@@ -22,8 +22,9 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   and reach the interface as `model.vocabulary`; a screen holds no
   enum-to-words table of its own.
 - Whether an area can be edited is `canEdit(area)` in `webview/store.mjs`,
-  which reads the published `draft.editable`. Core decides it once, with
-  `draftBinding` (D-L60); nothing else recomputes it.
+  which reads the published `draft.editable` (no other module reads it; see
+  **Checked**). Core decides it once, with `draftBinding` (D-L60); nothing
+  else recomputes it.
 - Types are strict at the existing seams (D-L59). Internal types sit beside
   their owning layer; `contracts/` holds only what crosses the panel.
 
@@ -49,11 +50,13 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   what is drawn is what would be applied (D-L35).
 - A screen posts what a builder returns: edits from `webview/view/edits.mjs`
   (pointing records from `webview/view/pointing-config.mjs`), controls from
-  `webview/view/controls.mjs`; never an object assembled inline. A new builder
-  gets its payload staged in `tests/view/edits.test.mjs`.
+  `webview/view/controls.mjs`; never an object assembled inline (see
+  **Checked**). A new builder gets its payload staged in
+  `tests/view/edits.test.mjs`.
 - Markup is built with `el()` from template strings, and every value from the
   keyboard, a file or the shell goes through `esc()` or `textContent`,
-  attributes included.
+  attributes included (see **Checked**; numbers too, unless built from
+  constants).
 - A control's `data-f` identity names the stored owner and field, never a
   label or array position, so a reordered item keeps it; focus is kept with
   `webview/lib/focus.mjs`.
@@ -100,11 +103,14 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | Every source module starts with `// @ts-check`; the strict type checks pass | `tests/scripts/conventions.test.js`, `npm run typecheck` |
 | Screens author no colour literals | `tests/scripts/conventions.test.js` |
 | Semantic lookups never use a position's stored keycode name | `tests/scripts/conventions.test.js` |
+| Only `webview/store.mjs` reads the draft's `editable`; every other webview module asks `canEdit(area)` or `writable()` | `tests/scripts/conventions.test.js` |
+| No webview module posts an object literal: `post()` and `postLeavingDemo()` take a builder's output or a message the store hands back | `tests/scripts/conventions.test.js` |
 | Every stored enum value has a word | `tests/model/vocabulary.test.js` |
 | A draft edit type agrees across `core/model/draft-edits.js`, `contracts/edits.d.ts` and `webview/view/edits.mjs` | `tests/model/draft-edits.test.js` |
 | A webview number that is also a wire number equals the schema's | `tests/view/enum-drift.test.mjs` |
 | Every form control has a `data-f` identity, unique on screen | `tests/view/form-identities.test.mjs`, `browser-tests/focus-identities.spec.js` |
 | No screen names a key or action as plain text | `tests/view/key-names-marked.test.mjs` |
+| Every value interpolated into webview markup, or handed to `el()` or an HTML setter, is escaped, a number by construction or markup a checked template made; the exceptions say why | `tests/view/markup-escaped.test.mjs` |
 | Every file Ark ships parses | `scripts/syntax-coverage.js` (in `npm run check`) |
 | The vendored keycode catalog reproduces from `upstream/qmk/` | `npm run keycodes -- --check` |
 | `upstream/` files match their pinned sources | `tests/scripts/upstream.test.js`, `npm run upstream -- --check` |

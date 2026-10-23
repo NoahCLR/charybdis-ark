@@ -86,7 +86,7 @@ function groupTables(model, canEdit) {
         ["Rows in the combo table", model.rgb.comboFeedbackLedGroups, "combo"],
         ["Rows in the key feedback table", model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior"],
     ])) {
-        const box = el(`<div><div class="sect-h"><h4>${title}</h4><span class="right tag">${rows?.length || 0} row${rows?.length === 1 ? "" : "s"}</span></div></div>`);
+        const box = el(`<div><div class="sect-h"><h4>${esc(title)}</h4><span class="right tag">${rows?.length || 0} row${rows?.length === 1 ? "" : "s"}</span></div></div>`);
         box.append(groupRowsTable(rows, target));
         node.append(box);
     }

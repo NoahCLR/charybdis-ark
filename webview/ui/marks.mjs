@@ -25,7 +25,7 @@ import {layerSwatch} from "./layerbar.mjs";
 export function branchBadge(model, count, className = "") {
     const colour = feedbackColours(model).branches[count - 2];
     const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
-    return `<span class="bn${lit ? " lit" : ""}${className ? ` ${esc(className)}` : ""}"${lit ? ` style="--tint:${css(colour)}"` : ""}>${count}×</span>`;
+    return `<span class="bn${lit ? " lit" : ""}${className ? ` ${esc(className)}` : ""}"${lit ? ` style="--tint:${css(colour)}"` : ""}>${esc(count)}×</span>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind */
@@ -56,7 +56,7 @@ export function comboBadge(model, badge = "C") {
 export function slotLight(model, slot) {
     const row = pdColourRow(model, slot.id);
     const lit = Boolean(row && !isOff(row.color) && stageEnabled(model, "pd"));
-    return {row, lit, swatch: (klass = "") => `<span class="pd-swatch ${klass} ${lit ? "" : "swatch-off"}"
+    return {row, lit, swatch: (klass = "") => `<span class="pd-swatch ${esc(klass)} ${lit ? "" : "swatch-off"}"
         ${lit && row ? `style="background:${css(row.color)}"` : ""}></span>`};
 }
 
@@ -70,7 +70,7 @@ export function sends(model, action) {
     const named = namedAction(model, action);
     if (!named) return "";
     return `<span class="sends">${named.kind === "pointing" ? slotLight(model, named.slot).swatch("mk-swatch") : ""}`
-        + `<span class="sends-name">${esc(named.name)}</span>${named.tags.map((tag) => `<span class="sends-tag">${tag}</span>`).join("")}</span>`;
+        + `<span class="sends-name">${esc(named.name)}</span>${named.tags.map((tag) => `<span class="sends-tag">${esc(tag)}</span>`).join("")}</span>`;
 }
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} action */
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
@@ -164,5 +164,5 @@ export function macroSteps(model, payload) {
     return `<div class="step-chips">${chips.map((chip) => `<span class="step-chip ${esc(chip.kind)}" data-tip="${esc(chip.full)}">${said(chip)}${chip.kind === "text"
         ? `<span aria-hidden="true">“</span><span class="step-chip-label">${esc(chip.label)}</span><span aria-hidden="true">”</span>`
         : `<span class="step-chip-mark" aria-hidden="true">${stepMark(chip.kind)}</span><span class="step-chip-label">${esc(chip.label)}</span>`}${chip.kind === "delay"
-        ? '<span class="step-chip-unit">ms</span>' : ""}</span>`).join(THEN)}${more ? `${THEN}<span class="step-chips-more">+${more} more</span>` : ""}</div>`;
+        ? '<span class="step-chip-unit">ms</span>' : ""}</span>`).join(THEN)}${more ? `${THEN}<span class="step-chips-more">+${esc(more)} more</span>` : ""}</div>`;
 }

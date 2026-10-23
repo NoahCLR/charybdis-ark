@@ -1,5 +1,5 @@
 // @ts-check
-import {el} from "../../lib/dom.mjs";
+import {el, esc} from "../../lib/dom.mjs";
 import {post, writable} from "../../store.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -23,7 +23,7 @@ export function stageCombo(model) {
     }));
     const where = section("Where it paints");
     const locality = el(`<label class="field"><span>Locality</span><select data-f="lighting:combo:locality" class="input" ${canEdit ? "" : "disabled"}>
-        ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${combo.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
+        ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${combo.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         { if (combo.color) post(edits.comboFeedback(/** @type {HTMLSelectElement} */ (event.target).value, combo.color)); });
     where.append(stack(locality));

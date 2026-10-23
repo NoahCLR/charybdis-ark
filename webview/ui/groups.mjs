@@ -16,7 +16,7 @@ import {GROUP_TITLES, inGroupOrder, setReachGroupOpen} from "../view/reach-group
 /** @param {string} tab @param {string} id @param {number} count @param {boolean} [drafted] @param {string} [detail] */
 export function groupHeader(tab, id, count, drafted = false, detail = "") {
     const open = state.reachGroups[id];
-    return `<button class="group-h" data-group-tab="${tab}" data-group="${id}" aria-expanded="${open}">
+    return `<button class="group-h" data-group-tab="${esc(tab)}" data-group="${esc(id)}" aria-expanded="${esc(open)}">
         ${DISCLOSURE}<span class="ttl">${esc(GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (id)])}${detail ? ` <span class="mono dim">· ${esc(detail)}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
         <span class="n">${count}</span></button>`;
 }
@@ -67,7 +67,7 @@ export function reachTable(tab, groups, columns) {
                 : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)
             : ""}</tbody>`;
     const node = el(`<div class="reach-table"><table class="t fixed">
-        <colgroup>${columns.map(([, width]) => `<col style="width:${width}">`).join("")}</colgroup>
+        <colgroup>${columns.map(([, width]) => `<col style="width:${esc(width)}">`).join("")}</colgroup>
         <thead><tr>${columns.map(([name]) => `<th>${esc(name)}</th>`).join("")}</tr></thead>
         ${inGroupOrder(groups).map(section).join("")}
     </table></div>`);

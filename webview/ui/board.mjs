@@ -78,10 +78,10 @@ export function board(model, layer, options = {}) {
             const x = startX + order * step;
             const colour = tierColour(model, tier.kind);
             if (!feedbackOn || isOff(colour)) {
-                return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="none" stroke="${text || "var(--light-detail)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
+                return `<circle cx="${esc(x)}" cy="${esc(rows.tierY)}" r="3.9" fill="none" stroke="${text || "var(--light-detail)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
             }
-            return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="${css(colour)}" stroke="${text || "var(--light-detail)"}" stroke-width="1.1"></circle>`
-                + (tier.count > 1 ? `<text x="${x}" y="${/** @type {number} */ (rows.tierY) + 0.5}" class="kc-dotn" fill="${idealText(colour)}">${tier.count}</text>` : "");
+            return `<circle cx="${esc(x)}" cy="${esc(rows.tierY)}" r="3.9" fill="${css(colour)}" stroke="${text || "var(--light-detail)"}" stroke-width="1.1"></circle>`
+                + (tier.count > 1 ? `<text x="${esc(x)}" y="${esc(/** @type {number} */ (rows.tierY) + 0.5)}" class="kc-dotn" fill="${idealText(colour)}">${esc(tier.count)}</text>` : "");
         }).join("");
 
         if (combos.length) {
@@ -98,7 +98,7 @@ export function board(model, layer, options = {}) {
             let x = cx - (widths.reduce((sum, width) => sum + width, 0) + between) / 2;
             marks += combos.map((combo, order) => {
                 const width = widths[order];
-                const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight * 0.22}" fill="var(--badge-ink)" stroke="${comboLit ? css(comboColour) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
+                const badge = `<rect x="${esc(x)}" y="${esc(rows.comboY)}" width="${esc(width)}" height="${esc(rows.comboHeight)}" rx="${rows.comboHeight * 0.22}" fill="var(--badge-ink)" stroke="${comboLit ? css(comboColour) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
                     + `<text x="${x + width / 2}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
                 x += width + gap;
                 return badge;
@@ -120,18 +120,18 @@ export function board(model, layer, options = {}) {
             ? {max: 6.4, min: 5.2, width: GEO.keyW - 12}
             : {max: 8, min: 6.2, width: GEO.keyW - 12}) : null;
         /** @param {ReturnType<typeof fitText>} fit */
-        const squeeze = (fit) => fit.squeeze ? ` textLength="${fit.squeeze}" lengthAdjust="spacingAndGlyphs"` : "";
+        const squeeze = (fit) => fit.squeeze ? ` textLength="${esc(fit.squeeze)}" lengthAdjust="spacingAndGlyphs"` : "";
 
-        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
-            aria-label="${esc(keyMeaning(shown))} at index ${index}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
+        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"
+            aria-label="${esc(keyMeaning(shown))} at index ${esc(index)}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
             <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
-            ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
-            <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
-            ${subFit ? `<text class="kc-sub" x="${cx}" y="${rows.subY}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
+            ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${esc(rows.separatorY)}" x2="${visual.x + GEO.keyW - 8}" y2="${esc(rows.separatorY)}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
+            <text class="kc-label" x="${cx}" y="${esc(rows.mainY)}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
+            ${subFit ? `<text class="kc-sub" x="${cx}" y="${esc(rows.subY)}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
         </g>`;
     }
 
@@ -236,10 +236,10 @@ function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickabl
     const lit = mode === "leds" ? "" : ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
     const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}${mode === "leds" ? " leds" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
         aria-label="Trackball LED ${TRACKBALL_LED}">
-        <circle cx="${x}" cy="${y}" r="${r}"${lit}></circle>
-        ${mode === "leds" ? `<text class="kc-label sm" x="${x}" y="${y}">${TRACKBALL_LED}</text>` : ""}</g>`;
+        <circle cx="${esc(x)}" cy="${y}" r="${r}"${lit}></circle>
+        ${mode === "leds" ? `<text class="kc-label sm" x="${esc(x)}" y="${y}">${TRACKBALL_LED}</text>` : ""}</g>`;
     return {
         markup,
-        glow: mode === "leds" ? "" : `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${x}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
+        glow: mode === "leds" ? "" : `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${esc(x)}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
     };
 }

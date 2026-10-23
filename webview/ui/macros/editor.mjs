@@ -42,7 +42,7 @@ export function editor(model, slot, canEdit) {
                 ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label></div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
-                ${STEP_KINDS.map(([value]) => `<button class="btn" data-insert-kind="${value}" data-act="macro-insert:${esc(slot.keycode)}:${value}" ${editable ? "" : "disabled"}>${esc(addStepLabel(value))}</button>`).join("")}
+                ${STEP_KINDS.map(([value]) => `<button class="btn" data-insert-kind="${esc(value)}" data-act="macro-insert:${esc(slot.keycode)}:${esc(value)}" ${editable ? "" : "disabled"}>${esc(addStepLabel(value))}</button>`).join("")}
                 <label class="sw macro-raw-toggle"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:raw-toggle" data-raw-toggle aria-controls="macro-raw-${esc(slot.keycode)}" ${rawOpen ? "checked" : ""}><span class="track"></span><span>Raw payload</span></label>
             </div>
             <details class="macro-raw" id="macro-raw-${esc(slot.keycode)}" data-raw ${rawOpen ? "open" : ""}>
@@ -155,7 +155,7 @@ function placedOn(model, slot) {
             const count = route.keys.length;
             return `${ROUTE_WORDS[route.group]}${route.group === "here" && count > 1 ? ` ×${count}` : ""}`;
         }).join(" · ");
-        return `<button class="layer-chip link" data-goto-layer="${at}"
+        return `<button class="layer-chip link" data-goto-layer="${esc(at)}"
             data-tip="${esc(swatch.tip)} · reached by ${esc(how)} · show on the board">${swatch.html}
             <span>${esc(layerName(layer))}</span><span class="idx">${esc(how)}</span></button>`;
     }).join("");

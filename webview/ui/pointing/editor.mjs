@@ -31,17 +31,17 @@ export function editor(model, slot, canEdit, slots) {
     const head = el(`<div class="card">
         <div class="card-h">
             ${light.swatch("lg")}
-            <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${slot.id} · ${esc(bindingName(slot))}</span>
+            <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${esc(slot.id)} · ${esc(bindingName(slot))}</span>
             <span class="right">
-                ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${disabled}
+                ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${esc(disabled)}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
-                <button class="btn tiny ghost" data-act="clear" ${disabled}
+                <button class="btn tiny ghost" data-act="clear" ${esc(disabled)}
                     data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it is configured again.">Clear slot</button>
             </span></div>
         <div class="card-b pd-identity"></div></div>`);
     const headBody = /** @type {HTMLElement} */ (head.querySelector(".card-b"));
     const name = el(`<label class="field"><span>Name</span>
-        <input data-f="pointing:${slot.id}:name" class="input" value="${esc(slot.name)}" data-tip="${esc(NAME_TIP)}" ${disabled}>
+        <input data-f="pointing:${esc(slot.id)}:name" class="input" value="${esc(slot.name)}" data-tip="${esc(NAME_TIP)}" ${esc(disabled)}>
         <span class="note" data-name-count></span></label>`);
     const nameInput = /** @type {HTMLInputElement} */ (name.querySelector("input"));
     countNameBytes(nameInput, /** @type {HTMLElement} */ (name.querySelector("[data-name-count]")));

@@ -54,9 +54,9 @@ export function screenPointing() {
         const {swatch} = slotLight(model, slot);
         const bindings = !slot.kind ? bindingsForSlot(model, slot) : null;
         const inert = bindings ? bindings.keys.length + bindings.behaviours.length + bindings.combos.length : 0;
-        const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}">
+        const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${esc(slot.id)}" aria-current="${state.pdSlot === slot.id}">
             ${swatch()}
-            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id}</span>
+            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${esc(slot.id)}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? `Scrolling${slot.axis ? ` · ${esc(word(words(model).scrollAxes, slot.axis))}` : ""}` : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
             ${inert ? `<span class="meta warn">${inert} action${inert === 1 ? "" : "s"} reach it · inert</span>` : ""}</button>`);
         card.addEventListener("click", () => pick(slot));
@@ -82,8 +82,8 @@ function emptyChips(model, empties, changedSlots, pick) {
         const {keys, behaviours, combos} = bindingsForSlot(model, slot);
         const inert = keys.length + behaviours.length + combos.length;
         const tip = `Slot ${slot.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
-        const chip = el(`<button class="slotchip ${inert ? "warn" : ""}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}"
-            aria-label="${esc(tip)}" data-tip="${esc(tip)}">${slot.id}${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "corner") : ""}</button>`);
+        const chip = el(`<button class="slotchip ${inert ? "warn" : ""}" data-slot="${esc(slot.id)}" aria-current="${state.pdSlot === slot.id}"
+            aria-label="${esc(tip)}" data-tip="${esc(tip)}">${esc(slot.id)}${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "corner") : ""}</button>`);
         chip.addEventListener("click", () => pick(slot));
         grid.append(chip);
     }

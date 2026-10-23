@@ -139,11 +139,11 @@ function paintTiles(node, model, slot, steps) {
             ? step.keys.map((key, at) => `<span class="macro-chord-part">${at ? "+ " : ""}${esc(sequenceFace(model, {kind: "tap", keys: [key]}).label)}</span>`).join(" ")
             : esc(face.label || (step.kind === "text" ? "Text…" : "Choose…"));
         const wrap = el(`<div class="macro-token-wrap"><button type="button" class="macro-token ${esc(step.kind)} ${face.wide ? "wide" : ""} ${issues[index] ? "invalid" : ""}"
-            data-step-tile="${index}" data-step-id="${esc(step.focusId)}" data-act="macro-step:${esc(slot.keycode)}:${esc(step.focusId)}"
-            draggable="${editable}" aria-pressed="${selected}" aria-label="${esc(title)}" ${issues[index] ? 'aria-invalid="true"' : ""} data-tip="${esc(title)}">
-            <span class="macro-token-index" aria-hidden="true">${index + 1}</span><span class="macro-token-mark" aria-hidden="true">${stepMark(step.kind)}</span>
+            data-step-tile="${esc(index)}" data-step-id="${esc(step.focusId)}" data-act="macro-step:${esc(slot.keycode)}:${esc(step.focusId)}"
+            draggable="${editable}" aria-pressed="${esc(selected)}" aria-label="${esc(title)}" ${issues[index] ? 'aria-invalid="true"' : ""} data-tip="${esc(title)}">
+            <span class="macro-token-index" aria-hidden="true">${esc(index + 1)}</span><span class="macro-token-mark" aria-hidden="true">${stepMark(step.kind)}</span>
             <span class="macro-token-label">${content}${step.kind === "delay" ? '<span class="macro-token-unit"> ms</span>' : ""}</span>
-            <span class="macro-token-kind">${stepWord(step.kind, face.kind === "chord")}</span>
+            <span class="macro-token-kind">${esc(stepWord(step.kind, face.kind === "chord"))}</span>
             ${issues[index] ? '<span class="macro-token-error" aria-hidden="true">!</span>' : ""}</button>
             ${index < steps.length - 1 ? '<span class="macro-connector" aria-hidden="true">→</span>' : ""}</div>`);
         const tile = /** @type {HTMLButtonElement} */ (wrap.querySelector("button"));
@@ -200,14 +200,14 @@ function removeStep(slot, steps, id) {
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps @param {MacroStep} step @param {number} index @param {boolean} canEdit */
 export function stepEditor(model, slot, steps, step, index, canEdit) {
     const label = stepKindName(step.kind);
-    const node = el(`<div class="macro-step" data-step="${index}">
-        <div class="row macro-step-head"><span class="kind">Step ${index + 1} · ${esc(label)}</span><span class="right row">
+    const node = el(`<div class="macro-step" data-step="${esc(index)}">
+        <div class="row macro-step-head"><span class="kind">Step ${esc(index + 1)} · ${esc(label)}</span><span class="right row">
             <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step earlier">← Earlier</button>
             <button class="btn tiny ghost" data-move="1" ${canEdit && index < steps.length - 1 ? "" : "disabled"} aria-label="Move step later">Later →</button>
             <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button>
             <button class="btn tiny ghost" data-close-step aria-label="Close step editor">×</button></span></div>
-        ${step.kind === "text" ? `<label class="field"><textarea data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:text" aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${index}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
-            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${index}" type="number" min="0" max="65535" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
+        ${step.kind === "text" ? `<label class="field"><textarea data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:text" aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${esc(index)}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
+            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${esc(index)}" type="number" min="0" max="65535" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
             : `<div class="row"><span class="tok">${esc(describeStep(step, key => actionLabel(model, key))) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
     </div>`);
     const input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (node.querySelector("textarea, input"));

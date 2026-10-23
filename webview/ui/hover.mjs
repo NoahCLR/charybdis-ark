@@ -101,7 +101,7 @@ function keyCard(index) {
     if (!position) return "";
     const own = reachSections(model, layer, position, index);
     return `<div class="hc-head"><div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position), keyMeaning(position))}</span>
-        <span class="hc-pill">index ${index}</span></div>
+        <span class="hc-pill">index ${esc(index)}</span></div>
         <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code>${headline(model, keyMeaning(position))}</div>${own.join("")}${seenThrough(model, stack, index)}`;
 }
 

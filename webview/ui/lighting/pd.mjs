@@ -21,7 +21,7 @@ export function stagePointing(model) {
     (model.pdModes || []).forEach((slot) => {
         const row = pdColourRow(model, slot.id);
         const lit = row && !isOff(row.color);
-        const item = el(`<button class="rowitem ${slot.id === state.pdSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${slot.id}">
+        const item = el(`<button class="rowitem ${slot.id === state.pdSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${esc(slot.id)}">
             <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
             <span class="m">${esc(!row ? "not reported" : lit ? localityLabel(row.locality).toLowerCase() : "no colour")}</span></button>`);
         item.addEventListener("click", () => { state.pdSlot = slot.id; render(); });
@@ -37,12 +37,12 @@ export function stagePointing(model) {
     }));
     const where = section("Where it paints");
     const locality = el(`<label class="field"><span>Locality</span>
-        <select data-f="lighting:pointing:${state.pdSlot}:locality" class="input" ${canEdit ? "" : "disabled"}
+        <select data-f="lighting:pointing:${esc(state.pdSlot)}:locality" class="input" ${canEdit ? "" : "disabled"}
             data-tip="Where the colour paints while the mode runs. The trigger key choices follow the key that started it, and paint every key when no key did.">
-        ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${row?.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
+        ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${row?.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         { if (row) post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
-    const previewSwitch = el(`<label class="sw"><input data-f="lighting:pointing:${state.pdSlot}:preview" type="checkbox" ${state.pdPreview ? "checked" : ""}><span class="track"></span>
+    const previewSwitch = el(`<label class="sw"><input data-f="lighting:pointing:${esc(state.pdSlot)}:preview" type="checkbox" ${state.pdPreview ? "checked" : ""}><span class="track"></span>
         <span class="txt">Preview it active on the board</span></label>`);
     /** @type {HTMLInputElement} */ (previewSwitch.querySelector("input")).addEventListener("change", (event) => { state.pdPreview = /** @type {HTMLInputElement} */ (event.target).checked; render(); });
     where.append(stack(locality, previewSwitch));

@@ -39,8 +39,8 @@ export function stageLayers(model) {
     }));
     const where = section("Where it paints");
     const mode = el(`<label class="field"><span>Which keys light up</span>
-        <select data-f="lighting:layer:${layer?.index}:mode" class="input" ${canEdit ? "" : "disabled"}>
-            ${vocabulary(model).paintModes.map(([id, text]) => `<option value="${id}" ${(row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY") === id ? "selected" : ""}>${esc(text)}</option>`).join("")}
+        <select data-f="lighting:layer:${esc(layer?.index)}:mode" class="input" ${canEdit ? "" : "disabled"}>
+            ${vocabulary(model).paintModes.map(([id, text]) => `<option value="${esc(id)}" ${(row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY") === id ? "selected" : ""}>${esc(text)}</option>`).join("")}
         </select></label>`);
     /** @type {HTMLSelectElement} */ (mode.querySelector("select")).addEventListener("change", (event) =>
         { if (row) post(edits.layerColour(row.layer, /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });

@@ -40,7 +40,7 @@ function stepCard(model, entry, now) {
             : `<p class="note hs-empty">Nothing that the review lists changed in this step.</p>`;
     const where = entry.current
         ? `<span class="hs-here"><i class="dot draft"></i> Your draft is here</span>`
-        : `<button class="btn tiny" data-step="${entry.step}" ${model.draft?.busy ? "disabled" : ""}
+        : `<button class="btn tiny" data-step="${esc(entry.step)}" ${model.draft?.busy ? "disabled" : ""}
             data-tip="${esc(entry.undone ? "Redo every step up to and including this one." : "Undo every step after this one. Redo brings them back.")}">${entry.undone ? "Redo to here" : "Go back to here"}</button>`;
     return `<section class="hs-step ${entry.current ? "current" : ""} ${entry.undone ? "undone" : ""}">
         <div class="hs-head">

@@ -94,7 +94,7 @@ function keyButton(entry, picked) {
 function macroButton(slot, picked) {
     return `<button class="pk ${slot.name ? "wide" : ""} ${picked ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
         <span class="l">${esc(slot.name || slot.keycode.replace(/^VIA_MACRO_/, "M"))}</span>
-        <span class="c">${slot.name ? `M${esc(slot.keycode.split("_").at(-1))} · ` : ""}${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`;
+        <span class="c">${slot.name ? `M${esc(slot.keycode.split("_").at(-1))} · ` : ""}${slot.empty ? "empty" : `${esc(slot.bytes)} B`}</span></button>`;
 }
 
 /** @param {Model} model */
@@ -134,7 +134,7 @@ function sectionBody(model) {
             const shifted = key.labels[1] && key.labels[1].length <= 3;
             const extra = key.labels[2] || key.labels[3];
             return `<g class="pkb-key ${on ? "on" : ""}" data-pick="${esc(key.value)}" tabindex="0" role="button" aria-label="${esc(spoken || key.value)}">
-                <rect x="${key.x}" y="${key.y}" width="${key.w}" height="${key.h}" rx="8"></rect>
+                <rect x="${esc(key.x)}" y="${esc(key.y)}" width="${esc(key.w)}" height="${esc(key.h)}" rx="8"></rect>
                 ${extra
                     ? key.labels.map((label, index) => label ? `<text class="${index === 0 ? `pkb-main ${label.length > 1 ? "sm" : ""}` : "pkb-alt"}" x="${key.x + key.w * (index < 2 ? 0.26 : 0.74)}" y="${key.y + key.h * (index % 2 ? 0.36 : 0.74)}">${esc(label)}</text>` : "").join("")
                     : shifted
@@ -152,13 +152,13 @@ function sectionBody(model) {
         // Lock rather than getting a button of its own.
         /** @param {string} value @param {string} label @param {string} tip */
         const button = (value, label, tip, on = picked(value)) =>
-            `<button class="pk wide ${on ? "on" : ""}" data-pick="${value}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${value}</span></button>`;
+            `<button class="pk wide ${on ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${esc(label)}</span><span class="c">${esc(value)}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers">${layers().map((layer) => `
             <div class="pk-layer">
-                <span class="ix">${layer.index}</span><span class="nm">${esc(layerName(layer))}</span>
+                <span class="ix">${esc(layer.index)}</span><span class="nm">${esc(layerName(layer))}</span>
                 ${button(`MO(${layer.index})`, "Hold", "On while the key is down.")}
                 ${button(`LOCK_LAYER(${layer.index})`, "Lock", "Turns the layer on until pressed again. QMK's TG() is the same lock.", picked(`LOCK_LAYER(${layer.index})`) || picked(`TG(${layer.index})`))}
-                ${picker.comboOutput ? "" : `<button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${layer.index}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${layer.index}, …)</span></button>`}
+                ${picker.comboOutput ? "" : `<button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${esc(layer.index)}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${esc(layer.index)}, …)</span></button>`}
                 ${button(`TT(${layer.index})`, "Tap-toggle", "Holds the layer like Hold; repeated taps lock it.")}
                 ${button(`OSL(${layer.index})`, "One-shot", "Holds the layer like Hold; a tap turns it on for the next key only.")}
                 ${button(`TO(${layer.index})`, "Move", "Locks this layer alone and releases every other lock. TO(0) returns to the base layer.")}
@@ -179,10 +179,10 @@ function sectionBody(model) {
         const kinds = vocabulary(model).pointing.kinds;
         /** @param {string} value @param {string} label @param {string} tip */
         const button = (value, label, tip) =>
-            `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${esc(value)}</span></button>`;
+            `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${esc(label)}</span><span class="c">${esc(value)}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers modes ${many ? "many" : ""}"${rows}>${slots.map((slot) => `
             <div class="pk-layer ${slot.kind ? "" : "empty"}">
-                <span class="ix">${slot.id}</span>
+                <span class="ix">${esc(slot.id)}</span>
                 <span class="nm"><span>${esc(slot.displayName)}</span><span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
                 ${button(slot.binding.hold, "Hold", "On while the key is down.")}
                 ${button(slot.binding.lock, "Lock", "Turns the mode on until pressed again.")}
@@ -223,13 +223,13 @@ export function pickerOverlay() {
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
-                <p class="note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${picker.maxKeys} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
+                <p class="note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${esc(picker.maxKeys)} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
             <input class="input pk-search" id="pickerSearch" data-f="picker:search" placeholder="Search every section" value="${esc(picker.search)}">
             <span class="right"><button class="btn ghost" data-act="cancel">Close</button></span>
         </div>
         ${picker.mode === "list" ? "" : `<div class="pk-mods"><span class="label">Modifiers</span>
-            ${modifierControls(model).map(({value: wrap, label}) => `<button class="pk-mod ${picker.mods.includes(wrap) ? "on" : ""}" data-mod="${wrap}"
-                data-tip="${picker.shortcut ? "Held with the key." : `Wraps the picked key as ${wrap}(key).`}">${esc(label)}</button>`).join("")}
+            ${modifierControls(model).map(({value: wrap, label}) => `<button class="pk-mod ${picker.mods.includes(wrap) ? "on" : ""}" data-mod="${esc(wrap)}"
+                data-tip="${picker.shortcut ? "Held with the key." : `Wraps the picked key as ${esc(wrap)}(key).`}">${esc(label)}</button>`).join("")}
             <span class="note">held together with the key</span></div>`}
         <div class="sheet-b">
             <div class="picker-side">${sections(model).map((section) =>
@@ -239,7 +239,7 @@ export function pickerOverlay() {
         <div class="sheet-f">
             <span class="label">Selected</span>
             ${picker.layerTap ? `<button class="chip" data-act="clearlt">LT ${esc(layerTapName(picker.layerTap))} ✕</button>` : ""}
-            ${picker.keys.length ? picker.keys.map((key, index) => `<button class="chip" data-remove="${index}">${esc(key)} ✕</button>`).join("")
+            ${picker.keys.length ? picker.keys.map((key, index) => `<button class="chip" data-remove="${esc(index)}">${esc(key)} ✕</button>`).join("")
                 : picker.mods.length ? modifierControls(model).filter(({value: wrap}) => picker.mods.includes(wrap)).map(({value: wrap, label}) =>
                     `<button class="chip" data-unmod="${esc(wrap)}">${esc(label)} ✕</button>`).join("")
                 : `<span class="note">nothing picked yet</span>`}

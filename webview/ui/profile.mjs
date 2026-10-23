@@ -211,8 +211,8 @@ function reviewSheet(model, portable, busy) {
             ${same ? `<div class="callout">This file holds exactly what ${holds}. ${changesNothing ? "Using it changes nothing."
                 : `Using it puts your draft back to that, as Discard all does; Undo brings your ${pending} change${pending === 1 ? "" : "s"} back.`}</div>` : ""}
             ${summary.length ? `<table class="t import-diff"><thead><tr><th>What this file changes</th><th>Differences</th><th></th></tr></thead>
-                <tbody>${summary.map((group) => `<tr class="cat"><td>${esc(group.category)}</td><td class="mono">${group.count}</td><td class="note">${esc(group.status)}</td></tr>
-                    ${group.rows.map((row) => `<tr class="sub"><td>${esc(row.label)}</td><td class="mono">${row.count}</td><td></td></tr>`).join("")}`).join("")}</tbody></table>` : ""}
+                <tbody>${summary.map((group) => `<tr class="cat"><td>${esc(group.category)}</td><td class="mono">${esc(group.count)}</td><td class="note">${esc(group.status)}</td></tr>
+                    ${group.rows.map((row) => `<tr class="sub"><td>${esc(row.label)}</td><td class="mono">${esc(row.count)}</td><td></td></tr>`).join("")}`).join("")}</tbody></table>` : ""}
             ${same ? "" : `<div class="callout">${esc(callout)}</div>`}
         </div>
         <div class="sheet-f"><span class="right row gap-8">
