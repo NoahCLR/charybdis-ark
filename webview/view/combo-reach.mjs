@@ -318,13 +318,13 @@ export function combosOnKey(model, stack, at, held, layoutIndex) {
 // presses leaves the combo if the combo has it, and otherwise joins at the end
 // under the keycode the keyboard stores for that key. One removed and picked
 // again therefore counts as added. A position nothing answers, or a disabled
-// key, is not an input.
-/** @param {string[]} inputs @param {Position | null | undefined} position */
-export function toggleComboInput(inputs, position) {
+// key, is not an input, and none joins once the combo has `limit` inputs, the
+// keyboard's combo input limit.
+/** @param {string[]} inputs @param {Position | null | undefined} position @param {number | null} [limit] */
+export function toggleComboInput(inputs, position, limit = null) {
     if (!position || keyFace(position).kind === "disabled") return inputs;
-    return inputs.some((name) => inputOn(name, position))
-        ? inputs.filter((name) => !inputOn(name, position))
-        : [...inputs, position.keycode];
+    if (inputs.some((name) => inputOn(name, position))) return inputs.filter((name) => !inputOn(name, position));
+    return limit && inputs.length >= limit ? inputs : [...inputs, position.keycode];
 }
 
 // What a combo sends, by what it means: the combo reports the catalogue's name

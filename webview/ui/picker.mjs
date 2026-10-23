@@ -15,7 +15,7 @@ import {actionMarked} from "./marks.mjs";
 import {PICKER_BOARD, legendFits, pickerBoardKey} from "../view/picker-board.mjs";
 import {pickerExpression} from "../view/edits.mjs";
 import {modifierPick, pickerModifierProblem} from "../view/keyvalues.mjs";
-import {keyProblem} from "../view/keycode-expression.mjs";
+import {comboOutputProblem, keyProblem} from "../view/keycode-expression.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
 import {customKeyChoice, offeredName, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutModifiers} from "../view/custom-key.mjs";
@@ -33,11 +33,12 @@ const modifierControls = model => vocabulary(model).pickerModifiers || [];
 // one that already has it is picked as any key is, otherwise an unused one is
 // made it. The picker names the key either way. `customKeyRuns` says what the
 // field does with a custom key: runs its behaviour too (a layout key, a combo
-// output), or sends only its shortcut (a behaviour step).
-export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false}) {
+// output), or sends only its shortcut (a behaviour step). `comboOutput` holds
+// the pick to what a combo can send: no Tap-hold, which needs a key of its own.
+export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false, comboOutput = false}) {
     const keys = allowedKeys ? seed.map(key => getModel()?.qmkKeycodeAliases?.[key] || key) : seed.slice();
     const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : [];
-    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey};
+    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
     render();
 }
 
@@ -64,8 +65,8 @@ const sections = (model) => pickerSections().filter(section => !state.picker?.al
 
 // Modifiers alone, or with a modifier key, are one set of modifiers, stored as
 // the simplest keycode that holds them (modifierPick): Command, Right Command
-// and the Left Command key are RGUI(KC_LEFT_GUI). Any other selection is
-// stored as picked.
+// and the Left Command key are RGUI(KC_LEFT_GUI), as are Command and Right
+// Command alone. Any other selection is stored as picked.
 /** @param {Model} model @param {import("../state.js").PickerState} picker */
 const folded = (model, picker) => !picker.shortcut && picker.mode === "single" && !picker.layerTap ? modifierPick(model, picker) : null;
 /** @param {Model} model @param {import("../state.js").PickerState} picker */
@@ -157,14 +158,14 @@ function sectionBody(model) {
                 <span class="ix">${layer.index}</span><span class="nm">${esc(layerName(layer))}</span>
                 ${button(`MO(${layer.index})`, "Hold", "On while the key is down.")}
                 ${button(`LOCK_LAYER(${layer.index})`, "Lock", "Turns the layer on until pressed again. QMK's TG() is the same lock.", picked(`LOCK_LAYER(${layer.index})`) || picked(`TG(${layer.index})`))}
-                <button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${layer.index}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${layer.index}, …)</span></button>
+                ${picker.comboOutput ? "" : `<button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${layer.index}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${layer.index}, …)</span></button>`}
                 ${button(`TT(${layer.index})`, "Tap-toggle", "Holds the layer like Hold; repeated taps lock it.")}
                 ${button(`OSL(${layer.index})`, "One-shot", "Holds the layer like Hold; a tap turns it on for the next key only.")}
                 ${button(`TO(${layer.index})`, "Move", "Locks this layer alone and releases every other lock. TO(0) returns to the base layer.")}
             </div>`).join("")}</div>
             <p class="note pk-note">${picker.layerTap
                 ? `Tap-hold on <b>${esc(layerTapName(picker.layerTap))}</b> is armed — now pick the tap key from any section.`
-                : `Hold reaches the layer while the key is down. Lock toggles it. Tap-hold asks for a tap key next. Tap-toggle and One-shot hold like Hold; Move switches to the layer alone.`}</p></div>`;
+                : `Hold reaches the layer while the key is down. Lock toggles it. ${picker.comboOutput ? "" : "Tap-hold asks for a tap key next. "}Tap-toggle and One-shot hold like Hold; Move switches to the layer alone.${picker.comboOutput ? " A combo can't send Tap-hold, which needs a key of its own." : ""}`}</p></div>`;
     }
     if (section.kind === "modes") {
         // One row per slot, laid out like the layers: the slot, what it does,
@@ -207,12 +208,14 @@ export function pickerOverlay() {
     const value = expression();
     // A key the draft would refuse never enables Use: the dialog must not
     // close into an error. Shortcuts and holds keep their own checks.
-    const plain = picker.layoutKey && !picker.shortcut && value ? keyProblem(model, value) : "";
+    const plain = picker.shortcut || !value ? "" : picker.layoutKey ? keyProblem(model, value) : picker.comboOutput ? comboOutputProblem(model, value) : "";
     const problem = pickerModifierProblem(model, stored(model, picker)) || plain;
     // Modifiers no keycode can hold, offered as a custom key's shortcut.
     const fold = folded(model, picker);
     const offer = !picker.onCustomKey || picker.mode !== "single" || picker.shortcut || picker.layerTap ? null
         : fold ? ("shortcut" in fold && (model?.customKeyShortcutKeys || []).length ? fold.shortcut : null) : shortcutOffer(model, picker);
+    // A pick that cannot be stored shows no value: the problem line says why.
+    const storable = problem || offer ? "" : value;
     const {existing, withBehaviour, spare} = offer ? customKeyChoice(model, offer, layers(), {runsBehaviour: picker.customKeyRuns !== "shortcut"})
         : {existing: undefined, withBehaviour: false, spare: undefined};
     /** @param {import("../../contracts/panel.js").CustomKey} key */
@@ -237,8 +240,10 @@ export function pickerOverlay() {
             <span class="label">Selected</span>
             ${picker.layerTap ? `<button class="chip" data-act="clearlt">LT ${esc(layerTapName(picker.layerTap))} ✕</button>` : ""}
             ${picker.keys.length ? picker.keys.map((key, index) => `<button class="chip" data-remove="${index}">${esc(key)} ✕</button>`).join("")
+                : picker.mods.length ? modifierControls(model).filter(({value: wrap}) => picker.mods.includes(wrap)).map(({value: wrap, label}) =>
+                    `<button class="chip" data-unmod="${esc(wrap)}">${esc(label)} ✕</button>`).join("")
                 : `<span class="note">nothing picked yet</span>`}
-            <code class="mono pk-value">${esc(value || "—")}</code>
+            <code class="mono pk-value">${esc(storable || "—")}</code>
             <span class="right"><button class="btn ghost" data-act="clear">Clear</button>
                 <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>${picker.shortcut ? "Use shortcut" : "Use keycode"}</button></span>
         </div>
@@ -273,6 +278,8 @@ export function pickerOverlay() {
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clear"]'))) { picker.keys = []; picker.mods = []; picker.layerTap = null; return render(); }
         const remove = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-remove]"));
         if (remove) { picker.keys.splice(Number(remove.dataset.remove), 1); return render(); }
+        const unmod = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-unmod]"));
+        if (unmod) { picker.mods = picker.mods.filter((mod) => mod !== unmod.dataset.unmod); return render(); }
         // The picker closes itself before handing the choice on, so every
         // caller only says what the choice does.
         if (existing && /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="use-existing-key"]'))) {

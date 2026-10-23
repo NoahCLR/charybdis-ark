@@ -47,6 +47,13 @@ function layoutLabel({layer, changes}, document) {
     return changes.length > 1 ? `Changed ${changes.length} keys at once` : "Changed a key";
 }
 
+// A behaviour saved for a key that had none is added, not edited.
+/** @param {import("../../contracts/edits.js").EditOf<"saveBehavior">} message @param {Document} document */
+function behaviorLabel({behavior}, document) {
+    const rows = require("./portable-profile").validateSnapshot(document).behaviors.rows;
+    return require("./key-behavior-edits").hasBehaviorFor(rows, behavior.keycode) ? "Edited a behaviour" : "Added a behaviour";
+}
+
 const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: Entry<K>}} */ ({
     updateLayoutKeys: {editor: "layout", label: layoutLabel},
     updateConfigDefaults: {editor: "settings", label: "Saved a settings section"},
@@ -64,7 +71,7 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     deleteCombo: {editor: "profile", domain: "combos", label: "Removed a combo"},
     updateComboHoldTerm: {editor: "profile", domain: "combos", label: "Changed the combo hold threshold"},
     updateComboDefaultTerm: {editor: "profile", domain: "combos", label: "Changed the default combo window"},
-    saveBehavior: {editor: "profile", domain: "behaviours", label: "Edited a behaviour"},
+    saveBehavior: {editor: "profile", domain: "behaviours", label: behaviorLabel},
     deleteBehavior: {editor: "profile", domain: "behaviours", label: "Removed a behaviour"},
     retargetBehavior: {editor: "profile", domain: "behaviours", label: message => message.conflict === "swap" ? "Swapped two behaviours" : "Moved a behaviour"},
     updateLayerColor: {editor: "profile", domain: "lighting", label: "Edited lighting"},

@@ -61,9 +61,11 @@ export const STATE_FIELDS = {
     //   form        the builder's fields, kept across renders; followsDefault
     //               says the window is the keyboard's default, not the combo's own
     //   awaiting    a Keep or Delete posted; the builder closes when the host accepts it
+    //   madeKey     the custom key the output picker offered for a shortcut no
+    //               keycode holds: made only with the combo, on Keep (D-L63)
     // A draft change closes it, as Close does.
     combo: resetsTo({open: false, picking: false, inputs: [],
-        form: {output: "", termMs: "", followsDefault: false, mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null},
+        form: {output: "", termMs: "", followsDefault: false, mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null, madeKey: null},
     () => closedComboBuilder()),
     placement: kept(null),     // {keycode}: next board click places it on the current layer
     retarget: resets(null),    // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
@@ -92,7 +94,7 @@ export const STATE_FIELDS = {
         return take && forms[take] ? {[take]: {draft: forms[take].draft}} : {};
     }),
     recording: kept(null),     // {slot, before} only while a take is being captured; a draft change does not stop it
-    lastTake: resets(null),    // {slot, before}: the finished take Clear take can undo
+    lastTake: resets(null),    // {slot, before, after}: the finished take Clear take can undo, until its macro changes
     recordDelays: kept(true),
     recordPreserveHoldTiming: kept(false),
     recordDelayThreshold: kept(30),
@@ -128,7 +130,7 @@ export const state = initialState(STATE_FIELDS);
 function comboBuilder(combo = null, defaultTermMs = "") {
     const follows = combo ? Boolean(combo.followsDefault) : defaultTermMs !== "";
     return {
-        open: true, picking: false, awaiting: false, editId: combo?.id ?? null,
+        open: true, picking: false, awaiting: false, editId: combo?.id ?? null, madeKey: null,
         form: {output: combo?.output || "", termMs: String(combo?.termMs ?? defaultTermMs), followsDefault: follows,
             useOutputBehavior: combo?.useOutputBehavior ?? true, enabled: combo?.enabled ?? true, allowedLayers: combo?.allowedLayers ?? (2 ** layers().length - 1),
             mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},

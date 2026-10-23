@@ -50,6 +50,6 @@ test("a profile with a misplaced action is refused, naming it, before recovery o
     const combos = {id: PROFILE_DOMAIN_IDS.COMBOS, version: 3, payload: encodeComboDomain({version: 3, defaultTermMs: 50, holdTermMs: 0, rows: [{inputs: [code(0x04), code(0x05)], output: code(0x4104), termMs: null, mustHold: false, mustTap: false, ordered: false}]})};
     const target = {...base, profile: encodeProfileBlob({...blob, domains: [...blob.domains.filter(domain => domain.id !== PROFILE_DOMAIN_IDS.COMBOS), combos]}).toString("base64")};
     const {service, keyboard} = await connectedService(t);
-    await assert.rejects(service.restorePortableProfile(target, {saveRecovery: refuseRecovery}), /Combo 0: LT\(1,KC_A\) makes its own tap\/hold decision/);
+    await assert.rejects(service.restorePortableProfile(target, {saveRecovery: refuseRecovery}), /C0: LT\(1,KC_A\) makes its own tap\/hold decision/);
     assert.deepEqual(keyboard.mutations, []);
 });

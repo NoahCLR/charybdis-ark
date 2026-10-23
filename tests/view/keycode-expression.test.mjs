@@ -5,7 +5,7 @@ import {profileLayers, profileMacros, editLayers, editMacros} from "../fixtures/
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {isPlainKey, keyProblem, keycodeValue, takesModifiers} from "../../webview/view/keycode-expression.mjs";
+import {comboOutputProblem, isPlainKey, keyProblem, keycodeValue, takesModifiers} from "../../webview/view/keycode-expression.mjs";
 
 const require = createRequire(import.meta.url);
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
@@ -50,6 +50,25 @@ test("the picker's check stores what the draft stores and refuses what it refuse
         assert.equal(problem === "", stored !== undefined, `${expression}: picker says "${problem}", draft stores ${stored}`);
         if (stored !== undefined) assert.equal(keycodeValue(model, expression), stored, expression);
     }
+});
+
+// What the draft stores as a new combo's output, or undefined if it refuses it.
+function comboDrafted(expression) {
+    const draft = new ProfileDraftSession(snapshot, "test-device", capabilities);
+    try {
+        draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "addCombo", inputs: ["KC_Q", "KC_W"], output: expression, termMs: "50", holdTermMs: "200"});
+    } catch { return undefined; }
+    return draft.view({}).changes.length;
+}
+
+test("the combo output picker's check refuses what the draft refuses as a combo output, Tap-hold among it", () => {
+    for (const expression of EXPRESSIONS) {
+        const stored = comboDrafted(expression);
+        const problem = comboOutputProblem(model, expression);
+        assert.equal(problem === "", stored !== undefined, `${expression}: picker says "${problem}", draft ${stored === undefined ? "refuses" : "stores"} it`);
+    }
+    assert.match(comboOutputProblem(model, "LT(3, KC_F)"), /Tap-hold/);
+    assert.equal(comboOutputProblem(model, "MO(2)"), "", "Hold is a combo output");
 });
 
 test("every catalogue key the picker offers is one the draft stores, by the same value", () => {

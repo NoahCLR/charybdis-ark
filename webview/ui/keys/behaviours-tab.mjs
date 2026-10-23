@@ -8,7 +8,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {actionLabel, behaviourTiers} from "../../view/keyface.mjs";
 import {behaviourGroups, behavioursInView} from "../../view/reach.mjs";
-import {currentLayer, getModel, heldLayers, layerName, layers, render, selectedPosition, state} from "../../store.mjs";
+import {currentLayer, getModel, heldLayers, layerName, layers, previewing, render, selectedPosition, state} from "../../store.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachGroupToggles, groupHeader, groupOpen} from "../groups.mjs";
@@ -48,7 +48,7 @@ function followedBelow(behaviour) {
     const model = getModel();
     const name = actionMarked(model, behaviour.keycode);
     return `<p class="note beh-note">The selected key on <b>${esc(layerName(currentLayer()))}</b> is transparent,
-        so in this preview <b>${esc(layerName(followed.from))}</b> answers with ${name}. A behaviour belongs to its keycode:
+        so ${previewing() ? "in this preview " : ""}<b>${esc(layerName(followed.from))}</b> answers with ${name}. A behaviour belongs to its keycode:
         this is ${name}’s, and a change here applies wherever ${name} is pressed, not only at this position.</p>`;
 }
 

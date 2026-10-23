@@ -291,7 +291,9 @@ function editCombos(bytes, message, context) {
     } else if (message.type === "deleteCombo") {
         table.rows.splice(integer(message.id, table.rows.length - 1, "Combo index"), 1);
     } else {
-        if (!Array.isArray(message.inputs) || message.inputs.length < 2 || message.inputs.length > (context.capabilities?.maxKeysPerCombo ?? 16)) throw invalid("Choose between two inputs and the keyboard's combo input limit.");
+        const keysPerCombo = context.capabilities?.maxKeysPerCombo ?? 16;
+        if (!Array.isArray(message.inputs) || message.inputs.length < 2) throw invalid("A combo needs at least two keys.");
+        if (message.inputs.length > keysPerCombo) throw invalid(`A combo takes at most ${keysPerCombo} keys.`);
         const previous = message.type === "saveCombo" ? table.rows[integer(message.id, table.rows.length - 1, "Combo index")] : null;
         if (message.useOutputBehavior !== undefined && typeof message.useOutputBehavior !== "boolean") throw invalid("Output behaviour permission must be on or off.");
         const useOutputBehavior = message.useOutputBehavior ?? previous?.useOutputBehavior ?? true;

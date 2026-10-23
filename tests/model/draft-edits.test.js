@@ -83,6 +83,11 @@ test("each edit is recorded in its own words", () => {
     assert.equal(layout([{layoutIndex: 0, keycode: "KC_A"}]), "Changed a key");
     assert.equal(layout([{layoutIndex: 0, keycode: "KC_A"}, {layoutIndex: 1, keycode: "KC_B"}, {layoutIndex: 2, keycode: "KC_C"}]), "Changed 3 keys at once");
     assert.equal(layout([{layoutIndex: 0, keycode: stored(1)}, {layoutIndex: 1, keycode: stored(0)}]), "Swapped two keys");
+    const behaviours = require("../../core/model/portable-profile").validateSnapshot(document).behaviors.rows;
+    const saved = keycodes.resolve(behaviours[0].target.operand).name;
+    const unused = ["KC_F24", "KC_F23", "KC_F22"].find(key => !behaviours.some(row => keycodes.resolve(row.target.operand)?.name === key));
+    assert.equal(draftEditLabel({type: "saveBehavior", behavior: {keycode: saved, steps: []}}, document), "Edited a behaviour", "a key that has one");
+    assert.equal(draftEditLabel({type: "saveBehavior", behavior: {keycode: unused, steps: []}}, document), "Added a behaviour", "a key that had none");
     assert.equal(draftEditLabel({type: "retargetBehavior", keycode: "KC_A", target: "KC_B", conflict: "swap"}, document), "Swapped two behaviours");
     assert.equal(draftEditLabel({type: "retargetBehavior", keycode: "KC_A", target: "KC_B"}, document), "Moved a behaviour");
     assert.equal(draftEditLabel({type: "updateRgbStages", stageEnableMask: 0}, document), "Edited lighting");

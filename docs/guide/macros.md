@@ -72,7 +72,8 @@ take; so does switching slot or screen.
   to**. The wait before the first key is never recorded.
 - **Preserve hold timing** keeps every press and release with its timing, for
   a macro that needs keys held for a while. It keeps Record delays on.
-- **Clear take** puts back what the slot held before you recorded.
+- **Clear take** puts back what the slot held before you recorded. Once you
+  change the steps after a take, Clear take turns off and your edits stay.
 
 The recorder takes every key a macro can send: letters, digits, F1–F24,
 punctuation, modifiers, navigation keys, the numpad, Print Screen, the Menu

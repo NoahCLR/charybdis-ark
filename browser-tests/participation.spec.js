@@ -83,4 +83,21 @@ test("a transparent late-layer key explains its source and opens that placement"
     await page.evaluate(() => {window.__posted.length = 0;});
     await page.getByText('Use behaviour', {exact: true}).click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "updatePlacementPolicy", layer: 0, layoutIndex: 0})]);
+
+    // With no preview held, What this key reaches follows the same key from
+    // below as the status line does, and Open opens that key's behaviour.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        store.showLayer(15); store.state.selected = 0; store.state.tab = "key"; store.render();
+    });
+    const base = model.layers[0], below = base.positions.find(key => key.layoutIndex === 0);
+    const reach = page.locator('.key-reaches [data-goto="behaviours"]');
+    await expect(reach).toBeEnabled();
+    await expect(reach).not.toContainText("Unavailable");
+    await expect(reach).toContainText(`from ${base.displayName || base.name}`);
+    await reach.click();
+    await expect.poll(() => page.evaluate(async () => {
+        const {state} = await import("/webview/store.mjs");
+        return [state.tab, state.behaviourRow];
+    })).toEqual(["behaviours", below.semantic || below.keycode]);
 });

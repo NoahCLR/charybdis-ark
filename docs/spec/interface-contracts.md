@@ -166,9 +166,15 @@ A name the catalog gives a key is what the key does wherever it is placed
   reads back by name (`tests/view/picker-sections.test.mjs`,
   `browser-tests/retired-user-keys.spec.js`).
 - The picker folds modifiers into the simplest keycode that holds them
-  (`modifierPick`) and refuses mixed left/right sets, offering a custom key's
-  shortcut instead where the field allows one
-  (`tests/view/keyvalues.test.mjs`, `tests/view/keycode-expression.test.mjs`).
+  (`modifierPick`): modifiers on one side alone, or with one modifier on the
+  other side, are a keycode (`S(KC_LEFT_CTRL)`, `RGUI(KC_LEFT_GUI)`). Only two
+  or more on each side are refused, with a custom key's shortcut offered
+  instead where the field allows one (`tests/view/keyvalues.test.mjs`,
+  `tests/view/keycode-expression.test.mjs`).
+- A layout key's picker (`layoutKey`) and a combo output's (`comboOutput`)
+  keep Use off for what the draft refuses there (`keyProblem`,
+  `comboOutputProblem`); a combo output's picker offers no Tap-hold, which
+  needs a key of its own (`tests/view/keycode-expression.test.mjs`).
 
 ## Pointing tap outputs
 
@@ -204,8 +210,9 @@ is no shortcut. Ark reads and writes settings version 8 only (D-L64;
   combo output also runs the key's behaviour, so a match with one is offered
   beside a new key; a behaviour step sends only the shortcut, so any match is
   used. Otherwise the first unused custom key gets the shortcut in the same
-  draft step as the edit that uses it (`tests/view/custom-key.test.mjs`,
-  `browser-tests/custom-key-shortcut.spec.js`).
+  draft step as the edit that uses it; a combo output's key is made only when
+  the combo is kept (`tests/view/custom-key.test.mjs`,
+  `tests/view/edits.test.mjs`, `browser-tests/custom-key-shortcut.spec.js`).
 - Review shows it as the key's Shortcut field, discarded with the name, and
   names it in the host OS's words (`tests/model/custom-key-editor.test.js`).
 - A custom key with a shortcut taps and falls back to holding itself

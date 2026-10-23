@@ -5,7 +5,8 @@
 // keyboard checks a profile it is asked to save and refuses the whole domain
 // when one action is misplaced, so the editors check every row before they
 // encode, and an upload is checked before it starts, with a message naming the
-// row instead of the keyboard's bare rejection.
+// row instead of the keyboard's bare rejection. A combo is named by its badge
+// (C0, C1, …), as the combo table and Review name it.
 
 /** @typedef {{layerCount?: number, capabilities?: import("./types.js").ProfileDestination}} PlacementOptions */
 
@@ -36,7 +37,7 @@ function behaviorPlacementProblem(rows, options) {
 function comboPlacementProblem(rows, options) {
     for (const [index, row] of rows.entries()) {
         const problem = placementProblem(row.output, PLACEMENT.COMBO_OUTPUT, options);
-        if (problem) return `Combo ${index}: ${problem}`;
+        if (problem) return `C${index}: ${problem}`;
     }
     return undefined;
 }

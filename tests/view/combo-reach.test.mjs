@@ -129,6 +129,11 @@ test("the combo builder picks the key that answers, and rings its inputs by name
     assert.equal(comboInputShown({}, stack, 1, [], "KC_COMMA"), true);
 
     assert.deepEqual(toggleComboInput(["KC_A"], comboAnswers({}, stack, 2).get(3)), ["KC_A"], "a disabled key is not an input");
+
+    // At the keyboard's combo input limit no key joins, but one can still leave.
+    assert.deepEqual(toggleComboInput(["KC_A", "KC_B"], comboAnswers({}, stack, 0).get(2), 2), ["KC_A", "KC_B"], "a full combo takes no more");
+    assert.deepEqual(toggleComboInput(["KC_A", "KC_B"], comboAnswers({}, stack, 0).get(1), 2), ["KC_A"]);
+    assert.deepEqual(toggleComboInput(["KC_A"], comboAnswers({}, stack, 0).get(2), 2), ["KC_A", "KC_C"]);
 });
 
 test("the selected key lists the combos it is an input of, as the layers in view answer it", () => {

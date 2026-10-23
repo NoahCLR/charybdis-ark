@@ -11,12 +11,13 @@ export function canHaveBehaviour(/** @type {Model} */ model, /** @type {string} 
 }
 
 // The key a board position opens in Behaviours. Rows are keyed by keycode, so
-// in a layer preview a transparent position follows the key the board shows
-// there, answered from below, and names the layer that supplies it. Outside a
-// preview, or with nothing mapped below, it stays the stored key.
+// a transparent position follows the key that answers it from below, through
+// the layers held in a preview and the base layer, which is always on, and
+// names the layer that supplies it. With nothing mapped below it stays the
+// stored key.
 export function behaviourKeyAt(/** @type {import("../../contracts/panel.js").Layer[]} */ stack, /** @type {number} */ at, /** @type {number[]} */ held, /** @type {number | undefined} */ index) {
     const own = (stack[at]?.positions || []).find((position) => position.layoutIndex === index);
-    if (!held?.length || keyFace(own).kind !== "transparent") return {keycode: keyMeaning(own), from: null};
+    if (keyFace(own).kind !== "transparent") return {keycode: keyMeaning(own), from: null};
     const answer = resolvedPositions(stack, at, held).find((entry) => entry.position.layoutIndex === index);
     return answer ? {keycode: keyMeaning(answer.position), from: answer.layer} : {keycode: keyMeaning(own), from: null};
 }

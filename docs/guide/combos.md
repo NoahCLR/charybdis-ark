@@ -8,7 +8,9 @@ keyboard holds up to 128 combos, each with up to 16 keys.
 **Keys → Combos** lists the combos for the layer you picked, grouped by how
 they are reached: on the selected key, on this layer, through a transparent
 key, and the ones this layer can't reach. Each row shows its badge (C0, C1…),
-its keys, what it sends, its **Window** and any conditions.
+its keys, what it sends, its **Window**, any conditions, and **Reached by**:
+the layers its keys come from when they fall through or are matched
+elsewhere, or "this layer" when every key is on the layer you picked.
 
 Click a row to see its keys ringed on the board and open it for editing, with
 **Delete**. The same badges sit on the key faces on the board.
@@ -17,13 +19,16 @@ Click a row to see its keys ringed on the board and open it for editing, with
 
 **New combo** opens the builder.
 
-1. **Sends**: what the combo sends, with **Pick…**.
+1. **Sends**: what the combo sends, with **Pick…**. A combo can't send a
+   layer's **Tap-hold**, which decides tap or hold on a key of its own, so
+   the picker doesn't offer it.
 2. **Inputs**: **Pick on board** and click the keys on the board, then
    **Done**. Click a picked key again to drop it.
 3. **Keep combo in draft**.
 
 Keep stays off until the combo has what it sends and at least two keys, and
-the note beside it says which is missing. Until you keep it, the builder holds
+the note beside it says which is missing. At 16 keys the note says so and
+**Pick on board** takes no more. Until you keep it, the builder holds
 the combo on its own; **Cancel** drops it.
 
 Each combo also has:

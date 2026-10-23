@@ -102,9 +102,10 @@ export interface EditPayloads {
     /**
      * A custom key's shortcut (firmware D-F26): a HID report modifier mask and one key, `{mods: 0, key: 0}` to clear it.
      * `name` names the key in the same step. `then` is a layout or profile edit staged on top in the same draft step
-     * (a layout key, a behaviour cell): what the keycode picker offers for modifiers no keycode can hold (D-L63).
+     * (a layout key, a behaviour cell, a combo kept with it as its output): what the keycode picker offers for
+     * modifiers no keycode can hold (D-L63).
      */
-    updateCustomKeyShortcut: {keycode: string; shortcut: {mods: number; key: number}; name?: string; then?: Extract<PanelEdit, {type: 'updateLayoutKeys' | 'saveBehavior'}>; expectedFingerprint?: string};
+    updateCustomKeyShortcut: {keycode: string; shortcut: {mods: number; key: number}; name?: string; then?: Extract<PanelEdit, {type: 'updateLayoutKeys' | 'saveBehavior' | 'addCombo' | 'saveCombo'}>; expectedFingerprint?: string};
     renameKeyboard: {name: string; expectedFingerprint?: string};
     savePdMode: {slot: number; config: PdConfig; expectedBase?: Partial<BaseIdentity>};
     clearPdMode: {slot: number; expectedBase?: Partial<BaseIdentity>};

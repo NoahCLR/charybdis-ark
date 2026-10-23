@@ -166,3 +166,16 @@ export function keyProblem(model, expression) {
     if (layer !== undefined && layer >= layers) return `This keyboard has ${layers} layers, numbered 0–${layers - 1}.`;
     return "";
 }
+
+// What is wrong with a combo output expression, or "" when the draft takes it:
+// what a layout key takes, less KC_NO, which would send nothing, and Tap-hold
+// (LT), which decides tap or hold on a key of its own and so is never a combo's
+// output (core/schema/actions.js placementProblem, comboOutput).
+/** @param {Model} model @param {string} expression */
+export function comboOutputProblem(model, expression) {
+    const problem = keyProblem(model, expression);
+    if (problem) return problem;
+    const code = /** @type {number} */ (keycodeValue(model, expression));
+    if (code === 0) return "A combo has to send something. Choose a key.";
+    return code >= 0x4000 && code < 0x5000 ? "A combo can't send Tap-hold: it decides tap or hold on a key of its own. Send Hold or the key instead." : "";
+}

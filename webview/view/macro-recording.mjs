@@ -1,7 +1,7 @@
 // @ts-check
 // Captured events stay separate from the macro text. Compact capture can then
 // revise a pending tap into a chord when another key overlaps it.
-import {serializeMacroStep} from "./macro.mjs";
+import {samePayload, serializeMacroStep} from "./macro.mjs";
 
 /** @typedef {{keycode: string, type: 'keydown' | 'keyup', time: number}} RecordedKey */
 /** @typedef {{step: import('./types.js').MacroStep, time: number, end: number}} TimedStep */
@@ -136,3 +136,9 @@ export function recordedTakePayload(before, events, {explicit = false, delays = 
     }
     return result;
 }
+
+// A finished take stands while its macro holds exactly what the take produced.
+// Any later change to that macro's steps ends it, so Clear take, which puts
+// back what the macro held before Record, never loses an edit made after it.
+/** @param {{slot: string, after: string} | null | undefined} take @param {string} slot @param {string} payload @param {Readonly<Record<string, string>>} [aliases] */
+export const takeStands = (take, slot, payload, aliases) => take?.slot === slot && samePayload(payload, take.after, aliases);

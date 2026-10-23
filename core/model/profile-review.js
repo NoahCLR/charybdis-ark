@@ -55,6 +55,10 @@ const namesIn = (value, macros, detected) => {
         keys: profileKeyNames({hostOs: host.effective, hostLayout: host.layout, macosIso: host.macosIso, actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
             customKeys: value.settings.customKeyNames.map((name, slot) => ({slot, name}))})};
 };
+// The layers a behaviour or combo runs on, each named as everywhere else (an
+// unnamed layer is "Layer n", the base "Base"), compared by the stored mask.
+/** @param {number} mask @param {Names} names @returns {Field} */
+const allowedLayers = (mask, names) => ({text: names.layers.flatMap((_, i) => mask & 2 ** i ? [layerCalled(names.layers, i)] : []).join(", ") || "none", key: mask});
 // The mark a stored keycode carries: the layer it acts on (model/key-names.js
 // keyLayer, as the screens mark it), or the pointing mode it runs.
 /** @param {number} code @returns {Mark | undefined} */
@@ -162,7 +166,7 @@ function behaviourFields(row, defaults, names) {
         ["Long hold threshold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
         ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
         ["Enabled", row.enabled ? "on" : "off"],
-        ["Allowed layers", {text: names.layers.filter((_, i) => row.allowedLayers & 2 ** i).join(", ") || "none", key: row.allowedLayers}],
+        ["Allowed layers", allowedLayers(row.allowedLayers, names)],
     ]);
     for (const step of row.steps) for (const [tier, name] of TIERS) {
         const branch = step[tier];
@@ -214,7 +218,7 @@ function comboFields(row, table, names) {
         detail: row.inputs.map(input => action(input, names, true)).join(" + "), key: JSON.stringify(row.inputs)}],
         ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", window], ["Conditions", options || "none"],
         ["Enabled", row.enabled ? "on" : "off"], ["Use output behaviour", row.useOutputBehavior ? "on" : "off"],
-        ["Allowed layers", {text: names.layers.filter((_, i) => row.allowedLayers & 2 ** i).join(", ") || "none", key: row.allowedLayers}]]));
+        ["Allowed layers", allowedLayers(row.allowedLayers, names)]]));
 }
 // The two values every combo shares. A version 1 table has no default window,
 // and without combos no hold threshold either.

@@ -188,4 +188,12 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     return encode(rows);
 }
 
-module.exports = {editKeyBehaviors};
+// Whether a behaviour saved for this key finds a row already there, found as
+// the edit finds it: by the name the row listens to, or by the keycode it is.
+/** @param {Row[]} rows @param {string} keycode */
+function hasBehaviorFor(rows, keycode) {
+    const code = keycodes.encode(String(keycode ?? "").trim());
+    return rows.some(row => normalized(actionName(row.target)) === normalized(keycode) || (code !== undefined && nativeCode(row.target) === code));
+}
+
+module.exports = {editKeyBehaviors, hasBehaviorFor};

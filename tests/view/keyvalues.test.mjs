@@ -92,11 +92,20 @@ test("modifiers alone, or with a modifier key, fold into one set stored as the s
     assert.deepEqual(modifierPick(picking, {mods: ["RGUI"], keys: ["KC_LGUI"]}), {keys: ["KC_LEFT_GUI"], mods: ["RGUI"]});
     // ...and adding Command, which that key already is, changes nothing.
     assert.deepEqual(modifierPick(picking, {mods: ["G", "RGUI"], keys: ["KC_LGUI"]}), {keys: ["KC_LEFT_GUI"], mods: ["RGUI"]});
-    // Both Commands with no key: the right one becomes the key.
-    assert.deepEqual(modifierPick(picking, {mods: ["G", "RGUI"], keys: []}), {keys: ["KC_RIGHT_GUI"], mods: ["G"]});
-    // A lone modifier is its own key; several from one side wrap one of them.
+    // Both Commands with no key: the left one becomes the key, as when the
+    // Left Command key was clicked.
+    assert.deepEqual(modifierPick(picking, {mods: ["G", "RGUI"], keys: []}), {keys: ["KC_LEFT_GUI"], mods: ["RGUI"]});
+    assert.deepEqual(modifierPick(picking, {mods: ["RGUI"], keys: ["KC_LGUI"]}), modifierPick(picking, {mods: ["G", "RGUI"], keys: []}));
+    // A lone modifier is its own key.
     assert.deepEqual(modifierPick(picking, {mods: ["C"], keys: []}), {keys: ["KC_LEFT_CTRL"], mods: []});
+    // Several from one side wrap the first of them, so the keycode field's
+    // S(KC_LEFT_CTRL) is what Left Ctrl + Left Shift gives.
+    assert.deepEqual(modifierPick(picking, {mods: ["C", "S"], keys: []}), {keys: ["KC_LEFT_CTRL"], mods: ["S"]});
+    assert.deepEqual(modifierPick(picking, {mods: ["S", "C", "A"], keys: []}), {keys: ["KC_LEFT_CTRL"], mods: ["S", "A"]});
+    assert.deepEqual(modifierPick(picking, {mods: ["RSFT", "RCTL"], keys: []}), {keys: ["KC_RIGHT_CTRL"], mods: ["RSFT"]});
+    // One on a side and several on the other: the lone one is the key.
     assert.deepEqual(modifierPick(picking, {mods: ["C", "S", "RALT"], keys: []}), {keys: ["KC_RIGHT_ALT"], mods: ["C", "S"]});
+    assert.deepEqual(modifierPick(picking, {mods: ["A", "RCTL", "RSFT"], keys: []}), {keys: ["KC_LEFT_ALT"], mods: ["RCTL", "RSFT"]});
     // Two or more on each side: no keycode holds it, so a custom key would.
     assert.deepEqual(modifierPick(picking, {mods: ["C", "S", "RCTL", "RSFT"], keys: []}), {shortcut: {mods: 0x33, key: 0}});
     assert.deepEqual(modifierPick(picking, {mods: ["S", "RCTL", "RSFT"], keys: ["KC_LCTL"]}), {shortcut: {mods: 0x33, key: 0}});

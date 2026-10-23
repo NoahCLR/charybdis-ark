@@ -76,7 +76,7 @@ export function screenKeys() {
                 // transparent key picks what shows through it, and switching
                 // layers afterwards leaves this input as it is.
                 const answer = comboAnswers(model, layers(), state.layer, heldLayers()).get(index);
-                state.combo.inputs = toggleComboInput(state.combo.inputs, answer);
+                state.combo.inputs = toggleComboInput(state.combo.inputs, answer, model?.firmware?.keysPerCombo);
             } else {
                 state.selected = index;
                 // Follow the key the board shows, including one with no

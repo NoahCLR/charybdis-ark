@@ -7,7 +7,7 @@
 
 import {esc} from "../../lib/dom.mjs";
 import {actionLabel, keyMeaning, keyName} from "../../view/keyface.mjs";
-import {behaviourRouteKeys, macroKeycodes, macroReach, pointingReach, pointingSlotFor, reachInView, reachKeys} from "../../view/reach.mjs";
+import {behaviourRouteKeys, macroKeycodes, macroReach, pointingReach, pointingSlotFor, reachInView, reachKeys, reachText} from "../../view/reach.mjs";
 import {comboGroups, combosInView} from "../../view/combo-reach.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
 import {getModel, heldLayers, layerName, layers, state} from "../../store.mjs";
@@ -66,16 +66,14 @@ export const sourceLabel = (entry) =>
     esc(layerName(entry.layer)) + (entry.whileHeld ? " when held" : "");
 
 // The keys are named as the board names them; a combo's row already names
-// its inputs, so it says only where they come from, and stays blank when
-// there is nothing to add.
+// its inputs, so it says only where they come from (reachText).
 /** @param {(ReturnType<typeof resolvedPositions>[number] & {reference?: boolean})[]} keys @param {{names?: boolean}} [options] */
 export const keysReach = (keys, {names = true} = {}) => {
     const model = getModel();
     const named = names ? [...new Set(keys.map((entry) => keyNameMarked(model, keyName(entry.position), keyMeaning(entry.position))))] : [];
     const sources = [...new Set(keys.filter((entry) => entry.fellThrough).map(sourceLabel))];
     const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => esc(layerName(entry.layer))))];
-    return [named.join(", "), sources.length ? `on ${sources.join(", ")}` : "", matched.length ? `matched on ${matched.join(", ")}` : ""]
-        .filter(Boolean).join(" · ") || (names ? "—" : "");
+    return reachText({named, sources, matched}, {names});
 };
 // A behaviour that only answers through a transparent key still fires its
 // branches, so it belongs here — named with the layer that holds it, because

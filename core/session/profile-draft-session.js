@@ -360,8 +360,8 @@ class ProfileDraftSession {
         else if (editedBy(message, "customKey")) {
             document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
             // A custom key made for a shortcut is put to use in the same step
-            // (a layout key, a behaviour cell), so one undo takes both back
-            // (D-L63).
+            // (a layout key, a behaviour cell, a combo's output), so one undo
+            // takes both back (D-L63).
             const then = "then" in message ? message.then : undefined;
             if (then) document = this.editFollowing(then, document);
         }
@@ -381,13 +381,16 @@ class ProfileDraftSession {
             combos: this.combos(), maximumBrightness: this.current.limits?.brightnessMax,
         }).toString("base64")};
     }
-    // The edit a custom key made for a shortcut carries: a layout key or a
-    // behaviour, staged on the document that already holds the key (D-L63).
+    // The edit a custom key made for a shortcut carries: a layout key, a
+    // behaviour or a combo, staged on the document that already holds the key
+    // (D-L63).
     /** @param {{type: string}} message @param {Document} base @returns {Document} */
     editFollowing(message, base) {
         if (message.type === "updateLayoutKeys") return this.editLayout(/** @type {import("../../contracts/edits.js").EditOf<"updateLayoutKeys">} */ (message), base);
-        if (message.type === "saveBehavior") return this.editProfile(/** @type {import("../../contracts/edits.js").EditOf<"saveBehavior">} */ (message), base);
-        throw fail("A custom key made for a shortcut goes on a key or in a behaviour.");
+        if (["saveBehavior", "addCombo", "saveCombo"].includes(message.type)) {
+            return this.editProfile(/** @type {Extract<import("../model/device-profile-edits.js").ProfileEdit, {type: "saveBehavior" | "addCombo" | "saveCombo"}>} */ (message), base);
+        }
+        throw fail("A custom key made for a shortcut goes on a key, in a behaviour or in a combo.");
     }
     // A Rename & Reorder save: its document, and the order it saved, which
     // rearranges this revision. An order and each name are separate

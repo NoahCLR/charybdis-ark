@@ -54,9 +54,10 @@ export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ 
 // buttons, so Command + Right Command + the Left Command key is just Left and
 // Right Command. Folded into one set, it is stored as the simplest keycode
 // that holds it: one modifier as the key, wrapped in the others when those are
-// all on one side (Left + Right Command is RGUI(KC_LEFT_GUI)), a lone modifier
-// as its own key. A set no keycode can hold (two or more modifiers on each
-// side) comes back as the shortcut a custom key would take instead (D-L63).
+// all on one side (Left Ctrl + Left Shift is S(KC_LEFT_CTRL), Left + Right
+// Command is RGUI(KC_LEFT_GUI)), a lone modifier as its own key. A set no
+// keycode can hold (two or more modifiers on each side) comes back as the
+// shortcut a custom key would take instead (D-L63).
 // Null when the selection has a key that is not a modifier, or nothing.
 /** @param {Model} model @param {{keys?: string[], mods?: string[]}} picker @returns {{keys: string[], mods: string[]} | {shortcut: {mods: number, key: number}} | null} */
 export function modifierPick(model, {keys = [], mods = []}) {
@@ -71,11 +72,13 @@ export function modifierPick(model, {keys = [], mods = []}) {
     if (!mask) return null;
     const oneSide = (/** @type {number} */ bits) => !(bits & 0x0f) || !(bits & 0xf0);
     const single = (/** @type {number} */ bits) => bits !== 0 && (bits & (bits - 1)) === 0;
-    // The clicked modifier stays the key when it can; otherwise a side with
-    // one modifier gives it, the right side first.
+    // The clicked modifier stays the key when it can. Otherwise a set on one
+    // side gives its first modifier, and a set on both sides the lone modifier
+    // of one side, the left first, so the rest share the other side.
     const inner = keyBit && oneSide(mask & ~keyBit) ? keyBit
-        : single(mask & 0xf0) && oneSide(mask & ~(mask & 0xf0)) ? mask & 0xf0
-        : single(mask & 0x0f) && oneSide(mask & ~(mask & 0x0f)) ? mask & 0x0f : 0;
+        : oneSide(mask) ? mask & -mask
+        : single(mask & 0x0f) ? mask & 0x0f
+        : single(mask & 0xf0) ? mask & 0xf0 : 0;
     if (!inner) return {shortcut: {mods: mask, key: 0}};
     const name = (model?.qmkKeycodes || []).find((entry) => entry.keycode === 0xe0 + Math.log2(inner))?.value;
     if (!name) return null;

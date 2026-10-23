@@ -42,8 +42,8 @@ export function attachLayersControl(bar) {
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 13V3M2.5 5.5 5 3l2.5 2.5M11 3v10M8.5 10.5 11 13l2.5-2.5"/></svg>
         <span>Rename &amp; Reorder</span></button>`);
     trigger.addEventListener("click", () => {
-        state.layersOpen = !state.layersOpen;
-        if (!state.layersOpen) state.layersAsked = false;
+        if (state.layersOpen) discardLayers();
+        else state.layersOpen = true;
         render();
     });
     bar.append(trigger);
@@ -174,8 +174,7 @@ function editor(model, portable, busy) {
         render();
     });
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => {
-        post(controls.control("cancelPortableReview"));
-        closeLayers();
+        discardLayers();
         render();
     });
     return node;
@@ -237,6 +236,14 @@ export function closeLayers() {
     state.layersAsked = false;
 }
 
+// Moves and Make base stay pending in the host until Keep layers in draft, so
+// every other way of closing the panel (Discard, Escape, a click outside it or
+// on its trigger) drops them, and it opens again on the draft's order.
+export function discardLayers() {
+    post(controls.control("cancelPortableReview"));
+    closeLayers();
+}
+
 function closeDismiss() {
     if (!dismiss) return;
     document.removeEventListener("pointerdown", dismiss, true);
@@ -248,7 +255,7 @@ function watchOutside(panel, trigger) {
     closeDismiss();
     dismiss = (event) => {
         if (panel.contains(/** @type {Node | null} */ (event.target)) || trigger.contains(/** @type {Node | null} */ (event.target))) return;
-        closeLayers();
+        discardLayers();
         render();
     };
     document.addEventListener("pointerdown", dismiss, true);

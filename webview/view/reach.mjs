@@ -28,6 +28,16 @@ function comboBehaviourFor(model, combo, keys, stack, at, held = []) {
     });
     return permitted ? row : undefined;
 }
+
+// The words of a reach: the keys, as the board names them, then the layers
+// they fall through to and the layers a reference matched on. A combo's row
+// already names its inputs, so it leaves the keys out, and when every input is
+// on the layer in view it says that, so its cell is never blank.
+/** @param {{named?: string[], sources?: string[], matched?: string[]}} parts @param {{names?: boolean}} [options] */
+export const reachText = ({named = [], sources = [], matched = []}, {names = true} = {}) =>
+    [names ? named.join(", ") : "", sources.length ? `on ${sources.join(", ")}` : "", matched.length ? `matched on ${matched.join(", ")}` : ""]
+        .filter(Boolean).join(" · ") || (names ? "—" : "this layer");
+
 /**
  * Where to press for this, on this layer.
  *

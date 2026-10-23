@@ -10,7 +10,9 @@ on this layer, through a combo, through a transparent key, and so on. Select
 any key and its behaviour opens, even if it doesn't have one yet; there is no
 separate Add.
 
-Transparent keys and `KC_NO` can't have a behaviour.
+Transparent keys and `KC_NO` can't have a behaviour. Select a transparent key
+and the key that answers it from below opens instead, with the layer it comes
+from; the base layer is always on, so one answers even with no layer preview.
 
 ## The grid
 
