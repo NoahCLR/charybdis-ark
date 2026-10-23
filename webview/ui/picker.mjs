@@ -93,7 +93,7 @@ function keyButton(entry, picked) {
 /** @param {MacroSlot} slot @param {boolean} picked */
 function macroButton(slot, picked) {
     return `<button class="pk ${slot.name ? "wide" : ""} ${picked ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
-        <span class="l">${esc(slot.name || slot.keycode.replace(/^VIA_MACRO_/, "M"))}</span>
+        <span class="l">${esc(slot.name || slot.keycode.replace(/^MACRO_/, "M"))}</span>
         <span class="c">${slot.name ? `M${esc(slot.keycode.split("_").at(-1))} · ` : ""}${slot.empty ? "empty" : `${esc(slot.bytes)} B`}</span></button>`;
 }
 

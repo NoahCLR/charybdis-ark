@@ -62,7 +62,7 @@ for(const theme of ["vscode-dark","vscode-light"]) {
         }
         await page.evaluate(async()=>{
             const s=await import('/webview/store.mjs');
-            s.state.screen='macros';s.state.macroSlot='VIA_MACRO_0';s.setMacroForm('VIA_MACRO_0',{draft:'{+KC_RGUI}{KC_LGUI,KC_RALT}{-KC_RGUI}'});s.render();
+            s.state.screen='macros';s.state.macroSlot='MACRO_0';s.setMacroForm('MACRO_0',{draft:'{+KC_RGUI}{KC_LGUI,KC_RALT}{-KC_RGUI}'});s.render();
         });
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
@@ -72,7 +72,7 @@ for(const theme of ["vscode-dark","vscode-light"]) {
             await expect(page.locator('[data-step-tile="0"]')).toHaveAccessibleName(new RegExp(hostKeyLabel('Right GUI',host)));
             await expect(page.locator('[data-step-tile="0"] .macro-token-label')).toHaveText(host === 1 ? 'R Cmd' : host === 2 ? 'R Win' : host === 3 ? 'R Super' : 'R GUI');
         }
-        await page.evaluate(async()=>{const s=await import('/webview/store.mjs');s.setMacroForm('VIA_MACRO_0',{draft:'{+KC_RALT}'});s.render();});
+        await page.evaluate(async()=>{const s=await import('/webview/store.mjs');s.setMacroForm('MACRO_0',{draft:'{+KC_RALT}'});s.render();});
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
             await expect(page.locator('.unavailable').filter({hasText:'before the macro ends'})).toContainText(hostKeyLabel('Right Alt',host));

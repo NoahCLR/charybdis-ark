@@ -90,7 +90,7 @@ test("invalid edits and references are rejected before upload", () => {
     for (const steps of [undefined, [{tapCount: 5}], [{tapCount: 0}, {tapCount: 0}], [{tapCount: 0, tap: {style: "" , action: "KC_A"}}], [{tapCount: 0, tap: {style: "BOGUS", action: "KC_A"}}]]) {
         assert.throws(() => save({...form(), steps}));
     }
-    for (const action of ["", "UNKNOWN", "MO(16)", "LOCK_LAYER(16)", "VIA_MACRO_128", "MACRO_16", "DF(2)", "G(MO(2))"]) {
+    for (const action of ["", "UNKNOWN", "MO(16)", "LOCK_LAYER(16)", "MACRO_128", "VIA_MACRO_128", "DF(2)", "G(MO(2))"]) {
         assert.throws(() => save({...form(), steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action}}]}), undefined, action);
     }
     for (const repeatHz of ["", "0", "101", "-1", "2.5"]) assert.throws(() => save({...form(), steps: [{tapCount: 0, hold: {style: "REPEAT_WHILE_HELD", action: "KC_A", repeatHz}}]}));

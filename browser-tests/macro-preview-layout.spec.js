@@ -12,7 +12,7 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
             // error feedback beside the field.
             const model = store.getModel();
             store.setModel({...model, macroBank: {...model.macroBank, free: 400}});
-            store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render();
+            store.state.screen = "macros"; store.state.macroSlot = "MACRO_17"; store.render();
             window.__posted.length = 0;
         });
         await page.locator('[data-insert-kind="text"]').click();

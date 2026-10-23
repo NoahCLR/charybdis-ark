@@ -420,7 +420,7 @@ test("literal macro steps stage through the real web shell, export exactly, undo
     await page.locator('.read-placeholder [data-act="explore-demo"]').click();
     await ready(page);
     await page.locator('[data-screen="macros"]').click();
-    await page.locator('[data-slot="VIA_MACRO_17"]').click();
+    await page.locator('[data-slot="MACRO_17"]').click();
     await page.locator('[data-insert-kind="text"]').click();
     const text = ' {"key": "{KC_A}"}\nhello ';
     await page.locator("[data-step-text]").fill(text);

@@ -39,9 +39,9 @@ const {CAPABILITIES_32, document32} = require(app + "/tests/fixtures/pd-slots-32
 // profile.
 let current = document32();
 current = editMacro({document: current, fingerprint: fingerprint(current)},
-    {keycode: "VIA_MACRO_0", payload: "hello{KC_A}", expectedFingerprint: fingerprint(current)});
+    {keycode: "MACRO_0", payload: "hello{KC_A}", expectedFingerprint: fingerprint(current)});
 for (let slot = 0; slot < 128; slot++) current = editMacro({document: current, fingerprint: fingerprint(current)},
-    {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(32, "!"), expectedFingerprint: fingerprint(current)});
+    {keycode: `MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(32, "!"), expectedFingerprint: fingerprint(current)});
 for (let slot = 0; slot < 128; slot++) current = editCustomKey({document: current, fingerprint: fingerprint(current)},
     {keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(32, "?"), expectedFingerprint: fingerprint(current)}, CAPABILITIES_32);
 // Shortcuts Ark writes (firmware D-F26): mixed sides with a key, modifiers

@@ -48,7 +48,8 @@ const milestoneCapabilities = {
 
 test("semantic compiler maps stable actions and rejects source-only helpers", () => {
     const model = minimalStudioModel();
-    assert.deepEqual(semanticActionForExpression("VIA_MACRO_12", model), {kind: 6, operand: 12});
+    assert.deepEqual(semanticActionForExpression("MACRO_12", model), {kind: 6, operand: 12});
+    assert.deepEqual(semanticActionForExpression("VIA_MACRO_12", model), {kind: 6, operand: 12}, "the former name");
     assert.deepEqual(semanticActionForExpression("LOCK_LAYER(_BASE)", model), {kind: 3, operand: 0});
     assert.throws(
         () => semanticActionForExpression("SOME_LOCAL_C_FUNCTION(KC_A)", model),
@@ -64,7 +65,7 @@ test("the native resolver refuses expressions whose bits would land on another k
     assert.equal(resolve("LOCK_LAYER(15)", {}) - resolve("LOCK_LAYER(0)", {}), 15);
     // Each of these used to OR into an unrelated keycode: a dead user keycode,
     // a macro with Ctrl dropped, RIGHT_THUMB, TO(4), QK_BOOTLOADER, MO(1)+mods.
-    for (const expression of ["G(VIA_MACRO_3)", "C(VIA_MACRO_3)", "C(PD_SLOT_0)", "LOCK_LAYER(16)",
+    for (const expression of ["G(MACRO_3)", "C(MACRO_3)", "C(PD_SLOT_0)", "LOCK_LAYER(16)",
         "LT(18,0x04)", "LT(60,0x00)", "LCTL(MO(1))"]) {
         assert.equal(resolve(expression, {}), undefined, expression);
     }

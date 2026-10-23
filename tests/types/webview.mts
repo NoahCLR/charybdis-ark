@@ -15,9 +15,9 @@ function contracts(slot: PdSlot, identity: BaseIdentity) {
         edits.placementPolicy(0, 1, true, false),
         edits.deleteBehaviour('KC_A', identity),
         edits.comboMessage(null, {inputs: ['KC_A', 'KC_B'], output: 'KC_C', termMs: '50'}),
-        edits.macroMessage('VIA_MACRO_0', 'hello', 'fingerprint'),
-        edits.macroProtectionMessage('VIA_MACRO_0', 'auto', 'fingerprint'),
-        edits.macroValidationMessage('VIA_MACRO_0', 'hello', 1),
+        edits.macroMessage('MACRO_0', 'hello', 'fingerprint'),
+        edits.macroProtectionMessage('MACRO_0', 'auto', 'fingerprint'),
+        edits.macroValidationMessage('MACRO_0', 'hello', 1),
         edits.pdMode(slot.id, newMode(slot, 1), identity),
         edits.layerColour('Layer 1', 'ALL_KEYS', {h: '0', s: '255', v: '100'}),
     ];
@@ -42,9 +42,9 @@ function contracts(slot: PdSlot, identity: BaseIdentity) {
     // @ts-expect-error Participation switches are booleans.
     edits.placementPolicy(0, 1, 'true', false);
     // @ts-expect-error A macro validation request needs its correlation ID.
-    edits.macroValidationMessage('VIA_MACRO_0', 'hello');
+    edits.macroValidationMessage('MACRO_0', 'hello');
     // @ts-expect-error A posted update must say what macro value changed.
-    const emptyMacro: PanelEdit = {type: 'updateMacro', keycode: 'VIA_MACRO_0'};
+    const emptyMacro: PanelEdit = {type: 'updateMacro', keycode: 'MACRO_0'};
     // @ts-expect-error A pointing form must supply its name and DPI readers.
     readConfig(slot, {kind: () => 1});
     // @ts-expect-error Core/Node globals do not leak into the renderer environment.
@@ -134,7 +134,7 @@ function rendererViews(model: PublishedModel, position: Position) {
     reachEntries(behaviors, 'here')[0].keys[0].position.slot;
     // @ts-expect-error The empty combo-map branch still stores typed combos.
     combosOnLayer(null, [], 0).set(0, ['KC_A']);
-    const routeName: string = macroPlacements(model, model.layers, 'VIA_MACRO_0')[0].routes[0].entry.name;
+    const routeName: string = macroPlacements(model, model.layers, 'MACRO_0')[0].routes[0].entry.name;
     const action = namedAction(model, 'PD_SLOT_0');
     if (action?.kind === 'pointing') {
         const slot: number = action.slot.id;

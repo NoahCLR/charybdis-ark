@@ -72,9 +72,9 @@ for (const {screen, source, initial} of [
             const apply = new core.ApplyProgress(); apply.finish(); service.liveApply = apply.view();
             store.state.screen = screen;
             const localText = ' {{"key": "{{KC_A}}"}}\ncafé “hello” 🙂. ';
-            store.state.macroSlot = "VIA_MACRO_17";
+            store.state.macroSlot = "MACRO_17";
             loop.serviceChanged();
-            store.setMacroForm("VIA_MACRO_17", {draft: localText}); store.render();
+            store.setMacroForm("MACRO_17", {draft: localText}); store.render();
             const start = performance.now();
             if (source === "layout") await service.readLayout();
             else await service.readCommittedProfile();
@@ -85,7 +85,7 @@ for (const {screen, source, initial} of [
             return {preserved, models, replies, elapsed, lastBar, progress: lastProgress?.read.progress,
                 layoutMatches: source !== "layout" || service.layout.layers.every(({layer, keys}) => keys.every(key => key.keycode === core.portable.validateSnapshot(doc).layers[layer][key.row * 6 + key.column])),
                 profileBytes: bytes.length, staleIgnored, error: service.error?.message,
-                localTextPreserved: store.macroForm("VIA_MACRO_17").draft === localText,
+                localTextPreserved: store.macroForm("MACRO_17").draft === localText,
                 posts: window.__posted.length - beforePosts};
         }, {screen, source, initial, coreFile, doc: document(), featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
         expect(result.error).toBeUndefined();
@@ -117,7 +117,7 @@ test("read phase changes keep the editor, while content and permissions redraw i
         model.portable.busy = true;
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
         const editor = document.querySelector(".content");
-        store.setMacroForm("VIA_MACRO_17", {draft: 'literal café “hello” 🙂'});
+        store.setMacroForm("MACRO_17", {draft: 'literal café “hello” 🙂'});
         const phase = structuredClone(model);
         phase.device.health.phase = "read-profile";
         phase.load.phase = "read-profile"; phase.load.operationId++;
@@ -136,7 +136,7 @@ test("read phase changes keep the editor, while content and permissions redraw i
         idle.device.health.busy = false;
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: idle}}));
         return {preserved, namesRedraw, permissionRedraw: afterNames !== document.querySelector(".content"),
-            formKept: store.macroForm("VIA_MACRO_17").draft === 'literal café “hello” 🙂'};
+            formKept: store.macroForm("MACRO_17").draft === 'literal café “hello” 🙂'};
     });
     expect(result).toEqual({preserved: true, namesRedraw: true, permissionRedraw: true, formKept: true});
 });

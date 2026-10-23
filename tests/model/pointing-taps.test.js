@@ -33,7 +33,7 @@ test("macro outputs keep their place, and are offered alone", () => {
         {slot: 4, name: "Macros", label: "Button 1", macro: 1},
     ]);
     assert.deepEqual(pointingMacros([{...slot, kind: 0}]), []);
-    for (const name of ["QK_MACRO_0", "MC_31", "VIA_MACRO_127"]) {
+    for (const name of ["QK_MACRO_0", "MC_31", "MACRO_127"]) {
         assert.ok(pointingTapKeys().plain.includes(name));
         assert.ok(!pointingTapKeys().modified.includes(name));
     }

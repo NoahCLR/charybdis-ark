@@ -92,14 +92,14 @@ test("with Unicode playback on, only non-ASCII text refuses a held ordinary key,
 });
 
 test("a macro is found by its name, and by its slot when it has none", () => {
-    const named = {keycode: "VIA_MACRO_3", name: "Screenshot area"};
-    const unnamed = {keycode: "VIA_MACRO_12", name: ""};
+    const named = {keycode: "MACRO_3", name: "Screenshot area"};
+    const unnamed = {keycode: "MACRO_12", name: ""};
     assert.equal(macroMatches(named, "screen"), true, "part of the name, case ignored");
     assert.equal(macroMatches(named, "  AREA "), true, "surrounding spaces are not part of the search");
     assert.equal(macroMatches(named, "m3"), true, "the slot label the grid shows");
     assert.equal(macroMatches(named, "copy"), false);
     assert.equal(macroMatches(unnamed, "macro 12"), true, "the name the editor falls back to");
-    assert.equal(macroMatches(unnamed, "VIA_MACRO_12"), true, "and its keycode");
+    assert.equal(macroMatches(unnamed, "MACRO_12"), true, "and its keycode");
     assert.equal(macroMatches(unnamed, "screen"), false);
     assert.equal(macroMatches(unnamed, ""), true, "an empty search hides nothing");
 });
@@ -211,15 +211,15 @@ test("a macro's chip tells an unkept edit, a change kept in the draft and the ma
     const {DEMO_CAPABILITIES} = require("../../core/session/demo-session");
     const draft = new ProfileDraftSession({document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)}, "test-device", DEMO_CAPABILITIES);
     const changes = () => draft.view({selectedDeviceId: "test-device", connected: true}).changes;
-    assert.equal(macroLocalState(changes(), "VIA_MACRO_0", false).text, "as read");
-    assert.deepEqual(macroLocalState(changes(), "VIA_MACRO_0", true), {state: "local", dot: "draft", text: "edited here"});
-    draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateMacro", keycode: "VIA_MACRO_0", payload: "Hi"});
-    assert.deepEqual(macroLocalState(changes(), "VIA_MACRO_0", false), {state: "draft", dot: "draft", text: "changed in draft"});
-    assert.equal(macroLocalState(changes(), "VIA_MACRO_1", false).text, "as read", "another macro is as read");
-    assert.equal(macroLocalState(changes(), "VIA_MACRO_0", true).text, "edited here", "an unkept edit over it still says so");
+    assert.equal(macroLocalState(changes(), "MACRO_0", false).text, "as read");
+    assert.deepEqual(macroLocalState(changes(), "MACRO_0", true), {state: "local", dot: "draft", text: "edited here"});
+    draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateMacro", keycode: "MACRO_0", payload: "Hi"});
+    assert.deepEqual(macroLocalState(changes(), "MACRO_0", false), {state: "draft", dot: "draft", text: "changed in draft"});
+    assert.equal(macroLocalState(changes(), "MACRO_1", false).text, "as read", "another macro is as read");
+    assert.equal(macroLocalState(changes(), "MACRO_0", true).text, "edited here", "an unkept edit over it still says so");
     draft.jump(draft.revision, 0);
-    assert.equal(macroLocalState(changes(), "VIA_MACRO_0", false).text, "as read", "undone, it is as read again");
+    assert.equal(macroLocalState(changes(), "MACRO_0", false).text, "as read", "undone, it is as read again");
     // A playback change Your computer caused is listed under the macro, but it
     // is not a change to the macro.
-    assert.equal(macroLocalState([{unit: "settings:host"}], "VIA_MACRO_0", false).text, "as read");
+    assert.equal(macroLocalState([{unit: "settings:host"}], "MACRO_0", false).text, "as read");
 });

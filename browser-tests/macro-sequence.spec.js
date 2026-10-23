@@ -16,7 +16,7 @@ const updates = page => page.evaluate(() => window.__posted.filter(m => m.type =
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`fixed tiles, full names and retained name/protection controls (${theme})`, async ({page}) => {
-        await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"}, theme);
+        await openControls(page, "macros", {macroSlot: "MACRO_17"}, theme);
         await payload(page, "{+KC_LGUI}{KC_A}{-KC_LGUI}{65535}{KC_LGUI,KC_LSFT,KC_LALT,KC_ENT}" + "long text ".repeat(100));
         const sizes = await page.locator(".macro-token").evaluateAll(nodes => nodes.map(node => [node.offsetWidth, node.offsetHeight]));
         expect(sizes).toEqual([[64,80],[64,80],[64,80],[64,80],[144,80],[144,80]]);
@@ -50,7 +50,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
 }
 
 test("dragging a release before its press stays local, flags tiles and can be corrected", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "MACRO_17"});
     await payload(page, "{+KC_LGUI}{KC_A}{-KC_LGUI}{50}{KC_C}hello");
     const release = page.locator('[data-step-tile="2"]');
     const id = await release.getAttribute("data-step-id");
@@ -69,7 +69,7 @@ test("dragging a release before its press stays local, flags tiles and can be co
 
 test("text and delays reorder across wrapped rows without losing editor identity", async ({page}) => {
     await page.setViewportSize({width: 800, height: 900});
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "MACRO_17"});
     await payload(page, "hello{50}{KC_A}{KC_C}{KC_ENT}{KC_LGUI,KC_C}");
     await page.locator('[data-step-tile="0"]').click();
     const fieldId = await page.locator('[data-step-text="0"]').getAttribute("data-f");
@@ -99,7 +99,7 @@ test("text and delays reorder across wrapped rows without losing editor identity
 });
 
 test("recording and read-only slots keep their sequence inspectable without offering drag edits", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "MACRO_17"});
     await payload(page, "{KC_A}{50}{KC_C}");
     await page.locator('[data-act="record"]').click();
     await expect(page.locator('.macro-token[draggable="true"]')).toHaveCount(0);

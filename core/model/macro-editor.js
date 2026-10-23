@@ -44,7 +44,7 @@ function macroEditorView(snapshot, capabilities) {
         const protection = macroProtectionOf(bytes);
         const needsUnicodeEntry = playback.typing.some(route => route.method !== "layout");
         const needsUnicodeSetup = playback.code === "UNICODE_SETUP_REQUIRED";
-        return {kind: "via", keycode: `VIA_MACRO_${index}`, name: names[index],
+        return {keycode: `MACRO_${index}`, name: names[index],
             payload, protection, uninterruptible: protection === "on" || (protection === "auto" && needsUnicodeEntry),
             needsUnicodeEntry, needsUnicodeSetup, playbackError: playback.error, playbackCode: playback.code, empty: !payload, bytes: bytes.length,
             playable: !playback.error, available: !budget.outOfRoom.has(index),
@@ -80,7 +80,7 @@ function macroInputStatus(snapshot, message, capabilities) {
 
 /** @param {string} keycode */
 function macroIndex(keycode) {
-    const match = /^VIA_MACRO_(\d+)$/.exec(keycode || "");
+    const match = /^MACRO_(\d+)$/.exec(keycode || "");
     const index = match ? Number(match[1]) : -1;
     if (!match || index >= MACRO_SLOTS || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");
     return index;

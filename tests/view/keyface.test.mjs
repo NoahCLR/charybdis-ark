@@ -3,10 +3,10 @@ import test from "node:test";
 import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import keyNames from "../../core/model/key-names.js";
 
-test("visible macro keycodes use the VIA_MACRO_n name for both QMK's named and unnamed values", () => {
-    const model = {qmkKeycodeAliases: {QK_MACRO_9: "VIA_MACRO_9", "0x773F": "VIA_MACRO_63", QK_USER_16: "PD_SLOT_0"}};
-    assert.equal(visibleKeycode(model, "QK_MACRO_9"), "VIA_MACRO_9");
-    assert.equal(visibleKeycode(model, "0x773F"), "VIA_MACRO_63");
+test("visible macro keycodes use the MACRO_n name for both QMK's named and unnamed values", () => {
+    const model = {qmkKeycodeAliases: {QK_MACRO_9: "MACRO_9", "0x773F": "MACRO_63", QK_USER_16: "PD_SLOT_0"}};
+    assert.equal(visibleKeycode(model, "QK_MACRO_9"), "MACRO_9");
+    assert.equal(visibleKeycode(model, "0x773F"), "MACRO_63");
     assert.equal(visibleKeycode(model, "QK_USER_16"), "QK_USER_16", "other stored identities keep their existing display");
     assert.equal(visibleKeycode({}, "QK_MACRO_9"), "QK_MACRO_9", "an unadvertised alias is not invented");
 });

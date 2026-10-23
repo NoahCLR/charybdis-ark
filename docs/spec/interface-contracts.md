@@ -163,9 +163,12 @@ A name the catalog gives a key is what the key does wherever it is placed
 - The picker offers only what does something on this keyboard: not
   `QK_USER_0`–`QK_USER_31`, `DRGSCRL`/`DRG_TOG` (drag scroll is the
   `PD_SLOT_0` pointing mode), unnamed `QK_KB` slots, features the build lacks,
-  or the `QK_MACRO_n` duplicates of `VIA_MACRO_n`. A key that holds one still
+  or the `QK_MACRO_n` duplicates of `MACRO_n`. A key that holds one still
   reads back by name (`tests/view/picker-sections.test.mjs`,
   `browser-tests/retired-user-keys.spec.js`).
+- A macro key reads as its name or `MACRO_n`, never the `VIA_MACRO_n` it was
+  called before firmware D-F31; typed, that former name still stages its slot
+  (`tests/view/keycode-expression.test.mjs`).
 - The picker folds modifiers into the simplest keycode that holds them
   (`modifierPick`): modifiers on one side alone, or with one modifier on the
   other side, are a keycode (`S(KC_LEFT_CTRL)`, `RGUI(KC_LEFT_GUI)`). Only two

@@ -279,7 +279,7 @@ test("combo grouping skips irrelevant holds but keeps layers that block transpar
         const key = index === 0 ? "KC_A" : index === 7 ? "KC_B" : index === 13 ? "KC_NO" : "KC_TRANSPARENT";
         return [{layoutIndex: 0, keycode: key}, {layoutIndex: 1, keycode: index === 15 ? "KC_C" : "KC_TRANSPARENT"}];
     }})));
-    const combo = {id: 0, inputs: ["KC_B", "KC_C"], output: "VIA_MACRO_0"};
+    const combo = {id: 0, inputs: ["KC_B", "KC_C"], output: "MACRO_0"};
     const groups = comboGroups({combos: [combo]}, stack, 15);
     assert.deepEqual(groups.throughKeys[0].held, [stack[7]]);
     assert.deepEqual(groups.throughKeys[0].keys.map(key => key.layer.index), [7, 15]);

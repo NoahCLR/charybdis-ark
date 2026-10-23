@@ -39,8 +39,8 @@ test("the playback protection control stages a portable policy and Review/discar
     const {macroEditorView} = require("../../core/model/macro-editor");
     const fixture = hostMacros(1 | (3 << 16), ["café🙂"]);
     const draft = new ProfileDraftSession(fixture.snapshot, "test-device", fixture.capabilities);
-    const message = edits.macroProtectionMessage("VIA_MACRO_0", "off", draft.current.fingerprint);
-    assert.deepEqual(message, {type: "updateMacro", keycode: "VIA_MACRO_0", protection: "off", expectedFingerprint: draft.current.fingerprint});
+    const message = edits.macroProtectionMessage("MACRO_0", "off", draft.current.fingerprint);
+    assert.deepEqual(message, {type: "updateMacro", keycode: "MACRO_0", protection: "off", expectedFingerprint: draft.current.fingerprint});
     stage(draft, message);
     assert.equal(macroEditorView(draft.current, fixture.capabilities).macros[0].uninterruptible, false);
     const change = draft.changes().find(row => row.unit === "macro:0");
@@ -111,9 +111,9 @@ test("Delete stores the key as transparent, and nothing else moves", () => {
 test("a modifier around a macro or pointing key is refused, not stored as another keycode", () => {
     const draft = session();
     const before = profileLayers(draft.document)[0].slice();
-    // the picker builds Cmd + VIA macro 3 as G(VIA_MACRO_3)
-    const picked = edits.pickerExpression({keys: ["VIA_MACRO_3"], mods: ["G"]});
-    assert.equal(picked, "G(VIA_MACRO_3)");
+    // the picker builds Cmd + macro 3 as G(MACRO_3)
+    const picked = edits.pickerExpression({keys: ["MACRO_3"], mods: ["G"]});
+    assert.equal(picked, "G(MACRO_3)");
     for (const keycode of [picked, "C(PD_SLOT_0)", "LOCK_LAYER(16)", "LT(60, 0x00)"]) {
         assert.throws(() => stage(draft, edits.setKey("Layer 0", 3, keycode)), /Cannot represent/, keycode);
     }
@@ -256,7 +256,7 @@ test("the editor removes exactly the rows the core's review notes as changing no
     const {resolveNativeQmkExpression} = require("../../core/schema/compiled-profile-v1");
     const model = buildSnapshotModel(session().current, capabilities, {editable: true, reason: ""});
     // Keys this profile holds, which the core publishes defaults for.
-    for (const keycode of ["KC_ENTER", "LGUI(KC_C)", "VIA_MACRO_10", "LT(3,KC_SLASH)", "OSM(MOD_LSFT)", "MO(3)", "LOCK_LAYER(3)", "PD_SLOT_0", "PD_SLOT_0_LOCK", "CUSTOM_KEY_0"]) {
+    for (const keycode of ["KC_ENTER", "LGUI(KC_C)", "MACRO_10", "LT(3,KC_SLASH)", "OSM(MOD_LSFT)", "MO(3)", "LOCK_LAYER(3)", "PD_SLOT_0", "PD_SLOT_0_LOCK", "CUSTOM_KEY_0"]) {
         const row = behaviourEditorRow(model, keycode);
         assert.ok(row, keycode);
         for (const fields of [{}, {terms: {tapHoldTerm: "120"}}, {terms: {multiTapTerm: "90"}}, {anchored: true}, {enabled: false}]) {
@@ -485,18 +485,18 @@ test("LED group rows land in every table, and groups renumber when one is delete
 
 test("a macro payload is posted as the text the keyboard stores", () => {
     const draft = session();
-    stage(draft, edits.macroMessage("VIA_MACRO_0", "hello{120}{KC_ENT}", draft.current.fingerprint));
+    stage(draft, edits.macroMessage("MACRO_0", "hello{120}{KC_ENT}", draft.current.fingerprint));
     assert.equal(draft.dirty, true);
     assert.ok(reviewAreas(draft).includes("Macros"));
-    assert.throws(() => stage(draft, edits.macroMessage("VIA_MACRO_0", "{KC_A", draft.current.fingerprint)),
+    assert.throws(() => stage(draft, edits.macroMessage("MACRO_0", "{KC_A", draft.current.fingerprint)),
         /macro command|}/i, "a payload the keyboard cannot parse is refused");
 });
 
 test("a macro name is posted without its steps, and review shows the rename", () => {
     const draft = session();
-    stage(draft, edits.macroMessage("VIA_MACRO_5", "hello", draft.current.fingerprint));
+    stage(draft, edits.macroMessage("MACRO_5", "hello", draft.current.fingerprint));
     const before = profileMacros(decoded(draft).document)[5];
-    const message = edits.macroNameMessage("VIA_MACRO_5", "  Sign-off ", draft.current.fingerprint);
+    const message = edits.macroNameMessage("MACRO_5", "  Sign-off ", draft.current.fingerprint);
     assert.deepEqual(Object.keys(message).sort(), ["expectedFingerprint", "keycode", "name", "type"], "no payload travels with a rename");
     stage(draft, message);
     const after = decoded(draft);
@@ -629,11 +629,12 @@ test("the keyboard's name is posted trimmed against the draft it was read from, 
 
 test("a macro left holding a key is refused, and macro and custom keys land as the keyboard's own values", () => {
     const draft = session();
-    assert.throws(() => stage(draft, edits.macroMessage("VIA_MACRO_0", "{+KC_A}", draft.current.fingerprint)), /Release/);
-    stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 0, keycode: "VIA_MACRO_63"}, {layoutIndex: 1, keycode: "CUSTOM_KEY_15"}]));
+    assert.throws(() => stage(draft, edits.macroMessage("MACRO_0", "{+KC_A}", draft.current.fingerprint)), /Release/);
+    stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 0, keycode: "MACRO_63"}, {layoutIndex: 1, keycode: "CUSTOM_KEY_15"}]));
     assert.equal(profileLayers(draft.document)[0][slotOf(0)], 0x773f);
     assert.equal(profileLayers(draft.document)[0][slotOf(1)], 0x7f0f);
-    assert.throws(() => stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 1, keycode: "MACRO_15"}])), /Cannot represent/, "the retired user macros are gone");
+    stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 1, keycode: "MACRO_15"}]));
+    assert.equal(profileLayers(draft.document)[0][slotOf(1)], 0x770f, "MACRO_n is a macro slot, no longer a retired user macro");
 });
 
 test("a recorded take appends to what the payload held, with no pause before the first key", () => {
@@ -644,7 +645,7 @@ test("a recorded take appends to what the payload held, with no pause before the
     ], {threshold: 30, round: 10});
     assert.equal(payload, "{KC_H}{KC_A}{120}{KC_B}{KC_C}", "gaps under the threshold are dropped");
     const draft = session();
-    stage(draft, edits.macroMessage("VIA_MACRO_1", payload, draft.current.fingerprint));
+    stage(draft, edits.macroMessage("MACRO_1", payload, draft.current.fingerprint));
     assert.equal(draft.dirty, true);
 });
 
@@ -1202,7 +1203,7 @@ test("the Host section posts staged settings with Review, undo, redo and backup 
     stage(draft, edits.settingsSection(host(), field => field.macro === "unicodeEnabled" ? true : undefined, portable.fingerprint(draft.document)));
     assert.equal(decoded(draft).settings.values[27], 0x102);
     assert.ok(reviewAreas(draft).includes("Settings"));
-    stage(draft, edits.macroMessage("VIA_MACRO_0", "café 🙂 e\u0301", portable.fingerprint(draft.document)));
+    stage(draft, edits.macroMessage("MACRO_0", "café 🙂 e\u0301", portable.fingerprint(draft.document)));
     assert.equal(Buffer.from(profileMacros(draft.document)[0], "base64").toString("utf8"), "café 🙂 e\u0301");
     const backup = JSON.parse(JSON.stringify(draft.document));
     assert.equal(portable.validateSnapshot(backup, caps).settings.values[27], 0x102);
@@ -1222,7 +1223,7 @@ test("the Host section stages a keyboard layout and the macOS ISO bit", () => {
     assert.deepEqual(message.fields, [{macro: "hostOs", value: "0"}, {macro: "hostLayout", value: "2"}, {macro: "macosIso", enabled: true}]);
     stage(draft, message);
     assert.equal(decoded(draft).settings.values[27], (2 << 16) | 0x1000000);
-    stage(draft, edits.macroMessage("VIA_MACRO_0", "café “hello” €", portable.fingerprint(draft.document)));
+    stage(draft, edits.macroMessage("MACRO_0", "café “hello” €", portable.fingerprint(draft.document)));
     assert.equal(Buffer.from(profileMacros(draft.document)[0], "base64").toString("utf8"), "café “hello” €");
 });
 
@@ -1231,8 +1232,8 @@ test("literal step messages inspect and stage the exact text with undo intact", 
     const {macroInputStatus} = require("../../core/model/macro-editor");
     const draft = session(), text = ' {"key": "{KC_A}"}\nhello ';
     const {payload} = macroStepsInput([{kind: "text", text}, {kind: "tap", keys: ["KC_ENT"]}]);
-    const message = edits.macroValidationMessage("VIA_MACRO_17", payload, 777);
-    assert.deepEqual(message, {type: "validateMacro", keycode: "VIA_MACRO_17", payload, requestId: 777});
+    const message = edits.macroValidationMessage("MACRO_17", payload, 777);
+    assert.deepEqual(message, {type: "validateMacro", keycode: "MACRO_17", payload, requestId: 777});
     assert.equal(macroInputStatus(draft.current, message, draft.capabilities).error, "");
     const before = draft.document;
     stage(draft, edits.macroMessage(message.keycode, message.payload, draft.current.fingerprint));
@@ -1280,11 +1281,11 @@ test("pointing macros stage inherit-only outputs and survive review, history and
     const snapshot = {document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)};
     const draft = new ProfileDraftSession(snapshot, "test-device", caps);
     const before = decoded(draft).pdModes[4];
-    stage(draft, {type: "updateMacro", keycode: "VIA_MACRO_0", payload: "Hi"});
-    stage(draft, edits.macroNameMessage("VIA_MACRO_0", "Greeting", draft.current.fingerprint));
+    stage(draft, {type: "updateMacro", keycode: "MACRO_0", payload: "Hi"});
+    stage(draft, edits.macroNameMessage("MACRO_0", "Greeting", draft.current.fingerprint));
     const config = readConfig(before, formOf({kind: 1, name: before.name, dpi: before.dpi, axis: AXIS.EIGHT,
-        "dir:left": "VIA_MACRO_0", "dirPolicy:left": MODIFIER_POLICY.EXACT,
-        "dir:right": "VIA_MACRO_127", "dirPolicy:right": MODIFIER_POLICY.MASK, "dirMask:right": 2,
+        "dir:left": "MACRO_0", "dirPolicy:left": MODIFIER_POLICY.EXACT,
+        "dir:right": "MACRO_127", "dirPolicy:right": MODIFIER_POLICY.MASK, "dirMask:right": 2,
         "diag:upLeft": "MC_0", "button:0:kind": BUTTON.TAP, "button:0:tap": "0x7700"}));
     stage(draft, edits.pdMode(4, config, draft.identity()));
     const after = decoded(draft).pdModes[4];
@@ -1303,9 +1304,9 @@ test("pointing macros stage inherit-only outputs and survive review, history and
     imported.replace(portable.validateSnapshot(backup).document, imported.revision, "edit", "Imported profile");
     assert.deepEqual(decoded(imported).pdModes[4], after, "a backup keeps the macro outputs");
     const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
-    assert.ok(model.pdModeEditing.tapKeys.plain.includes("VIA_MACRO_127"));
+    assert.ok(model.pdModeEditing.tapKeys.plain.includes("MACRO_127"));
     for (const [modifierPolicy, mask] of [[1, 2], [2, 0], [0, 2]]) {
-        const bad = structuredClone(config); bad.directions.left = {keycode: "VIA_MACRO_0", modifierPolicy, mask};
+        const bad = structuredClone(config); bad.directions.left = {keycode: "MACRO_0", modifierPolicy, mask};
         assert.throws(() => stage(draft, edits.pdMode(4, bad, draft.identity())), /must inherit held modifiers/);
     }
 });

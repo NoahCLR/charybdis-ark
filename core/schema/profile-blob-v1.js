@@ -36,8 +36,9 @@ const PROFILE_ACTION_KINDS = Object.freeze({
     LAYER_LOCK: 3,
     PD_MODE_MOMENTARY: 4,
     PD_MODE_LOCK: 5,
-    VIA_MACRO: 6,
-    // Kind 7 named the retired user macros under earlier action vocabularies.
+    MACRO: 6,
+    // Kind 7 named the retired user macros under earlier action vocabularies,
+    // when MACRO_n was their name, not a macro slot's.
     CUSTOM_KEY: 7,
 });
 
@@ -266,7 +267,7 @@ function normalizeSemanticAction(action, options = {}) {
         case PROFILE_ACTION_KINDS.PD_MODE_LOCK:
             assertOperandSlot(kind, operand, limits.maxPdModes, "PD mode");
             break;
-        case PROFILE_ACTION_KINDS.VIA_MACRO:
+        case PROFILE_ACTION_KINDS.MACRO:
             assertOperandSlot(kind, operand, limits.maxMacroSlots, "macro slot");
             break;
         case PROFILE_ACTION_KINDS.CUSTOM_KEY:

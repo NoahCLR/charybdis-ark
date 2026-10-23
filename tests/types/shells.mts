@@ -14,7 +14,7 @@ function shells(environment: WebEnvironment, response: PanelResponse) {
     // @ts-expect-error A model reply carries the complete published model.
     channel.post({type: 'model', model: {layers: []}});
     // @ts-expect-error A browser reply cannot stand in for an authored panel request.
-    api.postMessage({type: 'macroValidation', keycode: 'VIA_MACRO_0', payload: '', requestId: 1, validation: {error: '', code: ''}});
+    api.postMessage({type: 'macroValidation', keycode: 'MACRO_0', payload: '', requestId: 1, validation: {error: '', code: ''}});
 }
 void shells;
 

@@ -16,7 +16,7 @@ async function command(page, action) {
 
 
 async function openMacro(page, payload = '{KC_A}{KC_C}') {
-    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17'});
+    await openControls(page, 'macros', {macroSlot: 'MACRO_17'});
     await page.evaluate(async payload => {
         const store = await import('/webview/store.mjs'), model = structuredClone(store.getModel());
         Object.assign(model.macros[17], {payload, bytes: 6, empty: false});
@@ -146,12 +146,12 @@ test('Shift-click copy/paste preserves order, uses new identities, and paste/gro
 test('select-all and clipboard work between slots while history stays per slot; a reset from the core clears stale history', async ({page}) => {
     await openMacro(page);
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+a'); await page.keyboard.press('Control+c');
-    await page.locator('[data-slot="VIA_MACRO_18"]').click();
+    await page.locator('[data-slot="MACRO_18"]').click();
     await command(page, 'paste');
     await expect(page.locator('[data-step-tile]')).toHaveCount(2);
-    await page.locator('[data-slot="VIA_MACRO_17"]').click();
+    await page.locator('[data-slot="MACRO_17"]').click();
     expect((await history(page)).undo).toBe(0);
-    await page.locator('[data-slot="VIA_MACRO_18"]').click();
+    await page.locator('[data-slot="MACRO_18"]').click();
     await command(page, 'undo');
     await expect(page.locator('.macro-empty')).toBeVisible();
     expect((await history(page)).redo).toBeGreaterThan(0);
@@ -175,7 +175,7 @@ test('read-only editors consume step undo/paste without sending draft history or
     await page.keyboard.press('Control+z'); await page.keyboard.press('Control+v');
     await expect(page.locator('[data-step-tile]')).toHaveCount(1);
     expect(await updates(page)).toEqual([]); expect(await draftHistory(page)).toEqual([]);
-    await page.locator('[data-slot="VIA_MACRO_17"]').focus();
+    await page.locator('[data-slot="MACRO_17"]').focus();
     await page.keyboard.press('Control+z');
     expect(await draftHistory(page)).toEqual([expect.objectContaining({type: 'undoProfileDraft'})]);
 });
@@ -216,7 +216,7 @@ test('Ctrl/Meta-click selects disjoint steps; copying includes only selected ste
     await page.locator('[data-step-tile="0"]').click({modifiers: [process.platform === 'darwin' ? 'Meta' : 'Control']});
     await expect(page.locator('[data-step-id][aria-pressed="true"]')).toHaveCount(2);
     await page.keyboard.press('Control+c');
-    await page.locator('[data-slot="VIA_MACRO_18"]').click();
+    await page.locator('[data-slot="MACRO_18"]').click();
     await command(page, 'paste');
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{KC_A}{KC_C}');
     await expect(page.locator('[data-step-tile]')).toHaveCount(2);
@@ -247,7 +247,7 @@ test('restoring while an inspection by the core is pending rejects its late repl
 test('pasting an unsupported key stays local, and a finished take followed by Clear take is separately undoable', async ({page}) => {
     await openMacro(page);
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+c');
-    await page.locator('[data-slot="VIA_MACRO_18"]').click();
+    await page.locator('[data-slot="MACRO_18"]').click();
     await page.evaluate(async () => {
         const store = await import('/webview/store.mjs'), model = store.getModel();
         store.setModel({...model, macroPayloadKeycodes: model.macroPayloadKeycodes.filter(key => key !== 'KC_A')});
@@ -300,7 +300,7 @@ test('clicking an empty sequence gives shortcuts focus; paste replaces a blank T
     await openMacro(page, '{50}');
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+c');
     await page.locator('[data-step-delay]').fill('250'); await page.locator('[data-step-delay]').press('Tab');
-    await page.locator('[data-slot="VIA_MACRO_18"]').click();
+    await page.locator('[data-slot="MACRO_18"]').click();
     await page.locator('.macro-empty').click();
     await expect(page.locator('[data-sequence-tiles]')).toBeFocused();
     await page.keyboard.press('Control+v');

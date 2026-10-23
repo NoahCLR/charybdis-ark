@@ -37,7 +37,7 @@ function actionName(action) {
         case ACTION.QMK_KEYCODE: return keycodes.resolve(action.operand).name;
         case ACTION.LAYER_MOMENTARY: return `MO(${action.operand})`;
         case ACTION.LAYER_LOCK: return `LOCK_LAYER(${action.operand})`;
-        case ACTION.VIA_MACRO: return `VIA_MACRO_${action.operand}`;
+        case ACTION.MACRO: return `MACRO_${action.operand}`;
         case ACTION.CUSTOM_KEY: return `CUSTOM_KEY_${action.operand}`;
         case ACTION.PD_MODE_MOMENTARY:
         case ACTION.PD_MODE_LOCK: {
