@@ -210,7 +210,7 @@ const DRAFT_ACTIONS = Object.freeze({
         if (!draft.stale && !draft.base.incomplete && panelState(session).selectedDeviceId === draft.deviceId) {
             draft.discardAll(revision);
             session.resetDraftForms = true;
-            session.notice = "Draft discarded. Undo (⌘Z) brings it back.";
+            session.notice = "Draft discarded. Undo brings it back.";
             return;
         }
         draft.assertRevision(revision, {allowStale: true});

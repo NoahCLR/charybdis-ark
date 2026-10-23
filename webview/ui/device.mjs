@@ -44,7 +44,7 @@ export function screenDevice() {
     const restart = !demo && health?.restartNeeded ? `<div class="callout danger-note" role="alert"><strong>Restart the keyboard.</strong>
         The left half did not confirm a cancelled save, so the keyboard refuses new saves until it restarts. Nothing was lost.
         <ol class="steps"><li>Unplug the USB cable from the right half (not the cable between the halves).</li><li>Wait a few seconds, then plug it back in.</li><li>Choose Read keyboard below.</li></ol></div>` : "";
-    const earlier = !demo && health?.earlierFormat ? `<p class="note">A saved profile uses an earlier format or test layout that this firmware does not read, so the keyboard runs its built-in defaults. Apply saves your profile in the current format.</p>` : "";
+    const earlier = !demo && health?.earlierFormat ? `<p class="note">A saved profile uses an earlier format or test layout that this firmware does not read, so the keyboard runs its compiled defaults. Apply saves your profile in the current format.</p>` : "";
     const saving = !demo && health?.recoveryPending ? `<p class="note">${esc(SAVE_IN_PROGRESS.detail)}</p>` : "";
     const halves = halvesRows(model).map((half) => `<span class="half ${half.ok ? "ok" : "warn"}">${esc(half.side)} · ${esc(half.role)} ${half.ok ? "✓" : "!"}<span class="note"> ${esc(half.words)}</span></span>`).join("");
     const product = productName(model);
@@ -75,7 +75,7 @@ export function screenDevice() {
                     ["Halves", esc(halvesWords(model, health?.halves).label)],
                     ["Phase", esc(phaseWords(model, health?.phase)?.label || "")],
                     ["Firmware word", esc(model?.firmware?.versionWord || "")],
-                    ["Built-in defaults", esc(model?.firmware?.defaultsDigest || "")],
+                    ["Compiled defaults", esc(model?.firmware?.defaultsDigest || "")],
                 ])}</div>
                 <div class="list">${(model?.diagnostics || []).map((note) =>
                     `<div class="list-row note-row"><span class="note">${esc(note)}</span></div>`).join("")

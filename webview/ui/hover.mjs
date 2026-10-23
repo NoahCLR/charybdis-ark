@@ -16,6 +16,7 @@ import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
 import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, macroSteps, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {KIND} from "../view/pointing-config.mjs";
+import {modifierKey} from "../view/shortcuts.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
 const card = el(`<div class="hovercard" hidden></div>`);
@@ -141,7 +142,7 @@ function seenThrough(model, stack, index) {
             <div class="hc-h">Falls through to ${marked(model, {kind: "layer", layer: from.index}, layerName(from))}</div>
             <div class="hc-flow"><span class="hc-name">${keyNameMarked(model, keyName(position), keyMeaning(position))}</span>
             <code class="hc-stored">${esc(visibleKeycode(model, position.keycode))}</code></div>${headline(model, keyMeaning(position))}
-            ${held.length ? "" : `<div class="hc-sub hc-foot">With no layer previewed. ⌘-click a layer tab to see what answers while it is held.</div>`}</div>
+            ${held.length ? "" : `<div class="hc-sub hc-foot">With no layer previewed. ${modifierKey()}-click a layer tab to see what answers while it is held.</div>`}</div>
         ${sections.join("")}</div>`;
 }
 

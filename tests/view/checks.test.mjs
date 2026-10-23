@@ -63,6 +63,15 @@ test("a check's tags say its level, and where it comes from unless it is new", (
     assert.deepEqual(checkTags(check("warning", "fixed")), ["Warning", "fixed"]);
 });
 
+test("in the demo, what the draft started from is the demo setup, not a keyboard", () => {
+    assert.equal(checkGroups([check("warning", "existing")])[0].title, "Already on the keyboard");
+    assert.equal(checkGroups([check("warning", "existing")], {demo: true})[0].title, "Already in the demo setup");
+    assert.deepEqual(checkTags(check("notice", "existing"), {demo: true}), ["Notice", "in the demo setup"]);
+    for (const group of checkGroups([check("trap", "new"), check("warning", "existing"), check("notice", "fixed")], {demo: true})) {
+        assert.doesNotMatch(group.title, /keyboard/, group.id);
+    }
+});
+
 test("behaviour editor shows only current timing findings for its target", () => {
     const warning = {kind: "gestureTiming", status: "existing", place: {keycode: "QK_MOUSE_BUTTON_3"}};
     const model = {draft: {checks: [warning, {...warning, status: "fixed"}, {...warning, kind: "trap"},

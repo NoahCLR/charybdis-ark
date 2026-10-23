@@ -28,7 +28,7 @@ test("Host changes review affected text macros while leaving key steps and ident
     assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
     for (const row of effects) {
         assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
-        assert.match(row.note, /because of Settings → Host/);
+        assert.match(row.note, /because of Settings → Your computer\. Discard it together with that change\./);
         const typing = row.fields.find(field => field.label === "Text entry");
         assert.match(typing.before, /layout keys: "é"/);
         assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
@@ -75,7 +75,7 @@ test("a key changed for another with the same label is still a visible change", 
     const after=structuredClone(changed); editLayers(after, layers => layers[1][7]=0x59); // KC_1 → KC_KP_1, both labelled "1"
     const rows=profileReview(base,snapshot(after));
     assert.equal(rows.length,1);
-    assert.equal(rows[0].area,"Layout");
+    assert.equal(rows[0].area,"Keys");
     const [field]=rows[0].fields;
     assert.notEqual(field.before,field.after);
     assert.match(field.before,/KC_1\b/); assert.match(field.after,/KC_KP_1/);
@@ -84,7 +84,7 @@ test("a key changed for another with the same label is still a visible change", 
 test("a key changed to a layer key carries that layer's mark, and one changed to a pointing mode its slot", () => {
     const before=snapshot(document()), after=structuredClone(before.document);
     editLayers(after, layers => layers[0][7]=0x5225); editLayers(after, layers => layers[0][8]=0x4338); editLayers(after, layers => layers[0][9]=0x7e80); editLayers(after, layers => layers[0][10]=0x04); // MO(5), LT(3,KC_SLASH), PD slot 0, KC_A
-    const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Layout").map(row=>row.fields[0].afterMark);
+    const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Keys").map(row=>row.fields[0].afterMark);
     assert.deepEqual(marks,[{kind:"layer",layer:5},{kind:"layer",layer:3},{kind:"pointing",slot:0},undefined]);
 });
 
@@ -98,6 +98,7 @@ test("a key's participation is named where the key sits, as its layout change is
     const key=rows.find(row=>row.unit.startsWith("layout:")), placement=rows.find(row=>row.unit.startsWith("placement:"));
     assert.equal(key.title,"Base · Right · row 1, column 5");
     assert.equal(placement.title,"Participation · Base · Right · row 1, column 5");
+    assert.deepEqual([key.area,placement.area],["Keys","Keys"],"both sit under the screen they are made on");
 });
 
 // ── items ───────────────────────────────────────────────────────────────

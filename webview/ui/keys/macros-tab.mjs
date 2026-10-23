@@ -18,7 +18,7 @@ export function tabMacros(body, right) {
     const slots = model?.viaMacros || [];
     const reach = {...macroReach(model, layers(), state.layer), inView: macroView(model)};
     right.replaceChildren();
-    const open = el(`<button class="btn tiny ghost">Open the Macros view</button>`);
+    const open = el(`<button class="btn tiny ghost">Open the Macros screen</button>`);
     open.addEventListener("click", () => { state.screen = "macros"; render(); });
     right.appendChild(open);
 

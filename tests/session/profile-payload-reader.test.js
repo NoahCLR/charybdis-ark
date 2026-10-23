@@ -53,7 +53,7 @@ test("compiled defaults reuse stays in its connection and source", async () => {
     assert.deepEqual(compiled.requests, [0, 1, 2, 3, 0], "a new connection reader downloads defaults afresh");
 });
 
-// A reconnect, or Ark opened again, need not download the firmware's defaults
+// A reconnect, or Ark opened again, need not download the compiled defaults
 // again: a new reader may start from the last verified copy, which it uses
 // only when the keyboard's metadata names exactly those bytes.
 test("a new connection's reader reuses verified compiled defaults only for the same bytes", async () => {
@@ -70,7 +70,7 @@ test("a new connection's reader reuses verified compiled defaults only for the s
     kept[0].bytes[0] ^= 1;
     const same = payloadDevice({bytes, generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
     assert.deepEqual((await new ProfilePayloadReader(same, {compiled: kept[0]}).readCompiled()).bytes, bytes);
-    assert.deepEqual(same.requests, [0, 0], "the same firmware's defaults: metadata only");
+    assert.deepEqual(same.requests, [0, 0], "the same compiled defaults: metadata only");
     const other = payloadOf(61);
     const flashed = payloadDevice({bytes: other, generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
     assert.deepEqual((await new ProfilePayloadReader(flashed, {compiled: kept[0]}).readCompiled()).bytes, other);

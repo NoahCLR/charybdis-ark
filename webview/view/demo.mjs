@@ -25,6 +25,10 @@ export const DEMO_WORDS = Object.freeze({
     explore: "Explore a demo",
     exploreTip: "Open Ark on a demo setup, with no keyboard. Every screen works and every edit shows in the review; only Apply needs a keyboard.",
     exportNote: "Save the demo setup, with your edits, as a complete profile file. On your keyboard, Import it to review and apply it.",
+    draftTip: "Edits waiting in this window, over the demo setup. Nothing here is on a keyboard.",
+    // Where a check the draft did not make comes from: the demo setup.
+    existingChecks: "Already in the demo setup",
+    existingCheck: "in the demo setup",
 });
 
 // Leaving the demo, or opening another file in it, loses edits not exported

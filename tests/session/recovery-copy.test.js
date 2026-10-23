@@ -6,7 +6,7 @@ const {recoveryFileName} = require("../../core/session/recovery-copy");
 
 const at = new Date("2026-10-23T14:02:00.512Z");
 
-test("a recovery file is named by when, what made it and the keyboard", () => {
+test("a recovery copy is named by when, what made it and the keyboard", () => {
     assert.equal(recoveryFileName({format: "charybdis-profile"}, {cause: "save", keyboard: "Noah's Charybdis"}, at),
         "recovery-2026-10-23T14-02-00-512Z-before-save-noah-s-charybdis.charybdis.json");
     assert.equal(recoveryFileName({format: "charybdis-recovery-capture"}, {cause: "restore", keyboard: "Bastard Keyboards Charybdis"}, at),

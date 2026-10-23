@@ -9,7 +9,7 @@
 // item knows how to go to its editor.
 
 // The order areas are read in, as the rail lists the screens they live on.
-export const AREAS = ["Layout", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
+export const AREAS = ["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
 /** @param {string} area */
 const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 
@@ -17,7 +17,7 @@ const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 // host listed them. A group whose items span areas is shown in each area as
 // the part of it that lives there: every part carries the group's size, for
 // its Discard, and the other areas it reaches, so a swap of two layers reads
-// as keys under Layout, behaviours under Behaviours, and so on.
+// as keys under Keys, behaviours under Behaviours, and so on.
 /** @param {readonly import("../../contracts/model.js").ReviewChange[]} changes */
 export function reviewBlocks(changes) {
     /** @type {Map<number | null | undefined, {size: number, areas: Set<string>}>} */
@@ -235,3 +235,7 @@ function computeMarks(changes) {
 // pointing slot card) it sits in the tile's top-right corner, as on the board.
 /** @param {string} [tip] @param {string} [place] */
 export const draftDot = (tip = "Changed in your draft", place = "") => `<i class="draft-dot ${place}" data-tip="${tip}" aria-label="${tip}"></i>`;
+
+// What a stale draft's bar says it keeps: "your 1 change is kept".
+/** @param {number} count */
+export const changesKept = (count) => `your ${count} change${count === 1 ? " is" : "s are"} kept`;

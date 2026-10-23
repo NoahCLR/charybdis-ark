@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, liveSaveState, questionWords, railSaveLine, railSaveLines, switchQuestion} from "../../webview/view/edit-mode.mjs";
+import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, liveSaveState, questionWords, quietWords, railSaveLine, railSaveLines, switchQuestion} from "../../webview/view/edit-mode.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 
 const vocabulary = {editModes: {
@@ -28,13 +28,15 @@ test("leaving Live asks nothing (the keyboard saves first); entering it asks as 
 });
 
 test("in Live the keyboard's own saving is said from its status; flags show with the one way on", () => {
-    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, quietMs: 3000};
+    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, quietMs: 3000, quietWords: "3 seconds"};
     /** @param {object} live */
     const draft = live => /** @type {any} */ ({live: {mode: LIVE, unsaved: false, converged: true, keyboard, ...live}});
     assert.equal(liveSaveState(/** @type {any} */ ({live: null})), null);
     assert.equal(liveSaveState(draft({})), null, "nothing to say");
     assert.deepEqual((({kind, title}) => [kind, title])(/** @type {any} */ (liveSaveState(draft({unsaved: true})))), ["pending", "Not saved yet"]);
     assert.match(/** @type {any} */ (liveSaveState(draft({unsaved: true}))).detail, /after 3 seconds without typing/);
+    assert.match(/** @type {any} */ (liveSaveState(draft({unsaved: true, keyboard: {...keyboard, quietMs: 5000, quietWords: "5 seconds"}}))).detail, /after 5 seconds without typing/);
+    assert.equal(quietWords(null), "a few seconds", "no keyboard to say");
     assert.equal(liveSaveState(draft({unsaved: true, keyboard: {...keyboard, saving: true, storagePaused: true}}))?.detail, "The keyboard writes flash once no key is held.");
     assert.equal(liveSaveState(draft({keyboard: {...keyboard, savedByKeyboard: true}}))?.title, "Saved by the keyboard");
     assert.equal(liveSaveState(draft({unsaved: true, keyboard: {...keyboard, saveFailed: true}}))?.action, "save");
@@ -145,7 +147,10 @@ test("the question lists the checks Save or Send confirms", () => {
     assert.match(save.detail, /Save these edits with this warning\?/);
     assert.equal(save.answers[1].label, "Save anyway");
     assert.deepEqual(save.checks, checks);
-    assert.match(questionWords("sendOrDiscard", 1, {checks}).detail, /Send this edit with this warning\?/);
+    assert.match(questionWords("sendOrDiscard", 1, {checks}).detail, /Send your draft with this warning\?$/);
+    const trap = /** @type {any[]} */ ([{level: "trap", title: "Numbers can lock with no way back to Base", status: "new"}]);
+    assert.match(questionWords("sendOrDiscard", 3, {checks: trap}).detail, /Send your draft anyway\?$/, "it sends the whole draft, not one edit");
+    assert.doesNotMatch(questionWords("sendOrDiscard", 3, {checks: trap}).detail, /this edit/);
     assert.deepEqual(controls.setEditMode(LIVE_REVIEW, "send", true), {type: "setEditMode", mode: 2, pending: "send", confirmChecks: true});
 });
 

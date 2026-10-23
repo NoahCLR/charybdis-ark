@@ -12,7 +12,7 @@ choice holds across replugs and in both Chrome and VS Code.
 | Mode | An edit… | It is kept when… | Unplugging before then… |
 | --- | --- | --- | --- |
 | **Live + review** | runs on the keyboard at once | you review it and **Save** | puts back what was saved |
-| **Live** | runs on the keyboard at once | the keyboard saves it by itself, 3 seconds after your last edit with no key held | loses every edit since the last save |
+| **Live** | runs on the keyboard at once | the keyboard saves it by itself, a few seconds (3 unless it says otherwise) after your last edit with no key held | loses every edit since the last save |
 | **Apply** | waits in Ark; the keyboard is unchanged | you review it and **Apply** | changes nothing on the keyboard |
 
 A keyboard that was never set is in Live + review.
@@ -50,7 +50,8 @@ saved, and **Revert** puts both back on the saved profile.
 
 Live works like Live + review, with the same undo, redo and trap question, but
 there is no Save. The keyboard saves what it runs by itself once you have
-stopped editing for 3 seconds and no key is held. Holding a key puts the save
+stopped editing for the interval it reports (3 seconds unless it says
+otherwise; the bar names it) and no key is held. Holding a key puts the save
 off.
 
 - The bar says **Not saved yet** until then, with **Revert** and a button
@@ -97,7 +98,7 @@ from the bar.
 
 **Checks** come first: what the draft lets the keyboard do, and what must be
 fixed first. Then the changes, grouped by the area they are edited in:
-Layout, Layers, Behaviours, Combos, Custom keys, Macros, Mouse, Pointing modes,
+Keys, Layers, Behaviours, Combos, Custom keys, Macros, Mouse, Pointing modes,
 Lighting, Settings and so on. Each change shows the fields that differ, with
 the keyboard's value and the draft's side by side.
 

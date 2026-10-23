@@ -364,7 +364,7 @@ function profileReview(before, after, capabilities) {
         // its old name on the keyboard and its new one in the draft.
         /** @param {number} code @param {Names} names */
         const values = (code, names) => ({text: keyLabel(names.keys, code), detail: keyLabelWithName(names.keys, code), key: code, mark: keyMark(code)});
-        item("Layout", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.layers[l][p], namesB)]]),
+        item("Keys", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.layers[l][p], namesB)]]),
             {kind: "key", layer: l, layoutIndex: LAYOUT_INDEX.get(p)}, undefined, {kind: "layer", layer: l});
     }));
     a.settings.names.forEach((name, i) => {
@@ -381,7 +381,7 @@ function profileReview(before, after, capabilities) {
             /** @param {import("../schema/types.js").LayerRecord} entry @returns {Fields} */
             const fields = entry => new Map([["Use shared behaviour", entry.bypass.includes(position) ? "off" : "on"], ["Join combos", entry.exclude.includes(position) ? "off" : "on"]]);
             // Named where the key sits, as its layout change is.
-            item("Layout", `placement:${layer}:${position}`, `Participation · ${layerName(b, layer)} · ${positionName(position)}`, fields(record), fields(b.settings.layers[layer]),
+            item("Keys", `placement:${layer}:${position}`, `Participation · ${layerName(b, layer)} · ${positionName(position)}`, fields(record), fields(b.settings.layers[layer]),
                 {kind: "key", layer, layoutIndex: LAYOUT_INDEX.get(position)}, [true, true]);
         }
     });
@@ -445,8 +445,8 @@ function profileReview(before, after, capabilities) {
             };
             // The effect belongs to Host, so discarding it restores Host and
             // preserves independently edited macro text and names.
-            item("Macros", "settings:host", `Macro ${index}${macro.name ? ` · ${macro.name}` : ""} · host setup`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
-            /** @type {Change} */ (items.at(-1)).note = "Playback changes because of Settings → Host. Discard together with the Host change.";
+            item("Macros", "settings:host", `Macro ${index}${macro.name ? ` · ${macro.name}` : ""} · Your computer settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
+            /** @type {Change} */ (items.at(-1)).note = "Playback changes because of Settings → Your computer. Discard it together with that change.";
         });
     }
     // A custom key is its name and shortcut here; what its behaviour adds is

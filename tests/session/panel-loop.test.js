@@ -211,7 +211,8 @@ test("an export refused after disconnect reports the same failure in the notice 
         await loop.handleMessage({type: "exportPortableProfile"});
         const reply = last(host), error = loop.session.service.snapshot().error;
         assert.equal(error.message, "Connect the keyboard and wait for the current operation to finish.");
-        assert.equal(reply.notice, `Failed [${error.code}]: ${error.message}`);
+        assert.ok(error.code, "the failure keeps its code");
+        assert.equal(reply.notice, `Failed: ${error.message}`, "the notice reads as its sentence, without the code");
         assert.equal(reply.model.device.health.error, error.message);
         assert.match(loop.session.service.snapshot().diagnostics.at(-1), /Connect the keyboard and wait/);
         assert.deepEqual(host.exports, []);
@@ -226,7 +227,7 @@ test("a keyboard that never answers becomes a failure notice and a host error", 
     await loop.handleMessage({type: "refresh"});
     assert.ok(adapter.lastConnection().writes.length, "the loop reached the device through the injected adapter");
     assert.equal(host.errors.length, 1);
-    assert.equal(last(host).notice, `Failed [TIMEOUT]: ${host.errors[0]}`, "the failed connection's own error, with its code");
+    assert.equal(last(host).notice, `Failed: ${host.errors[0]}`, "the failed connection's own error, without its code");
     assert.equal(loop.session.readBusy, false, "a failed read leaves the panel free to try again");
     await loop.close();
 });
@@ -261,6 +262,7 @@ test("a refused edit is answered too, with the refusal as a notice", async () =>
     assert.equal(host.posted.length, 1, "a refusal still publishes, so the panel is not left waiting");
     assert.equal(last(host).acceptedEdit, undefined);
     assert.match(last(host).notice, /^Failed: This edit belongs to an older draft/);
+    assert.doesNotMatch(last(host).notice, /\[[A-Z_]+\]/, "no operation-failure code shows");
     assert.equal(host.errors.length, 1);
     assert.equal(loop.session.draft.dirty, false, "nothing was staged");
     // Even a message nobody knows is answered.
@@ -268,11 +270,11 @@ test("a refused edit is answered too, with the refusal as a notice", async () =>
     assert.equal(host.posted.length, 2);
 });
 
-test("an error with a code reaches the panel with its code", async () => {
+test("an error with a code reaches the panel as its sentence, without the code", async () => {
     const timeout = async () => {throw liveLinkError(LIVE_LINK_ERROR_CODES.TIMEOUT, "The keyboard did not answer.");};
     const host = fakeHost(), loop = loopWithDraft(host, {readPortableProfile: timeout});
     await loop.handleMessage({type: "exportPortableProfile"});
-    assert.equal(last(host).notice, "Failed [TIMEOUT]: The keyboard did not answer.");
+    assert.equal(last(host).notice, "Failed: The keyboard did not answer.");
     assert.deepEqual(host.errors, ["The keyboard did not answer."]);
     assert.deepEqual(host.exports, [], "nothing is saved when the read fails");
     assert.equal(loop.session.portableBusy, false);

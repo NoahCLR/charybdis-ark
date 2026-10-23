@@ -9,9 +9,14 @@
 // warnings ask for confirmation whether the draft made them or the keyboard
 // already has them.
 
+import {DEMO_WORDS} from "./demo.mjs";
+
 const LEVEL_RANK = {blocker: 0, trap: 1, warning: 2, notice: 3};
 export const LEVEL_WORD = {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"};
 export const STATUS_WORD = {new: "new", existing: "on the keyboard", fixed: "fixed"};
+// In the demo nothing is on a keyboard: what the draft started from is the
+// demo setup.
+const DEMO_STATUS_WORD = {...STATUS_WORD, existing: DEMO_WORDS.existingCheck};
 
 /** @param {import("../../contracts/model.js").Check} a @param {import("../../contracts/model.js").Check} b */
 const byLevel = (a, b) => (LEVEL_RANK[a.level] ?? 3) - (LEVEL_RANK[b.level] ?? 3);
@@ -19,13 +24,13 @@ const byLevel = (a, b) => (LEVEL_RANK[a.level] ?? 3) - (LEVEL_RANK[b.level] ?? 3
 // The groups the review lists, in reading order, leaving out empty ones. A
 // group opens by default when it has something to act on: what the draft adds,
 // and anything on the keyboard that is a trap.
-/** @param {readonly import("../../contracts/model.js").Check[]} [checks] */
-export function checkGroups(checks = []) {
+/** @param {readonly import("../../contracts/model.js").Check[]} [checks] @param {{demo?: boolean}} [options] */
+export function checkGroups(checks = [], {demo = false} = {}) {
     /** @param {import("../../contracts/model.js").Check["status"]} status */
     const of = (status) => checks.filter((check) => check.status === status).sort(byLevel);
     return [
         {id: "new", title: "New in this draft", items: of("new"), open: true},
-        {id: "existing", title: "Already on the keyboard", items: of("existing"), open: of("existing").some((check) => ["trap", "blocker"].includes(check.level))},
+        {id: "existing", title: demo ? DEMO_WORDS.existingChecks : "Already on the keyboard", items: of("existing"), open: of("existing").some((check) => ["trap", "blocker"].includes(check.level))},
         {id: "fixed", title: "Fixed by this draft", items: of("fixed"), open: false},
     ].filter((group) => group.items.length);
 }
@@ -52,7 +57,7 @@ export function checkSourceGroup(check, changes = []) {
 }
 
 // What the confirmation says before Apply (or Save, or a live edit) goes ahead.
-/** @param {readonly import("../../contracts/model.js").Check[]} checks @param {'apply' | 'save' | 'send'} [action] */
+/** @param {readonly import("../../contracts/model.js").Check[]} checks @param {'apply' | 'save' | 'send' | 'sendDraft'} [action] `send` is one live edit; `sendDraft` the whole draft, sent on switching to a live mode */
 export function confirmText(checks, action = "apply") {
     if (!checks.length) return "";
     const traps = checks.filter((check) => check.level === "trap");
@@ -61,16 +66,17 @@ export function confirmText(checks, action = "apply") {
     const count = (number, word) => `${number} ${word}${number === 1 ? "" : "s"}`;
     const trapCount = traps.reduce((total, check) => total + (check.kind === "trapOverflow" ? /** @type {number} */ (check.count) : 1), 0);
     const lead = checks.length === 1 ? checks[0].title : [traps.length && count(trapCount, "trap"), warnings.length && count(warnings.length, "warning")].filter(Boolean).join(" and ");
-    const ask = {apply: "Apply this profile", save: "Save these edits", send: "Send this edit"}[action];
+    const ask = {apply: "Apply this profile", save: "Save these edits", send: "Send this edit", sendDraft: "Send your draft"}[action];
     return traps.length ? `${lead}. A trapped layer can leave no way back to Base until you unplug the keyboard. ${ask} anyway?`
         : `${lead}. ${ask} with ${warnings.length === 1 ? "this warning" : "these warnings"}?`;
 }
 
 // The line a check's header shows beside its title: its level, and where it
 // comes from unless it is new.
-/** @param {import("../../contracts/model.js").Check} check */
-export function checkTags(check) {
-    return [LEVEL_WORD[check.level] || check.level, ...(check.status === "new" ? [] : [STATUS_WORD[check.status] || check.status])];
+/** @param {import("../../contracts/model.js").Check} check @param {{demo?: boolean}} [options] */
+export function checkTags(check, {demo = false} = {}) {
+    const words = demo ? DEMO_STATUS_WORD : STATUS_WORD;
+    return [LEVEL_WORD[check.level] || check.level, ...(check.status === "new" ? [] : [words[check.status] || check.status])];
 }
 
 // Findings already use the behaviour's semantic keycode in their edit target.

@@ -23,12 +23,13 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis
 const keycodes = require("../data/keycode-catalog");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {liveKeyboardStatus} = require("./live-profile-session");
+const {quietWords} = require("../model/vocabulary");
 
 // What the panel shows of the keyboard's own saving and its halves.
 /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
 const liveKeyboardView = keyboard => keyboard ? {saving: keyboard.saving, autoSaving: keyboard.autoSaving, savedByKeyboard: keyboard.savedByKeyboard,
     adjustmentPending: keyboard.adjustmentPending, saveFailed: keyboard.saveFailed, storagePaused: keyboard.storagePaused || keyboard.peerStoragePaused,
-    stopped: Boolean(keyboard.stopped), peerStopped: Boolean(keyboard.peerStopped), quietMs: keyboard.quietMs} : null;
+    stopped: Boolean(keyboard.stopped), peerStopped: Boolean(keyboard.peerStopped), quietMs: keyboard.quietMs, quietWords: quietWords(keyboard.quietMs)} : null;
 /**
  * @typedef {import("../model/types.js").PortableDocument} Document
  * @typedef {import("../model/types.js").ProfileSnapshot} Snapshot
@@ -366,7 +367,7 @@ class ProfileDraftSession {
             if (then) document = this.editFollowing(then, document);
         }
         else if (editedBy(message, "keyboardName")) document = editKeyboardName(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (editedBy(message, "layout")) document = this.editLayout(message);
+        else if (editedBy(message, "keymap")) document = this.editLayout(message);
         else if (editedBy(message, "profile")) document = this.editProfile(message, current.document);
         else throw fail("Unsupported draft edit.");
         return {document: validateSnapshot(document, this.capabilities).document, label: draftEditLabel(message, current.document), previousFingerprint: before};

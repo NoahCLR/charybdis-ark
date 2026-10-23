@@ -157,7 +157,7 @@ test("one draft composes every editor without changing its device snapshot", () 
     stage(draft,{type:"updateLayerColor",layer:"Layer 0",h:"23",s:"255",v:"100",mode:"KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
     stage(draft,{type:"saveCombo",id:0,inputs:["KC_A","KC_B"],output:"G(KC_N)",termMs:"60",holdTermMs:"200"});
     const view = draft.view({connected:true,selectedDeviceId:"board"});
-    assert.deepEqual(new Set(view.changes.map(c=>c.area)),new Set(["Layout","Macros","Settings","Behaviours","Lighting","Combos"]));
+    assert.deepEqual(new Set(view.changes.map(c=>c.area)),new Set(["Keys","Macros","Settings","Behaviours","Lighting","Combos"]));
     assert.match(view.changes.find(c=>c.area==="Combos").fields.find(f=>f.label==="Sends").after,/GUI\+N/);
     assert.equal(JSON.stringify(snapshot),original);
     assert.equal(draft.base.fingerprint,snapshot.fingerprint);

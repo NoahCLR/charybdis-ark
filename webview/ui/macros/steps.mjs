@@ -3,7 +3,7 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {describeStep, macroStepsInput} from "../../view/macro.mjs";
+import {describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
 import {withStepFocus} from "../../view/macro-focus.mjs";
 import {actionLabel} from "../../view/keyface.mjs";
 import {appendSequenceStep, moveSequenceStep, sequenceFace, sequenceInsertionAt, sequenceIssues} from "../../view/macro-sequence.mjs";
@@ -12,11 +12,6 @@ import {openPicker} from "../picker.mjs";
 import {stepMark, stepWord} from "../marks.mjs";
 import {inspectEdit} from "./validation.mjs";
 import {finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
-/** @type {[MacroStep["kind"], string][]} */
-export const STEP_KINDS = [
-    ["text", "Text"], ["tap", "Tap key or chord"], ["delay", "Delay"],
-    ["press", "Press and hold"], ["release", "Release"],
-];
 
 // Like the board's deletion shortcut, consume Backspace before a host turns it
 // into navigation. Keep normal editing keys inside form fields and dialogs.
@@ -73,7 +68,7 @@ export function insertStep(model, slot, steps, kind) {
     };
     if (kind === "text") insert({kind, text: ""});
     else if (kind === "delay") insert({kind, delay: 120});
-    else openPicker({title: STEP_KINDS.find(([value]) => value === kind)?.[1] || kind, contextKeycode: slot.keycode,
+    else openPicker({title: stepKindName(kind), contextKeycode: slot.keycode,
         mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? 16 : 1,
         onPick: expression => insert({kind, keys: expression.split(",").map(key => key.trim()).filter(Boolean)}),
     });
@@ -139,7 +134,7 @@ function paintTiles(node, model, slot, steps) {
     }
     node.replaceChildren(...steps.map((step, index) => {
         const face = sequenceFace(model, step), selected = selectedStepIds(slot).includes(step.focusId || "");
-        const title = `${index + 1}. ${STEP_KINDS.find(([kind]) => kind === step.kind)?.[1]}: ${face.full || "Choose a value"}${issues[index] ? ` · ${issues[index]}` : ""}`;
+        const title = `${index + 1}. ${stepKindName(step.kind)}: ${face.full || "Choose a value"}${issues[index] ? ` · ${issues[index]}` : ""}`;
         const content = "keys" in step && step.keys.length
             ? step.keys.map((key, at) => `<span class="macro-chord-part">${at ? "+ " : ""}${esc(sequenceFace(model, {kind: "tap", keys: [key]}).label)}</span>`).join(" ")
             : esc(face.label || (step.kind === "text" ? "Text…" : "Choose…"));
@@ -204,7 +199,7 @@ function removeStep(slot, steps, id) {
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps @param {MacroStep} step @param {number} index @param {boolean} canEdit */
 export function stepEditor(model, slot, steps, step, index, canEdit) {
-    const label = STEP_KINDS.find(([kind]) => kind === step.kind)?.[1] || step.kind;
+    const label = stepKindName(step.kind);
     const node = el(`<div class="macro-step" data-step="${index}">
         <div class="row macro-step-head"><span class="kind">Step ${index + 1} · ${esc(label)}</span><span class="right row">
             <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step earlier">← Earlier</button>

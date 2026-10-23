@@ -7,6 +7,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, heldLayers, layerName, layers, previewing, render, showLayer, state, toggleLayerOn} from "../store.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
+import {modifierKey} from "../view/shortcuts.mjs";
 
 // A layer's swatch and how it is lit, the same wherever a layer is named: a
 // layer whose colour is off, or whose stage is off, shows as unlit.
@@ -21,8 +22,8 @@ export function layerSwatch(model, layer, className = "") {
     };
 }
 
-// ⌘ on a Mac, Ctrl elsewhere: the modifier a click adds a layer to the preview with.
-const ADD_KEY = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform || "") ? "⌘" : "Ctrl";
+// The modifier a click adds a layer to the preview with (view/shortcuts.mjs).
+const ADD_KEY = modifierKey();
 
 // The layer tabs. Which layer you are looking at is a property of the
 // keyboard, not of a screen, so Keys and Lighting share one control, and it

@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {VOCABULARY, word, layerName, slotName, branchName, modifierNames} = require("../../core/model/vocabulary");
+const {VOCABULARY, EDIT_MODE_WORDS, editModeWords, quietWords, word, layerName, slotName, branchName, modifierNames} = require("../../core/model/vocabulary");
 const rgb = require("../../core/schema/rgb-domain-v1");
 const pd = require("../../core/schema/pd-mode-domain-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../../core/schema/key-behavior-domain-v1");
@@ -114,4 +114,14 @@ test("every state of the two halves has a label and words saying what to do", ()
         assert.doesNotMatch(`${label} ${detail}`, /converge|generation|peer|digest/i, `${id} is said without the protocol's words`);
     }
     assert.match(VOCABULARY.halves.alone.detail, /cable between the halves/);
+});
+
+test("Live's quiet interval is the one the keyboard reports, 3 seconds until it has", () => {
+    assert.equal(quietWords(5000), "5 seconds");
+    assert.equal(quietWords(1000), "1 second");
+    assert.equal(quietWords(undefined), "3 seconds");
+    assert.equal(quietWords(0), "3 seconds", "nothing reported");
+    assert.match(editModeWords(5000)[1].detail, /after 5 seconds with no edit/);
+    assert.match(EDIT_MODE_WORDS[1].detail, /after 3 seconds with no edit/);
+    assert.equal(editModeWords(5000)[0].detail, EDIT_MODE_WORDS[0].detail, "only Live's words carry it");
 });

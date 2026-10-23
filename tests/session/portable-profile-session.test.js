@@ -112,7 +112,7 @@ test("a sent commit the keyboard cancels is reported as not saved", async t => {
     await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && /no observable progress/.test(error.message) && !/Unplug/.test(error.message));
     assert.equal(f.keyboard.durable, false); assert.equal(f.keyboard.events.at(-1), "aborted");
 });
-test("a sent commit without a confirmed cancel keeps its recovery file and unknown outcome", async t => {
+test("a sent commit without a confirmed cancel keeps its recovery copy and unknown outcome", async t => {
     const f = fixture(); stall(f, t, {abortRejected: true});
     await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && error.saved === "unknown" && error.message.includes("/recovery.json"));
     assert.equal(f.keyboard.events.at(-1), "abort refused");

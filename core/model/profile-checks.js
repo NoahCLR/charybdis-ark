@@ -61,9 +61,9 @@ function profileFindings(decoded, destination = {}) {
         const playback = inspectMacroPlayback(payload, host);
         if (!playback.error) return;
         findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${playback.code}:${playback.error}`,
-            title: `Macro ${index} cannot play with this Host setup`,
+            title: `Macro ${index} cannot play with the settings in Your computer`,
             detail: `${playback.error} The keyboard stores this macro, but pressing it does nothing.`,
-            fix: "Fix the macro or change Settings → Host before playing it.", place: {kind: "macro", index}});
+            fix: "Fix the macro or change Settings → Your computer before playing it.", place: {kind: "macro", index}});
     });
     for (const output of pointingMacros(decoded.pdModes || [])) {
         const where = {kind: /** @type {const} */ ("pointing"), slot: output.slot};

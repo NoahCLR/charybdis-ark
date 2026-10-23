@@ -91,14 +91,26 @@ const LIVE_RESULT_WORDS = Object.freeze({
     STOPPED: "the keyboard stopped saving. Restart it to continue.",
 });
 
+// How long a keyboard in Live waits, with no edit and no key held, before it
+// saves by itself, in words: the quiet interval it reports, or 3 seconds
+// until it has reported one (firmware D-F32).
+const QUIET_FALLBACK_MS = 3000;
+/** @param {number | null | undefined} [quietMs] */
+function quietWords(quietMs) {
+    const seconds = Math.round((quietMs || QUIET_FALLBACK_MS) / 1000);
+    return `${seconds} second${seconds === 1 ? "" : "s"}`;
+}
+
 // How edits reach a keyboard (stored on it, firmware D-F32), all three
 // offered: what each does and what a replug does to edits not saved yet.
-/** @type {Readonly<Record<number, Readonly<{id: import('../../contracts/model.js').EditModeId, label: string, detail: string}>>>} */
-const EDIT_MODE_WORDS = Object.freeze({
+// Live's words carry the keyboard's quiet interval.
+/** @param {number | null | undefined} [quietMs] @returns {Readonly<Record<number, Readonly<{id: import('../../contracts/model.js').EditModeId, label: string, detail: string}>>>} */
+const editModeWords = (quietMs) => Object.freeze({
     0: Object.freeze({id: "apply", label: "Apply", detail: "Edits stay in Ark's draft until you review and apply them. The keyboard runs its saved profile until then."}),
-    1: Object.freeze({id: "live", label: "Live", detail: "Edits take effect on the keyboard at once. With or without Ark, the keyboard starts saving after 3 seconds with no edit and no key held; holding a key postpones it. Unplugging loses every edit since the last successful save. A failed automatic save leaves that revision unsaved."}),
+    1: Object.freeze({id: "live", label: "Live", detail: `Edits take effect on the keyboard at once. With or without Ark, the keyboard starts saving after ${quietWords(quietMs)} with no edit and no key held; holding a key postpones it. Unplugging loses every edit since the last successful save. A failed automatic save leaves that revision unsaved.`}),
     2: Object.freeze({id: "liveReview", label: "Live + review", detail: "Edits take effect on the keyboard at once. Nothing is permanent until you review and save; unplugging the keyboard puts back what was saved."}),
 });
+const EDIT_MODE_WORDS = editModeWords();
 
 // Whether the two halves agree, in words for someone who has never heard of
 // generations or a split link. The device model decides which applies. The
@@ -245,4 +257,4 @@ const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
-module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, EDIT_MODE_WORDS, VOCABULARY, word, layerName, slotName, branchName, modifierNames};
+module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, slotName, branchName, modifierNames};

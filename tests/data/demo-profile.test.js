@@ -15,6 +15,7 @@ const {DEMO_CAPABILITIES, DEMO_DEVICE_ID} = require("../../core/session/demo-ses
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {buildPanelModel} = require("../../core/session/panel-session");
 const {demoState, openDemo} = require("../../core/session/demo-session");
+const {inertBehaviorFindings} = require("../../core/model/inert-behaviors");
 
 const FILE = path.join(__dirname, "../../core/data/demo-profile.charybdis.json");
 const text = fs.readFileSync(FILE, "utf8");
@@ -57,4 +58,13 @@ test("the demo profile is complete: it opens a draft in which every area can be 
     assert.equal(model.portable.available, true);
     assert.equal(model.pdModes.length, 32);
     assert.deepEqual(model.draft.checks.filter((check) => check.level === "blocker"), [], "nothing in it blocks a save");
+});
+
+test("the demo opens on no behaviour that changes nothing", () => {
+    const decoded = validateSnapshot(JSON.parse(text), DEMO_CAPABILITIES);
+    assert.deepEqual(inertBehaviorFindings(decoded), []);
+    const session = {service: {snapshot: () => ({connected: false, devices: []}), portable: null}};
+    openDemo(session, {connected: false});
+    const model = buildPanelModel(session, demoState());
+    assert.deepEqual(model.draft.checks.filter((check) => check.kind === "inertBehavior"), [], "Review shows no inert-behaviour notice");
 });

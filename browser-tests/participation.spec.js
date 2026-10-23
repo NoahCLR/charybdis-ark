@@ -76,7 +76,7 @@ test("a transparent late-layer key explains its source and opens that placement"
         store.setModel(model); store.showLayer(15); store.render();
     }, model);
     await expect(page.locator('[data-source-layer]')).toBeVisible();
-    await expect(page.locator('.bench-body')).toContainText("This transparent key inherits its permissions");
+    await expect(page.locator('.bench-body')).toContainText("This transparent key takes its participation");
     await expect(page.locator('[data-use-behavior]')).toHaveCount(0);
     await page.locator('[data-source-layer]').click();
     await expect(page.locator('[data-use-behavior]')).toBeEnabled();

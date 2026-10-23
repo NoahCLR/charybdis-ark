@@ -20,7 +20,7 @@ const {layerOfRef} = require("../schema/actions");
  * @typedef {import("../../contracts/edits.js").DraftEditType} DraftEditType
  * @typedef {import("../../contracts/edits.js").PanelEdit} PanelEdit
  * @typedef {import("./types.js").PortableDocument} Document
- * @typedef {"layout" | "settings" | "macro" | "customKey" | "keyboardName" | "profile"} Editor
+ * @typedef {"keymap" | "settings" | "macro" | "customKey" | "keyboardName" | "profile"} Editor
  * @typedef {"placement" | "pointing" | "combos" | "behaviours" | "lighting"} Domain
  */
 /**
@@ -55,7 +55,7 @@ function behaviorLabel({behavior}, document) {
 }
 
 const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: Entry<K>}} */ ({
-    updateLayoutKeys: {editor: "layout", label: layoutLabel},
+    updateLayoutKeys: {editor: "keymap", label: layoutLabel},
     updateConfigDefaults: {editor: "settings", label: "Saved a settings section"},
     updateViaMacro: {editor: "macro", label: "Edited a macro"},
     updateCustomKey: {editor: "customKey", label: "Renamed a custom key"},

@@ -24,7 +24,7 @@
  */
 const {fingerprint} = require("../model/portable-profile");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
-const {EDIT_MODE_WORDS, PHASE} = require("../model/vocabulary");
+const {EDIT_MODE_WORDS, PHASE, quietWords} = require("../model/vocabulary");
 const {IDENTITY} = require("../model/layer-order");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
@@ -196,7 +196,7 @@ const LIVE_ACTIONS = Object.freeze({
     revert: async ({draft, revision, session}) => {
         draft.assertRevision(revision, {allowStale: false});
         if (await revertTo(session, draft, {document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: IDENTITY})) {
-            session.notice = "Reverted: the keyboard runs its saved profile again. Undo (⌘Z) sends the edits back.";
+            session.notice = "Reverted: the keyboard runs its saved profile again. Undo sends the edits back.";
         }
     },
     // Save: a recovery copy of what is saved, then the keyboard writes what it
@@ -208,7 +208,7 @@ const LIVE_ACTIONS = Object.freeze({
         draft.assertRevision(revision);
         const live = /** @type {import("./types.js").LiveState} */ (draft.live);
         const keyboardSaves = live.mode === EDIT_MODE.LIVE;
-        if (keyboardSaves && !live.keyboard?.saveFailed && live.unsaved) throw new Error("In Live the keyboard saves by itself after 3 seconds with no edit and no key held.");
+        if (keyboardSaves && !live.keyboard?.saveFailed && live.unsaved) throw new Error(`In Live the keyboard saves by itself after ${quietWords(live.keyboard?.quietMs)} with no edit and no key held.`);
         if (!keyboardSaves && draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before saving.");
         if (!keyboardSaves && draft.reviewedRevision !== revision) throw new Error("Review the keyboard's unsaved edits before saving them.");
         if (!live.unsaved) {session.notice = "Nothing to save: the keyboard runs its saved profile."; return;}
@@ -294,7 +294,7 @@ async function setEditMode(session, message, recoveryFor, host) {
     session.liveProposal = undefined;
     const words = {
         [EDIT_MODE.APPLY]: "Apply: edits wait in Ark's draft until you review and apply them.",
-        [EDIT_MODE.LIVE]: "Live: edits take effect on the keyboard at once, and it saves them by itself after 3 seconds with no edit and no key held.",
+        [EDIT_MODE.LIVE]: `Live: edits take effect on the keyboard at once, and it saves them by itself after ${quietWords(session.draft?.live?.keyboard?.quietMs)} with no edit and no key held.`,
         [EDIT_MODE.LIVE_REVIEW]: "Live + review: edits take effect on the keyboard at once; review and Save make them permanent.",
     }[mode];
     let notice = known?.mode === mode ? "Both halves now store the same edit mode." : `Edits now reach the keyboard by ${words}`;

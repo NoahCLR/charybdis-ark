@@ -7,6 +7,8 @@ import {discardLabel, groupNote, placeState, reviewBlocks, statusBesideCount, st
 import {reviewColumns, reviewItem} from "./review-items.mjs";
 import {checksSection} from "./checks.mjs";
 import {checkSourceGroup, checksToConfirm, confirmText} from "../view/checks.mjs";
+import {shortcut} from "../view/shortcuts.mjs";
+import {quietWords} from "../view/edit-mode.mjs";
 
 export function reviewOverlay() {
     const model = getModel();
@@ -77,7 +79,7 @@ export function reviewOverlay() {
         const change = draft.changes.find((entry) => entry.group === group);
         if (!change) return "";
         return `<button class="ck-source" data-check-source="${group}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↓</button>`;
-    }, draft.live ? "Save" : "Apply");
+    }, draft.live ? "Save" : "Apply", demo.active);
     // Ask about active warnings and traps for this revision before writing.
     const confirmChecks = checksToConfirm(draft.checks);
     const confirming = confirmChecks.length && state.confirmChecks === draft.revision;
@@ -92,7 +94,7 @@ export function reviewOverlay() {
             ${checks}
             ${sections}
             <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
-                : keyboardSaves ? "The keyboard already runs these changes and saves them by itself after 3 seconds without typing. Revert puts back what is saved."
+                : keyboardSaves ? `The keyboard already runs these changes and saves them by itself after ${quietWords(draft.live?.keyboard)} without typing. Revert puts back what is saved.`
                 : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then writes them as its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
                 : "Apply saves a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts Apply, the recovery copy restores it."}</div></div>
         </div>
@@ -102,8 +104,8 @@ export function reviewOverlay() {
             <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks, live ? "save" : "apply"))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
                 <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>${live ? "Save anyway" : "Apply anyway"}</button></span></div>`
-        : `<div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
-            <span class="right">${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc("Put back what is saved. Nothing is written; Undo (⌘Z) sends the edits again.")}">Revert</button>` : ""}
+        : `<div class="sheet-f"><span class="note" data-tip="${esc(model?.device?.summary || "")}">${esc(model?.device?.label || "")} · ${esc(model?.device?.savedProfile || "")}</span>
+            <span class="right">${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc(`Put back what is saved. Nothing is written; Undo (${shortcut("Z")}) sends the edits again.`)}">Revert</button>` : ""}
                 ${keyboardSaves ? draft.live?.keyboard?.saveFailed ? `<button class="btn primary" data-act="save-again" ${draft.connected && !draft.stale ? "" : "disabled"}
                     data-tip="${esc("The keyboard's own save failed. Ask it to save these edits again, after a recovery copy of what is saved now.")}">Save again</button>` : ""
                 : `<button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}

@@ -3,6 +3,7 @@
 import {behaviourListeningTo, canonicalKeycode, keyFace, keyMeaning} from "./keyface.mjs";
 import {resolvedPositions} from "./layer-resolution.mjs";
 import {timingInput} from "./timing-input.mjs";
+import {vocabulary} from "./vocabulary.mjs";
 
 export function canHaveBehaviour(/** @type {Model} */ model, /** @type {string} */ keycode) {
     const key = canonicalKeycode(model, keycode);
@@ -39,8 +40,18 @@ export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string
     return {...(existing || {keycode: key, steps: [], tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0",
         keepsAutoMouseAnchored: false, builtIn: defaults?.builtIn || {}}),
         stored: Boolean(existing), timingDefaults: defaults?.timing || model?.behaviorTimingDefaults || {},
+        timingWords: timingWords(model, defaults?.timingSources),
         // Unknown counts as yes, so nothing that might matter is dropped.
         timingAlone: defaults?.timingAlone !== false};
+}
+
+// The words naming where each timing field's default comes from, as the host
+// says it per key (device-model.js behaviorDefaults); without it, the
+// placeholder says only "default".
+/** @param {Model} model @param {Record<string, import("../../contracts/panel.js").TimingSource> | undefined} sources @returns {Record<string, string>} */
+function timingWords(model, sources) {
+    const words = vocabulary(model).timingSources;
+    return Object.fromEntries(Object.entries(sources || {}).map(([name, source]) => [name, words[source] || ""]));
 }
 
 export function behaviourTimingField(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour, /** @type {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} */ name) {
@@ -48,7 +59,7 @@ export function behaviourTimingField(/** @type {import("../../contracts/panel.js
     const followsDefault = Number(stored) === 0;
     const fallback = behaviour.timingDefaults?.[name];
     return {stored, followsDefault, fallback: fallback === undefined ? "" : String(fallback),
-        ...timingInput(stored, fallback, followsDefault)};
+        ...timingInput(stored, fallback, followsDefault, behaviour.timingWords?.[name])};
 }
 
 // Whether a behaviour as the editor holds it has a timing of its own: stored

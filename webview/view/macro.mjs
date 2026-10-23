@@ -12,6 +12,19 @@
 
 /** @typedef {import("./types.js").MacroStep} MacroStep */
 
+// Each kind of macro step by its one name (glossary "Macro step"): the add
+// buttons, the step editor and the picker it opens all say it this way.
+/** @type {[MacroStep["kind"], string][]} */
+export const STEP_KINDS = [
+    ["text", "Text"], ["tap", "Key or chord"], ["delay", "Delay"],
+    ["press", "Press"], ["release", "Release"],
+];
+/** @param {string} kind */
+export const stepKindName = (kind) => STEP_KINDS.find(([value]) => value === kind)?.[1] || kind;
+// The button that adds a step of this kind.
+/** @param {string} kind */
+export const addStepLabel = (kind) => `+ ${stepKindName(kind)}`;
+
 const MAX_DELAY = 65535, MAX_KEYS = 16;
 /** @param {string} character */
 const printable = (character) => {
@@ -196,4 +209,17 @@ export function samePayload(a, b, aliases = {}) {
     /** @param {MacroStep} step @returns {MacroStep} */
     const canonical = step => step.kind === "text" || step.kind === "delay" ? step : {...step, keys: step.keys.map(key => aliases[key] || key)};
     return serializeMacro(one.steps.map(canonical)) === serializeMacro(two.steps.map(canonical));
+}
+
+// What a macro card's chip says its editor holds, against the draft and the
+// keyboard: an edit not kept in the draft yet, a macro the draft changed
+// (Review lists it), or the macro as read (in the demo, as the demo setup has
+// it). A playback change caused by Your computer is not a change to the macro.
+/** @param {readonly Pick<import("../../contracts/model.js").ReviewChange, "unit">[] | undefined} changes @param {string} keycode @param {boolean} local @returns {{state: "local" | "draft" | "read", dot: string, text: string}} */
+export function macroLocalState(changes, keycode, local) {
+    if (local) return {state: "local", dot: "draft", text: "edited here"};
+    const unit = `macro:${keycode.replace(/^VIA_MACRO_/, "")}`;
+    return (changes || []).some((change) => change.unit === unit)
+        ? {state: "draft", dot: "draft", text: "changed in draft"}
+        : {state: "read", dot: "on", text: "as read"};
 }

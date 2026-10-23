@@ -12,7 +12,10 @@ test("whole-profile checks report inert actions and destination blockers", () =>
     decoded.macroSlots[0] = Buffer.from("é");
     const checks = profileFindings(decoded, {brightnessMax: 100, effects: [{id: 2}]});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.count, 2);
-    assert.equal(checks.find(row => row.kind === "unplayableMacro")?.place.index, 0);
+    const unplayable = checks.find(row => row.kind === "unplayableMacro");
+    assert.equal(unplayable?.place.index, 0);
+    assert.equal(unplayable?.title, "Macro 0 cannot play with the settings in Your computer");
+    assert.equal(unplayable?.fix, "Fix the macro or change Settings → Your computer before playing it.");
     assert.deepEqual(checks.filter(row => row.level === "blocker").map(row => row.kind), ["brightnessBlocker", "effectBlocker"]);
 });
 

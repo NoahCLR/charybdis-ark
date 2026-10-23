@@ -113,7 +113,7 @@ export function tabKey(body) {
         const inherited = source.index !== layer.index;
         const controls = el(`<div class="stack key-participation">
             <div class="sect-h"><h4>Behaviour and combos on ${esc(layerName(source))}</h4></div>
-            ${inherited ? `<p class="note">This transparent key inherits its permissions from ${esc(layerName(source))}.</p><button class="btn tiny" data-source-layer>Open source placement</button>` : `
+            ${inherited ? `<p class="note">This transparent key takes its participation from ${esc(layerName(source))}.</p><button class="btn tiny" data-source-layer>Open source placement</button>` : `
             <label class="sw"><input type="checkbox" data-f="key:${source.index}:${key.layoutIndex}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
             <label class="sw"><input type="checkbox" data-f="key:${source.index}:${key.layoutIndex}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
             <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behavior ? "runs here" : "this key has none")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "this key can take part; each combo has its own switches too")}.</p>

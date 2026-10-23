@@ -6,10 +6,10 @@ const {hostLayout, layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts"
 
 // What to do when the host layout cannot type a character, by effective OS.
 const ENTRY_SETUP = [
-    "Choose a host OS and enable Unicode playback in Settings → Host to type it with Unicode entry.",
-    "Choose the Unicode Hex Input layout in Settings → Host to type it with Unicode entry.",
-    "Enable Unicode playback in Settings → Host to type it with Unicode entry.",
-    "Enable Unicode playback in Settings → Host to type it with Unicode entry.",
+    "Choose a host OS and enable Unicode playback in Settings → Your computer to type it with Unicode entry.",
+    "Choose the Unicode Hex Input layout in Settings → Your computer to type it with Unicode entry.",
+    "Enable Unicode playback in Settings → Your computer to type it with Unicode entry.",
+    "Enable Unicode playback in Settings → Your computer to type it with Unicode entry.",
 ];
 
 // Inspection and staging use the same codec and limits. A partial or oversized

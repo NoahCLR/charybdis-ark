@@ -444,7 +444,7 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
     await page.keyboard.press('Control+z');
     await expect(page.locator('[data-step-text]')).toHaveValue(text);
-    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
+    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('changed in draft');
     await page.keyboard.press('Control+Shift+z');
     await expect(page.locator('.macro-empty')).toBeVisible();
     await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');

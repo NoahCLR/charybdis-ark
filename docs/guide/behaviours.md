@@ -61,10 +61,12 @@ Above the grid are the behaviour's timings:
   hold.
 - **Long hold threshold**: how long before it counts as a long hold.
 
-A timing that follows the keyboard's default shows it greyed, such as
-`150 · default`. Type a value to give this behaviour its own; clear the field
-to follow the default again. The defaults are in **Settings → Tap & hold
-timing** (below).
+A timing that follows the keyboard's default shows it greyed, with the
+setting it comes from, such as `200 · dual-role` on an `LT` or `MT` key,
+`150 · behaviour default` on any other key, and `400 · default` for the long
+hold threshold or multi tap window. Type a value to give this behaviour its own;
+clear the field to follow the default again. The defaults are in
+**Settings → Tap & hold timing** (below).
 
 When Review's checks find a problem with the timing, a note above the grid
 says so.
