@@ -8,7 +8,7 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {shareHold} from "../../view/share.mjs";
 import {sectionsIn} from "../settings.mjs";
-import {unavailable} from "../shell.mjs";
+import {unavailable} from "../frame.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 
 // How long the auto-mouse colour holds before it fades, as a share of the

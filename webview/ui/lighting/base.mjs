@@ -4,7 +4,7 @@ import {canEdit as canEditArea, post} from "../../store.mjs";
 import {lightingOff} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
 import {sectionsIn} from "../settings.mjs";
-import {unavailable} from "../shell.mjs";
+import {unavailable} from "../frame.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 
 // The background effect is QMK's own RGB Matrix effect: drawn first, under

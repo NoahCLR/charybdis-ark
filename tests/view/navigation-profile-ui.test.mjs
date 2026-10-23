@@ -8,9 +8,9 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
 const read = (name) => fs.readFileSync(path.join(root, "webview", "ui", name), "utf8");
 
 test("the navigation rail stays label-only", () => {
-    const shell = read("shell.mjs");
-    assert.doesNotMatch(shell, /nav-count|function counts\(/);
-    assert.doesNotMatch(shell, /layers\.length|macroSlots|configDefaults/);
+    const frame = read("frame.mjs");
+    assert.doesNotMatch(frame, /nav-count|function counts\(/);
+    assert.doesNotMatch(frame, /layers\.length|macroSlots|configDefaults/);
 });
 
 test("layer tabs sit on the board they choose, on every layer-aware screen", () => {

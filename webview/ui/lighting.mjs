@@ -14,7 +14,7 @@ import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
-import {topbar, unavailable} from "./shell.mjs";
+import {topbar, unavailable} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {localityLabel} from "./lighting/common.mjs";
 import {stageBody} from "./lighting/stage-body.mjs";

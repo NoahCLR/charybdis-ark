@@ -17,7 +17,7 @@ import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
 import {keyProblem} from "../../view/keycode-expression.mjs";
 import {actionMarked, comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
 import {customKeyBypassText, customKeyOf} from "../../view/custom-key.mjs";
-import {unavailable} from "../shell.mjs";
+import {unavailable} from "../frame.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {pickKeycodeFor} from "./key-edits.mjs";
 

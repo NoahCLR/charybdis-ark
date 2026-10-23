@@ -16,7 +16,7 @@ import {draftMarks} from "../view/review.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
-import {topbar, unavailable} from "./shell.mjs";
+import {topbar, unavailable} from "./frame.mjs";
 import {bench} from "./keys/bench.mjs";
 import {legend, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
 import {behaviourKey, selectBehaviourKey} from "./keys/behaviour-selection.mjs";

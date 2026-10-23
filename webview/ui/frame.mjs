@@ -1,5 +1,5 @@
 // @ts-check
-// The shell: who the keyboard is, where you are, and the one gate every change
+// The frame: who the keyboard is, where you are, and the one gate every change
 // passes through on its way to the device.
 
 // Selector assertions refer to elements created by this module's authored markup.

@@ -34,7 +34,8 @@ Around the core:
   It imports nothing from `core/`, not even types; it renders the model the
   shell posts and posts edits back. `webview/view/` turns the model into what
   is drawn and builds every posted edit, purely; `webview/ui/` holds the
-  screens and components; `webview/lib/` the DOM, focus and colour helpers.
+  frame (`frame.mjs`), the screens and their components; `webview/lib/` the
+  DOM, focus and colour helpers.
 - **`contracts/`**: type declarations shared by the core, the shells and the
   interface for what crosses the panel boundary. No runtime code.
 
