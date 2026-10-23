@@ -78,7 +78,7 @@ test("an empty profile sets up nothing it can grow", () => {
 test("naming a macro or the keyboard grows the bar, not the counts", () => {
     const {editKeyboardName} = require("../../core/model/keyboard-name");
     const before = snapshot(pdDocument());
-    const macro = snapshot(editMacro(before, {keycode: "VIA_MACRO_3", name: "Zoom mute", expectedFingerprint: before.fingerprint}));
+    const macro = snapshot(editMacro(before, {keycode: "MACRO_3", name: "Zoom mute", expectedFingerprint: before.fingerprint}));
     const keyboard = snapshot(editKeyboardName(before, {name: "Noah’s board", expectedFingerprint: before.fingerprint}));
     const a = profileUsage(before, schema2), b = profileUsage(macro, schema2), c = profileUsage(keyboard, schema2);
     assert.equal(b.used - a.used, 9, "the name's text, beside the length byte every name has");

@@ -21,7 +21,7 @@ test("compact basic-key labels retain modifier side, host and layout naming unde
     }
     assert.equal(compactKeyLabels({}).KC_SPC, "Space");
     assert.equal(compactKeyLabel("An unfamiliar long name"), "An unfamiliar long name");
-    assert.equal(compactKeyLabels({}).VIA_MACRO_0, undefined, "profile names are not shortened");
+    assert.equal(compactKeyLabels({}).MACRO_0, undefined, "profile names are not shortened");
 });
 
 test("semantic target aliases link the native ABI and stay absent for an unknown one", () => {
@@ -35,15 +35,15 @@ test("semantic target aliases link the native ABI and stay absent for an unknown
 test("a key reads by the profile's name for it, under every name it is known by", () => {
     const names = profileKeyNames({
         actionsKnown: true,
-        macros: [{keycode: "VIA_MACRO_0", name: "Copy line"}, {keycode: "VIA_MACRO_1", name: ""}],
+        macros: [{keycode: "MACRO_0", name: "Copy line"}, {keycode: "MACRO_1", name: ""}],
         pdModes: [{id: 0, kind: 2, name: "Dragscroll"}, {id: 1, kind: 0, name: ""}],
     });
     assert.equal(keyLabel(names, PD_SLOT_0), "Dragscroll · hold", "not the catalogue's bare user slot");
     assert.equal(names.labels.PD_SLOT_0, "Dragscroll · hold");
     assert.equal(keyLabel(names, PD_BINDINGS[1].holdCode), "Slot 1 · hold (empty)", "an empty slot says so");
     assert.equal(keyLabel(names, PD_BINDINGS[0].lockCode), "Dragscroll · lock");
-    assert.equal(names.labels.VIA_MACRO_0, "Copy line");
-    assert.equal(names.labels.VIA_MACRO_1, "Macro 1", "an unnamed macro reads by its number");
+    assert.equal(names.labels.MACRO_0, "Copy line");
+    assert.equal(names.labels.MACRO_1, "Macro 1", "an unnamed macro reads by its number");
     assert.equal(keyLabel(names, 0x04), "A", "the rest reads as the catalogue names it");
     assert.equal(keyLabel(profileKeyNames(), PD_SLOT_0), keycodes.resolve(PD_SLOT_0).label, "no profile, no renaming");
 });

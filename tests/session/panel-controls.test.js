@@ -218,7 +218,7 @@ test("a destination blocker refuses Apply before recovery or HID", async () => {
     const session = {service};
     observeService(session, service.snapshot());
     buildPanelModel(session, service.snapshot());
-    stage(session, {type: "updateMacro", keycode: "VIA_MACRO_0", payload: "hello"});
+    stage(session, {type: "updateMacro", keycode: "MACRO_0", payload: "hello"});
     session.draft.review(session.draft.revision);
     assert.equal(session.draft.hasBlockers(), true);
     await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision, confirmChecks: true}, h), /blockers/);
@@ -301,7 +301,7 @@ test("layer edits and imports are kept in the draft; without one they restore to
     assert.equal(review.fileName, "desk.charybdis.json");
     assert.deepEqual(review.differences, [], "compared with the keyboard, not the draft: the draft's rename is not a difference of this file");
     const changed = new ProfileDraftSession(snapshot(), "kb", capabilities);
-    changed.stage({type: "updateMacro", keycode: "VIA_MACRO_2", payload: "hello", draftRevision: changed.revision});
+    changed.stage({type: "updateMacro", keycode: "MACRO_2", payload: "hello", draftRevision: changed.revision});
     await portableControl(session, {type: "choosePortableProfile"}, {chooseProfile: async () => JSON.stringify(changed.document)});
     assert.deepEqual(buildPanelModel(session, session.service.snapshot()).portable.review.differences, [{unit: "macro:2", title: "Macro 2", status: "added", place: {kind: "macro", index: 2}}],
         "each difference by what it is, what happened and where it is edited, without its fields");

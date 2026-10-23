@@ -2,6 +2,7 @@
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {vocabulary} from "./vocabulary.mjs";
 import {actionLabel, canonicalKeycode} from "./keyface.mjs";
+import {macroOfName} from "./keycode-expression.mjs";
 
 // Numeric keycodes, named.
 //
@@ -18,7 +19,7 @@ const MOD_WRAPPERS_RIGHT = [[1, "RCTL"], [2, "RSFT"], [4, "RALT"], [8, "RGUI"]];
 export function keyName(/** @type {Model} */ model, /** @type {number} */ code) {
     if (!code) return "";
     const macro = macroIndex(code);
-    if (macro !== null) return `VIA_MACRO_${macro}`;
+    if (macro !== null) return `MACRO_${macro}`;
     const direct = (/** @type {number} */ value) => (model?.qmkKeycodes || []).find((entry) => entry.keycode === value)?.value;
     const exact = direct(code);
     if (exact) return exact;
@@ -116,13 +117,16 @@ export function pickerModifierProblem(model, picker) {
         ? "A keycode can hold left modifiers or right modifiers together. Choose modifiers from one side." : "";
 }
 
-// The macro slot a stored keycode names (VIA_MACRO_n), including the other
-// names the writer accepts.
+// The macro slot a stored keycode names (MACRO_n), including the other
+// names the writer accepts: QMK's own for the first 32 slots, and the former
+// VIA_MACRO_n.
 /** @param {string | number | null | undefined} code */
 export function macroIndex(code) {
     const text = String(code ?? "").trim();
-    const match = /^(?:VIA_MACRO_|QK_MACRO_|MC_)(\d+)$/.exec(text);
-    if (match && !text.startsWith("VIA_MACRO_") && Number(match[1]) > 31) return null;
+    const named = macroOfName(text);
+    if (named !== undefined) return named;
+    const match = /^(?:QK_MACRO_|MC_)(\d+)$/.exec(text);
+    if (match && Number(match[1]) > 31) return null;
     const value = match ? Number(match[1]) : /^(?:0x[0-9a-f]+|\d+)$/i.test(text) ? Number(text) - 0x7700 : -1;
     return Number.isInteger(value) && value >= 0 && value < 128 ? value : null;
 }
@@ -130,6 +134,6 @@ export function macroIndex(code) {
 export function pointingMacro(model, code) {
     const index = macroIndex(code);
     if (index === null) return null;
-    const slot = model?.macros?.find(slot => slot.keycode === `VIA_MACRO_${index}`);
+    const slot = model?.macros?.find(slot => slot.keycode === `MACRO_${index}`);
     return {index, name: slot?.name || `Macro ${index}`, empty: Boolean(slot?.empty)};
 }

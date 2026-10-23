@@ -27,6 +27,16 @@ const WRAPPERS = Object.freeze({
 const MOD_BITS = Object.freeze({CTL: 1, SFT: 2, ALT: 4, GUI: 8});
 const MACRO_BASE = 0x7700, LAYER_LOCK_BASE = 0x7ec0, LAYER_LOCKS = 16;
 
+// The macro slot a name reaches: MACRO_n, or VIA_MACRO_n, the name before
+// firmware D-F31 dropped VIA, so a name typed the old way still reaches its
+// macro (core/schema/compiled-profile-v1.js reads both too). Ark only ever
+// shows MACRO_n.
+/** @param {string} name */
+export const macroOfName = (name) => {
+    const match = /^(?:MACRO_|VIA_MACRO_)(\d+)$/.exec(name);
+    return match && Number(match[1]) < 128 ? Number(match[1]) : undefined;
+};
+
 /** @param {Record<string, number>} table @param {string} name */
 const own = (table, name) => Object.hasOwn(table, name) ? table[name] : undefined;
 
@@ -82,9 +92,9 @@ export function keycodeValue(model, expression) {
     if (direct !== undefined) return direct;
     const spellings = model?.qmkSpellings;
     if (spellings && Object.hasOwn(spellings.names, text)) return keycodeValue(model, spellings.names[text]);
-    let match = text.match(/^VIA_MACRO_(\d+)$/);
-    if (match) return Number(match[1]) < 128 ? MACRO_BASE + Number(match[1]) : undefined;
-    match = text.match(/^0x([0-9a-f]{1,4})$/i);
+    const macro = macroOfName(text);
+    if (macro !== undefined) return MACRO_BASE + macro;
+    let match = text.match(/^0x([0-9a-f]{1,4})$/i);
     if (match) return Number.parseInt(match[1], 16);
     if (/^\d+$/.test(text)) return Number(text) <= 0xffff ? Number(text) : undefined;
     const call = text.match(/^([A-Z][A-Z0-9_]*)\((.*)\)$/);

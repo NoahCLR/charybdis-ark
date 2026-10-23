@@ -19,7 +19,7 @@ const NAVIGATION = new Set([
 const valueOf = (entry) => entry.value || entry.key || entry.name || "";
 /** @param {string[]} groups @returns {(entry: Entry) => boolean} */
 const inGroups = (...groups) => (entry) => groups.includes(entry.group);
-// Macro slots are offered by their VIA_MACRO_n names in the Macros section.
+// Macro slots are offered by their MACRO_n names in the Macros section.
 const NATIVE_MACRO = /^QK_MACRO_\d+$/;
 // QMK's User 0–31 entries occupy the retired, inert custom-key block.
 // Keep their catalogue names for readback; current custom keys have their own names.

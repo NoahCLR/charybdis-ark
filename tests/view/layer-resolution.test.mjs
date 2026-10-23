@@ -9,17 +9,17 @@ test("a transparent key can be answered by any layer below that is held with thi
     // LT(SYM,J) on the other hand, so {Base, Numbers, Symbols} is a real hold.
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const stack = withAnswers([
-        {index: 0, name: "Base", positions: [at(0, "KC_8"), at(1, "KC_RIGHT_ALT"), at(2, "VIA_MACRO_0")]},
+        {index: 0, name: "Base", positions: [at(0, "KC_8"), at(1, "KC_RIGHT_ALT"), at(2, "MACRO_0")]},
         {index: 1, name: "Numbers", positions: [at(0, "KC_P7"), at(1, "KC_NO"), at(2, "KC_TRANSPARENT")]},
         {index: 2, name: "Symbols", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT"), at(2, "KC_TRANSPARENT")]},
     ]);
 
     // Symbols alone: the default layer answers everything.
     assert.deepEqual(resolvedPositions(stack, 2, []).map((entry) => entry.position.keycode),
-        ["KC_8", "KC_RIGHT_ALT", "VIA_MACRO_0"]);
+        ["KC_8", "KC_RIGHT_ALT", "MACRO_0"]);
     // Symbols with Numbers held: Numbers wins where it has a key, KC_NO included.
     assert.deepEqual(resolvedPositions(stack, 2, [1]).map((entry) => entry.position.keycode),
-        ["KC_P7", "KC_NO", "VIA_MACRO_0"], "and its transparent position still falls to Base");
+        ["KC_P7", "KC_NO", "MACRO_0"], "and its transparent position still falls to Base");
 
     // Both are real, so both are reachable, each named with what it needs.
     const reachable = reachablePositions(stack, 2);

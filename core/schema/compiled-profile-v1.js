@@ -4,7 +4,7 @@
 /** @typedef {{qmkKeycodeValues?: Record<string, number>, layers?: {name: string}[]}} ExpressionModel */
 
 // Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
-// PD_SLOT_0, VIA_MACRO_3 — resolved to profile actions and native keycodes.
+// PD_SLOT_0, MACRO_3 — resolved to profile actions and native keycodes.
 
 const {PD_SLOT_BINDINGS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
 const {combineModifiers} = require("../data/keycode-catalog");
@@ -12,6 +12,15 @@ const {customKeyCode, customKeyOfName, layerLockCode, LAYER_LOCK_SLOTS} = requir
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 
 const QMK_MACRO_BASE = 0x7700;
+
+// The macro slot a name reaches: MACRO_n, or VIA_MACRO_n, the name before
+// firmware D-F31 dropped VIA, so a name typed the old way still reaches its
+// macro. Ark only ever writes MACRO_n.
+/** @param {string} name */
+const macroOfName = name => {
+    const match = /^(?:MACRO_|VIA_MACRO_)(\d+)$/.exec(name);
+    return match && Number(match[1]) < 128 ? Number(match[1]) : undefined;
+};
 /** @type {Readonly<Record<string, number>>} */
 const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
     DPI_MOD: 0x7e00,
@@ -74,9 +83,9 @@ function semanticActionForExpression(value, model, label = "Action") {
     if (!expression) throw compileError("UNSUPPORTED_ACTION", `${label} is empty.`, {expression});
     if (PD_ACTIONS[expression]) return {...PD_ACTIONS[expression]};
 
-    let match = expression.match(/^VIA_MACRO_(\d+)$/);
-    if (match) return {kind: PROFILE_ACTION_KINDS.VIA_MACRO, operand: Number(match[1])};
-    match = expression.match(/^CUSTOM_KEY_(\d+)$/);
+    const macro = macroOfName(expression);
+    if (macro !== undefined) return {kind: PROFILE_ACTION_KINDS.MACRO, operand: macro};
+    const match = expression.match(/^CUSTOM_KEY_(\d+)$/);
     if (match) return {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, operand: Number(match[1])};
 
     const call = parseCall(expression);
@@ -106,8 +115,8 @@ function resolveNativeQmkExpression(value, model) {
     if (expression === "_______") return catalog.KC_TRNS ?? catalog.KC_TRANSPARENT ?? 1;
     if (expression === "XXXXXXX") return catalog.KC_NO ?? 0;
 
-    let match = expression.match(/^VIA_MACRO_(\d+)$/);
-    if (match && Number(match[1]) < 128) return QMK_MACRO_BASE + Number(match[1]);
+    const macro = macroOfName(expression);
+    if (macro !== undefined) return QMK_MACRO_BASE + macro;
     const custom = customKeyOfName(expression);
     if (custom !== undefined) return customKeyCode(custom);
 
@@ -130,7 +139,7 @@ function resolveNativeQmkExpression(value, model) {
     }
     // A modifier wrapper only applies to a basic or already-modified key
     // (QK_MODS, up to 0x1FFF). Anything above would OR the modifier bits into
-    // an unrelated keycode, e.g. C(VIA_MACRO_3) into a macro without Ctrl.
+    // an unrelated keycode, e.g. C(MACRO_3) into a macro without Ctrl.
     if (MODIFIER_WRAPPERS[call.name] !== undefined && call.args.length === 1) {
         const keycode = resolveNativeQmkExpression(call.args[0], model);
         if (keycode === undefined || keycode > QK_MODS_MAX) return undefined;

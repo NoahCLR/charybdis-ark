@@ -39,9 +39,9 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await publish();
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
-            store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_1"; store.render();
+            store.state.screen = "macros"; store.state.macroSlot = "MACRO_1"; store.render();
         });
-        await expect(page.locator('[data-slot="VIA_MACRO_1"]')).toContainText("blocked");
+        await expect(page.locator('[data-slot="MACRO_1"]')).toContainText("blocked");
         await expect(page.locator('[data-macro-feedback]')).toContainText("Release ordinary keys");
         await expect(page.locator('[data-macro-feedback]')).toContainText("stored macro cannot play");
         await expect(page.locator('[data-macro-feedback]')).not.toContainText("This edit is not staged");
@@ -64,7 +64,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         draft.discard(draft.revision, discard.group);
         await publish();
         await expect(review).toHaveCount(0);
-        await expect(page.locator('[data-slot="VIA_MACRO_1"]')).not.toContainText("blocked");
+        await expect(page.locator('[data-slot="MACRO_1"]')).not.toContainText("blocked");
         expect(draft.document.macros).toEqual(snapshot.document.macros);
     });
 }

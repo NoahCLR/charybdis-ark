@@ -67,7 +67,7 @@ test("a draft change resets the existing forms and preserves historically kept p
     const standing = {
         screen: "macros", layer: 2, layersOn: [1], selected: 7, tab: "behaviours", cell: "0-hold", cellRow: "QK_USER_16",
         cellHow: {cell: "0-hold", keycode: "QK_USER_16", style: "REPEAT_WHILE_HELD", repeatHz: "20"},
-        placement: {keycode: "VIA_MACRO_1"}, keyClipboard: {keycode: "KC_A", label: "A"}, pdSlot: 2, macroSlot: "VIA_MACRO_0",
+        placement: {keycode: "MACRO_1"}, keyClipboard: {keycode: "KC_A", label: "A"}, pdSlot: 2, macroSlot: "MACRO_0",
         macroSearch: "hello", ledPicks: [1, 4], trackball: true, rowColour: {h: "10", s: "20", v: "30"},
         ledRow: {target: "pdMode", owner: "PD_SLOT_0", source: "Thumbs"}, recordPreserveHoldTiming: true, overlay: "history",
         notice: "Saved.", recording: null,
@@ -75,8 +75,8 @@ test("a draft change resets the existing forms and preserves historically kept p
     Object.assign(state, standing, {
         retarget: {from: "QK_USER_16", to: "KC_B", existing: "QK_USER_17"},
         pdKind: {slot: 1, kind: 2}, pdButtons: {slot: 1, rows: {0: {}}}, pdTaps: {slot: 1, rows: {"dir:up": {}}},
-        lastTake: {slot: "VIA_MACRO_0", before: "abc"},
-        macroForms: {VIA_MACRO_0: {draft: "unstaged", stepError: "bad"}},
+        lastTake: {slot: "MACRO_0", before: "abc"},
+        macroForms: {MACRO_0: {draft: "unstaged", stepError: "bad"}},
     });
     openComboBuilder({id: 4, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: 40, followsDefault: false, enabled: true, allowedLayers: 1});
     state.combo.picking = true;
@@ -107,20 +107,20 @@ test("a draft change closes the combo builder exactly as Close does", () => {
 
 test("a take being recorded keeps the text it is building on, and nothing else of its slot or others", () => {
     Object.assign(state, {
-        recording: {slot: "VIA_MACRO_1", before: "ab"},
-        lastTake: {slot: "VIA_MACRO_0", before: "x"},
+        recording: {slot: "MACRO_1", before: "ab"},
+        lastTake: {slot: "MACRO_0", before: "x"},
         macroForms: {
-            VIA_MACRO_0: {draft: "other", steps: []},
-            VIA_MACRO_1: {draft: "ab{KC_C}", stepError: "stale", wantsStage: true},
+            MACRO_0: {draft: "other", steps: []},
+            MACRO_1: {draft: "ab{KC_C}", stepError: "stale", wantsStage: true},
         },
     });
     const recording = state.recording;
     resetDraftForms();
-    assert.deepEqual(state.macroForms, {VIA_MACRO_1: {draft: "ab{KC_C}"}});
+    assert.deepEqual(state.macroForms, {MACRO_1: {draft: "ab{KC_C}"}});
     assert.equal(state.recording, recording, "the take carries on");
     assert.equal(state.lastTake, null);
 
-    state.macroForms = {VIA_MACRO_0: {draft: "other"}};
+    state.macroForms = {MACRO_0: {draft: "other"}};
     resetDraftForms();
     assert.deepEqual(state.macroForms, {}, "a take whose slot has no form leaves none behind");
 });

@@ -10,12 +10,12 @@ async function editor(page, {free} = {}) {
         const store = await import("/webview/store.mjs");
         const model = store.getModel();
         if (free !== undefined) store.setModel({...model, macroBank: {...model.macroBank, free}});
-        store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render();
+        store.state.screen = "macros"; store.state.macroSlot = "MACRO_17"; store.render();
         window.__posted.length = 0;
     }, free);
     await page.locator('[data-insert-kind="text"]').click();
 }
-const inspection = page => page.evaluate(async () => (await import('/webview/store.mjs')).macroForm('VIA_MACRO_17').validation?.validation);
+const inspection = page => page.evaluate(async () => (await import('/webview/store.mjs')).macroForm('MACRO_17').validation?.validation);
 const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateMacro"));
 async function add(page, kind) {
     await page.locator(`[data-insert-kind="${kind}"]`).click();

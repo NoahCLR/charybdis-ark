@@ -80,13 +80,13 @@ test("ending a take timestamps synthetic releases at the end, without adding idl
 });
 
 test("a finished take stands only while its macro holds exactly what the take produced", () => {
-    const take = {slot: "VIA_MACRO_3", before: "hi", after: "hi{KC_A}"};
-    assert.equal(takeStands(take, "VIA_MACRO_3", "hi{KC_A}"), true, "nothing changed since Stop");
-    assert.equal(takeStands(take, "VIA_MACRO_3", "hi{KC_A}{KC_B}"), false, "a step pasted after the take");
-    assert.equal(takeStands(take, "VIA_MACRO_3", "hi"), false, "a step deleted after the take");
-    assert.equal(takeStands(take, "VIA_MACRO_3", "ho{KC_A}"), false, "text typed after the take");
+    const take = {slot: "MACRO_3", before: "hi", after: "hi{KC_A}"};
+    assert.equal(takeStands(take, "MACRO_3", "hi{KC_A}"), true, "nothing changed since Stop");
+    assert.equal(takeStands(take, "MACRO_3", "hi{KC_A}{KC_B}"), false, "a step pasted after the take");
+    assert.equal(takeStands(take, "MACRO_3", "hi"), false, "a step deleted after the take");
+    assert.equal(takeStands(take, "MACRO_3", "ho{KC_A}"), false, "text typed after the take");
     // Another spelling of the same steps is no change.
-    assert.equal(takeStands({...take, after: "{KC_LCTL}"}, "VIA_MACRO_3", "{KC_LEFT_CTRL}", {KC_LCTL: "KC_LEFT_CTRL"}), true);
-    assert.equal(takeStands(take, "VIA_MACRO_4", "hi{KC_A}"), false, "another macro's take");
-    assert.equal(takeStands(null, "VIA_MACRO_3", "hi{KC_A}"), false);
+    assert.equal(takeStands({...take, after: "{KC_LCTL}"}, "MACRO_3", "{KC_LEFT_CTRL}", {KC_LCTL: "KC_LEFT_CTRL"}), true);
+    assert.equal(takeStands(take, "MACRO_4", "hi{KC_A}"), false, "another macro's take");
+    assert.equal(takeStands(null, "MACRO_3", "hi{KC_A}"), false);
 });

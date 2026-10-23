@@ -28,7 +28,7 @@ test("native PD, layer-lock and custom-key identities sit in their fixed blocks"
     // Custom keys moved to their own block, 0x7f00 (D-F14).
     for (const id of [0, 3, 63, 64, 127]) assert.equal(resolveNativeQmkExpression(`CUSTOM_KEY_${id}`, model), 0x7f00 + id);
     assert.equal(resolveNativeQmkExpression("CUSTOM_KEY_128", model), undefined);
-    assert.equal(resolveNativeQmkExpression("MACRO_0", model), undefined, "the retired user macros are gone");
+    assert.equal(resolveNativeQmkExpression("MACRO_0", model), 0x7700, "MACRO_n is a macro slot, no longer a retired user macro");
 });
 
 test("the fixture's slots encode as its records and preserve the full preset policies", () => {

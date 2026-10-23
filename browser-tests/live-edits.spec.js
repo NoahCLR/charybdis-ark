@@ -201,7 +201,7 @@ test("mouse: a pointer setting posts", async ({page}) => {
 });
 test("macros: a macro's name posts", async ({page}) => {
     await openLive(page, "macros");
-    const name = page.locator('[data-f="macro:VIA_MACRO_0:name"]');
+    const name = page.locator('[data-f="macro:MACRO_0:name"]');
     await name.fill("Hello 777");
     await name.press("Enter");
     await expect.poll(() => posted(page).then(rows => JSON.stringify(rows))).toContain("Hello 777");

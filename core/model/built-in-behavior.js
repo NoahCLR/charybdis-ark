@@ -53,7 +53,7 @@ function builtInActions(target, {customKeyShortcuts = []} = {}) {
         const own = {kind: ACTION.CUSTOM_KEY, operand: slot};
         return {tap: own, hold: own, fallback: true, releaseTaps: true};
     }
-    if (target?.kind === ACTION.VIA_MACRO) return {releaseTaps: true};
+    if (target?.kind === ACTION.MACRO) return {releaseTaps: true};
     if (target?.kind === ACTION.LAYER_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind === ACTION.PD_MODE_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};

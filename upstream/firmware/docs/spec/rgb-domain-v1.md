@@ -16,7 +16,7 @@ lighting ceilings a build reports are on
 All integers are unsigned; multibyte integers are little-endian. A colour is
 three bytes, hue, saturation, value. Hue and saturation take `0..255`; value
 is at most the build's `RGB_MATRIX_MAXIMUM_BRIGHTNESS`, which GET `0x08`
-page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/62f47aa07f059fc33ad68521070c979ff041ae1f/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
+page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
 [editor metadata](profile-wire-v1/settings-domain.md#editor-metadata--get-0x08)).
 Black (`0, 0, 0`) is literal black, except in a group row
 ([below](#group-rows)) and in a layer colour, where saturation and value `0`
@@ -283,9 +283,9 @@ Held by: `tests/host/run_effective_rgb_runtime_tests.sh` (`effective_rgb_runtime
 ## Compatibility
 
 The firmware reads only version 4 (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/62f47aa07f059fc33ad68521070c979ff041ae1f/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 3 and
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 3 and
 earlier are `INVALID_VERSION` and are not translated. The 32 pointing-colour
-rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/62f47aa07f059fc33ad68521070c979ff041ae1f/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
-the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/62f47aa07f059fc33ad68521070c979ff041ae1f/docs/adr/0014-bigger-profiles.md)).
+rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
+the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0014-bigger-profiles.md)).
 
 Held by: `tests/host/run_profile_rgb_v4_tests.sh` (`profile_rgb_v4_test.c`), `tests/fixtures/rgb_domain_v4.json` (`version-3`, `version-2`).

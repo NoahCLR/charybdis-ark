@@ -101,11 +101,11 @@ test("a position carries what its value means, not only what the keyboard calls 
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
         capabilities: {actionAbiDigest: 0x6fd70b90},
-        macroView: {macros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
+        macroView: {macros: [{keycode: "MACRO_0", name: "Sign-off"}]},
         customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7f00, name: "Right Thumb", hasBehavior: true}]},
     });
     assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.semantic]), [
-        ["0x7E80", "PD_SLOT_0"], ["QK_MACRO_0", "VIA_MACRO_0"], ["KC_A", "KC_A"], ["0x7F00", "CUSTOM_KEY_0"]]);
+        ["0x7E80", "PD_SLOT_0"], ["QK_MACRO_0", "MACRO_0"], ["KC_A", "KC_A"], ["0x7F00", "CUSTOM_KEY_0"]]);
     assert.equal(model.qmkKeyLabels["0x7F00"], "Right Thumb", "a named custom key is labelled by its name");
     for (const [slot, keycode] of [[63, 0x7f3f], [64, 0x7f40], [127, 0x7f7f]]) {
         assert.ok(model.qmkKeycodes.some(key => key.value === `CUSTOM_KEY_${slot}` && key.keycode === keycode && key.group === "Custom keys"), `custom key ${slot} is offered`);
@@ -460,9 +460,9 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
     committed.domains = {...committed.domains, keyBehaviors: {...committed.domains.keyBehaviors, rows: [
         row({kind: 2, flags: 0, operand: 1}),   // MO(1)
         row({kind: 3, flags: 0, operand: 2}),   // LOCK_LAYER(2)
-        row({kind: 6, flags: 0, operand: 0}),   // VIA_MACRO_0
+        row({kind: 6, flags: 0, operand: 0}),   // MACRO_0
     ]}};
-    const macroView = {macros: [{kind: "via", keycode: "VIA_MACRO_0", payload: ""}], hardcodedMacros: []};
+    const macroView = {macros: [{keycode: "MACRO_0", payload: ""}], hardcodedMacros: []};
     const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x6fd70b90}}).qmkKeyLabels;
     const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x6fd70b90}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
@@ -534,16 +534,16 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     const capabilities = {...CURRENT_CAPABILITIES, featureFlags: (1 << 17) | (1 << 18)};
     const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}}, "board", capabilities);
     draft.stage({type: "updateLayoutKeys", draftRevision: draft.revision, layer: "Layer 0", changes: [
-        {layoutIndex: 0, keycode: "PD_SLOT_0"}, {layoutIndex: 1, keycode: "VIA_MACRO_0"},
+        {layoutIndex: 0, keycode: "PD_SLOT_0"}, {layoutIndex: 1, keycode: "MACRO_0"},
         {layoutIndex: 2, keycode: "CUSTOM_KEY_0"}, {layoutIndex: 3, keycode: "LT(3,KC_F)"},
         {layoutIndex: 4, keycode: "MT(MOD_LSFT,KC_A)"}, {layoutIndex: 5, keycode: "MO(2)"},
     ]});
-    draft.stage({type: "updateMacro", draftRevision: draft.revision, keycode: "VIA_MACRO_0", name: "Sign-off", payload: "hello"});
+    draft.stage({type: "updateMacro", draftRevision: draft.revision, keycode: "MACRO_0", name: "Sign-off", payload: "hello"});
     draft.stage({type: "updateCustomKey", draftRevision: draft.revision, keycode: "CUSTOM_KEY_0", name: "Right Thumb"});
     const state = {capabilities, phase: "reading", error: {message: "Read unavailable"}, committed: {state: "unavailable"},
         combos: {state: "unavailable", error: {message: "Combo read unavailable"}}};
     const model = buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""}, state);
-    assert.deepEqual(model.layers[0].positions.slice(0, 3).map(key => key.semantic), ["PD_SLOT_0", "VIA_MACRO_0", "CUSTOM_KEY_0"]);
+    assert.deepEqual(model.layers[0].positions.slice(0, 3).map(key => key.semantic), ["PD_SLOT_0", "MACRO_0", "CUSTOM_KEY_0"]);
     assert.equal(model.layers[0].positions[1].display, "Sign-off");
     assert.equal(model.layers[0].positions[2].display, "Right Thumb");
     assert.equal(model.layers[0].displayName, "Base");

@@ -152,7 +152,7 @@ export function placeState(place, layers = []) {
         // Which group lists a combo depends on the layer shown, so the combo is
         // asked for by id and the tab picks it where it finds it.
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};
-        case "macro": return {screen: "macros", macroSlot: `VIA_MACRO_${place.index}`};
+        case "macro": return {screen: "macros", macroSlot: `MACRO_${place.index}`};
         case "customKey": return {screen: "customKeys", customKey: `CUSTOM_KEY_${place.index}`};
         case "pointing": return {screen: "pointing", pdSlot: place.slot, pdKind: null, pdButtons: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
@@ -210,7 +210,7 @@ function computeMarks(changes) {
             marks.layers.add(place.layer);
         } else if (place.kind === "behaviour") marks.behaviours.add(place.keycode);
         else if (place.kind === "combo") marks.combos.add(place.index);
-        else if (place.kind === "macro") marks.macros.add(`VIA_MACRO_${place.index}`);
+        else if (place.kind === "macro") marks.macros.add(`MACRO_${place.index}`);
         else if (place.kind === "customKey") marks.customKeys.add(`CUSTOM_KEY_${place.index}`);
         else if (place.kind === "pointing") marks.pointing.add(place.slot);
         else if (place.kind === "lighting") {

@@ -27,7 +27,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         if (fs.existsSync(`preview/${theme}.html`)) await page.goto(`/preview/${theme}.html`);
         else await openPreview(page, theme);
         await publish();
-        await page.evaluate(async () => {const store = await import("/webview/store.mjs"); store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_0"; store.render();});
+        await page.evaluate(async () => {const store = await import("/webview/store.mjs"); store.state.screen = "macros"; store.state.macroSlot = "MACRO_0"; store.render();});
         const policy = page.locator("[data-protection]");
         await expect(policy.locator("option:checked")).toHaveText("Automatic · off");
         await expect(page.locator('[data-macro-editor]')).toContainText("when this layout needs Unicode entry");
@@ -40,7 +40,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await expect(policy.locator("option:checked")).toHaveText("Automatic · on");
         await expect(page.locator('[data-macro-editor]')).not.toContainText("Avoid typing while a text macro plays");
         await policy.selectOption("off");
-        expect(await stagePosted()).toMatchObject({type: "updateMacro", keycode: "VIA_MACRO_0", protection: "off"});
+        expect(await stagePosted()).toMatchObject({type: "updateMacro", keycode: "MACRO_0", protection: "off"});
         await expect(policy).toHaveValue("off");
         await expect(page.locator('[data-macro-editor]')).toContainText("Avoid typing while a text macro plays");
         await page.evaluate(async () => {const store = await import("/webview/store.mjs"); store.state.overlay = "review"; store.render();});

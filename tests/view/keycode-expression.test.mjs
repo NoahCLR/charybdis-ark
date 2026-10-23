@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {comboOutputProblem, isPlainKey, keyProblem, keycodeValue, takesModifiers} from "../../webview/view/keycode-expression.mjs";
+import {keyName} from "../../webview/view/keyvalues.mjs";
 
 const require = createRequire(import.meta.url);
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
@@ -38,8 +39,8 @@ const EXPRESSIONS = [
     "MT(MOD_LCTL, KC_A)", "MT(MOD_LCTL|MOD_RSFT, KC_A)", "MT(MOD_LCTL, S(KC_1))", "MT(MOD_LCTL, KC_EXLM)",
     "LT(3, KC_F)", "LT(3,KC_F)", "LT(2, LT(3, KC_F))", "LT(16, KC_A)", "LT(3, CUSTOM_KEY_1)", "LT(1, KC_LCTRL)",
     "MO(2)", "MO(15)", "MO(16)", "TG(1)", "TO(0)", "TT(3)", "OSL(4)", "DF(1)", "PDF(1)", "LOCK_LAYER(1)", "LOCK_LAYER(16)",
-    "S(MO(2))", "G(PD_SLOT_0)", "S(VIA_MACRO_0)", "G(A(S(C(LT(3,KC_F)))))", "C(PD_SLOT_0)",
-    "PD_SLOT_0", "PD_SLOT_0_LOCK", "VIA_MACRO_0", "VIA_MACRO_127", "VIA_MACRO_128", "CUSTOM_KEY_5",
+    "S(MO(2))", "G(PD_SLOT_0)", "S(MACRO_0)", "G(A(S(C(LT(3,KC_F)))))", "C(PD_SLOT_0)",
+    "PD_SLOT_0", "PD_SLOT_0_LOCK", "MACRO_0", "MACRO_127", "MACRO_128", "CUSTOM_KEY_5",
     "OSM(MOD_LSFT)", "LM(1, MOD_LSFT)", "LM(16, MOD_LSFT)", "0x0004", "0x5240", "4", "NOT_A_KEY", "", "LT(3,", "KC_A)",
 ];
 
@@ -50,6 +51,19 @@ test("the picker's check stores what the draft stores and refuses what it refuse
         assert.equal(problem === "", stored !== undefined, `${expression}: picker says "${problem}", draft stores ${stored}`);
         if (stored !== undefined) assert.equal(keycodeValue(model, expression), stored, expression);
     }
+});
+
+// VIA_MACRO_n was the macro keycodes' name before firmware D-F31: typed, it
+// still reaches its macro, and the key then reads by today's name.
+test("every name for a macro slot stores the same keycode, which reads as MACRO_n", () => {
+    for (const expression of ["MACRO_3", "VIA_MACRO_3", "QK_MACRO_3", "MC_3"]) {
+        assert.equal(drafted(expression), 0x7703, expression);
+        assert.equal(keycodeValue(model, expression), 0x7703, expression);
+    }
+    assert.equal(keyName(model, 0x7703), "MACRO_3");
+    assert.equal(drafted("VIA_MACRO_127"), 0x777f);
+    assert.equal(keyProblem(model, "VIA_MACRO_128"), "VIA_MACRO_128 is not a key this keyboard can store.");
+    assert.equal(drafted("VIA_MACRO_128"), undefined);
 });
 
 // What the draft stores as a new combo's output, or undefined if it refuses it.
@@ -82,5 +96,5 @@ test("a tap with a hold is a plain key; modifiers wrap only basic or modified ke
     assert.equal(isPlainKey(model, "KC_EXLM"), false);
     assert.equal(isPlainKey(model, "MO(1)"), false);
     assert.equal(takesModifiers(model, "KC_EXLM"), true);
-    for (const key of ["MO(2)", "PD_SLOT_0", "VIA_MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(takesModifiers(model, key), false, key);
+    for (const key of ["MO(2)", "PD_SLOT_0", "MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(takesModifiers(model, key), false, key);
 });

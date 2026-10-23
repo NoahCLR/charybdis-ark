@@ -40,7 +40,7 @@ test("a pointing tuning field drops pasted letters", async ({page}) => {
 });
 
 test("a macro delay refuses the letters and signs a number field would allow", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "MACRO_17"});
     await page.locator('[data-insert-kind="delay"]').click();
     const field = page.locator("[data-step-delay]");
     await field.fill("");

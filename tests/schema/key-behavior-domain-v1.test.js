@@ -60,7 +60,7 @@ function representative() {
             steps: [
                 {
                     tapIndex: 2,
-                    tap: {kind: PROFILE_ACTION_KINDS.VIA_MACRO, operand: 10},
+                    tap: {kind: PROFILE_ACTION_KINDS.MACRO, operand: 10},
                     longHold: {
                         style: KEY_BEHAVIOR_HOLD_STYLES.TAP_AT_HOLD_THRESHOLD,
                         action: {kind: PROFILE_ACTION_KINDS.LAYER_LOCK, operand: 3},
@@ -105,7 +105,7 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
                     },
                     {
                         tapIndex: 2,
-                        tap: {kind: PROFILE_ACTION_KINDS.VIA_MACRO, flags: 0, operand: 10},
+                        tap: {kind: PROFILE_ACTION_KINDS.MACRO, flags: 0, operand: 10},
                         longHold: {
                             style: KEY_BEHAVIOR_HOLD_STYLES.TAP_AT_HOLD_THRESHOLD,
                             repeatHz: 0,

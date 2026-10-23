@@ -119,7 +119,7 @@ test("local macro inspection replies before the ordinary busy guard without stag
     const loop = openPanelLoop({post: response => replies.push(response)}, {service: {snapshot: () => state(), close: async () => {}}});
     Object.assign(loop.session, current, {service: {...current.service, snapshot: () => state()}, readBusy: true, portableBusy: true});
     const revision = current.draft.revision;
-    await loop.handleMessage({...request("validateMacro", current), keycode: "VIA_MACRO_0", payload: "hello", requestId: 7});
+    await loop.handleMessage({...request("validateMacro", current), keycode: "MACRO_0", payload: "hello", requestId: 7});
     assert.equal(replies.length, 1);
     assert.equal(replies[0].type, "macroValidation");
     assert.equal(replies[0].requestId, 7);

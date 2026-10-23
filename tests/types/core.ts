@@ -65,17 +65,17 @@ function profileContracts(document: PortableDocument, snapshot: CompleteSnapshot
     const draft = new ProfileDraftSession(snapshot, 'board', {compiledLayerCount: 16, actionAbiDigest: document.actionAbiDigest});
     draft.stage({type: 'updateLayoutKeys', layer: 'Layer 0', changes: [{layoutIndex: 0, keycode: 'KC_A'}], draftRevision: draft.revision});
     // @ts-expect-error A staged edit must identify the revision the editor saw.
-    draft.stage({type: 'updateMacro', keycode: 'VIA_MACRO_0', payload: 'hello'});
+    draft.stage({type: 'updateMacro', keycode: 'MACRO_0', payload: 'hello'});
     // @ts-expect-error Layout edits use Layer n references rather than bare indices.
     draft.stage({type: 'updateLayoutKeys', layer: 0, changes: [], draftRevision: draft.revision});
     // @ts-expect-error Profile-domain edits cannot write the separate macro bank.
-    editDeviceProfile(Buffer.alloc(32), {type: 'updateMacro', keycode: 'VIA_MACRO_0', payload: 'hello'});
+    editDeviceProfile(Buffer.alloc(32), {type: 'updateMacro', keycode: 'MACRO_0', payload: 'hello'});
     const validated = validateSnapshot(document);
     const same: PortableDocument = decodedOf({document, decoded: validated}).document;
     const reader = new ProfilePayloadReader(connection);
     const apply = new ApplyProgress(view => {const progress: number | undefined = view.bytes?.completed; void progress;});
     apply.report('upload', {completed: 1, total: 2});
-    editMacro(snapshot, {keycode: 'VIA_MACRO_0', payload: 'hello', expectedFingerprint: snapshot.fingerprint});
+    editMacro(snapshot, {keycode: 'MACRO_0', payload: 'hello', expectedFingerprint: snapshot.fingerprint});
     void same;
 
     // @ts-expect-error Decoding needs a complete document, not partial profile fields.
@@ -85,7 +85,7 @@ function profileContracts(document: PortableDocument, snapshot: CompleteSnapshot
     // @ts-expect-error Progress uses the established Apply steps.
     apply.report('writing random bytes');
     // @ts-expect-error A direct macro edit needs the fingerprint it was built from.
-    editMacro(snapshot, {keycode: 'VIA_MACRO_0', payload: 'hello'});
+    editMacro(snapshot, {keycode: 'MACRO_0', payload: 'hello'});
     // @ts-expect-error Portable documents store encoded macro streams, not numeric keycodes.
     document.macros = [4];
     // @ts-expect-error Candidate metadata needs its action vocabulary identity.

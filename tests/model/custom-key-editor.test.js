@@ -20,7 +20,7 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
     assert.deepEqual(view.keys[127], {slot: 127, keycode: "CUSTOM_KEY_127", code: 0x7f7f, name: "", hasBehavior: false, shortcut: {mods: 0, key: 0}});
     assert.deepEqual(view.names, {perName: 32}, "a name is counted in bytes of UTF-8");
     assert.ok(["KC_A", "KC_EXSEL", "QK_MOUSE_BUTTON_1", "MS_BTN1", "QK_MOUSE_BUTTON_8"].every(name => view.shortcutKeys.includes(name)), "basic keys and mouse buttons 1-8");
-    assert.ok(!["KC_LEFT_CTRL", "KC_LCTL", "KC_NO", "KC_SYSTEM_POWER", "QK_MOUSE_CURSOR_UP", "CUSTOM_KEY_0", "VIA_MACRO_0", "KC_AUDIO_MUTE"].some(name => view.shortcutKeys.includes(name)),
+    assert.ok(!["KC_LEFT_CTRL", "KC_LCTL", "KC_NO", "KC_SYSTEM_POWER", "QK_MOUSE_CURSOR_UP", "CUSTOM_KEY_0", "MACRO_0", "KC_AUDIO_MUTE"].some(name => view.shortcutKeys.includes(name)),
         "modifiers belong in the mask; media, system, mouse movement and user keys stay out");
     const named = editCustomKey(before, {keycode: "CUSTOM_KEY_2", name: " Click Spam ", expectedFingerprint: before.fingerprint}, capabilities);
     const after = validateSnapshot(named, capabilities);
@@ -42,7 +42,7 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
 test("a macro name edit keeps the custom-key names", () => {
     let current = snapshot(pdDocument());
     current = snapshot(editCustomKey(current, {keycode: "CUSTOM_KEY_0", name: "Right Thumb", expectedFingerprint: current.fingerprint}, capabilities));
-    current = snapshot(editMacro(current, {keycode: "VIA_MACRO_3", name: "OCR Copy", expectedFingerprint: current.fingerprint}, capabilities));
+    current = snapshot(editMacro(current, {keycode: "MACRO_3", name: "OCR Copy", expectedFingerprint: current.fingerprint}, capabilities));
     const settings = validateSnapshot(current.document).settings;
     assert.equal(settings.formatVersion, 8);
     assert.equal(settings.customKeyNames[0], "Right Thumb");
@@ -68,7 +68,7 @@ test("wrong keys, stale drafts, long names and older firmware are refused", () =
     const current = snapshot(pdDocument());
     const message = {keycode: "CUSTOM_KEY_0", name: "Thumb", expectedFingerprint: current.fingerprint};
     assert.throws(() => editCustomKey(current, {...message, expectedFingerprint: "stale"}, capabilities), /changed/);
-    for (const keycode of ["CUSTOM_KEY_128", "CUSTOM_KEY_01", "VIA_MACRO_0", "KC_A"]) assert.throws(() => editCustomKey(current, {...message, keycode}, capabilities), /custom key/);
+    for (const keycode of ["CUSTOM_KEY_128", "CUSTOM_KEY_01", "MACRO_0", "KC_A"]) assert.throws(() => editCustomKey(current, {...message, keycode}, capabilities), /custom key/);
     assert.equal(validateSnapshot(editCustomKey(current, {...message, keycode: "CUSTOM_KEY_127"}, capabilities)).settings.customKeyNames[127], "Thumb", "the last custom key is one");
     assert.throws(() => editCustomKey(current, {...message, name: "x".repeat(33)}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID" && /32 bytes of text/.test(error.message));
     assert.throws(() => editCustomKey(current, {...message, name: "tab\there"}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID" && /no control characters/.test(error.message));

@@ -21,8 +21,8 @@ function edited() {
             fields: section.fields.map((field) => field.kind === "toggle" ? {macro: field.macro, enabled: updates[field.macro] ?? field.enabled} : {macro: field.macro, value: updates[field.macro] ?? field.value})};
     };
     stage({type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 3, keycode: "KC_B"}, {layoutIndex: 4, keycode: "KC_C"}]});
-    stage({type: "updateMacro", keycode: "VIA_MACRO_2", payload: "hello"});
-    stage({type: "updateMacro", keycode: "VIA_MACRO_5", name: "Greeting", expectedFingerprint: draft.current.fingerprint});
+    stage({type: "updateMacro", keycode: "MACRO_2", payload: "hello"});
+    stage({type: "updateMacro", keycode: "MACRO_5", name: "Greeting", expectedFingerprint: draft.current.fingerprint});
     stage(settings("keyTiming", {tapHoldTerm: "175", multiTapTerm: "190"}));
     stage({type: "retargetBehavior", keycode: "KC_ESCAPE", target: "KC_Q", expectedBase: draft.identity()});
     stage({type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "50", holdTermMs: "200"});

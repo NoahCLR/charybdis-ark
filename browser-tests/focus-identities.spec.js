@@ -15,7 +15,7 @@ const surfaces = [
     ["keys", {tab: "key"}], ["keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI", cell: "1-hold", cellRow: "KC_LEFT_GUI"}],
     ["keys", {tab: "combos"}], ["keys", {layersOpen: true}],
     ["settings", {settingsOpen: ["keyBehavior", "comboSettings", "autoMouse", "mouse"]}],
-    ["mouse", {}], ["customKeys", {}], ["macros", {macroSlot: "VIA_MACRO_17"}],
+    ["mouse", {}], ["customKeys", {}], ["macros", {macroSlot: "MACRO_17"}],
     ...["base", "layers", "auto", "pd", "combo", "key", "groups"].map(stage =>
         ["lighting", {stage, layer: 1, pdSlot: 0, feedbackRow: "holdActiveColor"}]),
     ...[0, 4, 8].map(pdSlot => ["pointing", {pdSlot, pdAdvanced: true}]),
@@ -118,7 +118,7 @@ test("picker search has a unique identity beside its underlying editor", async (
 });
 
 test("macro step identity moves with the step and survives edits and accepted models", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "MACRO_17"});
     await page.locator('[data-insert-kind="text"]').click();
     await page.locator("[data-step-text]").fill("First");
     await page.locator("[data-step-text]").dispatchEvent("change");

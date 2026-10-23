@@ -371,7 +371,7 @@ test("live macro validation replies inline without staging, history, toasts or d
     const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});
     loop.serviceChanged(); shell.posted.length = 0;
     const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
-    const message = {type: "validateMacro", keycode: "VIA_MACRO_17", payload: "{{KC_A}}\nhello", requestId: 777,
+    const message = {type: "validateMacro", keycode: "MACRO_17", payload: "{{KC_A}}\nhello", requestId: 777,
         draftId: draft.id, draftRevision: revision};
     await loop.handleMessage(message);
     assert.deepEqual(last(shell), {...message, type: "macroValidation", validation: require("../../core/model/macro-editor").macroInputStatus(draft.current, message, draft.capabilities)});
@@ -434,7 +434,7 @@ test("the published binding is what edits, macro checks, imports and Apply answe
         shell.posted.length = 0;
         await loop.handleMessage({...edit(draft), layer: "Layer 0", changes: [{layoutIndex: 1, keycode: "KC_B"}]});
         assert.match(last(shell).notice, /^Failed/, `${label}: the edit is refused`);
-        await loop.handleMessage({type: "validateMacro", keycode: "VIA_MACRO_1", payload: "hi", requestId: 1, draftId: draft.id, draftRevision: draft.revision});
+        await loop.handleMessage({type: "validateMacro", keycode: "MACRO_1", payload: "hi", requestId: 1, draftId: draft.id, draftRevision: draft.revision});
         assert.ok(last(shell).validation.error, `${label}: the macro check is refused`);
         await loop.handleMessage({type: "reviewPortableProfile", text: JSON.stringify(document), name: "a.charybdis.json", draftId: draft.id, draftRevision: draft.revision});
         assert.match(last(shell).notice, /^Failed/, `${label}: the import is refused`);
@@ -473,7 +473,7 @@ test("demo macros use the same live validation without a keyboard", async () => 
     await loop.handleMessage({type: "openDemo"});
     const draft = loop.session.draft;
     assert.ok(loop.session.demo, "validation is exercised in the demo, not a keyboard draft");
-    await loop.handleMessage({type: "validateMacro", keycode: "VIA_MACRO_17", payload: "literal {{braces}}", requestId: 1,
+    await loop.handleMessage({type: "validateMacro", keycode: "MACRO_17", payload: "literal {{braces}}", requestId: 1,
         draftId: draft.id, draftRevision: draft.revision});
     assert.equal(last(shell).type, "macroValidation");
     assert.equal(last(shell).validation.error, "");
@@ -499,7 +499,7 @@ test("a retained dirty draft adopts the reconnected keyboard's capabilities at r
     assert.equal(last(shell).model.draft.editable, true);
     assert.equal(draft.capabilities.firmwareVersion, 0x00020000);
     await loop.handleMessage({type: "updateMacro", draftId: draft.id, draftRevision: draft.revision,
-        keycode: "VIA_MACRO_0", payload: "a".repeat(600)});
+        keycode: "MACRO_0", payload: "a".repeat(600)});
     assert.equal(last(shell).model.macros[0].payload.length, 600);
 });
 

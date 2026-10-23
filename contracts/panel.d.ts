@@ -39,7 +39,7 @@ export interface BehaviorView extends Omit<Behavior, 'steps'> {
 }
 export interface ComboView extends Combo {inputPositions?: number[]; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
 export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string}
-export interface MacroSlot {kind: string; keycode: string; name: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
+export interface MacroSlot {keycode: string; name: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
 /** A custom key's shortcut: a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI) and one key, 0 for none. */
 export interface CustomKeyShortcut {mods: number; key: number}
 /** `shortcutLabel` names the shortcut in the host's words ("Left Ctrl + Right Alt + K"), empty for none. */

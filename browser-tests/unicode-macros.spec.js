@@ -28,7 +28,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             const store = await import("/webview/store.mjs");
             const model = structuredClone(store.getModel());
             model.macroUnicode = {mode:1,enabled:true};
-            store.setModel(model); store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render(); window.__posted.length = 0;
+            store.setModel(model); store.state.screen = "macros"; store.state.macroSlot = "MACRO_17"; store.render(); window.__posted.length = 0;
         });
         await page.locator('[data-insert-kind="text"]').click();
         const text = ' {"café": “hello”} 🙂 e\u0301 👩‍💻 ';

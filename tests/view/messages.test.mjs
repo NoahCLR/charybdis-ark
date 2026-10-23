@@ -101,7 +101,7 @@ test("a macro inspection goes to its editor, and an unknown reply changes nothin
     const {receive, calls} = surface();
     const model = reading();
     setModel(model);
-    const validation = {type: "macroValidation", keycode: "VIA_MACRO_0", payload: "hi", requestId: 7, validation: {error: "", code: ""}};
+    const validation = {type: "macroValidation", keycode: "MACRO_0", payload: "hi", requestId: 7, validation: {error: "", code: ""}};
     receive(validation);
     assert.deepEqual(calls.validations, [validation]);
     receive({type: "somethingElse"});

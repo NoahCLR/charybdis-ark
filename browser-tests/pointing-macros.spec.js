@@ -14,7 +14,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
-        draft.stage({type: "updateMacro", keycode: "VIA_MACRO_0", payload: "777", name: "Greeting <&>", draftId: draft.id, draftRevision: draft.revision});
+        draft.stage({type: "updateMacro", keycode: "MACRO_0", payload: "777", name: "Greeting <&>", draftId: draft.id, draftRevision: draft.revision});
         const publish = async () => {
             const editing = draftBinding({draft}, connection);
             const patch = {...buildSnapshotModel(draft.current, capabilities, editing, connection), draft: {...draft.view(connection), ...editing}};
@@ -43,7 +43,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             await picker.locator('[data-sec="macros"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(128);
             if (macro === 0) await expect(picker).toContainText("Greeting <&>");
-            await picker.locator(`[data-pick="VIA_MACRO_${macro}"]`).click();
+            await picker.locator(`[data-pick="MACRO_${macro}"]`).click();
             await picker.locator('[data-mod="C"]').click();
             await expect(picker.locator('[data-act="use"]')).toBeDisabled();
             await picker.locator('[data-mod="C"]').click();
@@ -51,7 +51,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             const message = await stagePosts();
             const [group, name] = field.split(":");
             expect(message.config[group === "dir" ? "directions" : "diagonals"][name])
-                .toEqual({keycode: `VIA_MACRO_${macro}`, modifierPolicy: 0, mask: 0});
+                .toEqual({keycode: `MACRO_${macro}`, modifierPolicy: 0, mask: 0});
             await expect(page.locator(`[data-f="pointing:4:${field}"]`)).toHaveValue(macro === 0 ? "Greeting <&>" : "Macro 127");
         }
         await expect(page.locator(".pd-cross")).toContainText("Empty macro: does nothing yet");
@@ -69,10 +69,10 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await page.locator('label:has(input[data-f="pointing:4:button:1:tap"]) button').click();
         const picker = page.getByRole("dialog", {name: "Pick a keycode"});
         await picker.locator('[data-sec="macros"]').click();
-        await picker.locator('[data-pick="VIA_MACRO_0"]').click();
+        await picker.locator('[data-pick="MACRO_0"]').click();
         await picker.locator('[data-act="use"]').click();
         const message = await stagePosts();
-        expect(message.config.buttons[1].tap).toEqual({keycode: "VIA_MACRO_0", modifierPolicy: 0, mask: 0});
+        expect(message.config.buttons[1].tap).toEqual({keycode: "MACRO_0", modifierPolicy: 0, mask: 0});
         expect(validateSnapshot(draft.document).pdModes[4].buttons[1].tap.keycode).toBe(0x7700);
         await expect(page.locator(".pd-buttons")).toContainText("Inherit modifiers · the macro continues after its trigger");
     });
