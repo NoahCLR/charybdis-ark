@@ -13,7 +13,7 @@ export function formControls(model, slot, canEdit, stageCurrent) {
     /** @param {string} label @param {import("../../../contracts/edits.js").Scalar | null | undefined} value @param {string} key @param {import("../surface-types.js").FieldOptions} [options] */
     const field = (label, value, key, options = {}) => {
         const node = el(`<label class="field"><span>${esc(label)}</span>
-            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
+            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
             ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
         form[key] = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).value;
         return node;
@@ -21,8 +21,8 @@ export function formControls(model, slot, canEdit, stageCurrent) {
     /** @param {string} label @param {readonly (readonly [number, string])[]} choices @param {import("../../../contracts/edits.js").Scalar | undefined} current @param {string} key @param {import("../surface-types.js").SelectOptions} [options] */
     const select = (label, choices, current, key, options = {}) => {
         const node = el(`<label class="field ${options.inline ? "inline" : ""}"><span>${esc(label)}</span>
-            <select data-f="pointing:${slot.id}:${esc(key)}" class="input" ${disabled} ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>
-            ${choices.map(([value, text]) => `<option value="${value}" ${String(value) === String(current) ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
+            <select data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input" ${disabled} ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>
+            ${choices.map(([value, text]) => `<option value="${esc(value)}" ${String(value) === String(current) ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
         form[key] = () => Number(/** @type {HTMLSelectElement} */ (node.querySelector("select")).value);
         if (options.onChange) /** @type {HTMLSelectElement} */ (node.querySelector("select")).addEventListener("change", options.onChange);
         return node;
@@ -34,8 +34,8 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         // stages the stored keycode; a QMK name or alias typed over it stages
         // that.
         const shown = options.name ?? keyDisplayName(model, Number(code ?? 0));
-        const node = el(`<label class="field ${options.klass || ""}"><span>${options.labelHtml || esc(label)}</span>
-            <div class="input-row"><input data-f="pointing:${slot.id}:${esc(key)}" class="input" value="${esc(shown)}" placeholder="nothing" ${disabled}
+        const node = el(`<label class="field ${esc(options.klass)}"><span>${options.labelHtml || esc(label)}</span>
+            <div class="input-row"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input" value="${esc(shown)}" placeholder="nothing" ${disabled}
                 data-tip="${esc(name ? `Stored as ${name}. Type a QMK keycode name, or pick one.` : "Type a QMK keycode name, or pick one.")}">
             <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
         const macro = pointingMacro(model, code);

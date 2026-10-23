@@ -18,7 +18,7 @@ export function editModeSwitch(busy) {
     const current = modes.choices.find((choice) => choice.value === modes.mode);
     return `<label class="rail-mode" data-tip="${esc(current?.detail || "")}"><span>Edits</span>
         <select id="rail-edit-mode" data-f="rail:edit-mode" data-act="edit-mode" aria-label="How edits reach the keyboard" ${busy ? "disabled" : ""}>
-            ${modes.choices.map((choice) => `<option value="${choice.value}" ${choice.value === modes.mode ? "selected" : ""} ${choice.offered ? "" : "disabled"}>${esc(choice.label)}</option>`).join("")}
+            ${modes.choices.map((choice) => `<option value="${esc(choice.value)}" ${choice.value === modes.mode ? "selected" : ""} ${choice.offered ? "" : "disabled"}>${esc(choice.label)}</option>`).join("")}
         </select>${modes.conflict ? `<button class="btn ghost tiny" data-act="edit-mode-settle" ${busy ? "disabled" : ""}
             data-tip="The halves stored different modes. Settle stores this one on both."><i class="dot warn"></i> Settle</button>` : ""}${model.editMode?.notStored
             ? `<i class="dot warn" data-tip="The keyboard has not stored its edit mode yet and keeps trying. Unplugging it now may lose the mode."></i>` : ""}</label>`;
@@ -58,7 +58,7 @@ export function editModeOverlay() {
         <div class="sheet-b"><p>${esc(words.detail)}</p>${words.checks.length
             ? `<ul class="live-ask-checks">${words.checks.map((check) => `<li><i class="dot ${check.level === "trap" ? "err" : "warn"}"></i> ${esc(check.title)}</li>`).join("")}</ul>` : ""}</div>
         <div class="sheet-f"><button class="btn ghost" data-act="cancel">Cancel</button>
-            <span class="right">${words.answers.map((answer) => `<button class="btn${answer.primary ? " primary" : ""}" data-pending="${answer.pending}">${esc(answer.label)}</button>`).join("")}</span></div>
+            <span class="right">${words.answers.map((answer) => `<button class="btn${answer.primary ? " primary" : ""}" data-pending="${esc(answer.pending)}">${esc(answer.label)}</button>`).join("")}</span></div>
     </div></div>`);
     const close = () => {state.overlay = null; state.modeAsk = null; rerender();};
     node.addEventListener("click", (event) => {

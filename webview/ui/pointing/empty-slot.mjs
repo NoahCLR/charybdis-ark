@@ -23,7 +23,7 @@ function inertNote(model, slot) {
 export function emptySlot(model, slot, canEdit, slots) {
     const sources = slots.filter((row) => row.kind);
     const node = el(`<div class="pd-editor stack"><div class="card">
-        <div class="card-h">${slotLight(model, slot).swatch("lg")}<h3>Slot ${slot.id} is empty</h3>
+        <div class="card-h">${slotLight(model, slot).swatch("lg")}<h3>Slot ${esc(slot.id)} is empty</h3>
             <span class="tag">${esc(bindingName(slot))}</span></div>
         <div class="card-b stack">
         <p class="note pd-empty-note">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(slot.binding?.lock || "")}</code> locks it on.</p>
@@ -34,8 +34,8 @@ export function emptySlot(model, slot, canEdit, slots) {
             <button class="btn" data-new="${KIND.SCROLLING}" ${canEdit ? "" : "disabled"}
                 data-tip="Scrolling, starting from Dragscroll's tuning.">New scrolling mode</button></div>
         ${sources.length ? `<div class="pd-copy">
-            <label class="field"><span>Copy from</span><select class="input" data-f="pointing:${slot.id}:copy" data-source ${canEdit ? "" : "disabled"}>
-                ${sources.map((row) => `<option value="${row.id}">Slot ${row.id} · ${esc(row.name)}</option>`).join("")}</select></label>
+            <label class="field"><span>Copy from</span><select class="input" data-f="pointing:${esc(slot.id)}:copy" data-source ${canEdit ? "" : "disabled"}>
+                ${sources.map((row) => `<option value="${esc(row.id)}">Slot ${esc(row.id)} · ${esc(row.name)}</option>`).join("")}</select></label>
             <button class="btn" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
             : ""}
         ${canEdit || model?.draft?.busy ? "" : `<div class="unavailable">${esc(unavailable(model) || "This slot cannot be edited right now.")}</div>`}

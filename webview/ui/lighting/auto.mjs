@@ -76,7 +76,7 @@ export function stageAuto(model) {
     }
     const policy = section("Fade");
     const select = el(`<label class="field"><span>Fade mode</span><select data-f="lighting:auto:fade-mode" class="input" ${editFade ? "" : "disabled"}>
-        ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
+        ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${esc(id)}" ${fade.mode === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
         { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
     policy.append(stack(select, el(`<p class="note">Where the fade lands once auto-mouse turns the pointer layer off. The board shows the destination, not the animation.</p>`)));

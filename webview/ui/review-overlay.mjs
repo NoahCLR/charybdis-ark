@@ -52,7 +52,7 @@ export function reviewOverlay() {
     /** @type {import("../../contracts/model.js").ReviewChange[]} */
     const shown = [];
     const sections = reviewBlocks(draft.changes).map(({area, blocks, count}) => `<section class="rv-sect">
-        <div class="sect-h"><h4>${esc(area)}</h4><span class="right tag">${count}</span></div>
+        <div class="sect-h"><h4>${esc(area)}</h4><span class="right tag">${esc(count)}</span></div>
         ${columns}
         ${((titleSlot) => blocks.map((block) => {
             const grouped = block.size > 1;
@@ -78,7 +78,7 @@ export function reviewOverlay() {
         if (group === undefined) return "";
         const change = draft.changes.find((entry) => entry.group === group);
         if (!change) return "";
-        return `<button class="ck-source" data-check-source="${group}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↓</button>`;
+        return `<button class="ck-source" data-check-source="${esc(group)}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↓</button>`;
     }, draft.live ? "Save" : "Apply", demo.active);
     // Ask about active warnings and traps for this revision before writing.
     const confirmChecks = checksToConfirm(draft.checks);
@@ -94,7 +94,7 @@ export function reviewOverlay() {
             ${checks}
             ${sections}
             <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
-                : keyboardSaves ? `The keyboard already runs these changes and saves them by itself after ${quietWords(draft.live?.keyboard)} without typing. Revert puts back what is saved.`
+                : keyboardSaves ? `The keyboard already runs these changes and saves them by itself after ${esc(quietWords(draft.live?.keyboard))} without typing. Revert puts back what is saved.`
                 : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then writes them as its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
                 : "Apply saves a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts Apply, the recovery copy restores it."}</div></div>
         </div>

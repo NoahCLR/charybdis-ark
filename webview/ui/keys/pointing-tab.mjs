@@ -39,10 +39,10 @@ export function tabPointing(body, right) {
             <td><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${slotLight(model, slot).swatch()}</span>
                 ${esc(slot.displayName || `Slot ${slot.id}`)}${variant ? ` · ${esc(variant)}` : ""} <code class="dim">${esc(keycodes.join(" · "))}</code>${changedSlots.has(slot.id) ? draftDot() : ""}</td>
             <td class="muted">${slot.kind
-                ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal pointer speed"}`
+                ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${esc(slot.dpi)} DPI` : " · normal pointer speed"}`
                 : "Empty · these keys do nothing yet"}</td>
             <td class="muted">${reachedBy}</td>
-            <td class="reach-edit"><button class="btn tiny ghost" data-editpd="${slot.id}">Edit</button></td></tr>`;
+            <td class="reach-edit"><button class="btn tiny ghost" data-editpd="${esc(slot.id)}">Edit</button></td></tr>`;
     };
     // Holding a mode and locking it on are the same mode reached two ways, so
     // the card is named for the one its route uses. A route that uses both

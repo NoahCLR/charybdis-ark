@@ -12,7 +12,7 @@ export function modifierGrid(model, {label, mask, id, disabled = false}) {
     const bits = modifierBits(model);
     const columns = (vocabulary(model).pickerModifiers || []).filter(({bit}) => bit < 16).map(({label}) => label);
     /** @param {readonly [number, string]} entry */
-    const cell = ([bit, name]) => `<label class="sw" data-tip="${esc(name)}"><input data-f="${esc(id)}:modifier:${bit}" type="checkbox" data-bit="${bit}" aria-label="${esc(name)}"
+    const cell = ([bit, name]) => `<label class="sw" data-tip="${esc(name)}"><input data-f="${esc(id)}:modifier:${esc(bit)}" type="checkbox" data-bit="${esc(bit)}" aria-label="${esc(name)}"
         ${mask & bit ? "checked" : ""} ${disabled ? "disabled" : ""}><span class="track"></span></label>`;
     /** @param {boolean} right */
     const side = (right) => bits.filter(([bit]) => (bit >= 16) === right);

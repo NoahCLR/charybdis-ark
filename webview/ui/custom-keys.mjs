@@ -70,7 +70,7 @@ export function screenCustomKeys() {
         const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
         const cell = el(`<button class="mslot ${row.name || row.hasBehavior || hasShortcut(row) ? "filled" : ""}" data-custom-key="${esc(row.keycode)}"
             aria-current="${row.keycode === key?.keycode}" data-tip="${esc(tip)}">
-            <span class="n">K${row.slot}</span>${changed.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
+            <span class="n">K${esc(row.slot)}</span>${changed.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
             <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : "—"}</span></button>`);
         cell.addEventListener("click", () => {
             // Another key's behaviour opens with no cell open, as picking
@@ -156,7 +156,7 @@ function shortcutField(model, key, canEdit) {
     const identity = model?.customKeyEditing?.identity;
     const name = keyName(model, key.shortcut.key);
     const node = el(`<div class="field"><span>Shortcut</span>
-            <div class="input-row"><input data-f="custom-key:${key.slot}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
+            <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
                 data-tip="One key and any modifiers, left and right mixed. Pick… opens the keycode picker with its modifier row.">
             <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>
             <button class="btn ghost" data-act="clear-shortcut" ${canEdit && hasShortcut(key) ? "" : "disabled"}
@@ -182,7 +182,7 @@ function placedOn(model, key) {
     const chips = customKeyPlacements(model, layers(), key.keycode).map(({layer, at, routes}) => {
         const swatch = layerSwatch(model, layer);
         const how = routes.map((route) => `${ROUTE_WORDS[route.group] || route.group}${route.group === "here" && route.keys.length > 1 ? ` ×${route.keys.length}` : ""}`).join(" · ");
-        return `<button class="layer-chip link" data-goto-layer="${at}"
+        return `<button class="layer-chip link" data-goto-layer="${esc(at)}"
             data-tip="${esc(swatch.tip)} · reached by ${esc(how)} · show on the board">${swatch.html}
             <span>${esc(layerName(layer))}</span><span class="idx">${esc(how)}</span></button>`;
     }).join("");

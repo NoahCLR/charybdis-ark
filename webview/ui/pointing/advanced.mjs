@@ -87,8 +87,8 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
-                const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${slot.id}:scroll:${esc(key)}" class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
-                    aria-label="${esc(`${label} ${index ? "denominator" : "numerator"}`)}" ${disabled}>`));
+                const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
+                    aria-label="${esc(`${label} ${index ? "denominator" : "numerator"}`)}" ${esc(disabled)}>`));
                 form[`scroll:${key}`] = () => input.value;
                 if (index) inputs.append(el(`<i>:</i>`));
                 inputs.append(input);
@@ -123,7 +123,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             tap.querySelector?.("span")?.classList.add("sr");
             const macro = tapping ? pointingMacro(model, button.tap?.keycode) : null;
             const held = macro ? `${word(words(model).modifierPolicy, MODIFIER_POLICY.INHERIT)} · the macro continues after its trigger` : holding ? modifierNames(model, button.modifiers).join(", ") || "choose at least one below" : "—";
-            table.append(el(`<span class="n">${index + 1}</span>`), kindSelect, tap,
+            table.append(el(`<span class="n">${esc(index + 1)}</span>`), kindSelect, tap,
                 el(`<span class="note"><span class="narrow">Held modifiers: </span>${esc(held)}</span>`));
             if (holding) {
                 const mods = modifiers(`Button ${index + 1} holds`, button.modifiers ?? 0, `button:${index}:modifiers`);

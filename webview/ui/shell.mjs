@@ -45,7 +45,7 @@ export function rail() {
             </select>` : `<span class="rail-product">${esc(device.label || "No keyboard connected")}</span>`;
     /** @param {string} tone @param {string} text @param {string} tip */
     const line = (tone, text, tip) =>
-        `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${tone}"></i> ${esc(text)}</div>`;
+        `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${esc(tone)}"></i> ${esc(text)}</div>`;
 
     // The keyboard's line never changes shape: what it is doing and whether
     // its halves agree are the dot's colour, said in words on hover. The
@@ -63,7 +63,7 @@ export function rail() {
     const applySaving = draft && !draft.live ? railSaveLines(draft) : [];
 
     const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
-        <button class="nav-item" data-screen="${id}" aria-current="${state.screen === id}"
+        <button class="nav-item" data-screen="${esc(id)}" aria-current="${state.screen === id}"
             ${screenAvailable(model, id) ? "" : "disabled"}>
             ${definition.icon}<span>${esc(definition.label)}</span>
         </button>`).join("")).join("");
@@ -83,7 +83,7 @@ export function rail() {
                     data-tip="Let go of this keyboard. The page will not open it again until you choose it.">Disconnect</button>` : ""}</div>` : ""}
             <div class="rail-status">
                 ${draft?.live ? (device.connected ? liveStatus(draft) : "") : !draft?.dirty ? "" : draft.matching && !draft.stale
-                    ? `<button class="stat link" data-act="open-review" data-tip="${demo.active ? DEMO_WORDS.draftTip : "Edits waiting in this window. The keyboard still runs its saved profile."} Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
+                    ? `<button class="stat link" data-act="open-review" data-tip="${demo.active ? esc(DEMO_WORDS.draftTip) : "Edits waiting in this window. The keyboard still runs its saved profile."} Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
                     : line("draft", `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft`, demo.active ? DEMO_WORDS.draftTip : "Edits waiting in this window. The keyboard still runs its saved profile.")}
                 ${applySaving.map(saveLine).join("")}
                 ${keyboardLine ? line(keyboardLine.tone, keyboardLine.text, keyboardLine.tip) : ""}
@@ -151,7 +151,7 @@ function liveStatus(draft) {
 }
 
 /** @param {ReturnType<typeof railSaveLines>[number]} saving */
-const saveLine = (saving) => `<div class="stat live-save ${saving.kind}" data-tip="${esc(saving.tip)}"><i class="dot ${saving.tone}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(saving.text)}</div>`;
+const saveLine = (saving) => `<div class="stat live-save ${esc(saving.kind)}" data-tip="${esc(saving.tip)}"><i class="dot ${esc(saving.tone)}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(saving.text)}</div>`;
 
 // A shell that leaves the theme to the panel (a web page) gets its toggle at
 // the top right of every screen, the Keyboard screen's own header included; in
@@ -205,8 +205,8 @@ function applySteps(apply) {
         const current = step.state === "active";
         const counted = current && apply.bytes
             ? `<span class="ap-bar"><i style="width:${Math.round((apply.bytes.completed / apply.bytes.total) * 100)}%"></i></span>
-               <span class="ap-bytes" style="min-width:${`${apply.bytes.total} / ${apply.bytes.total} bytes`.length}ch">${apply.bytes.completed} / ${apply.bytes.total} bytes</span>` : "";
-        return `<li class="${step.state}"><span class="mark">${step.state === "active" ? spinner() : ""}</span>
+               <span class="ap-bytes" style="min-width:${`${apply.bytes.total} / ${apply.bytes.total} bytes`.length}ch">${esc(apply.bytes.completed)} / ${esc(apply.bytes.total)} bytes</span>` : "";
+        return `<li class="${esc(step.state)}"><span class="mark">${step.state === "active" ? spinner() : ""}</span>
             <span class="lbl">${esc(step.label)}</span>
             ${current && (apply.detail || counted) ? `<span class="ap-detail"><span class="ap-text" title="${esc(apply.detail)}">${esc(apply.detail)}</span>${counted}</span>` : ""}</li>`;
     }).join("");
@@ -345,8 +345,8 @@ function liveCommitBar(draft) {
         return node;
     }
     if (saving?.kind === "failed") {
-        const node = el(`<div class="commit live ${saving.kind}">
-            <span class="n"><i class="dot ${saving.tone}"></i> <strong>${esc(saving.title)}</strong>
+        const node = el(`<div class="commit live ${esc(saving.kind)}">
+            <span class="n"><i class="dot ${esc(saving.tone)}"></i> <strong>${esc(saving.title)}</strong>
             <span class="muted">${esc(saving.detail)}</span></span>
             <span class="sep"></span>
             <button class="btn ghost tiny" data-act="revert"

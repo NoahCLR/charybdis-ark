@@ -36,7 +36,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
     const head = el(`<div class="row colour-head">
         <span class="swatch-lg" style="background:${css(colour)}"></span>
         <div><div class="colour-title">${esc(title)}</div>
-            <div class="note mono">${esc(hsvLabel(colour))} · rgb(${rgb(colour).join(", ")})</div></div>
+            <div class="note mono">${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})</div></div>
         ${canEdit && offTip ? `<button class="btn tiny ghost" data-off data-tip="${esc(offTip)}">Turn off</button>` : ""}</div>`);
     node.append(head);
     if (v === 0) node.append(el(`<p class="note">Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.</p>`));
@@ -55,7 +55,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
 
     const fields = el(`<div class="grid3">
         ${[["H", h, 255], ["S", s, 255], [`V · max ${maximum}`, v, maximum]].map(([name, value, max], index) =>
-            `<label class="field"><span>${name}</span><input type="number" min="0" max="${max}" step="1" class="input mono" value="${value}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
+            `<label class="field"><span>${esc(name)}</span><input type="number" min="0" max="${esc(max)}" step="1" class="input mono" value="${esc(value)}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
     /** @type {NodeListOf<HTMLInputElement>} */ (fields.querySelectorAll("[data-channel]")).forEach((input) => input.addEventListener("change", () => {
         const next = [h, s, v];
         next[Number(input.dataset.channel)] = Number(input.value) || 0;

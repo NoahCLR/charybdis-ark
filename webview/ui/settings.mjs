@@ -162,7 +162,7 @@ function comboReferenceFold(model, section, shown, canEdit, searching) {
         const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${shown.includes(field) ? "" : "hidden"}>
             <span class="txt">${marked(model, field.governs, layer ? layerName(layer) : field.label)}</span>
             <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
-            ${layers().map((entry) => `<option value="Layer ${entry.index}" ${field.value === `Layer ${entry.index}` ? "selected" : ""}>${esc(entry.displayName || entry.name)}</option>`).join("")}</select></label>`);
+            ${layers().map((entry) => `<option value="Layer ${esc(entry.index)}" ${field.value === `Layer ${entry.index}` ? "selected" : ""}>${esc(entry.displayName || entry.name)}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (cell.querySelector("select")).addEventListener("change", submit);
         grid.appendChild(cell);
     }
@@ -340,7 +340,7 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
     }
     if (field.kind === "layer") {
         const node = el(`<select class="input" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${editable ? "" : "disabled"}>
-            ${layers().map((layer) => `<option value="Layer ${layer.index}" ${field.value === `Layer ${layer.index}` ? "selected" : ""}>${esc(layer.displayName || layer.name)}</option>`).join("")}</select>`);
+            ${layers().map((layer) => `<option value="Layer ${esc(layer.index)}" ${field.value === `Layer ${layer.index}` ? "selected" : ""}>${esc(layer.displayName || layer.name)}</option>`).join("")}</select>`);
         node.addEventListener("change", submit);
         control.appendChild(node);
         return row;

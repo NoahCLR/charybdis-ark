@@ -65,7 +65,7 @@ export function tabBehaviours(body, right) {
     const route = behaviourRoute();
     const changed = draftMarks(model?.draft?.changes).behaviours;
     /** @param {string} group @param {import("../../../contracts/panel.js").BehaviorView} row @param {string} note */
-    const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${group}">
+    const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${esc(group)}">
         <span class="t">${actionMarked(model, row.keycode)}${actionLabel(model, row.keycode) === row.keycode ? ""
             : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</span>
         <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${note}` : ""}</span></button>`;

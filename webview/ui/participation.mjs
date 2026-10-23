@@ -11,7 +11,7 @@ export function definitionControls(layers, definition, editable, changed, identi
         <label class="sw" data-tip="Off, this ${noun} keeps its actions and timing but does nothing until it is on again."><input type="checkbox" data-f="${esc(identity)}:enabled" data-definition-enabled ${definition.enabled !== false ? "checked" : ""} ${editable ? "" : "disabled"}>
             <span class="track"></span><span class="txt">Use this ${noun}</span></label>
         <details class="def-layers"><summary class="note" data-tip="The layers a key can come from for this ${noun} to run.">${DISCLOSURE}Layers it runs on</summary><div class="row sw-group">
-            ${layers.map(layer => `<label class="sw"><input type="checkbox" data-f="${esc(identity)}:allowed-layer:${layer.index}" data-allowed-layer="${layer.index}" ${(definition.allowedLayers ?? 0xffff) & 2 ** layer.index ? "checked" : ""} ${editable ? "" : "disabled"}>
+            ${layers.map(layer => `<label class="sw"><input type="checkbox" data-f="${esc(identity)}:allowed-layer:${esc(layer.index)}" data-allowed-layer="${esc(layer.index)}" ${(definition.allowedLayers ?? 0xffff) & 2 ** layer.index ? "checked" : ""} ${editable ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">${esc(layer.label || layer.name)}</span></label>`).join("")}
         </div></details>
         <p class="note">It runs only where Settings and the key's own switch allow it too.</p>

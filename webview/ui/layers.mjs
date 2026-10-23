@@ -126,16 +126,16 @@ function editor(model, portable, busy) {
         const mapped = mappedKeyCount(layer);
         const base = position === 0;
         const label = names[layerId] || (layerId ? `Layer ${layerId}` : "Base");
-        const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${layerId}">
+        const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${esc(layerId)}">
             ${base ? `<span class="lp-grip-slot" aria-hidden="true"></span>`
-                : `<button class="lp-grip" data-grip="${layerId}" ${busy ? "disabled" : ""} aria-label="Move ${esc(label)}: drag, or press the up and down arrows"
+                : `<button class="lp-grip" data-grip="${esc(layerId)}" ${busy ? "disabled" : ""} aria-label="Move ${esc(label)}: drag, or press the up and down arrows"
                     data-tip="Drag to move this layer, or focus it and press ↑ ↓.">${GRIP}</button>`}
-            <span class="note mono">${layerId}</span>
-            <span class="name-bytes"><input data-f="layer:${layerId}:name" class="input" value="${esc(names[layerId])}" data-name="${layerId}" ${busy ? "disabled" : ""} data-tip="${esc(NAME_TIP)}"
-                aria-label="${layerId ? `Name for layer ${layerId}` : "Base layer name"}"><span class="note name-bytes-count" data-name-count></span></span>
+            <span class="note mono">${esc(layerId)}</span>
+            <span class="name-bytes"><input data-f="layer:${esc(layerId)}:name" class="input" value="${esc(names[layerId])}" data-name="${esc(layerId)}" ${busy ? "disabled" : ""} data-tip="${esc(NAME_TIP)}"
+                aria-label="${layerId ? `Name for layer ${esc(layerId)}` : "Base layer name"}"><span class="note name-bytes-count" data-name-count></span></span>
             <span class="note ${mapped ? "" : "dim"}">${mapped ? `${mapped} key${mapped === 1 ? "" : "s"}` : "nothing mapped"}</span>
             ${base ? `<span class="tag lp-base" data-tip="Always on, and what every transparent key falls through to.">base</span>`
-                : `<button class="btn tiny ghost" data-base="${layerId}" ${busy ? "disabled" : ""}
+                : `<button class="btn tiny ghost" data-base="${esc(layerId)}" ${busy ? "disabled" : ""}
                     data-tip="Put this layer at the bottom. Its transparent keys become KC_NO; KC_NO on the former base becomes transparent. An uncoloured former base gets the saved base colour.">Make base</button>`}</div>`);
         countNameBytes(/** @type {HTMLInputElement} */ (row.querySelector("[data-name]")), /** @type {HTMLElement} */ (row.querySelector("[data-name-count]")));
         list.append(row);

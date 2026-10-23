@@ -52,7 +52,7 @@ export function screenMacros() {
     const available = memory?.available ?? bank.length;
     const grid = el(`<div class="card"><div class="card-h"><h3>Slots</h3>
         <input class="input search card-search" id="macroSearch" data-f="macros:search" type="search" placeholder="Search by name" value="${esc(state.macroSearch || "")}">
-        <span class="tag" data-tip="${available} of ${bank.length} slots have room in macro memory">${filled} of ${bank.length} used${available < bank.length ? ` · ${bank.length - available} without room` : ""}</span></div>
+        <span class="tag" data-tip="${esc(available)} of ${bank.length} slots have room in macro memory">${filled} of ${bank.length} used${available < bank.length ? ` · ${bank.length - available} without room` : ""}</span></div>
         <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);
     /** @type {HTMLInputElement} */ (grid.querySelector("#macroSearch")).addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
     const cells = /** @type {HTMLElement} */ (grid.querySelector(".macro-grid"));
@@ -71,7 +71,7 @@ export function screenMacros() {
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
-            <span class="v">${row.needsUnicodeSetup ? vocabulary(model).macroPlayback?.setup : row.playable === false ? vocabulary(model).macroPlayback?.blocked : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? vocabulary(model).macroPlayback?.unavailable : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
+            <span class="v">${row.needsUnicodeSetup ? esc(vocabulary(model).macroPlayback?.setup) : row.playable === false ? esc(vocabulary(model).macroPlayback?.blocked) : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? esc(vocabulary(model).macroPlayback?.unavailable) : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });
@@ -89,7 +89,7 @@ function memoryMeter(memory) {
     const used = memory.stored, share = Math.min(100, (used / memory.capacity) * 100);
     const unavailable = memory.slots - memory.available;
     return `<div class="sect-h memory-h"><h4>Macro memory</h4>
-            <span class="right note">${used.toLocaleString("en-US")} of ${memory.capacity.toLocaleString("en-US")} bytes used · ${memory.free.toLocaleString("en-US")} free</span></div>
+            <span class="right note">${esc(used.toLocaleString("en-US"))} of ${esc(memory.capacity.toLocaleString("en-US"))} bytes used · ${esc(memory.free.toLocaleString("en-US"))} free</span></div>
         <div class="meter"><i style="width:${share}%"></i></div>
-        <p class="note meter-note">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${memory.reserveTaps} key taps${unavailable ? `; ${unavailable} slot${unavailable === 1 ? " is" : "s are"} unavailable until there is room again` : ""}.</p>`;
+        <p class="note meter-note">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${esc(memory.reserveTaps)} key taps${unavailable ? `; ${esc(unavailable)} slot${unavailable === 1 ? " is" : "s are"} unavailable until there is room again` : ""}.</p>`;
 }
