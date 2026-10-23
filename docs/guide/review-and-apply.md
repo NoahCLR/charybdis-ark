@@ -1,0 +1,216 @@
+# Review and Apply
+
+Every edit you make goes into one draft, whatever screen you make it on. The
+draft has undo, redo and a full history. How it reaches the keyboard, and when
+it becomes permanent, depends on the edit mode.
+
+## Edit modes
+
+Pick the mode under **Edits** in the rail. The keyboard stores it, so the
+choice holds across replugs and in both Chrome and VS Code.
+
+| Mode | An edit… | It is kept when… | Unplugging before then… |
+| --- | --- | --- | --- |
+| **Live + review** | runs on the keyboard at once | you review it and **Save** | puts back what was saved |
+| **Live** | runs on the keyboard at once | the keyboard saves it by itself, 3 seconds after your last edit with no key held | loses every edit since the last save |
+| **Apply** | waits in Ark; the keyboard is unchanged | you review it and **Apply** | changes nothing on the keyboard |
+
+A keyboard that was never set is in Live + review.
+
+Closing Ark changes none of this. In Live + review the keyboard keeps running
+your unsaved edits until it is unplugged. In Live it saves them by itself,
+with or without Ark.
+
+### Live + review
+
+Every edit takes effect on both halves as you make it, so you can try it as
+you type. The rail and the bar count the **unsaved changes** the keyboard
+runs. The bar has two buttons:
+
+- **Review and save** opens Review, which compares what the keyboard has
+  **Saved** with what is **Running now**. **Save on keyboard** keeps a
+  recovery copy of what was saved, then writes the running profile as the
+  saved one on both halves.
+- **Revert** puts back the saved profile without writing anything. Undo sends
+  the edits again.
+
+Undo and redo send their change to the keyboard too. Undo every edit and the
+keyboard is back on its saved profile.
+
+If an edit would add a trap or a warning (see [Checks](#checks)), Ark holds it
+and asks first: **Go back** sends nothing, **Send anyway** sends it. An edit
+that would add a blocker is not sent at all.
+
+Until the slave half has taken an edit, the rail says **Slave half catching
+up** and the next edit waits. If the slave half refuses the edits, the rail
+says **Halves apart**: the halves now run different profiles, nothing can be
+saved, and **Revert** puts both back on the saved profile.
+
+### Live
+
+Live works like Live + review, with the same undo, redo and trap question, but
+there is no Save. The keyboard saves what it runs by itself once you have
+stopped editing for 3 seconds and no key is held. Holding a key puts the save
+off.
+
+- The bar says **Not saved yet** until then, with **Revert** and a button
+  that opens Review.
+- It says **Saving on the keyboard** while the keyboard writes.
+- The rail says **Saved by the keyboard** once the keyboard reports it saved.
+
+Ark only reports what the keyboard says; it keeps no timer of its own. If the
+keyboard's save fails, the bar says **The keyboard could not save** and offers
+**Save again** or **Revert**. Your edits still run, unsaved, so don't unplug
+the keyboard until one of them works.
+
+### Apply
+
+Edits wait in Ark's draft and the keyboard runs its saved profile untouched.
+The bar counts the changes in your draft and has two buttons:
+
+- **Review and apply** opens Review.
+- **Discard all** throws the draft away. Undo brings it back.
+
+The draft lives in the Ark window (in Chrome, the tab). Closing it loses
+edits you haven't applied.
+
+### Switching modes
+
+The keyboard changes mode only with nothing unsaved, so Ark asks when a switch
+would lose something:
+
+- From Live + review with unsaved changes, it asks you to **Save on keyboard**
+  or **Revert** first.
+- From Apply to a live mode with a draft, it asks whether to **Send live**
+  (your draft starts running on the keyboard, unsaved) or **Discard draft**.
+- Leaving Live asks nothing. The keyboard saves what is left first, after a
+  recovery copy.
+
+**Cancel** changes nothing. Both halves store the mode, so switching needs the
+cable between the halves. If the halves ever stored different modes,
+**Settle** beside the switch stores the shown one on both.
+
+## Review
+
+Review lists every change in your draft, compared with the keyboard. Open it
+from the bar.
+
+**Checks** come first: what the draft lets the keyboard do, and what must be
+fixed first. Then the changes, grouped by the area they are edited in:
+Layout, Layers, Behaviours, Combos, Custom keys, Macros, Mouse, Pointing modes,
+Lighting, Settings and so on. Each change shows the fields that differ, with
+the keyboard's value and the draft's side by side.
+
+- **Show** closes Review and opens the change where it is edited.
+- **Discard** puts that one change back.
+- Changes made by one edit, such as two keys swapped, are discarded together.
+
+Layers are compared by which layer they are, not where they sit, so a
+reorder is one change and a key edited afterwards is another.
+
+## Checks
+
+Before anything is kept, Review checks what the layers let you reach. Each
+check says whether your draft made it, the keyboard already has it, or the
+draft fixes it.
+
+- A **Trap** is a layer that can lock on with no way back to the base layer.
+  Review shows the steps into it and a way out.
+- A **Blocker** keeps Apply and Save disabled until it is fixed, such as a
+  lighting effect or brightness this keyboard can't show.
+- A **Warning** is something Ark asks about before writing: a layer nothing
+  reaches, a layer key onto an empty layer, a combo that can't fire, a macro
+  your computer's settings can't play, and so on.
+- A **Notice** only informs, such as a behaviour that changes nothing.
+
+When the draft has a trap or a warning, even one already on the keyboard,
+Apply and Save ask first: **Go back** or **Apply anyway** (**Save anyway** in
+Live + review). Notices and fixed checks need no answer.
+
+When a new trap or warning clearly comes from one change, the check links to
+it and the change is highlighted.
+
+### Timing checks
+
+The checks also read your timings. They warn about holds that overlap or can
+never happen, and give advice on very short combo windows. The keyboard
+decides every tap or hold itself, from the presses, so these checks only ever
+rule out what can't happen. They don't promise every gesture is comfortable to
+press.
+
+## Draft history
+
+**Draft history** at the foot of the rail lists every step of your draft,
+newest first, each with when you made it and what it changed from the step
+before. Go back or forward to any of them.
+
+⌘Z (Ctrl+Z) undoes and ⇧⌘Z or ⌘Y redoes, outside text fields and dialogs. The
+macro editor has its own step undo while you work in it.
+
+## When the keyboard changes under you
+
+Keys on the keyboard that adjust a setting, such as DPI up or down and the
+lighting keys, change what it runs. Ark notices within a second, reads the
+keyboard again and shows the new value. That is not an error.
+
+- In Apply, a draft with edits then says **The keyboard changed**, and
+  **Review against the keyboard** compares your draft with the keyboard as it
+  is now. **Discard draft** starts over from the keyboard.
+- In the live modes, an edit you make just as a key changed the keyboard is
+  not sent. Ark reads the keyboard; make the edit again.
+
+**Keyboard adjustment pending** means such a change is still waiting to reach
+both halves. Release any held keys.
+
+## Applying
+
+**Apply to keyboard**, in Review, keeps a recovery copy, then writes the
+whole profile to both halves as one save and reads it back. The bar shows
+each step:
+
+1. Check the keyboard
+2. Save a recovery copy
+3. Send the profile
+4. Keyboard checks the profile
+5. Copy the profile to the slave half
+6. Save it on the master half
+7. Finish the slave half
+8. Check both halves
+
+The keyboard keeps running its saved profile until both halves confirm, then
+both switch at once. Afterwards Ark reads the keyboard back, and editing
+resumes when that read finishes. You can stay on any screen meanwhile.
+
+A save is all or nothing. Release held keys and unlock layers first: the
+keyboard waits for them, and if they stay held it gives up and nothing
+changes.
+
+If Apply stops, the bar keeps the step it stopped at and the keyboard's reason
+until you dismiss it, with one of three outcomes:
+
+- Nothing was saved. The keyboard kept the profile it had.
+- The keyboard had already decided to save, and finishes by itself once both
+  halves are connected. Read the keyboard then.
+- Ark can't tell which profile was saved. Read the keyboard to see what it
+  runs.
+
+Either way the recovery copy is on the [Backups](backups.md) screen.
+
+## When the keyboard stops saving
+
+Rarely, a keyboard stops saving: a flash write failed, or something else it
+can't safely carry on from. Typing still works, but it refuses edits, Save
+and Revert until it restarts. The rail says **Stopped saving · Restart** and
+the bar says **The keyboard stopped saving**.
+
+**Restart**, in the bar, restarts both halves without unplugging:
+
+1. With unsaved edits, Ark first keeps them as a recovery copy. If it can't,
+   it doesn't restart.
+2. The keyboard restarts and comes back a moment later. Ark reads it again.
+3. Ark sends your unsaved edits back, still unsaved. In Live + review, review
+   and save them; in Live the keyboard saves them by itself.
+
+Unplugging the keyboard works too, but loses the unsaved edits. Ark never
+restarts the keyboard on its own. If the keyboard stops saving again straight
+away, the fault is in its flash or firmware and another restart won't help.

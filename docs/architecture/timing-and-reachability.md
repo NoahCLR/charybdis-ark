@@ -5,7 +5,7 @@ conservative analysis behind them
 ([D-L36](../adr/0036-review-checks-reach-and-save-blockers.md),
 [D-L48](../adr/0048-timing-advice-follows-firmware-capability.md),
 [D-L49](../adr/0049-timing-findings-constrain-reachability-conservatively.md);
-for the person, the [guide](../GUIDE.md#timing-checks)). Firmware owns timing
+for the person, the [guide](../guide/review-and-apply.md#timing-checks)). Firmware owns timing
 and [participation](../../upstream/firmware/docs/architecture/participation-policy.md).
 Ark owns the analysis, its limits and how inherited behaviour is shown.
 
