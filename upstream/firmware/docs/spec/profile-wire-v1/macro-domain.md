@@ -1,14 +1,14 @@
 # Macro domain `0x70`
 
 Domain `0x70`, version 1, holds the 128 macros' steps in one bank (D-F30,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). It is the
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). It is the
 only copy of the macros the firmware keeps; VIA is not supported (D-F31,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0031-via-is-not-supported.md)). Macro names live in the
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0031-via-is-not-supported.md)). Macro names live in the
 [settings domain](settings-domain.md#names) (D-F43,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0043-macros-have-names-user-macros-retired.md)). The domain
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0043-macros-have-names-user-macros-retired.md)). The domain
 id, envelope and byte order are [blob and digests](blob-and-digests.md)'s; how
 domains make a profile is [the device-resident profile](../device-resident-profile.md)'s;
-how a macro plays is [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/architecture/runtime-flow.md#macro-flow)'s.
+how a macro plays is [macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/architecture/macro-playback.md)'s.
 Refusal codes are named in [errors](errors.md).
 
 ## Bank layout
@@ -46,10 +46,10 @@ control (U+0080–U+009F), and not cut off by the terminator. Playback
 saturates a delay at 65,535 ms.
 
 The protection step (D-F17,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0017-per-macro-protection-isolates-keyboard-output.md)) sets
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0017-per-macro-protection-isolates-keyboard-output.md)) sets
 the macro's uninterruptible playback: no prefix is automatic, `p = 1` on and
 `p = 2` off; any other `p` is refused. What each policy does is
-[runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/architecture/runtime-flow.md#macro-flow)'s.
+[macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/architecture/macro-playback.md#uninterruptible-playback)'s.
 
 Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_macro_payload_tests.sh` (`macro_payload_test.c`).
 
