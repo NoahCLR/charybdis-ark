@@ -103,7 +103,7 @@ with its document, origin, label, time and layer order.
 [D-L20](../adr/0020-differential-apply.md),
 [D-L23](../adr/0023-apply-shows-its-steps-and-failures.md) and
 [D-L58](../adr/0058-transfer-less-validate-the-complete-saved-result.md);
-for the person, the [guide](../GUIDE.md#applying-changes).
+for the person, the [guide](../guide/review-and-apply.md#applying).
 
 1. `DRAFT_ACTIONS.apply` (`panel-controls.js`) refuses blockers and
    unconfirmed traps or warnings before any recovery copy or HID write, in
@@ -165,7 +165,7 @@ against the firmware's candidate transaction and validator.
 [D-L65](../adr/0065-live-and-review-edits-reach-the-keyboard-at-once.md),
 [D-L66](../adr/0066-in-live-the-keyboard-saves-by-itself.md) and
 [D-L67](../adr/0067-a-stopped-keyboard-says-so-and-ark-restarts-it.md);
-for the person, the [guide](../GUIDE.md#how-edits-reach-the-keyboard). The
+for the person, the [guide](../guide/review-and-apply.md#edit-modes). The
 keyboard stores its edit mode (firmware D-F32), and `refresh` reads it; when
 it cannot, Ark uses Apply's reads until the next `refresh`. Live + review (the
 mode of a keyboard never set) and Live open the draft on the keyboard's

@@ -3,7 +3,7 @@
 How Ark's interface renders and which module owns each rule more than one
 screen needs. Each rule names the test that holds it; "(no test)" marks a
 contract nothing checks yet. `npm run preview` renders the real interface over
-the demo. The [guide](../GUIDE.md#the-interface) explains using it; layering
+the demo. The [guide](../guide/README.md) explains using it; layering
 and placement of new work follow the
 [architecture](../architecture/README.md#where-new-work-goes).
 

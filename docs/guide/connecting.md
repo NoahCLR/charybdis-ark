@@ -1,0 +1,145 @@
+# Connecting
+
+Ark talks to your Charybdis over USB. It needs the left and right halves from
+the [latest firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest),
+flashed to both halves. It works with the current firmware only.
+
+## Where Ark runs
+
+**In Chrome or Edge.** Open <https://ark.ncleroy.dev> on your computer. There
+is nothing to install. The page reaches the keyboard over WebHID, which only
+Chrome and Edge have, and only over HTTPS. In another browser the page says
+Ark needs Chrome or Edge and offers only the demo. On a phone it shows a short
+notice instead: a phone can't reach the keyboard.
+
+**In VS Code.** Ark is also a VS Code extension, installed from a checkout:
+
+```sh
+git clone https://github.com/NoahCLR/charybdis-ark.git
+cd charybdis-ark
+npm ci
+ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0   # then reload VS Code
+```
+
+Click **Charybdis Ark** in the status bar, or run **Charybdis: Open Charybdis
+Ark** from the command palette. Each VS Code window has one Ark panel; running
+the command again brings it forward.
+
+Both work the same way. What differs is called out where it matters.
+
+## Reading the keyboard
+
+With no keyboard, Ark shows **Connect your keyboard**.
+
+- In Chrome, choose **Choose keyboard** and pick your Charybdis in Chrome's
+  list. After that the page connects to it by itself whenever it opens.
+- In VS Code, plug the keyboard in and choose **Read keyboard**.
+
+Ark then reads the whole profile the keyboard runs: keys, layers, behaviours,
+combos, macros, pointing modes, lighting and settings. The screen says what it
+is reading while it works, and the screens open once the read is done.
+Everything Ark shows comes from that read.
+
+If the keyboard runs older firmware, Ark stops there and tells you to update
+both halves. Nothing on the keyboard changes. The Keyboard screen links to the
+firmware release.
+
+If Ark can show the keyboard but can't read its complete profile, the editing
+screens say **Keyboard not ready for edits** and offer **Read keyboard** to
+try again. The usual cause is a missing half: check the cable between the
+halves.
+
+## The rail
+
+The column on the left is the rail. From the top:
+
+- The keyboard's name, with a dot that says how it is:
+  - green: connected, both halves together
+  - orange: the other half isn't found, or the halves disagree
+  - red: no keyboard
+  - grey: not read yet, or reconnecting
+  - a hollow ring: the demo
+
+  The dot pulses while Ark is reading or busy. Hover it for what it means and
+  what to do.
+- **Edits**: how your edits reach the keyboard: **Apply**, **Live** or
+  **Live + review**. See [Review and Apply](review-and-apply.md#edit-modes).
+- In Chrome, **Choose keyboard** and **Disconnect**. Disconnect lets go of
+  the keyboard and takes back the page's permission to open it, until you
+  choose it again.
+- The screens: **Keys**, **Lighting**, **Macros**, **Custom keys**, **Mouse**,
+  **Pointing modes** and **Settings** under Configure; **Backups** and
+  **Keyboard** under Keyboard.
+- Messages from Ark, each with ✕ to dismiss it.
+- **Draft history**, with undo (↺) and redo (↻).
+
+With more than one Charybdis connected, the name becomes a menu that picks
+which one to edit. A draft with edits stays with its own keyboard; the other
+stays read-only until you switch back or discard the draft.
+
+## One tab, one keyboard
+
+In Chrome, only one Ark tab holds the keyboard. A second tab says Ark is open
+in another tab, and takes over when that one closes. If closing or reloading
+the tab would lose something (edits not applied or saved, or a save still
+running), the browser asks first.
+
+In VS Code, closing the panel during a save doesn't stop the save. Ark
+finishes it and says so. Keep the keyboard plugged in until then.
+
+## The demo
+
+No keyboard to hand? **Explore a demo** opens Ark on a complete setup with
+nothing connected: 16 layers, 32 pointing modes, 128 macros and 128 custom
+keys. Every screen works, and every edit shows up in Review. Only Apply needs
+a keyboard.
+
+A strip across the top says **Demo · no keyboard**. It has two buttons:
+
+- **Open a profile file…** puts one of your backups in place of the demo
+  setup.
+- **Leave demo** goes back to connecting a keyboard.
+
+Nothing in the demo reaches a keyboard and nothing is kept. To take what you
+made to your keyboard, export it from Review or the Backups screen, then
+import it there. If you leave with edits you haven't exported, Ark asks first
+and offers **Export…**.
+
+The demo is offered only when no keyboard is connected.
+
+## The Keyboard screen
+
+The Keyboard screen is about the keyboard itself.
+
+**Its name.** The title is the keyboard's name. Click it to rename the
+keyboard, Enter to finish, Escape to put it back. Leave it empty for the
+firmware's built-in name. A name is up to 32 bytes: letters take one,
+accented letters two. The name is part of the profile, so it goes through
+Review like any edit, and backups carry it. Once the keyboard has it, your
+computer, Chrome and Ark all call it by that name. To take it, the keyboard
+drops off USB for a moment and comes back, and Ark follows it.
+
+**This keyboard** shows the product, the firmware and whether it works with
+this Ark, Ark's own version, and the two halves. The half with the USB cable
+and the trackball is the master; the other is the slave. Each half says
+whether it is connected and holds the same saved settings.
+
+**Memory** shows how full the profile is. Behaviours, combos, lighting,
+pointing modes, custom keys, settings and names share one space. **In use** counts what you have set up against what the keyboard
+holds: behaviours, tap counts, combos, LED groups, LED overrides, macros,
+custom keys and pointing modes. Macro steps live in the same space, within a limit
+of their own, shown as **Macro memory**. The bar turns orange from 90%, when the next edit
+may not fit. While your draft has changes, the figures are the draft's.
+
+**Built into this firmware** lists what only a new firmware build can change:
+how many layers, tap counts, macros, pointing modes and combos there are, the
+repeat ceiling and the DPI steps.
+
+**Diagnostics** holds the details of the last read and **Read from keyboard**,
+which reads it again.
+
+## Light and dark
+
+In Chrome, the button at the top right of a screen switches between a light
+and a dark theme. Ark starts from your system's setting and remembers your
+choice. In VS Code, Ark follows VS Code's theme.

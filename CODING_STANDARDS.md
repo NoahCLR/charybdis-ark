@@ -82,8 +82,8 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   a decision as an ADR, a contract in `docs/spec/`, a cross-layer flow in
   `docs/architecture/`. Verification runs, counts and dated progress belong
   in commit messages, not docs.
-- A change to what a person sees or does updates `docs/GUIDE.md` and, when a
-  capability changes, `README.md`. The README stays a short pitch in Noah's
+- A change to what a person sees or does updates its page in `docs/guide/`
+  and, when a capability changes, `README.md`. The README stays a short pitch in Noah's
   voice; development material goes in `docs/development.md`.
 - Names in code, interface text and docs use `GLOSSARY.md`'s terms, never the
   words it lists to avoid.

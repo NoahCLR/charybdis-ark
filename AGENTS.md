@@ -52,9 +52,9 @@ skipped; [Developing Ark](docs/development.md) has the rest.
 - Never flash firmware or Apply a profile to verify a change, and coordinate
   before opening the physical keyboard. Unit tests never prove hardware
   acceptance.
-- A product behaviour change updates `docs/GUIDE.md`, `README.md` when a
-  capability changes, and the governing spec, in the same change. A lasting
-  decision is an ADR (the next D-L number,
+- A product behaviour change updates its page in [the guide](docs/guide/),
+  `README.md` when a capability changes, and the governing spec, in the same
+  change. A lasting decision is an ADR (the next D-L number,
   [domain docs](docs/agents/domain.md)). Plans and known gaps live in the
   vault, never in `docs/`; pull requests never link or quote it.
 
