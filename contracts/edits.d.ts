@@ -6,15 +6,15 @@ export interface Colour {h?: Scalar; s?: Scalar; v?: Scalar}
 export interface BaseIdentity {source: string; generation: number; digest: Scalar; originHalf: Scalar}
 export interface DraftIdentity {draftId: string; draftRevision: number}
 export type Tier = 'tap' | 'hold' | 'long';
-export type HoldHelper = 'PRESS_AND_HOLD_UNTIL_RELEASE' | 'TAP_AT_HOLD_THRESHOLD' | 'TAP_ON_RELEASE_AFTER_HOLD' | 'REPEAT_WHILE_HELD';
-export type BranchHelper = HoldHelper | 'TAP_SENDS';
-export interface BehaviorBranch {helper?: BranchHelper; action: string; repeatHz?: Scalar}
+export type HoldStyle = 'PRESS_AND_HOLD_UNTIL_RELEASE' | 'TAP_AT_HOLD_THRESHOLD' | 'TAP_ON_RELEASE_AFTER_HOLD' | 'REPEAT_WHILE_HELD';
+export type BranchStyle = HoldStyle | 'TAP_SENDS';
+export interface BehaviorBranch {style?: BranchStyle; action: string; repeatHz?: Scalar}
 export interface BehaviorStep {tapCount: number; tap?: BehaviorBranch; hold?: BehaviorBranch; longHold?: BehaviorBranch}
 export interface Behavior {
     keycode: string;
     steps: BehaviorStep[];
     tapHoldTerm?: Scalar;
-    longerHoldTerm?: Scalar;
+    longHoldTerm?: Scalar;
     multiTapTerm?: Scalar;
     keepsAutoMouseAnchored?: boolean;
     enabled?: boolean;

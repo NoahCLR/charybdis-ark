@@ -55,7 +55,7 @@ The column on the left is the rail. From the top:
 
 - The keyboard's name, with a dot that says how it is:
   - green: connected, both halves together
-  - orange: the other half isn't found, or the halves disagree
+  - orange: the slave half isn't found, or the halves disagree
   - red: no keyboard
   - grey: not read yet, or reconnecting
   - a hollow ring: the demo
@@ -122,9 +122,10 @@ drops off USB for a moment and comes back, and Ark follows it.
 **This keyboard** shows the product, the firmware and whether it works with
 this Ark, Ark's own version, and the two halves. The product is the
 firmware's built-in name; a renamed keyboard reports only its new name, so
-Ark leaves the product out rather than repeat the title. The half with the USB cable
-and the trackball is the master; the other is the slave. Each half says
-whether it is connected and holds the same saved settings.
+Ark leaves the product out rather than repeat the title. The halves are the
+**Master half**, the right one with the USB cable and the trackball, and the
+**Slave half**, the left one. Each says whether it is connected and holds the
+same saved settings.
 
 **Memory** shows how full the profile is. Behaviours, combos, lighting,
 pointing modes, custom keys, settings and names share one space. **In use** counts what you have set up against what the keyboard

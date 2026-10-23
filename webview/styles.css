@@ -732,7 +732,7 @@ button.tier:hover { background: var(--surface-3); }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 /* Whether the behaviour runs and where lead, keeping a readable width; the
-   mouse-layer switch sits at the row's end, and wraps below beside a narrow
+   pointer-layer switch sits at the row's end, and wraps below beside a narrow
    editor (Custom keys) rather than squeezing them. */
 .beh-intro { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; padding: 13px 0 16px; }
 .beh-intro > .stack { flex: 1 1 280px; min-width: 0; }

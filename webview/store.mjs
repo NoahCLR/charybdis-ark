@@ -19,8 +19,8 @@ const vscode = acquireVsCodeApi();
 // the forms (undo, redo, a jump, discard, rebase, Apply, an import, another
 // keyboard or the demo), `resets` and `resetsTo` start a form again from the
 // model; `kept` survives. This preserves the existing reset policy, including
-// pending cell-helper choices and the LED group builder. A new field takes
-// one of the three here rather than joining a separate reset list.
+// pending hold-style choices for empty cells and the LED group builder. A new
+// field takes one of the three here rather than joining a separate reset list.
 /** @type {import("./view/state-fields.mjs").StateFields<PanelState>} */
 export const STATE_FIELDS = {
     screen: kept("keys"),
@@ -49,7 +49,7 @@ export const STATE_FIELDS = {
     keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
     stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
     settingsDurationUnits: kept({}), // display preferences; stored settings remain milliseconds
-    // {cell, keycode, helper, repeatHz}: how the open empty cell runs, chosen
+    // {cell, keycode, style, repeatHz}: how the open empty cell runs, chosen
     // before it sends anything. Historically kept across draft replacement;
     // it shows only while the matching behaviour cell is empty.
     cellHow: kept(null),

@@ -497,7 +497,7 @@ test("the profile meter follows the draft, and is absent without a keyboard or a
     const draft = session.draft;
     const behaviours = keyboard.counts.find((entry) => entry.id === "behaviours").used;
     routeMessage(session, {type: "saveBehavior", draftId: draft.id, draftRevision: draft.revision,
-        behavior: {keycode: "KC_F13", tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, steps: []}}, connected({capabilities: sized}));
+        behavior: {keycode: "KC_F13", tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0, steps: []}}, connected({capabilities: sized}));
     const staged = buildPanelModel(session, connected({capabilities: sized})).portable.usage;
     assert.equal(staged.source, "draft");
     assert.equal(staged.used, keyboard.used + 18, "a behaviour without steps costs its 18-byte row");

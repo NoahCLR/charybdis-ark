@@ -335,17 +335,17 @@ test("a working copy changed without Ark is said, and the draft starts again fro
 
 test("halves apart: the rail and commit bar offer Revert, Save says why", async t => {
     const {keyboard, session, key, send, shell} = await open(t);
-    keyboard.faults.peerRefuses = 2;
+    keyboard.faults.slaveRefuses = 2;
     await key(0, 15, "KC_G");
     assert.match(model(shell).notice, /slave half refused this edit/);
-    assert.equal(model(shell).model.draft.live.apart, true);
+    assert.equal(model(shell).model.draft.live.slaveRefused, true);
     await send({type: "reviewProfileDraft"});
     await send({type: "saveProfileDraft", confirmChecks: true});
     assert.match(model(shell).notice, /halves run different profiles.*Revert/);
     assert.equal(keyboard.generation, 42, "nothing saved");
     await send({type: "revertProfileDraft"});
-    assert.equal(session.draft.live.apart, false);
-    assert.equal(keyboard.apart, false);
+    assert.equal(session.draft.live.slaveRefused, false);
+    assert.equal(keyboard.slaveRefused, false);
 });
 
 test("choosing the same mode again settles halves that stored different modes", async t => {
@@ -423,12 +423,12 @@ test("leaving Live has the keyboard save what it has not saved yet, with no ques
 test("leaving Live waits for a save of the keyboard's own; when it cannot save, the mode stays and says why", async t => {
     const {keyboard, session, key, send, shell} = await open(t, {mode: EDIT_MODE.LIVE});
     await key(0, 21, "KC_M");
-    keyboard.raised.peerRefused = true;
+    keyboard.raised.slaveRefused = true;
     await send({type: "setEditMode", mode: EDIT_MODE.APPLY});
     assert.match(model(shell).notice, /slave half refused .* Revert/);
     assert.equal(keyboard.mode, EDIT_MODE.LIVE, "the mode is unchanged");
     assert.equal(session.draft.live.mode, EDIT_MODE.LIVE);
-    keyboard.raised.peerRefused = false;
+    keyboard.raised.slaveRefused = false;
     keyboard.autoSave();
     await send({type: "setEditMode", mode: EDIT_MODE.APPLY});
     assert.equal(keyboard.mode, EDIT_MODE.APPLY, "nothing left to save: it switches at once");

@@ -16,25 +16,25 @@ test("every v1 semantic action has an explicit display, including unknown numeri
 });
 
 test("a row carries its key's built-in first tap and hold, named as a person reads them", () => {
-    const row = (operand) => ({target: {kind: 1, operand}, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0,
+    const row = (operand) => ({target: {kind: 1, operand}, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0,
         keepsAutoMouseAnchored: false, steps: [{tapIndex: 1, tap: {kind: 1, operand: 4}}]});
     const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows: [row(0x2a16), row(0x4338), row(0xe3)]}));
     const byKey = (rows) => Object.fromEntries(rows.map((entry) => [entry.keycode, entry.builtIn]));
     const rows = byKey(behaviorRowsForView(domain));
     assert.deepEqual(rows["MT(MOD_LSFT|MOD_LGUI,KC_S)"], {
-        tap: {helper: "TAP_SENDS", action: "KC_S", label: "S"},
-        hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI"},
+        tap: {style: "TAP_SENDS", action: "KC_S", label: "S"},
+        hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI"},
     }, "a modifiers-only hold reads as its modifiers, not Shift+GUI+N/A");
-    assert.deepEqual(rows["LT(3,KC_SLASH)"].hold, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)", repeatHz: "0"});
+    assert.deepEqual(rows["LT(3,KC_SLASH)"].hold, {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)", repeatHz: "0"});
     assert.deepEqual(rows.KC_LEFT_GUI, {});
 });
 
 test("a behaviour branch carries the readable name of the keycode it stores, when one exists", () => {
-    const branch = (operand) => ({mode: 1, repeatHz: 0, action: {kind: 1, operand}});
+    const branch = (operand) => ({style: 1, repeatHz: 0, action: {kind: 1, operand}});
     const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows: [{
-        target: {kind: 1, operand: 4}, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false,
+        target: {kind: 1, operand: 4}, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false,
         steps: [
-            {tapIndex: 0, tap: {kind: 1, operand: 0x0220}, hold: branch(0x0228), longHold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 3}}},
+            {tapIndex: 0, tap: {kind: 1, operand: 0x0220}, hold: branch(0x0228), longHold: {style: 1, repeatHz: 0, action: {kind: 2, operand: 3}}},
             {tapIndex: 1, tap: {kind: 1, operand: 0xfffe}},
         ],
     }]}));
@@ -47,19 +47,19 @@ test("a behaviour branch carries the readable name of the keycode it stores, whe
     assert.equal("label" in unknown.tap, false);
 });
 
-test("decoded behaviors preserve sparse branches, all hold modes, anchors and timing zeros", () => {
-    const rows = [1, 2, 3, 4].map((mode) => ({
-        target: {kind: 1, operand: mode + 3}, tapHoldTerm: 0, longerHoldTerm: 410, multiTapTerm: 190,
-        keepsAutoMouseAnchored: mode === 3,
+test("decoded behaviors preserve sparse branches, all hold styles, anchors and timing zeros", () => {
+    const rows = [1, 2, 3, 4].map((style) => ({
+        target: {kind: 1, operand: style + 3}, tapHoldTerm: 0, longHoldTerm: 410, multiTapTerm: 190,
+        keepsAutoMouseAnchored: style === 3,
         steps: [{tapIndex: 4, tap: {kind: 6, operand: 0},
-            hold: {mode, repeatHz: mode === 3 ? 37 : 0, action: {kind: 2, operand: 0}},
-            longHold: {mode: 4, repeatHz: 0, action: {kind: 7, operand: 15}}}],
+            hold: {style, repeatHz: style === 3 ? 37 : 0, action: {kind: 2, operand: 0}},
+            longHold: {style: 4, repeatHz: 0, action: {kind: 7, operand: 15}}}],
     }));
     const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows}));
     const view = behaviorRowsForView(domain);
-    assert.deepEqual(view.map(r => r.steps[0].hold.helper), ["PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "REPEAT_WHILE_HELD", "TAP_ON_RELEASE_AFTER_HOLD"]);
+    assert.deepEqual(view.map(r => r.steps[0].hold.style), ["PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "REPEAT_WHILE_HELD", "TAP_ON_RELEASE_AFTER_HOLD"]);
     assert.equal(view[0].tapHoldTerm, "0");
-    assert.equal(view[0].longerHoldTerm, "410");
+    assert.equal(view[0].longHoldTerm, "410");
     assert.equal(view[0].multiTapTerm, "190");
     assert.equal(view[2].keepsAutoMouseAnchored, true);
     assert.equal(view[0].keepsAutoMouseAnchored, false);
@@ -107,8 +107,8 @@ test("RGB selectors and disabled stages are displayed without inventing enabled 
 test("authored and built-in behaviour labels use the profile's host naming rule", () => {
     const {profileKeyNames} = require("../../core/model/key-names");
     const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows:[{
-        target:{kind:1, operand:0x1804}, tapHoldTerm:0, longerHoldTerm:0, multiTapTerm:0,
-        steps:[{tapIndex:0, tap:{kind:1, operand:0x1c04}, hold:{mode:1, repeatHz:0, action:{kind:1, operand:0xe6}}}]
+        target:{kind:1, operand:0x1804}, tapHoldTerm:0, longHoldTerm:0, multiTapTerm:0,
+        steps:[{tapIndex:0, tap:{kind:1, operand:0x1c04}, hold:{style:1, repeatHz:0, action:{kind:1, operand:0xe6}}}]
     }]}));
     for(const [hostOs, alt, gui] of [[0,"Alt","GUI"],[1,"Option","Command"],[2,"Alt","Windows"],[3,"Alt","Super"]]) {
         const [row] = behaviorRowsForView(domain, {}, profileKeyNames({hostOs}));

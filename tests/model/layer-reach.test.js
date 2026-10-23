@@ -216,10 +216,10 @@ test("behaviour branches lock and release like keys, told by the taps that reach
     const lock = {target: code(KC_ESC), steps: [{tapIndex: 1, tap: {kind: 3, flags: 0, operand: 2}}]};
     const [trap] = traps(profile({keys: {"0:0": KC_ESC, "2:0": KC_B}, rows: [lock]}));
     assert.deepEqual(trap.path, ["Double-tap KC_ESCAPE on Base (its behaviour sends LOCK_LAYER(2))"]);
-    const release = {target: code(KC_B), steps: [{tapIndex: 0, hold: {mode: 2, repeatHz: 0, action: code(TO(0))}}]};
+    const release = {target: code(KC_B), steps: [{tapIndex: 0, hold: {style: 2, repeatHz: 0, action: code(TO(0))}}]};
     assert.deepEqual(traps(profile({keys: {"0:0": KC_ESC, "2:0": KC_B}, rows: [lock, release]})), []);
     // A layer hold only holds from a "Press and hold until release" branch.
-    const held = {target: code(KC_B), steps: [{tapIndex: 0, hold: {mode: 1, repeatHz: 0, action: {kind: 2, flags: 0, operand: 3}}}]};
+    const held = {target: code(KC_B), steps: [{tapIndex: 0, hold: {style: 1, repeatHz: 0, action: {kind: 2, flags: 0, operand: 3}}}]};
     assert.deepEqual(traps(profile({keys: {"0:0": KC_ESC, "2:0": KC_B, "3:0": TO(0)}, rows: [lock, held]})), []);
 });
 
@@ -373,30 +373,30 @@ test("layer keys that hold or toggle Base do nothing, and are counted wherever t
 });
 
 test("an impossible release hold cannot invent a layer entrance or escape", () => {
-    const row = {target: code(KC_ESC), tapHoldTerm: 100, longerHoldTerm: 100,
-        steps: [{tapIndex: 0, hold: {mode: 4, action: code(TG(2))}, longHold: {mode: 4, action: code(KC_A)}}]};
+    const row = {target: code(KC_ESC), tapHoldTerm: 100, longHoldTerm: 100,
+        steps: [{tapIndex: 0, hold: {style: 4, action: code(TG(2))}, longHold: {style: 4, action: code(KC_A)}}]};
     const p = profile({keys: {"0:0": KC_ESC, "2:1": KC_B}, rows: [row]});
     assert.ok(layerReach(p).some(f => f.kind === "unreachable" && f.layers.includes(2)));
-    row.longerHoldTerm = 101;
+    row.longHoldTerm = 101;
     assert.ok(!layerReach(p).some(f => f.kind === "unreachable" && f.layers.includes(2)));
 });
 
 test("combo-output behaviours use the same timing reachability as physical keys", () => {
-    const row = {target: code(KC_ESC), tapHoldTerm: 100, longerHoldTerm: 100,
-        steps: [{tapIndex: 0, hold: {mode: 4, action: code(TG(2))}, longHold: {mode: 4, action: code(KC_A)}}]};
+    const row = {target: code(KC_ESC), tapHoldTerm: 100, longHoldTerm: 100,
+        steps: [{tapIndex: 0, hold: {style: 4, action: code(TG(2))}, longHold: {style: 4, action: code(KC_A)}}]};
     const p = profile({keys: {"0:1": KC_B, "2:2": KC_B}, rows: [row],
         combos: [{inputs: [code(KC_A), code(KC_B)], output: code(KC_ESC)}]});
     assert.ok(layerReach(p).some(f => f.kind === "unreachable" && f.layers.includes(2)));
-    row.longerHoldTerm = 200;
+    row.longHoldTerm = 200;
     assert.ok(!layerReach(p).some(f => f.kind === "unreachable" && f.layers.includes(2)));
 });
 
 test("an impossible release action cannot conceal a trapped layer", () => {
-    const row = {target: code(KC_ESC), tapHoldTerm: 100, longerHoldTerm: 100,
-        steps: [{tapIndex: 0, hold: {mode: 4, action: code(TO(0))}, longHold: {mode: 4, action: code(KC_A)}}]};
+    const row = {target: code(KC_ESC), tapHoldTerm: 100, longHoldTerm: 100,
+        steps: [{tapIndex: 0, hold: {style: 4, action: code(TO(0))}, longHold: {style: 4, action: code(KC_A)}}]};
     const p = profile({keys: {"0:0": TG(2), "2:0": KC_B, "2:1": KC_ESC}, rows: [row]});
     assert.deepEqual(traps(p).map(f => f.layers), [[2]]);
-    row.longerHoldTerm = 200;
+    row.longHoldTerm = 200;
     assert.deepEqual(traps(p), []);
 });
 

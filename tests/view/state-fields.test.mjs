@@ -66,7 +66,7 @@ test("a draft change resets the existing forms and preserves historically kept p
     setModel({layers: [layer(0), layer(1), layer(2)]});
     const standing = {
         screen: "macros", layer: 2, layersOn: [1], selected: 7, tab: "behaviours", cell: "0-hold", cellRow: "QK_USER_16",
-        cellHow: {cell: "0-hold", keycode: "QK_USER_16", helper: "REPEAT_WHILE_HELD", repeatHz: "20"},
+        cellHow: {cell: "0-hold", keycode: "QK_USER_16", style: "REPEAT_WHILE_HELD", repeatHz: "20"},
         placement: {keycode: "VIA_MACRO_1"}, keyClipboard: {keycode: "KC_A", label: "A"}, pdSlot: 2, macroSlot: "VIA_MACRO_0",
         macroSearch: "hello", ledPicks: [1, 4], trackball: true, rowColour: {h: "10", s: "20", v: "30"},
         ledRow: {target: "pdMode", owner: "PD_SLOT_0", source: "Thumbs"}, recordPreserveHoldTiming: true, overlay: "history",

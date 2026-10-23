@@ -46,8 +46,8 @@ test("a SET reply says the result and where the working copy is", () => {
     assert.throws(() => decodeEditReply(trailing, request), {code: "NONCANONICAL_RESPONSE"});
     const unknown = Buffer.from(reply); unknown[5] = 17;
     assert.throws(() => decodeEditReply(unknown, request), {code: "INCOMPATIBLE_RESPONSE"});
-    const refusedPeer = Buffer.from(reply); refusedPeer.writeUInt16LE(0x3800, 15);
-    assert.equal(decodeEditReply(refusedPeer, request).flags, 0x3800);
+    const refusedSlave = Buffer.from(reply); refusedSlave.writeUInt16LE(0x3800, 15);
+    assert.equal(decodeEditReply(refusedSlave, request).flags, 0x3800);
     // Bits 14 and 15 (firmware D-F34): a stopped keyboard; every bit is now known.
     const stopped = Buffer.from(reply); stopped.writeUInt16LE(0xc000, 15);
     assert.equal(decodeEditReply(stopped, request).flags, 0xc000);
@@ -63,9 +63,9 @@ test("a restart carries its confirmation, and its answer says whether the slave 
     assert.throws(() => buildRestartRequest(0), RangeError);
     const reply = Buffer.from(request); reply.fill(0, 5);
     reply[5] = EDIT_RESULT.OK; reply.writeUInt16LE(0x4000, 15); reply[17] = 1;
-    assert.deepEqual(decodeEditReply(reply, request), {result: 0, resultName: "OK", phase: 0, session: 0, revision: 0, flags: 0x4000, peerAcknowledged: true});
+    assert.deepEqual(decodeEditReply(reply, request), {result: 0, resultName: "OK", phase: 0, session: 0, revision: 0, flags: 0x4000, slaveAcknowledged: true});
     reply[17] = 0;
-    assert.equal(decodeEditReply(reply, request).peerAcknowledged, false);
+    assert.equal(decodeEditReply(reply, request).slaveAcknowledged, false);
     for (const [at, value] of [[17, 2], [18, 1], [31, 1]]) {
         const broken = Buffer.from(reply); broken[at] = value;
         assert.throws(() => decodeEditReply(broken, request), {code: "NONCANONICAL_RESPONSE"});
@@ -73,34 +73,34 @@ test("a restart carries its confirmation, and its answer says whether the slave 
 });
 
 test("edit status pages decode both halves, the save, the last refusal and the keyboard's own saves", () => {
-    const local = Buffer.alloc(25), peer = Buffer.alloc(25), error = Buffer.alloc(25), auto = Buffer.alloc(25);
+    const local = Buffer.alloc(25), slave = Buffer.alloc(25), error = Buffer.alloc(25), auto = Buffer.alloc(25);
     auto[0] = 1; auto[1] = 0b10; auto.writeUInt32LE(3, 2); auto.writeUInt32LE(12, 6); auto.writeUInt32LE(42, 10); auto.writeUInt16LE(3000, 14);
     local[0] = 1; local[1] = 4; local.writeUInt16LE(0b1_0000_1111, 2); local.writeUInt32LE(0xdeadbeef, 4); local.writeUInt32LE(12, 8);
     local.writeUInt32LE(42, 12); local[16] = 1; local[17] = EDIT_RESULT.QUEUED; local.writeUInt16LE(7, 18); local.writeUInt16LE(8, 20); local[22] = 2; local[23] = 3;
-    peer[0] = 1; peer.writeUInt32LE(0xdeadbeef, 4); peer.writeUInt32LE(11, 8); peer[12] = 1; peer[13] = 2; peer.writeUInt16LE(30, 16); peer.writeUInt32LE(40, 20); peer[24] = 2;
+    slave[0] = 1; slave.writeUInt32LE(0xdeadbeef, 4); slave.writeUInt32LE(11, 8); slave[12] = 1; slave[13] = 2; slave.writeUInt16LE(30, 16); slave.writeUInt32LE(40, 20); slave[24] = 2;
     error[0] = 5; error[1] = 0x60; error.writeUInt32LE(99, 7); error.writeUInt32LE(3, 14); error.writeUInt32LE(5000, 18);
-    const status = decodeEditStatusPages([local, peer, error, auto]);
-    assert.equal(status.unsaved, true); assert.equal(status.peerRequired, true); assert.equal(status.peerConverged, true); assert.equal(status.peerKnown, true);
+    const status = decodeEditStatusPages([local, slave, error, auto]);
+    assert.equal(status.unsaved, true); assert.equal(status.slaveRequired, true); assert.equal(status.slaveConverged, true); assert.equal(status.slaveKnown, true);
     assert.equal(status.waitingSafe, true); assert.equal(status.saving, false);
     assert.deepEqual([status.session, status.revision, status.savedGeneration, status.savedOrigin, status.mode], [0xdeadbeef, 12, 42, 1, 2]);
-    assert.deepEqual(status.peer, {phase: 1, lastResult: 0, transactionId: 0, session: 0xdeadbeef, revision: 11, unsaved: true, savedCompiled: false, mode: 2});
+    assert.deepEqual(status.slave, {phase: 1, lastResult: 0, transactionId: 0, session: 0xdeadbeef, revision: 11, unsaved: true, savedCompiled: false, mode: 2});
     assert.equal(status.save.phase, 2); assert.equal(status.save.transactionId, 30);
     assert.equal(status.refusal.domainId, 0x60); assert.equal(status.refusal.byteOffset, 99); assert.equal(status.activeLength, 5000);
     assert.deepEqual(status.autoSave, {inProgress: false, lastWasAutomatic: true, count: 3, revision: 12, generation: 42, quietMs: 3000});
-    assert.deepEqual([status.peerStoragePaused, status.peerRefused, status.modeNotStored], [false, false, false]);
-    // Bits 10–12: the other half's save waits, the other half refused this
+    assert.deepEqual([status.slaveStoragePaused, status.slaveRefused, status.modeNotStored], [false, false, false]);
+    // Bits 10–12: the slave half's save waits, the slave half refused this
     // working copy, the edit mode is not stored yet. Bit 13 is a queued key
     // adjustment; bits 14 and 15 a stopped master half and slave half (D-F34).
     const flagged = Buffer.from(local); flagged.writeUInt16LE(0x3c00, 2);
-    assert.deepEqual((({peerStoragePaused, peerRefused, modeNotStored, adjustmentPending}) => [peerStoragePaused, peerRefused, modeNotStored, adjustmentPending])(decodeEditStatusPages([flagged, peer, error, auto])), [true, true, true, true]);
-    assert.deepEqual([status.stopped, status.peerStopped], [false, false]);
+    assert.deepEqual((({slaveStoragePaused, slaveRefused, modeNotStored, adjustmentPending}) => [slaveStoragePaused, slaveRefused, modeNotStored, adjustmentPending])(decodeEditStatusPages([flagged, slave, error, auto])), [true, true, true, true]);
+    assert.deepEqual([status.stopped, status.slaveStopped], [false, false]);
     for (const [bits, expected] of [[0x4000, [true, false]], [0x8000, [false, true]], [0xc000, [true, true]]]) {
         const page = Buffer.from(local); page.writeUInt16LE(bits, 2);
-        const decoded = decodeEditStatusPages([page, peer, error, auto]);
-        assert.deepEqual([decoded.stopped, decoded.peerStopped], expected);
+        const decoded = decodeEditStatusPages([page, slave, error, auto]);
+        assert.deepEqual([decoded.stopped, decoded.slaveStopped], expected);
     }
     const layout = Buffer.from(local); layout[0] = 2;
-    assert.throws(() => decodeEditStatusPages([layout, peer, error, auto]), {code: "INCOMPATIBLE_RESPONSE"});
+    assert.throws(() => decodeEditStatusPages([layout, slave, error, auto]), {code: "INCOMPATIBLE_RESPONSE"});
     for (const broken of [(page) => {page[0] = 2;}, (page) => {page[1] = 4;}, (page) => {page[16] = 1;}]) {
         const page = Buffer.from(auto); broken(page);
         assert.throws(() => decodeAutoSavePage(page), /automatic save|Reserved/);
@@ -110,7 +110,7 @@ test("edit status pages decode both halves, the save, the last refusal and the k
 
 test("the mode, runtime and active-profile pages decode, refusing what they never carry", () => {
     const mode = Buffer.from([2, 5, 0, 0, 0, 2, 5, 0, 0, 0, 5]);
-    assert.deepEqual(decodeEditModePage(mode), {mode: 2, counter: 5, peerMode: 2, peerCounter: 5, peerKnown: true, conflict: false, agreed: true});
+    assert.deepEqual(decodeEditModePage(mode), {mode: 2, counter: 5, slaveMode: 2, slaveCounter: 5, slaveKnown: true, conflict: false, agreed: true});
     assert.throws(() => decodeEditModePage(Buffer.from([...mode.subarray(0, 10), 8])), {code: "INCOMPATIBLE_RESPONSE"});
     const runtime = Buffer.alloc(24); runtime.set([1, 0, 1, 1]); runtime.writeUInt16LE(1200, 4); runtime.writeUInt32LE(0xc8ff00, 12);
     const decoded = decodeRuntimePage(runtime);

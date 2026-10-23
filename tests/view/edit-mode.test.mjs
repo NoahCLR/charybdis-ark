@@ -40,18 +40,18 @@ test("in Live the keyboard's own saving is said from its status; flags show with
     assert.equal(liveSaveState(draft({unsaved: true, keyboard: {...keyboard, saving: true, storagePaused: true}}))?.detail, "The keyboard writes flash once no key is held.");
     assert.equal(liveSaveState(draft({keyboard: {...keyboard, savedByKeyboard: true}}))?.title, "Saved by the keyboard");
     assert.equal(liveSaveState(draft({unsaved: true, keyboard: {...keyboard, saveFailed: true}}))?.action, "save");
-    assert.equal(liveSaveState(draft({unsaved: true, apart: true, keyboard: {...keyboard, saveFailed: true}}))?.action, "revert", "the halves apart come first: Save is refused");
+    assert.equal(liveSaveState(draft({unsaved: true, slaveRefused: true, keyboard: {...keyboard, saveFailed: true}}))?.action, "revert", "the halves apart come first: Save is refused");
     assert.equal(liveSaveState(draft({keyboard: {...keyboard, adjustmentPending: true}}))?.title, "Keyboard adjustment pending");
     assert.equal(liveSaveState(draft({mode: LIVE_REVIEW, keyboard: {...keyboard, adjustmentPending: true}}))?.kind, "adjustment");
     // Live + review: the commit bar says "unsaved" itself; only trouble is said here.
     assert.equal(liveSaveState(draft({mode: LIVE_REVIEW, unsaved: true})), null);
-    assert.equal(liveSaveState(draft({mode: LIVE_REVIEW, unsaved: true, apart: true}))?.kind, "refused");
+    assert.equal(liveSaveState(draft({mode: LIVE_REVIEW, unsaved: true, slaveRefused: true}))?.kind, "refused");
 });
 
 // A DPI or lighting key change still reaching both halves is the keyboard's
 // own: never "not saved yet", and said under an Apply draft too.
 test("a pending keyboard adjustment is said as itself in every edit mode", () => {
-    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, stopped: false, peerStopped: false, quietMs: 3000};
+    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, stopped: false, slaveStopped: false, quietMs: 3000};
     const adjusting = {...keyboard, adjustmentPending: true};
     const changes = (count) => Array.from({length: count}, () => ({}));
     /** @param {object} live @param {number} [count] */
@@ -83,19 +83,19 @@ test("a pending keyboard adjustment is said as itself in every edit mode", () =>
     assert.equal(railSaveLine(liveDraft({mode: LIVE, unsaved: true, keyboard}))?.text, "Edits not saved yet");
     // A stopped keyboard and halves apart outrank it.
     assert.equal(railSaveLine(liveDraft({mode: LIVE, keyboard: {...adjusting, stopped: true}}))?.text, STOPPED_WORDS.rail);
-    assert.equal(liveSaveState(liveDraft({mode: LIVE_REVIEW, unsaved: true, apart: true}))?.kind, "refused");
-    assert.equal(railSaveLine(liveDraft({mode: LIVE_REVIEW, unsaved: true, apart: true})), null, "the halves apart have their own rail line");
+    assert.equal(liveSaveState(liveDraft({mode: LIVE_REVIEW, unsaved: true, slaveRefused: true}))?.kind, "refused");
+    assert.equal(railSaveLine(liveDraft({mode: LIVE_REVIEW, unsaved: true, slaveRefused: true})), null, "the halves apart have their own rail line");
 });
 
 // Firmware D-F34: a keyboard that stopped saving used to look like "not
 // ready" and "the slave half is catching up". Now one state says so, for
 // either half, in every live mode, ahead of anything else, with Restart.
 test("a keyboard that stopped saving outranks every other state and offers Restart", () => {
-    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, stopped: false, peerStopped: false, quietMs: 3000};
+    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, stopped: false, slaveStopped: false, quietMs: 3000};
     /** @param {object} live */
     const draft = live => /** @type {any} */ ({live: {mode: LIVE_REVIEW, unsaved: true, converged: false, keyboard, ...live}});
-    for (const flag of ["stopped", "peerStopped"]) for (const mode of [LIVE, LIVE_REVIEW]) {
-        const state = liveSaveState(draft({mode, apart: true, keyboard: {...keyboard, saveFailed: true, saving: true, adjustmentPending: true, [flag]: true}}));
+    for (const flag of ["stopped", "slaveStopped"]) for (const mode of [LIVE, LIVE_REVIEW]) {
+        const state = liveSaveState(draft({mode, slaveRefused: true, keyboard: {...keyboard, saveFailed: true, saving: true, adjustmentPending: true, [flag]: true}}));
         assert.deepEqual(state, {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"});
     }
     assert.equal(STOPPED_WORDS.title, "The keyboard stopped saving");

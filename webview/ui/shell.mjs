@@ -145,7 +145,7 @@ function liveStatus(draft) {
             ? `<button class="stat link" data-act="open-review" data-tip="The keyboard runs these edits now. Review and save them to keep them; Revert or unplugging the keyboard puts back what is saved."><i class="dot draft"></i> ${esc(words)}</button>`
             : `<div class="stat" data-tip="The keyboard runs these edits now; nothing is saved yet."><i class="dot draft"></i> ${esc(words)}</div>`);
     }
-    if (live.apart) lines.push(`<div class="stat" data-tip="The slave half refused the keyboard's unsaved edits, so the halves run different profiles. Save waits until they agree: Revert puts both back on the saved profile."><i class="dot err"></i> Halves apart · Revert</div>`);
+    if (live.slaveRefused) lines.push(`<div class="stat" data-tip="The slave half refused the keyboard's unsaved edits, so the halves run different profiles. Save waits until they agree: Revert puts both back on the saved profile."><i class="dot err"></i> Halves apart · Revert</div>`);
     else if (!live.converged) lines.push(`<div class="stat" data-tip="The master half runs the last edit; the slave half is still taking it. The next edit waits for it; if this stays, check the cable between the halves."><i class="dot warn"></i> Slave half catching up</div>`);
     return lines.join("");
 }
@@ -358,7 +358,7 @@ function liveCommitBar(draft) {
         return node;
     }
     if (!live.unsaved && !draft.dirty) return null;
-    if (live.mode === LIVE && !live.apart) {
+    if (live.mode === LIVE && !live.slaveRefused) {
         const count = draft.changes.length;
         const node = el(`<div class="commit live auto">
             <span class="n"><i class="dot draft${saving?.kind === "saving" ? " busy" : ""}"></i> <strong>${esc(saving?.title || "Not saved yet")}</strong>
@@ -376,13 +376,13 @@ function liveCommitBar(draft) {
     // working copy: Revert is then the way back, with nothing to review.
     const node = el(`<div class="commit live">
         <span class="n"><i class="dot draft"></i> <strong>${count ? `${count} unsaved change${count === 1 ? "" : "s"}` : "Unsaved edits"}</strong>
-        <span class="muted">${count ? "running on the keyboard" : "match what is saved"}${live.apart ? " · the halves are apart" : live.converged ? "" : " · the slave half is catching up"}</span></span>
+        <span class="muted">${count ? "running on the keyboard" : "match what is saved"}${live.slaveRefused ? " · the halves are apart" : live.converged ? "" : " · the slave half is catching up"}</span></span>
         ${statusBesideCount(draft.changes) ? `<span class="peek"><span class="note">${esc(statusBesideCount(draft.changes))}</span></span>` : ""}
         <span class="sep"></span>
-        <button class="btn ${count && !live.apart ? "ghost tiny" : "primary"}" data-act="revert"
-            data-tip="${live.apart ? `The slave half refused these edits, so they cannot be saved. Revert puts both halves back on the saved profile; Undo (${shortcut("Z")}) sends the edits again.`
+        <button class="btn ${count && !live.slaveRefused ? "ghost tiny" : "primary"}" data-act="revert"
+            data-tip="${live.slaveRefused ? `The slave half refused these edits, so they cannot be saved. Revert puts both halves back on the saved profile; Undo (${shortcut("Z")}) sends the edits again.`
                 : `Put back the profile the keyboard has saved. Nothing is written; Undo (${shortcut("Z")}) sends the edits again.`}">Revert</button>
-        ${count && !live.apart ? `<button class="btn primary" data-act="review"
+        ${count && !live.slaveRefused ? `<button class="btn primary" data-act="review"
             data-tip="See every unsaved change against what is saved, then save them on both halves.">Review and save</button>` : ""}</div>`);
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="review"]'))?.addEventListener("click", openReview);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="revert"]')).addEventListener("click", () => post(controls.revertDraft()));

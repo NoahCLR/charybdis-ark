@@ -197,12 +197,12 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
         assert.equal((await coordinator.send(buildEditBeginRequest(0x16, {session: progress.session, revision: progress.revision + 5, splices: 1, insertTotal: 1}))).resultName, "STALE");
         console.log("refusals: BUSY while receiving, out-of-order and overlapping splices, too large, a damaged stream, a stale identity");
 
-        // Every status flag, the other half's page, the mode and runtime pages.
-        const flagFields = /** @type {const} */ ([["peer_required", "peerRequired", EDIT_FLAGS.PEER_REQUIRED], ["halves_agree", "peerConverged", EDIT_FLAGS.PEER_CONVERGED],
-            ["peer_known", "peerKnown", EDIT_FLAGS.PEER_KNOWN], ["edits_blocked", "editsBlocked", EDIT_FLAGS.EDITS_BLOCKED], ["saved_compiled", "savedCompiled", EDIT_FLAGS.SAVED_COMPILED],
+        // Every status flag, the slave half's page, the mode and runtime pages.
+        const flagFields = /** @type {const} */ ([["peer_required", "slaveRequired", EDIT_FLAGS.PEER_REQUIRED], ["halves_agree", "slaveConverged", EDIT_FLAGS.PEER_CONVERGED],
+            ["peer_known", "slaveKnown", EDIT_FLAGS.PEER_KNOWN], ["edits_blocked", "editsBlocked", EDIT_FLAGS.EDITS_BLOCKED], ["saved_compiled", "savedCompiled", EDIT_FLAGS.SAVED_COMPILED],
             ["save_phase", "saving", EDIT_FLAGS.SAVING], ["mode_conflict", "modeConflict", EDIT_FLAGS.MODE_CONFLICT], ["storage_paused", "storagePaused", EDIT_FLAGS.STORAGE_PAUSED],
-            ["peer_storage_paused", "peerStoragePaused", EDIT_FLAGS.PEER_STORAGE_PAUSED], ["peer_refused", "peerRefused", EDIT_FLAGS.PEER_REFUSED], ["mode_store_failed", "modeNotStored", EDIT_FLAGS.MODE_NOT_STORED], ["adjustment_pending", "adjustmentPending", EDIT_FLAGS.ADJUSTMENT_PENDING],
-            ["stopped", "stopped", EDIT_FLAGS.STOPPED], ["peer_stopped", "peerStopped", EDIT_FLAGS.PEER_STOPPED]]);
+            ["peer_storage_paused", "slaveStoragePaused", EDIT_FLAGS.PEER_STORAGE_PAUSED], ["peer_refused", "slaveRefused", EDIT_FLAGS.PEER_REFUSED], ["mode_store_failed", "modeNotStored", EDIT_FLAGS.MODE_NOT_STORED], ["adjustment_pending", "adjustmentPending", EDIT_FLAGS.ADJUSTMENT_PENDING],
+            ["stopped", "stopped", EDIT_FLAGS.STOPPED], ["peer_stopped", "slaveStopped", EDIT_FLAGS.PEER_STOPPED]]);
         for (const name of ["peer_required", "halves_agree", "peer_known", "edits_blocked", "saved_compiled", "save_phase", "mode_conflict", "storage_paused", "peer_storage_paused", "peer_refused", "mode_store_failed", "adjustment_pending", "stopped", "peer_stopped"]) await keyboard.set(name, 0);
         let seen = 0;
         for (const [field, key, bit] of flagFields) {
@@ -236,9 +236,9 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
         // Restart (D-F34): Ark's frame through the firmware's channel, its
         // confirmation checked there, the answer's byte 17 decoded here.
         await keyboard.set("stopped", 1);
-        assert.deepEqual(await coordinator.restart(), {peerAcknowledged: true}, "taken while stopped");
+        assert.deepEqual(await coordinator.restart(), {slaveAcknowledged: true}, "taken while stopped");
         await keyboard.set("restart_acknowledged", 0);
-        assert.deepEqual(await coordinator.restart(), {peerAcknowledged: false});
+        assert.deepEqual(await coordinator.restart(), {slaveAcknowledged: false});
         const stray = buildRestartRequest(0x22); stray[8] ^= 1;
         assert.equal((await sendEditRequest(connection, stray, options)).resultName, "INVALID_ARGUMENT", "a wrong confirmation restarts nothing");
         assert.equal(await keyboard.restarts(), 2);
@@ -248,11 +248,11 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
             ["peer_flags", 3], ["peer_mode", 1], ["save_last_result", EDIT_RESULT.PUBLICATION_FAILED], ["save_last_error", 9], ["save_last_transaction", 0x0bb0],
             ["saved_generation", 42], ["saved_origin", 1], ["peer_mode_counter", 7], ["peer_known", 1], ["mode_conflict", 1]])) await keyboard.set(name, value);
         const status = await readEditStatus(connection, options);
-        assert.deepEqual(status.peer, {phase: 1, lastResult: EDIT_RESULT.ABORTED, transactionId: 0x4321, session: 0x5e550001, revision: 9, unsaved: true, savedCompiled: true, mode: 1});
+        assert.deepEqual(status.slave, {phase: 1, lastResult: EDIT_RESULT.ABORTED, transactionId: 0x4321, session: 0x5e550001, revision: 9, unsaved: true, savedCompiled: true, mode: 1});
         assert.deepEqual([status.save.lastResult, status.save.lastError, status.save.lastTransactionId, status.savedGeneration, status.savedOrigin], [EDIT_RESULT.PUBLICATION_FAILED, 9, 0x0bb0, 42, 1]);
         assert.equal(status.phase, EDIT_PHASE.IDLE);
         const mode = await readEditMode(connection, options);
-        assert.deepEqual([mode.mode, mode.peerMode, mode.peerCounter, mode.peerKnown, mode.conflict, mode.agreed], [2, 1, 7, true, true, false]);
+        assert.deepEqual([mode.mode, mode.slaveMode, mode.slaveCounter, mode.slaveKnown, mode.conflict, mode.agreed], [2, 1, 7, true, true, false]);
         await keyboard.set("mode_conflict", 0);
         assert.equal((await coordinator.send(buildEditModeRequest(0x21, 0))).resultName, "NOT_CLEAN", "the mode waits for Save or Revert");
         for (const [name, value] of /** @type {[string, number][]} */ ([["combos_master", 1], ["combos_override", 0], ["behaviours_master", 1], ["behaviours_override", 1], ["default_dpi", 1600], ["rgb_color", 0xc8ff55],

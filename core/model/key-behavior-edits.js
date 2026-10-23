@@ -5,7 +5,7 @@ const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 const {nativeCode} = require("../schema/actions");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression} = require("../schema/compiled-profile-v1");
 const {PD_SLOT_COUNT, actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
 const {behaviorPlacementProblem} = require("./profile-placement");
@@ -149,19 +149,19 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
             for (const field of /** @type {const} */ (["tap", "hold", "longHold"])) {
                 const branch = step[field];
                 if (!branch) continue;
-                const helper = String(branch.helper ?? "").trim();
-                if (!helper) {
-                    if (String(branch.action ?? "").trim() || String(branch.repeatHz ?? "").trim()) throw invalid("Choose a helper for each enabled behaviour branch.");
+                const style = String(branch.style ?? "").trim();
+                if (!style) {
+                    if (String(branch.action ?? "").trim() || String(branch.repeatHz ?? "").trim()) throw invalid("Choose how each enabled behaviour branch runs.");
                     continue;
                 }
                 if (field === "tap") {
-                    if (helper !== "TAP_SENDS") throw invalid("Tap branches require the Tap sends helper.");
+                    if (style !== "TAP_SENDS") throw invalid("Tap branches only run as Tap sends.");
                     next.tap = action(branch.action, oldStep?.tap);
                 } else {
-                    if (!Object.hasOwn(KEY_BEHAVIOR_HOLD_MODES, helper)) throw invalid(`Unknown hold helper: ${helper}.`);
+                    if (!Object.hasOwn(KEY_BEHAVIOR_HOLD_STYLES, style)) throw invalid(`Unknown hold style: ${style}.`);
                     next[field] = {
-                        mode: KEY_BEHAVIOR_HOLD_MODES[/** @type {keyof typeof KEY_BEHAVIOR_HOLD_MODES} */ (helper)],
-                        repeatHz: helper === "REPEAT_WHILE_HELD" ? integer(branch.repeatHz, 100, "Repeat frequency") : 0,
+                        style: KEY_BEHAVIOR_HOLD_STYLES[/** @type {keyof typeof KEY_BEHAVIOR_HOLD_STYLES} */ (style)],
+                        repeatHz: style === "REPEAT_WHILE_HELD" ? integer(branch.repeatHz, 100, "Repeat frequency") : 0,
                         action: action(branch.action, oldStep?.[field]?.action),
                     };
                 }
@@ -175,7 +175,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         const row = {
             target: previous?.target ?? target,
             tapHoldTerm: integer(form.tapHoldTerm, 65535, "Tap/hold time", true),
-            longerHoldTerm: integer(form.longerHoldTerm, 65535, "Long-hold time", true),
+            longHoldTerm: integer(form.longHoldTerm, 65535, "Long-hold time", true),
             multiTapTerm: integer(form.multiTapTerm, 65535, "Multi-tap time", true),
             keepsAutoMouseAnchored: anchored,
             enabled,

@@ -27,7 +27,7 @@ Sniping slows directional pointing modes too; scrolling modes ignore it.
 
 **Auto-mouse**
 
-- **Auto-mouse** turns the **Auto-mouse layer** on when you move the ball.
+- **Auto-mouse** turns the **Pointer layer** on when you move the ball.
 - **Timeout**: how long the layer stays on after the ball stops. The lighting
   fade keeps its share of it (see [Lighting](lighting.md#auto-mouse-fade)).
 - **Movement debounce**, **Delay after typing** and **Movement threshold**

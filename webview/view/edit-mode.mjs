@@ -105,8 +105,8 @@ export function liveSaveState(draft, {adjustment = true} = {}) {
     if (!live) return adjusting ? ADJUSTMENT : null;
     // Stopped outranks everything: "catching up" and "not ready" were what
     // a stopped keyboard used to look like.
-    if (keyboard?.stopped || keyboard?.peerStopped) return {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"};
-    if (live.apart) return {kind: "refused", tone: "err", title: "Halves apart",
+    if (keyboard?.stopped || keyboard?.slaveStopped) return {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"};
+    if (live.slaveRefused) return {kind: "refused", tone: "err", title: "Halves apart",
         detail: `The slave half refused these edits, so the halves run different profiles and nothing can be saved. Revert puts both back on the saved profile; Undo (${shortcut("Z")}) sends the edits again.`, action: "revert"};
     if (adjusting) return ADJUSTMENT;
     if (keyboard?.saveFailed && live.unsaved) return {kind: "failed", tone: "err", title: "The keyboard could not save",

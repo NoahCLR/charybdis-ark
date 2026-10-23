@@ -181,45 +181,45 @@ test("copy, paste and delete on the board are told apart from everything else", 
 test("a behaviour row posted as the editor builds it is accepted whole", () => {
     const draft = session();
     // the fixture already has an Escape row; the editor saves it whole
-    const behaviour = {keycode: "KC_ESCAPE", tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false,
-        steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_ESCAPE"}}]};
-    const change = {tapCount: 0, kind: "hold", branch: edits.cellBranch("hold", {action: "KC_LSFT", helper: "PRESS_AND_HOLD_UNTIL_RELEASE"})};
-    stage(draft, edits.saveBehaviour(behaviour, {terms: {tapHoldTerm: "175", longerHoldTerm: ""}, change}, draft.identity()));
+    const behaviour = {keycode: "KC_ESCAPE", tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false,
+        steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_ESCAPE"}}]};
+    const change = {tapCount: 0, kind: "hold", branch: edits.cellBranch("hold", {action: "KC_LSFT", style: "PRESS_AND_HOLD_UNTIL_RELEASE"})};
+    stage(draft, edits.saveBehaviour(behaviour, {terms: {tapHoldTerm: "175", longHoldTerm: ""}, change}, draft.identity()));
     const row = decoded(draft).behaviors.rows.find((entry) => entry.target.kind === 1 && entry.target.operand === 0x29);
     assert.equal(row.tapHoldTerm, 175);
-    assert.equal(row.longerHoldTerm, 0, "an empty timing field means the keyboard default");
-    assert.equal(row.steps[0].hold.mode, 1);
+    assert.equal(row.longHoldTerm, 0, "an empty timing field means the keyboard default");
+    assert.equal(row.steps[0].hold.style, 1);
     assert.ok(reviewAreas(draft).includes("Behaviours"));
 });
 
 test("choosing repeat while held posts a rate the keyboard accepts", () => {
-    assert.deepEqual(edits.cellBranch("hold", {action: "KC_RIGHT", helper: "REPEAT_WHILE_HELD", repeatHz: ""}),
-        {helper: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: edits.DEFAULT_REPEAT_HZ});
-    assert.equal(edits.cellBranch("hold", {action: "KC_RIGHT", helper: "TAP_AT_HOLD_THRESHOLD", repeatHz: "30"}).repeatHz, "0");
+    assert.deepEqual(edits.cellBranch("hold", {action: "KC_RIGHT", style: "REPEAT_WHILE_HELD", repeatHz: ""}),
+        {style: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: edits.DEFAULT_REPEAT_HZ});
+    assert.equal(edits.cellBranch("hold", {action: "KC_RIGHT", style: "TAP_AT_HOLD_THRESHOLD", repeatHz: "30"}).repeatHz, "0");
     assert.equal(edits.cellBranch("tap", {action: " "}), null, "an empty cell removes the tier");
     const draft = session();
-    const behaviour = {keycode: "KC_Q", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_Q"}}]};
+    const behaviour = {keycode: "KC_Q", steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_Q"}}]};
     stage(draft, edits.saveBehaviour(behaviour, {change: {tapCount: 0, kind: "hold",
-        branch: edits.cellBranch("hold", {action: "KC_RIGHT", helper: "REPEAT_WHILE_HELD", repeatHz: ""})}}, draft.identity()));
+        branch: edits.cellBranch("hold", {action: "KC_RIGHT", style: "REPEAT_WHILE_HELD", repeatHz: ""})}}, draft.identity()));
     const row = decoded(draft).behaviors.rows.find((entry) => entry.target.operand === 0x14);
     assert.equal(row.steps[0].hold.repeatHz, Number(edits.DEFAULT_REPEAT_HZ));
 });
 
 test("how an empty cell runs is held until it sends something, then posted with it", () => {
-    assert.deepEqual(edits.cellEdit("hold", {stored: false, action: "", helper: "REPEAT_WHILE_HELD", repeatHz: "30"}),
-        {pending: {helper: "REPEAT_WHILE_HELD", repeatHz: "30"}}, "an empty cell posts nothing the keyboard would drop");
-    assert.deepEqual(edits.cellEdit("hold", {stored: false, action: "KC_RIGHT", helper: "REPEAT_WHILE_HELD", repeatHz: "30"}),
-        {branch: {helper: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: "30"}}, "the first action carries the held choice");
-    assert.deepEqual(edits.cellEdit("hold", {stored: true, action: " ", helper: "TAP_AT_HOLD_THRESHOLD"}),
+    assert.deepEqual(edits.cellEdit("hold", {stored: false, action: "", style: "REPEAT_WHILE_HELD", repeatHz: "30"}),
+        {pending: {style: "REPEAT_WHILE_HELD", repeatHz: "30"}}, "an empty cell posts nothing the keyboard would drop");
+    assert.deepEqual(edits.cellEdit("hold", {stored: false, action: "KC_RIGHT", style: "REPEAT_WHILE_HELD", repeatHz: "30"}),
+        {branch: {style: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: "30"}}, "the first action carries the held choice");
+    assert.deepEqual(edits.cellEdit("hold", {stored: true, action: " ", style: "TAP_AT_HOLD_THRESHOLD"}),
         {branch: null}, "emptying a stored cell still removes the tier");
-    assert.deepEqual(edits.cellEdit("tap", {stored: false, action: ""}), {pending: null}, "a tap tier has no helper to hold");
+    assert.deepEqual(edits.cellEdit("tap", {stored: false, action: ""}), {pending: null}, "a tap tier has no hold style");
 });
 
 test("a behaviour row is added by a key's first action, and deleted again", () => {
     const draft = session();
     const rows = () => decoded(draft).behaviors.rows.length;
     const before = rows();
-    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "KC_A"}}}, draft.identity()));
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch: {style: "TAP_SENDS", action: "KC_A"}}}, draft.identity()));
     assert.equal(rows(), before + 1);
     stage(draft, edits.deleteBehaviour("KC_Q", draft.identity()));
     assert.equal(rows(), before);
@@ -228,7 +228,7 @@ test("a behaviour row is added by a key's first action, and deleted again", () =
 test("an edit that leaves a stored row changing nothing removes it, and Undo brings it back", () => {
     const draft = session();
     const rows = () => decoded(draft).behaviors.rows.filter(entry => entry.target.kind === 1 && entry.target.operand === 0x14);
-    const branch = {helper: "TAP_SENDS", action: "KC_A"};
+    const branch = {style: "TAP_SENDS", action: "KC_A"};
     stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch}}, draft.identity()));
     const stored = {keycode: "KC_Q", stored: true, timingAlone: false, steps: [{tapCount: 0, tap: branch}]};
     const cleared = edits.saveBehaviour(stored, {change: {tapCount: 0, kind: "tap", branch: null}}, draft.identity());
@@ -260,7 +260,7 @@ test("the editor removes exactly the rows the core's review notes as changing no
         const row = behaviourEditorRow(model, keycode);
         assert.ok(row, keycode);
         for (const fields of [{}, {terms: {tapHoldTerm: "120"}}, {terms: {multiTapTerm: "90"}}, {anchored: true}, {enabled: false}]) {
-            const terms = {tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", ...fields.terms};
+            const terms = {tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0", ...fields.terms};
             const posted = edits.saveBehaviour({...row, ...terms, stored: true, steps: []}, fields, null);
             // The same row stored as it is, for the core's rule to judge.
             const draft = session();
@@ -284,7 +284,7 @@ test("new behaviour rows preserve built-in actions, including LT targets", () =>
         assert.equal(row().tapHoldTerm, 177, "timing-only edits keep the target valid");
         assert.deepEqual(row().steps, []);
         assert.throws(() => stage(draft, edits.saveBehaviour({keycode, steps: []}, {change: {
-            tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "LT(3,KC_F)"},
+            tapCount: 0, kind: "tap", branch: {style: "TAP_SENDS", action: "LT(3,KC_F)"},
         }}, draft.identity())), /makes its own tap\/hold decision/, "LT is still refused as an authored action");
     }
 });
@@ -295,8 +295,8 @@ test("a custom key on no layer gets its behaviour row from the Custom keys scree
     const isRow = (entry) => entry.target.kind === 7 && entry.target.operand === slot;
     assert.ok(!profileLayers(draft.document).some((layer) => layer.includes(customKeyCode(slot))), "CUSTOM_KEY_5 is on no layer");
     assert.ok(!decoded(draft).behaviors.rows.some(isRow));
-    const row = behaviourEditorRow({behaviorTimingDefaults: {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"}}, "CUSTOM_KEY_5");
-    stage(draft, edits.saveBehaviour(row, {change: {tapCount: 0, kind: "long", branch: edits.cellBranch("long", {action: "KC_B", helper: "TAP_AT_HOLD_THRESHOLD"})}}, draft.identity()));
+    const row = behaviourEditorRow({behaviorTimingDefaults: {tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "150"}}, "CUSTOM_KEY_5");
+    stage(draft, edits.saveBehaviour(row, {change: {tapCount: 0, kind: "long", branch: edits.cellBranch("long", {action: "KC_B", style: "TAP_AT_HOLD_THRESHOLD"})}}, draft.identity()));
     const saved = decoded(draft).behaviors.rows.find(isRow);
     assert.ok(saved, "the row is stored for the unplaced custom key");
     assert.equal(saved.steps[0].longHold.action.operand, 0x05);
@@ -304,19 +304,19 @@ test("a custom key on no layer gets its behaviour row from the Custom keys scree
 });
 
 test("an unstored editor only creates a row after an action, a timing where one alone does something, or the anchor", () => {
-    const timing = {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"};
+    const timing = {tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "150"};
     const model = {behaviorTimingDefaults: timing, behaviorEditing: {keyDefaults: {
         KC_Q: {builtIn: {}, timing, timingAlone: false}, "LT(3,KC_F)": {builtIn: {}, timing, timingAlone: true}}}};
     // On a plain key a timing alone does nothing (firmware D-F27), so it makes no row.
-    for (const terms of [{multiTapTerm: "777"}, {tapHoldTerm: "177"}, {longerHoldTerm: "477"}]) {
+    for (const terms of [{multiTapTerm: "777"}, {tapHoldTerm: "177"}, {longHoldTerm: "477"}]) {
         assert.equal(edits.saveBehaviour(behaviourEditorRow(model, "KC_Q"), {terms}, null), null, JSON.stringify(terms));
     }
     for (const [keycode, operand, change] of [
         ["LT(3,KC_F)", 0x4309, {terms: {multiTapTerm: "777"}}],
         ["LT(3,KC_F)", 0x4309, {terms: {tapHoldTerm: "177"}}],
-        ["LT(3,KC_F)", 0x4309, {terms: {longerHoldTerm: "477"}}],
+        ["LT(3,KC_F)", 0x4309, {terms: {longHoldTerm: "477"}}],
         ["KC_Q", 0x14, {anchored: true}],
-        ["KC_Q", 0x14, {change: {tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "KC_A"}}}],
+        ["KC_Q", 0x14, {change: {tapCount: 0, kind: "tap", branch: {style: "TAP_SENDS", action: "KC_A"}}}],
     ]) {
         const draft = session();
         const before = decoded(draft).behaviors.rows.length;
@@ -331,7 +331,7 @@ test("an unstored editor only creates a row after an action, a timing where one 
         const saved = decoded(draft).behaviors.rows.find(entry => entry.target.kind === 1 && entry.target.operand === operand);
         assert.equal(decoded(draft).behaviors.rows.length, before + 1);
         assert.equal(saved.tapHoldTerm, Number(change.terms?.tapHoldTerm || 0));
-        assert.equal(saved.longerHoldTerm, Number(change.terms?.longerHoldTerm || 0));
+        assert.equal(saved.longHoldTerm, Number(change.terms?.longHoldTerm || 0));
         assert.equal(saved.multiTapTerm, Number(change.terms?.multiTapTerm || 0));
         assert.equal(saved.keepsAutoMouseAnchored, Boolean(change.anchored));
         assert.equal(saved.steps.length, change.change ? 1 : 0);
@@ -566,7 +566,7 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
     const draft = session();
     const before = draft.document;
     const behaviour = {keycode: "KC_Q", steps: []};
-    const then = edits.saveBehaviour(behaviour, {change: {tapCount: 0, kind: "hold", branch: edits.cellBranch("hold", {action: "CUSTOM_KEY_9", helper: "PRESS_AND_HOLD_UNTIL_RELEASE"})}}, draft.identity());
+    const then = edits.saveBehaviour(behaviour, {change: {tapCount: 0, kind: "hold", branch: edits.cellBranch("hold", {action: "CUSTOM_KEY_9", style: "PRESS_AND_HOLD_UNTIL_RELEASE"})}}, draft.identity());
     stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, key: 0}, "Left Ctrl + Right Ctrl", /** @type {any} */ (then)));
     const after = decoded(draft);
     assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x11, key: 0});

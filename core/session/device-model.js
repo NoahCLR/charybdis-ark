@@ -344,7 +344,7 @@ function behaviorFeatures(content) {
 /** @param {Configuration} content @param {import("./types.js").DeviceModelInput["capabilities"]} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {import("../../contracts/panel.js").PublishedModel["behaviorEditing"]["keyDefaults"]} */
 function behaviorDefaults(content, capabilities, aliases, names) {
     const defaults = content.settingsView?.timing || {};
-    const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longerHoldTerm, defaults.multiTapTerm];
+    const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longHoldTerm, defaults.multiTapTerm];
     const features = behaviorFeatures(content);
     const customKeys = (content.customKeyView?.keys || []).map(key => key.code);
     return Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
@@ -355,8 +355,8 @@ function behaviorDefaults(content, capabilities, aliases, names) {
         // A key follows the same one with or without a row (firmware D-F27).
         const source = holdTermSetting(target) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
         return [aliases[name] || name, {builtIn: builtInForView(target, features, names),
-            timing: {tapHoldTerm: timing.hold, longerHoldTerm: timing.long, multiTapTerm: timing.repeat},
-            timingSources: {tapHoldTerm: source, longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},
+            timing: {tapHoldTerm: timing.hold, longHoldTerm: timing.long, multiTapTerm: timing.repeat},
+            timingSources: {tapHoldTerm: source, longHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},
             timingAlone: timingAlone(target, features.customKeyShortcuts)}];
     }));
 }
@@ -427,7 +427,7 @@ function deviceHeader(state) {
             recoveryPending: Boolean(state.mutationCompatibility?.recoveryPending || status?.candidatePending),
             // The slave half never confirmed a cancelled save. Only a restart
             // releases it, and the keyboard refuses new saves until then.
-            restartNeeded: Boolean(status?.peerCleanupPending),
+            restartNeeded: Boolean(status?.slaveCleanupPending),
             // A slot holds a profile from an earlier store format or test layout, which the
             // keyboard neither reads nor converts (D-L64): it runs its built-in
             // defaults until a profile is saved.
@@ -452,17 +452,17 @@ function convergence(status) {
 function halvesState(status) {
     if (!status) return "unread";
     if (halvesConverged(status)) return "agree";
-    return status.peerKnown ? "apart" : "alone";
+    return status.slaveKnown ? "apart" : "alone";
 }
 
 /** @param {Partial<import("./types.js").ProfileStatus> | null | undefined} status */
 function halvesConverged(status) {
     return Boolean(status &&
-        status.peerKnown === true &&
-        status.peerConverged === true &&
+        status.slaveKnown === true &&
+        status.slaveConverged === true &&
         !status.conflictCount &&
         status.activeGeneration === status.committedGeneration &&
-        status.committedGeneration === status.peerGeneration);
+        status.committedGeneration === status.slaveGeneration);
 }
 
 /** @param {number | undefined} value */

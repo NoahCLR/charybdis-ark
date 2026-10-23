@@ -59,7 +59,7 @@ later cannot hide a problem:
   finding that removes an edge. The layer walk drops that Hold branch, on
   combo outputs too.
 - **Overlap.** Other equal or reversed thresholds warn without naming an
-  impossible action. Hold modes, input delivery and scan order decide that.
+  impossible action. Hold styles, input delivery and scan order decide that.
 - **Comfort.** Windows and gaps under 50 ms are notices. This is a heuristic,
   never a validity rule, and no value is rewritten. Combo waits are not
   subtracted from repeat windows: the keyboard times repeats from presses.

@@ -715,7 +715,7 @@ class ProfileDeviceService {
         let result;
         await this.runOperation(PHASE.LIVE_SAVE, async () => {
             result = await this.liveCoordinator().save(identity, status => {
-                this.portableProgress = status.storagePaused || status.peerStoragePaused ? "Waiting for a quiet keyboard to write flash"
+                this.portableProgress = status.storagePaused || status.slaveStoragePaused ? "Waiting for a quiet keyboard to write flash"
                     : status.waitingSafe ? "Release held keys to finish saving" : "Saving on both halves";
                 this.emitChange();
             });
@@ -746,7 +746,7 @@ class ProfileDeviceService {
         let result;
         await this.runOperation(PHASE.LIVE_SAVE, async () => {
             result = await this.liveCoordinator().flush(status => {
-                this.portableProgress = status.storagePaused || status.peerStoragePaused ? "Waiting for a quiet keyboard to write flash"
+                this.portableProgress = status.storagePaused || status.slaveStoragePaused ? "Waiting for a quiet keyboard to write flash"
                     : status.autoSave.inProgress ? "The keyboard is saving its edits" : "Saving what the keyboard has not saved yet";
                 this.emitChange();
             }, async status => {
@@ -786,7 +786,7 @@ class ProfileDeviceService {
     // with whether the slave half acknowledged, and so restarts too.
     async restartKeyboard() {
         if (!this.connection?.connected) this.refuse("Connect the keyboard before restarting it.");
-        /** @type {{peerAcknowledged: boolean} | undefined} */
+        /** @type {{slaveAcknowledged: boolean} | undefined} */
         let result;
         await this.runOperation(PHASE.RESTART, async () => {
             this.expectReconnect(true, "to restart");

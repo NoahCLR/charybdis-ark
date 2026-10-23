@@ -13,7 +13,7 @@ import {behaviourChangesNothing} from "./behavior-editor.mjs";
  * @typedef {import("../../contracts/edits.js").BaseIdentity} BaseIdentity
  * @typedef {import("../../contracts/edits.js").Scalar} Scalar
  * @typedef {import("../../contracts/edits.js").Tier} Tier
- * @typedef {import("../../contracts/edits.js").BranchHelper} BranchHelper
+ * @typedef {import("../../contracts/edits.js").BranchStyle} BranchStyle
  * @typedef {import("../../contracts/edits.js").Behavior} Behavior
  * @typedef {import("../../contracts/edits.js").BehaviorStep} BehaviorStep
  * @typedef {import("../../contracts/edits.js").BehaviorBranch} BehaviorBranch
@@ -61,15 +61,15 @@ export const deleteBehaviour = (keycode, identity) => ({type: "deleteBehavior", 
 export const retargetBehaviour = (keycode, target, identity, conflict) =>
     ({type: "retargetBehavior", keycode, target, expectedBase: identity ?? undefined, ...(conflict ? {conflict} : {})});
 
-// One cell of the grid as the editor holds it. A tap tier has no helper; the
+// One cell of the grid as the editor holds it. A tap tier has no hold style; the
 // repeat rate only means something for "repeat while held", where it must be
 // 1–100 Hz, so an empty field posts the default rather than 0.
-/** @param {Tier} kind @param {{action?: Scalar, helper?: BranchHelper, repeatHz?: Scalar}} fields @returns {BehaviorBranch | null} */
-export function cellBranch(kind, {action, helper, repeatHz}) {
+/** @param {Tier} kind @param {{action?: Scalar, style?: BranchStyle, repeatHz?: Scalar}} fields @returns {BehaviorBranch | null} */
+export function cellBranch(kind, {action, style, repeatHz}) {
     const sends = String(action ?? "").trim();
     if (!sends) return null;
-    if (kind === "tap") return {helper: "TAP_SENDS", action: sends};
-    return {helper, action: sends, repeatHz: helper === "REPEAT_WHILE_HELD" ? String(repeatHz ?? "").trim() || DEFAULT_REPEAT_HZ : "0"};
+    if (kind === "tap") return {style: "TAP_SENDS", action: sends};
+    return {style, action: sends, repeatHz: style === "REPEAT_WHILE_HELD" ? String(repeatHz ?? "").trim() || DEFAULT_REPEAT_HZ : "0"};
 }
 
 // What one edit in the cell editor does. A cell that sends nothing has nothing
@@ -77,11 +77,11 @@ export function cellBranch(kind, {action, helper, repeatHz}) {
 // by the editor rather than posted; the choice then goes out with the first
 // action. A cell that already holds a branch posts every edit, and emptying it
 // removes the tier.
-/** @param {Tier} kind @param {{stored?: boolean, action?: Scalar, helper?: BranchHelper, repeatHz?: Scalar}} fields */
-export function cellEdit(kind, {stored, action, helper, repeatHz}) {
-    const branch = cellBranch(kind, {action, helper, repeatHz});
+/** @param {Tier} kind @param {{stored?: boolean, action?: Scalar, style?: BranchStyle, repeatHz?: Scalar}} fields */
+export function cellEdit(kind, {stored, action, style, repeatHz}) {
+    const branch = cellBranch(kind, {action, style, repeatHz});
     if (branch || stored) return {branch};
-    return {pending: kind === "tap" ? null : {helper, repeatHz}};
+    return {pending: kind === "tap" ? null : {style, repeatHz}};
 }
 
 // One behaviour row, posted whole: the form is the row. `terms` are the
@@ -89,9 +89,9 @@ export function cellEdit(kind, {stored, action, helper, repeatHz}) {
 // `change` replaces one cell, and every other cell is carried as read. A row
 // that would change nothing is not kept: a key without a row gets none, and a
 // stored row is removed rather than saved, so Undo and Review show the removal.
-/** @param {Behavior} behaviour @param {{terms?: Partial<Record<'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm', Scalar>>, anchored?: boolean, enabled?: boolean, allowedLayers?: number, change?: {tapCount: number, kind: Tier, branch: BehaviorBranch | null}}} [fields] @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'saveBehavior'> | import("../../contracts/edits.js").EditOf<'deleteBehavior'> | null} */
+/** @param {Behavior} behaviour @param {{terms?: Partial<Record<'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm', Scalar>>, anchored?: boolean, enabled?: boolean, allowedLayers?: number, change?: {tapCount: number, kind: Tier, branch: BehaviorBranch | null}}} [fields] @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'saveBehavior'> | import("../../contracts/edits.js").EditOf<'deleteBehavior'> | null} */
 export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowedLayers, change} = {}, identity) {
-    /** @param {'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'} name */
+    /** @param {'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm'} name */
     const term = (name) => terms[name] === undefined ? String(behaviour[name] ?? "0") : String(terms[name]).trim() || "0";
     const sourceSteps = new Map((behaviour.steps || []).map((step) => [step.tapCount, step]));
     if (change && !sourceSteps.has(change.tapCount)) sourceSteps.set(change.tapCount, {tapCount: change.tapCount});
@@ -102,15 +102,15 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowed
             const branch = change && change.tapCount === step.tapCount && change.kind === kind ? change.branch : step[field];
             if (!branch) continue;
             next[field] = kind === "tap"
-                ? {helper: "TAP_SENDS", action: branch.action}
-                : {helper: branch.helper, action: branch.action, repeatHz: branch.repeatHz || "0"};
+                ? {style: "TAP_SENDS", action: branch.action}
+                : {style: branch.style, action: branch.action, repeatHz: branch.repeatHz || "0"};
         }
         return next;
     }).filter((step) => step.tap || step.hold || step.longHold);
     const behavior = {
         keycode: behaviour.keycode,
         tapHoldTerm: term("tapHoldTerm"),
-        longerHoldTerm: term("longerHoldTerm"),
+        longHoldTerm: term("longHoldTerm"),
         multiTapTerm: term("multiTapTerm"),
         keepsAutoMouseAnchored: anchored ?? behaviour.keepsAutoMouseAnchored,
         enabled: enabled ?? behaviour.enabled ?? true,

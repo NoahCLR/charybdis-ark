@@ -8,7 +8,7 @@ const {VOCABULARY, branchName} = require("./vocabulary");
 const {keyLabel, shortcutLabel} = require("./key-names");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {builtInActions} = require("./built-in-behavior");
 const {changesNothing} = require("./inert-behaviors");
 const {
@@ -57,8 +57,8 @@ function builtInForView(target, features, names) {
     const {tap, hold, fallback, releaseTaps, fromPress} = builtInActions(target, features);
     return {
         ...(releaseTaps ? {releaseTaps: true} : {}),
-        ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names, features)}} : {}),
-        ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names, features),
+        ...(tap ? {tap: {style: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names, features)}} : {}),
+        ...(hold ? {hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names, features),
             ...(fallback ? {fallback: true} : {}), ...(fromPress ? {fromPress: true} : {})}} : {}),
     };
 }
@@ -67,7 +67,7 @@ function builtInForView(target, features, names) {
 function behaviorRowsForView(domain, features = {}, names) {
     /** @param {import("../schema/types.js").HoldBranch | undefined} branch */
     const hold = (branch) => branch && ({
-        helper: enumName(KEY_BEHAVIOR_HOLD_MODES, branch.mode),
+        style: enumName(KEY_BEHAVIOR_HOLD_STYLES, branch.style),
         action: actionName(branch.action),
         repeatHz: String(branch.repeatHz),
         ...actionDisplay(branch.action, names),
@@ -76,7 +76,7 @@ function behaviorRowsForView(domain, features = {}, names) {
         keycode: actionName(row.target),
         builtIn: builtInForView(row.target, features, names),
         tapHoldTerm: String(row.tapHoldTerm),
-        longerHoldTerm: String(row.longerHoldTerm),
+        longHoldTerm: String(row.longHoldTerm),
         multiTapTerm: String(row.multiTapTerm),
         keepsAutoMouseAnchored: row.keepsAutoMouseAnchored,
         enabled: row.enabled,
@@ -85,7 +85,7 @@ function behaviorRowsForView(domain, features = {}, names) {
         steps: row.steps.map((step) => ({
             tapCount: step.tapIndex,
             tapCountName: branchName(step.tapIndex + 1),
-            ...(step.tap ? {tap: {helper: "TAP_SENDS", action: actionName(step.tap), ...actionDisplay(step.tap, names)}} : {}),
+            ...(step.tap ? {tap: {style: "TAP_SENDS", action: actionName(step.tap), ...actionDisplay(step.tap, names)}} : {}),
             ...(step.hold ? {hold: hold(step.hold)} : {}),
             ...(step.longHold ? {longHold: hold(step.longHold)} : {}),
         })),

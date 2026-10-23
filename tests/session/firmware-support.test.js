@@ -128,12 +128,12 @@ test("read diagnostic reasons and their order stay stable", () => {
     ]);
 });
 
-test("live mutation readiness keeps its additional transfer and peer diagnostic gate", () => {
+test("live mutation readiness keeps its additional transfer and slave-half diagnostic gate", () => {
     const compatible = {compatible: true, reasons: []};
-    const status = {peerKnown: true, peerConverged: true, candidatePending: true};
+    const status = {slaveKnown: true, slaveConverged: true, candidatePending: true};
     const caps = {...complete, featureFlags: support.REQUIRED_LIVE_MUTATION_FEATURES, candidateChunkMax: 20};
     assert.deepEqual(support.evaluateLiveMutationCompatibility(caps, compatible, true, status), {
-        available: true, reasons: [], requiredFeatureMask: support.REQUIRED_LIVE_MUTATION_FEATURES, peerReady: true, recoveryPending: true,
+        available: true, reasons: [], requiredFeatureMask: support.REQUIRED_LIVE_MUTATION_FEATURES, slaveReady: true, recoveryPending: true,
     });
     for (const feature of [FEATURES.SPLIT_KEYBOARD, FEATURES.SAVES]) {
         assert.equal(support.evaluateLiveMutationCompatibility({...caps, featureFlags: caps.featureFlags & ~feature}, compatible, true, status).available, false);
@@ -144,9 +144,9 @@ test("live mutation readiness keeps its additional transfer and peer diagnostic 
         "Firmware does not advertise a candidate upload chunk size.",
     ]);
     assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true).reasons.at(-1), "Live profile status has not been read yet.");
-    assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true, {...status, peerKnown: false}).reasons.at(-1),
+    assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true, {...status, slaveKnown: false}).reasons.at(-1),
         "The slave half has not been detected over the cable between the halves.");
-    assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true, {...status, peerConverged: false}).reasons.at(-1),
+    assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true, {...status, slaveConverged: false}).reasons.at(-1),
         "The two keyboard halves have not established a converged profile state yet.");
 });
 

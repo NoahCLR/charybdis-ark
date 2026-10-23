@@ -43,8 +43,8 @@ const run = (shell, title, work) => shell.progress ? shell.progress(title, work)
 // The slave half confirmed its copy before the keyboard switched, but the
 // cable between the halves may have come out since; say so instead of
 // claiming a readback of both halves that did not happen.
-/** @param {{peerUnseen?: boolean} | undefined} result @param {string} verb */
-const savedNotice = (result, verb) => result?.peerUnseen
+/** @param {{slaveUnseen?: boolean} | undefined} result @param {string} verb */
+const savedNotice = (result, verb) => result?.slaveUnseen
     ? `Complete profile ${verb} both halves and active. The slave half confirmed its copy but is not connected now; plug the cable between the halves back in.`
     : `Complete profile ${verb} both halves and verified.`;
 // The profile is saved whatever the read after it does, so a failed read is

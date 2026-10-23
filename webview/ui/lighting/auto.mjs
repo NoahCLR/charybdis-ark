@@ -79,7 +79,7 @@ export function stageAuto(model) {
         ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
         { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
-    policy.append(stack(select, el(`<p class="note">Where the fade lands once the auto-mouse layer drops out. The board shows the destination, not the animation.</p>`)));
+    policy.append(stack(select, el(`<p class="note">Where the fade lands once auto-mouse turns the pointer layer off. The board shows the destination, not the animation.</p>`)));
     const endColour = section("End colour");
     const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
     endColour.append(unused
@@ -87,7 +87,7 @@ export function stageAuto(model) {
             <div><div class="colour-title">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
         : colourControl(model, {colour: fade.end_color, canEdit: editFade, title: "Fade destination", ...offWording("auto"),
             onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
-    if (unused) endColour.append(el(`<p class="note">Follow-the-real-destination lands on whatever the board would show once the auto-mouse layer drops out, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
+    if (unused) endColour.append(el(`<p class="note">Follow-the-real-destination lands on whatever the board would show once auto-mouse turns the pointer layer off, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
     node.append(policy, endColour, fadeTiming(model, idle));
     return node;
 }

@@ -48,7 +48,7 @@ const CURRENT_DOMAINS = "16:4,32:2,48:3,64:8,80:3,96:1,112:1";
 // still answer from the document. `settingsVersion` is the version its
 // settings readback reports: any but 8 is firmware Ark does not read.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */
@@ -77,7 +77,7 @@ function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = f
     // nothing pending.
     const status = [page(25, (p) => {
         p.set([1, 2]);
-        p.writeUInt16LE((compiledOnly ? PROFILE_STATE_FLAGS.ACTIVE_IS_COMPILED_DEFAULT : PROFILE_STATE_FLAGS.COMMITTED_VALID) | (peerKnown ? PROFILE_STATE_FLAGS.PEER_KNOWN | PROFILE_STATE_FLAGS.PEER_CONVERGED : 0), 2);
+        p.writeUInt16LE((compiledOnly ? PROFILE_STATE_FLAGS.ACTIVE_IS_COMPILED_DEFAULT : PROFILE_STATE_FLAGS.COMMITTED_VALID) | (slaveKnown ? PROFILE_STATE_FLAGS.PEER_KNOWN | PROFILE_STATE_FLAGS.PEER_CONVERGED : 0), 2);
         for (const offset of [4, 8]) p.writeUInt32LE(fnv1a32(defaults), offset);
         p.writeUInt32LE(compiledOnly ? fnv1a32(defaults) : digest, 12);
         if (!compiledOnly) p.writeUInt32LE(digest, 20);

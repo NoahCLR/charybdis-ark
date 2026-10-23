@@ -8,19 +8,20 @@
 // Where to get the firmware, as the README says.
 export const FIRMWARE_RELEASES = "https://github.com/NoahCLR/charybdis-4x6/releases/latest";
 
-// The master half is always the right one, with the USB cable and the
-// trackball; the firmware builds force it. Each half's state in words.
-/** @param {Model | null | undefined} model @returns {{side: string, role: string, ok: boolean, words: string}[]} */
+// Each half by its role: the master half is always the right one, with the
+// USB cable and the trackball (the firmware builds force it), and the slave
+// half the left. The side follows as detail. Each half's state in words.
+/** @param {Model | null | undefined} model @returns {{half: string, side: string, ok: boolean, words: string}[]} */
 export function halvesRows(model) {
     const halves = model?.device?.health?.halves;
     const connected = Boolean(model?.device?.connected);
-    const left = halves === "agree" ? {ok: true, words: "connected, same saved settings"}
+    const slave = halves === "agree" ? {ok: true, words: "connected, same saved settings"}
         : halves === "alone" ? {ok: false, words: "not answering: check the cable between the halves"}
         : halves === "apart" ? {ok: false, words: "connected, but holding different saved settings"}
         : {ok: false, words: "not read yet"};
     return [
-        {side: "Right half (USB, trackball)", role: "master", ok: connected, words: connected ? "connected over USB" : "not connected"},
-        {side: "Left half", role: "slave", ...(connected ? left : {ok: false, words: "not connected"})},
+        {half: "Master half", side: "right, USB and trackball", ok: connected, words: connected ? "connected over USB" : "not connected"},
+        {half: "Slave half", side: "left", ...(connected ? slave : {ok: false, words: "not connected"})},
     ];
 }
 
@@ -32,6 +33,20 @@ export const SAVE_IN_PROGRESS = Object.freeze({
     detail: "A save is in progress on the keyboard: it keeps its previous profile until both halves confirm the new one.",
 });
 
+// A keyboard whose slave half never confirmed a cancelled save
+// (`health.restartNeeded`), in the words the rail and the Keyboard screen
+// both use. Ark's Restart is only for a stopped keyboard (D-L67), so the way
+// out is to unplug the master half's USB cable.
+export const RESTART_NEEDED = Object.freeze({
+    label: "Restart the keyboard",
+    detail: "The slave half did not confirm a cancelled save, so the keyboard refuses new saves until it restarts. Nothing was lost.",
+    steps: Object.freeze([
+        "Unplug the USB cable from the master half (not the cable between the halves).",
+        "Wait a few seconds, then plug it back in.",
+        "Read the keyboard again.",
+    ]),
+});
+
 // The rail's line about the keyboard itself, under the draft's: a restart it
 // needs, or a save it is finishing. Null when there is neither, and in the
 // demo.
@@ -39,8 +54,7 @@ export const SAVE_IN_PROGRESS = Object.freeze({
 export function keyboardStatusLine(model) {
     const health = model?.device?.health;
     if (model?.demo?.active || !health) return null;
-    if (health.restartNeeded) return {tone: "err", text: "Restart the keyboard",
-        tip: "The slave half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost."};
+    if (health.restartNeeded) return {tone: "err", text: RESTART_NEEDED.label, tip: [RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" ")};
     if (health.recoveryPending) return {tone: "draft", text: SAVE_IN_PROGRESS.label, tip: SAVE_IN_PROGRESS.detail};
     return null;
 }

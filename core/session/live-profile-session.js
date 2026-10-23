@@ -37,9 +37,9 @@ function liveKeyboardStatus(status, saveMark = -1) {
         savedByKeyboard: !status.unsaved && status.autoSave.lastWasAutomatic && status.autoSave.count > 0
             && status.autoSave.revision === status.revision && status.autoSave.generation === status.savedGeneration,
         saveFailed: failed, saveError: failed ? status.save.lastError : 0, lastSaveTransaction: status.save.lastTransactionId,
-        storagePaused: status.storagePaused, peerStoragePaused: status.peerStoragePaused,
-        adjustmentPending: status.adjustmentPending, peerRefused: status.peerRefused, modeNotStored: status.modeNotStored,
-        stopped: status.stopped, peerStopped: status.peerStopped, quietMs: status.autoSave.quietMs};
+        storagePaused: status.storagePaused, slaveStoragePaused: status.slaveStoragePaused,
+        adjustmentPending: status.adjustmentPending, slaveRefused: status.slaveRefused, modeNotStored: status.modeNotStored,
+        stopped: status.stopped, slaveStopped: status.slaveStopped, quietMs: status.autoSave.quietMs};
 }
 
 /** @param {import("./types.js").DeviceCapabilities} capabilities @param {Buffer} stored @param {Buffer} defaults */
@@ -62,7 +62,7 @@ async function snapshotLive(connection, ids, capabilities, {payloadReader = new 
     const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the keyboard's working copy");
     const status = await readProfileStatus(connection, options);
-    if (!status.peerKnown) throw fail("KEYBOARD_NOT_READY", "The slave half is not connected. Connect the cable between the halves and read again.");
+    if (!status.slaveKnown) throw fail("KEYBOARD_NOT_READY", "The slave half is not connected. Connect the cable between the halves and read again.");
     let before = await readEditProgress(connection, options);
     for (let polls = 0; before.phase !== EDIT_PHASE.IDLE; polls++, before = await readEditProgress(connection, options)) {
         if (polls >= SETTLE_POLLS) throw fail("LIVE_EDIT_PENDING", "The keyboard is still taking an edit. Release held keys and locked layers, then read the keyboard again.");
@@ -100,7 +100,7 @@ async function snapshotLive(connection, ids, capabilities, {payloadReader = new 
     return {...current, status: finalStatus, saved: stored, runtime, combosReadback: combos,
         live: {mode: mode.mode, modeConflict: mode.conflict, session: after.session, revision: after.revision,
             savedGeneration: after.savedGeneration, savedOrigin: after.savedOrigin, unsaved: after.unsaved,
-            converged: !after.peerRequired || after.peerConverged, apart: after.peerRefused, working: working.bytes, saved, defaults: defaults.bytes,
+            converged: !after.slaveRequired || after.slaveConverged, slaveRefused: after.slaveRefused, working: working.bytes, saved, defaults: defaults.bytes,
             keyboard: liveKeyboardStatus(after), saveMark: -1}};
 }
 

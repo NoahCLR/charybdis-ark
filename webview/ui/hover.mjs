@@ -8,13 +8,13 @@ import {actionNaming, behaviourFor, canonicalKeycode, dualRole, keyMeaning, keyN
 import {comboBehaviours, comboInputIsKey, combosAt, combosShownAt} from "../view/combo-reach.mjs";
 import {customKeyHeadline, customKeyOf, customKeyShortcutOnly} from "../view/custom-key.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
-import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds, helperDetail} from "../view/behavior-editor.mjs";
+import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds, styleDetail} from "../view/behavior-editor.mjs";
 import {behaviourRuns} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
 import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, macroSteps, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
-import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
+import {styleWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {KIND} from "../view/pointing-config.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
 
@@ -268,16 +268,16 @@ const named = (model, action) => {
 };
 /** @param {string} text */
 const under = (text) => text ? `<span class="hc-life hc-under">${esc(text)}</span>` : "";
-/** @param {import("../../contracts/edits.js").Tier} kind @param {string | undefined} helper */
-const helperText = (kind, helper) => helperWord(getModel(), kind, helper ?? "");
+/** @param {import("../../contracts/edits.js").Tier} kind @param {string | undefined} style */
+const styleText = (kind, style) => styleWord(getModel(), kind, style ?? "");
 // How a hold tier runs, with the threshold it waits for or the rate it repeats at.
 /** @param {import("../../contracts/edits.js").Tier} kind @param {import("../../contracts/panel.js").Branch} branch @param {ReturnType<typeof behaviourThresholds>} terms */
 const helperAt = (kind, branch, terms) => {
-    const detail = helperDetail(kind, branch, terms);
-    return detail ? `${helperText(kind, branch.helper)} (${detail})` : helperText(kind, branch.helper);
+    const detail = styleDetail(kind, branch, terms);
+    return detail ? `${styleText(kind, branch.style)} (${detail})` : styleText(kind, branch.style);
 };
 // The Behaviours editor's own words for each threshold.
-const TERM_WORDS = {tapHoldTerm: "tap / hold", longerHoldTerm: "long hold", multiTapTerm: "multi tap window"};
+const TERM_WORDS = {tapHoldTerm: "tap / hold", longHoldTerm: "long hold", multiTapTerm: "multi tap window"};
 // A threshold as the keyboard runs it: its own time or the keyboard's default.
 /** @param {{ms: string}} term */
 const threshold = (term) => term.ms === "" ? "keyboard default" : `${term.ms} ms`;

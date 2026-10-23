@@ -34,7 +34,7 @@ the bridge, with no VIA code or hardware.
 
 The live-edit runner owns its C probe here and links the selected firmware's
 production edit channel and working copy; the probe is the owner between them
-(one half; Save, the edit mode and the other half's facts are fields the corpus
+(one half; Save, the edit mode and the slave half's facts are fields the corpus
 sets). Ark's coordinator sends real edits and the C working copy must equal
 Ark's splicing byte for byte; refusals and every reply layout and status flag
 pass through Ark's decoders, in normal and sanitizer builds.

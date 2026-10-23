@@ -60,7 +60,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     assert.equal(model.configDefaults.length, 14, "Combos, behaviours, the read-only macro host setup and All lighting each have a section");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
-    assert.equal(fields.find(field => field.macro === "mouseLayer").value, "Layer 4");
+    assert.equal(fields.find(field => field.macro === "pointerLayer").value, "Layer 4");
     assert.equal(fields.find(field => field.macro === "brightness").value, "200");
     assert.equal(model.behaviorTimingDefaults.tapHoldTerm, "150");
     assert.equal(model.settingsEditing.writable, true);
@@ -119,7 +119,7 @@ test("range hints and numeric bounds follow the stored field rules", () => {
 test("every unchanged section is a byte-exact round trip and edits preserve unrelated domains and banks", () => {
     const current = snapshot();
     for (const section of settingsEditorView(current).sections) assert.deepEqual(editSettings(current, message(current, section.id)), current.document);
-    const next = editSettings(current, message(current, "autoMouse", {mouseTimeout: "900", mouseLayer: "Layer 7", autoMouse: false}));
+    const next = editSettings(current, message(current, "autoMouse", {mouseTimeout: "900", pointerLayer: "Layer 7", autoMouse: false}));
     const before = validateSnapshot(current.document), after = validateSnapshot(next);
     assert.deepEqual({...next, profile: current.document.profile}, current.document);
     assert.deepEqual(after.rgb, before.rgb); assert.deepEqual(after.behaviors, before.behaviors); assert.deepEqual(after.combos, before.combos);
@@ -172,7 +172,7 @@ test("invalid settings, incomplete sections and stale drafts fail before any dev
     assert.throws(() => edit("autoMouse", {mouseTimeout: "0"}), /Timeout.*range/, "the fade needs a timeout to be a share of");
     assert.throws(() => edit("automouseFade", {mouseFadeHold: "100"}), /range/, "a share is shorter than the whole");
     assert.throws(() => edit("autoMouse", {mouseDebounce: "256"}), /debounce.*range/);
-    assert.throws(() => edit("autoMouse", {mouseLayer: "Layer 16"}), /layer/);
+    assert.throws(() => edit("autoMouse", {pointerLayer: "Layer 16"}), /layer/);
     assert.throws(() => edit("comboSettings", {combosEnabled: "false"}), /enabled or disabled/);
     for (const value of ["", "1.5", "Infinity", "-1", "65536", " 150 "]) assert.throws(() => edit("keyTiming", {tapHoldTerm: value}));
     assert.throws(() => edit("normalPointerSpeed", {normalDpi: "500"}), /range/);
@@ -332,7 +332,7 @@ test("settings presentation owns combo timing words and explicit duration units"
         [["default", "Default combo window"], ["hold", "Combo hold threshold"]]);
     assert.ok(combos.comboTiming.every(field => field.hint));
     const fields = view.sections.flatMap(section => section.fields);
-    for (const macro of ["tappingTerm", "tapHoldTerm", "longerHoldTerm", "multiTapTerm", "mouseTimeout", "mouseDebounce", "mouseDelay", "lightingTimeout", "feedbackFlash"]) {
+    for (const macro of ["tappingTerm", "tapHoldTerm", "longHoldTerm", "multiTapTerm", "mouseTimeout", "mouseDebounce", "mouseDelay", "lightingTimeout", "feedbackFlash"]) {
         assert.equal(fields.find(field => field.macro === macro).unit, "ms", macro);
     }
     for (const macro of ["normalDpi", "snipingDpi", "mouseThreshold", "hue", "brightness", "hostOs"]) {

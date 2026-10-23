@@ -20,7 +20,7 @@ export interface DraftDeviceContext {
 }
 export interface DraftApplyService {
     snapshot(): DraftDeviceContext;
-    restorePortableProfile(document: import('../model/types.js').PortableDocument, options: {expectedFingerprint?: string; saveRecovery: SaveRecovery}): Promise<import('../model/types.js').CompleteSnapshot & {peerUnseen?: boolean}>;
+    restorePortableProfile(document: import('../model/types.js').PortableDocument, options: {expectedFingerprint?: string; saveRecovery: SaveRecovery}): Promise<import('../model/types.js').CompleteSnapshot & {slaveUnseen?: boolean}>;
 }
 export type DraftEdit = Extract<import('../../contracts/edits.js').PanelEdit, {type: import('../../contracts/edits.js').DraftEditType}> & {draftRevision: number; expectedBase?: Partial<import('../../contracts/edits.js').BaseIdentity>};
 
@@ -75,7 +75,7 @@ export interface DeviceModelInput {
 }
 
 export type CandidateStatus = Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus>>;
-export type CandidatePeer = NonNullable<Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidatePeerStatus>>>;
+export type CandidateSlave = NonNullable<Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidateSlaveStatus>>>;
 export interface CandidateProgress {
     adjustmentPending?: boolean;
     phase: string;
@@ -89,7 +89,7 @@ export interface CandidateProgress {
     chunkIndex: number;
     chunkCount: number;
     status: CandidateStatus | null;
-    peer: CandidatePeer | null;
+    slave: CandidateSlave | null;
 }
 export type CandidateBaseSource = import('../protocol/types.js').ReuseSource & {bytes: Buffer};
 export interface PreparedCandidate {transactionId: number; metadata: import('../protocol/types.js').CandidateMetadata; status: CandidateStatus; progress: CandidateProgress}
@@ -103,7 +103,7 @@ export interface CandidateDriverOptions {
     chunkSize?: number;
     requestIds?: import('../protocol/types.js').RequestIds;
     sleep?: (ms: number) => Promise<void>;
-    readPeerStatus?: typeof import('../protocol/profile-candidate-v1.js').readCandidatePeerStatus | null;
+    readSlaveStatus?: typeof import('../protocol/profile-candidate-v1.js').readCandidateSlaveStatus | null;
     onProgress?: (progress: CandidateProgress) => void;
 }
 export interface SnapshotIdentity {profile: string; settingsCrc: number; settingsDigest: number}
@@ -181,7 +181,7 @@ export interface PanelSession extends DemoSession {
     /** What the keyboard held before the last successful Apply, for "Put back what it had". */
     beforeApply?: {document: import('../model/types.js').PortableDocument; deviceId: string | null | undefined; savedAt: string};
     /** A restart Ark asked for (keyboard-restart.js): the unsaved edits it keeps to send back once the keyboard is read again, and their recovery copy. */
-    restart?: {deviceId: string | null | undefined; serialNumber: string; kept?: import('../model/types.js').PortableDocument; recovery?: string; peerAcknowledged: boolean};
+    restart?: {deviceId: string | null | undefined; serialNumber: string; kept?: import('../model/types.js').PortableDocument; recovery?: string; slaveAcknowledged: boolean};
     service: DemoSession['service'] & {portable?: import('../model/types.js').ProfileSnapshot | null};
 }
 /** Model publication reads portable data without invoking device operations. */
@@ -206,8 +206,8 @@ export interface LiveState {
     unsaved: boolean;
     /** Both halves hold this session and revision. */
     converged: boolean;
-    /** The other half refused this working copy: the halves run different profiles until a Revert. */
-    apart?: boolean;
+    /** The slave half refused this working copy: the halves run different profiles until a Revert. */
+    slaveRefused?: boolean;
     working: Buffer;
     saved: Buffer;
     defaults: Buffer;
@@ -228,14 +228,14 @@ export interface LiveKeyboardStatus {
     saveError: number;
     lastSaveTransaction: number;
     storagePaused: boolean;
-    peerStoragePaused: boolean;
-    /** The other half refused this working copy: the halves differ until Revert or an Apply; Save is refused. */
-    peerRefused: boolean;
+    slaveStoragePaused: boolean;
+    /** The slave half refused this working copy: the halves differ until Revert or an Apply; Save is refused. */
+    slaveRefused: boolean;
     /** Storing the edit mode failed; the keyboard keeps trying. */
     modeNotStored: boolean;
     /** The master half's profile storage stopped, or the slave half says its did: only a restart clears it (firmware D-F34). */
     stopped: boolean;
-    peerStopped: boolean;
+    slaveStopped: boolean;
     quietMs: number;
 }
 /** A Live + review read: the working copy as the snapshot, the saved profile beside it. */
@@ -269,9 +269,9 @@ export interface ControlService extends DraftApplyService {
     readPortableProfile(options?: {forRestore?: false; reuseReadback?: boolean}): Promise<CompleteReadSnapshot>;
     readPortableProfile(options: {forRestore: true; reuseReadback?: boolean}): Promise<ReadSnapshot>;
     restorePortableProfile(document: import('../model/types.js').PortableDocument, options: RestoreOptions): Promise<RestoredProfile>;
-    postLiveEdit(edit: {from: Buffer; to: Buffer; defaults: Buffer; identity: {session: number; revision: number}; replaceWhenLarge?: boolean}): Promise<{bytes: Buffer; session: number; revision: number; converged: boolean; apart: boolean; sent: number}>;
+    postLiveEdit(edit: {from: Buffer; to: Buffer; defaults: Buffer; identity: {session: number; revision: number}; replaceWhenLarge?: boolean}): Promise<{bytes: Buffer; session: number; revision: number; converged: boolean; slaveRefused: boolean; sent: number}>;
     saveWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditStatus & {saved: boolean}>;
-    revertWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditProgress & {converged: boolean; apart: boolean}>;
+    revertWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditProgress & {converged: boolean; slaveRefused: boolean}>;
     setEditMode(mode: number): Promise<import('../protocol/types.js').EditModeRead | undefined>;
     /** An operation holds the keyboard. */
     readonly busy?: boolean;
@@ -284,7 +284,7 @@ export interface ControlService extends DraftApplyService {
     /** What the keyboard runs now, read as one revision (GET 0x21). */
     readWorkingCopy(): Promise<{metadata: import('../protocol/types.js').ActiveProfileMetadata; bytes: Buffer}>;
     /** Restart both halves (firmware D-F34); whether the slave half acknowledged. */
-    restartKeyboard(): Promise<{peerAcknowledged: boolean}>;
+    restartKeyboard(): Promise<{slaveAcknowledged: boolean}>;
     /** The keyboard the connection was last lost to unexpectedly, once (keyboard-reconnect.js). */
     takeLost?(): LostKeyboard | undefined;
 }

@@ -163,8 +163,8 @@ function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = fal
         liveSnapshot = {...snapshot, document: working, fingerprint: portable.fingerprint(working), summary: portable.summary(working), saved: snapshot,
             runtime: null, live: {mode, session: 0x5e550001, revision: 1, savedGeneration: 42, savedOrigin: 0, unsaved: true, converged: true, working: bytes, saved, defaults: saved,
                 keyboard: {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, saveError: 0, lastSaveTransaction: 0,
-                    adjustmentPending: false, storagePaused: false, peerStoragePaused: false, peerRefused: false, modeNotStored: false,
-                    stopped, peerStopped: false, quietMs: 3000}}};
+                    adjustmentPending: false, storagePaused: false, slaveStoragePaused: false, slaveRefused: false, modeNotStored: false,
+                    stopped, slaveStopped: false, quietMs: 3000}}};
     }
     const session = new ProfileDraftSession(/** @type {any} */ (liveSnapshot || snapshot), deviceId, capabilities);
     /** @type {import("../core/session/types.js").PanelDeviceState} */
@@ -173,7 +173,7 @@ function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = fal
         connected: true,
         busy: false,
         capabilities,
-        status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, peerGeneration: 42},
+        status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, slaveGeneration: 42},
         devices: [
             {id: deviceId, label: "Charybdis 4x6 · preview", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"},
             ...(process.argv.includes("--multiple") ? [{id: "preview-second", label: "Charybdis 4x6 · second", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"}] : []),
@@ -182,7 +182,7 @@ function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = fal
         // No name of its own: the keyboard reports its built-in one.
         storedKeyboardName: "",
         // How edits reach it, stored on the keyboard: Apply here, Live + review with `live`.
-        editMode: {mode: live ? mode : 0, counter: 1, peerMode: live ? mode : 0, peerCounter: 1, peerKnown: true, conflict: false, agreed: true},
+        editMode: {mode: live ? mode : 0, counter: 1, slaveMode: live ? mode : 0, slaveCounter: 1, slaveKnown: true, conflict: false, agreed: true},
         runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true},
             live: {defaultDpi: 1200, snipingDpi: 400, rgbMode: 1, rgbColor: 0, defaultLayers: 1, keymapOptions: 0}} : null,
     };

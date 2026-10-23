@@ -41,7 +41,7 @@ function layoutWith(keys) {
 test("unstored behaviour defaults share the firmware timing and built-in rules", () => {
     const values = [0x4309, 0x2109, 0x52a1, 0x52c2, 0x5281, 0x5201, 0x04, 0, 1];
     const state = {layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"}}};
+        settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "170"}}};
     const model = buildDeviceModel(state);
     const defaults = model.behaviorEditing.keyDefaults;
     assert.equal(defaults["LT(3,KC_F)"].timing.tapHoldTerm, "210", "LT inherits the dual-role threshold");
@@ -55,7 +55,7 @@ test("unstored behaviour defaults share the firmware timing and built-in rules",
     }
     assert.equal(defaults["TO(1)"].timing.tapHoldTerm, "150", "TO() is no dual-role key");
     assert.equal(defaults["MT(MOD_LCTL,KC_F)"].builtIn.tap.action, "KC_F");
-    assert.deepEqual(defaults.KC_A.timing, {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"});
+    assert.deepEqual(defaults.KC_A.timing, {tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "170"});
     assert.equal(defaults.KC_NO, undefined);
     assert.equal(defaults.KC_TRANSPARENT, undefined);
     assert.deepEqual(model.keyBehaviors, [], "no behaviour is authored by publishing defaults");
@@ -68,13 +68,13 @@ test("every custom key has built-in behaviour defaults, placed or not", () => {
     const model = buildDeviceModel({
         layout: layoutWith([0x7f00, 0x04].map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x6fd70b90},
-        settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"}},
+        settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "170"}},
         customKeyView: {keys},
     });
     const defaults = model.behaviorEditing.keyDefaults;
     assert.deepEqual(defaults.CUSTOM_KEY_0.builtIn, {releaseTaps: true}, "a placed custom key");
     assert.deepEqual(defaults.CUSTOM_KEY_5, defaults.CUSTOM_KEY_0, "an unplaced one has the same defaults");
-    assert.deepEqual(defaults.CUSTOM_KEY_5.timing, {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"});
+    assert.deepEqual(defaults.CUSTOM_KEY_5.timing, {tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "170"});
     assert.ok(!model.keyBehaviors.some(row => row.keycode === "CUSTOM_KEY_5"), "publishing defaults authors no behaviour");
 });
 
@@ -235,7 +235,7 @@ test("the header reports the keyboard, not a profile directory", () => {
     const connected = buildDeviceModel({
         capabilities: {compiledLayerCount: 5},
         device: {manufacturer: "bastardkb", product: "Charybdis 4x6"},
-        status: {committedGeneration: 7, committedDigest: 0xabcd1234, activeGeneration: 7, peerGeneration: 7, peerKnown: true, peerConverged: true},
+        status: {committedGeneration: 7, committedDigest: 0xabcd1234, activeGeneration: 7, slaveGeneration: 7, slaveKnown: true, slaveConverged: true},
     }).device;
     assert.equal(connected.connected, true);
     assert.equal(connected.label, "bastardkb Charybdis 4x6");
@@ -277,24 +277,24 @@ test("the Settings card gets the stored name, and the built-in one only while th
 
 test("half divergence is stated plainly rather than shown as healthy", () => {
     const converged = buildDeviceModel({
-        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, peerKnown: true, peerConverged: true},
+        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, slaveGeneration: 4, committedDigest: 1, slaveKnown: true, slaveConverged: true},
     }).device;
     assert.match(converged.summary, /both halves connected/);
     assert.equal(converged.health.halves, "agree");
 
     const diverged = buildDeviceModel({
-        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 3, committedDigest: 1, peerKnown: true, peerConverged: false},
+        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, slaveGeneration: 3, committedDigest: 1, slaveKnown: true, slaveConverged: false},
     }).device;
     assert.match(diverged.summary, /halves out of sync/);
     assert.equal(diverged.health.halves, "apart");
 
-    for (const [peer, halves, words] of [
-        [{peerKnown: false, peerConverged: false}, "alone", /slave half not found/],
-        [{peerKnown: true, peerConverged: false}, "apart", /halves out of sync/],
-        [{peerKnown: true, peerConverged: true, conflictCount: 1}, "apart", /halves out of sync/],
+    for (const [slave, halves, words] of [
+        [{slaveKnown: false, slaveConverged: false}, "alone", /slave half not found/],
+        [{slaveKnown: true, slaveConverged: false}, "apart", /halves out of sync/],
+        [{slaveKnown: true, slaveConverged: true, conflictCount: 1}, "apart", /halves out of sync/],
     ]) {
         const absentOrUnready = buildDeviceModel({capabilities: {}, status: {
-            committedGeneration: 0, activeGeneration: 0, peerGeneration: 0, committedDigest: 0, ...peer,
+            committedGeneration: 0, activeGeneration: 0, slaveGeneration: 0, committedDigest: 0, ...slave,
         }}).device;
         assert.equal(absentOrUnready.health.converged, false);
         assert.equal(absentOrUnready.health.halves, halves, "the slave half missing reads apart from halves disagreeing");
@@ -320,7 +320,7 @@ test("the header exposes one health model for connection, convergence and recove
         capabilities: {},
         busy: true,
         phase: "read-profile",
-        status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, candidatePending: true, peerKnown: true, peerConverged: true},
+        status: {committedGeneration: 4, activeGeneration: 4, slaveGeneration: 4, committedDigest: 1, candidatePending: true, slaveKnown: true, slaveConverged: true},
         mutationCompatibility: {recoveryPending: true},
     }).device;
     assert.equal(connected.health.profile, "synced");
@@ -331,13 +331,13 @@ test("the header exposes one health model for connection, convergence and recove
     assert.equal(connected.health.restartNeeded, false);
     const wedged = buildDeviceModel({
         capabilities: {compiledLayerCount: 16},
-        status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, peerKnown: true, peerConverged: true, peerCleanupPending: true},
+        status: {committedGeneration: 4, activeGeneration: 4, slaveGeneration: 4, committedDigest: 1, slaveKnown: true, slaveConverged: true, slaveCleanupPending: true},
     }).device;
-    assert.equal(wedged.health.restartNeeded, true, "the rail asks for a restart while the peer holds a cancelled save");
+    assert.equal(wedged.health.restartNeeded, true, "the rail asks for a restart while the slave half holds a cancelled save");
     assert.equal(wedged.health.earlierFormat, false);
     const earlier = buildDeviceModel({
         capabilities: {compiledLayerCount: 16},
-        status: {committedGeneration: 0, activeGeneration: 0, peerKnown: true, peerConverged: true, storedEarlierFormat: true},
+        status: {committedGeneration: 0, activeGeneration: 0, slaveKnown: true, slaveConverged: true, storedEarlierFormat: true},
     }).device;
     assert.equal(earlier.health.earlierFormat, true, "the keyboard says its saved profile is in an earlier format");
 });
@@ -422,7 +422,7 @@ test("the header reports the generation once the profile is read", () => {
 test("compiled defaults are shown, and labelled as compiled", () => {
     const model = buildDeviceModel({
         capabilities: {},
-        status: {committedGeneration: 0, committedDigest: 0, activeGeneration: 0, peerGeneration: 0},
+        status: {committedGeneration: 0, committedDigest: 0, activeGeneration: 0, slaveGeneration: 0},
         committed: committedRead({source: "compiled", generation: 0, byteLength: 210, domains: decodedDeviceProfile().domains}),
     });
 
@@ -436,7 +436,7 @@ test("compiled defaults are shown, and labelled as compiled", () => {
 test("an uncommitted keyboard does not claim generation 0 as a generation", () => {
     const model = buildDeviceModel({
         capabilities: {},
-        status: {committedGeneration: 0, committedDigest: 0, activeGeneration: 0, peerGeneration: 0},
+        status: {committedGeneration: 0, committedDigest: 0, activeGeneration: 0, slaveGeneration: 0},
     });
     assert.match(model.device.summary, /no committed profile/);
     assert.doesNotMatch(model.device.summary, /generation 0/);
@@ -446,7 +446,7 @@ test("an uncommitted keyboard does not claim generation 0 as a generation", () =
 test("a committed profile is still reported as committed", () => {
     const model = buildDeviceModel({
         capabilities: {},
-        status: {committedGeneration: 7, committedDigest: 0xabcd1234, activeGeneration: 7, peerGeneration: 7},
+        status: {committedGeneration: 7, committedDigest: 0xabcd1234, activeGeneration: 7, slaveGeneration: 7},
         committed: committedRead({source: "committed", generation: 7}),
     });
     assert.match(model.device.summary, /generation 7/);
@@ -456,7 +456,7 @@ test("a committed profile is still reported as committed", () => {
 
 test("a behaviour on a key never renames what the vocabulary already names", () => {
     const committed = decodedDeviceProfile();
-    const row = (target) => ({target, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false, steps: []});
+    const row = (target) => ({target, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false, steps: []});
     committed.domains = {...committed.domains, keyBehaviors: {...committed.domains.keyBehaviors, rows: [
         row({kind: 2, flags: 0, operand: 1}),   // MO(1)
         row({kind: 3, flags: 0, operand: 2}),   // LOCK_LAYER(2)
@@ -550,7 +550,7 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timing.tapHoldTerm, "200");
     assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].builtIn.hold.action, "MO(3)");
     assert.deepEqual(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timingSources,
-        {tapHoldTerm: "tappingTerm", longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"});
+        {tapHoldTerm: "tappingTerm", longHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"});
     // Every dual-role key follows the dual-role term, row or not (firmware
     // D-F27, bit 31); any other key's row the behaviour term.
     const mt = Object.entries(model.behaviorEditing.keyDefaults).find(([name]) => /^(LSFT_T|MT)\(/.test(name))?.[1];

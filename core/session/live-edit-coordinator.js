@@ -4,7 +4,7 @@
 // One live edit, Save, Revert or mode change at a time, in the order the
 // firmware takes them (D-F32, profile-wire-v1/live-edits.md): an edit is
 // begin, its splices, the inserted bytes, commit, then the edit status until
-// the keyboard says how it ended and whether the other half holds it too.
+// the keyboard says how it ended and whether the slave half holds it too.
 // Nothing here decides what to send; the draft does (profile-draft-session.js).
 //
 // What a caller learns, every time: the session and revision the keyboard has
@@ -28,14 +28,14 @@ const {LIVE_RESULT_WORDS} = require("../model/vocabulary");
 const REQUIRED_DOMAINS = Object.freeze([PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]);
 const DEFAULT_TIMING = Object.freeze({
     pollMs: 5,
-    // An edit waits for a safe boundary (held keys) and for the other half;
+    // An edit waits for a safe boundary (held keys) and for the slave half;
     // both are short on a keyboard in use, and a person is watching.
     editMs: 5000,
-    peerMs: 3000,
+    slaveMs: 3000,
     busyMs: 3000,
-    // After the other half refuses an edit, the master half sends it the
+    // After the slave half refuses an edit, the master half sends it the
     // whole working copy once over the split link, which takes far longer
-    // than an edit: a new edit waits this long while the other half answers.
+    // than an edit: a new edit waits this long while the slave half answers.
     catchUpMs: 30000,
     // A save erases and programs flash, pausing for a quiet keyboard before
     // each erase (D-F29); its own wait counts toward nothing on the keyboard.
@@ -66,18 +66,18 @@ function refused(result, what, details = {}) {
     return new LiveEditError(code, `${what}: ${words}`, {result: name, ...details});
 }
 
-// The other half refused the working copy, as an edit and as a whole copy:
+// The slave half refused the working copy, as an edit and as a whole copy:
 // the halves run different profiles until a Revert or an Apply, and Save and
 // new edits are BUSY meanwhile (profile-split-v1.md).
 /** @param {string} what */
 const apart = what => new LiveEditError("LIVE_HALVES_APART",
     `${what}: the slave half refused the keyboard's unsaved edits, so the halves run different profiles. Revert puts both back on the saved profile.`);
 
-// The other half is not heard (edit status flag 3 clear for 3 s): what needs
+// The slave half is not heard (edit status flag 3 clear for 3 s): what needs
 // both halves stays BUSY until it is back, so waiting never ends it
 // (Profile Wire admission, "Edit mode").
 /** @param {string} what */
-const absent = what => new LiveEditError("LIVE_PEER_ABSENT",
+const absent = what => new LiveEditError("LIVE_SLAVE_ABSENT",
     `${what}: the slave half is not connected. Connect the cable between the halves and try again.`);
 
 // 16-bit transaction ids, nonzero, never one the keyboard last finished or is
@@ -117,9 +117,9 @@ class LiveEditCoordinator {
     /** @param {Buffer} request */
     send(request) {return sendEditRequest(this.connection, request, this.options);}
 
-    // A SET the keyboard may answer BUSY while the other half catches up or
+    // A SET the keyboard may answer BUSY while the slave half catches up or
     // something else holds the profile: asked again until it is taken. A
-    // BUSY because the halves are apart, the other half is not connected or a
+    // BUSY because the halves are apart, the slave half is not connected or a
     // half stopped never ends by waiting. A save holds
     // the profile until it lands (in Live the keyboard's own starts 3 s after
     // an edit and takes seconds, more for a large profile), so while the
@@ -155,12 +155,12 @@ class LiveEditCoordinator {
 
     // Sends the change from `from` (the keyboard's working copy, exactly) to
     // `to`, made against `identity`. Resolves with the bytes the keyboard
-    // now runs, its new pair, whether the other half holds them yet and
+    // now runs, its new pair, whether the slave half holds them yet and
     // whether it refused them.
     /** @param {{from: Buffer, to: Buffer, defaults?: Buffer, identity: {session: number, revision: number}, capacity: number, replaceWhenLarge?: boolean}} edit */
     async post({from, to, defaults, identity, capacity, replaceWhenLarge = false}) {
         const diff = diffProfiles(from, to, {defaults, required: REQUIRED_DOMAINS});
-        if (!diff.splices.length) return {bytes: from, ...identity, converged: true, apart: false, sent: 0};
+        if (!diff.splices.length) return {bytes: from, ...identity, converged: true, slaveRefused: false, sent: 0};
         const result = applySplices(from, diff, {versions: PROFILE_DOMAIN_VERSIONS});
         let replacement = false, stream = diff.stream;
         if (!spliceEditFits(from.length, result.length, stream.length, capacity)) {
@@ -223,20 +223,20 @@ class LiveEditCoordinator {
         }
     }
 
-    // Whether the other half holds this session and revision, waiting a
+    // Whether the slave half holds this session and revision, waiting a
     // moment for it, and whether it refused them (the halves are then apart
-    // until a Revert). A keyboard whose other half is not required (one half
+    // until a Revert). A keyboard whose slave half is not required (one half
     // on its own) holds it by definition. Not holding it yet is "catching
     // up": the master half keeps sending, and the next edit waits for it.
-    /** @param {number} session @param {number} revision @returns {Promise<{converged: boolean, apart: boolean}>} */
+    /** @param {number} session @param {number} revision @returns {Promise<{converged: boolean, slaveRefused: boolean}>} */
     async convergence(session, revision) {
-        const until = this.now() + this.timing.peerMs;
+        const until = this.now() + this.timing.slaveMs;
         for (;;) {
             const progress = await this.progress();
-            if (progress.peerRefused) return {converged: false, apart: true};
-            if (progress.session !== session || progress.revision !== revision) return {converged: false, apart: false};
-            if (!progress.peerRequired || progress.peerConverged) return {converged: true, apart: false};
-            if (this.now() > until) return {converged: false, apart: false};
+            if (progress.slaveRefused) return {converged: false, slaveRefused: true};
+            if (progress.session !== session || progress.revision !== revision) return {converged: false, slaveRefused: false};
+            if (!progress.slaveRequired || progress.slaveConverged) return {converged: true, slaveRefused: false};
+            if (this.now() > until) return {converged: false, slaveRefused: false};
             await this.sleep(this.timing.pollMs);
         }
     }
@@ -274,7 +274,7 @@ class LiveEditCoordinator {
         for (;;) {
             const status = await this.status();
             onProgress(status);
-            if (status.peerRefused) throw apart("The keyboard could not save");
+            if (status.slaveRefused) throw apart("The keyboard could not save");
             const running = status.adjustmentPending || status.saving || status.save.phase !== 0 || status.autoSave.inProgress;
             if (!running && !status.unsaved) return {saved: false, ...status};
             if (!running) {
@@ -324,7 +324,7 @@ class LiveEditCoordinator {
     async restart() {
         const reply = await this.send(buildRestartRequest(this.transactionIds.next()));
         if (reply.result !== EDIT_RESULT.OK) throw refused(reply.result, "The keyboard did not restart", {flags: 0});
-        return {peerAcknowledged: Boolean(reply.peerAcknowledged)};
+        return {slaveAcknowledged: Boolean(reply.slaveAcknowledged)};
     }
 
     // The edit mode, stored on both halves; confirmed by reading it back.

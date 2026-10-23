@@ -1,6 +1,6 @@
 import type {RequestConnection} from '../transport/types.js';
 import type {CandidateBlobOptions, CandidateMetadata, CandidateMetadataInput, RequestIds} from '../protocol/types.js';
-import type {CandidateBaseSource, CandidateProgress, CandidateStatus, CandidatePeer, CandidateDriverOptions} from './types.js';
+import type {CandidateBaseSource, CandidateProgress, CandidateStatus, CandidateSlave, CandidateDriverOptions} from './types.js';
 
 export interface CoordinatorOptions extends CandidateDriverOptions {
     pollIntervalMs?: number;
@@ -46,7 +46,7 @@ export interface UploadContext {
     totalBytes: number;
     transactionId?: number;
     expectedDigest?: number;
-    peer?: CandidatePeer;
+    slave?: CandidateSlave;
 }
 export type OperationContext = UploadContext & {transactionId: number; status: CandidateStatus};
 export type CommitContext = OperationContext & {expectedDigest: number};

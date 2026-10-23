@@ -252,7 +252,7 @@ test("a setting is marked with what it governs, as the Settings screen marks it"
     const items=profileReview(before,after);
     const timing=items.find(entry=>entry.unit==="settings:keyTiming").fields;
     assert.deepEqual(timing.filter(field=>field.labelMark).map(field=>field.labelMark),[{kind:"tier",tier:"hold"},{kind:"tier",tier:"long"}]);
-    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Auto-mouse layer");
+    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Pointer layer");
     assert.deepEqual(layer.afterMark,{kind:"layer",layer:3},"a layer value carries the layer's colour");
 });
 test("a settings section is listed under the screen it is edited on", () => {

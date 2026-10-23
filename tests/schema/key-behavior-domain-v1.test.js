@@ -7,7 +7,7 @@ const test = require("node:test");
 
 const {
     KEY_BEHAVIOR_DOMAIN_V1,
-    KEY_BEHAVIOR_HOLD_MODES,
+    KEY_BEHAVIOR_HOLD_STYLES,
     KEY_BEHAVIOR_LIMITS,
     decodeKeyBehaviorDomain,
     decodeKeyBehaviorDomainEnvelope,
@@ -54,7 +54,7 @@ function representative() {
         {
             target: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: 0x1234},
             tapHoldTerm: 150,
-            longerHoldTerm: 400,
+            longHoldTerm: 400,
             multiTapTerm: 175,
             keepsAutoMouseAnchored: true,
             steps: [
@@ -62,14 +62,14 @@ function representative() {
                     tapIndex: 2,
                     tap: {kind: PROFILE_ACTION_KINDS.VIA_MACRO, operand: 10},
                     longHold: {
-                        mode: KEY_BEHAVIOR_HOLD_MODES.TAP_AT_HOLD_THRESHOLD,
+                        style: KEY_BEHAVIOR_HOLD_STYLES.TAP_AT_HOLD_THRESHOLD,
                         action: {kind: PROFILE_ACTION_KINDS.LAYER_LOCK, operand: 3},
                     },
                 },
                 {
                     tapIndex: 0,
                     hold: {
-                        mode: KEY_BEHAVIOR_HOLD_MODES.REPEAT_WHILE_HELD,
+                        style: KEY_BEHAVIOR_HOLD_STYLES.REPEAT_WHILE_HELD,
                         repeatHz: 25,
                         action: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: 0x28},
                     },
@@ -89,7 +89,7 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
             {
                 target: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, flags: 0, operand: 0x1234},
                 tapHoldTerm: 150,
-                longerHoldTerm: 400,
+                longHoldTerm: 400,
                 multiTapTerm: 175,
                 keepsAutoMouseAnchored: true,
                 enabled: true,
@@ -98,7 +98,7 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
                     {
                         tapIndex: 0,
                         hold: {
-                            mode: KEY_BEHAVIOR_HOLD_MODES.REPEAT_WHILE_HELD,
+                            style: KEY_BEHAVIOR_HOLD_STYLES.REPEAT_WHILE_HELD,
                             repeatHz: 25,
                             action: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, flags: 0, operand: 0x28},
                         },
@@ -107,7 +107,7 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
                         tapIndex: 2,
                         tap: {kind: PROFILE_ACTION_KINDS.VIA_MACRO, flags: 0, operand: 10},
                         longHold: {
-                            mode: KEY_BEHAVIOR_HOLD_MODES.TAP_AT_HOLD_THRESHOLD,
+                            style: KEY_BEHAVIOR_HOLD_STYLES.TAP_AT_HOLD_THRESHOLD,
                             repeatHz: 0,
                             action: {kind: PROFILE_ACTION_KINDS.LAYER_LOCK, flags: 0, operand: 3},
                         },
@@ -117,7 +117,7 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
             {
                 target: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, flags: 0, operand: 2},
                 tapHoldTerm: 0,
-                longerHoldTerm: 0,
+                longHoldTerm: 0,
                 multiTapTerm: 0,
                 keepsAutoMouseAnchored: false,
                 enabled: false,
@@ -163,7 +163,7 @@ test("encoder canonicalizes row and step order and rejects duplicate identities"
     assert.throws(() => encodeKeyBehaviorDomain(duplicateStep), (error) => error.code === "DUPLICATE_STEP");
 });
 
-test("encoder enforces actions, authorable hold modes, repeat rates, and capacities", () => {
+test("encoder enforces actions, authorable hold styles, repeat rates, and capacities", () => {
     const noneTarget = representative();
     noneTarget.rows[0].target = {kind: PROFILE_ACTION_KINDS.NONE, operand: 0};
     assert.throws(() => encodeKeyBehaviorDomain(noneTarget), (error) => error.code === "INVALID_TARGET");
@@ -176,16 +176,16 @@ test("encoder enforces actions, authorable hold modes, repeat rates, and capacit
         steps: [{tapIndex: 5, tap: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: 2}}],
     }]}), (error) => error.code === "INVALID_TAP_INDEX");
 
-    for (const [mode, repeatHz, code] of [
+    for (const [style, repeatHz, code] of [
         [0, 0, "INVALID_HOLD_MODE"],
         [5, 0, "INVALID_HOLD_MODE"],
-        [KEY_BEHAVIOR_HOLD_MODES.REPEAT_WHILE_HELD, 0, "INVALID_REPEAT_RATE"],
-        [KEY_BEHAVIOR_HOLD_MODES.REPEAT_WHILE_HELD, 101, "INVALID_REPEAT_RATE"],
-        [KEY_BEHAVIOR_HOLD_MODES.TAP_AT_HOLD_THRESHOLD, 1, "INVALID_REPEAT_RATE"],
+        [KEY_BEHAVIOR_HOLD_STYLES.REPEAT_WHILE_HELD, 0, "INVALID_REPEAT_RATE"],
+        [KEY_BEHAVIOR_HOLD_STYLES.REPEAT_WHILE_HELD, 101, "INVALID_REPEAT_RATE"],
+        [KEY_BEHAVIOR_HOLD_STYLES.TAP_AT_HOLD_THRESHOLD, 1, "INVALID_REPEAT_RATE"],
     ]) {
         assert.throws(() => encodeKeyBehaviorDomain({rows: [{
             target: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: 1},
-            steps: [{tapIndex: 0, hold: {mode, repeatHz, action: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: 2}}}],
+            steps: [{tapIndex: 0, hold: {style, repeatHz, action: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: 2}}}],
         }]}), (error) => error.code === code);
     }
     assert.throws(() => encodeKeyBehaviorDomain({rows: Array.from({length: 129}, (_, operand) => ({
@@ -226,9 +226,9 @@ test("decoder rejects noncanonical ordering, counts, flags, lengths, and truncat
     const duplicateStep = Buffer.from(valid);
     duplicateStep[30] = 0;
     assert.throws(() => decodeKeyBehaviorDomain(duplicateStep), (error) => error.code === "DUPLICATE_STEP");
-    const internalHoldMode = Buffer.from(valid);
-    internalHoldMode[24] = 0;
-    assert.throws(() => decodeKeyBehaviorDomain(internalHoldMode), (error) => error.code === "INVALID_HOLD_MODE");
+    const internalHoldStyle = Buffer.from(valid);
+    internalHoldStyle[24] = 0;
+    assert.throws(() => decodeKeyBehaviorDomain(internalHoldStyle), (error) => error.code === "INVALID_HOLD_MODE");
 
     const firstRowLength = valid.readUInt16LE(4) + KEY_BEHAVIOR_DOMAIN_V1.ROW_LENGTH_SIZE;
     const first = valid.subarray(4, 4 + firstRowLength);

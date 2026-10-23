@@ -61,7 +61,7 @@ test("a backup from older firmware is refused, never upgraded: the keyboard stor
 test("behaviour targets and tap/hold branches follow their layers", () => {
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
-    behaviors.rows = [{target: {kind: 2, operand: 1}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 4}, hold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 1}}}]}];
+    behaviors.rows = [{target: {kind: 2, operand: 1}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 4}, hold: {style: 1, repeatHz: 0, action: {kind: 2, operand: 1}}}]}];
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors); source.profile = encodeProfileBlob(blob).toString("base64");
     const row = validateSnapshot(reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])).behaviors.rows[0];
     assert.equal(row.target.operand, 4); assert.equal(row.steps[0].tap.operand, 1); assert.equal(row.steps[0].hold.action.operand, 4);
@@ -90,7 +90,7 @@ test("with keys not following, layers move but every layer key keeps its number"
     const {decodeComboDomain, encodeComboDomain} = require("../../core/schema/combo-domain-v1");
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
-    behaviors.rows = [{target: {kind: 2, operand: 1}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 4}, hold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 1}}}]}];
+    behaviors.rows = [{target: {kind: 2, operand: 1}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 4}, hold: {style: 1, repeatHz: 0, action: {kind: 2, operand: 1}}}]}];
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors);
     const combos = decodeComboDomain(blob.domains[2].payload);
     combos.rows[0].output = {kind: 1, operand: 0x5284};
@@ -122,7 +122,7 @@ test("a new base trades roles with the old one: keys to either keep their number
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     // TO(0), TO(3), TG(2) and MO(3) on the old base; LOCK_LAYER(0) and TT(3) as behaviour branches; TO(3) on a combo.
     const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
-    behaviors.rows = [{target: {kind: 1, operand: 0x04}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 0}, hold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 3}}}]}];
+    behaviors.rows = [{target: {kind: 1, operand: 0x04}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 0}, hold: {style: 1, repeatHz: 0, action: {kind: 2, operand: 3}}}]}];
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors);
     const combos = decodeComboDomain(blob.domains[2].payload);
     combos.rows[0].output = {kind: 1, operand: 0x5203};

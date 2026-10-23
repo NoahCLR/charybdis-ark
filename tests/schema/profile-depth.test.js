@@ -20,7 +20,7 @@ test("tap depth uses destination limits before offline palette counts and reject
 test("depth eight survives complete-profile read, edit, history, reorder and partial discard; depth five refuses it", () => {
     const source = document(), decoded = validateSnapshot(source), blob = decodeProfileBlob(decoded.profile);
     const caps = {...CURRENT_CAPABILITIES, maxTapStepsPerBehavior: 8, maxPopulatedBehaviorSteps: 1024, maxBehaviorRows: 128};
-    const row = {target: {kind: 1, operand: 4}, tapHoldTerm: decoded.settings.values[1], longerHoldTerm: 0, multiTapTerm: 0,
+    const row = {target: {kind: 1, operand: 4}, tapHoldTerm: decoded.settings.values[1], longHoldTerm: 0, multiTapTerm: 0,
         steps: Array.from({length: 8}, (_, tapIndex) => ({tapIndex, tap: {kind: 1, operand: 5}}))};
     blob.domains[1].payload = encodeKeyBehaviorDomain({rows: [row]}, {limits: {maxTapStepsPerBehavior: 8, maxPopulatedSteps: 1024}});
     decoded.rgb.keyFeedback.tapBranchColors = Array.from({length: 7}, (_, h) => ({h, s: 255, v: 10}));

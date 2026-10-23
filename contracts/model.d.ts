@@ -48,7 +48,7 @@ export interface StatusModel {
     draft?: {changes?: readonly unknown[]; live?: unknown};
 }
 
-export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'peer' | 'commit' | 'converge' | 'verify';
+export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'slave' | 'commit' | 'converge' | 'verify';
 /** `saved`: "none" nothing was saved; "decided" the keyboard decided to save and finishes by itself; "unknown". */
 export interface ApplyFailure {step: ApplyStep; label: string; reason: string; saved: string}
 /** What the connected firmware reports about itself (core/session/firmware-support.js firmwareView). */
@@ -79,7 +79,7 @@ export interface Vocabulary {
     macroPlayback?: Readonly<Record<string, string>>;
     macroProtection: WordList<'auto' | 'on' | 'off'>;
     hostLayouts: WordList<number>;
-    holdHelpers: {hold: WordList<string>; long: WordList<string>};
+    holdStyles: {hold: WordList<string>; long: WordList<string>};
     holdWithoutLongHold: WordList<string>;
     tapSends: string;
     holdFromPress: string;

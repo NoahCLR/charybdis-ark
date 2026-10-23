@@ -154,18 +154,18 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         activeOriginHalf: 1,
         committedGeneration: 0x61626364,
         committedOriginHalf: 0,
-        peerGeneration: 0x71727374,
-        peerOriginHalf: 1,
+        slaveGeneration: 0x71727374,
+        slaveOriginHalf: 1,
         candidateTransactionId: 0x8182,
         lastCommittedTransactionId: 0x9192,
         conflictCount: 0xa1a2,
         validationState: 0xb1,
         lastError: 0xc1,
         candidatePending: true,
-        peerKnown: true,
-        peerConverged: true,
+        slaveKnown: true,
+        slaveConverged: true,
         waitingSafeBoundary: true,
-        peerCleanupPending: false,
+        slaveCleanupPending: false,
         storedEarlierFormat: false,
     });
 });
@@ -269,8 +269,8 @@ test("status pages expose explicit compiled-only state", () => {
     assert.equal(decoded.activeKind, 0);
     assert.equal(decoded.activeGeneration, 0);
     assert.equal(decoded.candidatePending, false);
-    assert.equal(decoded.peerKnown, false);
-    assert.equal(decoded.peerConverged, false);
+    assert.equal(decoded.slaveKnown, false);
+    assert.equal(decoded.slaveConverged, false);
     assert.equal(decoded.waitingSafeBoundary, false);
 });
 
@@ -309,18 +309,18 @@ test("patterned status vectors decode every semantic field exactly", () => {
         activeOriginHalf: 1,
         committedGeneration: 0x55667788,
         committedOriginHalf: 0,
-        peerGeneration: 0x99aabbcc,
-        peerOriginHalf: 1,
+        slaveGeneration: 0x99aabbcc,
+        slaveOriginHalf: 1,
         candidateTransactionId: 0x1234,
         lastCommittedTransactionId: 0x5678,
         conflictCount: 0x9abc,
         validationState: 0xde,
         lastError: 0xef,
         candidatePending: true,
-        peerKnown: true,
-        peerConverged: true,
+        slaveKnown: true,
+        slaveConverged: true,
         waitingSafeBoundary: true,
-        peerCleanupPending: false,
+        slaveCleanupPending: false,
         storedEarlierFormat: false,
     });
 });
@@ -337,13 +337,13 @@ test("status says a slot holds a profile in an earlier store format (flag 9)", (
     assert.throws(() => decodeStatusPages([identity, Buffer.alloc(25)]), /unknown bits 0x400/);
 });
 
-test("status reports a cancelled save the peer never confirmed", () => {
+test("status reports a cancelled save the slave half never confirmed", () => {
     const identity = Buffer.alloc(25);
     identity.set([1, 2], 0);
     identity.writeUInt16LE(PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING | PROFILE_STATE_FLAGS.PEER_KNOWN, 2);
     const decoded = decodeStatusPages([identity, Buffer.alloc(25)]);
-    assert.equal(decoded.peerCleanupPending, true);
-    assert.equal(decoded.peerKnown, true);
+    assert.equal(decoded.slaveCleanupPending, true);
+    assert.equal(decoded.slaveKnown, true);
     assert.equal(decoded.candidatePending, false);
 });
 

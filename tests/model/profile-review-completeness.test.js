@@ -38,7 +38,7 @@ function completeFixture() {
     value = rewrite(value, PROFILE_DOMAINS.find(row => row.key === "pdModes"), modes, decoded.codecOptions);
     const behaviors = structuredClone(decoded.behaviors);
     const repeating = behaviors.rows.flatMap(row => row.steps).find(step => step.longHold);
-    repeating.longHold.mode = 3; repeating.longHold.repeatHz = 100;
+    repeating.longHold.style = 3; repeating.longHold.repeatHz = 100;
     return rewrite(value, PROFILE_DOMAINS.find(row => row.key === "behaviors"), behaviors, decoded.codecOptions);
 }
 

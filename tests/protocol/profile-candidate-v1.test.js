@@ -376,8 +376,8 @@ test("request and transaction id allocators wrap without emitting zero", () => {
 });
 
 // Candidate status page 1, mirroring noah_profile_candidate_v1_handle_peer_status_get.
-const {CANDIDATE_PEER_PHASE, buildCandidatePeerStatusRequest, readCandidatePeerStatus} = require("../../core/protocol/profile-candidate-v1");
-function peerResponse(request, {status = 0, payload = null} = {}) {
+const {CANDIDATE_PEER_PHASE, buildCandidateSlaveStatusRequest, readCandidateSlaveStatus} = require("../../core/protocol/profile-candidate-v1");
+function slaveResponse(request, {status = 0, payload = null} = {}) {
     const response = Buffer.from(request);
     response.fill(0, 5);
     response[5] = status;
@@ -387,7 +387,7 @@ function peerResponse(request, {status = 0, payload = null} = {}) {
     }
     return response;
 }
-function peerPayload() {
+function slavePayload() {
     const payload = Buffer.alloc(25);
     payload[0] = 2;
     payload[1] = CANDIDATE_PEER_PHASE.SENDING;
@@ -399,29 +399,29 @@ function peerPayload() {
     payload.writeUInt32LE(2, 16);
     return payload;
 }
-test("candidate status page 1 reports the copy to the other half", async () => {
+test("candidate status page 1 reports the copy to the slave half", async () => {
     let ids = 0x50;
-    const reply = (options) => ({async request(actual) { return peerResponse(actual, options); }});
-    const peer = await readCandidatePeerStatus(reply({payload: peerPayload()}), {nextRequestId: () => ids++});
-    assert.deepEqual(peer, {phase: CANDIDATE_PEER_PHASE.SENDING, phaseName: "SENDING", lastStatus: 6, lastStatusName: "BUSY",
+    const reply = (options) => ({async request(actual) { return slaveResponse(actual, options); }});
+    const slave = await readCandidateSlaveStatus(reply({payload: slavePayload()}), {nextRequestId: () => ids++});
+    assert.deepEqual(slave, {phase: CANDIDATE_PEER_PHASE.SENDING, phaseName: "SENDING", lastStatus: 6, lastStatusName: "BUSY",
         cleanupPending: true, master: true, waitingSafeBoundary: false, transferOffset: 40, transferLength: 0x10078, retryCount: 7, transportFailureCount: 2,
         busyStreak: 0, busyReason: "UNSPECIFIED", busyStoreState: "UNINITIALIZED", busyOwner: "NONE", busyAdmission: "NONE"});
-    assert.equal(buildCandidatePeerStatusRequest(0x51)[4], 1, "page 1");
-    // Why the other half keeps saying BUSY: a stale earlier copy it is still receiving.
+    assert.equal(buildCandidateSlaveStatusRequest(0x51)[4], 1, "page 1");
+    // Why the slave half keeps saying BUSY: a stale earlier copy it is still receiving.
     // Layout 2 packs the transfer owner (low nibble) and admission (high).
-    const busy = peerPayload(); busy.writeUInt16LE(300, 20); busy[22] = 3; busy[23] = 2; busy[24] = 0x21;
-    assert.deepEqual(await readCandidatePeerStatus(reply({payload: busy}), {nextRequestId: () => ids++}).then(({busyStreak, busyReason, busyStoreState, busyOwner, busyAdmission}) => ({busyStreak, busyReason, busyStoreState, busyOwner, busyAdmission})),
+    const busy = slavePayload(); busy.writeUInt16LE(300, 20); busy[22] = 3; busy[23] = 2; busy[24] = 0x21;
+    assert.deepEqual(await readCandidateSlaveStatus(reply({payload: busy}), {nextRequestId: () => ids++}).then(({busyStreak, busyReason, busyStoreState, busyOwner, busyAdmission}) => ({busyStreak, busyReason, busyStoreState, busyOwner, busyAdmission})),
         {busyStreak: 300, busyReason: "OTHER_COPY", busyStoreState: "RECEIVING", busyOwner: "REMOTE_PUSH", busyAdmission: "PEER"});
     // The copy is ready and the decision waits for this half to go idle.
-    const waiting = peerPayload(); waiting[3] = 0x06;
-    assert.equal((await readCandidatePeerStatus(reply({payload: waiting}), {nextRequestId: () => ids++})).waitingSafeBoundary, true);
+    const waiting = slavePayload(); waiting[3] = 0x06;
+    assert.equal((await readCandidateSlaveStatus(reply({payload: waiting}), {nextRequestId: () => ids++})).waitingSafeBoundary, true);
 
-    await assert.rejects(readCandidatePeerStatus(reply({status: 2}), {nextRequestId: () => ids++}), {code: "DEVICE_REJECTED"}, "a refused page is an error");
+    await assert.rejects(readCandidateSlaveStatus(reply({status: 2}), {nextRequestId: () => ids++}), {code: "DEVICE_REJECTED"}, "a refused page is an error");
 
-    for (const [offset, value, pattern] of [[0, 1, /layout/], [1, 10, /phase/], [2, 11, /peer status/], [3, 0x08, /flag/], [22, 8, /busy detail/], [23, 10, /busy detail/], [24, 0x03, /busy detail/], [24, 0x30, /busy detail/]]) {
-        const payload = peerPayload();
+    for (const [offset, value, pattern] of [[0, 1, /layout/], [1, 10, /phase/], [2, 11, /slave-half status/], [3, 0x08, /flag/], [22, 8, /busy detail/], [23, 10, /busy detail/], [24, 0x03, /busy detail/], [24, 0x30, /busy detail/]]) {
+        const payload = slavePayload();
         payload[offset] = value;
-        await assert.rejects(readCandidatePeerStatus(reply({payload}), {nextRequestId: () => ids++}), pattern);
+        await assert.rejects(readCandidateSlaveStatus(reply({payload}), {nextRequestId: () => ids++}), pattern);
     }
 });
 

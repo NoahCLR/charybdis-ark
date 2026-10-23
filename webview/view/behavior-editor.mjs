@@ -37,7 +37,7 @@ export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string
     const existing = behaviourListeningTo(model, keycode);
     const key = existing?.keycode || canonicalKeycode(model, keycode);
     const defaults = model?.behaviorEditing?.keyDefaults?.[key];
-    return {...(existing || {keycode: key, steps: [], tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0",
+    return {...(existing || {keycode: key, steps: [], tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0",
         keepsAutoMouseAnchored: false, builtIn: defaults?.builtIn || {}}),
         stored: Boolean(existing), timingDefaults: defaults?.timing || model?.behaviorTimingDefaults || {},
         timingWords: timingWords(model, defaults?.timingSources),
@@ -54,7 +54,7 @@ function timingWords(model, sources) {
     return Object.fromEntries(Object.entries(sources || {}).map(([name, source]) => [name, words[source] || ""]));
 }
 
-export function behaviourTimingField(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour, /** @type {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} */ name) {
+export function behaviourTimingField(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour, /** @type {"tapHoldTerm" | "longHoldTerm" | "multiTapTerm"} */ name) {
     const stored = String(behaviour[name] ?? "0");
     const followsDefault = Number(stored) === 0;
     const fallback = behaviour.timingDefaults?.[name];
@@ -64,10 +64,10 @@ export function behaviourTimingField(/** @type {import("../../contracts/panel.js
 
 // Whether a behaviour as the editor holds it has a timing of its own: stored
 // zero, or nothing written, follows the default.
-export const behaviourHasTiming = (/** @type {Pick<import("../../contracts/edits.js").Behavior, "tapHoldTerm" | "longerHoldTerm" | "multiTapTerm">} */ behaviour) =>
-    [behaviour.tapHoldTerm, behaviour.longerHoldTerm, behaviour.multiTapTerm].some((value) => !/^0*$/.test(String(value ?? "").trim()));
+export const behaviourHasTiming = (/** @type {Pick<import("../../contracts/edits.js").Behavior, "tapHoldTerm" | "longHoldTerm" | "multiTapTerm">} */ behaviour) =>
+    [behaviour.tapHoldTerm, behaviour.longHoldTerm, behaviour.multiTapTerm].some((value) => !/^0*$/.test(String(value ?? "").trim()));
 
-// A behaviour that changes nothing: no branches, not keeping the mouse layer
+// A behaviour that changes nothing: no branches, not keeping the pointer layer
 // on, and no timing that applies to its key. A row without branches is no row
 // (firmware D-F27 "Rows without steps"): its timing counts only where
 // `timingAlone` says a timing alone does something, and its switch and layers
@@ -85,29 +85,29 @@ export function behaviourChangesNothing(/** @type {import("../../contracts/edits
 export function behaviourThresholds(/** @type {Model} */ model, /** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour) {
     const row = behaviourEditorRow(model, behaviour.keycode) || {...behaviour, timingDefaults: model?.behaviorTimingDefaults || {}};
     const steps = behaviour.steps || [];
-    /** @param {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} name */
+    /** @param {"tapHoldTerm" | "longHoldTerm" | "multiTapTerm"} name */
     const term = (name) => {
         const field = behaviourTimingField(/** @type {any} */ (row), name);
         return {name, ms: field.followsDefault ? field.fallback : field.stored};
     };
     const used = {
         tapHoldTerm: !steps.length || steps.some((step) => step.hold || step.longHold),
-        longerHoldTerm: steps.some((step) => step.longHold),
+        longHoldTerm: steps.some((step) => step.longHold),
         multiTapTerm: steps.some((step) => step.tapCount > 0),
     };
-    return {tapHoldTerm: term("tapHoldTerm"), longerHoldTerm: term("longerHoldTerm"), multiTapTerm: term("multiTapTerm"),
-        used: /** @type {const} */ (["tapHoldTerm", "longerHoldTerm", "multiTapTerm"]).filter((name) => used[name])};
+    return {tapHoldTerm: term("tapHoldTerm"), longHoldTerm: term("longHoldTerm"), multiTapTerm: term("multiTapTerm"),
+        used: /** @type {const} */ (["tapHoldTerm", "longHoldTerm", "multiTapTerm"]).filter((name) => used[name])};
 }
 
-// The number a hold tier's helper turns on, as the card states it beside the
-// helper: a Hold that taps at or after its threshold waits for tap / hold and a
-// Long hold for long hold, while one that repeats runs at its own rate, given
-// as stored. Empty when the helper turns on neither.
-export function helperDetail(/** @type {import("../../contracts/edits.js").Tier} */ kind, /** @type {{helper?: string, repeatHz?: import("../../contracts/edits.js").Scalar}} */ branch, /** @type {ReturnType<typeof behaviourThresholds>} */ terms) {
+// The number a hold tier's hold style turns on, as the card states it beside
+// the hold style: a Hold that taps at or after its threshold waits for
+// tap / hold and a Long hold for long hold, while one that repeats runs at its
+// own rate, given as stored. Empty when the hold style turns on neither.
+export function styleDetail(/** @type {import("../../contracts/edits.js").Tier} */ kind, /** @type {{style?: string, repeatHz?: import("../../contracts/edits.js").Scalar}} */ branch, /** @type {ReturnType<typeof behaviourThresholds>} */ terms) {
     if (kind === "tap") return "";
-    if (branch.helper === "REPEAT_WHILE_HELD") return `${String(branch.repeatHz ?? "0")} Hz`;
-    if (branch.helper !== "TAP_AT_HOLD_THRESHOLD" && branch.helper !== "TAP_ON_RELEASE_AFTER_HOLD") return "";
-    const term = terms[kind === "hold" ? "tapHoldTerm" : "longerHoldTerm"];
+    if (branch.style === "REPEAT_WHILE_HELD") return `${String(branch.repeatHz ?? "0")} Hz`;
+    if (branch.style !== "TAP_AT_HOLD_THRESHOLD" && branch.style !== "TAP_ON_RELEASE_AFTER_HOLD") return "";
+    const term = terms[kind === "hold" ? "tapHoldTerm" : "longHoldTerm"];
     return term.ms === "" ? "" : `${term.ms} ms`;
 }
 

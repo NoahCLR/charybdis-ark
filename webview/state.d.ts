@@ -1,4 +1,4 @@
-import type {BranchHelper, Combo, PdButton, PdTap, Scalar} from '../contracts/edits.js';
+import type {BranchStyle, Combo, PdButton, PdTap, Scalar} from '../contracts/edits.js';
 import type {PanelCommand, PanelResponse} from '../contracts/messages.js';
 import type {MacroStep} from './view/types.js';
 import type {ScreenId} from './view/screens.mjs';
@@ -20,7 +20,7 @@ export interface PanelState {
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;
     reachGroups: Record<string, boolean>; resetBenchHeight: boolean; reachRow: {macros: string | null; combos: string | null; pointing: string | null};
     cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; keyDetailsOpen: boolean; stackOpen: boolean;
-    cellHow: {cell: string; keycode: string; helper?: BranchHelper; repeatHz?: Scalar} | null;
+    cellHow: {cell: string; keycode: string; style?: BranchStyle; repeatHz?: Scalar} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null;
         madeKey: {keycode: string; shortcut: {mods: number; key: number}; name: string} | null};
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;

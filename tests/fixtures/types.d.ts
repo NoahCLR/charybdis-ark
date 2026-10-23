@@ -24,7 +24,7 @@ export interface FakeKeyboardOptions {
     document: PortableDocument;
     compiled?: Buffer;
     compiledOnly?: boolean;
-    peerKnown?: boolean;
+    slaveKnown?: boolean;
     generation?: number;
     firmwareVersion?: number;
     brightnessMax?: number;
@@ -49,7 +49,7 @@ export interface WritableKeyboardFaults {
     stageError?: boolean;
     abortRejected?: boolean;
     cleanupPending?: boolean;
-    peerUnseen?: boolean;
+    slaveUnseen?: boolean;
     disconnectAfterDecision?: boolean;
     /** After the decision the keyboard loses split authority (or sees a concurrent commit) and ends in AUTHORITY_FAILED with `error`, on the candidate read after the one that showed the decision. `accept` is how far the slave half's VIA ACCEPT got first: acknowledged (the master half's rewrite runs), queued and never answered, or never requested. */
     authorityFailed?: {error: number};

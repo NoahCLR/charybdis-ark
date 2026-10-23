@@ -41,11 +41,11 @@ const LOCAL_REFUSALS = new Set(["LIVE_EDIT_TOO_LARGE", "LIVE_HALVES_APART"]);
 /** @param {unknown} error */
 const codeOf = error => /** @type {{code?: string}} */ (error)?.code || "";
 
-// The halves are apart: the other half refused the working copy, so only a
+// The halves are apart: the slave half refused the working copy, so only a
 // Revert brings them together. The draft says so without reading again.
 /** @param {Draft} draft */
 function markApart(draft) {
-    if (draft.live) draft.live = {...draft.live, apart: true, converged: false};
+    if (draft.live) draft.live = {...draft.live, slaveRefused: true, converged: false};
 }
 
 /** @param {Session} session */
@@ -95,8 +95,8 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
         session.acceptedEdit = accepted;
         // A new keyboard name is taken by one USB restart once the keyboard
         // is quiet (firmware D-F25): that loss is expected, as after a save.
-        if (!result.apart) expectReconnect(session, renamedTo(before, {...before, document: target.document, fingerprint: fingerprint(target.document)}));
-        if (result.apart) session.notice = "The slave half refused this edit, so the halves run different profiles. Revert puts both back on the saved profile.";
+        if (!result.slaveRefused) expectReconnect(session, renamedTo(before, {...before, document: target.document, fingerprint: fingerprint(target.document)}));
+        if (result.slaveRefused) session.notice = "The slave half refused this edit, so the halves run different profiles. Revert puts both back on the saved profile.";
         else if (!result.converged) session.notice = "The edit runs on the master half; the slave half is catching up. The next edit waits for it.";
         return true;
     } catch (error) {
@@ -131,7 +131,7 @@ async function revertTo(session, draft, target) {
         return false;
     }
     const before = draft.current;
-    draft.confirmLive(target, {session: result.session, revision: result.revision, bytes: live.saved, converged: result.converged, apart: result.apart, unsaved: false});
+    draft.confirmLive(target, {session: result.session, revision: result.revision, bytes: live.saved, converged: result.converged, slaveRefused: result.slaveRefused, unsaved: false});
     expectReconnect(session, renamedTo(before, draft.completeBase));
     session.resetDraftForms = true;
     return true;

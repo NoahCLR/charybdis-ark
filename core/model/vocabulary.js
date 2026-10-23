@@ -73,7 +73,7 @@ const PHASE_WORDS = Object.freeze({
 /** @type {Readonly<Record<string, string>>} */
 const LIVE_RESULT_WORDS = Object.freeze({
     STALE: "the keyboard changed since Ark last read it (another edit, a key adjustment or a restart).",
-    BUSY: "the keyboard was busy with another edit, a save or its other half.",
+    BUSY: "the keyboard was busy with another edit, a save or its slave half.",
     INVALID_ARGUMENT: "the keyboard did not understand the request.",
     INVALID_STATE: "the keyboard was not ready for it.",
     WRONG_TRANSACTION: "another edit was in progress.",
@@ -85,7 +85,7 @@ const LIVE_RESULT_WORDS = Object.freeze({
     VALIDATION_REJECTED: "the keyboard's checks refused the result.",
     NOT_CLEAN: "the keyboard has unsaved edits. Save or Revert them first.",
     READ_ERROR: "the keyboard could not read or store it.",
-    ABORTED: "a save, an Apply or the other half replaced the profile meanwhile, or the edit was left unfinished (a Revert, or nothing arrived for 15 seconds).",
+    ABORTED: "a save, an Apply or the slave half's newer profile replaced the profile meanwhile, or the edit was left unfinished (a Revert, or nothing arrived for 15 seconds).",
     PUBLICATION_FAILED: "the keyboard could not switch to the result.",
     // Not a result: the keyboard's flags say its profile storage stopped.
     STOPPED: "the keyboard stopped saving. Restart it to continue.",
@@ -142,10 +142,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // A host layout names its OS, since German on macOS and on Windows differ.
     hostLayouts: hostLayouts().map(/** @returns {[number, string]} */ layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
     // How a hold tier runs once its threshold passes, in that tier's words: a
-    // helper that names a threshold names the tier's own, the Tap / hold
+    // hold style that names a threshold names the tier's own, the Tap / hold
     // threshold for Hold and the Long hold threshold for Long hold. A tap tier
     // only sends.
-    holdHelpers: {
+    holdStyles: {
         hold: [
             ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
             ["TAP_AT_HOLD_THRESHOLD", "tap at Tap / hold threshold"],

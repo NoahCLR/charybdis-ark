@@ -12,7 +12,7 @@
 
 const {PLACEMENT, actionName, keycodeAction, placementProblem} = require("../schema/actions");
 const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
-const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
@@ -26,7 +26,7 @@ function behaviorPlacementProblem(rows, options) {
         const problem = at(row.target, PLACEMENT.KEY)
             || row.steps.map(step => (step.tap && at(step.tap, PLACEMENT.TAP))
                 || [step.hold, step.longHold].map(hold => hold && at(hold.action,
-                    hold.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE ? PLACEMENT.HOLD_PRESS : PLACEMENT.HOLD_OTHER)).find(Boolean))
+                    hold.style === KEY_BEHAVIOR_HOLD_STYLES.PRESS_AND_HOLD_UNTIL_RELEASE ? PLACEMENT.HOLD_PRESS : PLACEMENT.HOLD_OTHER)).find(Boolean))
                 .find(Boolean);
         if (problem) return `${where}: ${problem}`;
     }

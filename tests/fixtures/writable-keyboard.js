@@ -17,10 +17,10 @@ const {PROFILE_CANDIDATE_V1: C, CANDIDATE_STATE: S, CANDIDATE_OPERATION: O,
 function writableKeyboard(options) {
     const source = validateSnapshot(options.document);
     const local = {profile: Buffer.from(source.profile)};
-    const peer = {profile: Buffer.from(source.profile)};
+    const slave = {profile: Buffer.from(source.profile)};
     let active = Buffer.from(source.candidate), activeGeneration = options.generation ?? 42;
     let activeKind = options.compiledOnly ? 0 : 1;
-    let peerGeneration = activeGeneration;
+    let slaveGeneration = activeGeneration;
     let reader = fakeKeyboard(options);
     let candidate = Buffer.alloc(0), transactionId = 0, nextOffset = 0;
     /** @type {number} */
@@ -41,21 +41,21 @@ function writableKeyboard(options) {
     const events = [];
     /** @type {import('./types.js').WritableKeyboardFaults} */
     const faults = {};
-    const keyboard = {requests, mutations, unhandled, events, local, peer, faults, answer,
+    const keyboard = {requests, mutations, unhandled, events, local, slave, faults, answer,
         get durable() {return durable;}, get active() {return Buffer.from(active);},
         get generation() {return activeGeneration;},
-        // Simulate reconnect + firmware roll-forward from the accepted peer
-        // bank. No host writes are needed after the durable decision.
+        // Simulate reconnect + firmware roll-forward from the accepted slave
+        // half bank. No host writes are needed after the durable decision.
         recover() {
             if (!durable) throw Error("There is no durable decision to recover.");
-            peer.profile = Buffer.from(candidate);
+            slave.profile = Buffer.from(candidate);
             faults.disconnected = false; activate();
         }};
     function activate() {
         if (faults.authorityFailed) return;
         if (!durable) return;
-        local.profile = Buffer.from(candidate); peer.profile = Buffer.from(candidate);
-        active = Buffer.from(candidate); activeGeneration++; activeKind = 1; peerGeneration = activeGeneration;
+        local.profile = Buffer.from(candidate); slave.profile = Buffer.from(candidate);
+        active = Buffer.from(candidate); activeGeneration++; activeKind = 1; slaveGeneration = activeGeneration;
         candidateState = S.IDLE; activated = true;
         const document = createSnapshot({profile: active, actionAbiDigest: options.document.actionAbiDigest});
         reader = fakeKeyboard({...options, document, compiled: options.compiled || source.candidate, compiledOnly: false, generation: activeGeneration});
@@ -123,7 +123,7 @@ function writableKeyboard(options) {
                 let flags = reply.readUInt16LE(9);
                 if (candidateState !== S.IDLE) flags |= PROFILE_STATE_FLAGS.CANDIDATE_PENDING;
                 if (faults.cleanupPending) flags |= PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING;
-                if (activated && faults.peerUnseen) flags &= ~(PROFILE_STATE_FLAGS.PEER_KNOWN | PROFILE_STATE_FLAGS.PEER_CONVERGED);
+                if (activated && faults.slaveUnseen) flags &= ~(PROFILE_STATE_FLAGS.PEER_KNOWN | PROFILE_STATE_FLAGS.PEER_CONVERGED);
                 reply.writeUInt16LE(flags, 9);
             }
             if (value === 2 && r.readUInt16LE(4) === 1 && activated) reply.writeUInt16LE(transactionId, 7 + 17);
