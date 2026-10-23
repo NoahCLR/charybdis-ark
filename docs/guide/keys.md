@@ -65,13 +65,19 @@ The row of modifiers above the board wraps the key you pick: Command + C
 stores `G(KC_C)`. The footer shows the keycode you'll get, and **Use keycode**
 stores it.
 
+Modifiers picked with no other key are stored with one of them as the key,
+wrapped in the rest: Left Ctrl + Left Shift stores `S(KC_LEFT_CTRL)`, and
+Left + Right Command `RGUI(KC_LEFT_GUI)`.
+
 A keycode can hold modifiers from one side only. For anything else, such as
-Left Ctrl with Right Ctrl, the picker offers a custom key instead (on a board
-key, in a behaviour, or as a combo output):
+Left Ctrl + Right Ctrl + C, or two modifiers from each side with no key, the
+picker offers a custom key instead (on a board key, in a behaviour, or as a
+combo output):
 
 - **Use Custom key N** takes a free custom key, gives it that shortcut and a
   name, and uses it. On a key it is one draft step, and one undo takes it
-  back.
+  back. As a combo output it is made when you keep the combo, in the same
+  step; **Cancel** leaves the draft as it was.
 - If a custom key already sends exactly that, the picker offers it by name.
   If that key also has a behaviour of its own, you choose: that key, behaviour
   and all, or **Make Custom key N** with the shortcut alone.

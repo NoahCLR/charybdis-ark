@@ -21,7 +21,7 @@ import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
 import {historyOverlay} from "./ui/history.mjs";
-import {closeLayers} from "./ui/layers.mjs";
+import {discardLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
 import {screenMouse} from "./ui/mouse.mjs";
@@ -209,7 +209,7 @@ addEventListener("keydown", (event) => {
     hideHover();
     if (state.picker) { state.picker = null; render(); return; }
     if (state.retarget) { state.retarget = null; render(); return; }
-    if (state.layersOpen) { closeLayers(); render(); return; }
+    if (state.layersOpen) { discardLayers(); render(); return; }
     if (state.overlay) {
         // Leaving the review by Esc is leaving it by Close.
         if (state.overlay === "review") post(controls.control("closeProfileDraftReview"));

@@ -18,4 +18,6 @@ export interface PickerOptions {
     customKeyRuns?: 'behaviour' | 'shortcut';
     /** A layout key: Use stays off for a key the draft would refuse. */
     layoutKey?: boolean;
+    /** A combo's output: Tap-hold is not offered, and only what a combo can send enables Use. */
+    comboOutput?: boolean;
 }

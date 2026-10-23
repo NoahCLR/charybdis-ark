@@ -49,7 +49,7 @@ test("adding, editing and deleting combos preserves every untouched profile doma
     assert.equal(rows[2].output.operand, 0x806);
     for (let id = 0; id < 2; id++) assert.deepEqual(decodeProfileBlob(added).domains[id].payload, decodeProfileBlob(bytes).domains[id].payload);
     // A combo holds its output, so a layer hold works there; LT() does not.
-    assert.throws(() => editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "LT(1,KC_A)", termMs: "30"}, context), /Combo 2: LT\(1,KC_A\) makes its own tap\/hold decision/);
+    assert.throws(() => editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "LT(1,KC_A)", termMs: "30"}, context), /C2: LT\(1,KC_A\) makes its own tap\/hold decision/);
     const edited = editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "MO(2)", termMs: "30", mustHold: true}, context);
     // QMK never fires a combo with a 0 ms window, so none is stored.
     assert.throws(() => editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "KC_E", termMs: "0"}, context), /at least 1 ms/);
@@ -62,6 +62,13 @@ test("adding, editing and deleting combos preserves every untouched profile doma
     assert.equal(comboRows(removed)[1].output.kind, 2);
     const rgbChanged = editDeviceProfile(removed, {type: "updateRgbStages", stageEnableMask: 0});
     assert.deepEqual(comboRows(rgbChanged), comboRows(removed));
+});
+test("a combo's key count is refused in plain words, naming the keyboard's limit", () => {
+    const keys = count => Array.from({length: count}, (_, at) => `KC_F${at + 1}`);
+    assert.throws(() => editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A"], output: "KC_C", termMs: ""}, context), /A combo needs at least two keys\./);
+    assert.throws(() => editDeviceProfile(bytes, {type: "addCombo", inputs: keys(17), output: "KC_C", termMs: ""}, context), /A combo takes at most 16 keys\./);
+    const four = {...context, capabilities: {...context.capabilities, maxKeysPerCombo: 4}};
+    assert.throws(() => editDeviceProfile(bytes, {type: "addCombo", inputs: keys(5), output: "KC_C", termMs: ""}, four), /A combo takes at most 4 keys\./);
 });
 test("a combo follows the default window until it has its own, and the default is one edit", () => {
     const added = editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: ""}, context);

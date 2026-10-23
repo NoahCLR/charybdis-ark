@@ -12,8 +12,8 @@ import {behaviourKeyAt} from "../../view/behavior-editor.mjs";
 export const behaviourRoute = () =>
     state.behaviourRoute && state.behaviourRoute.row === state.behaviourRow ? /** @type {import("../../view/keyface-types.js").BehaviorRoute} */ (state.behaviourRoute.group) : null;
 
-// The key a board position opens in Behaviours: in a layer preview, a
-// transparent key follows the key answered from below.
+// The key a board position opens in Behaviours: a transparent key follows the
+// key answered from below.
 /** @param {number | undefined} index */
 export const behaviourKey = (index) => behaviourKeyAt(layers(), state.layer, heldLayers(), index);
 

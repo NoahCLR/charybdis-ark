@@ -4,7 +4,7 @@
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
 import {canEdit, getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
-import {recordedKeycode, recordedTakePayload} from "../../view/macro-recording.mjs";
+import {recordedKeycode, recordedTakePayload, takeStands} from "../../view/macro-recording.mjs";
 import {rememberMacroEdit} from "./history.mjs";
 import {stageMacro} from "./validation.mjs";
 /* ── the recorder ──────────────────────────────────────────────────────── */
@@ -56,7 +56,8 @@ export function recorder(model, slot, canEdit) {
     });
     // Clear take puts the payload back to what it was before Record. A take
     // still in progress was never staged; a finished one was, so its restore
-    // is staged too, rather than only rewriting the text on screen.
+    // is staged too, rather than only rewriting the text on screen. A finished
+    // take is offered only until its macro changes (reconcileRecording).
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="clear-take"]')).addEventListener("click", () => {
         const take = state.recording?.slot === slot.keycode ? state.recording
             : state.lastTake?.slot === slot.keycode ? state.lastTake : null;
@@ -115,7 +116,7 @@ function stopRecording(model = getModel(), slot = null, redraw = true) {
     const recordedSlot = state.recording?.slot;
     const payload = recordedTakePayload(state.recording.before, recordedEvents, {...recordingOptions(), finishedAt: Date.now()});
     detachCapture();
-    state.lastTake = state.recording ? {slot: state.recording.slot, before: state.recording.before} : null;
+    state.lastTake = state.recording ? {slot: state.recording.slot, before: state.recording.before, after: payload} : null;
     state.recording = null;
     const target = slot || (model?.viaMacros || [])
         .find((candidate) => candidate.keycode === recordedSlot);
@@ -124,13 +125,18 @@ function stopRecording(model = getModel(), slot = null, redraw = true) {
 }
 
 // Every render checks the recorder's owner, so navigation through the rail,
-// a placement jump or a host update follows the same stop policy.
+// a placement jump or a host update follows the same stop policy. A finished
+// take ends once its macro changes (takeStands), whatever changed it.
 export function reconcileRecording() {
     const model = getModel(), bank = model?.viaMacros || [];
     const selected = bank.find(slot => slot.keycode === state.macroSlot) || bank[0];
     if (state.recording && (state.screen !== "macros" || state.overlay || state.picker
         || selected?.keycode !== state.recording.slot || !canEdit("macros") || selected?.available === false)) {
         stopRecording(model, null, false);
+    }
+    const take = state.lastTake, taken = take && bank.find(slot => slot.keycode === take.slot);
+    if (take && !(taken && takeStands(take, taken.keycode, macroForm(taken.keycode).draft ?? taken.payload ?? "", model?.qmkKeycodeAliases))) {
+        state.lastTake = null;
     }
 }
 

@@ -4,7 +4,7 @@ import test from "node:test";
 import {keyMeaning, behaviourFor} from "../../webview/view/keyface.mjs";
 import {resolvedPositions, reachablePositions} from "../../webview/view/layer-resolution.mjs";
 import {combosInView, combosForKey} from "../../webview/view/combo-reach.mjs";
-import {reachKeys, behavioursInView, reachInView, behaviourGroups, behaviourRouteKeys, macroKeycodes, macroPlacements, customKeyPlacements, macroReach, pointingReach, pointingSlotFor, pointingAction, macroAction, namedAction, slotKeycodes, bindingsForSlot, bindingKeycode} from "../../webview/view/reach.mjs";
+import {reachKeys, reachText, behavioursInView, reachInView, behaviourGroups, behaviourRouteKeys, macroKeycodes, macroPlacements, customKeyPlacements, macroReach, pointingReach, pointingSlotFor, pointingAction, macroAction, namedAction, slotKeycodes, bindingsForSlot, bindingKeycode} from "../../webview/view/reach.mjs";
 import {createRequire} from "node:module";
 const {PD_SLOT_BINDINGS: PD_BINDINGS} = createRequire(import.meta.url)("../../core/data/pd-bindings.js");
 const slotWith = (fields) => ({...fields, binding: PD_BINDINGS[fields.id]});
@@ -531,4 +531,14 @@ test("generated behaviour lists use the declared owner's physical source rather 
     assert.equal(behavioursInView(model, stack, 1).length, 0);
     row.enabled = true; model.participation.behaviorsEnabled = false;
     assert.equal(behavioursInView(model, stack, 1).length, 0);
+});
+
+test("a reach says where its keys come from, and a combo reached on this layer alone says so", () => {
+    assert.equal(reachText({named: ["A", "B"], sources: ["Base"], matched: []}), "A, B · on Base");
+    assert.equal(reachText({named: ["A"], sources: [], matched: ["Nav"]}), "A · matched on Nav");
+    assert.equal(reachText({}), "—", "a key list with nothing in it");
+    // A combo's row names its inputs already: only where they come from.
+    assert.equal(reachText({named: ["A"], sources: ["Base when held"], matched: []}, {names: false}), "on Base when held");
+    assert.equal(reachText({named: ["A"], sources: [], matched: ["Nav"]}, {names: false}), "matched on Nav");
+    assert.equal(reachText({named: [], sources: [], matched: []}, {names: false}), "this layer", "every input on the layer in view: never blank");
 });

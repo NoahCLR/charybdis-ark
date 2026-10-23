@@ -62,13 +62,21 @@ test("a transparent key in a layer preview opens the key answered from below", (
     assert.deepEqual(key([1], 2), ["KC_C", "Base"], "through two transparent keys to the default layer");
     assert.deepEqual(key([1], 3), ["CUSTOM_KEY_0", "Base"], "rows are found by what a key means, not its stored name");
     assert.equal(behaviourEditorRow({}, key([1], 1)[0]), undefined, "a key answered by KC_NO still has no editor");
-    assert.deepEqual(key([], 0), ["KC_TRANSPARENT", null], "outside a preview the board shows the transparent key itself");
-    assert.equal(behaviourEditorRow({}, key([], 0)[0]), undefined);
+    // With no preview the base layer still answers, as the Key tab's status line says.
+    assert.deepEqual(key([], 0), ["KC_A", "Base"], "outside a preview the base layer answers");
+    assert.deepEqual(key([], 3), ["CUSTOM_KEY_0", "Base"]);
+    assert.deepEqual(behaviourKeyAt(stack, 1, [], 2), {keycode: "KC_C", from: stack[0]}, "a transparent key on a layer above the base");
+    assert.equal(behaviourEditorRow({}, behaviourKeyAt(stack, 1, [], 1).keycode), undefined, "KC_NO itself has no editor");
     assert.deepEqual(behaviourKeyAt(stack, 1, [], 0), {keycode: "KC_DELETE", from: null}, "a mapped key opens its own row");
     assert.deepEqual(behaviourKeyAt(stack, 1, [], 9), {keycode: "", from: null}, "no position, no key");
 
     const hollow = withAnswers([{index: 0, name: "Base", positions: [at(0, "KC_TRANSPARENT")]}, {index: 1, name: "Top", positions: [at(0, "KC_TRANSPARENT")]}]);
     assert.deepEqual(behaviourKeyAt(hollow, 1, [0], 0), {keycode: "KC_TRANSPARENT", from: null}, "nothing mapped below");
+    assert.deepEqual(behaviourKeyAt(hollow, 1, [], 0), {keycode: "KC_TRANSPARENT", from: null}, "nothing mapped below, no preview");
+    const overNothing = withAnswers([{index: 0, name: "Base", positions: [at(0, "KC_NO")]}, {index: 1, name: "Top", positions: [at(0, "KC_TRANSPARENT")]}]);
+    const below = behaviourKeyAt(overNothing, 1, [], 0);
+    assert.equal(below.keycode, "KC_NO", "a transparent key over KC_NO follows it");
+    assert.equal(canHaveBehaviour({}, below.keycode), false, "and still has no behaviour");
 });
 
 test("timing fields show effective defaults but keep their stored inheritance zeros", () => {

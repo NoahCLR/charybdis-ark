@@ -574,13 +574,38 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
     assert.deepEqual([row.steps[0].hold.action.kind, row.steps[0].hold.action.operand], [7, 9], "the hold sends the custom key");
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before, "one undo takes back both");
-    // Without a following edit (a combo output, saved with its combo later),
-    // the key is only named and given the shortcut.
+    // Without a following edit the key is only named and given the shortcut.
     stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, key: 0}, "Left Ctrl + Right Ctrl"));
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[9], {mods: 0x11, key: 0});
     assert.deepEqual(profileLayers(draft.document), profileLayers(before));
     assert.throws(() => stage(draft, {...edits.customKeyForShortcut("CUSTOM_KEY_8", {mods: 0x11, key: 0}, ""), then: /** @type {any} */ ({type: "renameKeyboard", name: "x"})}),
-        /goes on a key or in a behaviour/, "only a layout key or a behaviour follows");
+        /goes on a key, in a behaviour or in a combo/, "only a layout key, a behaviour or a combo follows");
+});
+
+test("a combo kept with the custom key its output picker offered makes both in one draft step", () => {
+    const draft = session();
+    const before = draft.document;
+    const made = {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, key: 0}, name: "Left Ctrl + Right Ctrl"};
+    const combo = edits.comboMessage(null, {output: "CUSTOM_KEY_9", inputs: ["KC_A", "KC_B"], termMs: "50", followsDefault: false, holdTermMs: "200"});
+    const message = edits.comboKept(combo, made, draft.current.fingerprint);
+    assert.deepEqual(message, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, key: 0},
+        expectedFingerprint: draft.current.fingerprint, name: "Left Ctrl + Right Ctrl", then: combo});
+    const combos = decoded(draft).combos.rows.length;
+    stage(draft, message);
+    const after = decoded(draft);
+    assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x11, key: 0});
+    assert.equal(after.combos.rows.length, combos + 1);
+    assert.deepEqual([after.combos.rows.at(-1).output.kind, after.combos.rows.at(-1).output.operand], [7, 9], "the combo sends the custom key");
+    assert.equal(draft.view({selectedDeviceId: "test-device", connected: true}).undoLabel, "Made a custom key for a shortcut");
+    draft.undo(draft.revision);
+    assert.deepEqual(draft.document, before, "one undo takes back the key and the combo");
+    // Without an offer taken, or once the output is something else, the
+    // combo is kept on its own and no key is made.
+    assert.deepEqual(edits.comboKept(combo, null), combo);
+    const other = edits.comboMessage(null, {output: "KC_E", inputs: ["KC_A", "KC_B"], termMs: "50", followsDefault: false, holdTermMs: "200"});
+    assert.deepEqual(edits.comboKept(other, made), other);
+    const edited = edits.comboMessage(0, {output: "CUSTOM_KEY_9", inputs: ["KC_A", "KC_B"], termMs: "50", followsDefault: false, holdTermMs: "200"});
+    assert.equal(edits.comboKept(edited, made).then, edited, "an edited combo takes the key too");
 });
 
 test("the keyboard's name is posted trimmed against the draft it was read from, and review shows the rename", () => {

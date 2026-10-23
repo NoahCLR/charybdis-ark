@@ -133,6 +133,17 @@ test("the Keys screen's picker offers a custom key for Ctrl and Shift on both si
     const offer = page.locator('.picker [data-act="use-custom-key"]');
     await expect(offer).toHaveText(/^Use Custom key \d+$/);
     await expect(page.locator(".picker .pk-offer")).toContainText("No keycode can hold");
+    // The footer names the modifiers picked, and shows no keycode value for them.
+    const chips = page.locator(".picker .sheet-f [data-unmod]");
+    await expect(chips).toHaveCount(4);
+    await expect(page.locator(".picker .sheet-f")).not.toContainText("nothing picked yet");
+    await expect(page.locator(".picker .pk-value")).toHaveText("—");
+    // Its ✕ takes a modifier off, as its button does: Left Ctrl + Left Shift + Right Shift is a keycode.
+    await page.locator('.picker .sheet-f [data-unmod="RCTL"]').click();
+    await expect(chips).toHaveCount(3);
+    await expect(page.locator('.picker [data-mod="RCTL"]')).not.toHaveClass(/\bon\b/);
+    await expect(page.locator(".picker .pk-value")).toHaveText("S(C(KC_RIGHT_SHIFT))");
+    await page.locator('.picker [data-mod="RCTL"]').click();
     const slot = Number((await offer.textContent()).match(/\d+/)[0]);
     const layer = await page.evaluate(async () => (await import("/webview/store.mjs")).currentLayer()?.name);
     await clearPosts(page);
@@ -191,18 +202,46 @@ test("a behaviour cell's picker makes a custom key for mixed-side modifiers, and
 
 // A combo output is saved with its combo: the key is made now and becomes the
 // output in the builder.
-test("a combo output's picker makes a custom key and fills the output", async ({page}) => {
+// The custom key a combo output's picker offers is made only with the combo:
+// Cancel leaves the draft as it was, and Keep posts both as one step.
+test("a combo output's picker fills the output with a custom key made only when the combo is kept", async ({page}) => {
     await openControls(page, "keys", {tab: "combos"});
-    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    const takeOffer = async () => {
+        await page.getByRole("button", {name: "New combo", exact: true}).click();
+        await page.locator('[data-act="pickout"]').click();
+        for (const mod of ["S", "A", "RSFT", "RALT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
+        const offer = page.locator('.picker [data-act="use-custom-key"]');
+        const slot = Number((await offer.textContent()).match(/\d+/)[0]);
+        await clearPosts(page);
+        await offer.click();
+        await expect(page.locator("[data-output]")).toHaveValue(`CUSTOM_KEY_${slot}`);
+        await expect(page.locator(".combo-builder")).toContainText("once you keep this combo");
+        return slot;
+    };
+    const inputs = () => page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        store.state.combo.inputs = ["KC_A", "KC_B"]; store.render();
+    });
+    await takeOffer();
+    await page.locator('.combo-builder [data-act="cancel"]').click();
+    expect(await posted(page)).toEqual([]);
+
+    const slot = await takeOffer();
+    await inputs();
+    await page.locator('.combo-builder [data-act="keep"]').click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x66, key: 0},
+        then: expect.objectContaining({type: "addCombo", output: `CUSTOM_KEY_${slot}`, inputs: ["KC_A", "KC_B"]})})]);
+
+    // Picking another output after the offer makes no key.
+    await page.evaluate(async () => { const store = await import("/webview/store.mjs"); store.closeComboBuilder(); store.render(); });
+    await takeOffer();
     await page.locator('[data-act="pickout"]').click();
-    for (const mod of ["S", "A", "RSFT", "RALT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
-    const offer = page.locator('.picker [data-act="use-custom-key"]');
-    const slot = Number((await offer.textContent()).match(/\d+/)[0]);
-    await clearPosts(page);
-    await offer.click();
-    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x66, key: 0}})]);
-    expect((await posted(page))[0].then).toBeUndefined();
-    await expect(page.locator("[data-output]")).toHaveValue(`CUSTOM_KEY_${slot}`);
+    await page.locator('.picker [data-remove="0"]').click();
+    await page.locator('.picker [data-pick="KC_E"]').first().click();
+    await page.locator('.picker [data-act="use"]').click();
+    await inputs();
+    await page.locator('.combo-builder [data-act="keep"]').click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "addCombo", output: "KC_E"})]);
 });
 
 // On a layout key a matching custom key that has a behaviour would run it
@@ -282,8 +321,14 @@ test("modifier buttons and a modifier key fold into the simplest keycode", async
     await clearPosts(page);
     await page.locator('.picker [data-act="use"]').click();
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys", layer, changes: [{layoutIndex: 27, keycode: "RGUI(KC_LEFT_GUI)"}]})]);
-    // Both Commands from the buttons alone: the same keycode, the other way round.
+    // Both Commands from the buttons alone: the same keycode.
     await pick(["G", "RGUI"]);
-    await expect(value).toHaveText("G(KC_RIGHT_GUI)");
+    await expect(value).toHaveText("RGUI(KC_LEFT_GUI)");
+    await expect(page.locator('.picker [data-act="use"]')).toBeEnabled();
+    await page.locator('.picker [data-act="cancel"]').first().click();
+    // Two from one side alone is a keycode too, not a custom key.
+    await pick(["C", "S"]);
+    await expect(value).toHaveText("S(KC_LEFT_CTRL)");
+    await expect(page.locator(".picker .pk-problem")).toHaveCount(0);
     await expect(page.locator('.picker [data-act="use"]')).toBeEnabled();
 });

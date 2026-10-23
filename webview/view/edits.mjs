@@ -138,6 +138,13 @@ export function comboMessage(id, {output, inputs, termMs, followsDefault, holdTe
     if (useOutputBehavior !== undefined) payload.useOutputBehavior = useOutputBehavior;
     return id === null || id === undefined ? {type: "addCombo", ...payload} : {type: "saveCombo", id, ...payload};
 }
+// A combo kept with the custom key its output picker offered: the key is made
+// only now, with the combo in one draft step, so one undo takes both back and a
+// combo never kept leaves no key behind (D-L63). Once the output is something
+// else, the offered key is not made.
+/** @param {ReturnType<typeof comboMessage>} combo @param {{keycode: string, shortcut: {mods: number, key: number}, name: string} | null | undefined} made @param {string} [identity] */
+export const comboKept = (combo, made, identity) => made && combo.output === made.keycode
+    ? customKeyForShortcut(made.keycode, made.shortcut, made.name, combo, identity) : combo;
 /** @param {number} id @returns {import("../../contracts/edits.js").EditOf<'deleteCombo'>} */
 export const deleteCombo = (id) => ({type: "deleteCombo", id});
 /** @param {Scalar} holdTermMs @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateComboHoldTerm'>} */
@@ -233,7 +240,8 @@ export const customKeyNameMessage = (keycode, name, identity) => ({type: "update
 /** @param {string} keycode @param {number} mods @param {number} key @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
 export const customKeyShortcutMessage = (keycode, mods, key, identity) => ({type: "updateCustomKeyShortcut", keycode, shortcut: {mods: Number(mods) || 0, key: Number(key) || 0}, expectedFingerprint: identity});
 // A custom key made for a shortcut no keycode can hold: named, and put to use
-// by `then` (a layout key or a behaviour cell) in the same draft step (D-L63).
+// by `then` (a layout key, a behaviour cell or a combo) in the same draft step
+// (D-L63).
 /** @param {string} keycode @param {{mods: number, key: number}} shortcut @param {string} name @param {import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']['then']} [then] @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
 export const customKeyForShortcut = (keycode, shortcut, name, then, identity) => ({...customKeyShortcutMessage(keycode, shortcut.mods, shortcut.key, identity),
     name: String(name ?? "").trim(), ...(then ? {then} : {})});

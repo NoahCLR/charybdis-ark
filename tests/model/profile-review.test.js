@@ -157,6 +157,17 @@ test("a behaviour lists only the fields that changed, in the editor's words", ()
     assert.deepEqual(item.fields,[{label:"Tap / hold threshold",status:"changed",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
         labelMark:{kind:"tier",tier:"hold"}}], "the tiers that did not change are not repeated, and the timing is marked with the tier it decides");
 });
+test("a behaviour's allowed layers are named as every screen names them, never blank", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const target=validateSnapshot(base).behaviors.rows[0].target, names=validateSnapshot(base).settings.names;
+    const after=snapshot(behaviours(base,rows=>rows.map(row=>JSON.stringify(row.target)===JSON.stringify(target)?{...row,allowedLayers:0b1000000000010011}:row)));
+    const [item]=profileReview(before,after);
+    const field=item.fields.find(entry=>entry.label==="Allowed layers");
+    const called=index=>names[index]||(index?`Layer ${index}`:"Base");
+    assert.equal(field.after,[0,1,4,15].map(called).join(", "));
+    assert.ok(field.after.split(", ").every(Boolean),"no layer is a blank name");
+    assert.ok(!names[15],"the fixture leaves layer 15 unnamed"); assert.match(field.after,/Layer 15$/);
+});
 test("a removed behaviour is marked removed and lists what it held, without its defaults", () => {
     const base=pdDocument(), before=snapshot(base), row=validateSnapshot(base).behaviors.rows[0];
     const [item]=profileReview(before,snapshot(behaviours(base,rows=>rows.slice(1))));

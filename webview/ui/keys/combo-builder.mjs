@@ -9,7 +9,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {scrollContentTo} from "../../lib/scroll.mjs";
 import {actionLabel, canonicalKeycode, visibleKeycode} from "../../view/keyface.mjs";
-import {customKeyOf, customKeySendsNote, hasShortcut} from "../../view/custom-key.mjs";
+import {customKeyOf, customKeySendsNote, hasShortcut, shortcutPickLabel} from "../../view/custom-key.mjs";
 import {comboInputShown} from "../../view/combo-reach.mjs";
 import {closeComboBuilder, getModel, heldLayers, layerName, layers, post, render, state} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
@@ -18,7 +18,7 @@ import {timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
 import {keyNameMarked} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
-import {comboMissing} from "../../view/combo-form.mjs";
+import {comboFull, comboMissing} from "../../view/combo-form.mjs";
 
 /** @param {string} text */
 const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -39,9 +39,17 @@ export function comboBuilder(canEdit, holdTerm) {
     // every combo keeps its own.
     const fallback = edits.comboDefaultTermValue(model);
     const windowField = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "");
-    // Keep stays off until the combo has what it sends and two keys, and says
-    // which is missing: the keyboard refuses less (B8).
-    const missing = comboMissing(form, state.combo.inputs);
+    // Keep stays off until the combo has what it sends and two keys, and no
+    // more than the keyboard's limit, and says what is wrong: the keyboard
+    // refuses anything else (B8). At the limit it says so, and takes no more.
+    const limit = model?.firmware?.keysPerCombo;
+    const missing = comboMissing(form, state.combo.inputs, limit);
+    const note = missing || comboFull(state.combo.inputs, limit);
+    // The custom key the output picker offered is not made until Keep, so
+    // what it will send comes from the offer, not from the key as it is now.
+    const made = state.combo.madeKey && form.output === state.combo.madeKey.keycode ? state.combo.madeKey : null;
+    const sendsNote = made ? `Custom key · sends ${shortcutPickLabel(model, made.shortcut)} once you keep this combo`
+        : customKeySendsNote(model, canonicalKeycode(model, form.output));
     const node = el(`<div class="card combo-builder">
         <div class="card-h"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
@@ -49,7 +57,7 @@ export function comboBuilder(canEdit, holdTerm) {
             <div class="field"><span>Sends</span>
                 <div class="input-row"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:output" data-output value="${esc(visibleKeycode(model, form.output))}" ${canEdit ? "" : "disabled"}>
                 <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div>
-                ${customKeySendsNote(model, canonicalKeycode(model, form.output)) ? `<span class="note">${esc(customKeySendsNote(model, canonicalKeycode(model, form.output)))}</span>` : ""}</div>
+                ${sendsNote ? `<span class="note">${esc(sendsNote)}</span>` : ""}</div>
             <div class="field"><span>Inputs</span>
                 <div class="row combo-inputs">
                     ${state.combo.inputs.length ? state.combo.inputs.map((input) => `<span class="chip"${shown(input) ? ""
@@ -70,7 +78,7 @@ export function comboBuilder(canEdit, holdTerm) {
             <div class="field">
                 <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                     <span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions.useOutputBehavior))}</span></label>
-                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output))} The behaviour master and Settings · Combos · Combo outputs use behaviours must also be on.</p>
+                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output, made))} The behaviour master and Settings · Combos · Combo outputs use behaviours must also be on.</p>
             </div>
             <div class="row combo-flags">
                 ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],
@@ -81,7 +89,7 @@ export function comboBuilder(canEdit, holdTerm) {
             <div class="row combo-actions">
                 <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting && !missing ? "" : "disabled"}>Keep combo in draft</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
-                <span class="note" data-combo-missing ${missing ? "" : "hidden"}>${esc(missing)}</span>
+                <span class="note" data-combo-missing ${note ? "" : "hidden"}>${esc(note)}</span>
             </div>
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
         </div></div>`);
@@ -100,12 +108,13 @@ export function comboBuilder(canEdit, holdTerm) {
     });
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="pickout"]'))?.addEventListener("click", () => openPicker({
         title: "Combo output", context: editing ? original?.badge : "new combo",
-        seed: form.output ? [form.output] : [],
-        onPick: (expression) => { form.output = expression; },
-        // Modifiers no keycode can hold: an unused custom key is made that
-        // shortcut now and becomes the output, saved with the combo (D-L63).
+        seed: form.output ? [form.output] : [], comboOutput: true,
+        onPick: (expression) => { form.output = expression; state.combo.madeKey = null; },
+        // Modifiers no keycode can hold: an unused custom key becomes the
+        // output, and is made that shortcut only when the combo is kept, in
+        // the same draft step (D-L63). Cancel leaves the draft as it was.
         onCustomKey: (keycode, shortcut, name) => {
-            post(edits.customKeyForShortcut(keycode, shortcut, name, undefined, getModel()?.customKeyEditing?.identity));
+            state.combo.madeKey = {keycode, shortcut, name};
             form.output = keycode;
         },
     }));
@@ -114,11 +123,12 @@ export function comboBuilder(canEdit, holdTerm) {
     /** @type {HTMLInputElement} */ (node.querySelector("[data-output]")).addEventListener("input", (event) => {
         form.output = /** @type {HTMLInputElement} */ (event.target).value;
         // Typing what it sends can complete the combo before the next render.
-        const now = comboMissing(form, state.combo.inputs);
+        const now = comboMissing(form, state.combo.inputs, limit);
         const keep = /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="keep"]'));
         if (keep) keep.disabled = !canEdit || state.combo.awaiting || Boolean(now);
+        const text = now || comboFull(state.combo.inputs, limit);
         const note = /** @type {HTMLElement | null} */ (node.querySelector("[data-combo-missing]"));
-        if (note) { note.textContent = now; note.hidden = !now; }
+        if (note) { note.textContent = text; note.hidden = !text; }
     });
     // Typing a window gives the combo its own; emptying the field, or Use
     // default, has it follow the keyboard's default again. The button changes
@@ -169,11 +179,11 @@ export function comboBuilder(canEdit, holdTerm) {
     });
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="keep"]'))?.addEventListener("click", () => {
         state.combo.awaiting = true;
-        post(edits.comboMessage(editing ? state.combo.editId : null, {
+        post(edits.comboKept(edits.comboMessage(editing ? state.combo.editId : null, {
             ...form,
             inputs: state.combo.inputs.slice(),
             holdTermMs: holdTerm(),
-        }));
+        }), state.combo.madeKey, getModel()?.customKeyEditing?.identity));
         render();
     });
     return node;
@@ -181,8 +191,9 @@ export function comboBuilder(canEdit, holdTerm) {
 
 // What a bypassed output sends, when it is a custom key: its shortcut, or
 // nothing without one (firmware D-F26).
-/** @param {Model} model @param {string} output */
-function bypassedOutput(model, output) {
+/** @param {Model} model @param {string} output @param {{shortcut: {mods: number, key: number}} | null} made */
+function bypassedOutput(model, output, made) {
+    if (made) return `This custom key sends its shortcut, ${shortcutPickLabel(model, made.shortcut)}.`;
     const key = customKeyOf(model, canonicalKeycode(model, output));
     if (!key) return "A custom key sends its shortcut, or nothing if it has none.";
     return hasShortcut(key) ? `This custom key sends its shortcut, ${key.shortcutLabel}.` : "This custom key has no shortcut, so it sends nothing.";

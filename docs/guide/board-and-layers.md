@@ -74,7 +74,8 @@ board, highest first, with the base at the bottom.
   move with their layer either way.
 
 Nothing changes until you press **Keep layers in draft**. **Discard** drops
-the moves.
+the moves, and so does closing the list any other way: Escape, or a click
+outside it.
 
 Make base swaps the two layers' roles: a key that reached the new base now
 reaches the old one. The new base's transparent keys become `KC_NO`, since

@@ -266,6 +266,36 @@ test('pasting an unsupported key stays local, and a finished take followed by Cl
     await expect(page.locator('.macro-empty')).toBeVisible();
 });
 
+test('an edit after a finished take ends it: Clear take turns off and the edit stays', async ({page}) => {
+    await openMacro(page, '{KC_A}');
+    const clear = page.locator('[data-act="clear-take"]');
+    await page.locator('[data-act="record"]').click(); await page.keyboard.press('b'); await page.locator('[data-act="record"]').click();
+    await expect(page.locator('[data-step-tile]')).toHaveCount(2);
+    await expect(clear).toBeEnabled();
+    // A delete after the take.
+    await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Delete');
+    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{KC_B}');
+    await expect(clear).toBeDisabled();
+    await expect(page.locator('[data-step-tile]')).toHaveCount(1);
+    // A paste after another take.
+    await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+c');
+    await page.locator('[data-act="record"]').click(); await page.keyboard.press('c'); await page.locator('[data-act="record"]').click();
+    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{KC_B}{KC_C}');
+    await expect(clear).toBeEnabled();
+    await command(page, 'paste');
+    await expect(page.locator('[data-step-tile]')).toHaveCount(3);
+    await expect(clear).toBeDisabled();
+    await clear.click({force: true});
+    await expect(page.locator('[data-step-tile]')).toHaveCount(3);
+    // A take with nothing after it still clears back to before Record.
+    await page.locator('[data-act="record"]').click(); await page.keyboard.press('d'); await page.locator('[data-act="record"]').click();
+    await expect(page.locator('[data-step-tile]')).toHaveCount(4);
+    const before = await updates(page).then(rows => rows.at(-2)?.payload);
+    await clear.click();
+    await expect(page.locator('[data-step-tile]')).toHaveCount(3);
+    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe(before);
+});
+
 test('clicking an empty sequence gives shortcuts focus; paste replaces a blank Text starter without changing the clipboard', async ({page}) => {
     await openMacro(page, '{50}');
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+c');
