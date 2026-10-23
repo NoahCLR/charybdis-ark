@@ -67,7 +67,7 @@ function verifiedCompiled({metadata, bytes}) {
     return metadata.generation === 0 && bytes.length === metadata.payloadLength && crc32(bytes) === metadata.crc32 && fnv1a32(bytes) === metadata.digest;
 }
 
-// The last verified compiled defaults as a host keeps them between runs, and
+// The last verified compiled defaults as a shell keeps them between runs, and
 // back. Anything unreadable, oversized or failing its own checks is no copy.
 const STORED_COMPILED_VERSION = 1;
 /** @param {import("../protocol/types.js").PayloadRead} read */

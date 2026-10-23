@@ -56,7 +56,7 @@ function macroEditorView(snapshot, capabilities) {
         // entry (mode). The interface judges held keys against layoutChars.
         unicode: {mode: host.unicodeMode, enabled: host.unicodeEnabled, os: host.effective,
             layout: host.layout, layoutFits: host.layoutFits, layoutName: layout.name, layoutChars: layout.chars},
-        viaMacros: slots.map(slot),
+        macros: slots.map(slot),
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
             slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS},
         // Every slot can hold a full-length name, whatever the others hold.
@@ -86,7 +86,7 @@ function macroIndex(keycode) {
     return index;
 }
 
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateViaMacro'] & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateMacro'] & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editMacro(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
     const index = macroIndex(message.keycode);

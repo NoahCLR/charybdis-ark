@@ -288,7 +288,7 @@ function editCombos(bytes, message, context) {
     const followsDefault = "followsDefault" in message && message.followsDefault === true || String("termMs" in message ? message.termMs ?? "" : "").trim() === "";
     if (message.type === "updateComboHoldTerm") {
         table.holdTermMs = integer(message.holdTermMs, 65535, "Hold threshold");
-    } else if (message.type === "updateComboDefaultTerm") {
+    } else if (message.type === "updateComboDefaultWindow") {
         table.defaultTermMs = comboWindow(message.defaultTermMs, "Default combo window");
     } else if (message.type === "deleteCombo") {
         table.rows.splice(integer(message.id, table.rows.length - 1, "Combo index"), 1);

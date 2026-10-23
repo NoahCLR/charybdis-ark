@@ -3,7 +3,7 @@
 // a <select>'s list as a native menu, and while that menu is open the page
 // gets no WebHID input reports, nor any input events, until it closes. A
 // look at a live keyboard sent then goes unanswered though the keyboard is
-// fine, so the host pauses its looks (core/session/live-watch.js) while such
+// fine, so the shell pauses its looks (core/session/live-watch.js) while such
 // a menu may be open, and while the page is hidden.
 //
 // A menu opens from a press on a <select> showing one row, or from the keys

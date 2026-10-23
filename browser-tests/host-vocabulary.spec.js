@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openPreview} = require("./host-page");
+const {openPreview} = require("./shell-page");
 const {buildDeviceModel} = require("../core/session/device-model");
 const {resolve} = require("../core/data/keycode-catalog");
 const {hostKeyLabel} = require("../core/model/key-names");

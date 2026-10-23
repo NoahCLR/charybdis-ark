@@ -3,9 +3,9 @@
 //
 // The keyboard stores a macro as text: literal characters, {KC_X} to tap,
 // {+KC_X} to press, {-KC_X} to release and {120} to wait. This parses it for
-// the preview and checks it by the same rules the host enforces on save
+// the preview and checks it by the same rules the core enforces on save
 // (core/schema/macro-payload.js), so the preview never calls valid what the
-// host would refuse. `options.keys` is the host's list of key names a macro
+// core would refuse. `options.keys` is the core's list of key names a macro
 // may send; without it, key names are not checked. A key still held at the end
 // is not an error here — the step builder passes through that state — and
 // unreleased() reports it.

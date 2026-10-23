@@ -40,9 +40,9 @@ test("the playback protection control stages a portable policy and Review/discar
     const fixture = hostMacros(1 | (3 << 16), ["café🙂"]);
     const draft = new ProfileDraftSession(fixture.snapshot, "test-device", fixture.capabilities);
     const message = edits.macroProtectionMessage("VIA_MACRO_0", "off", draft.current.fingerprint);
-    assert.deepEqual(message, {type: "updateViaMacro", keycode: "VIA_MACRO_0", protection: "off", expectedFingerprint: draft.current.fingerprint});
+    assert.deepEqual(message, {type: "updateMacro", keycode: "VIA_MACRO_0", protection: "off", expectedFingerprint: draft.current.fingerprint});
     stage(draft, message);
-    assert.equal(macroEditorView(draft.current, fixture.capabilities).viaMacros[0].uninterruptible, false);
+    assert.equal(macroEditorView(draft.current, fixture.capabilities).macros[0].uninterruptible, false);
     const change = draft.changes().find(row => row.unit === "macro:0");
     assert.deepEqual(change.fields.map(field => [field.label, field.before, field.after]), [["Uninterruptible playback", "Automatic · on", "Off"]]);
     const exported = JSON.parse(JSON.stringify(draft.document));
@@ -50,7 +50,7 @@ test("the playback protection control stages a portable policy and Review/discar
     draft.discard(draft.revision, change.group);
     assert.deepEqual(profileMacros(draft.document), profileMacros(fixture.snapshot.document));
     draft.undo(draft.revision);
-    assert.equal(macroEditorView(draft.current, fixture.capabilities).viaMacros[0].protection, "off");
+    assert.equal(macroEditorView(draft.current, fixture.capabilities).macros[0].protection, "off");
 });
 
 function session() {
@@ -58,7 +58,7 @@ function session() {
     const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
     return new ProfileDraftSession(snapshot, "test-device", capabilities);
 }
-// The host adds the draft id and revision to every message the webview posts.
+// The webview's store adds the draft id and revision to every message it posts.
 const stage = (draft, message) => draft.stage({draftId: draft.id, draftRevision: draft.revision, ...message});
 const decoded = (draft) => portable.validateSnapshot(draft.document);
 const slotOf = (layoutIndex) => CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][1];
@@ -250,19 +250,19 @@ test("an edit that leaves a stored row changing nothing removes it, and Undo bri
     assert.equal(edits.saveBehaviour({...stored, stored: false, steps: []}, {terms: {tapHoldTerm: "120"}}, draft.identity()), null);
 });
 
-test("the editor removes exactly the rows the host's review notes as changing nothing", () => {
+test("the editor removes exactly the rows the core's review notes as changing nothing", () => {
     const {changesNothing} = require("../../core/model/inert-behaviors");
     const {nativeCode} = require("../../core/schema/actions");
     const {resolveNativeQmkExpression} = require("../../core/schema/compiled-profile-v1");
     const model = buildSnapshotModel(session().current, capabilities, {editable: true, reason: ""});
-    // Keys this profile holds, which the host publishes defaults for.
+    // Keys this profile holds, which the core publishes defaults for.
     for (const keycode of ["KC_ENTER", "LGUI(KC_C)", "VIA_MACRO_10", "LT(3,KC_SLASH)", "OSM(MOD_LSFT)", "MO(3)", "LOCK_LAYER(3)", "PD_SLOT_0", "PD_SLOT_0_LOCK", "CUSTOM_KEY_0"]) {
         const row = behaviourEditorRow(model, keycode);
         assert.ok(row, keycode);
         for (const fields of [{}, {terms: {tapHoldTerm: "120"}}, {terms: {multiTapTerm: "90"}}, {anchored: true}, {enabled: false}]) {
             const terms = {tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", ...fields.terms};
             const posted = edits.saveBehaviour({...row, ...terms, stored: true, steps: []}, fields, null);
-            // The same row stored as it is, for the host's rule to judge.
+            // The same row stored as it is, for the core's rule to judge.
             const draft = session();
             stage(draft, {type: "saveBehavior", behavior: {keycode: row.keycode, steps: [], ...terms,
                 keepsAutoMouseAnchored: Boolean(fields.anchored), enabled: fields.enabled ?? true, allowedLayers: 0xffff}});
@@ -375,15 +375,15 @@ test("a keyboard that stores the combo timing keeps it without combos, and a new
 test("the default window and the hold threshold are each their own message, set with or without combos", () => {
     const draft = session();
     stage(draft, edits.comboHoldTerm("275"));
-    stage(draft, edits.comboDefaultTerm("70"));
+    stage(draft, edits.comboDefaultWindow("70"));
     assert.deepEqual([decoded(draft).combos.defaultTermMs, decoded(draft).combos.holdTermMs], [70, 275]);
     for (const [inputs, output] of [[["KC_D", "KC_F"], "KC_ESCAPE"], [["KC_J", "KC_K"], "KC_TAB"]]) {
         stage(draft, edits.comboMessage(null, {inputs, output, termMs: ""}));
     }
-    stage(draft, edits.comboDefaultTerm("45"));
+    stage(draft, edits.comboDefaultWindow("45"));
     assert.deepEqual(draft.combos().rows.map((row) => [row.termMs, row.followsDefault]), [[45, true], [45, true]],
         "the combos that follow the default run with its new value");
-    assert.throws(() => stage(draft, edits.comboDefaultTerm("0")), /at least 1 ms/);
+    assert.throws(() => stage(draft, edits.comboDefaultWindow("0")), /at least 1 ms/);
 });
 
 test("a combo is edited and deleted by the id the interface holds", () => {
@@ -1100,8 +1100,8 @@ test("the combo hold threshold is the one the keyboard stores, else its tapping 
     assert.equal(edits.comboHoldTermValue(model, ""), "240");
     assert.equal(edits.comboHoldTermValue({...model, comboReadback: {holdTermMs: null}}, ""), "200", "an older keyboard without combos: its own tapping term");
     assert.equal(edits.comboHoldTermValue({...model, comboReadback: {holdTermMs: 0}}, ""), "0", "0 is a threshold, not a missing one");
-    assert.equal(edits.comboDefaultTermValue(model), "50");
-    assert.equal(edits.comboDefaultTermValue({comboReadback: {defaultTermMs: null}}), "", "an older keyboard has no default");
+    assert.equal(edits.comboDefaultWindowValue(model), "50");
+    assert.equal(edits.comboDefaultWindowValue({comboReadback: {defaultTermMs: null}}), "", "an older keyboard has no default");
 });
 
 // ── the 32-slot firmware ────────────────────────────────────────────────
@@ -1232,7 +1232,7 @@ test("literal step messages inspect and stage the exact text with undo intact", 
     const draft = session(), text = ' {"key": "{KC_A}"}\nhello ';
     const {payload} = macroStepsInput([{kind: "text", text}, {kind: "tap", keys: ["KC_ENT"]}]);
     const message = edits.macroValidationMessage("VIA_MACRO_17", payload, 777);
-    assert.deepEqual(message, {type: "validateViaMacro", keycode: "VIA_MACRO_17", payload, requestId: 777});
+    assert.deepEqual(message, {type: "validateMacro", keycode: "VIA_MACRO_17", payload, requestId: 777});
     assert.equal(macroInputStatus(draft.current, message, draft.capabilities).error, "");
     const before = draft.document;
     stage(draft, edits.macroMessage(message.keycode, message.payload, draft.current.fingerprint));
@@ -1280,7 +1280,7 @@ test("pointing macros stage inherit-only outputs and survive review, history and
     const snapshot = {document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)};
     const draft = new ProfileDraftSession(snapshot, "test-device", caps);
     const before = decoded(draft).pdModes[4];
-    stage(draft, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "Hi"});
+    stage(draft, {type: "updateMacro", keycode: "VIA_MACRO_0", payload: "Hi"});
     stage(draft, edits.macroNameMessage("VIA_MACRO_0", "Greeting", draft.current.fingerprint));
     const config = readConfig(before, formOf({kind: 1, name: before.name, dpi: before.dpi, axis: AXIS.EIGHT,
         "dir:left": "VIA_MACRO_0", "dirPolicy:left": MODIFIER_POLICY.EXACT,

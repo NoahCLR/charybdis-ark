@@ -1,5 +1,5 @@
 import type {BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PdSlot, Scalar} from './edits.js';
-import type {ApplyView, Check, DemoView, HistoryStep, HostPanel, LoadView, Participation, PhaseId, ProfileUsage, ReviewChange, SettingField, SettingsSection, Vocabulary} from './model.js';
+import type {ApplyView, Check, DemoView, HistoryStep, ShellPanel, LoadView, Participation, PhaseId, ProfileUsage, ReviewChange, SettingField, SettingsSection, Vocabulary} from './model.js';
 
 export interface Position {
     layoutIndex: number;
@@ -112,7 +112,7 @@ export interface PublishedModel {
     rgb: Partial<RgbView> & {maximumBrightness?: number; baseEffect: BaseRgbView};
     combos: ComboView[];
     comboReadback: {layerReferences?: number[]; version?: number; state?: string; writable?: boolean; defaultTermMs?: number; holdTermMs?: number; enabled?: boolean; error?: {message?: string}};
-    viaMacros: MacroSlot[];
+    macros: MacroSlot[];
     macroNameSpace: {perName: number} | null;
     macroBank: {capacity: number; stored: number; free: number; available: number; slots: number; reserveTaps: number} | null;
     hostSettings: {selected: number; detected: number; effective: number; unicodeEnabled: boolean; unicodeMode: number; layout: number; layoutFits: boolean; macosIso: boolean} | null;
@@ -130,7 +130,7 @@ export interface PublishedModel {
     /** The keys a custom key's shortcut may hold, by catalogue name and alias. */
     customKeyShortcutKeys: string[];
     customKeyEditing: {identity: string; writable: boolean};
-    /** The keyboard's own name: '' for the firmware's built-in one, which `builtIn` gives when the host knows it. */
+    /** The keyboard's own name: '' for the firmware's built-in one, which `builtIn` gives when the shell knows it. */
     keyboardName: {name: string; builtIn: string; identity: string; perName: number} | null;
     qmkKeycodes: CatalogEntry[];
     qmkKeyLabels: Record<string, string>;
@@ -152,7 +152,7 @@ export interface PublishedModel {
     /** Core always sets `progress`, possibly undefined, which a JSON transport drops. */
     postApplyRead: {step: import('./messages.js').ReadStep; progress?: import('./model.js').CountedProgress | null} | null;
     portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null; /** The file's profile bytes against this keyboard's memory. */ fits?: {used: number; capacity: number} | null} | null; layers: {key: string; order: number[]; names: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null; /** When the copy from before the last Apply on this keyboard was saved; Put back what it had uses it. */ putBack: string | null};
-    host: HostPanel;
+    shell: ShellPanel;
     load: LoadView;
     /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */
     /** Waiting for the keyboard to come back: renamed by a save, or `lost`. */

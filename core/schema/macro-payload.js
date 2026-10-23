@@ -74,7 +74,7 @@ function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT} = {}
     return steps;
 }
 
-// A VIA macro as the bytes QMK stores: text as is, then 1 and an opcode for a
+// A macro as the bytes QMK stores: text as is, then 1 and an opcode for a
 // key tap (1), press (2), release (3) or a delay (4, digits, '|').
 /** @param {string} payload @param {import("./types.js").MacroOptions} [options] */
 function encodeMacroPayload(payload, options) {

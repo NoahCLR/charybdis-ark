@@ -143,7 +143,7 @@ test("the bundled core decodes, encodes and stages exactly as Node does", async 
 });
 
 test("the bundled panel renders the model the bundled core builds, and posts its edits", async ({page}) => {
-    // Stand in for the host as scripts/preview.js does: answer "ready" with the
+    // Stand in for the shell as scripts/preview.js does: answer "ready" with the
     // model and log every post.
     const {files, errors} = await openBuild(page, `<div id="root"></div>
 <script>

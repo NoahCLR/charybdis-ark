@@ -10,9 +10,9 @@ const shownWords = (page) => page.evaluate(() => [document.body.innerText,
         ["data-tip", "title", "aria-keyshortcuts"].map((name) => node.getAttribute(name) || ""))].join("\n"));
 
 for (const [platform, mac] of [["Win32", false], ["Linux x86_64", false], ["MacIntel", true]]) {
-    for (const host of ["demo-edited", "live", "live-auto"]) test(`shortcuts read as ${mac ? "⌘" : "Ctrl"} on ${platform} (${host})`, async ({page}) => {
+    for (const shell of ["demo-edited", "live", "live-auto"]) test(`shortcuts read as ${mac ? "⌘" : "Ctrl"} on ${platform} (${shell})`, async ({page}) => {
         await page.addInitScript((name) => Object.defineProperty(Navigator.prototype, "platform", {get: () => name}), platform);
-        await page.goto(`/preview/index.html?host=${host}`);
+        await page.goto(`/preview/index.html?shell=${shell}`);
         await page.locator('[data-screen="keys"]').click();
         await page.locator("[data-key]").first().click();
         await page.locator('.commit [data-act="review"]').first().click();

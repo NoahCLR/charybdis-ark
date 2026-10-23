@@ -9,9 +9,9 @@
 // sizing fields belong only to replies containing a complete inspection.
 // Macros: the keyboard's macro slots, edited as literal text and key steps, each
 // with an optional name kept in the keyboard's profile. The slots share one
-// block of macro memory; the host says which still have room.
+// block of macro memory; the core says which still have room.
 //
-// The preview parses the payload for reading; the host parses it again for
+// The preview parses the payload for reading; the core parses it again for
 // real when the slot is staged, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
@@ -26,7 +26,7 @@ export {receiveMacroValidation} from "./macros/validation.mjs";
 
 export function screenMacros() {
     const model = getModel();
-    const bank = model?.viaMacros || [];
+    const bank = model?.macros || [];
     const memory = model?.macroBank;
     const slot = bank.find((row) => row.keycode === state.macroSlot) || bank[0];
     const canEdit = canEditArea("macros") && slot?.available !== false;

@@ -8,8 +8,8 @@ export type ConnectionToken = number | string | null;
 export type SaveRecovery = (document: import('../model/types.js').PortableDocument | import('../model/types.js').RecoveryCaptureDocument) => Promise<string | undefined>;
 /** What a recovery copy records besides its profile (recovery-copy.js): what made it and the keyboard's name. */
 export interface RecoveryAbout {cause: import('../../contracts/model.js').RecoveryCause; keyboard: string}
-/** The host's seam: keeps the copy with what it records, and resolves to where it went. */
-export type HostSaveRecovery = (document: Parameters<SaveRecovery>[0], about: RecoveryAbout) => Promise<string | undefined>;
+/** The shell's seam: keeps the copy with what it records, and resolves to where it went. */
+export type ShellSaveRecovery = (document: Parameters<SaveRecovery>[0], about: RecoveryAbout) => Promise<string | undefined>;
 export interface DraftDeviceContext {
     connected: boolean;
     selectedDeviceId?: string | null;
@@ -106,20 +106,20 @@ export interface CandidateDriverOptions {
     readPeerStatus?: typeof import('../protocol/profile-candidate-v1.js').readCandidatePeerStatus | null;
     onProgress?: (progress: CandidateProgress) => void;
 }
-export interface CaptureIdentity {profile: string; settingsCrc: number; settingsDigest: number}
+export interface SnapshotIdentity {profile: string; settingsCrc: number; settingsDigest: number}
 export interface HeldStorage {profile: Buffer}
-export interface CaptureFacts {
+export interface ReadFacts {
     status: ProfileStatus;
-    identity?: CaptureIdentity;
+    identity?: SnapshotIdentity;
     storage?: HeldStorage;
     readback?: {active: import('../protocol/types.js').PayloadRead; source: string; combos: Awaited<ReturnType<typeof import('../protocol/combo-readback-v1.js').readDeviceCombos>>};
 }
-export type CapturedProfile = (import('../model/types.js').CompleteSnapshot & CaptureFacts) | (import('../model/types.js').IncompleteSnapshot & CaptureFacts & {document: import('../model/types.js').RecoveryCaptureDocument; fingerprint: string});
-export interface CaptureOptions {sleep?: (ms: number) => Promise<void>; payloadReader?: InstanceType<typeof import('./profile-payload-reader.js').ProfilePayloadReader>; reuseReadback?: boolean}
+export type ReadSnapshot = (import('../model/types.js').CompleteSnapshot & ReadFacts) | (import('../model/types.js').IncompleteSnapshot & ReadFacts & {document: import('../model/types.js').RecoveryCaptureDocument; fingerprint: string});
+export interface SnapshotOptions {sleep?: (ms: number) => Promise<void>; payloadReader?: InstanceType<typeof import('./profile-payload-reader.js').ProfilePayloadReader>; reuseReadback?: boolean}
 export interface RestoreOptions {
     expectedFingerprint?: string;
     saveRecovery?: SaveRecovery;
-    baseSnapshot?: CapturedProfile;
+    baseSnapshot?: ReadSnapshot;
     onProgress?: (text: string) => void;
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;
     sleep?: (ms: number) => Promise<void>;
@@ -160,9 +160,9 @@ export interface LayerEditState {before: import('../model/types.js').CompleteSna
 export type LayerEditMessage = import('../../contracts/messages.js').LayerEditControl | import('../../contracts/messages.js').LayerSaveControl;
 export interface ImportDifferences {against: string; items: (import('../../contracts/model.js').ReviewSummary & {unit: string})[]}
 export interface PortableReview {document: import('../model/types.js').PortableDocument; before: import('../model/types.js').ProfileSnapshot; fileName?: string | null; differences?: ImportDifferences; revision?: number; deviceId?: string | null; draftId?: string}
-export interface PanelHost extends ProfileChooser {words?: Record<string, string>; panel?: () => Partial<import('../../contracts/model.js').HostPanel>}
+export interface PanelShell extends ProfileChooser {words?: Record<string, string>; panel?: () => Partial<import('../../contracts/model.js').ShellPanel>}
 export interface PanelSession extends DemoSession {
-    host?: PanelHost;
+    shell?: PanelShell;
     portableBusy?: boolean;
     portableReview?: PortableReview;
     portableLayers?: LayerEditState;
@@ -191,9 +191,9 @@ export interface PanelEnvelope {type: string; draftId?: string; draftRevision?: 
 export type PanelMessage = PanelEnvelope | (DraftEdit & {draftId?: string});
 export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; editable: boolean; reason: DraftBlock; steps?: import('../../contracts/model.js').HistoryStep[]};
 /** What the panel adds to the device model; the posted shape is the contract's. */
-export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load' | 'reconnecting' | 'firmware' | 'editMode' | 'liveProposal' | 'runtime'> & {draft?: PanelDraftView};
+export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'shell' | 'load' | 'reconnecting' | 'firmware' | 'editMode' | 'liveProposal' | 'runtime'> & {draft?: PanelDraftView};
 
-export type CompleteCapture = Extract<CapturedProfile, import('../model/types.js').CompleteSnapshot>;
+export type CompleteReadSnapshot = Extract<ReadSnapshot, import('../model/types.js').CompleteSnapshot>;
 /** Where the keyboard's working copy is (firmware D-F32), with the exact bytes a live edit is made against. */
 export interface LiveState {
     mode: number;
@@ -239,7 +239,7 @@ export interface LiveKeyboardStatus {
     quietMs: number;
 }
 /** A Live + review read: the working copy as the snapshot, the saved profile beside it. */
-export type LiveCapture = import('../model/types.js').CompleteSnapshot & import('../model/types.js').SnapshotFacts & {
+export type LiveSnapshot = import('../model/types.js').CompleteSnapshot & import('../model/types.js').SnapshotFacts & {
     status: ProfileStatus;
     saved: import('../model/types.js').CompleteSnapshot & import('../model/types.js').SnapshotFacts;
     live: LiveState;
@@ -265,9 +265,9 @@ export interface ControlService extends DraftApplyService {
     readCommittedProfile(options?: {reuse?: boolean}): Promise<unknown>;
     readCombos(): Promise<unknown>;
     readBaseRgb(): Promise<unknown>;
-    readKeyboardProfile(): Promise<CompleteCapture>;
-    readPortableProfile(options?: {forRestore?: false; reuseReadback?: boolean}): Promise<CompleteCapture>;
-    readPortableProfile(options: {forRestore: true; reuseReadback?: boolean}): Promise<CapturedProfile>;
+    readKeyboardProfile(): Promise<CompleteReadSnapshot>;
+    readPortableProfile(options?: {forRestore?: false; reuseReadback?: boolean}): Promise<CompleteReadSnapshot>;
+    readPortableProfile(options: {forRestore: true; reuseReadback?: boolean}): Promise<ReadSnapshot>;
     restorePortableProfile(document: import('../model/types.js').PortableDocument, options: RestoreOptions): Promise<RestoredProfile>;
     postLiveEdit(edit: {from: Buffer; to: Buffer; defaults: Buffer; identity: {session: number; revision: number}; replaceWhenLarge?: boolean}): Promise<{bytes: Buffer; session: number; revision: number; converged: boolean; apart: boolean; sent: number}>;
     saveWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditStatus & {saved: boolean}>;
@@ -292,11 +292,11 @@ export interface ControlService extends DraftApplyService {
 export interface LostKeyboard {deviceId: string; serialNumber: string; product: string; otherDevices: readonly {id: string; product?: string}[]; what: string; /** It left a request unanswered: Ark closed the connection, the keyboard stayed. */ unanswered: boolean}
 /** A renamed keyboard the panel waits to see again (keyboard-reconnect.js). */
 export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string; /** Restarted because Ark asked, rather than renamed. */ restart?: boolean; /** Said after how the wait ended: what followed the read. */ after?: string}
-export interface ControlHost extends PanelHost {
+export interface ControlShell extends PanelShell {
     progress?: <T>(title: string, work: () => Promise<T>) => Promise<T>;
-    saveRecovery?: HostSaveRecovery;
+    saveRecovery?: ShellSaveRecovery;
 }
-export interface LoopHost extends ControlHost {
+export interface LoopShell extends ControlShell {
     post(message: import('../../contracts/messages.js').PanelResponse): unknown;
     showError?: (text: string) => unknown;
     saveExport(file: import('../../contracts/messages.js').ExportedProfile): Promise<string | undefined>;
@@ -315,7 +315,7 @@ export interface DeviceServiceOptions {
     onChange?: (state?: PanelDeviceState) => void;
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;
     onReadProgress?: (view: import('../../contracts/messages.js').ReadProgress) => void;
-    /** Where the host keeps the last verified compiled defaults between runs, as text (profile-payload-reader.js). */
+    /** Where the shell keeps the last verified compiled defaults between runs, as text (profile-payload-reader.js). */
     compiledDefaults?: {get(): unknown; set(value: string): unknown};
 }
 
@@ -329,4 +329,4 @@ export interface ServiceSnapshot extends PanelDeviceState {
     lastRefreshedAt: string;
 }
 
-export type VerifiedCapture = (CompleteCapture & {identity: CaptureIdentity; storage: HeldStorage; readback: NonNullable<CaptureFacts['readback']>}) | (Extract<CapturedProfile, {incomplete: true}> & {identity: CaptureIdentity});
+export type VerifiedSnapshot = (CompleteReadSnapshot & {identity: SnapshotIdentity; storage: HeldStorage; readback: NonNullable<ReadFacts['readback']>}) | (Extract<ReadSnapshot, {incomplete: true}> & {identity: SnapshotIdentity});

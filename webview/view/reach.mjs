@@ -370,7 +370,7 @@ export function reachGroups(model, stack, at, namesOf, all) {
  */
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
 export const macroReach = (model, stack, at) => reachGroups(model, stack, at, macroKeycodes,
-    (model?.viaMacros || [])
+    (model?.macros || [])
         // An empty slot is not a macro this layer is missing, it is a slot.
         .filter((slot) => !slot.empty).map((slot) => slot.keycode));
 
@@ -439,7 +439,7 @@ export function pointingAction(model, action) {
 export function macroAction(model, action) {
     const [keycode] = macroKeycodes(action);
     if (!keycode || keycode !== String(action).trim()) return null;
-    const slot = (model?.viaMacros || []).find((row) => row.keycode === keycode);
+    const slot = (model?.macros || []).find((row) => row.keycode === keycode);
     return {slot, keycode, name: slot?.name || `Macro ${keycode.split("_").at(-1)}`, empty: Boolean(slot?.empty)};
 }
 
@@ -455,7 +455,7 @@ export function namedAction(model, action) {
     return null;
 }
 
-// The two values a slot answers to: hold and lock, as the host's binding
+// The two values a slot answers to: hold and lock, as the core's binding
 // registry gives them. Matching on the numbers rather than on names matters
 // for an empty slot, whose record carries no name for the model to resolve —
 // the keycode exists on the keyboard either way.

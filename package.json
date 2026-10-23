@@ -38,7 +38,7 @@
     "pins": "node scripts/check-pins.js",
     "upstream": "node scripts/refresh-upstream.js",
     "agreement": "node scripts/check-agreement.js",
-    "typecheck": "tsc -p tsconfig.foundation.json && tsc -p tsconfig.json && tsc -p tsconfig.hosts.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.developer.json && tsc -p tsconfig.preview.json && tsc -p tsconfig.branch-window.json"
+    "typecheck": "tsc -p tsconfig.foundation.json && tsc -p tsconfig.json && tsc -p tsconfig.shells.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.developer.json && tsc -p tsconfig.preview.json && tsc -p tsconfig.branch-window.json"
   },
   "dependencies": {
     "node-hid": "^3.4.0"

@@ -1,6 +1,6 @@
 // @ts-check
 // The Configure screens show a board only after a complete editable read.
-// The host keeps the gate closed across the small gaps between HID requests.
+// The core keeps the gate closed across the small gaps between HID requests.
 
 import {configureReady, screenAvailable, screenDefinition} from "./screens.mjs";
 export {configureReady, screenAvailable};
@@ -40,8 +40,8 @@ export function readScreen(model, screen = "keys") {
     const definition = screenDefinition(screen);
     if (!definition) return {state: "unavailable", title: "Screen unavailable",
         detail: "Choose a screen from the menu to continue."};
-    // A host that cannot reach a keyboard at all says why, in place of reading.
-    if (model?.host?.blocked) return {state: "blocked", title: model.host.blocked.title, detail: model.host.blocked.detail};
+    // A shell that cannot reach a keyboard at all says why, in place of reading.
+    if (model?.shell?.blocked) return {state: "blocked", title: model.shell.blocked.title, detail: model.shell.blocked.detail};
     if (!model || model.load?.state === "loading") {
         const phase = model?.load?.phase;
         const progress = model?.load?.progress;
@@ -53,7 +53,7 @@ export function readScreen(model, screen = "keys") {
     if (configureReady(model)) return null;
     const device = model.device || {};
     if (!device.connected) return {state: "unavailable", title: "Connect your keyboard",
-        detail: device.health?.error || model.host?.words?.connectHint || "Connect a Charybdis, then read it to begin editing."};
+        detail: device.health?.error || model.shell?.words?.connectHint || "Connect a Charybdis, then read it to begin editing."};
     // Halves that are not together are the usual reason, and say what to do.
     const halves = device.health?.halves;
     const halvesDetail = halves === "alone" || halves === "apart" ? model.vocabulary?.halves?.[halves]?.detail : "";

@@ -1,6 +1,6 @@
 // Compile-time checks for the renderer's posted data. This body never runs.
 import {serializeMacro} from '../../webview/view/macro.mjs';
-import {hostOf} from '../../webview/view/host.mjs';
+import {shellOf} from '../../webview/view/shell-panel.mjs';
 import {placeState} from '../../webview/view/review.mjs';
 import {participationAt} from '../../webview/view/participation.mjs';
 import * as edits from '../../webview/view/edits.mjs';
@@ -29,7 +29,7 @@ function contracts(slot: PdSlot, identity: BaseIdentity) {
             // @ts-expect-error Pointing edits carry a slot, not a layout layer.
             message.layer;
         }
-        if (message.type === 'updateViaMacro' && typeof message.payload === 'string') {
+        if (message.type === 'updateMacro' && typeof message.payload === 'string') {
             const text: string = message.payload;
             void text;
         }
@@ -44,19 +44,19 @@ function contracts(slot: PdSlot, identity: BaseIdentity) {
     // @ts-expect-error A macro validation request needs its correlation ID.
     edits.macroValidationMessage('VIA_MACRO_0', 'hello');
     // @ts-expect-error A posted update must say what macro value changed.
-    const emptyMacro: PanelEdit = {type: 'updateViaMacro', keycode: 'VIA_MACRO_0'};
+    const emptyMacro: PanelEdit = {type: 'updateMacro', keycode: 'VIA_MACRO_0'};
     // @ts-expect-error A pointing form must supply its name and DPI readers.
     readConfig(slot, {kind: () => 1});
     // @ts-expect-error Core/Node globals do not leak into the renderer environment.
     Buffer.alloc(32);
     serializeMacro([{kind: 'text', text: 'hello'}, {kind: 'tap', keys: ['KC_A']}, {kind: 'delay', delay: '120'}]);
-    hostOf({host: {theme: 'dark', build: {version: '2026.10.7', commit: 'bb1a35f'}}});
-    // @ts-expect-error Macro steps describe key names; conversion to wire numbers is the host's.
+    shellOf({shell: {theme: 'dark', build: {version: '2026.10.7', commit: 'bb1a35f'}}});
+    // @ts-expect-error Macro steps describe key names; conversion to wire numbers is the core's.
     serializeMacro([{kind: 'tap', keys: [4]}]);
     // @ts-expect-error A delay step has a delay field, not key fields.
     serializeMacro([{kind: 'delay', keys: ['KC_A']}]);
-    // @ts-expect-error The host reports one of the supported panel themes.
-    hostOf({host: {theme: 'blue'}});
+    // @ts-expect-error The shell reports one of the supported panel themes.
+    shellOf({shell: {theme: 'blue'}});
     placeState({kind: 'key', layer: 0, layoutIndex: 1});
     // @ts-expect-error A pointing finding names a slot rather than a layout layer.
     placeState({kind: 'pointing', layer: 0});

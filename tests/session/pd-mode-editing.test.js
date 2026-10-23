@@ -33,7 +33,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]});
 
     stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_7", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
-    stage({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello", name: "Greeting"});
+    stage({type: "updateMacro", keycode: "VIA_MACRO_0", payload: "hello", name: "Greeting"});
     const reordered = reorderLayers(draft.document, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.deepEqual(validateSnapshot(reordered).pdModes, validateSnapshot(draft.document).pdModes);
     const view = draft.view({connected: true, selectedDeviceId: "board"});

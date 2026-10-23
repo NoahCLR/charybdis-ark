@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openPreview} = require("./host-page");
+const {openPreview} = require("./shell-page");
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`Host Settings and literal Text steps post exact content (${theme})`, async ({page}) => {
         await openPreview(page, theme);
@@ -34,8 +34,8 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         const text = ' {"café": “hello”} 🙂 e\u0301 👩‍💻 ';
         await page.locator('[data-step-text]').fill(text);
         await page.locator('[data-step-text]').dispatchEvent('change');
-        await expect.poll(() => page.evaluate(() => window.__posted.filter(item => item.type === 'updateViaMacro').length)).toBe(1);
-        const posted = await page.evaluate(() => window.__posted.filter(item => item.type === "updateViaMacro"));
+        await expect.poll(() => page.evaluate(() => window.__posted.filter(item => item.type === 'updateMacro').length)).toBe(1);
+        const posted = await page.evaluate(() => window.__posted.filter(item => item.type === "updateMacro"));
         expect(posted.at(-1)?.payload).toContain(text.replaceAll("{", "{{").replaceAll("}", "}}"));
     });
 }

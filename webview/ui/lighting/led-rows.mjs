@@ -49,7 +49,7 @@ export function groupRowsTable(rows, target) {
 
 // Who a row belongs to depends on its table: a layer, a pointing mode, a key
 // feedback state, or — for combo feedback — nobody, since every combo shares
-// one colour. The values are the names the host's RGB enums use.
+// one colour. The values are the names the core's RGB enums use.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} target @returns {readonly (readonly [string, string])[]} */
 export function rowOwners(model, target) {
     if (target === "layer") return [...layers().map((layer) => /** @type {[string, string]} */ ([`Layer ${layer.index}`, layerName(layer)])), ["RGB_LAYER_GROUP_ALL", "All layers"]];

@@ -33,7 +33,7 @@ for (const theme of ["plain", "vscode-dark"]) {
         await expect.poll(() => posted(page)).toEqual([shortcut(0x0f, 0)]);
 
         // Publish a model in which the key has the mixed-side shortcut, as the
-        // host would after staging: the field shows it, the picker opens with
+        // core would after staging: the field shows it, the picker opens with
         // its modifiers on, and Clear posts none.
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");

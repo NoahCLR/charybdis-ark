@@ -95,7 +95,7 @@ export function macroHistoryShortcut(event, action) {
     const target = event.target;
     if (!(target instanceof Element) || state.picker || state.overlay || state.recording || state.retarget) return false;
     const keycode = target.closest('[data-macro-editor]')?.getAttribute('data-macro-editor');
-    const slot = getModel()?.viaMacros?.find(item => item.keycode === keycode);
+    const slot = getModel()?.macros?.find(item => item.keycode === keycode);
     if (!slot) return false;
     event.preventDefault();
     if (!event.repeat && !event.isComposing) macroCommand(slot, action);
@@ -108,7 +108,7 @@ export function macroClipboardShortcut(event) {
         || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || !['c', 'v', 'a'].includes(key)
         || target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return false;
     const keycode = target.closest('[data-macro-editor]')?.getAttribute('data-macro-editor');
-    const slot = getModel()?.viaMacros?.find(item => item.keycode === keycode);
+    const slot = getModel()?.macros?.find(item => item.keycode === keycode);
     if (!slot) return false;
     event.preventDefault();
     if (event.repeat) return true;

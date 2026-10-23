@@ -27,8 +27,8 @@ import type {PanelRequest, PanelResponse} from '../../contracts/messages.js';
 import {buildDeviceModel} from '../../core/session/device-model.js';
 import {buildPanelModel, startLayerEdit} from '../../core/session/panel-session.js';
 import {demoExport, demoState} from '../../core/session/demo-session.js';
-import {captureProfile, restoreProfile} from '../../core/session/portable-profile-session.js';
-import type {CapturedProfile, DeviceCapabilities, PanelSession, PanelDeviceState, CaptureIdentity} from '../../core/session/types.js';
+import {snapshotProfile, restoreProfile} from '../../core/session/portable-profile-session.js';
+import type {ReadSnapshot, DeviceCapabilities, PanelSession, PanelDeviceState, SnapshotIdentity} from '../../core/session/types.js';
 import type {SemanticAction} from '../../core/schema/types.js';
 
 async function contracts() {
@@ -65,11 +65,11 @@ function profileContracts(document: PortableDocument, snapshot: CompleteSnapshot
     const draft = new ProfileDraftSession(snapshot, 'board', {compiledLayerCount: 16, actionAbiDigest: document.actionAbiDigest});
     draft.stage({type: 'updateLayoutKeys', layer: 'Layer 0', changes: [{layoutIndex: 0, keycode: 'KC_A'}], draftRevision: draft.revision});
     // @ts-expect-error A staged edit must identify the revision the editor saw.
-    draft.stage({type: 'updateViaMacro', keycode: 'VIA_MACRO_0', payload: 'hello'});
+    draft.stage({type: 'updateMacro', keycode: 'VIA_MACRO_0', payload: 'hello'});
     // @ts-expect-error Layout edits use Layer n references rather than bare indices.
     draft.stage({type: 'updateLayoutKeys', layer: 0, changes: [], draftRevision: draft.revision});
-    // @ts-expect-error Host profile-domain edits cannot write the separate VIA macro bank.
-    editDeviceProfile(Buffer.alloc(32), {type: 'updateViaMacro', keycode: 'VIA_MACRO_0', payload: 'hello'});
+    // @ts-expect-error Profile-domain edits cannot write the separate macro bank.
+    editDeviceProfile(Buffer.alloc(32), {type: 'updateMacro', keycode: 'VIA_MACRO_0', payload: 'hello'});
     const validated = validateSnapshot(document);
     const same: PortableDocument = decodedOf({document, decoded: validated}).document;
     const reader = new ProfilePayloadReader(connection);
@@ -130,11 +130,11 @@ void contracts;
 void profileContracts;
 void recoveryContracts;
 
-async function sessionContracts(session: PanelSession, state: PanelDeviceState, capabilities: DeviceCapabilities, connection: Awaited<ReturnType<InstanceType<typeof DeviceRequestCoordinator>['connect']>>, captured: CapturedProfile) {
+async function sessionContracts(session: PanelSession, state: PanelDeviceState, capabilities: DeviceCapabilities, connection: Awaited<ReturnType<InstanceType<typeof DeviceRequestCoordinator>['connect']>>, snapshot: ReadSnapshot) {
     const published: import('../../contracts/panel.js').PublishedModel = buildPanelModel(session, state);
     const source: PanelDeviceState = demoState();
     const report = buildDeviceModel({layout: {state: 'reading', progress: {done: 1, total: 16}}});
-    const read = await captureProfile(connection, {next: () => 1}, capabilities);
+    const read = await snapshotProfile(connection, {next: () => 1}, capabilities);
     if (read.incomplete) {
         const bank: string = read.document.macros;
         // @ts-expect-error An interrupted read is diagnostic recovery data, not a portable profile.
@@ -145,7 +145,7 @@ async function sessionContracts(session: PanelSession, state: PanelDeviceState, 
         void document;
     }
     const restored = await restoreProfile(connection, {next: () => 1}, capabilities, 'untrusted file', {
-        baseSnapshot: captured,
+        baseSnapshot: snapshot,
         saveRecovery: async document => document.format === 'charybdis-profile' ? 'backup.json' : 'recovery.json',
         onApplyProgress: view => {const step: string = view.current; void step;},
     });
@@ -155,12 +155,12 @@ async function sessionContracts(session: PanelSession, state: PanelDeviceState, 
     // @ts-expect-error Published timing values retain numeric/editor text types, never arbitrary objects.
     report.behaviorEditing.keyDefaults.KC_A.timing.tapHoldTerm = {milliseconds: 200};
     // @ts-expect-error Restore identity binds the profile, VIA store and settings, not only a digest.
-    const identity: CaptureIdentity = {profile: 'one digest'};
+    const identity: SnapshotIdentity = {profile: 'one digest'};
     // @ts-expect-error A demo export needs an open demo and its draft.
     demoExport(session);
-    if (captured.incomplete) {
+    if (snapshot.incomplete) {
         // @ts-expect-error Rename/reorder requires a complete portable read.
-        startLayerEdit(captured, 0);
+        startLayerEdit(snapshot, 0);
     }
     // @ts-expect-error Recovery persistence reports a saved path, never a success boolean.
     restoreProfile(connection, {next: () => 1}, capabilities, 'untrusted file', {saveRecovery: async () => true});
@@ -181,11 +181,11 @@ function orchestrationContracts(connection: Awaited<ReturnType<InstanceType<type
     loop.handleMessage(JSON.parse('"untrusted"') as unknown);
     // @ts-expect-error A history jump identifies the chosen step.
     const jump: PanelRequest = {type: 'jumpProfileDraft', draftRevision: 0};
-    // @ts-expect-error Hosts save a recovery path, not a success flag.
+    // @ts-expect-error Shells save a recovery path, not a success flag.
     openPanelLoop({post: () => {}, saveExport: async () => undefined, saveRecovery: async () => true});
     // @ts-expect-error Read counters and portable read text use different payloads.
     new ProfileDeviceService().reportReadProgress('layout', 'Loading');
-    // @ts-expect-error Theme choices are shared across the renderer and host.
+    // @ts-expect-error Theme choices are shared across the renderer and shell.
     const request: PanelRequest = {type: 'setTheme', theme: 'blue'};
     void request; void jump;
 }

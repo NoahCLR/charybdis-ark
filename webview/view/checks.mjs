@@ -1,5 +1,5 @@
 // @ts-check
-// The review's checks: what the host's layer walk (core/model/layer-reach.js)
+// The review's checks: what the core's layer walk (core/model/layer-reach.js)
 // found in the draft, arranged for reading, and whether Apply has to be
 // confirmed.
 //

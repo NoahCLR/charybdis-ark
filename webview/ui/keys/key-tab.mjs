@@ -101,7 +101,7 @@ export function tabKey(body) {
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-goto]")).forEach((button) => button.addEventListener("click", () => {
         state.tab = button.dataset.goto || "key";
         if (state.tab === "behaviours") selectBehaviourKey(followed.keycode);
-        if (state.tab === "combos" && !combos.length) openComboBuilder(null, edits.comboDefaultTermValue(getModel()));
+        if (state.tab === "combos" && !combos.length) openComboBuilder(null, edits.comboDefaultWindowValue(getModel()));
         render();
     }));
     const answer = position && resolvedPositions(layers(), state.layer, heldLayers()).find(entry => entry.position.layoutIndex === position.layoutIndex);

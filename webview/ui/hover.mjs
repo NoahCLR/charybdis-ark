@@ -160,7 +160,7 @@ function reachSections(model, layer, position, index,
     const custom = customOf(model, keyMeaning(position));
     const role = dualRole(model, position);
     // A row that changes nothing says so, and why, in place of its details
-    // (firmware D-F27 "Rows without steps"; the host judges it).
+    // (firmware D-F27 "Rows without steps"; the core judges it).
     const inert = Boolean(behaviour?.changesNothing);
     const inertNote = behaviour && inert ? `Its behaviour changes nothing: ${behaviourHasTiming(behaviour)
         ? "on this key a timing does nothing without a branch" : "it has no branches or timing of its own"}, so the key runs as if it had none.` : "";
@@ -213,7 +213,7 @@ function reachSections(model, layer, position, index,
                 : "Key feedback is off, so no tier flashes on the keyboard."}</div>` : ""}</div>`);
     }
     if (macros.length) {
-        const slots = model?.viaMacros || [];
+        const slots = model?.macros || [];
         sections.push(`<div class="hc-sect"><div class="hc-h">Macro</div>${macros.map((keycode) => {
             const macro = slots.find((row) => row.keycode === keycode);
             if (!macro) return `<div class="hc-sub">${esc(keycode)} · not reported by the keyboard</div>`;

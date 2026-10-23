@@ -3,7 +3,7 @@
 // replacing editors, and delayed replies must still belong to this read/draft.
 import {closeComboBuilder, getModel, layerName, post, resetDraftForms, setModel, state} from "./store.mjs";
 import {control} from "./view/controls.mjs";
-import {hostOf} from "./view/host.mjs";
+import {shellOf} from "./view/shell-panel.mjs";
 import {readScreen} from "./view/readiness.mjs";
 import {screenDefinition} from "./view/screens.mjs";
 import {sameEditorContent} from "./view/render-content.mjs";
@@ -47,7 +47,7 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
                 || !message.apply || (model.apply && message.apply.id < model.apply.id)) return;
             setModel({...model, apply: message.apply});
             // A copy's byte counter must not rebuild its disabled editors. The
-            // same main thread receives HID replies in the browser host.
+            // same main thread receives HID replies in the web page.
             refreshCommitBar();
             return;
         }
@@ -61,12 +61,12 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
         const demoNow = Boolean(message.model?.demo?.active);
         if (inDemo && !demoNow) state.screen = "keys";
         inDemo = demoNow;
-        // A host that leaves the theme to the panel says which; otherwise the
-        // host's own theme (VS Code's body class) holds.
-        const theme = hostOf(message.model).theme;
+        // A shell that leaves the theme to the panel says which; otherwise the
+        // shell's own theme (VS Code's body class) holds.
+        const theme = shellOf(message.model).theme;
         if (theme) document.documentElement.dataset.theme = theme;
         else delete document.documentElement.dataset.theme;
-        // The host reports a refused edit as a notice prefixed "Failed"; that is a
+        // The core reports a refused edit as a notice prefixed "Failed"; that is a
         // failure, so it is shown as one rather than as a neutral message.
         if (message.notice) {
             const failed = /^Failed/.test(message.notice);
@@ -74,8 +74,8 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
             state.notice = failed ? "" : message.notice;
         }
         if (message.resetDraftForms) resetDraftForms();
-        // A combo builder waiting on Keep or Delete closes when the host accepts
-        // the edit, and stays open with its fields when the host refuses it. A
+        // A combo builder waiting on Keep or Delete closes when the core accepts
+        // the edit, and stays open with its fields when the core refuses it. A
         // builder for a combo that no longer exists closes too.
         if (state.combo.awaiting) {
             if (/^Failed/.test(message.notice || "")) state.combo.awaiting = false;

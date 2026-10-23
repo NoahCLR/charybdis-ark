@@ -2,7 +2,7 @@
 'use strict';
 const {test, expect} = require('@playwright/test');
 const {openControls, publishAccepted} = require('./control-preview');
-const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === 'updateViaMacro'));
+const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === 'updateMacro'));
 const draftHistory = page => page.evaluate(() => window.__posted.filter(m => ['undoProfileDraft', 'redoProfileDraft'].includes(m.type)));
 const history = page => page.evaluate(async () => {
     const store = await import('/webview/store.mjs');
@@ -19,25 +19,25 @@ async function openMacro(page, payload = '{KC_A}{KC_C}') {
     await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17'});
     await page.evaluate(async payload => {
         const store = await import('/webview/store.mjs'), model = structuredClone(store.getModel());
-        Object.assign(model.viaMacros[17], {payload, bytes: 6, empty: false});
+        Object.assign(model.macros[17], {payload, bytes: 6, empty: false});
         Object.assign(model.draft, {canUndo: true, canRedo: true});
         store.setModel(model); store.resetDraftForms(); store.render();
         window.__posted.length = 0;
     }, payload);
 }
 
-test('undo restores a deleted macro step after host acceptance, and redo deletes it without draft history commands', async ({page}) => {
+test('undo restores a deleted macro step after the core accepts it, and redo deletes it without draft history commands', async ({page}) => {
     await openMacro(page);
     const removedId = await page.locator('[data-step-tile="1"]').getAttribute('data-step-id');
     await page.locator('[data-step-tile="1"]').click(); await page.keyboard.press('Delete');
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{KC_A}');
-    await publishAccepted(page, ['viaMacros', 17, 'payload'], '{KC_A}');
+    await publishAccepted(page, ['macros', 17, 'payload'], '{KC_A}');
     await page.keyboard.press('Control+z');
     await expect(page.locator('[data-step-tile]')).toHaveCount(2);
     await expect(page.locator('[data-step-tile="1"]')).toHaveAttribute('data-step-id', removedId);
     await expect(page.locator('[data-step-tile="1"]')).toBeFocused();
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{KC_A}{KC_C}');
-    await publishAccepted(page, ['viaMacros', 17, 'payload'], '{KC_A}{KC_C}');
+    await publishAccepted(page, ['macros', 17, 'payload'], '{KC_A}{KC_C}');
     await page.keyboard.press('Control+Shift+z');
     await expect(page.locator('[data-step-tile]')).toHaveCount(1);
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{KC_A}');
@@ -143,7 +143,7 @@ test('Shift-click copy/paste preserves order, uses new identities, and paste/gro
     expect(await draftHistory(page)).toEqual([]);
 });
 
-test('select-all and clipboard work between slots while history stays per slot; a host reset clears stale history', async ({page}) => {
+test('select-all and clipboard work between slots while history stays per slot; a reset from the core clears stale history', async ({page}) => {
     await openMacro(page);
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+a'); await page.keyboard.press('Control+c');
     await page.locator('[data-slot="VIA_MACRO_18"]').click();
@@ -222,7 +222,7 @@ test('Ctrl/Meta-click selects disjoint steps; copying includes only selected ste
     await expect(page.locator('[data-step-tile]')).toHaveCount(2);
 });
 
-test('restoring while a host inspection is pending rejects its late reply and preserves the original draft', async ({page}) => {
+test('restoring while an inspection by the core is pending rejects its late reply and preserves the original draft', async ({page}) => {
     await openMacro(page);
     await page.evaluate(() => {
         window.__heldHistory = []; window.__historyDispatch = window.dispatchEvent.bind(window);

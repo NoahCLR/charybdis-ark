@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openPreview} = require("./host-page");
+const {openPreview} = require("./shell-page");
 
 for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     test(`long literal macro text stays inside its row (${theme})`, async ({page}) => {
@@ -36,13 +36,13 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
         }
         await expect(page.locator("[data-macro-feedback]")).toContainText("Shorten it or clear another macro");
         await expect(page.locator("[data-macro-feedback]")).not.toContainText("not a key");
-        const updates = await page.evaluate(() => window.__posted.filter(message => message.type === "updateViaMacro"));
+        const updates = await page.evaluate(() => window.__posted.filter(message => message.type === "updateMacro"));
         expect(updates).toHaveLength(1); // Only the 400-byte prose fits.
         await page.locator("[data-raw-toggle]").click();
         await page.locator("[data-raw-payload]").fill(pastedCode);
         await page.locator("[data-raw-payload]").dispatchEvent("change");
         await expect(page.locator("[data-macro-feedback]")).toContainText(".keycode = CUSTOM_KEY_0 is not a key");
         await expect(page.locator("[data-step-text]")).toBeDisabled();
-        expect(await page.evaluate(() => window.__posted.filter(message => message.type === "updateViaMacro").length)).toBe(1);
+        expect(await page.evaluate(() => window.__posted.filter(message => message.type === "updateMacro").length)).toBe(1);
     });
 }

@@ -4,13 +4,13 @@ const {PHASE, editModeWords, quietWords} = require("../model/vocabulary");
 
 // The panel's side of a session: what extension.js used to decide inline.
 //
-// A panel session is a plain object the host keeps per window — the device
+// A panel session is a plain object the shell keeps per window — the device
 // service, the draft, the layer editor, and the outbox the next model carries
 // (a notice, an accepted edit, a request to reset forms). Whether its draft
 // may be edited, and the changes that move several of its fields at once, are
 // panel-session-state.js's. Everything here is
 // free of VS Code, so it is tested like the rest of core/; panel-loop.js runs
-// it for every host, and extension.js keeps only VS Code's dialogs, files and
+// it for every shell, and extension.js keeps only VS Code's dialogs, files and
 // progress.
 
 /**
@@ -31,7 +31,7 @@ const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDr
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
 const {LOST_WORDS, RECONNECT_WORDS, RESTART_WORDS} = require("./keyboard-reconnect");
-// Retained exports for hosts that inspect the routes; never hand-maintained.
+// Retained exports for shells that inspect the routes; never hand-maintained.
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
 const DEMO_MESSAGES = controlsOn("demo");
@@ -39,25 +39,25 @@ const DEMO_MESSAGES = controlsOn("demo");
 const WORK_ROUTES = new Set(["draft", "portable", "demo", "read"]);
 const BUSY_REFUSAL = "Wait for the current operation to finish before starting another.";
 
-// What the panel says and offers that depends on its host, published as
-// `model.host`, so the panel never asks which host it is in. A host passes
+// What the panel says and offers that depends on its shell, published as
+// `model.shell`, so the panel never asks which shell it is in. A shell passes
 // `words` that differ from these, and `panel()` for what it offers now:
 //
-//   chooseKeyboard   the panel offers Choose keyboard, which opens the host's picker
-//   blocked          {title, detail}: why this host cannot reach a keyboard at all
+//   chooseKeyboard   the panel offers Choose keyboard, which opens the shell's picker
+//   blocked          {title, detail}: why this shell cannot reach a keyboard at all
 //   theme            "light" or "dark" when the panel offers its own theme toggle
 //   recoveries       [{id, name, savedAt}]: recovery copies the panel lists, each downloadable
-//   build            {version, commit} the host was built from
-//   progress         what the host is doing, where it has no indicator of its own
+//   build            {version, commit} the shell was built from
+//   progress         what the shell is doing, where it has no indicator of its own
 //
-// A session without a host (the preview, tests) describes the extension's.
-const HOST_WORDS = Object.freeze({
+// A session without a shell (the preview, tests) describes the extension's.
+const SHELL_WORDS = Object.freeze({
     noKeyboard: "No keyboard is connected. Connect one and choose Read keyboard.",
     connectHint: "Connect a Charybdis, then read it to begin editing.",
 });
-/** @param {import("./types.js").PanelHost | null | undefined} host @returns {import("../../contracts/model.js").HostPanel} */
-function hostModel(host) {
-    const offered = host?.panel?.() || {};
+/** @param {import("./types.js").PanelShell | null | undefined} shell @returns {import("../../contracts/model.js").ShellPanel} */
+function shellModel(shell) {
+    const offered = shell?.panel?.() || {};
     return {
         chooseKeyboard: Boolean(offered.chooseKeyboard),
         blocked: offered.blocked || null,
@@ -65,7 +65,7 @@ function hostModel(host) {
         recoveries: Array.isArray(offered.recoveries) ? offered.recoveries : null,
         build: offered.build || null,
         progress: offered.progress || null,
-        words: {...HOST_WORDS, ...host?.words},
+        words: {...SHELL_WORDS, ...shell?.words},
     };
 }
 
@@ -190,7 +190,7 @@ function buildPanelModel(session, state) {
     // A read that did not fail, held only by its draft (stale, or another
     // keyboard's): the panel says that, not that the read failed.
     const held = !readReady && session.readReady !== false && binding.reason !== "no-draft" ? binding.reason : "";
-    const host = hostModel(session.host);
+    const shell = shellModel(session.shell);
     // A renamed keyboard that has gone to take its new name is coming back:
     // the panel waits for it as for a read, rather than asking to connect one.
     const reconnecting = session.reconnect && !state.connected ? {name: session.reconnect.name, lost: session.reconnect.lost !== undefined, ...(session.reconnect.restart ? {restart: true} : {})} : null;
@@ -206,7 +206,7 @@ function buildPanelModel(session, state) {
     };
     // What the firmware says about itself and its ceilings (Keyboard, Settings).
     const firmware = firmwareView(state.capabilities);
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting, firmware, editMode, liveProposal: proposal, runtime};
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, shell, load, reconnecting, firmware, editMode, liveProposal: proposal, runtime};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,
@@ -267,10 +267,10 @@ function panelRequest(value) {
 
 /**
  * Where a message from the webview goes. Draft edits are staged here, since
- * staging is synchronous; everything else names the handler the host runs:
+ * staging is synchronous; everything else names the handler the shell runs:
  * "draft" (review, undo, apply…), "portable" (backups, layers), "read", or
  * "none" for a message that only needs an answer. Every refusal throws, and
- * the host turns it into a notice.
+ * the shell turns it into a notice.
  */
 /** @param {Session} session @param {import("./types.js").PanelMessage | null | undefined} message @param {State} state */
 function routeMessage(session, message, state) {
@@ -284,7 +284,7 @@ function routeMessage(session, message, state) {
     }
     // Nothing starts while a read or backup runs, and a request that would is
     // refused out loud (panel-loop.js). A webview that loads again only asks
-    // for the model, and host controls start nothing here, so both are answered.
+    // for the model, and shell controls start nothing here, so both are answered.
     if (session.portableBusy || session.readBusy) {
         if (type === "ready" || !(DRAFT_EDITS.has(type) || WORK_ROUTES.has(control?.route || ""))) return "none";
         throw new Error(BUSY_REFUSAL);
@@ -420,4 +420,4 @@ function applyLayerEdit(edit, message) {
 /** @param {LayerEdit} edit */
 const layerEditDocument = (edit) => rewriteLayers(edit, edit.names);
 
-module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, shellModel, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};

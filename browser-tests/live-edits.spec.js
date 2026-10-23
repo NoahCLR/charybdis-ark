@@ -3,14 +3,14 @@
 // Live + review (firmware D-F32) in the preview: the mode switch and its
 // questions, Save and Revert, a live edit's trap question, a toggle turned off
 // by key, and an edit in every domain posted from the same controls as in
-// Apply. The host sends each one to the keyboard; the preview logs what the
+// Apply. The core sends each one to the keyboard; the preview logs what the
 // panel posts.
 const {test, expect} = require("@playwright/test");
 const {clearPosts, posted, expectPost, change} = require("./control-preview");
 
 /** @param {import("@playwright/test").Page} page @param {string} screen @param {object} [state] */
 async function openLive(page, screen, state = {}) {
-    await page.goto("/preview/index.html?host=live");
+    await page.goto("/preview/index.html?shell=live");
     await page.locator(`[data-screen="${screen}"]`).click();
     await page.evaluate(async state => {
         const store = await import("/webview/store.mjs");
@@ -76,7 +76,7 @@ test("review compares what is saved with what runs, and Save posts the keyboard'
     await expect(sheet).toContainText("Saved");
     await expect(sheet).toContainText("Running now");
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "reviewProfileDraft"})]);
-    // The host marks the review read; the preview stands in for it.
+    // The core marks the review read; the preview stands in for it.
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
@@ -168,7 +168,7 @@ test("the mode question lists the checks Save confirms, and Save anyway confirms
 });
 
 // Each domain's own control posts its edit in Live + review exactly as in
-// Apply; the host sends it live.
+// Apply; the core sends it live.
 test("keys: a key change posts", async ({page}) => {
     await openLive(page, "keys");
     await change(page.locator('[data-f="key:0:0:keycode"]'), "KC_Q");
@@ -187,7 +187,7 @@ test("settings: a timing posts", async ({page}) => {
 test("combos: the default window posts", async ({page}) => {
     await openLive(page, "settings");
     await change(page.locator('[data-f="settings:combo:default"]'), 77);
-    await expectPost(page, {type: "updateComboDefaultTerm", defaultTermMs: "77"});
+    await expectPost(page, {type: "updateComboDefaultWindow", defaultTermMs: "77"});
 });
 test("pointing: a scrolling field posts its record", async ({page}) => {
     await openLive(page, "pointing", {pdSlot: 0});
@@ -205,7 +205,7 @@ test("macros: a macro's name posts", async ({page}) => {
     await name.fill("Hello 777");
     await name.press("Enter");
     await expect.poll(() => posted(page).then(rows => JSON.stringify(rows))).toContain("Hello 777");
-    expect((await posted(page))[0].type).toBe("updateViaMacro");
+    expect((await posted(page))[0].type).toBe("updateMacro");
 });
 test("behaviours: a custom key's behaviour posts", async ({page}) => {
     await openLive(page, "customKeys");
@@ -239,7 +239,7 @@ test("switching into Live from Live + review asks Save or Revert; from Apply wit
 });
 
 test("in Live an edit posts as in Live + review, the bar has no Save, and leaving Live asks nothing", async ({page}) => {
-    await page.goto("/preview/index.html?host=live-auto");
+    await page.goto("/preview/index.html?shell=live-auto");
     await page.locator('[data-screen="mouse"]').click();
     await page.evaluate(() => {window.__posted.length = 0;});
     const mode = page.locator('[data-f="rail:edit-mode"]');
@@ -264,7 +264,7 @@ test("in Live an edit posts as in Live + review, the bar has no Save, and leavin
 });
 
 test("in Live the keyboard's own save, a failed one and halves apart each say what to do", async ({page}) => {
-    await page.goto("/preview/index.html?host=live-auto");
+    await page.goto("/preview/index.html?shell=live-auto");
     /** @param {object} keyboard @param {boolean} [unsaved] */
     const set = (keyboard, unsaved = true) => page.evaluate(async ([keyboard, unsaved]) => {
         const store = await import("/webview/store.mjs");
@@ -307,7 +307,7 @@ test("in Live the keyboard's own save, a failed one and halves apart each say wh
 // Firmware D-F34: a keyboard that stopped saving says so in one line where it
 // used to look "not ready" or "catching up", and Restart posts its control.
 test("a keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
-    await page.goto("/preview/index.html?host=live-stopped");
+    await page.goto("/preview/index.html?shell=live-stopped");
     const bar = page.locator(".commit.live.stopped");
     await expect(bar).toContainText("The keyboard stopped saving");
     await expect(bar).toContainText("Restart it to continue.");

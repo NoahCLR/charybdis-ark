@@ -79,7 +79,7 @@ for (const method of ["readLayout", "readCommittedProfile"]) {
     }
 }
 
-test("complete capture checks active origin before exposing macros or other domains", async t => {
+test("a complete snapshot checks active origin before exposing macros or other domains", async t => {
     const {service} = await recoveryKeyboard(t, {mismatch: "origin"});
     await assert.rejects(service.readKeyboardProfile(), {code: "PROFILE_CHANGED"});
     assert.equal(service.snapshot().macroView, null);

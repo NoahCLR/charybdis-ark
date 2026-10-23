@@ -62,7 +62,7 @@ export interface ControlPayloads {
         openProfileDraftHistory: {discardDemo?: boolean};
         closeProfileDraftHistory: {discardDemo?: boolean};
     };
-    host: {
+    shell: {
         chooseKeyboard: {discardDemo?: boolean};
         forgetKeyboard: Record<never, never>;
         setTheme: {theme: 'light' | 'dark'};
@@ -71,7 +71,7 @@ export interface ControlPayloads {
         deleteRecovery: {id: string | number};
     };
     inspect: {
-        validateViaMacro: Omit<Extract<PanelEdit, {type: 'validateViaMacro'}>, 'type'>;
+        validateMacro: Omit<Extract<PanelEdit, {type: 'validateMacro'}>, 'type'>;
     };
 }
 export type ControlsOn<R extends keyof ControlPayloads> = {[T in keyof ControlPayloads[R]]: {type: T} & ControlPayloads[R][T]}[keyof ControlPayloads[R]];
@@ -80,7 +80,7 @@ export type ControlType = PanelControl['type'];
 export type DraftControl = ControlsOn<'draft'>;
 export type PortableControl = ControlsOn<'portable'>;
 export type DemoControl = ControlsOn<'demo'>;
-export type HostControl = ControlsOn<'host'>;
+export type ShellControl = ControlsOn<'shell'>;
 export type LayerEditControl = Extract<PortableControl, {type: 'editPortableLayer'}>;
 export type LayerSaveControl = Extract<PortableControl, {type: 'savePortableLayers'}>;
 /** The store attaches the current draft identity to edits and controls. */

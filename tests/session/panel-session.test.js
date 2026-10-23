@@ -71,7 +71,7 @@ test("draft edits are staged, and refused when stale, draftless or on the wrong 
 
 test("the model carries the draft's steps only while the history sheet is open", () => {
     const session = panelWithDraft();
-    assert.equal(buildPanelModel(session, connected()).draft.steps, undefined, "closed, the history stays in the host");
+    assert.equal(buildPanelModel(session, connected()).draft.steps, undefined, "closed, the history stays in the shell");
     assert.equal(routeMessage(session, {type: "openProfileDraftHistory"}, connected()), "none");
     const steps = buildPanelModel(session, connected()).draft.steps;
     assert.deepEqual(steps.map((entry) => [entry.label, entry.current]), [["Read from the keyboard", true]]);
@@ -101,7 +101,7 @@ test("every other message names the handler that answers it", () => {
     assert.equal(session.readBusy, true);
     assert.throws(() => routeMessage(session, {type: "refresh"}, connected()), /current operation/, "a second read is refused explicitly");
     assert.equal(routeMessage(session, {type: "ready"}, connected()), "none", "a reloaded panel is answered with the model");
-    assert.equal(routeMessage(session, {type: "setTheme", theme: "dark"}, connected()), "none", "a host control starts nothing, so it is answered");
+    assert.equal(routeMessage(session, {type: "setTheme", theme: "dark"}, connected()), "none", "a shell control starts nothing, so it is answered");
     session.readBusy = false;
     assert.equal(routeMessage(session, {type: "ready"}, connected()), "read");
     session.readBusy = false;
@@ -110,7 +110,7 @@ test("every other message names the handler that answers it", () => {
     session.portableReview = {before: snapshot()};
     session.portableLayers = startLayerEdit(snapshot(), session.draft.revision);
     assert.equal(routeMessage(session, {type: "selectDevice", deviceId: "other"}, connected({devices: [device, {id: "other"}]})), "read");
-    assert.equal(session.resetDraftForms, true, "switching devices clears unfinished form text, but keeps the host draft");
+    assert.equal(session.resetDraftForms, true, "switching devices clears unfinished form text, but keeps the shell draft");
     assert.equal(session.portableReview, undefined, "a file review belongs to the previous keyboard");
     assert.equal(session.portableLayers, undefined, "a layer editor belongs to the previous keyboard");
     session.readBusy = false;
@@ -508,27 +508,27 @@ test("the profile meter follows the draft, and is absent without a keyboard or a
     assert.equal(buildPanelModel(session, connected()).portable.usage, null, "firmware that advertises no size shows no meter");
 });
 
-test("the model says what its host offers, in the host's words", () => {
-    const {HOST_WORDS} = require("../../core/session/panel-session");
-    // A session with no host describes the extension's: nothing extra, its words.
+test("the model says what its shell offers, in the shell's words", () => {
+    const {SHELL_WORDS} = require("../../core/session/panel-session");
+    // A session with no shell describes the extension's: nothing extra, its words.
     const plain = buildPanelModel(panelWithDraft(), connected());
-    assert.deepEqual(plain.host, {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {...HOST_WORDS}});
+    assert.deepEqual(plain.shell, {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {...SHELL_WORDS}});
 
     const session = panelWithDraft();
     const recoveries = [{id: 1, name: "recovery-1.charybdis.json", savedAt: "2026-10-06T09:00:00.000Z"}];
-    session.host = {words: {noKeyboard: "Choose keyboard to connect one."},
+    session.shell = {words: {noKeyboard: "Choose keyboard to connect one."},
         panel: () => ({chooseKeyboard: true, theme: "light", recoveries, build: {version: "1", commit: "abc"}, progress: "Reading"})};
     const model = buildPanelModel(session, connected());
-    assert.deepEqual(model.host, {chooseKeyboard: true, blocked: null, theme: "light", recoveries, build: {version: "1", commit: "abc"}, progress: "Reading",
-        words: {...HOST_WORDS, noKeyboard: "Choose keyboard to connect one."}});
-    session.host.panel = () => ({theme: "sepia", blocked: {title: "No", detail: "Why"}});
-    assert.equal(buildPanelModel(session, connected()).host.theme, null, "only a theme the panel has");
-    assert.deepEqual(buildPanelModel(session, connected()).host.blocked, {title: "No", detail: "Why"});
+    assert.deepEqual(model.shell, {chooseKeyboard: true, blocked: null, theme: "light", recoveries, build: {version: "1", commit: "abc"}, progress: "Reading",
+        words: {...SHELL_WORDS, noKeyboard: "Choose keyboard to connect one."}});
+    session.shell.panel = () => ({theme: "sepia", blocked: {title: "No", detail: "Why"}});
+    assert.equal(buildPanelModel(session, connected()).shell.theme, null, "only a theme the panel has");
+    assert.deepEqual(buildPanelModel(session, connected()).shell.blocked, {title: "No", detail: "Why"});
 });
 
-test("no host or firmware brings back the retired PD upgrade export", () => {
+test("no shell or firmware brings back the retired PD upgrade export", () => {
     const session = panelWithDraft();
-    session.host = {exportPdUpgrade: async () => {}};
+    session.shell = {exportPdUpgrade: async () => {}};
     const state = connected();
     state.capabilities = {...state.capabilities, featureFlags: 1 << 13};
     assert.equal("pdUpgradeAvailable" in buildPanelModel(session, state).portable, false);

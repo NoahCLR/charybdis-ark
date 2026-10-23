@@ -5,8 +5,8 @@ const {PHASE, PHASE_WORDS} = require("../model/vocabulary");
 // Panel controls have one policy: where they run, what they bind to, what
 // the demo permits and which operation surrounds them. The actions themselves
 // live in the controller modules; this inert table cannot import them.
-/** @typedef {'draft' | 'portable' | 'demo' | 'read' | 'view' | 'host' | 'inspect'} Route */
-/** @typedef {{route: Route, action: string, binding: 'none' | 'apply' | 'import' | 'profile' | 'inspect', demo: 'allow' | 'refuse' | 'ignore' | 'leave' | 'export' | 'open' | 'replace' | 'close' | 'host-leave', phase: 'panel' | 'apply' | 'restore' | 'read' | 'view' | 'host' | 'inspect', identity: boolean}} Control */
+/** @typedef {'draft' | 'portable' | 'demo' | 'read' | 'view' | 'shell' | 'inspect'} Route */
+/** @typedef {{route: Route, action: string, binding: 'none' | 'apply' | 'import' | 'profile' | 'inspect', demo: 'allow' | 'refuse' | 'ignore' | 'leave' | 'export' | 'open' | 'replace' | 'close' | 'shell-leave', phase: 'panel' | 'apply' | 'restore' | 'read' | 'view' | 'shell' | 'inspect', identity: boolean}} Control */
 /** @type {Readonly<Record<import('../../contracts/messages.js').ControlType, Readonly<Control>>>} */
 const CONTROLS = Object.freeze({
     reviewProfileDraft: Object.freeze({route: "draft", action: "review", binding: "none", demo: "allow", phase: "panel", identity: true}),
@@ -45,13 +45,13 @@ const CONTROLS = Object.freeze({
     selectDevice: Object.freeze({route: "read", action: "select", binding: "none", demo: "leave", phase: "read", identity: false}),
     openProfileDraftHistory: Object.freeze({route: "view", action: "openHistory", binding: "none", demo: "allow", phase: "view", identity: false}),
     closeProfileDraftHistory: Object.freeze({route: "view", action: "closeHistory", binding: "none", demo: "allow", phase: "view", identity: false}),
-    chooseKeyboard: Object.freeze({route: "host", action: "chooseKeyboard", binding: "none", demo: "host-leave", phase: "host", identity: false}),
-    forgetKeyboard: Object.freeze({route: "host", action: "forgetKeyboard", binding: "none", demo: "allow", phase: "host", identity: false}),
-    setTheme: Object.freeze({route: "host", action: "setTheme", binding: "none", demo: "allow", phase: "host", identity: false}),
-    downloadRecovery: Object.freeze({route: "host", action: "downloadRecovery", binding: "none", demo: "allow", phase: "host", identity: false}),
-    useRecovery: Object.freeze({route: "host", action: "useRecovery", binding: "none", demo: "refuse", phase: "host", identity: false}),
-    deleteRecovery: Object.freeze({route: "host", action: "deleteRecovery", binding: "none", demo: "allow", phase: "host", identity: false}),
-    validateViaMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    chooseKeyboard: Object.freeze({route: "shell", action: "chooseKeyboard", binding: "none", demo: "shell-leave", phase: "shell", identity: false}),
+    forgetKeyboard: Object.freeze({route: "shell", action: "forgetKeyboard", binding: "none", demo: "allow", phase: "shell", identity: false}),
+    setTheme: Object.freeze({route: "shell", action: "setTheme", binding: "none", demo: "allow", phase: "shell", identity: false}),
+    downloadRecovery: Object.freeze({route: "shell", action: "downloadRecovery", binding: "none", demo: "allow", phase: "shell", identity: false}),
+    useRecovery: Object.freeze({route: "shell", action: "useRecovery", binding: "none", demo: "refuse", phase: "shell", identity: false}),
+    deleteRecovery: Object.freeze({route: "shell", action: "deleteRecovery", binding: "none", demo: "allow", phase: "shell", identity: false}),
+    validateMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
 });
 
 /** @param {string | null | undefined} type @returns {Readonly<Control> | undefined} */

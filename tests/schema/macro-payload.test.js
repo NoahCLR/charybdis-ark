@@ -16,7 +16,7 @@ test("protection has one canonical prefix before the steps", () => {
     }
 });
 
-test("VIA macros round-trip text, literal braces, Cmd+N, holds and delays", () => {
+test("Macros round-trip text, literal braces, Cmd+N, holds and delays", () => {
     const payload = 'hello {{"key": 1}}\n{KC_LGUI,KC_N}{250}{+KC_LSFT}{KC_A}{-KC_LSFT}{0}';
     const bytes = encodeMacroPayload(payload);
     assert.deepEqual(encodeMacroPayload(decodeMacroPayload(bytes)), bytes);

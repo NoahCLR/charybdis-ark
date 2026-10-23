@@ -16,7 +16,7 @@ async function editor(page, {free} = {}) {
     await page.locator('[data-insert-kind="text"]').click();
 }
 const inspection = page => page.evaluate(async () => (await import('/webview/store.mjs')).macroForm('VIA_MACRO_17').validation?.validation);
-const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateViaMacro"));
+const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateMacro"));
 async function add(page, kind) {
     await page.locator(`[data-insert-kind="${kind}"]`).click();
 }
@@ -149,7 +149,7 @@ test("discarded input ignores delayed validation and can be entered again", asyn
     await editor(page);
     await page.locator("[data-step-text]").fill("pending");
     await expect.poll(() => inspection(page).then(value => value?.bytes)).toBe(7);
-    const request = await page.evaluate(() => window.__posted.find(m => m.type === "validateViaMacro"));
+    const request = await page.evaluate(() => window.__posted.find(m => m.type === "validateMacro"));
     await page.locator('[data-act="discard"]').click();
     await page.evaluate(message => window.dispatchEvent(new MessageEvent("message", {data: {...message, type: "macroValidation", validation: {error: "OLD ERROR"}}})), request);
     await expect(page.locator("[data-macro-feedback]")).not.toContainText("OLD ERROR");

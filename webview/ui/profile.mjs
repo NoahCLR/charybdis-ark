@@ -15,7 +15,7 @@ import {getModel, post, canEdit as canEditArea} from "../store.mjs";
 import {topbar} from "./shell.mjs";
 import {categorySummary, statusBesideCount} from "../view/review.mjs";
 import {stageOrder} from "../view/vocabulary.mjs";
-import {copyTitle, deleteRecovery, downloadRecovery, hostOf, useRecovery} from "../view/host.mjs";
+import {copyTitle, deleteRecovery, downloadRecovery, shellOf, useRecovery} from "../view/shell-panel.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {reviewPortableProfile} from "../view/edits.mjs";
 import {fitsLine} from "../view/backups.mjs";
@@ -72,7 +72,7 @@ export function screenProfile() {
     wireProfileDrop(/** @type {HTMLElement} */ (actions.querySelector("[data-profile-drop]")));
     pad.appendChild(actions);
 
-    const recoveries = hostOf(model).recoveries;
+    const recoveries = shellOf(model).recoveries;
     if (!demo) pad.appendChild(recoveriesCard(recoveries));
     pad.appendChild(defaultsCard());
 

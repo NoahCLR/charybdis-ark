@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const Module = require("node:module");
 
-// extension.js needs the host only when activated; this checks the copy rules.
+// extension.js needs VS Code only when activated; this checks the copy rules.
 const load = Module._load;
 Module._load = function (request, ...rest) { return request === "vscode" ? {} : load.call(this, request, ...rest); };
 const {adoptFormerRecoveries} = require("../extension");

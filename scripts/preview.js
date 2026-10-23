@@ -33,7 +33,7 @@ const PREVIEW_BASE = [
 ];
 
 // Keys the keyboard stores as bare user keycodes: configured pointing modes
-// (slots 0 and 12), empty slots (6 and 20), a VIA macro and a custom key. The
+// (slots 0 and 12), empty slots (6 and 20), a macro and a custom key. The
 // preview carries them because they are the values whose stored name and
 // semantic name differ.
 /** @type {Record<number, number>} */
@@ -78,17 +78,17 @@ const capabilities = {
     macroBytes: 34903,
 };
 
-// The hosts the preview stands in for. The extension's is what it always was;
-// the web page's says what the page offers, in its words (web/web-host.mjs),
+// The shells the preview stands in for. The extension's is what it always was;
+// the web page's says what the page offers, in its words (web/web-shell.mjs),
 // with no keyboard yet, or in a browser without WebHID. preview/index.html
-// shows the extension's; ?host=web, web-none or web-unsupported the others.
-/** @type {import("../core/session/types.js").PanelHost} */
-const VSCODE_HOST = {};
-/** @returns {Promise<Record<string, import("../core/session/types.js").PanelHost>>} */
-async function webHosts() {
-    const {BLOCKED, WEB_WORDS} = await import("../web/web-host.mjs");
+// shows the extension's; ?shell=web, web-none or web-unsupported the others.
+/** @type {import("../core/session/types.js").PanelShell} */
+const VSCODE_SHELL = {};
+/** @returns {Promise<Record<string, import("../core/session/types.js").PanelShell>>} */
+async function webShells() {
+    const {BLOCKED, WEB_WORDS} = await import("../web/web-shell.mjs");
     const {version} = require("../package.json");
-    /** @type {Partial<import("../contracts/model.js").HostPanel>} */
+    /** @type {Partial<import("../contracts/model.js").ShellPanel>} */
     const offered = {chooseKeyboard: true, theme: "dark", build: {version, commit: "preview"}, recoveries: [
         // Made by different operations on two keyboards, and one stored
         // before copies recorded either.
@@ -98,36 +98,36 @@ async function webHosts() {
         {id: 1, name: "recovery-2026-10-01T18-40-55-020Z.charybdis.json", savedAt: "2026-10-01T18:40:55.020Z"},
     ]};
     return {
-        none: VSCODE_HOST,
-        demo: VSCODE_HOST,
+        none: VSCODE_SHELL,
+        demo: VSCODE_SHELL,
         "demo-edited": {words: WEB_WORDS, panel: () => offered},
         web: {words: WEB_WORDS, panel: () => offered},
-        live: VSCODE_HOST,
-        "live-auto": VSCODE_HOST,
+        live: VSCODE_SHELL,
+        "live-auto": VSCODE_SHELL,
         // A keyboard that stopped saving (firmware D-F34), unsaved edits on it.
-        "live-stopped": VSCODE_HOST,
+        "live-stopped": VSCODE_SHELL,
         "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
         "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
     };
 }
 
-// No keyboard: what a host publishes before one is chosen or connected.
-/** @param {import("../core/session/types.js").PanelHost} host */
-function emptyModel(host) {
-    return buildPanelModel({service: {portable: null}, host}, {connected: false, busy: false, devices: [], phase: PHASE.EMPTY});
+// No keyboard: what a shell publishes before one is chosen or connected.
+/** @param {import("../core/session/types.js").PanelShell} shell */
+function emptyModel(shell) {
+    return buildPanelModel({service: {portable: null}, shell}, {connected: false, busy: false, devices: [], phase: PHASE.EMPTY});
 }
 
-// The demo, as the host loop opens it: the bundled demo profile in a real
+// The demo, as the shell loop opens it: the bundled demo profile in a real
 // draft (core/session/demo-session.js), and with `edits` staged in it, so the
 // review and leaving with edits not exported can be looked at.
 /**
- * @param {import("../core/session/types.js").PanelHost} host
- * @param {Exclude<import("../contracts/edits.js").PanelEdit, {type: "reviewPortableProfile" | "validateViaMacro"}>[]} [edits]
+ * @param {import("../core/session/types.js").PanelShell} shell
+ * @param {Exclude<import("../contracts/edits.js").PanelEdit, {type: "reviewPortableProfile" | "validateMacro"}>[]} [edits]
  */
-function demoModel(host, edits = []) {
+function demoModel(shell, edits = []) {
     const {openDemo, panelState} = require("../core/session/demo-session");
     /** @type {import("../core/session/types.js").PanelSession} */
-    const session = {service: {portable: null, snapshot: () => ({connected: false, busy: false, devices: []})}, host};
+    const session = {service: {portable: null, snapshot: () => ({connected: false, busy: false, devices: []})}, shell};
     openDemo(session, session.service.snapshot());
     // openDemo synchronously created this draft from its validated fixture.
     const draft = /** @type {InstanceType<typeof ProfileDraftSession>} */ (session.draft);
@@ -142,11 +142,11 @@ const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed"
 
 // `live` renders a keyboard in Live + review (firmware D-F32): the draft is
 // its working copy, with one unsaved edit, and a combos key has turned combos
-// off for now. ?host=live shows it; ?host=live-auto the same keyboard in Live
-// (`mode` 1), waiting to save the edit by itself; ?host=live-stopped one that
+// off for now. ?shell=live shows it; ?shell=live-auto the same keyboard in Live
+// (`mode` 1), waiting to save the edit by itself; ?shell=live-stopped one that
 // stopped saving (firmware D-F34, `stopped`), with Restart.
-/** @param {import("../core/session/types.js").PanelHost} [host] @param {{live?: boolean, mode?: number, stopped?: boolean}} [options] */
-function buildModel(host = VSCODE_HOST, {live = false, mode = 2, stopped = false} = {}) {
+/** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean}} [options] */
+function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = false} = {}) {
     const doc = fillPreviewLayer(document32());
     const snapshot = {
         document: doc,
@@ -186,15 +186,15 @@ function buildModel(host = VSCODE_HOST, {live = false, mode = 2, stopped = false
         runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true},
             live: {defaultDpi: 1200, snipingDpi: 400, rgbMode: 1, rgbColor: 0, defaultLayers: 1, keymapOptions: 0}} : null,
     };
-    // The host's own model builder, so the preview cannot drift from it. The
+    // The shell's own model builder, so the preview cannot drift from it. The
     // layer editor is open so Rename & Reorder has something to show.
-    const panel = {service: {portable: null}, host, draft: session, portableLayers: startLayerEdit(snapshot, session.revision)};
+    const panel = {service: {portable: null}, shell, draft: session, portableLayers: startLayerEdit(snapshot, session.revision)};
     const model = buildPanelModel(panel, state);
     return model;
 }
 
 // `--device` renders the interface against the keyboard that is plugged in,
-// read-only, the way the host builds its model. Fixture data cannot show what a
+// read-only, the way the shell builds its model. Fixture data cannot show what a
 // real profile does to a surface — every naming inconsistency found so far came
 // from looking at this.
 async function deviceModel() {
@@ -214,7 +214,7 @@ async function deviceModel() {
 
         // Exactly the model the panel would build for this keyboard.
         /** @type {import("../core/session/types.js").PanelSession} */
-        const panel = {service, host: VSCODE_HOST};
+        const panel = {service, shell: VSCODE_SHELL};
         observeService(panel, service.snapshot());
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
@@ -226,21 +226,21 @@ async function deviceModel() {
 }
 
 const model = process.argv.includes("--device") ? deviceModel() : buildModel();
-// `--vscode` also writes the page as the panel actually renders it: the host
+// `--vscode` also writes the page as the panel actually renders it: the shell
 // puts its own stylesheet in front of this one (a cascade layer that dresses
 // <code> and pads the body) and hangs its theme class on <body>. Both of those
 // have broken this interface before, and neither is visible in preview/index.html.
 /** @param {string} page */
-function writeHostPages(page) {
+function writeShellPages(page) {
     const root = "/Applications/Visual Studio Code.app/Contents/Resources/app";
-    const shell = path.join(root, "out/vs/workbench/contrib/webview/browser/pre/index.html");
-    if (!fs.existsSync(shell)) {
+    const frame = path.join(root, "out/vs/workbench/contrib/webview/browser/pre/index.html");
+    if (!fs.existsSync(frame)) {
         console.log("skipped --vscode: no VS Code install at " + root);
         return;
     }
-    const source = fs.readFileSync(shell, "utf8");
+    const source = fs.readFileSync(frame, "utf8");
     const opening = source.indexOf("defaultStyles.textContent = `") + "defaultStyles.textContent = `".length;
-    const hostStyles = source.slice(opening, source.indexOf("`;", opening));
+    const shellStyles = source.slice(opening, source.indexOf("`;", opening));
     /** @param {string} name @returns {Record<string, string>} */
     const theme = (name) => {
         /** @type {import("./preview-types.js").ThemeFile} */
@@ -251,7 +251,7 @@ function writeHostPages(page) {
     for (const [label, file, klass] of [["dark", "dark_modern.json", "vscode-dark"], ["light", "light_modern.json", "vscode-light"]]) {
         const colours = theme(file);
         const declarations = Object.entries(colours).map(([key, value]) => `  --vscode-${key.replace(/\./g, "-")}: ${value};`).join("\n");
-        const injected = `<style>\n${hostStyles}\n</style>\n<style>\n:root {\n`
+        const injected = `<style>\n${shellStyles}\n</style>\n<style>\n:root {\n`
             + `  --vscode-font-family: -apple-system, sans-serif;\n  --vscode-font-size: 13px;\n`
             + `  --monaco-monospace-font: "SF Mono", Menlo, monospace;\n${declarations}\n}\n`
             + `html, body { background: var(--vscode-editor-background); }\n</style>\n`;
@@ -262,13 +262,13 @@ function writeHostPages(page) {
 }
 
 const previewDir = path.join(__dirname, "..", "preview");
-const macroHost = require("./build-web").bundle("core", {macroHost: "scripts/preview-macro-host.mjs"}, previewDir,
+const macroShell = require("./build-web").bundle("core", {macroShell: "scripts/preview-macro-shell.mjs"}, previewDir,
     {inject: [path.join(__dirname, "..", "web", "buffer.mjs")]});
-Promise.all([model, webHosts(), macroHost]).then(([model, hosts, macroHost]) => {
+Promise.all([model, webShells(), macroShell]).then(([model, shells, macroShell]) => {
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
-for (const [name, host] of Object.entries(hosts)) {
-    const web = name === "web" ? buildModel(host) : name === "live" ? buildModel(host, {live: true}) : name === "live-auto" ? buildModel(host, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(host, {live: true, stopped: true}) : name === "demo" ? demoModel(host) : name === "demo-edited" ? demoModel(host, [DEMO_EDIT]) : emptyModel(host);
+for (const [name, shell] of Object.entries(shells)) {
+    const web = name === "web" ? buildModel(shell) : name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
 const page = `<!doctype html>
@@ -276,12 +276,12 @@ const page = `<!doctype html>
 <title>Charybdis Ark — preview</title>
 <link rel="stylesheet" href="../webview/styles.css?built=${Date.now()}">
 <script>
-// Stand in for the extension host: answer the webview's "ready" with one
-// fixture model, exactly as the real host answers it after reading a keyboard,
-// and log every edit it posts back. ?host=web (web-none, web-unsupported)
-// answers as the web page's host does instead, and turns its theme toggle.
-// ?host=none is the extension with no keyboard; Explore a demo there opens
-// ?host=demo's model, the bundled demo (demo-edited has an edit staged).
+// Stand in for the VS Code shell: answer the webview's "ready" with one
+// fixture model, exactly as the real shell answers it after reading a keyboard,
+// and log every edit it posts back. ?shell=web (web-none, web-unsupported)
+// answers as the web shell does instead, and turns its theme toggle.
+// ?shell=none is the extension with no keyboard; Explore a demo there opens
+// ?shell=demo's model, the bundled demo (demo-edited has an edit staged).
 const posted = [];
 let model = null, wanted = false;
 const publish = () => {
@@ -292,17 +292,17 @@ window.acquireVsCodeApi = () => ({
     postMessage: (message) => {
         posted.push(message);
         console.log("posted", JSON.stringify(message));
-        if (message.type === "validateViaMacro") Promise.all([import("./${macroHost.macroHost}"), import("../webview/store.mjs")])
-            .then(([host, store]) => window.dispatchEvent(new MessageEvent("message", {data: host.inspect(message, store.getModel())})));
+        if (message.type === "validateMacro") Promise.all([import("./${macroShell.macroShell}"), import("../webview/store.mjs")])
+            .then(([shell, store]) => window.dispatchEvent(new MessageEvent("message", {data: shell.inspect(message, store.getModel())})));
         if (message.type === "ready" || message.type === "refresh") { wanted = true; publish(); }
-        if (message.type === "setTheme" && model?.host) { model.host.theme = message.theme; publish(); }
+        if (message.type === "setTheme" && model?.shell) { model.shell.theme = message.theme; publish(); }
         if (message.type === "openDemo") fetch("./model-demo.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });
     },
     getState: () => undefined, setState: () => {},
 });
 window.__posted = posted;
-const host = new URLSearchParams(location.search).get("host");
-fetch(host ? "./model-" + host + ".json" : "./model.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });
+const shell = new URLSearchParams(location.search).get("shell");
+fetch(shell ? "./model-" + shell + ".json" : "./model.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });
 // ?screen=lighting opens a screen by clicking its rail button, the way a
 // person would, so the preview needs no hook inside the app.
 const wantedScreen = new URLSearchParams(location.search).get("screen");
@@ -317,12 +317,12 @@ if (wantedScreen) {
 </body></html>
 `;
 fs.writeFileSync(path.join(__dirname, "..", "preview", "index.html"), page);
-if (process.argv.includes("--vscode")) writeHostPages(page);
+if (process.argv.includes("--vscode")) writeShellPages(page);
 console.log("layers", model.layers.length,
     "· behaviours", model.keyBehaviors.length,
     "· combos", model.combos.length,
     "· pd slots", model.pdModes.length,
-    "· macros", model.viaMacros.length,
+    "· macros", model.macros.length,
     "· settings sections", model.configDefaults.length,
     "· rgb layer rows", model.rgb.layerColors?.length);
 console.log("written preview/index.html");

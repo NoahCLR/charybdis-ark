@@ -1,7 +1,7 @@
 // @ts-check
 // The draft review: what it lists and how it hangs together.
 //
-// The host sends one item per thing that differs from the keyboard — a key,
+// The core sends one item per thing that differs from the keyboard — a key,
 // a behaviour, a pointing slot, a settings section — with whether it was
 // added, changed or removed, the fields that differ, the group its edits tie
 // it to, and where it is edited. These arrange that for reading: every item
@@ -14,7 +14,7 @@ export const AREAS = ["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "
 const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 
 // Items by area, in rail order, and within an area as blocks in the order the
-// host listed them. A group whose items span areas is shown in each area as
+// core listed them. A group whose items span areas is shown in each area as
 // the part of it that lives there: every part carries the group's size, for
 // its Discard, and the other areas it reaches, so a swap of two layers reads
 // as keys under Keys, behaviours under Behaviours, and so on.

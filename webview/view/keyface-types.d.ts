@@ -25,4 +25,4 @@ export type ImpliedBranch = {meaning: 'continues'; hold: InheritedBranch} | {mea
 export interface KeyFace {main: string; sub: string; kind: 'none' | 'transparent' | 'disabled' | 'layer' | 'key'}
 export type NamedAction =
     | {kind: 'pointing'; word: 'pointing mode'; name: string; slot: PointingSlot; tags: string[]}
-    | {kind: 'macro'; word: 'macro'; name: string; slot: PublishedModel['viaMacros'][number] | undefined; tags: string[]};
+    | {kind: 'macro'; word: 'macro'; name: string; slot: PublishedModel['macros'][number] | undefined; tags: string[]};

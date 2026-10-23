@@ -1,10 +1,10 @@
 // @ts-check
 "use strict";
 
-// The panel's HTML shell. This is host code, not page code: it is the only
-// place that turns files under `webview/` into webview URIs, which is why it
-// sits beside extension.js rather than inside the directory that must stay
-// pure browser modules.
+// The panel's HTML page. This is the VS Code shell's code, not page code: it
+// is the only place that turns files under `webview/` into webview URIs, which
+// is why it sits beside extension.js rather than inside the directory that
+// must stay pure browser modules.
 
 const {randomBytes} = require("node:crypto");
 const vscode = require("vscode");

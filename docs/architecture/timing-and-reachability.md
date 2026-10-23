@@ -170,7 +170,7 @@ per key; a key with none counts as yes. `saveBehaviour`
 - An edit that would leave a stored row so posts `deleteBehavior`, an
   undoable "Removed a behaviour".
 
-`tests/view/edits.test.mjs` ("the editor removes exactly the rows the host's
+`tests/view/edits.test.mjs` ("the editor removes exactly the rows the core's
 review notes as changing nothing") holds both sides together. Rows read or
 imported that already change nothing are kept, each with an `inertBehavior`
 notice. Ark removes nothing on read.

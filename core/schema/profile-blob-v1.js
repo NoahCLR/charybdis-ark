@@ -44,7 +44,7 @@ const PROFILE_ACTION_KINDS = Object.freeze({
 const PROFILE_ACTION_LIMITS = Object.freeze({
     maxLogicalLayers: LAYERS,
     maxPdModes: 32,
-    maxViaMacroSlots: 128,
+    maxMacroSlots: 128,
     maxCustomKeys: 128,
 });
 
@@ -267,7 +267,7 @@ function normalizeSemanticAction(action, options = {}) {
             assertOperandSlot(kind, operand, limits.maxPdModes, "PD mode");
             break;
         case PROFILE_ACTION_KINDS.VIA_MACRO:
-            assertOperandSlot(kind, operand, limits.maxViaMacroSlots, "VIA macro slot");
+            assertOperandSlot(kind, operand, limits.maxMacroSlots, "macro slot");
             break;
         case PROFILE_ACTION_KINDS.CUSTOM_KEY:
             assertOperandSlot(kind, operand, limits.maxCustomKeys, "custom key");

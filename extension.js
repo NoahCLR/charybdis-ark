@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-// Charybdis Ark — extension host.
+// Charybdis Ark — the VS Code shell.
 //
 // Thin on purpose. It owns the VS Code surface (command, panel, message relay)
 // and nothing else. Device, protocol and profile decisions live in core/, which
@@ -96,7 +96,7 @@ function openPanel(context) {
     // The keyboard firmware's compiled defaults, last verified, kept between
     // runs so a connect need not download them again (profile-payload-reader.js).
     const compiledDefaults = {get: () => context.globalState.get(COMPILED_DEFAULTS_KEY), set: (/** @type {string} */ value) => context.globalState.update(COMPILED_DEFAULTS_KEY, value)};
-    const loop = openPanelLoop(vscodeHost(panel, context.globalStorageUri, () => disposed), {compiledDefaults});
+    const loop = openPanelLoop(vscodeShell(panel, context.globalStorageUri, () => disposed), {compiledDefaults});
     // A live keyboard's own saves and key adjustments show up between edits.
     loop.watch();
     /** @type {Set<Promise<unknown>>} */
@@ -123,8 +123,8 @@ function openPanel(context) {
 // what each of these does: the panel, toasts, progress, the recovery copy on
 // disk, and the files the person chooses. Once the panel is closed nothing is
 // posted to it, while what it started finishes.
-/** @param {import("vscode").WebviewPanel} panel @param {import("vscode").Uri} recoveryRoot @param {() => boolean} [disposed] @returns {import("./core/session/types.js").LoopHost} */
-function vscodeHost(panel, recoveryRoot, disposed = () => false) {
+/** @param {import("vscode").WebviewPanel} panel @param {import("vscode").Uri} recoveryRoot @param {() => boolean} [disposed] @returns {import("./core/session/types.js").LoopShell} */
+function vscodeShell(panel, recoveryRoot, disposed = () => false) {
     return {
         post: (message) => disposed() ? Promise.resolve(false) : panel.webview.postMessage(message),
         showError: (text) => vscode.window.showErrorMessage(`Charybdis Ark: ${text}`),
@@ -153,7 +153,7 @@ module.exports = {activate, deactivate, adoptFormerRecoveries, openPanel};
 
 // Named by when, what made it and the keyboard it came from, as the browser
 // names its copies.
-/** @param {import("vscode").Uri} recoveryRoot @param {Parameters<import("./core/session/types.js").HostSaveRecovery>[0]} document @param {import("./core/session/types.js").RecoveryAbout} about */
+/** @param {import("vscode").Uri} recoveryRoot @param {Parameters<import("./core/session/types.js").ShellSaveRecovery>[0]} document @param {import("./core/session/types.js").RecoveryAbout} about */
 async function saveRecoveryFile(recoveryRoot, document, about) {
     await vscode.workspace.fs.createDirectory(recoveryRoot);
     const uri = vscode.Uri.joinPath(recoveryRoot, recoveryFileName(document, about, new Date()));

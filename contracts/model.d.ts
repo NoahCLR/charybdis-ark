@@ -11,7 +11,7 @@ export interface BuildInfo {version: string; commit: string}
 export type RecoveryCause = 'apply' | 'restore' | 'save' | 'restart' | 'leave-live';
 /** `cause` and `keyboard` are absent on copies stored before they were recorded. */
 export interface RecoveryCopy {id: string | number; name: string; savedAt: string; cause?: RecoveryCause; keyboard?: string}
-export interface HostPanel {
+export interface ShellPanel {
     chooseKeyboard: boolean;
     blocked: {title: string; detail: string; demo?: boolean} | null;
     theme: 'light' | 'dark' | null;
@@ -42,7 +42,7 @@ export interface StatusModel {
     vocabulary?: Pick<Vocabulary, 'phases'> & Partial<Pick<Vocabulary, 'halves'>>;
     load?: LoadView;
     device?: {connected?: boolean; health?: {error?: string; phase?: PhaseId; halves?: HalvesId}};
-    host?: HostPanel;
+    shell?: ShellPanel;
     demo?: DemoView;
     portable?: {available?: boolean; progress?: CountedProgress | string | null};
     draft?: {changes?: readonly unknown[]; live?: unknown};

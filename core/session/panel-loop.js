@@ -1,27 +1,27 @@
 // @ts-check
 "use strict";
 
-// The loop every host runs for one open panel: take a message the panel
+// The loop every shell runs for one open panel: take a message the panel
 // posted, route it, run it, publish the model, and turn a failure into the
-// panel's notice. It used to live in extension.js; a second host copying it
-// would drift from the first, so VS Code and any other host share this one.
+// panel's notice. It used to live in extension.js; a second shell copying it
+// would drift from the first, so VS Code and any other shell share this one.
 //
-// A host passes in only what a host has, as plain functions on `host`:
+// A shell passes in only what a shell has, as plain functions on `shell`:
 //
-//   host.post(message)              delivers a message to the panel (the model)
-//   host.showError(text)            optional: shows a failure outside the panel too
-//   host.progress(title, run)       optional: runs `run` behind a progress indicator
-//   host.saveRecovery(document, about)
+//   shell.post(message)             delivers a message to the panel (the model)
+//   shell.showError(text)           optional: shows a failure outside the panel too
+//   shell.progress(title, run)      optional: runs `run` behind a progress indicator
+//   shell.saveRecovery(document, about)
 //                                   writes a recovery copy with what made it and the
 //                                   keyboard's name ({cause, keyboard}; recovery-copy.js),
 //                                   resolves to where it went
-//   host.chooseProfile()            resolves to a chosen file ({text, name}, or its
+//   shell.chooseProfile()           resolves to a chosen file ({text, name}, or its
 //                                   text), or undefined when nothing was chosen;
 //                                   Import and the demo's Open a profile file use it
-//   host.saveExport(file)           saves an exported profile ({fileName, text});
+//   shell.saveExport(file)          saves an exported profile ({fileName, text});
 //                                   resolves to where it went, or undefined if cancelled
-//   host.words, host.panel()        optional: what the panel says and offers in this
-//                                   host (`model.host`; see panel-session.js)
+//   shell.words, shell.panel()      optional: what the panel says and offers in this
+//                                   shell (`model.shell`; see panel-session.js)
 //
 // `options` go to the device service: `adapter` is the device adapter (see
 // core/README.md; the native one when omitted) and `sleep(ms)` the wait between
@@ -30,13 +30,13 @@
 // `reconnect` tunes the wait for a renamed or lost keyboard to come back
 // (keyboard-reconnect.js): its `sleep`, `now`, `waitMs` and `pollMs`.
 //
-// A host calls `watch()` once its panel is open: between edits it looks at a
+// A shell calls `watch()` once its panel is open: between edits it looks at a
 // live keyboard about once a second (live-watch.js), for the saves it makes
 // by itself and the edits its own keys make; `close()` stops it.
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
- * @typedef {import("./types.js").LoopHost} Host
+ * @typedef {import("./types.js").LoopShell} Shell
  * @typedef {import("../../contracts/messages.js").PanelRequest} Message
  */
 const {panelControl} = require("./panel-control-registry");
@@ -54,8 +54,8 @@ const {FILE_MAX_BYTES} = require("../model/portable-profile");
 // Reading a keyboard leaves the demo first (asking about unexported edits is
 // the panel's, and a message that has not asked is refused).
 /** @typedef {{sleep?: (ms: number) => Promise<void>, now?: () => number, waitMs?: number, pollMs?: number}} ReconnectTiming */
-/** @param {Host} host @param {import("./types.js").DeviceServiceOptions & {service?: import("./types.js").ControlService, reconnect?: ReconnectTiming}} [options] */
-function openPanelLoop(host, options = {}) {
+/** @param {Shell} shell @param {import("./types.js").DeviceServiceOptions & {service?: import("./types.js").ControlService, reconnect?: ReconnectTiming}} [options] */
+function openPanelLoop(shell, options = {}) {
     /** @type {Session} */
     let session;
     const {service, reconnect: timing = {}, ...device} = options;
@@ -63,22 +63,22 @@ function openPanelLoop(host, options = {}) {
     /** @type {ReturnType<typeof watchLive> | undefined} */
     let watching;
     const loop = {
-        publish: () => publish(session, host),
+        publish: () => publish(session, shell),
         serviceChanged: () => {
             // A keyboard lost unexpectedly is waited for and connected again.
             const lost = session.service.takeLost?.();
             if (lost) expectLost(session, lost, waiting.timing.now);
-            serviceChanged(session, host);
-            followReconnect(session, host, waiting);
+            serviceChanged(session, shell);
+            followReconnect(session, shell, waiting);
         },
         handleMessage: /** @param {unknown} posted */ async (posted) => {
-            await handleMessage(session, panelRequest(posted), host);
-            followReconnect(session, host, waiting);
+            await handleMessage(session, panelRequest(posted), shell);
+            followReconnect(session, shell, waiting);
         },
         // Settles when a wait for a renamed keyboard ends, at once without one.
         reconnected: () => waiting.running || Promise.resolve(),
         watch: /** @param {{intervalMs?: number, paused?: () => boolean}} [options] */ (options = {}) => {
-            watching ||= watchLive(session, {publish: () => publish(session, host), sleep: device.sleep, ...options});
+            watching ||= watchLive(session, {publish: () => publish(session, shell), sleep: device.sleep, ...options});
         },
         close: () => {
             if (session.reconnect) endReconnect(session, session.reconnect);
@@ -89,36 +89,36 @@ function openPanelLoop(host, options = {}) {
     };
     const activeService = service || new ProfileDeviceService({...device, onChange: loop.serviceChanged,
         onApplyProgress: apply => {
-            void host.post({type: "applyProgress", apply, draftId: session.draft?.id, draftRevision: session.draft?.revision});
+            void shell.post({type: "applyProgress", apply, draftId: session.draft?.id, draftRevision: session.draft?.revision});
         },
         onReadProgress: read => {
-            void host.post({type: "readProgress", read, draftId: session.draft?.id, draftRevision: session.draft?.revision});
+            void shell.post({type: "readProgress", read, draftId: session.draft?.id, draftRevision: session.draft?.revision});
         },
     });
-    session = {service: activeService, notice: undefined, host};
+    session = {service: activeService, notice: undefined, shell};
     return {session, ...loop};
 }
 
-/** @param {Session} session @param {Host} host */
-function serviceChanged(session, host) {
+/** @param {Session} session @param {Shell} shell */
+function serviceChanged(session, shell) {
     observeService(session, panelState(session));
-    publish(session, host);
+    publish(session, shell);
 }
 
-/** @param {Session} session @param {Host} host */
-function publish(session, host) {
+/** @param {Session} session @param {Shell} shell */
+function publish(session, shell) {
     const model = buildPanelModel(session, panelState(session));
-    void host.post({type: "model", model, ...takeOutbox(session)});
+    void shell.post({type: "model", model, ...takeOutbox(session)});
 }
 
 // Edit/control paths publish, including the ones that decline or fail:
 // the webview waits on that reply — a combo builder closes when its edit is
 // accepted and stays open when it is refused — and a refusal reaches the panel
 // as a notice rather than as silence.
-/** @param {Session} session @param {Message | null | undefined} message @param {Host} host */
-async function handleMessage(session, message, host) {
+/** @param {Session} session @param {Message | null | undefined} message @param {Shell} shell */
+async function handleMessage(session, message, shell) {
     if (message && panelControl(message.type)?.action === "validateMacro") {
-        const inspection = /** @type {Extract<Message, {type: "validateViaMacro"}>} */ (message);
+        const inspection = /** @type {Extract<Message, {type: "validateMacro"}>} */ (message);
         /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "macroValidation"}>} */
         const reply = {type: "macroValidation", keycode: inspection.keycode, payload: inspection.payload,
             requestId: inspection.requestId, draftId: message.draftId, draftRevision: message.draftRevision, validation: {error: "", code: ""}};
@@ -129,105 +129,105 @@ async function handleMessage(session, message, host) {
             reply.validation = {error: /** @type {import("./types.js").OperationFailure} */ (error).message, code: /** @type {import("./types.js").OperationFailure} */ (error).code || "MACRO_EDIT_CONFLICT"};
         }
         // Local inspection neither stages an edit nor emits a toast or HID.
-        await host.post(reply);
+        await shell.post(reply);
         return;
     }
     // Reading or choosing a keyboard is the person's choice: a wait for a
     // renamed keyboard gives way to it.
     const route = message && panelControl(message.type)?.route;
-    if (session.reconnect && (route === "read" || route === "host" && /Keyboard$/.test(message?.type || ""))) endReconnect(session, session.reconnect);
+    if (session.reconnect && (route === "read" || route === "shell" && /Keyboard$/.test(message?.type || ""))) endReconnect(session, session.reconnect);
     try {
         if (session.demo && message && panelControl(message.type)?.demo === "leave" && !session.portableBusy) leaveDemo(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message));
         const route = routeMessage(session, message, panelState(session));
-        if (route === "draft") await draftMessage(session, /** @type {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} */ (message), host);
+        if (route === "draft") await draftMessage(session, /** @type {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} */ (message), shell);
         else if (route === "live") {
             try {await whilePanelBusy(session, () => liveEdit(session, /** @type {import("./types.js").DraftEdit} */ (/** @type {unknown} */ (message))));}
-            finally {publish(session, host);}
+            finally {publish(session, shell);}
         }
-        else if (route === "demo") await demoMessage(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message), host);
-        else if (route === "portable") await portableMessage(session, /** @type {import("../../contracts/messages.js").PortableControl} */ (message), host);
-        else if (route === "read") await connectAndRead(session, message?.type === "selectDevice" ? message.deviceId : undefined, host);
+        else if (route === "demo") await demoMessage(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message), shell);
+        else if (route === "portable") await portableMessage(session, /** @type {import("../../contracts/messages.js").PortableControl} */ (message), shell);
+        else if (route === "read") await connectAndRead(session, message?.type === "selectDevice" ? message.deviceId : undefined, shell);
         // A staged edit, and even an unrecognised message, is answered, so the
         // panel is never left waiting on a reply.
-        else publish(session, host);
+        else publish(session, shell);
     } catch (error) {
         const text = error instanceof Error ? error.message : String(error);
-        host.showError?.(text);
+        shell.showError?.(text);
         // Put it in the panel too. A toast is easy to miss and disappears,
         // and the panel is where someone looks when it seems stuck. It reads
         // as the sentence the failure says; its code (OperationFailure.code)
         // is for the code that handles it, not for the person.
         session.notice = `Failed: ${text}`;
-        publish(session, host);
+        publish(session, shell);
     }
 }
 
 // After a save that renamed the keyboard, or after losing it, wait for it to
 // come back and read it again (keyboard-reconnect.js), once at a time.
-/** @param {Session} session @param {Host} host @param {{timing: ReconnectTiming, running: Promise<void> | undefined}} waiting */
-function followReconnect(session, host, waiting) {
+/** @param {Session} session @param {Shell} shell @param {{timing: ReconnectTiming, running: Promise<void> | undefined}} waiting */
+function followReconnect(session, shell, waiting) {
     const expected = session.reconnect;
     if (!expected || waiting.running) return;
     const read = /** @param {string} deviceId */ async (deviceId) => {
         if (deviceId !== session.service.snapshot().selectedDeviceId) closeEditors(session, {resetForms: true});
         beginRead(session);
-        await connectAndRead(session, deviceId, host);
+        await connectAndRead(session, deviceId, shell);
     };
-    waiting.running = awaitReconnect(session, expected, {...waiting.timing, read, publish: () => publish(session, host)})
-        .catch(() => {endReconnect(session, expected); publish(session, host);})
+    waiting.running = awaitReconnect(session, expected, {...waiting.timing, read, publish: () => publish(session, shell)})
+        .catch(() => {endReconnect(session, expected); publish(session, shell);})
         .finally(() => {
             waiting.running = undefined;
             // A save during the wait may have renamed it again.
-            if (session.reconnect && session.reconnect !== expected) followReconnect(session, host, waiting);
+            if (session.reconnect && session.reconnect !== expected) followReconnect(session, shell, waiting);
         });
 }
 
 // Connect, learn what the keyboard is, and read what it is running.
-/** @param {Session} session @param {string | undefined} selectedDeviceId @param {Host} host */
-async function connectAndRead(session, selectedDeviceId, host) {
+/** @param {Session} session @param {string | undefined} selectedDeviceId @param {Shell} shell */
+async function connectAndRead(session, selectedDeviceId, shell) {
     /** @type {boolean | undefined} */
     let ready;
     try {
-        ready = await readKeyboard(session, selectedDeviceId, host);
+        ready = await readKeyboard(session, selectedDeviceId, shell);
     } finally {
         // Injected services need not emit notifications, and a failed read
         // may still have changed connection facts. Observe once at this
         // explicit operation boundary before projecting the reply.
         observeService(session, panelState(session));
         endRead(session, ready);
-        publish(session, host);
+        publish(session, shell);
     }
 }
 
-/** @param {Session} session @param {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} message @param {Host} host */
-async function draftMessage(session, message, host) {
+/** @param {Session} session @param {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} message @param {Shell} shell */
+async function draftMessage(session, message, shell) {
     try {
-        await controlOperation(session, message, () => draftControl(session, {...message, draftRevision: message.draftRevision ?? NaN}, host));
-    } finally {publish(session, host);}
+        await controlOperation(session, message, () => draftControl(session, {...message, draftRevision: message.draftRevision ?? NaN}, shell));
+    } finally {publish(session, shell);}
 }
 
-// Exporting is split: what to save is decided here, saving it is the host's
+// Exporting is split: what to save is decided here, saving it is the shell's
 // (a file dialog in VS Code, a download on a web page).
-/** @param {Session} session @param {import("../../contracts/messages.js").PortableControl} message @param {Host} host */
-async function portableMessage(session, message, host) {
+/** @param {Session} session @param {import("../../contracts/messages.js").PortableControl} message @param {Shell} shell */
+async function portableMessage(session, message, shell) {
     try {
         await controlOperation(session, message, async () => {
             if (panelControl(message.type)?.action === "export" && session.demo) {
                 const {snapshot, saved} = demoExport(/** @type {Session & import("./types.js").ActiveDemoSession} */ (session));
-                const where = await host.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
+                const where = await shell.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
                 if (where) {
                     saved();
                     session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and apply it.`;
                 }
             } else if (panelControl(message.type)?.action === "export") {
                 const file = exportedProfile(await session.service.readPortableProfile());
-                const where = await host.saveExport(file);
+                const where = await shell.saveExport(file);
                 if (where) session.notice = "Complete keyboard profile exported to " + where;
             } else {
-                await portableControl(session, message, host);
+                await portableControl(session, message, shell);
             }
         });
-    } finally {publish(session, host);}
+    } finally {publish(session, shell);}
 }
 
 /** @template T @param {Session} session @param {Message} message @param {() => Promise<T>} work */
@@ -237,14 +237,14 @@ function controlOperation(session, message, work) {
 }
 
 // The demo's controls: open it, open a profile file in it, leave it.
-/** @param {Session} session @param {import("../../contracts/messages.js").DemoControl} message @param {Host} host */
-async function demoMessage(session, message, host) {
+/** @param {Session} session @param {import("../../contracts/messages.js").DemoControl} message @param {Shell} shell */
+async function demoMessage(session, message, shell) {
     try {
-        await controlOperation(session, message, () => demoControl(session, message, host, session.service.snapshot()));
-    } finally {publish(session, host);}
+        await controlOperation(session, message, () => demoControl(session, message, shell, session.service.snapshot()));
+    } finally {publish(session, shell);}
 }
 
-// What an exported profile file holds, and the name a host may suggest for it.
+// What an exported profile file holds, and the name a shell may suggest for it.
 /** @param {Pick<import("../model/types.js").ProfileSnapshot, "document">} snapshot @param {Date} [now] @param {string} [stem] */
 function exportedProfile(snapshot, now = new Date(), stem = "charybdis") {
     return {

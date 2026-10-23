@@ -1,8 +1,8 @@
 // @ts-check
 // Charybdis Ark — the webview.
 //
-// It renders the `model` the host posts and posts typed edits back. It holds
-// no device state of its own: the draft lives in the host, so what is drawn is
+// It renders the `model` the core posts and posts typed edits back. It holds
+// no device state of its own: the draft lives in the core, so what is drawn is
 // always what would be applied.
 
 import {createPanelMessages} from "./messages.mjs";
@@ -13,7 +13,7 @@ import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from ".
 import {mountNumberEntry} from "./lib/number-entry.mjs";
 import {getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
-import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
+import {chooseKeyboard, shellOf, otherTheme, setTheme} from "./view/shell-panel.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
 import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {SCREENS, screenDefinition, secondaryScreen} from "./view/screens.mjs";
@@ -73,7 +73,7 @@ function render({keepScreen = false} = {}) {
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
     root.appendChild(app);
-    const theme = hostOf(model).theme;
+    const theme = shellOf(model).theme;
     root.querySelector('[data-act="theme"]')?.addEventListener("click", () => post(setTheme(otherTheme(theme))));
     restoreKeysBenchHeight(root, benchHeight);
     restoreContentScroll(root, scroll);
@@ -101,11 +101,11 @@ function render({keepScreen = false} = {}) {
 /** @param {NonNullable<ReturnType<typeof readScreen>>} read @param {import("../contracts/panel.js").PublishedModel | null} model */
 function readPlaceholder(read, model) {
     const loading = read.state === "loading";
-    // Without a keyboard, a host with a picker offers it first.
-    const choose = hostOf(model).chooseKeyboard && !model?.device?.connected;
-    // Without a keyboard the demo is offered beside it; a host that cannot
-    // reach one at all still offers it, where the host says so.
-    const demoHere = demoOf(model).offered && (read.state !== "blocked" || Boolean(hostOf(model).blocked?.demo));
+    // Without a keyboard, a shell with a picker offers it first.
+    const choose = shellOf(model).chooseKeyboard && !model?.device?.connected;
+    // Without a keyboard the demo is offered beside it; a shell that cannot
+    // reach one at all still offers it, where the shell says so.
+    const demoHere = demoOf(model).offered && (read.state !== "blocked" || Boolean(shellOf(model).blocked?.demo));
     const screenTitle = screenDefinition(state.screen)?.title || "Keyboard";
     const secondary = secondaryScreen(model, state.screen);
     const screen = el(`<div class="main">${topbar(screenTitle, "Ark changes what your Charybdis does — keys, layers, lighting, macros and the trackball — and saves nothing until you review it.")}
@@ -115,7 +115,7 @@ function readPlaceholder(read, model) {
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
                 : read.state === "blocked" ? (demoHere ? `<div class="read-actions">${exploreButton("primary")}</div>` : "")
                 : `<div class="read-actions">${choose ? '<button class="btn primary" data-act="choose-keyboard">Choose keyboard</button>' : ""}
-                    ${model?.device?.connected || !hostOf(model).chooseKeyboard ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
+                    ${model?.device?.connected || !shellOf(model).chooseKeyboard ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
                     ${demoHere ? exploreButton("ghost") : ""}
                     ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
         </div></div></div></div>`);
@@ -170,8 +170,9 @@ function refreshCommitBar() {
 }
 
 const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation});
-// Host replies cross the message boundary as copies; their authored shapes are
-// checked in both hosts. Device values have already passed core's validators.
+// Replies from the core cross the message boundary as copies; their authored
+// shapes are checked in both shells. Device values have already passed core's
+// validators.
 addEventListener("message", (event) => receivePanelMessage(/** @type {import("../contracts/messages.js").PanelResponse} */ (event.data)));
 
 // A field that holds text keeps its own undo: ⌘Z there edits the text, not

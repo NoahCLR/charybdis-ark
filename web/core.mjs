@@ -1,5 +1,5 @@
 // @ts-check
-// What a browser host needs from core/, as one module: the web build bundles
+// What the web shell needs from core/, as one module: the web build bundles
 // this file (scripts/build-web.js) and the page imports the bundle. It is a
 // build entry, not part of the extension, which requires core/ directly.
 //
@@ -69,7 +69,7 @@ import * as keycodes from "../core/data/keycode-catalog.js";
 export {keycodes};
 
 // The Buffer core/ runs on: Node's own under Node, the `buffer` package in the
-// bundle (web/buffer.mjs). A host turns device bytes into one with it.
+// bundle (web/buffer.mjs). A shell turns device bytes into one with it.
 const NodeOrBundledBuffer = Buffer;
 export {NodeOrBundledBuffer as Buffer};
 

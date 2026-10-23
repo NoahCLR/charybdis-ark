@@ -17,7 +17,7 @@ test("step identities follow edits and reorders without changing the payload", (
     assert.equal(next, 2);
 });
 
-test("fresh host steps retain matching identities once, including duplicate values", () => {
+test("fresh steps from the core retain matching identities once, including duplicate values", () => {
     let next = 0;
     const createId = () => `step-${++next}`;
     const first = withStepFocus([{kind: "text", text: "same"}, {kind: "text", text: "same"},

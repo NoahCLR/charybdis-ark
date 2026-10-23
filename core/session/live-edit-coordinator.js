@@ -142,7 +142,7 @@ class LiveEditCoordinator {
         }
     }
 
-    // After a reconnect: an edit this host began on the lost connection is
+    // After a reconnect: an edit this shell began on the lost connection is
     // still being received and holds the profile until its 15 s lease ends.
     // Aborting it frees the keyboard at once; its id is never used again here.
     async abandonUnfinished() {

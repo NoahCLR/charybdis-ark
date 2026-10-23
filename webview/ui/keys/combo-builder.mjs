@@ -22,7 +22,7 @@ import {comboFull, comboMissing} from "../../view/combo-form.mjs";
 
 /** @param {string} text */
 const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
-// A builder input by the name the host gave its key, as the combo table and
+// A builder input by the name the core gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
 /** @param {Model} model @param {string} name */
 export const comboInputLabel = (model, name) => actionLabel(model, name);
@@ -37,7 +37,7 @@ export function comboBuilder(canEdit, holdTerm) {
     const form = state.combo.form;
     // The keyboard's default window; empty on a keyboard that has none, where
     // every combo keeps its own.
-    const fallback = edits.comboDefaultTermValue(model);
+    const fallback = edits.comboDefaultWindowValue(model);
     const windowField = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "");
     // Keep stays off until the combo has what it sends and two keys, and no
     // more than the keyboard's limit, and says what is wrong: the keyboard
@@ -72,7 +72,7 @@ export function comboBuilder(canEdit, holdTerm) {
                 </div>
             </div>
             <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window</span>
-                <div class="input-row"><span class="affix unit"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-term inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
+                <div class="input-row"><span class="affix unit"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-window inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
                     data-tip="Follow the default combo window (Settings · Combos) again, so this combo changes with it.">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="field">
@@ -139,17 +139,17 @@ export function comboBuilder(canEdit, holdTerm) {
         const button = /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="usedefault"]'));
         if (button) button.hidden = follows;
     };
-    /** @type {HTMLInputElement} */ (node.querySelector("[data-term]")).addEventListener("input", (event) => {
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-window]")).addEventListener("input", (event) => {
         form.termMs = /** @type {HTMLInputElement} */ (event.target).value;
         if (fallback) followed(/** @type {HTMLInputElement} */ (event.target).value.trim() === "");
     });
-    /** @type {HTMLInputElement} */ (node.querySelector("[data-term]")).addEventListener("change", (event) => {
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-window]")).addEventListener("change", (event) => {
         /** @type {HTMLInputElement} */ (event.target).value = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "").value;
     });
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="usedefault"]'))?.addEventListener("click", (event) => {
         event.preventDefault();
         form.termMs = fallback;
-        /** @type {HTMLInputElement} */ (node.querySelector("[data-term]")).value = "";
+        /** @type {HTMLInputElement} */ (node.querySelector("[data-window]")).value = "";
         followed(true);
     });
     /** @type {HTMLInputElement} */ (node.querySelector("[data-output-behavior]")).addEventListener("change", event => {
@@ -170,7 +170,7 @@ export function comboBuilder(canEdit, holdTerm) {
         });
     }
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { closeComboBuilder(); render(); });
-    // Keep and Delete close the builder once the host accepts them, so a
+    // Keep and Delete close the builder once the core accepts them, so a
     // second press cannot add the combo twice, and a refused combo keeps its
     // fields for fixing.
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="delete"]'))?.addEventListener("click", () => {

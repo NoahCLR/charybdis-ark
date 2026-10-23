@@ -35,10 +35,10 @@ export function keyFace(/** @type {import("../../contracts/panel.js").Position |
     };
 }
 
-// The layer a keycode acts on, as the host names it beside its label
+// The layer a keycode acts on, as the core names it beside its label
 // (qmkKeyLayers, from core/model/key-names.js keyLayer): MO(3), LOCK_LAYER(3)
 // and LT(3,KC_F) all name layer 3. Read under the stored name, the name the
-// host knows it by (QK_USER_31 → LOCK_LAYER(3)), or however the expression is
+// core knows it by (QK_USER_31 → LOCK_LAYER(3)), or however the expression is
 // spelled. Null for any other key: the interface never works a layer out of a
 // keycode itself.
 /** @param {ViewModel} model @param {string} keycode @returns {number | null} */
@@ -62,7 +62,7 @@ export function dualRole(model, position) {
 }
 
 // A key by its whole name, for anything that is not a key cap. A cap shows what
-// fits — "F" over "Navigation" — and the name is the host's for the keycode,
+// fits — "F" over "Navigation" — and the name is the core's for the keycode,
 // "F / Navigation" (core/model/key-names.js).
 /** @param {Position | null | undefined} position */
 export function keyName(position) {
@@ -74,7 +74,7 @@ export function keyName(position) {
 
 /** @type {Record<string, string>} */
 const LAYER_VERBS = {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"};
-// Only for a position the host has not named: the layer the keycode holds.
+// Only for a position the core has not named: the layer the keycode holds.
 /** @param {string} name */
 const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 
@@ -116,10 +116,10 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 
 // What a behaviour cell reads as in the grid: the name a person knows the key
 // by, so it says "#", "Shift+Enter" and "Hold Numbers" where the keyboard
-// stores KC_HASH, LSFT(KC_ENTER) and MO(1). Every name comes from the host
+// stores KC_HASH, LSFT(KC_ENTER) and MO(1). Every name comes from the core
 // (core/model/key-names.js); with none, the keycode is the label. The cell
 // editor keeps the keycode. A custom key's own tap and hold read as the
-// shortcut they send (firmware D-F26), which the host labels them with.
+// shortcut they send (firmware D-F26), which the core labels them with.
 /** @param {ViewModel} model @param {import("../../contracts/panel.js").Branch | null | undefined} branch */
 export function cellLabel(model, branch) {
     const action = String(branch?.action ?? "");

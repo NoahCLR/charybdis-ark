@@ -2,11 +2,11 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {dropFiles} = require("./profile-drop");
-const {openPreview} = require("./host-page");
+const {openPreview} = require("./shell-page");
 
-for (const host of ["", "?host=web", "?host=demo"]) {
-    test(`Import card posts a dropped file and refuses multiple, oversized and unreadable files (${host || "extension"})`, async ({page}) => {
-        await page.goto(`/preview/index.html${host}`);
+for (const shell of ["", "?shell=web", "?shell=demo"]) {
+    test(`Import card posts a dropped file and refuses multiple, oversized and unreadable files (${shell || "extension"})`, async ({page}) => {
+        await page.goto(`/preview/index.html${shell}`);
         await page.locator('[data-screen="profile"]').click();
         const card = page.locator("[data-profile-drop]");
         await expect(card).toContainText("drop a complete backup here");
@@ -163,8 +163,8 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     });
 }
 
-// The web page's controls, where the model offers them (?host=web is the web
-// host's model, scripts/preview.js). Each has to post what it says it does.
+// The web page's controls, where the model offers them (?shell=web is the web
+// shell's model, scripts/preview.js). Each has to post what it says it does.
 for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     test(`the keyboard's name is posted on change, with its byte count kept live (${theme})`, async ({page}) => {
         await openPreview(page, theme);
@@ -185,11 +185,11 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     });
 }
 
-test("the web host's controls post their messages", async ({page}) => {
+test("the web shell's controls post their messages", async ({page}) => {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
     const posted = () => page.evaluate(() => window.__posted.filter((message) => message.type !== "ready"));
-    await page.goto("/preview/index.html?host=web");
+    await page.goto("/preview/index.html?shell=web");
     await expect(page.locator(".rail-build")).toHaveText(/^Ark .+ · preview$/);
 
     await page.evaluate(() => {window.__posted.length = 0;});
@@ -220,15 +220,15 @@ test("the web host's controls post their messages", async ({page}) => {
     expect(errors).toEqual([]);
 });
 
-test("with no keyboard the web host offers its picker first, and without WebHID says why", async ({page}) => {
-    await page.goto("/preview/index.html?host=web-none");
+test("with no keyboard the web shell offers its picker first, and without WebHID says why", async ({page}) => {
+    await page.goto("/preview/index.html?shell=web-none");
     const placeholder = page.locator(".read-placeholder");
     await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
     await page.evaluate(() => {window.__posted.length = 0;});
     await placeholder.locator('[data-act="choose-keyboard"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "chooseKeyboard"})]);
 
-    await page.goto("/preview/index.html?host=web-unsupported");
+    await page.goto("/preview/index.html?shell=web-unsupported");
     await expect(page.locator(".read-placeholder h2")).toHaveText("Ark needs Chrome or Edge");
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
     await expect(page.locator('.rail [data-act="refresh"]')).toHaveCount(0);
@@ -245,7 +245,7 @@ test("the extension's panel has no theme toggle, picker, build line or browser r
     await page.locator('[data-screen="profile"]').click();
     await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(0);
     await expect(page.locator(".card.recoveries")).toContainText("VS Code's storage");
-    await expect(page.locator('[data-act="upgrade"]')).toHaveCount(0, {message: "the retired PD upgrade export is offered by no host"});
+    await expect(page.locator('[data-act="upgrade"]')).toHaveCount(0, {message: "the retired PD upgrade export is offered by no shell"});
 });
 
 // The demo's controls (scripts/preview.js builds the demo's models with the
@@ -258,22 +258,22 @@ test("the demo's controls post their messages", async ({page}) => {
 
     // With no keyboard the extension offers the demo beside Read keyboard, and
     // a browser without WebHID still offers it.
-    await page.goto("/preview/index.html?host=none");
+    await page.goto("/preview/index.html?shell=none");
     const placeholder = page.locator(".read-placeholder");
     await expect(placeholder.locator('[data-act="retry"]')).toHaveText("Read keyboard");
     await clear();
     await placeholder.locator('[data-act="explore-demo"]').click();
     await expect.poll(posted).toEqual([{type: "openDemo"}]);
     await expect(page.locator(".demo-banner")).toBeVisible();
-    await page.goto("/preview/index.html?host=web-unsupported");
+    await page.goto("/preview/index.html?shell=web-unsupported");
     await expect(page.locator('.read-placeholder [data-act="explore-demo"]')).toHaveCount(1);
-    await page.goto("/preview/index.html?host=web-none");
+    await page.goto("/preview/index.html?shell=web-none");
     await expect(page.locator('.read-placeholder [data-act="choose-keyboard"]')).toHaveCount(1);
     await expect(page.locator('.read-placeholder [data-act="explore-demo"]')).toHaveCount(1);
 
     // In the demo, with nothing to lose: an edit posts, and the banner's
     // controls post without asking.
-    await page.goto("/preview/index.html?host=demo");
+    await page.goto("/preview/index.html?shell=demo");
     await expect(page.locator(".rail-product")).toHaveText("Demo");
     await page.locator('[data-screen="mouse"]').click();
     await clear();
@@ -294,7 +294,7 @@ test("the demo's controls post their messages", async ({page}) => {
 
     // With an edit not exported: the review has Export in Apply's place, and
     // leaving asks first, then says it asked.
-    await page.goto("/preview/index.html?host=demo-edited");
+    await page.goto("/preview/index.html?shell=demo-edited");
     await page.locator('.commit [data-act="review"]').click();
     await expect(page.locator('.sheet [data-act="apply"]')).toHaveCount(0);
     await clear();

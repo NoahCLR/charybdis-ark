@@ -90,12 +90,12 @@ function decodeComboDomain(value, options = {}) {
 
 // The window a row runs with.
 /** @param {{defaultTermMs: number}} table @param {{termMs: number | null}} row */
-const effectiveComboTerm = (table, row) => row.termMs ?? table.defaultTermMs;
+const effectiveComboWindow = (table, row) => row.termMs ?? table.defaultTermMs;
 
 // The rows as the keyboard reports them running: each with the window it
 // runs with, whether that follows the default, and native keycodes.
 /** @param {ReturnType<typeof decodeComboDomain>} table */
-const runningComboRows = table => table.rows.map(row => ({...row, termMs: effectiveComboTerm(table, row), followsDefault: row.termMs === null,
+const runningComboRows = table => table.rows.map(row => ({...row, termMs: effectiveComboWindow(table, row), followsDefault: row.termMs === null,
     inputs: row.inputs.map(action => /** @type {number} */ (nativeCode(action))), output: /** @type {number} */ (nativeCode(row.output))}));
 
-module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboTerm, runningComboRows};
+module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboWindow, runningComboRows};

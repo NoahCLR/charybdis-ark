@@ -81,7 +81,7 @@ function exerciseCore(core, inputs) {
         return {name, decoded, fingerprint: portable.fingerprint(document), summary: portable.summary(document), rewritten};
     }));
 
-    // A draft as the host keeps one: staged edits, then the panel model, as
+    // A draft as the core keeps one: staged edits, then the panel model, as
     // scripts/preview.js builds it. The id and the clock are pinned, being the
     // two things two runs may not share.
     const {document, capabilities, messages, deviceId} = inputs.draft;

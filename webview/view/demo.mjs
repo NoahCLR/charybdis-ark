@@ -9,7 +9,7 @@ const NONE = {active: false, offered: false, name: null, fileName: null, unsaved
 /** @param {{demo?: Partial<import("../../contracts/model.js").DemoView>} | null | undefined} model */
 export const demoOf = (model) => ({...NONE, ...model?.demo});
 
-// The messages the demo's controls post. They are for the host, not the draft.
+// The messages the demo's controls post. They are for the core, not the draft.
 /** @returns {{type: "openDemo"}} */
 export const openDemo = () => ({type: "openDemo"});
 /** @returns {{type: "openDemo"}} */

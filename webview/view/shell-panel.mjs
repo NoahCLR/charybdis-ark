@@ -1,16 +1,16 @@
 // @ts-check
-// What the panel's host offers and says, as the model carries it
-// (`model.host`, core/session/panel-session.js). The panel never asks which
-// host it runs in: Choose keyboard, the theme toggle and the recovery copies
-// appear where the host says it has them, in the host's own words.
+// What the panel's shell offers and says, as the model carries it
+// (`model.shell`, core/session/panel-session.js). The panel never asks which
+// shell it runs in: Choose keyboard, the theme toggle and the recovery copies
+// appear where the shell says it has them, in the shell's own words.
 
-/** @type {import("../../contracts/model.js").HostPanel} */
+/** @type {import("../../contracts/model.js").ShellPanel} */
 const NONE = {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {}};
 
-/** @param {{host?: Partial<import("../../contracts/model.js").HostPanel>} | null | undefined} model */
-export const hostOf = (model) => ({...NONE, ...model?.host, words: {...model?.host?.words}});
+/** @param {{shell?: Partial<import("../../contracts/model.js").ShellPanel>} | null | undefined} model */
+export const shellOf = (model) => ({...NONE, ...model?.shell, words: {...model?.shell?.words}});
 
-// The messages these controls post. They are for the host, not the draft.
+// The messages these controls post. They are for the shell, not the draft.
 /** @returns {{type: "chooseKeyboard"}} */
 export const chooseKeyboard = () => ({type: "chooseKeyboard"});
 /** @returns {{type: "forgetKeyboard"}} */

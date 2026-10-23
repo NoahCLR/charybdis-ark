@@ -11,7 +11,7 @@
 // shorter side is 744.
 
 import {GEO, keyVisual} from "../webview/view/geometry.mjs";
-import {ARK_REPOSITORY, GITHUB_MARK, buildLine, commitUrl} from "../webview/view/host.mjs";
+import {ARK_REPOSITORY, GITHUB_MARK, buildLine, commitUrl} from "../webview/view/shell-panel.mjs";
 
 export const PHONE_SCREEN = 600;
 const KEYS = 56;

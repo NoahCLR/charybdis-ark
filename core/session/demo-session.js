@@ -179,9 +179,9 @@ function leaveDemo(session, message) {
     replaceDemoDraft(session, undefined);
 }
 
-// The demo's own controls. `host.chooseProfile` is the same file chooser
+// The demo's own controls. `shell.chooseProfile` is the same file chooser
 // Import uses; what it returns is checked as Import checks it.
-/** @typedef {{session: Session, message: import('../../contracts/messages.js').DemoControl, host: import('./types.js').ProfileChooser, state: State}} DemoContext */
+/** @typedef {{session: Session, message: import('../../contracts/messages.js').DemoControl, shell: import('./types.js').ProfileChooser, state: State}} DemoContext */
 /** @type {Readonly<Record<string, (context: DemoContext) => void | Promise<void>>>} */
 const DEMO_ACTIONS = Object.freeze({
     open: ({session, state}) => {
@@ -191,13 +191,13 @@ const DEMO_ACTIONS = Object.freeze({
         leaveDemo(session, message);
         session.notice = "Left the demo.";
     },
-    openProfile: async ({session, message, host, state}) => {
+    openProfile: async ({session, message, shell, state}) => {
         if (session.demo) assertDemoMayClose(session, message);
         else {
             const refused = demoRefusal(session, state);
             if (refused) throw fail(refused);
         }
-        const chosen = await host.chooseProfile?.();
+        const chosen = await shell.chooseProfile?.();
         if (chosen === undefined) return;
         const name = typeof chosen === "string" ? null : chosen.name || null;
         openDemo(session, state, {value: typeof chosen === "string" ? chosen : chosen.text, fileName: name});
@@ -206,12 +206,12 @@ const DEMO_ACTIONS = Object.freeze({
     },
 });
 
-/** @param {Session} session @param {import('../../contracts/messages.js').DemoControl} message @param {import('./types.js').ProfileChooser} host @param {State} state */
-async function demoControl(session, message, host, state) {
+/** @param {Session} session @param {import('../../contracts/messages.js').DemoControl} message @param {import('./types.js').ProfileChooser} shell @param {State} state */
+async function demoControl(session, message, shell, state) {
     const control = panelControl(message.type);
     const action = control?.route === "demo" ? DEMO_ACTIONS[control.action] : undefined;
     if (!action) throw fail("Unsupported demo control.");
-    await action({session, message, host, state});
+    await action({session, message, shell, state});
 }
 
 // Exporting from the demo saves the draft, edits and all: there is no keyboard

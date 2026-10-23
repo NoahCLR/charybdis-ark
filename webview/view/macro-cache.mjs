@@ -1,7 +1,7 @@
 // @ts-check
 // Published models are replaced, never mutated. Keep the latest payload for
 // each slot and reading purpose on that model; editing does not retain an
-// unbounded history, and a new model cannot reuse old host parsing options.
+// unbounded history, and a new model cannot reuse the core's old parsing options.
 import {parseMacro} from "./macro.mjs";
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */

@@ -67,7 +67,7 @@ for (const stage of stages) {
 }
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
-    test(`colour field focus survives the panel host cascade (${theme})`, async ({page}) => {
+    test(`colour field focus survives the shell's cascade (${theme})`, async ({page}) => {
         await openStage(page, "layers", theme);
         await change(channel(page, 0), 77);
         await expectPost(page, stages[0].message({h: 77, s: 255, v: 200}));

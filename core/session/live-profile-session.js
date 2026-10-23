@@ -54,9 +54,9 @@ function snapshotOf(capabilities, stored, defaults) {
  * @param {import("../protocol/types.js").RequestIds} ids
  * @param {import("./types.js").DeviceCapabilities} capabilities
  * @param {{payloadReader?: InstanceType<typeof ProfilePayloadReader>, onProgress?: (text: string) => void, sleep?: (ms: number) => Promise<void>}} [options]
- * @returns {Promise<import("./types.js").LiveCapture>}
+ * @returns {Promise<import("./types.js").LiveSnapshot>}
  */
-async function captureLive(connection, ids, capabilities, {payloadReader = new ProfilePayloadReader(connection), onProgress = () => {},
+async function snapshotLive(connection, ids, capabilities, {payloadReader = new ProfilePayloadReader(connection), onProgress = () => {},
     sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
     requireReady(capabilities);
     const options = {nextRequestId: () => ids.next()};
@@ -104,4 +104,4 @@ async function captureLive(connection, ids, capabilities, {payloadReader = new P
             keyboard: liveKeyboardStatus(after), saveMark: -1}};
 }
 
-module.exports = {captureLive, liveKeyboardStatus, snapshotOf};
+module.exports = {snapshotLive, liveKeyboardStatus, snapshotOf};

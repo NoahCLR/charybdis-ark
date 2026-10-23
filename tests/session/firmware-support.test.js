@@ -90,20 +90,20 @@ test("independent editor gates keep partial-read, busy and per-view behavior", (
     }
 });
 
-test("capture and identity reads retain the lease, active-profile, conflict and convergence distinctions", () => {
+test("snapshot and identity reads retain the lease, active-profile, conflict and convergence distinctions", () => {
     const stable = {stateFlags: FLAGS.PEER_CONVERGED, conflictCount: 0, activeKind: KIND.COMMITTED};
-    for (const activeKind of [KIND.COMMITTED, KIND.COMPILED_ONLY]) assert.equal(support.canCapture({...stable, activeKind}), true);
-    for (const activeKind of [KIND.PREVIEW, KIND.PENDING]) assert.equal(support.canCapture({...stable, activeKind}), false);
-    assert.equal(support.canCapture({...stable, stateFlags: FLAGS.PEER_KNOWN}), false);
+    for (const activeKind of [KIND.COMMITTED, KIND.COMPILED_ONLY]) assert.equal(support.canSnapshot({...stable, activeKind}), true);
+    for (const activeKind of [KIND.PREVIEW, KIND.PENDING]) assert.equal(support.canSnapshot({...stable, activeKind}), false);
+    assert.equal(support.canSnapshot({...stable, stateFlags: FLAGS.PEER_KNOWN}), false);
     assert.equal(support.canReadIdentity({...stable, stateFlags: 0}), true, "identity read does not acquire a convergence gate");
     const leased = {...stable, stateFlags: stable.stateFlags | FLAGS.CANDIDATE_PENDING};
-    assert.equal(support.canCapture(leased), false);
-    assert.equal(support.canCapture(leased, true), true);
+    assert.equal(support.canSnapshot(leased), false);
+    assert.equal(support.canSnapshot(leased, true), true);
     assert.equal(support.canReadIdentity(leased), true);
     assert.equal(support.canReadIdentity(leased, false), false);
     for (const blocked of [{...stable, stateFlags: stable.stateFlags | FLAGS.PREVIEW_ACTIVE}, {...stable, conflictCount: 1}]) {
         for (const allowCandidate of [true, false]) {
-            assert.equal(support.canCapture(blocked, allowCandidate), false);
+            assert.equal(support.canSnapshot(blocked, allowCandidate), false);
             assert.equal(support.canReadIdentity(blocked, allowCandidate), false);
         }
     }

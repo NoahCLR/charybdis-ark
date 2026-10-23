@@ -1,5 +1,5 @@
 // The panel state's declarations (webview/view/state-fields.mjs), and what
-// the store declares for each of its fields when the host replaces the draft
+// the store declares for each of its fields when the core replaces the draft
 // under the forms (webview/store.mjs resetDraftForms).
 import assert from "node:assert/strict";
 import test from "node:test";

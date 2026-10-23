@@ -69,7 +69,7 @@ test("pointing picks allow modified keyboard keys while mouse clicks and media s
 });
 
 test("a stored shortcut reads as the picker names it: a key's label, a macro's name", () => {
-    const named = {...buildDeviceModel(), viaMacros: [{keycode: "VIA_MACRO_17", name: "Copy line", empty: false}]};
+    const named = {...buildDeviceModel(), macros: [{keycode: "VIA_MACRO_17", name: "Copy line", empty: false}]};
     named.qmkKeyLabels = {...named.qmkKeyLabels, "LGUI(KC_C)": "Cmd+C", "LCTL(LSFT(KC_C))": "Ctrl+Shift+C"};
     assert.equal(keyDisplayName(named, 0x00d3), "Mouse Button 3");
     assert.equal(keyDisplayName(named, 0x0052), "Up");
@@ -84,7 +84,7 @@ test("pointing macro identities use the stored slot and current profile name", (
     for (const code of [0x7700, "VIA_MACRO_0", "QK_MACRO_0", "MC_0", "0x7700", "30464"]) assert.equal(macroIndex(code), 0);
     assert.equal(macroIndex("VIA_MACRO_127"), 127);
     for (const code of [0x7780, "VIA_MACRO_128", "C(VIA_MACRO_0)", "KC_A", ""]) assert.equal(macroIndex(code), null);
-    const model = {viaMacros: [{keycode: "VIA_MACRO_0", name: "Greeting <&>", empty: true}]};
+    const model = {macros: [{keycode: "VIA_MACRO_0", name: "Greeting <&>", empty: true}]};
     assert.deepEqual(pointingMacro(model, 0x7700), {index: 0, name: "Greeting <&>", empty: true});
     assert.deepEqual(pointingMacro(model, "VIA_MACRO_127"), {index: 127, name: "Macro 127", empty: false});
     assert.equal(keyName(model, 0x777f), "VIA_MACRO_127");

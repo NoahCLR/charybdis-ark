@@ -2,7 +2,7 @@
 "use strict";
 
 const {test, expect} = require("@playwright/test");
-const {openFold, openPreview} = require("./host-page");
+const {openFold, openPreview} = require("./shell-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
@@ -21,8 +21,8 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
                 store.setModel({...store.getModel(), ...patch}); store.render();
             }, patch);
         };
-        // Use the installed host's real stylesheet when available locally;
-        // CI uses the portable host-cascade fixture.
+        // Use the installed VS Code's real stylesheet when available locally;
+        // CI uses the portable shell-cascade fixture.
         if (fs.existsSync(`preview/${theme}.html`)) await page.goto(`/preview/${theme}.html`);
         else await openPreview(page, theme);
         await publish();

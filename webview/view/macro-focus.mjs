@@ -1,6 +1,6 @@
 // @ts-check
 // Steps have no stored identity. Local identities follow edits and reorders;
-// newly parsed host steps inherit matching identities without caching payloads.
+// steps the core newly parsed inherit matching identities without caching payloads.
 
 /** @typedef {import("./types.js").MacroStep} Step */
 /** @param {Step} step */

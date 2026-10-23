@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {expect} = require("@playwright/test");
-const {openPreview} = require("./host-page");
+const {openPreview} = require("./shell-page");
 
 async function openControls(page, screen, state = {}, theme = "plain") {
     await openPreview(page, theme);
@@ -35,7 +35,7 @@ async function change(field, value) {
 
 // Publish through the real message receiver, including acceptedEdit so the
 // renderer must rebuild the screen. A counter-only model would keep its DOM
-// and falsely prove focus restoration. Patches model what the host accepted;
+// and falsely prove focus restoration. Patches model what the core accepted;
 // the preview never applies edits itself.
 async function publishAccepted(page, path, value) {
     await page.evaluate(async ({path, value}) => {

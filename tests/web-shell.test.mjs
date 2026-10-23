@@ -1,12 +1,12 @@
-// The web page's host pieces that need no browser: the acquireVsCodeApi
-// stand-in, the worker's sleep, and the host's small decisions. The page
+// The web shell's pieces that need no browser: the acquireVsCodeApi
+// stand-in, the worker's sleep, and the shell's small decisions. The page
 // itself, over a fake WebHID keyboard, is browser-tests/web-page.spec.js's.
 
 import assert from "node:assert/strict";
 import test from "node:test";
 import {connectPanel} from "../web/panel-channel.mjs";
 import {workerSleep} from "../web/sleep.mjs";
-import {BLOCKED, COMPILED_DEFAULTS_KEY, PROFILE_FILE_LIMIT, WEB_WORDS, compiledDefaultsStore, initialTheme, leaving, readProfileFile} from "../web/web-host.mjs";
+import {BLOCKED, COMPILED_DEFAULTS_KEY, PROFILE_FILE_LIMIT, WEB_WORDS, compiledDefaultsStore, initialTheme, leaving, readProfileFile} from "../web/web-shell.mjs";
 import {listed} from "../web/recoveries.mjs";
 
 // A MessageChannel delivers on a later task, but not within any fixed time: a
@@ -25,14 +25,14 @@ test("the stand-in delivers both ways later and as copies, and shows the click i
     try {
         const sent = {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]};
         panel.api.postMessage(sent);
-        assert.equal(gestures.length, 1, "the host sees the message inside the click");
+        assert.equal(gestures.length, 1, "the shell sees the message inside the click");
         assert.deepEqual(gestures[0], sent);
         assert.notEqual(gestures[0], sent, "as a copy");
         assert.deepEqual(received, [], "the message itself arrives later, as in VS Code");
         sent.changes[0].keycode = "KC_B";
         await delivered(received);
         assert.equal(received.length, 1);
-        assert.equal(received[0].changes[0].keycode, "KC_A", "the panel cannot change what the host was sent");
+        assert.equal(received[0].changes[0].keycode, "KC_A", "the panel cannot change what the shell was sent");
 
         const model = {type: "model", model: {draft: {dirty: false}}};
         await panel.post(model);
@@ -40,7 +40,7 @@ test("the stand-in delivers both ways later and as copies, and shows the click i
         await delivered(shown);
         assert.deepEqual(shown, [model]);
         shown[0].model.draft.dirty = true;
-        assert.equal(model.model.draft.dirty, false, "nor the host's model by touching what it was sent");
+        assert.equal(model.model.draft.dirty, false, "nor the shell's model by touching what it was sent");
 
         panel.api.setState({screen: "keys"});
         assert.deepEqual(panel.api.getState(), {screen: "keys"});

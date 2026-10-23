@@ -1,12 +1,12 @@
 // @ts-check
-// The web page's host, started with the page's own globals. The build bundles
+// The web shell, started with the page's own globals. The build bundles
 // this file and names the worker, the panel and the build it came from
-// (scripts/build-web.js). It loads the panel itself, once the host is running:
+// (scripts/build-web.js). It loads the panel itself, once the shell is running:
 // the panel asks for acquireVsCodeApi() as it loads. On a phone it starts
 // neither, and shows only a notice (web/phone.mjs).
 
 import {isPhone, showPhoneNotice} from "./phone.mjs";
-import {initialTheme, startWebHost} from "./web-host.mjs";
+import {initialTheme, startWebShell} from "./web-shell.mjs";
 
 /* global __ARK_VERSION__, __ARK_COMMIT__, __ARK_SLEEP_WORKER__, __ARK_PANEL__ */
 const build = {version: __ARK_VERSION__, commit: __ARK_COMMIT__};
@@ -21,7 +21,7 @@ if (isPhone({matchMedia, screen: globalThis.screen})) {
     let worker;
     try {worker = new Worker(new URL(__ARK_SLEEP_WORKER__, import.meta.url));} catch {worker = undefined;}
 
-    const {api} = startWebHost({
+    const {api} = startWebShell({
         hid,
         locks: navigator.locks,
         storage: navigator.storage,

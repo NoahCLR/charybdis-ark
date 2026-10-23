@@ -8,7 +8,7 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
 
 ## Who does what
 
-- The shell (`extension.js`, `web/web-host.mjs`) supplies recovery copies
+- The shell (`extension.js`, `web/web-shell.mjs`) supplies recovery copies
   (each kept with what made it and the keyboard's name, which
   `core/session/recovery-copy.js` puts in its file name), file choosers, downloads, progress, a store for compiled defaults and, on
   the web, a sleep that tab throttling cannot slow.
@@ -35,12 +35,12 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
    key turned off (GET `0x22`) and edit progress. An edit the keyboard is
    still receiving is aborted, its transaction id retired.
 3. `readKeyboardProfile` takes one snapshot: live (below) when the keyboard is
-   not in Apply mode or still runs unsaved live edits, else `captureProfile`.
+   not in Apply mode or still runs unsaved live edits, else `snapshotProfile`.
 4. If the snapshot fails, the independent reads (`readLayout`,
    `readCommittedProfile`, `readBaseRgb`, `readCombos`) still run for
    diagnostics, and no editable draft opens.
 
-`captureProfile` refuses a keyboard without its slave half, with unconverged
+`snapshotProfile` refuses a keyboard without its slave half, with unconverged
 halves, or showing a preview, a pending candidate or a conflict. It reads
 status, the compiled defaults, the active saved profile, native combos, the
 settings twice and status again; any difference refuses the read as
@@ -174,7 +174,7 @@ working copy. All modes share the draft, review, checks and history.
 
 ### Reading a live keyboard
 
-`captureLive` (`live-profile-session.js`) reads a pair. It waits for the edit
+`snapshotLive` (`live-profile-session.js`) reads a pair. It waits for the edit
 status to go idle (no edit being received, checked or waiting for a held key;
 `LIVE_EDIT_PENDING` after 600 polls 50 ms apart). It reads the working copy
 (GET `0x21`) and checks its session, revision and saved generation, then the

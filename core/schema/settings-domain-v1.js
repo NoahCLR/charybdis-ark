@@ -7,7 +7,7 @@ const {canonical} = require("./bytes");
 // Settings domain 0x40, version 8, the only one the keyboard stores (firmware
 // D-F14, D-F26): 31 values, sixteen layer records, 128 custom-key shortcuts,
 // then 273 counted names — sixteen
-// layer names, 128 VIA macro names, 128 custom-key names and the keyboard's
+// layer names, 128 macro names, 128 custom-key names and the keyboard's
 // own name, each a length byte and up to 32 bytes of UTF-8 (profile-name.js).
 // An empty keyboard name means the firmware's built-in name; a stored one is
 // the USB product string the computer sees. Every other version is refused,

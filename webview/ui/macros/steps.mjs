@@ -13,8 +13,8 @@ import {stepMark, stepWord} from "../marks.mjs";
 import {inspectEdit} from "./validation.mjs";
 import {finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
 
-// Like the board's deletion shortcut, consume Backspace before a host turns it
-// into navigation. Keep normal editing keys inside form fields and dialogs.
+// Like the board's deletion shortcut, consume Backspace before the shell turns
+// it into navigation. Keep normal editing keys inside form fields and dialogs.
 /** @param {KeyboardEvent} event @returns {boolean} */
 export function macroStepShortcut(event) {
     if (event.defaultPrevented || event.isComposing || !["Delete", "Backspace"].includes(event.key)
@@ -23,7 +23,7 @@ export function macroStepShortcut(event) {
     if (!(target instanceof Element) || target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return false;
     const sequence = target.closest('[data-macro-sequence][data-editable="true"]');
     const keycode = sequence?.closest("[data-macro-editor]")?.getAttribute("data-macro-editor");
-    const slot = getModel()?.viaMacros?.find(item => item.keycode === keycode);
+    const slot = getModel()?.macros?.find(item => item.keycode === keycode);
     if (!slot) return false;
     const form = macroForm(slot.keycode), steps = form.steps ?? form.stepFocus ?? [];
     const id = target.closest("[data-step-id]")?.getAttribute("data-step-id") ?? form.selectedStep;

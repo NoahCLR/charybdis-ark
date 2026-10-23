@@ -24,7 +24,7 @@ export function leaveDemoOverlay() {
             close();
             post(controls.control("exportPortableProfile"));
         } else if (target.closest('[data-act="confirm-leave"]')) {
-            // Posted from this click, so a host that opens a picker or a file
+            // Posted from this click, so a shell that opens a picker or a file
             // chooser for it still can.
             post(leave.message);
             close();

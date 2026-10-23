@@ -75,7 +75,7 @@ export function sends(model, action) {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} action */
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
-// A mark as the host describes it: {kind: "tier", tier, branch?} · {kind:
+// A mark as the core describes it: {kind: "tier", tier, branch?} · {kind:
 // "branch", count} · {kind: "layer", layer} · {kind: "pointing", slot} ·
 // {kind: "combo", badge?} · {kind: "stage", on}. Anything else draws nothing.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value */
@@ -92,7 +92,7 @@ export function mark(model, value) {
 }
 
 // A key's name with the layer it acts on marked where the name says it:
-// "F / ■ Navigation", "Hold ■ Navigation", "■ Numbers + Shift". The host names
+// "F / ■ Navigation", "Hold ■ Navigation", "■ Numbers + Shift". The core names
 // the layer (qmkKeyLayers) and puts its name at one end of the key's name
 // (core/model/key-names.js); one that does not is left as it is.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} text @param {string} keycode */

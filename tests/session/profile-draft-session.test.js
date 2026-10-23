@@ -39,7 +39,7 @@ test("layout playback effects follow Host through Review, history, undo, redo an
     const {hostMacros} = require("../fixtures/host-macros");
     const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["café", "{+KC_A}é{-KC_A}"]);
     const draft = new ProfileDraftSession(snapshot, "board", capabilities);
-    stage(draft, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "café!", name: "Greeting"});
+    stage(draft, {type: "updateMacro", keycode: "VIA_MACRO_0", payload: "café!", name: "Greeting"});
     const authored = draft.current.fingerprint;
     stage(draft, settings(draft, "host", {hostLayout: "3"}));
     const rows = draft.changes(), host = rows.find(row => row.area === "Settings" && row.unit === "settings:host");
@@ -53,9 +53,9 @@ test("layout playback effects follow Host through Review, history, undo, redo an
     assert.equal(draft.steps().at(-1).changes.filter(row => row.area === "Macros").length, 2);
     draft.undo(draft.revision);
     assert.equal(draft.current.fingerprint, authored);
-    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[1].playable, true);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[1].playable, true);
     draft.redo(draft.revision);
-    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[1].playable, false);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[1].playable, false);
     draft.discard(draft.revision, draft.changes().find(row => row.unit === "settings:host").group);
     assert.equal(draft.current.fingerprint, authored, "discard restores Host and preserves the authored macro edit");
     assert.deepEqual(draft.changes().map(row => row.unit), ["macro:0"]);
@@ -65,9 +65,9 @@ test("switching to a native layout fixes stored text without rewriting it", () =
     const {hostMacros} = require("../fixtures/host-macros");
     const {snapshot, capabilities} = hostMacros(1, ["café"]);
     const draft = new ProfileDraftSession(snapshot, "board", capabilities);
-    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].playable, false);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[0].playable, false);
     stage(draft, settings(draft, "host", {hostLayout: "2"}));
-    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].playable, true);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[0].playable, true);
     assert.deepEqual(profileMacros(draft.document), profileMacros(snapshot.document));
     assert.equal(draft.checks().find(row => row.kind === "unplayableMacro").status, "fixed");
     assert.equal(draft.changes().find(row => row.area === "Macros").fields.find(field => field.label === "Playback").after, "Ready to play");
@@ -137,7 +137,7 @@ test("review blockers stop Apply before a recovery copy or device write", async 
     const {snapshot, caps} = fixture();
     snapshot.limits.brightnessMax = 100;
     const draft = new ProfileDraftSession(snapshot, "board", caps);
-    stage(draft, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello"});
+    stage(draft, {type: "updateMacro", keycode: "VIA_MACRO_0", payload: "hello"});
     draft.review(draft.revision);
     assert.equal(draft.hasBlockers(), true);
     assert.equal(draft.checks().find(row => row.kind === "brightnessBlocker")?.level, "blocker");
@@ -149,8 +149,8 @@ test("review blockers stop Apply before a recovery copy or device write", async 
 test("one draft composes every editor without changing its device snapshot", () => {
     const {draft,snapshot} = fixture(), original = JSON.stringify(snapshot);
     stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"hello"});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_1",payload:"{KC_LGUI,KC_N}"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"hello"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_1",payload:"{KC_LGUI,KC_N}"});
     stage(draft,settings(draft,"keyTiming",{tapHoldTerm:"175"}));
     const row = behaviorRowsForView(validateSnapshot(draft.document).behaviors)[0];
     stage(draft,{type:"saveBehavior",behavior:{...row,tapHoldTerm:"210"},expectedBase:draft.identity()});
@@ -166,25 +166,25 @@ test("one draft composes every editor without changing its device snapshot", () 
 });
 test("undo, redo, branching and no-op edits maintain one bounded history", () => {
     const {draft,snapshot} = fixture();
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"one"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"one"});
     const first = draft.current.fingerprint;
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"two"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"two"});
     draft.undo(draft.revision); assert.equal(draft.current.fingerprint,first);
     draft.undo(draft.revision); assert.equal(draft.dirty,false); assert.equal(draft.current.fingerprint,snapshot.fingerprint);
     draft.redo(draft.revision); assert.equal(draft.current.fingerprint,first);
     const revision = draft.revision;
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"one"}); assert.equal(draft.revision,revision);
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"branch"}); assert.equal(draft.view({}).canRedo,false);
-    for (let i=0;i<105;i++) stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:String(i)});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"one"}); assert.equal(draft.revision,revision);
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"branch"}); assert.equal(draft.view({}).canRedo,false);
+    for (let i=0;i<105;i++) stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:String(i)});
     assert.equal(draft.history.length,101); assert.equal(draft.base.fingerprint,snapshot.fingerprint);
 });
 test("the history lists every step, when it was made, and what it changed from the step before", () => {
     const {draft,snapshot} = fixture();
     let clock = 1000; draft.now = () => clock;
-    clock = 2000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"one"});
+    clock = 2000; stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"one"});
     const first = draft.current.fingerprint;
     clock = 3000; stage(draft,settings(draft,"keyTiming",{tapHoldTerm:"175"}));
-    clock = 4000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"two"});
+    clock = 4000; stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"two"});
     const steps = draft.steps();
     assert.deepEqual(steps.map(entry=>entry.label),["Read from the keyboard","Edited a macro","Saved a settings section","Edited a macro"]);
     assert.deepEqual(steps.slice(1).map(entry=>entry.at),[2000,3000,4000]);
@@ -208,8 +208,8 @@ test("the history lists every step, when it was made, and what it changed from t
     assert.throws(()=>draft.jump(draft.revision,4),/no longer in the draft history/);
     assert.throws(()=>draft.jump(draft.revision,"1"),/no longer in the draft history/);
     assert.throws(()=>draft.jump(0,1),/draft changed/);
-    clock = 5000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_1",payload:"x"});
-    draft.jump(draft.revision,1); clock = 6000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"y"});
+    clock = 5000; stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_1",payload:"x"});
+    draft.jump(draft.revision,1); clock = 6000; stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_2",payload:"y"});
     assert.deepEqual(draft.steps().map(entry=>entry.at).slice(1),[2000,6000],"a new edit after going back drops the undone steps and their times");
 });
 test("bounded history and a new branch retain each step's time, label, document and layer order", () => {
@@ -247,7 +247,7 @@ test("bounded history and a new branch retain each step's time, label, document 
     draft.undo(draft.revision);
     assert.equal(draft.current.decoded, oldestDecode);
     draft.redo(draft.revision);
-    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].payload, "branch");
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[0].payload, "branch");
 });
 
 test("draft staging takes owned layer keys and QMK functions in a behaviour", () => {
@@ -266,12 +266,12 @@ test("invalid edits and obsolete revisions cannot partially change the draft", (
     const {draft,snapshot} = fixture();
     assert.throws(()=>stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"NOT_A_KEY"}]}));
     assert.equal(draft.current.fingerprint,snapshot.fingerprint);
-    assert.throws(()=>draft.stage({type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"text",draftRevision:0}),/draft changed/);
+    assert.throws(()=>draft.stage({type:"updateMacro",keycode:"VIA_MACRO_0",payload:"text",draftRevision:0}),/draft changed/);
     assert.equal(draft.history.length,1);
 });
 test("external reads retain the draft and require an explicit new comparison", () => {
     const {draft,snapshot,caps} = fixture();
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"mine"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"mine"});
     const target = draft.current.fingerprint, external = new ProfileDraftSession(snapshot,"board",caps);
     stage(external,settings(external,"keyTiming",{tapHoldTerm:"190"}));
     draft.observe(external.current,"different-board"); assert.equal(draft.stale,false);
@@ -286,7 +286,7 @@ test("external reads retain the draft and require an explicit new comparison", (
 test("a reconnect requires review even when the HID path and profile are unchanged", async () => {
     const {snapshot, caps} = fixture();
     const draft = new ProfileDraftSession(snapshot, "board", caps, 1);
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"mine"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"mine"});
     draft.observe(snapshot, "board", 2);
     assert.equal(draft.connectionChanged, true);
     assert.equal(draft.stale, true);
@@ -300,7 +300,7 @@ test("a reconnect requires review even when the HID path and profile are unchang
 });
 test("apply requires the reviewed revision and original device, uses one verified restore, then clears history", async () => {
     const {draft,snapshot} = fixture(), calls=[];
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"text"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"text"});
     const saveRecovery=()=>"recovery", service={snapshot:()=>({connected:true,selectedDeviceId:"board"}),restorePortableProfile:async(document,options)=>{calls.push({document,options});return {...draft.current};}};
     await assert.rejects(draft.apply(service,draft.revision,saveRecovery),/Review/);
     draft.review(draft.revision);
@@ -310,7 +310,7 @@ test("apply requires the reviewed revision and original device, uses one verifie
     assert.equal(draft.dirty,false); assert.equal(draft.cursor,0);
 });
 test("interrupted apply retains the full target and can review against an incomplete recovery capture", async () => {
-    const {draft} = fixture(); stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"retained"}); draft.review(draft.revision);
+    const {draft} = fixture(); stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_2",payload:"retained"}); draft.review(draft.revision);
     const target = draft.current.fingerprint;
     const service={snapshot:()=>({connected:true,selectedDeviceId:"board"}),restorePortableProfile:async()=>{throw Object.assign(Error("interrupted"),{code:"RESTORE_INCOMPLETE"});}};
     await assert.rejects(draft.apply(service,draft.revision,()=>"recovery"),/interrupted/);
@@ -323,7 +323,7 @@ test("interrupted apply retains the full target and can review against an incomp
     assert.equal(draft.dirty,false);
 });
 test("comparing against an incomplete recovery base fails with the draft's stable error", () => {
-    const {draft} = fixture(); stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"retained"});
+    const {draft} = fixture(); stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_2",payload:"retained"});
     draft.observe({incomplete:true,fingerprint:"incomplete:device",document:{format:"charybdis-recovery-capture"}},"board");
     draft.rebase(draft.revision);
     const refused = {code:"PROFILE_DRAFT_CONFLICT", message:/Read a complete profile before comparing/};
@@ -347,7 +347,7 @@ test("rows are grouped by the edit that made them, and by any later edit that jo
     const {draft} = fixture();
     stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,key(2,"KC_C","Layer 1"));
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"alone"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"alone"});
     assert.deepEqual(unitsOf(draft,groupOf(draft,"layout:1:0")),["layout:1:0","layout:1:1"],"one message is one group");
     assert.notEqual(groupOf(draft,"layout:1:2"),groupOf(draft,"layout:1:0"),"a separate edit stays apart");
     assert.notEqual(groupOf(draft,"macro:0"),groupOf(draft,"layout:1:0"));
@@ -367,7 +367,7 @@ test("a unit edited back to the keyboard's value no longer ties anything togethe
 test("discarding a group puts every row of it back, as one undoable step, and leaves the rest", () => {
     const {draft,snapshot} = fixture();
     stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"kept"});
     const kept = profileMacros(draft.document)[0];
     draft.discard(draft.revision,groupOf(draft,"layout:1:1"));
     assert.deepEqual(draft.changes().map(row => row.unit),["macro:0"]);
@@ -393,7 +393,7 @@ test("a discard from a current review keeps it current, and discarding the last 
 test("a macro name discarded back leaves no indescribable settings difference", () => {
     const value = require("../fixtures/pd-profile").document();
     const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
     draft.discard(draft.revision,groupOf(draft,"macro:3"));
     assert.equal(draft.dirty,false,"discard restores the original settings bytes too");
 });
@@ -401,14 +401,14 @@ test("a rebase does not tie together everything it carried over", () => {
     const {draft,snapshot,caps} = fixture();
     stage(draft,key(0,"KC_A")); stage(draft,key(1,"KC_B"));
     const external = new ProfileDraftSession(snapshot,"board",caps);
-    stage(external,{type:"updateViaMacro",keycode:"VIA_MACRO_9",payload:"elsewhere"});
+    stage(external,{type:"updateMacro",keycode:"VIA_MACRO_9",payload:"elsewhere"});
     draft.observe(external.current,"board"); draft.rebase(draft.revision);
     assert.notEqual(groupOf(draft,"layout:0:0"),groupOf(draft,"layout:0:1"));
 });
 test("discarding the whole draft is a step undo takes back, and undo says what it undoes", () => {
     const {draft,snapshot} = fixture();
     stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
+    stage(draft,{type:"updateMacro",keycode:"VIA_MACRO_0",payload:"kept"});
     assert.equal(draft.view({}).undoLabel,"Edited a macro");
     const target = draft.current.fingerprint;
     draft.discardAll(draft.revision);
@@ -527,7 +527,7 @@ test("undo and redo carry the order; a rebase keeps it; an import and a whole di
     draft.undo(draft.revision); assert.deepEqual(units(draft),[]);
     draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(units(draft),["layerOrder","layout:2:0"]);
     const external = new ProfileDraftSession(snapshot,"board",caps);
-    stage(external,{type:"updateViaMacro",keycode:"VIA_MACRO_9",payload:"elsewhere"});
+    stage(external,{type:"updateMacro",keycode:"VIA_MACRO_9",payload:"elsewhere"});
     draft.observe(external.current,"board"); draft.rebase(draft.revision);
     assert.deepEqual(units(draft),["layerOrder","layout:2:0","macro:9"]);
     const imported = reorderLayers(snapshot.document,SWAP,SWAP.map(slot => snapshot.summary.names[slot]));
@@ -557,12 +557,12 @@ test("Unicode survives real draft Review, history, undo/redo and an unrelated ed
     const {draft,caps} = unicodeDraft(2);
     stage(draft,settings(draft,'host',{hostOs:'0',unicodeEnabled:true}));
     const text = ' café “hello” 🙂 e\u0301 👩‍💻 ';
-    stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:text});
+    stage(draft,{type:'updateMacro',keycode:'VIA_MACRO_0',payload:text});
     assert.ok(draft.changes().some(row=>row.unit==='macro:0'));
     assert.ok(draft.steps().at(-1).changes.some(row=>row.unit==='macro:0'));
     const encoded = profileMacros(draft.document)[0];
     const {macroEditorView} = require('../../core/model/macro-editor');
-    assert.equal(macroEditorView(draft.current,caps).viaMacros[0].payload,text);
+    assert.equal(macroEditorView(draft.current,caps).macros[0].payload,text);
     draft.undo(draft.revision); assert.notEqual(profileMacros(draft.document)[0],encoded);
     assert.doesNotThrow(()=>draft.steps());
     draft.redo(draft.revision); assert.equal(profileMacros(draft.document)[0],encoded);
@@ -581,7 +581,7 @@ test("new detection refreshes dirty draft labels and Unicode gates without alter
     const {macroEditorView} = require('../../core/model/macro-editor');
     const guiWord = () => draft.steps().at(-1).changes[0].fields[0].after;
     assert.match(guiWord(),/GUI/); // Populate presentation cache before fresh reads.
-    assert.throws(()=>stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:'café'}),/setup|Select|host/i);
+    assert.throws(()=>stage(draft,{type:'updateMacro',keycode:'VIA_MACRO_0',payload:'café'}),/setup|Select|host/i);
     for(const [detected,label] of [[1,'Command'],[2,'Windows'],[3,'Super'],[0,'GUI']]) {
         draft.observe({...snapshot,hostOs:{detected}},'board');
         assert.equal(draft.current.hostOs.detected,detected);
@@ -594,7 +594,7 @@ test("new detection refreshes dirty draft labels and Unicode gates without alter
         assert.doesNotThrow(()=>draft.changes());
     }
     draft.observe({...snapshot,hostOs:{detected:1}},'board');
-    stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:'café'});
+    stage(draft,{type:'updateMacro',keycode:'VIA_MACRO_0',payload:'café'});
     stage(draft,settings(draft,'host',{hostOs:'3',unicodeEnabled:true}));
     draft.observe({...snapshot,hostOs:{detected:2}},'board');
     assert.equal(macroEditorView(draft.current,caps).unicode.mode,3,'manual override wins');

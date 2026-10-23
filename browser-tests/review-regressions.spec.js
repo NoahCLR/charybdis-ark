@@ -21,7 +21,7 @@ for (const [index, destination] of [[1, 14], [9, 6]]) {
     });
 }
 
-// Moves stay pending in the host until Keep layers in draft; closing the
+// Moves stay pending in the core until Keep layers in draft; closing the
 // panel any other way discards them, as Discard does, so it reopens on the
 // draft's order.
 for (const [how, dismiss] of [

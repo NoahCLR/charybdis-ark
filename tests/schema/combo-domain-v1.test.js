@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {encodeComboDomain, decodeComboDomain, effectiveComboTerm, runningComboRows, COMBO_LIMITS} = require("../../core/schema/combo-domain-v1");
+const {encodeComboDomain, decodeComboDomain, effectiveComboWindow, runningComboRows, COMBO_LIMITS} = require("../../core/schema/combo-domain-v1");
 const fs = require("node:fs"), path = require("node:path");
 const golden = fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/combo_domain_v3.fixture"), "utf8").trim();
 const key = operand => ({kind: 1, operand, flags: 0});
@@ -53,8 +53,8 @@ test("combo domain v3 stores the default window and hold threshold once, and a r
     assert.deepEqual([...bytes.subarray(28 + 2, 28 + 4)], [45, 0]);
     const decoded = decodeComboDomain(bytes);
     assert.deepEqual(decoded, withIds(table));
-    assert.equal(effectiveComboTerm(decoded, decoded.rows[0]), 60);
-    assert.equal(effectiveComboTerm(decoded, decoded.rows[1]), 45);
+    assert.equal(effectiveComboWindow(decoded, decoded.rows[0]), 60);
+    assert.equal(effectiveComboWindow(decoded, decoded.rows[1]), 45);
     // As the keyboard reports them running: the window each runs with, and
     // native keycodes.
     const running = runningComboRows(decoded);

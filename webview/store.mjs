@@ -1,7 +1,7 @@
 // @ts-check
 // The webview's whole state: what the keyboard said, and where the person is
 // standing in the app. Edits never change the model here — they are posted to
-// the host, which answers with a new model. The draft lives on that side too,
+// the core, which answers with a new model. The draft lives on that side too,
 // so what is drawn is always what would be applied.
 
 import {behaviourKeyAt, behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
@@ -15,7 +15,7 @@ const vscode = acquireVsCodeApi();
 /** @typedef {import("./state.js").PanelState} PanelState */
 
 // Every field of the state, with its starting value and what a draft change
-// does to it (view/state-fields.mjs). When the host replaces the draft under
+// does to it (view/state-fields.mjs). When the core replaces the draft under
 // the forms (undo, redo, a jump, discard, rebase, Apply, an import, another
 // keyboard or the demo), `resets` and `resetsTo` start a form again from the
 // model; `kept` survives. This preserves the existing reset policy, including
@@ -60,7 +60,7 @@ export const STATE_FIELDS = {
     //               Labels are resolved from the current model on every render.
     //   form        the builder's fields, kept across renders; followsDefault
     //               says the window is the keyboard's default, not the combo's own
-    //   awaiting    a Keep or Delete posted; the builder closes when the host accepts it
+    //   awaiting    a Keep or Delete posted; the builder closes when the core accepts it
     //   madeKey     the custom key the output picker offered for a shortcut no
     //               keycode holds: made only with the combo, on Keep (D-L63)
     // A draft change closes it, as Close does.
@@ -207,7 +207,7 @@ export const selectedPosition = () => positionAt(currentLayer(), state.selected)
 // Editing is only offered where the keyboard says it is possible; everywhere
 // else the control stays visible and disabled, with the reason. Whether the
 // draft takes an edit is core's to say (`draft.editable`), so what is offered
-// is what the host accepts; the demo's draft, with no keyboard, takes them too.
+// is what the core accepts; the demo's draft, with no keyboard, takes them too.
 export const writable = () => Boolean(getModel()?.draft?.editable);
 
 // Posts a message that leaves the demo (or replaces its file), asking first
