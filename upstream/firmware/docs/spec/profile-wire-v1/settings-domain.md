@@ -43,7 +43,7 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 
 Every byte but 5 must be exactly its value. Firmware accepts only version 8
 and refuses every earlier one (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0010-firmware-accepts-only-current-formats.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0010-firmware-accepts-only-current-formats.md)).
 
 Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`).
 
@@ -55,7 +55,7 @@ Unless the table says otherwise a scalar is at most 65,535.
 
 | Id | Setting | Rule | Compiled default |
 | ---: | --- | --- | --- |
-| 0 | tapping term: dual-role keys and QMK's own tapping (D-F47, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0047-dual-role-setting-is-the-tapping-term.md)), ms | | `TAPPING_TERM` |
+| 0 | tapping term: dual-role keys and QMK's own tapping (D-F47, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0047-dual-role-setting-is-the-tapping-term.md)), ms | | `TAPPING_TERM` |
 | 1 | tap / hold threshold, ms | | `CUSTOM_TAP_HOLD_TERM` |
 | 2 | long hold threshold, ms | | `CUSTOM_LONGER_HOLD_TERM` |
 | 3 | multi tap window, ms | | `CUSTOM_MULTI_TAP_TERM` |
@@ -90,7 +90,7 @@ may edit. The domain accepts any brightness; QMK clamps it to the reported
 maximum when it applies it ([GET `0x08` page 1](#editor-metadata--get-0x08)).
 
 Scalar 27, the host settings word (D-F16,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0016-macro-text-typed-through-host-layout.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0016-macro-text-typed-through-host-layout.md)):
 
 | Bits | Meaning |
 | --- | --- |
@@ -106,7 +106,7 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 
 Scalars 18, 19, 21 and 22 are the adjustment scalars, the ones the keyboard's
 DPI and lighting keys set (D-F32,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0032-live-edits-working-copy-and-save.md)); adjustment index 0
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0032-live-edits-working-copy-and-save.md)); adjustment index 0
 to 3 is that order, which is scalar order, so an edit of any of them has its
 splices in ascending offset order. An adjustment's bytes are the adjusted
 scalars over the domain they land in, or over the compiled defaults' domain
@@ -140,7 +140,7 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 ## Custom-key shortcuts
 
 Each custom key's two-byte shortcut (D-F26,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0026-custom-key-carries-a-shortcut.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0026-custom-key-carries-a-shortcut.md)):
 
 | Offset | Field |
 | ---: | --- |
@@ -151,14 +151,14 @@ Both zero means no shortcut; modifiers alone and a key alone are shortcuts.
 Modifier keys belong in the mask; media, system, mouse-movement and every
 non-basic keycode are refused. The firmware does not check that a behaviour
 step naming a custom key has a shortcut; one without sends nothing. What a
-shortcut does is [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/architecture/runtime-flow.md)'s.
+shortcut does is [key press](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/architecture/key-press.md#from-an-action-to-the-report)'s.
 
 Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`).
 
 ## Names
 
 273 names follow, in order: 16 layer names, 128 macro names (D-F43,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0043-macros-have-names-user-macros-retired.md)), 128 custom-key
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0043-macros-have-names-user-macros-retired.md)), 128 custom-key
 names, then the keyboard's own name. Each is a length byte `0..32` and that
 many bytes; names are counted, not terminated, and the last one ends the
 domain exactly.
@@ -176,10 +176,34 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 ## Keyboard name
 
 The last name is the keyboard's name (D-F25,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0025-keyboard-name-is-usb-product-string.md)). The firmware
-serves it as the USB product string; empty means QMK's built-in
-`keyboard_name`. When a new name reaches the host is
-[runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/architecture/runtime-flow.md#usb-product-name)'s.
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0025-keyboard-name-is-usb-product-string.md)). A build with
+saves serves it as the USB product string through the BK fork's runtime
+product string hook (`USB_PRODUCT_STRING_USER`, `usb_product_string_user()`);
+empty means QMK's built-in product string. The manufacturer and serial
+number never change.
+
+Hosts read the string only when they enumerate the keyboard:
+
+- Before USB starts (`keyboard_pre_init`), both halves read the name of the
+  saved profile boot selection chooses, which checks the record's checksum
+  and compatibility but not the other half; with nothing saved, the compiled
+  defaults' name (`NOAH_KEYBOARD_NAME`).
+- When the active profile's name differs from the one USB enumerated with (an
+  Apply or Save renamed the keyboard, or the halves reconciled to a profile
+  other than the one read at boot), the master half restarts its USB driver
+  (QMK's `restart_usb_driver`, 50 ms off the bus) once all of these hold:
+  its owner is ready with no candidate, save, edit, activation or cleanup in
+  flight, both halves hold the same saved profile, and the
+  [safe boundary](../authority-state-table.md#safe-boundary) reports no
+  reason; no Raw HID report has arrived for 1 s, so a client finishes the
+  reads that follow its Apply; USB is enumerated and not suspended.
+- The new string is built in a second buffer and served by switching to it
+  just before the restart, so a host never reads a half-written string.
+- One change of the name is one restart, and an unchanged name never
+  restarts. A name that cannot be encoded serves the built-in string and
+  settles the same way. The empty name and a stored name equal to the
+  built-in text are different names, so a change between them restarts too.
+- The slave half never restarts USB: its USB stays off as QMK left it.
 
 Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`), `tests/host/run_qmk_usb_product_name_tests.sh`, `tests/host/run_qmk_usb_product_name_owner_tests.sh`.
 
@@ -238,12 +262,12 @@ metadata answer status 2. None of it is configuration: it describes the
 running build and is not part of any profile.
 
 Page 1, the brightness limit (D-F38,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0038-keyboard-reports-its-brightness-limit.md)), two bytes:
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0038-keyboard-reports-its-brightness-limit.md)), two bytes:
 version `1`, then `RGB_MATRIX_MAXIMUM_BRIGHTNESS` as `u8`. Reading it changes
 no LED state.
 
 Page 2, the lighting and key-option inventory (D-F39,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/add9dcc50006b47f77aa33581da6b9a2f158fd94/docs/adr/0039-native-settings-use-device-reported-capabilities.md)),
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0039-native-settings-use-device-reported-capabilities.md)),
 nine bytes:
 
 | Offset | Value |
