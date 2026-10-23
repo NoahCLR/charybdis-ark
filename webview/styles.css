@@ -112,7 +112,7 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
 .dim { color: var(--text-3); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
-/* ── shell ───────────────────────────────────────────────────────────── */
+/* ── frame ───────────────────────────────────────────────────────────── */
 .app {
   display: grid;
   grid-template-columns: var(--rail) minmax(0, 1fr);

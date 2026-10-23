@@ -4,7 +4,7 @@ import {KIND, newMode, scrollStarter} from "../../view/pointing-config.mjs";
 import {bindingsForSlot} from "../../view/reach.mjs";
 import {post} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
-import {unavailable} from "../shell.mjs";
+import {unavailable} from "../frame.mjs";
 import {actionMarked, slotLight} from "../marks.mjs";
 import {bindingName} from "./common.mjs";
 

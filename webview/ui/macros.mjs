@@ -20,7 +20,7 @@ import {readMacro} from "../view/macro-cache.mjs";
 import {canEdit as canEditArea, getModel, render, state} from "../store.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
-import {topbar, unavailable} from "./shell.mjs";
+import {topbar, unavailable} from "./frame.mjs";
 import {editor} from "./macros/editor.mjs";
 export {receiveMacroValidation} from "./macros/validation.mjs";
 

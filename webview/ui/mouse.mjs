@@ -13,7 +13,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
 import {actionLabel} from "../view/keyface.mjs";
 import {keycodePlacements, reachLine} from "../view/placements.mjs";
-import {topbar, unavailable} from "./shell.mjs";
+import {topbar, unavailable} from "./frame.mjs";
 import {sectionCard, sectionsIn} from "./settings.mjs";
 
 export function screenMouse() {

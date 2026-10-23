@@ -119,7 +119,7 @@ core/            the app, with no shell dependency (no vscode import, D-L02)
 contracts/       declarations for data posted between shell and panel; no code
 webview/         the interface: browser ES modules, no build step
   lib/ view/     pure helpers and model → presentation, with tests
-  ui/            screens and components
+  ui/            the frame, screens and components
   styles.css     the design system
 web/             the web shell and build entries
 scripts/         developer entry points and build steps

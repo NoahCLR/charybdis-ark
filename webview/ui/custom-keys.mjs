@@ -23,7 +23,7 @@ import {canEdit as canEditArea, getModel, layerName, layers, post, render, state
 import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {topbar, unavailable} from "./shell.mjs";
+import {topbar, unavailable} from "./frame.mjs";
 import {keyName} from "../view/keyvalues.mjs";
 import {customKeyDoes, hasShortcut, customKeyShortcutLine} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";

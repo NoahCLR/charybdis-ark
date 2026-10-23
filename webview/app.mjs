@@ -36,7 +36,7 @@ import {screenDevice} from "./ui/device.mjs";
 import {reviewOverlay} from "./ui/review-overlay.mjs";
 import {leaveDemoOverlay} from "./ui/leave-demo.mjs";
 import {editModeOverlay, liveProposalOverlay} from "./ui/edit-mode.mjs";
-import {commitBar, rail, topbar} from "./ui/shell.mjs";
+import {commitBar, rail, topbar} from "./ui/frame.mjs";
 
 const root = /** @type {HTMLElement} */ (document.getElementById("root"));
 /** @type {import("./view/screens.mjs").ScreenId | null} */

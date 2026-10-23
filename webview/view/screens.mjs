@@ -1,7 +1,7 @@
 // @ts-check
 // The rail, screen renderer and message receiver share one screen definition.
 // Render functions are supplied by the app: this registry stays pure and does
-// not import screens, their shell or their state.
+// not import screens, the frame or their state.
 
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {{screenKeys: () => HTMLElement, screenLighting: () => HTMLElement, screenMacros: () => HTMLElement,

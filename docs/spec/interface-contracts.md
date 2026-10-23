@@ -522,7 +522,7 @@ and the firmware serves the effective name as its USB product string
   match (`tests/session/device-model.test.js`).
 - The Keyboard screen's title is the name (`titleName`), following
   `canEdit("settings")`, with the built-in name as placeholder
-  (`browser-tests/settings-shell.spec.js`). It posts trimmed; core refuses
+  (`browser-tests/settings-screens.spec.js`). It posts trimmed; core refuses
   more than 32 bytes or control characters (`tests/view/edits.test.mjs`,
   `tests/model/keyboard-name.test.js`).
 

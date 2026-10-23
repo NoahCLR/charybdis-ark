@@ -12,7 +12,7 @@
 import * as edits from "../view/edits.mjs";
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
-import {topbar, unavailable} from "./shell.mjs";
+import {topbar, unavailable} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 import {githubMark} from "../view/shell-panel.mjs";

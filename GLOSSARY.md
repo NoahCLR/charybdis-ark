@@ -131,6 +131,11 @@ The part of the profile one screen edits, under which Review groups its
 changes.
 _Avoid_: section, domain (for this), category
 
+**Frame**:
+What stays around every screen: the rail, the top bar over the screen and
+the bar.
+_Avoid_: shell (for this), chrome, layout
+
 **Rail**:
 The column at the left that chooses the screen and shows the keyboard, its
 edit mode and the draft's history.

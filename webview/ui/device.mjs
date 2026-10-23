@@ -22,7 +22,7 @@ import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {firmwareFacts} from "../view/firmware-facts.mjs";
 import {attachTitleName, titleName} from "./title-name.mjs";
-import {themeToggle} from "./shell.mjs";
+import {themeToggle} from "./frame.mjs";
 import {renameNote} from "../view/edit-mode.mjs";
 
 /** @param {readonly (readonly [string, string])[]} rows each value already escaped markup */

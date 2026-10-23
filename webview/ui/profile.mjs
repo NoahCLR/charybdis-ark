@@ -12,7 +12,7 @@
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, canEdit as canEditArea} from "../store.mjs";
-import {topbar} from "./shell.mjs";
+import {topbar} from "./frame.mjs";
 import {categorySummary, statusBesideCount} from "../view/review.mjs";
 import {stageOrder} from "../view/vocabulary.mjs";
 import {copyTitle, deleteRecovery, downloadRecovery, shellOf, useRecovery} from "../view/shell-panel.mjs";

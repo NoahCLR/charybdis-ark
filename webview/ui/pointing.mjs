@@ -15,7 +15,7 @@ import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
 import {slotLight} from "./marks.mjs";
 import {word} from "../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {topbar, unavailable} from "./shell.mjs";
+import {topbar, unavailable} from "./frame.mjs";
 import {axisLabel, words} from "./pointing/common.mjs";
 import {editor} from "./pointing/editor.mjs";
 import {emptySlot} from "./pointing/empty-slot.mjs";
