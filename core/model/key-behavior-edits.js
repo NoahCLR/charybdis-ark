@@ -101,7 +101,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     // edit says what happens to it: replaced, or given the old key in a swap.
     if (message.type === "retargetBehavior") {
         const from = rowFor(message.keycode);
-        if (from.index < 0) throw invalid("This behaviour row is no longer present. Read from keyboard again.");
+        if (from.index < 0) throw invalid("This behaviour row is no longer present. Choose Read keyboard, then try again.");
         const to = rowFor(message.target);
         checkTarget(to.target);
         if (to.index === from.index) throw invalid("This behaviour already listens to that key.");
@@ -130,7 +130,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     const previous = rows[index];
 
     if (message.type === "deleteBehavior") {
-        if (!previous) throw invalid("This behaviour row is no longer present. Read from keyboard again.");
+        if (!previous) throw invalid("This behaviour row is no longer present. Choose Read keyboard, then try again.");
         rows.splice(index, 1);
     } else {
         checkTarget(target);

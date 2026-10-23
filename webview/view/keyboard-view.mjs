@@ -1,7 +1,7 @@
 // @ts-check
-// What the Keyboard screen and the halves banner say about the connected
-// keyboard: its two halves, its firmware against this Ark, and when to say
-// a half is missing. Pure: it reads the published model.
+// What the Keyboard screen says about the connected keyboard: its product,
+// its two halves and its firmware against this Ark. Pure: it reads the
+// published model.
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 
@@ -24,15 +24,36 @@ export function halvesRows(model) {
     ];
 }
 
-// The strip under the topbar on every screen, while a half is missing or the
-// halves disagree; nothing otherwise, and nothing in the demo.
-/** @param {Model | null | undefined} model @returns {string} */
-export function halvesBanner(model) {
-    if (!model?.device?.connected || model?.demo?.active) return "";
-    const halves = model.device.health?.halves;
-    if (halves === "alone") return "The left half isn't answering. You can edit; Apply waits for both halves.";
-    if (halves === "apart") return "The halves hold different saved settings. Apply waits until they agree.";
-    return "";
+// A save the keyboard is in the middle of and will finish
+// (`health.recoveryPending`), in the words the rail and the Keyboard screen
+// both use.
+export const SAVE_IN_PROGRESS = Object.freeze({
+    label: "Save in progress",
+    detail: "A save is in progress on the keyboard: it keeps its previous profile until both halves confirm the new one.",
+});
+
+// The rail's line about the keyboard itself, under the draft's: a restart it
+// needs, or a save it is finishing. Null when there is neither, and in the
+// demo.
+/** @param {Model | null | undefined} model @returns {{tone: string, text: string, tip: string} | null} */
+export function keyboardStatusLine(model) {
+    const health = model?.device?.health;
+    if (model?.demo?.active || !health) return null;
+    if (health.restartNeeded) return {tone: "err", text: "Restart the keyboard",
+        tip: "The slave half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost."};
+    if (health.recoveryPending) return {tone: "draft", text: SAVE_IN_PROGRESS.label, tip: SAVE_IN_PROGRESS.detail};
+    return null;
+}
+
+// The Keyboard screen's Product row: the firmware's built-in name, which Ark
+// knows while the keyboard carries no stored name (it is then the keyboard's
+// USB product). A renamed keyboard reports its given name over USB instead
+// (firmware D-F25), and the title already shows that, so the row is left out
+// (null) rather than repeating it.
+/** @param {Model | null | undefined} model @returns {string | null} */
+export function productName(model) {
+    if (model?.demo?.active) return "Charybdis 4x6 (demo)";
+    return model?.keyboardName?.builtIn || null;
 }
 
 // The firmware's line on the Keyboard screen: its version, and whether this

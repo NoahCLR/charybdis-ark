@@ -63,7 +63,7 @@ export const SCREENS = Object.freeze({
     }),
     device: screen({
         label: "Keyboard", group: "Keyboard", title: "Keyboard", keepOnPublish: false,
-        secondaryLabel: "Device details",
+        secondaryLabel: "Keyboard",
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6 6.5h4v3H6z"/></svg>',
         available: model => Boolean(model.device?.connected || model.demo?.active), render: renderers => renderers.screenDevice(),
         unavailable: {title: "Device status unavailable", detail: "Read the keyboard to see its connection and diagnostics."},

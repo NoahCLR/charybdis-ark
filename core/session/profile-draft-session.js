@@ -116,6 +116,10 @@ class ProfileDraftSession {
         this.hostOs = copy(snapshot.hostOs ?? null);
         /** @type {import("./types.js").LiveState | null} */
         this.live = live ? {...live.live} : null;
+        // An Apply draft's keyboard, as the look between edits last read it
+        // (a live draft's is `live.keyboard`).
+        /** @type {import("./types.js").LiveKeyboardStatus | undefined} */
+        this.applyKeyboard = undefined;
         this.history = [this.historyEntry(snapshot.document)];
         this.cursor = 0;
         this.revision = 1;
@@ -706,6 +710,15 @@ class ProfileDraftSession {
         if (status.unsaved !== live.unsaved) this.live.unsaved = status.unsaved;
         return changed ? "changed" : "same";
     }
+    // A look at the keyboard between edits under an Apply draft
+    // (live-watch.js): what it says of itself. The panel says only a key
+    // adjustment still reaching both halves there, so true when that changed.
+    /** @param {import("../protocol/types.js").EditStatus} status */
+    observeApplyStatus(status) {
+        const before = Boolean(this.applyKeyboard?.adjustmentPending);
+        this.applyKeyboard = liveKeyboardStatus(status);
+        return before !== this.applyKeyboard.adjustmentPending;
+    }
     // The keyboard saved what it runs by itself (Live): what is saved moves
     // to it, and the history stays, so undo still sends the last edits back.
     // Saved any other way (another app's Save) the draft starts there.
@@ -766,7 +779,11 @@ class ProfileDraftSession {
             // it (the halves then run different profiles), and what the
             // keyboard says of its own saving.
             // What the keyboard said of its own saving holds only while it is connected.
-            live: this.live ? {unsaved: this.live.unsaved, converged: this.live.converged, apart: Boolean(this.live.apart), mode: this.live.mode, keyboard: connected ? liveKeyboardView(this.live.keyboard) : null} : null};
+            live: this.live ? {unsaved: this.live.unsaved, converged: this.live.converged, apart: Boolean(this.live.apart), mode: this.live.mode, keyboard: connected ? liveKeyboardView(this.live.keyboard) : null} : null,
+            // What the keyboard says of itself in any edit mode: a live
+            // draft's `live.keyboard`, or what the look between edits read
+            // under an Apply draft.
+            keyboard: connected ? liveKeyboardView(this.live ? this.live.keyboard : this.applyKeyboard) : null};
     }
 }
 // The router (panel-session.js) and the web build take the registry's list from here.

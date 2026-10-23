@@ -62,6 +62,8 @@ export interface DraftView {
     changes: ReviewChange[]; checks: Check[]; steps?: HistoryStep[];
     /** Live modes: the keyboard runs unsaved edits; both halves hold the last one; the other half refused it (apart until Revert); what it says of its own saving. Null for an Apply draft. */
     live: {unsaved: boolean; converged: boolean; apart: boolean; mode: number; keyboard: LiveKeyboardView | null} | null;
+    /** What the keyboard says of itself in any edit mode (an Apply draft's from the look between edits); null while it is not connected or has said nothing. */
+    keyboard: LiveKeyboardView | null;
 }
 /** What a live keyboard says of its own saving and its halves (firmware D-F32). */
 export interface LiveKeyboardView {

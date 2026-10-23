@@ -11,7 +11,10 @@
 //   host.post(message)              delivers a message to the panel (the model)
 //   host.showError(text)            optional: shows a failure outside the panel too
 //   host.progress(title, run)       optional: runs `run` behind a progress indicator
-//   host.saveRecovery(document)     writes a recovery copy, resolves to where it went
+//   host.saveRecovery(document, about)
+//                                   writes a recovery copy with what made it and the
+//                                   keyboard's name ({cause, keyboard}; recovery-copy.js),
+//                                   resolves to where it went
 //   host.chooseProfile()            resolves to a chosen file ({text, name}, or its
 //                                   text), or undefined when nothing was chosen;
 //                                   Import and the demo's Open a profile file use it

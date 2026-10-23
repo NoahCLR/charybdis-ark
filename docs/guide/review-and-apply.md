@@ -142,7 +142,9 @@ press.
 
 **Draft history** at the foot of the rail lists every step of your draft,
 newest first, each with when you made it and what it changed from the step
-before. Go back or forward to any of them.
+before. Go back or forward to any of them. In Apply that changes only the
+draft; in Live and Live + review the step goes to the keyboard at once, as an
+edit.
 
 ⌘Z (Ctrl+Z) undoes and ⇧⌘Z or ⌘Y redoes, outside text fields and dialogs. The
 macro editor has its own step undo while you work in it.
@@ -155,12 +157,15 @@ keyboard again and shows the new value. That is not an error.
 
 - In Apply, a draft with edits then says **The keyboard changed**, and
   **Review against the keyboard** compares your draft with the keyboard as it
-  is now. **Discard draft** starts over from the keyboard.
+  is now. **Discard draft** starts over from the keyboard. Until you choose
+  one, the editing screens say the keyboard changed since the draft began
+  and point to the bar.
 - In the live modes, an edit you make just as a key changed the keyboard is
   not sent. Ark reads the keyboard; make the edit again.
 
 **Keyboard adjustment pending** means such a change is still waiting to reach
-both halves. Release any held keys.
+both halves. Release any held keys. The rail says it in every edit mode; it is
+the keyboard's own change, not an edit of yours waiting to be saved.
 
 ## Applying
 

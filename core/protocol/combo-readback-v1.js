@@ -76,7 +76,7 @@ async function readDeviceCombos(connection, options = {}) {
         if (!before.equals(await read(0))) continue;
         return decodeComboPages(before, pages);
     }
-    throw fail("COMBO_CHANGED", "Combo settings changed during readback. Read from keyboard again.");
+    throw fail("COMBO_CHANGED", "Combo settings changed during readback. Choose Read keyboard to read them again.");
 }
 
 module.exports = {COMBO_READBACK_V1, decodeComboPages, readDeviceCombos};

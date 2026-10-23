@@ -361,6 +361,11 @@ function behaviorDefaults(content, capabilities, aliases, names) {
     }));
 }
 
+// What the keyboard is called: a name the person gave it stands alone;
+// otherwise the manufacturer and product it reports over USB.
+/** @param {Pick<import("./types.js").DeviceModelInput, "storedKeyboardName" | "device">} state */
+const keyboardLabel = (state) => state.storedKeyboardName || [state.device?.manufacturer, state.device?.product].filter(Boolean).join(" ") || "Charybdis";
+
 /** @param {import("./types.js").DeviceModelInput} state */
 function deviceHeader(state) {
     const connected = Boolean(state.capabilities);
@@ -383,9 +388,7 @@ function deviceHeader(state) {
             },
         };
     }
-    // A name the person gave the keyboard stands alone; otherwise the
-    // manufacturer and product it reports over USB.
-    const label = state.storedKeyboardName || [state.device?.manufacturer, state.device?.product].filter(Boolean).join(" ") || "Charybdis";
+    const label = keyboardLabel(state);
     const status = state.status;
     // Say plainly when nothing is committed. "generation 0" reads like a real
     // generation and it is not one.
@@ -404,7 +407,7 @@ function deviceHeader(state) {
     }
     const subtitle = parts.length
         ? `${parts.join(" and ")} read from the keyboard`
-        : "Connected. Use Read from keyboard to load its configuration.";
+        : "Connected. Choose Read keyboard to load its configuration.";
     const converged = Boolean(status) && halvesConverged(status);
     return {
         connected: true,
@@ -532,4 +535,4 @@ function deviceLabels(devices) {
         : devices[index].serialNumber ? `${base} · ${devices[index].serialNumber}` : `Keyboard ${devices[index].number ?? index + 1} · ${base}`);
 }
 
-module.exports = {buildDeviceModel, buildSnapshotModel, deviceLabels, deviceSummary, editorViews};
+module.exports = {buildDeviceModel, buildSnapshotModel, deviceLabels, deviceSummary, editorViews, keyboardLabel};

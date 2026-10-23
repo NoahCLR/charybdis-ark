@@ -31,10 +31,10 @@ test("Lighting's stage tabs are the paint order, with no second row of stages", 
 test("profile management leads with working import and export cards", () => {
     const profile = read("profile.mjs");
     const actions = profile.indexOf("profile-actions");
-    // The save-in-progress status moved to Keyboard; the copies saved before
-    // each Apply follow the two actions.
-    const recovery = profile.indexOf("recoveriesCard(model");
-    assert(actions >= 0 && recovery > actions, "backup actions must precede the copies saved before Apply");
+    // The save-in-progress status moved to Keyboard; the recovery copies
+    // follow the two actions.
+    const recovery = profile.indexOf("recoveriesCard(recoveries");
+    assert(actions >= 0 && recovery > actions, "backup actions must precede the recovery copies");
     assert.match(profile, /class="card profile-action"/);
     assert.match(profile, /Export profile…/);
     assert.match(profile, /Choose profile…/);

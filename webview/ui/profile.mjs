@@ -18,6 +18,8 @@ import {stageOrder} from "../view/vocabulary.mjs";
 import {copyTitle, deleteRecovery, downloadRecovery, hostOf, useRecovery} from "../view/host.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {reviewPortableProfile} from "../view/edits.mjs";
+import {fitsLine} from "../view/backups.mjs";
+import {importCallout, importNote} from "../view/edit-mode.mjs";
 
 export function screenProfile() {
     const model = getModel();
@@ -49,8 +51,8 @@ export function screenProfile() {
             <div class="card-b">
                 <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg></span>
                 <h3>Import profile</h3>
-                <p class="note">${demo ? "Choose or drop a complete backup here and review its differences from the demo setup first. Import replaces the demo's draft; Undo brings it back."
-                    : "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and apply it."}</p>
+                <p class="note">${esc(demo ? "Choose or drop a complete backup here and review its differences from the demo setup first. Import replaces the demo's draft; Undo brings it back."
+                    : importNote(model?.draft))}</p>
                 <p class="note profile-drop-status" role="status" hidden></p>
                 <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Choose profile…</button>
             </div>
@@ -71,7 +73,7 @@ export function screenProfile() {
     pad.appendChild(actions);
 
     const recoveries = hostOf(model).recoveries;
-    if (!demo) pad.appendChild(recoveriesCard(model, recoveries));
+    if (!demo) pad.appendChild(recoveriesCard(recoveries));
     pad.appendChild(defaultsCard());
 
     main.appendChild(content);
@@ -83,6 +85,9 @@ export function screenProfile() {
 // Honest about what a backup is for: it restores onto the same firmware
 // release, which a firmware update may not keep.
 const FIRMWARE_LINE = "A backup restores onto the same firmware release; check the release notes before updating firmware.";
+
+// What every recovery copy is, before where the shell keeps it.
+const RECOVERY_NOTE = "Before every Apply, Save and restart, and before leaving Live or restoring a backup, Ark keeps a copy of what that could lose,";
 
 // Not built yet, and said so rather than half-built: Ark reads the
 // firmware’s complete defaults, but has no whole-defaults draft control yet.
@@ -145,25 +150,25 @@ function wireProfileDrop(card) {
     });
 }
 
-// The copies saved before each Apply. A browser keeps them in its storage,
-// each usable as a draft (through the same comparison as a backup file),
-// downloadable as a file, or deletable. VS Code saves them as files in its
-// storage folder, named by the Apply's notice.
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").RecoveryCopy[] | null} recoveries */
-function recoveriesCard(model, recoveries) {
-    const keyboard = model?.keyboardName?.name || model?.keyboardName?.builtIn || model?.device?.label || "";
+// The recovery copies Ark keeps before an Apply, a Save, a restart, leaving
+// Live or restoring a backup, each named by what made it and its keyboard. A
+// browser keeps them in its storage, each usable as a draft (through the same
+// comparison as a backup file), downloadable as a file, or deletable. VS Code
+// saves them as files in its storage folder, named by the notice after them.
+/** @param {import("../../contracts/model.js").RecoveryCopy[] | null} recoveries */
+function recoveriesCard(recoveries) {
     const canImport = canEditArea("import");
     const node = el(`<div class="card recoveries">
-        <div class="card-h"><h3>Saved before each Apply</h3>${recoveries ? `<span class="right note">${recoveries.length} in this browser</span>` : ""}</div>
+        <div class="card-h"><h3>Recovery copies</h3>${recoveries ? `<span class="right note">${recoveries.length} in this browser</span>` : ""}</div>
         ${recoveries?.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
-            <span class="recovery-name" title="${esc(copy.name)}">${esc(copyTitle(keyboard, copy.savedAt))}</span>
+            <span class="recovery-name" title="${esc(copy.name)}">${esc(copyTitle(copy))}</span>
             <span class="right row gap-4">
                 <button class="btn compact" data-use="${esc(copy.id)}" ${canImport ? "" : "disabled"}>Use as draft</button>
                 <button class="btn text" data-recovery="${esc(copy.id)}">Download</button>
                 <button class="btn text destructive" data-delete="${esc(copy.id)}">Delete</button></span></div>`).join("")}</div>` : ""}
         <div class="card-b"><p class="note">${recoveries
-            ? `${recoveries.length ? "" : "None yet. "}Every Apply first saves what the keyboard had, here. They stay in this browser until you delete them or clear the site's data, so download any you want to keep.`
-            : "Every Apply first saves what the keyboard had as a file in VS Code's storage for Ark; the message after Apply says where. Import one with Choose profile…"}</p></div>
+            ? `${recoveries.length ? "" : "None yet. "}${RECOVERY_NOTE} here. They stay in this browser until you delete them or clear the site's data, so download any you want to keep.`
+            : `${RECOVERY_NOTE} as a file in VS Code's storage for Ark; the message after an Apply, a Save or a restart says where. Import one with Choose profile…`}</p></div>
     </div>`);
     /** @param {string} attribute @param {(id: string | number) => Parameters<typeof post>[0]} message */
     const wire = (attribute, message) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll(`[${attribute}]`)).forEach((button) => button.addEventListener("click", () => {
@@ -194,15 +199,14 @@ function reviewSheet(model, portable, busy) {
     const callout = !current
         ? "An interrupted restore left an incomplete configuration, so this file cannot be compared with it. This profile replaces it; the interrupted data is kept as a diagnostic copy, so keep your original backup as well."
         : draft
-            ? `${pending ? `This replaces your draft and its ${pending} change${pending === 1 ? "" : "s"}; Undo brings ${pending === 1 ? "it" : "them"} back. ` : ""}Nothing is written to the keyboard until you review and apply; the review shows every change field by field.`
+            ? `${pending ? `This replaces your draft and its ${pending} change${pending === 1 ? "" : "s"}; Undo brings ${pending === 1 ? "it" : "them"} back. ` : ""}${importCallout(draft)}`
             : "This replaces the keyboard's layout, behaviours, combos, custom keys, macros, trackball modes, lighting and settings. The previous profile is saved automatically before restoring, and both halves are verified afterwards.";
-    /** @param {number} value */
-    const bytes = (value) => value.toLocaleString("en-GB");
+    const size = fits ? fitsLine(fits) : null;
     const node = el(`<div class="scrim import-scrim"><div class="sheet import-sheet" role="dialog" aria-modal="true" aria-label="${draft ? "Use this backup as your draft?" : "Restore this backup?"}">
         <div class="sheet-h"><h2>${draft ? "Use this backup as your draft?" : "Restore this backup?"}</h2>
             ${fileName ? `<span class="right note mono">${esc(fileName)}</span>` : ""}</div>
         <div class="sheet-b stack gap-12">
-            ${fits ? `<p class="note import-fits${fits.used > fits.capacity ? " warn" : ""}">This file fits: ${bytes(fits.used)} of ${bytes(fits.capacity)} bytes${fits.used > fits.capacity ? ". It is larger than this keyboard's memory." : ""}</p>` : ""}
+            ${size ? `<p class="note import-fits${size.warn ? " warn" : ""}">${esc(size.text)}</p>` : ""}
             ${counted ? `<p class="note">${esc(counted)}</p>` : ""}
             ${same ? `<div class="callout">This file holds exactly what ${holds}. ${changesNothing ? "Using it changes nothing."
                 : `Using it puts your draft back to that, as Discard all does; Undo brings your ${pending} change${pending === 1 ? "" : "s"} back.`}</div>` : ""}

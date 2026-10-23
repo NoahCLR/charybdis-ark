@@ -15,10 +15,10 @@ const {RESTART_LABEL} = require("../../core/session/keyboard-restart");
 
 function fakeHost({recoveryFails = false} = {}) {
     const host = {
-        posted: [], errors: [], recoveries: [],
+        posted: [], errors: [], recoveries: [], made: [],
         post: (message) => {host.posted.push(message);},
         showError: (text) => {host.errors.push(text);},
-        saveRecovery: async (doc) => {if (recoveryFails) return undefined; host.recoveries.push(doc); return `/recovery/${host.recoveries.length}.json`;},
+        saveRecovery: async (doc, about) => {if (recoveryFails) return undefined; host.recoveries.push(doc); host.made.push(about); return `/recovery/${host.recoveries.length}.json`;},
         saveExport: async () => undefined,
     };
     return host;
@@ -83,6 +83,7 @@ test("Restart keeps the unsaved edits, restarts both halves and puts them back u
     // The recovery copy holds what the keyboard ran: the unsaved edits.
     assert.equal(host.recoveries.length, 1);
     assert.equal(host.recoveries[0].profile, edited.toString("base64"));
+    assert.deepEqual(host.made, [{cause: "restart", keyboard: model(host).device.label}], "named for the restart and this keyboard");
     assert.equal(keyboard.restarting.restarts, 1);
     assert.match(notices(host).at(-1), /Restarting the keyboard… Ark keeps its unsaved edits/);
     await loop.reconnected();

@@ -8,8 +8,9 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
 
 ## Who does what
 
-- The shell (`extension.js`, `web/web-host.mjs`) supplies recovery copies,
-  file choosers, downloads, progress, a store for compiled defaults and, on
+- The shell (`extension.js`, `web/web-host.mjs`) supplies recovery copies
+  (each kept with what made it and the keyboard's name, which
+  `core/session/recovery-copy.js` puts in its file name), file choosers, downloads, progress, a store for compiled defaults and, on
   the web, a sleep that tab throttling cannot slow.
 - `core/session/panel-loop.js`, shared by both shells, hands each message to
   `routeMessage` (`core/session/panel-session.js`), runs `panel-controls.js` or `live-edits.js` and publishes
@@ -259,6 +260,9 @@ back input reports then, and while hidden (`web/native-popups.mjs`).
   news.
 - Under an Apply draft: a key adjustment the keyboard has saved is read again;
   the first look compares with the snapshot's saved generation and origin.
+  Until then the draft keeps what the keyboard says of itself
+  (`observeApplyStatus`) and publishes it as `draft.keyboard`, so the rail
+  says an adjustment is pending in Apply too.
 - A read refused `PROFILE_CHANGED` is retried, up to three times per draft.
 
 ### Switching edit modes

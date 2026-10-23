@@ -39,8 +39,8 @@ function fakeService(extra = {}) {
     return service;
 }
 const host = () => {
-    const saved = [];
-    return {saved, progress: async (title, work) => work(), saveRecovery: async (doc) => { saved.push(doc); return `/recovery/${saved.length}.json`; }};
+    const saved = [], made = [];
+    return {saved, made, progress: async (title, work) => work(), saveRecovery: async (doc, about) => { saved.push(doc); made.push(about); return `/recovery/${saved.length}.json`; }};
 };
 function sessionWithDraft() {
     const service = fakeService();
@@ -131,6 +131,7 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     session.service.calls.length = 0;
     await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
     assert.equal(h.saved.length, 1);
+    assert.deepEqual(h.made, [{cause: "apply", keyboard: "Bastard Keyboards Charybdis 4x6"}], "named for the Apply and the keyboard it came from");
     assert.deepEqual(session.service.calls, ["restorePortableProfile", "readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);
     assert.deepEqual(readSteps, [["layout", true], ["profile", true], ["combos", true], ["baseRgb", true]]);
     assert.equal(session.postApplyReadStep, undefined, "the readback state clears when Apply finishes");
@@ -312,6 +313,7 @@ test("layer edits and imports are kept in the draft; without one they restore to
     await portableControl(bare, {type: "restorePortableProfile"}, h);
     assert.deepEqual(bare.service.calls, ["restorePortableProfile", "readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);
     assert.match(bare.notice, /Recovery copy: \/recovery\/1\.json/);
+    assert.deepEqual(h.made, [{cause: "restore", keyboard: "Bastard Keyboards Charybdis 4x6"}], "named for the restore");
 });
 
 test("a layer editor opened on one keyboard cannot replace another keyboard's draft", async () => {

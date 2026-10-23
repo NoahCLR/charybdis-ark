@@ -16,10 +16,10 @@ const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
 
 function fakeHost() {
     const host = {
-        posted: [], errors: [], recoveries: [],
+        posted: [], errors: [], recoveries: [], made: [],
         post: (message) => {host.posted.push(message);},
         showError: (text) => {host.errors.push(text);},
-        saveRecovery: async (doc) => {host.recoveries.push(doc); return `/recovery/${host.recoveries.length}.json`;},
+        saveRecovery: async (doc, about) => {host.recoveries.push(doc); host.made.push(about); return `/recovery/${host.recoveries.length}.json`;},
         saveExport: async () => undefined,
     };
     return host;
@@ -181,11 +181,27 @@ test("a queued key adjustment reaches the panel before its revision changes", as
     keyboard.raised.adjustmentPending = true;
     assert.equal(await look(), true);
     assert.equal(model(host).model.draft.live.keyboard.adjustmentPending, true);
+    assert.equal(model(host).model.draft.keyboard.adjustmentPending, true, "the draft's keyboard view is the live one");
     keyboard.raised.adjustmentPending = false;
     assert.equal(await look(), true);
     assert.equal(model(host).model.draft.live.keyboard.adjustmentPending, false);
 });
 
+
+test("under an Apply draft, a queued key adjustment reaches the panel too", async t => {
+    const {keyboard, host, session, look} = await open(t, {mode: EDIT_MODE.APPLY});
+    assert.equal(session.draft.live, null);
+    assert.equal(await look(), false, "the first look only notes where the keyboard is");
+    assert.equal(model(host).model.draft.keyboard, null, "nothing said before a look");
+    keyboard.raised.adjustmentPending = true;
+    assert.equal(await look(), true);
+    assert.equal(model(host).model.draft.live, null, "still an Apply draft");
+    assert.equal(model(host).model.draft.keyboard.adjustmentPending, true);
+    assert.equal(await look(), false, "nothing new while it stays pending");
+    keyboard.raised.adjustmentPending = false;
+    assert.equal(await look(), true);
+    assert.equal(model(host).model.draft.keyboard.adjustmentPending, false);
+});
 
 test("an automatic save racing a reread stays eligible and synchronizes on the next poll", async t => {
     const {keyboard, session, look} = await open(t);

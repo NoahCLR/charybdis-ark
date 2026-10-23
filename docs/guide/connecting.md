@@ -120,7 +120,9 @@ computer, Chrome and Ark all call it by that name. To take it, the keyboard
 drops off USB for a moment and comes back, and Ark follows it.
 
 **This keyboard** shows the product, the firmware and whether it works with
-this Ark, Ark's own version, and the two halves. The half with the USB cable
+this Ark, Ark's own version, and the two halves. The product is the
+firmware's built-in name; a renamed keyboard reports only its new name, so
+Ark leaves the product out rather than repeat the title. The half with the USB cable
 and the trackball is the master; the other is the slave. Each half says
 whether it is connected and holds the same saved settings.
 
@@ -135,7 +137,7 @@ may not fit. While your draft has changes, the figures are the draft's.
 how many layers, tap counts, macros, pointing modes and combos there are, the
 repeat ceiling and the DPI steps.
 
-**Diagnostics** holds the details of the last read and **Read from keyboard**,
+**Diagnostics** holds the details of the last read and **Read keyboard**,
 which reads it again.
 
 ## Light and dark

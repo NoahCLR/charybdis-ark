@@ -320,7 +320,7 @@ function assertEffectiveCombos(bytes, read) {
     const profile = decodeProfileBlob(bytes);
     const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
     if (!domain) return;
-    if (read?.state !== "read") throw invalid("The profile was saved, but the running combos could not be verified. Read from keyboard before retrying.");
+    if (read?.state !== "read") throw invalid("The profile was saved, but the running combos could not be verified. Choose Read keyboard before retrying.");
     const table = decodeComboDomain(domain.payload);
     const expected = runningComboRows(table);
     const shared = table.defaultTermMs === read.defaultTermMs && table.holdTermMs === read.holdTermMs;

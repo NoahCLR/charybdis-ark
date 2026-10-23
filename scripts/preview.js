@@ -90,7 +90,11 @@ async function webHosts() {
     const {version} = require("../package.json");
     /** @type {Partial<import("../contracts/model.js").HostPanel>} */
     const offered = {chooseKeyboard: true, theme: "dark", build: {version, commit: "preview"}, recoveries: [
-        {id: 2, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt: "2026-10-06T09:14:03.512Z"},
+        // Made by different operations on two keyboards, and one stored
+        // before copies recorded either.
+        {id: 4, name: "recovery-2026-10-06T09-14-03-512Z-before-save-charybdis-home.charybdis.json", savedAt: "2026-10-06T09:14:03.512Z", cause: "save", keyboard: "Charybdis - Home"},
+        {id: 3, name: "recovery-2026-10-04T12-02-10-000Z-before-leave-live-charybdis-home.charybdis.json", savedAt: "2026-10-04T12:02:10.000Z", cause: "leave-live", keyboard: "Charybdis - Home"},
+        {id: 2, name: "recovery-2026-10-03T08-30-00-000Z-before-apply-charybdis-office.charybdis.json", savedAt: "2026-10-03T08:30:00.000Z", cause: "apply", keyboard: "Charybdis - Office"},
         {id: 1, name: "recovery-2026-10-01T18-40-55-020Z.charybdis.json", savedAt: "2026-10-01T18:40:55.020Z"},
     ]};
     return {

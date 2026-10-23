@@ -27,9 +27,24 @@ test("the build and a copy's time read as words", () => {
     assert.equal(buildLine(null), "");
     assert.equal(savedWhen("not a date"), "not a date");
     assert.match(savedWhen("2026-10-06T09:14:03.512Z"), /^6 Oct 2026, \d\d:\d\d$/, "British dates");
-    assert.match(copyTitle("Charybdis - Home", "2026-10-18T07:12:00Z"), /^Before Apply · Charybdis - Home · 18 Oct 2026, \d\d:\d\d$/);
     assert.deepEqual(useRecovery(2), {type: "useRecovery", id: 2});
     assert.deepEqual(deleteRecovery(2), {type: "deleteRecovery", id: 2});
+});
+
+test("a recovery copy is named by what made it and the keyboard it came from", () => {
+    const savedAt = "2026-10-18T07:12:00Z";
+    const titles = {apply: "Before Apply", restore: "Before restoring a backup", save: "Before Save", restart: "Before Restart", "leave-live": "Before leaving Live"};
+    for (const [cause, words] of Object.entries(titles)) {
+        assert.match(copyTitle({cause, keyboard: "Charybdis - Home", savedAt}), new RegExp(`^${words} · Charybdis - Home · 18 Oct 2026, \\d\\d:\\d\\d$`), cause);
+    }
+    assert.match(copyTitle({cause: "save", keyboard: "", savedAt}), /^Before Save · 18 Oct 2026, \d\d:\d\d$/, "no keyboard name, none shown");
+});
+
+test("a copy stored before causes were recorded has a neutral title", () => {
+    const savedAt = "2026-10-18T07:12:00Z";
+    assert.match(copyTitle({savedAt}), /^Recovery copy · 18 Oct 2026, \d\d:\d\d$/);
+    assert.match(copyTitle({cause: "unknown", keyboard: "Elsewhere", savedAt}), /^Recovery copy · 18 Oct 2026, \d\d:\d\d$/, "a cause this Ark has no words for");
+    for (const words of [copyTitle({savedAt}), copyTitle({cause: "apply", keyboard: "K", savedAt})]) assert.doesNotMatch(words, /Before Apply copy|recovery file|safety backup/i);
 });
 
 test("a build links to its commit on GitHub only when it names one", () => {
