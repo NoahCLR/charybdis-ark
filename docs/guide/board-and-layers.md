@@ -63,7 +63,9 @@ next layer down does; the base layer is always on.
 **Rename & Reorder**, after the last tab, opens the layer list over the
 board, highest first, with the base at the bottom.
 
-- Type in a name to rename a layer. Names are up to 32 bytes.
+- Type in a name to rename a layer. Names are up to 32 bytes: a letter takes
+  one, an accented letter two. The count under the name says where it
+  stands, and warns past the limit.
 - Drag a row by its grip to move it, or focus the grip and press ↑ or ↓.
 - **Make base** swaps a layer with the base. The base row itself can't be
   dragged.

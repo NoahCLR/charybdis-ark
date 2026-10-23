@@ -30,6 +30,12 @@ test("LED membership edits preserve references and refuse deleting an assigned g
     assert.throws(() => editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [58]}}));
 });
 
+test("saving a group refuses one with no LEDs, new or edited", () => {
+    assert.throws(() => editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {ledIndices: []}}), /Pick LEDs/);
+    assert.throws(() => editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: []}}), /Pick LEDs/);
+    assert.deepEqual(rgb(bytes).groups.map(group => group.leds.length).filter(length => !length), []);
+});
+
 const {decodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");
 const {fixturePages, retiredPages} = require("../fixtures/device-combos");

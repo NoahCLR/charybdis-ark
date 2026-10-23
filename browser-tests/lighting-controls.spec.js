@@ -6,15 +6,15 @@ const {openControls, clearPosts, posted, expectPost, change, publishAccepted} = 
 const body = page => page.locator("#benchBody");
 const channel = (page, index) => body(page).locator(`[data-channel="${index}"]`);
 const stages = [
-    {id: "layers", bit: 1, path: ["rgb", "layerColors", 1, "color"], colour: [85, 255, 200],
+    {id: "layers", offTip: /paints nothing/, bit: 1, path: ["rgb", "layerColors", 1, "color"], colour: [85, 255, 200],
         message: colour => ({type: "updateLayerColor", layer: "Layer 1", mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY", ...colour})},
-    {id: "auto", bit: 2, path: ["rgb", "automouseFade", "end_color"], colour: [167, 255, 199],
+    {id: "auto", offTip: /ends on black/, bit: 2, path: ["rgb", "automouseFade", "end_color"], colour: [167, 255, 199],
         message: colour => ({type: "updateAutomouseFade", mode: "END_COLOR_ON_ALL_KEYS", ...colour})},
-    {id: "pd", bit: 4, path: ["rgb", "pdModeColors", 0, "color"], colour: [21, 255, 200],
+    {id: "pd", offTip: /locality black.*Stage on/, bit: 4, path: ["rgb", "pdModeColors", 0, "color"], colour: [21, 255, 200],
         message: colour => ({type: "updatePdModeColor", pointingMode: "PD_MODE_DRAGSCROLL", locality: "RGB_RIGHT_HALF", ...colour})},
-    {id: "combo", bit: 8, path: ["rgb", "comboFeedback", "color"], colour: [191, 255, 200],
+    {id: "combo", offTip: /locality black.*Stage on/, bit: 8, path: ["rgb", "comboFeedback", "color"], colour: [191, 255, 200],
         message: colour => ({type: "updateComboFeedback", locality: "RGB_KEY_HALF", ...colour})},
-    {id: "key", bit: 16, path: ["rgb", "keyBehaviorFeedback", "holdActiveColor"], colour: [18, 255, 200],
+    {id: "key", offTip: /flashes black.*Stage on/, bit: 16, path: ["rgb", "keyBehaviorFeedback", "holdActiveColor"], colour: [18, 255, 200],
         message: colour => ({type: "updateKeyBehaviorFeedback", config: expect.objectContaining({holdActiveColor: colour,
             tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", locality: "RGB_KEY_HALF"})})},
 ];
@@ -49,6 +49,7 @@ for (const stage of stages) {
             await expect(field).toHaveValue(String(71 + index));
         }
         await clearPosts(page);
+        await expect(body(page).locator("[data-off]")).toHaveAttribute("data-tip", stage.offTip);
         await body(page).locator("[data-off]").click();
         await expectPost(page, stage.message({h: 0, s: 0, v: 0}));
         await publishAccepted(page, stage.path, {h: "0", s: "0", v: "0"});
@@ -77,6 +78,16 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
     });
 }
 
+test("the layer colour note describes only the paint modes its select offers", async ({page}) => {
+    await openStage(page, "layers");
+    const where = body(page).locator("section", {has: page.locator('[data-f="lighting:layer:1:mode"]')});
+    const offered = await where.locator("option").allInnerTexts();
+    expect(offered).toEqual(["Keys mapped on this layer only", "All keys"]);
+    const note = where.locator("p.note");
+    for (const mode of offered) await expect(note).toContainText(mode);
+    await expect(note).not.toContainText(/pass-through/i);
+});
+
 test("all Lighting policy selects post the chosen policy and retained colour", async ({page}) => {
     for (const [stage, label, value, message] of [
         ["layers", "Which keys light up", "ALL_KEYS", {type: "updateLayerColor", layer: "Layer 1", mode: "ALL_KEYS", h: 85, s: 255, v: 200}],
@@ -84,12 +95,21 @@ test("all Lighting policy selects post the chosen policy and retained colour", a
         ["pd", "Locality", "RGB_LEFT_HALF", {type: "updatePdModeColor", pointingMode: "PD_MODE_DRAGSCROLL", locality: "RGB_LEFT_HALF", h: 21, s: 255, v: 200}],
         ["combo", "Locality", "RGB_BOTH_HALVES", {type: "updateComboFeedback", locality: "RGB_BOTH_HALVES", h: 191, s: 255, v: 200}],
         ["key", "Tap commit", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
-        ["key", "Where", "RGB_LEFT_HALF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({locality: "RGB_LEFT_HALF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
+        ["key", "Locality", "RGB_LEFT_HALF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({locality: "RGB_LEFT_HALF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
     ]) {
         await openStage(page, stage);
         await body(page).locator("label.field").filter({has: page.getByText(label, {exact: true})}).locator("select").selectOption(value);
         await expectPost(page, message);
     }
+});
+
+test("key feedback names each colour once, in the list and on the board", async ({page}) => {
+    await openStage(page, "key");
+    const listed = await body(page).locator(".rowlist [data-row]").allInnerTexts();
+    const chips = await body(page).locator(".stage-chips .chip").allInnerTexts();
+    expect(chips.map(text => text.trim())).toEqual(listed.map(text => text.replace(/\s*off$/, "").trim()));
+    const commit = body(page).locator('[data-f="lighting:key:tap-commit"] option');
+    await expect(commit).toHaveText(["Off", "Double taps and more"]);
 });
 
 test("every key feedback colour row posts its own field, preserving all the other colours", async ({page}) => {
@@ -147,8 +167,17 @@ test("hue and saturation/brightness dragging preview locally and commit once on 
 test("LED groups stage every table/owner/source/colour control and remove rows/groups", async ({page}) => {
     await openStage(page, "groups");
     const builder = body(page).locator(".builder > aside");
+    await expect(builder.locator('[data-act="save"]')).toBeDisabled();
+    await expect(builder.locator('[data-act="save"]')).toHaveAttribute("data-tip", /Pick LEDs/);
     await page.locator('.board [data-key="0"]').click();
+    await expect(builder.locator(".sect-h .tag")).toHaveText("1 LED");
     await page.locator('[data-act="trackball"]').click();
+    await expect(builder.locator(".sect-h .tag")).toHaveText("2 LEDs");
+    const reusable = body(page).locator("table.t").first();
+    await expect(reusable).not.toContainText(/RGB_|KEY_FEEDBACK_|PD_MODE_|pdMode|keyBehavior/);
+    await expect(reusable).toContainText("Pointing-mode LED groups: All pointing modes");
+    await expect(reusable).toContainText("Key feedback LED groups: Every feedback state");
+    await expect(body(page).locator(".sect-h .tag")).toHaveText(["2 LEDs", "0 rows", "1 row", "1 row", "1 row"]);
     await builder.locator('[data-act="save"]').click();
     await expectPost(page, {type: "saveRgbReusableLedGroup", group: {ledIndices: [0, 56]}});
     await clearPosts(page);

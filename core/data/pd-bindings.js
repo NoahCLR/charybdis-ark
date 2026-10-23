@@ -4,7 +4,7 @@
 // The keyboard's pointing-mode keycodes: a fixed registry the firmware owns.
 //
 // Every slot has one canonical hold and lock name: slot n holds at
-// PD_HOLD_BASE + n and toggles at PD_LOCK_BASE + n (user-keycodes.js). The
+// PD_HOLD_BASE + n and locks at PD_LOCK_BASE + n (user-keycodes.js). The
 // blocks hold 32 slots, and the keyboard has all of them. Every module that
 // names or decodes a slot reads this table. The former preset names still
 // resolve to the first six slots.

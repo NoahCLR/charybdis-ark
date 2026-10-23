@@ -23,7 +23,7 @@ const {LAYERS} = require("../data/charybdis-layout");
 // The keys the keyboard handles with or without a row, as its key runtime
 // classifies them: dual-role keys (MT, LT, OSM), the keys that hold a layer
 // while down (MO, TT, OSL, LM) on a layer it has, pointing-mode holds, and
-// custom keys with a shortcut. TO, TG, LOCK_LAYER, pointing-mode toggles, DF
+// custom keys with a shortcut. TO, TG, LOCK_LAYER, pointing-mode locks, DF
 // and PDF it does not, so a timing alone does nothing there.
 const ANY_LAYER = /** @type {const} */ ([[0x2000, 0x3fff], [0x4000, 0x4fff], [0x5000, 0x51ff], [0x52a0, 0x52bf],
     [PD_HOLD_BASE, PD_HOLD_BASE + 0x1f]]);

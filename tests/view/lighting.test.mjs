@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {isOff} from "../../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, inheritsStageColour, layerPaints, keyLight, mappedKeyCount, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, inheritsStageColour, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -288,4 +288,21 @@ test("a trackball mode previews from its first placed key, and black paints dark
     const light = keyLight(model(), {index: 0, positions: []}, position(11, "KC_A"), {pdActive: black});
     assert.equal(light.source, "pointing");
     assert.ok(isOff(light.colour), "the right half goes dark");
+});
+
+test("Turn off says what black does: literal black for modes and feedback, nothing for a layer, the stage colour for a row", () => {
+    for (const stage of ["pd", "combo", "key"]) {
+        const {offTip, offNote} = offWording(stage);
+        for (const words of [offTip, offNote]) {
+            assert.match(words, /black/);
+            assert.match(words, /Stage on/);
+            assert.doesNotMatch(words, /paints nothing|underneath|not repainted|flashes nothing/);
+        }
+    }
+    assert.match(offWording("auto").offTip, /black/);
+    assert.match(offWording("layers").offTip, /paints nothing/);
+    assert.match(offWording("layers").offNote, /shows through/);
+    assert.match(offWording("groups").offTip, /stage's colour/);
+    assert.match(offWording("groups").offNote, /inherits its stage colour/);
+    assert.deepEqual(offWording("base"), {});
 });

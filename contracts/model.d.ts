@@ -91,6 +91,7 @@ export interface Vocabulary {
     fadeModes: WordList<string>;
     tapCommit: WordList<string>;
     feedbackOwners: WordList<string>;
+    ledTables: WordList<string>;
     stages: readonly {id: string; label: string; bit?: number}[];
     pointing: {
         kinds: WordList<number>;

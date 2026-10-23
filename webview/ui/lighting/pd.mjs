@@ -2,7 +2,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
 import {post, render, state, writable} from "../../store.mjs";
-import {PD_MODE_IDS, pdColourRow} from "../../view/lighting.mjs";
+import {offWording, PD_MODE_IDS, pdColourRow} from "../../view/lighting.mjs";
 import {slotCalled as slotName, vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -32,13 +32,13 @@ export function stagePointing(model) {
     const colour = section(`${slotName(model, state.pdSlot)} colour`);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${slotName(model, state.pdSlot)} while active`,
-        offNote: "No colour is stored, so this mode paints nothing while it runs.",
+        ...offWording("pd"),
         onChange: (next) => { if (row) post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], row.locality, next)); },
     }));
     const where = section("Where it paints");
     const locality = el(`<label class="field"><span>Locality</span>
         <select data-f="lighting:pointing:${state.pdSlot}:locality" class="input" ${canEdit ? "" : "disabled"}
-            data-tip="The overlay is not drawn on the key that binds the mode; it paints this region while the mode runs.">
+            data-tip="Where the colour paints while the mode runs. The trigger key choices follow the key that started it, and paint every key when no key did.">
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${row?.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         { if (row) post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
@@ -48,7 +48,7 @@ export function stagePointing(model) {
     where.append(stack(locality, previewSwitch));
     const note = section("What this stage does");
     note.className = "span";
-    note.append(el(`<p class="note stage-about">A pointing-mode colour is an overlay that exists only while the mode is held or toggled. It replaces whatever the layer paints inside its locality for as long as the mode runs — it is never painted on the key that binds it.</p>`));
+    note.append(el(`<p class="note stage-about">A pointing-mode colour is an overlay that exists only while the mode is held or locked. It replaces whatever the layer paints inside its locality for as long as the mode runs, the key that started it included when the locality holds it.</p>`));
     note.append(groupRowsTable(model.rgb.pdModeLedGroups, "pdMode"));
     main.append(colour, where, note);
     node.append(list, main);

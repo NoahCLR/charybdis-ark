@@ -2,17 +2,27 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {css, label as hsvLabel} from "../../lib/colour.mjs";
 import {getModel, layerName, layers, post, writable} from "../../store.mjs";
-import {slotCalled, vocabulary} from "../../view/vocabulary.mjs";
+import {slotCalled, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {inheritsStageColour} from "../../view/lighting.mjs";
 import {marked} from "../marks.mjs";
+
+// Where a group is used, as the row lists name it: the table, then the owner.
+/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {{target: string, owner: string}} usage */
+export function usageName(model, usage) {
+    const table = word(vocabulary(model).ledTables, usage.target);
+    return usage.owner ? `${table}: ${ownerName(model, usage.target, usage.owner)}` : table;
+}
+
+/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} target @param {string} owner */
+const ownerName = (model, target, owner) => rowOwners(model, target).find(([value]) => value === owner)?.[1] ?? owner ?? "—";
 
 // A row's owner by the name its dropdown offers, with the owner's mark —
 // the layer's colour, the pointing mode's light, the feedback tier's dot —
 // as the review shows the same row.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} target @param {string} owner */
 function ownerCell(model, target, owner) {
-    const name = rowOwners(model, target).find(([value]) => value === owner)?.[1] ?? owner ?? "—";
+    const name = ownerName(model, target, owner);
     const layer = target === "layer" && /^Layer (\d+)$/.exec(owner || "");
     const slot = target === "pdMode" ? (model?.rgb.pdModeColors || []).findIndex((row) => row.pointingMode === owner) : -1;
     const tier = target === "keyBehavior" && {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"}[owner];

@@ -9,14 +9,14 @@ import {createRequire} from "node:module";
 const {PD_SLOT_BINDINGS: PD_BINDINGS} = createRequire(import.meta.url)("../../core/data/pd-bindings.js");
 const slotWith = (fields) => ({...fields, binding: PD_BINDINGS[fields.id]});
 
-test("a branch action that sends a pointing mode reads as the mode, held or toggled", () => {
+test("a branch action that sends a pointing mode reads as the mode, held or locked", () => {
     const model = {pdModes: [{id: 0, displayName: "Dragscroll", kind: 2, binding: {hold: "PD_SLOT_0", lock: "PD_SLOT_0_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}, {id: 6, name: "", kind: 0, binding: {hold: "PD_SLOT_6", lock: "PD_SLOT_6_LOCK", holdCode: 0x7ef0, lockCode: 0x7ef1}}]};
     const hold = pointingAction(model, "PD_SLOT_0");
     assert.deepEqual([hold.slot.id, hold.name, hold.how, hold.empty], [0, "Dragscroll", "hold", false]);
-    assert.equal(pointingAction(model, "PD_SLOT_0_LOCK").how, "toggle");
+    assert.equal(pointingAction(model, "PD_SLOT_0_LOCK").how, "lock");
     const empty = pointingAction(model, "PD_SLOT_6");
     assert.deepEqual([empty.name, empty.how, empty.empty], ["Slot 6", "hold", true], "an unnamed empty slot goes by its number");
-    assert.equal(pointingAction(model, "0x7EF1").how, "toggle", "the lock keycode as a raw value too");
+    assert.equal(pointingAction(model, "0x7EF1").how, "lock", "the lock keycode as a raw value too");
     assert.equal(pointingAction(model, "KC_A"), null);
 });
 
@@ -35,7 +35,7 @@ test("pointing modes and macros read as what they are; plain keycodes read as th
         viaMacros: [{keycode: "VIA_MACRO_2", name: "", empty: true}],
     };
     const pd = namedAction(model, "PD_SLOT_4_LOCK");
-    assert.deepEqual([pd.kind, pd.word, pd.name, pd.tags], ["pointing", "pointing mode", "Arrow", ["toggle"]]);
+    assert.deepEqual([pd.kind, pd.word, pd.name, pd.tags], ["pointing", "pointing mode", "Arrow", ["lock"]]);
     const macro = namedAction(model, "VIA_MACRO_2");
     assert.deepEqual([macro.kind, macro.word, macro.name, macro.tags], ["macro", "macro", "Macro 2", ["empty"]]);
     assert.equal(namedAction(model, "KC_A"), null);
@@ -85,7 +85,7 @@ test("a pointing key is recognised as the keyboard names it, not only as the app
     assert.equal(pointingSlotFor(model, "QK_USER_16").name, "Dragscroll");
     assert.equal(pointingSlotFor(model, "QK_USER_22").name, "Dragscroll");
     assert.equal(pointingSlotFor(model, "0x7EF0").id, 6);
-    assert.equal(pointingSlotFor(model, "0x7EF1").id, 6, "the toggle keycode of an unnamed slot too");
+    assert.equal(pointingSlotFor(model, "0x7EF1").id, 6, "the lock keycode of an unnamed slot too");
     assert.equal(pointingSlotFor(model, 0x7ef0).id, 6);
     assert.equal(pointingSlotFor(model, "0x0041"), undefined, "an ordinary value is not a pointing key");
 });

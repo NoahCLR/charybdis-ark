@@ -2,7 +2,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
 import {canEdit as canEditArea, post, render, state, writable} from "../../store.mjs";
-import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
+import {offWording, stageEnabled} from "../../view/lighting.mjs";
 import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourControl, section, stack} from "./common.mjs";
@@ -65,7 +65,7 @@ export function stageKey(model) {
     const colour = section(current?.label || "Feedback");
     colour.append(colourControl(model, {
         colour: current?.colour, canEdit, title: current?.label || "",
-        offNote: "No colour is stored for this state, so the keyboard flashes nothing for it.",
+        ...offWording("key"),
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
     const policy = section("When and where");
@@ -73,24 +73,21 @@ export function stageKey(model) {
         ${vocabulary(model).tapCommit.map(([id, text]) => `<option value="${id}" ${feedback.tapCommitMode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (commit.querySelector("select")).addEventListener("change", (event) =>
         post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLSelectElement} */ (event.target).value})));
-    const locality = el(`<label class="field"><span>Where</span><select data-f="lighting:key:locality" class="input" ${canEdit ? "" : "disabled"}>
+    const locality = el(`<label class="field"><span>Locality</span><select data-f="lighting:key:locality" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${feedback.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: /** @type {HTMLSelectElement} */ (event.target).value})));
     policy.append(stack(commit, locality, flashInterval(model)));
     const onBoard = section("On the board");
     onBoard.className = "span";
-    const colours = feedbackColours(model);
-    /** @param {import("../../../contracts/edits.js").Colour} colour */
+    /** @param {import("../../../contracts/edits.js").Colour | undefined} colour */
     const dot = (colour) => {
         const lit = stageEnabled(model, "key") && !isOff(colour);
         return `<i class="fbdot${lit ? "" : " off"}"${lit ? ` style="background:${css(colour)}"` : ""}></i>`;
     };
+    // The chips name each colour as the list does.
     onBoard.append(el(`<div class="row gap-12 stage-chips">
-        <span class="chip">${dot(colours.tap)} tap branch</span>
-        <span class="chip">${dot(colours.hold)} hold branch</span>
-        <span class="chip">${dot(colours.long)} long hold branch</span>
-        ${(colours.branches || []).map((colour, index) => `<span class="chip">${dot(colour)} ${esc(branchName(model, index + 2).toLowerCase())}</span>`).join("")}</div>`));
+        ${rows.map((row) => `<span class="chip">${dot(row.colour)} ${esc(row.label)}</span>`).join("")}</div>`));
     onBoard.append(el(`<p class="note">These are the colours a key wears on the board: a behaviour's tap, hold and long-hold dots, and the branch numbers in the behaviour grid.${stageEnabled(model, "key") ? "" : " The stage is off, so every one of them is drawn hollow."}</p>`));
     onBoard.append(groupRowsTable(model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior"));
     main.append(colour, policy, onBoard);

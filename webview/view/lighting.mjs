@@ -157,6 +157,43 @@ export const layerPaints = (colour) => Boolean(colour) && !(Number(colour?.s) ==
 /** @param {Colour | null | undefined} colour */
 export const inheritsStageColour = (colour) => !colour || (Number(colour?.h) === 0 && Number(colour?.s) === 0 && Number(colour?.v) === 0);
 
+// What the colour editor says about HSV(0, 0, 0) in each stage: the tip on
+// Turn off and the note shown once it is stored. Outside a layer colour and a
+// group row black is literal black (firmware RGB domain spec, "Black"), so there
+// only the Stage on switch paints nothing. The background effect offers no
+// Turn off.
+/** @type {Record<string, {offTip: string, offNote?: string}>} */
+const OFF_WORDING = {
+    layers: {
+        offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
+        offNote: "No colour is stored for this layer, so the background effect shows through wherever it would paint.",
+    },
+    groups: {
+        offTip: "Store HSV(0, 0, 0): this row then takes its stage's colour.",
+        offNote: "A row stored as HSV(0, 0, 0) inherits its stage colour instead of painting its own.",
+    },
+    auto: {
+        offTip: "Store HSV(0, 0, 0): the fade then ends on black.",
+    },
+    pd: {
+        offTip: "Store HSV(0, 0, 0): this mode then paints its locality black while it runs. To paint nothing, switch Stage on off.",
+        offNote: "The colour is black, so this mode paints its locality black while it runs. To paint nothing, switch Stage on off; that turns off every pointing mode's colour.",
+    },
+    combo: {
+        offTip: "Store HSV(0, 0, 0): combo feedback then paints its locality black while a combo's inputs are held. To paint nothing, switch Stage on off.",
+        offNote: "The colour is black, so combo feedback paints its locality black while a combo's inputs are held. To paint nothing, switch Stage on off.",
+    },
+    key: {
+        offTip: "Store HSV(0, 0, 0): this state then flashes black. To flash nothing, switch Stage on off.",
+        offNote: "The colour is black, so the keyboard flashes black for this state. To flash nothing, switch Stage on off; that turns off every feedback colour.",
+    },
+};
+
+// Spread into the colour editor's options. A layer colour and a group row
+// ("groups", not a stage) are the two places black is not black.
+/** @param {string} stage @returns {{offTip?: string, offNote?: string}} */
+export const offWording = (stage) => OFF_WORDING[stage] || {};
+
 
 // Whether a key stores something of its own on layer l. The viewed layer's
 // position is passed in; any other layer is looked up at the same place.

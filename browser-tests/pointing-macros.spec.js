@@ -52,10 +52,9 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             const [group, name] = field.split(":");
             expect(message.config[group === "dir" ? "directions" : "diagonals"][name])
                 .toEqual({keycode: `VIA_MACRO_${macro}`, modifierPolicy: 0, mask: 0});
-            await expect(page.locator(`[data-f="pointing:4:${field}"]`)).toHaveValue(`VIA_MACRO_${macro}`);
+            await expect(page.locator(`[data-f="pointing:4:${field}"]`)).toHaveValue(macro === 0 ? "Greeting <&>" : "Macro 127");
         }
-        await expect(page.locator(".pd-cross")).toContainText("Greeting <&>");
-        await expect(page.locator(".pd-cross")).toContainText("empty: does nothing yet");
+        await expect(page.locator(".pd-cross")).toContainText("Empty macro: does nothing yet");
         await expect(page.locator(".pd-cross")).toContainText("Busy triggers are dropped");
         await expect(page.locator('[data-f="pointing:4:dirPolicy:left"]')).toHaveCount(0);
         await expect(page.locator('[data-f="pointing:4:diagPolicy:upLeft"]')).toHaveCount(0);

@@ -30,7 +30,7 @@ export function stageBase(model) {
     if (hue && saturation && brightness) {
         // Brightness waits for the keyboard's limit; hue and saturation do not.
         colour.append(colourControl(model, {
-            colour: {h: hue.value, s: saturation.value, v: brightness.value}, canEdit: editable, title: "Background colour", turnOff: false,
+            colour: {h: hue.value, s: saturation.value, v: brightness.value}, canEdit: editable, title: "Background colour",
             offNote: "Hue, saturation and brightness are all 0, so the background effect is dark.",
             onChange: (next) => submit({hue: String(next.h), saturation: String(next.s), brightness: brightness.readOnly ? undefined : String(next.v)}),
         }));

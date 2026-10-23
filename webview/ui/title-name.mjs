@@ -6,7 +6,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {esc} from "../lib/dom.mjs";
-import {NAME_TIP, nameCount} from "../view/names.mjs";
+import {NAME_MAX_BYTES, NAME_TIP, nameCount} from "../view/names.mjs";
 
 /**
  * @param {{f: string, value: string, placeholder: string, label: string, perName: number, canEdit: boolean}} field
@@ -24,16 +24,25 @@ export function titleName({f, value, placeholder, label, perName, canEdit}) {
 export function attachTitleName(node, {stored, perName, rename}) {
     const input = /** @type {HTMLInputElement | null} */ (node.querySelector("[data-name]"));
     if (!input) return;
-    const counter = /** @type {HTMLElement} */ (node.querySelector("[data-name-count]"));
-    const showCount = () => {
-        const count = nameCount(input.value, perName);
-        counter.textContent = count.label;
-        counter.classList.toggle("warn", count.over);
-    };
-    input.addEventListener("input", showCount);
+    const showCount = countNameBytes(input, /** @type {HTMLElement} */ (node.querySelector("[data-name-count]")), perName);
     input.addEventListener("change", () => { if (input.value !== stored) rename(input.value); });
     input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") { event.preventDefault(); input.blur(); }
         if (event.key === "Escape") { event.preventDefault(); input.value = stored; showCount(); input.blur(); }
     });
+}
+
+// A name field's byte count, as the title shows it: it follows each keystroke
+// and warns past the limit, where a character cut-off would miscount accented
+// letters. Returns the redraw, for a field set from code.
+/** @param {HTMLInputElement} input @param {HTMLElement} counter @param {number} [max] */
+export function countNameBytes(input, counter, max = NAME_MAX_BYTES) {
+    const show = () => {
+        const count = nameCount(input.value, max);
+        counter.textContent = count.label;
+        counter.classList.toggle("warn", count.over);
+    };
+    input.addEventListener("input", show);
+    show();
+    return show;
 }

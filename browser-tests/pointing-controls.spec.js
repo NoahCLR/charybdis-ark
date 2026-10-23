@@ -214,3 +214,37 @@ test("pointing navigation reaches placement and lighting without an edit", async
     await expect(page.locator('[data-ltab="pd"]')).toHaveAttribute("aria-selected", "true");
     expect(await posted(page)).toEqual([]);
 });
+
+test("the reach row places the hold key on a key, and an empty slot names what still reaches it", async ({page}) => {
+    await openControls(page, "pointing", {pdSlot: 4});
+    const place = editor(page).locator('[data-act="place"]');
+    await expect(place).toHaveText("Place on a key…");
+    await expect(place).toHaveAttribute("data-tip", /hold key/);
+    const hold = await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        const slot = model.pdModes.find(row => !row.kind);
+        model.keyBehaviors = [...(model.keyBehaviors || []), {keycode: "KC_F13", steps: [{tapIndex: 0, tap: {action: slot.binding.hold}}]}];
+        store.setModel(model);
+        store.state.pdSlot = slot.id;
+        store.render();
+        return slot.binding.hold;
+    });
+    const warning = editor(page).locator(".unavailable");
+    await expect(warning).toContainText("1 behaviour (F13) still reach this slot");
+    await expect(warning).not.toContainText(hold);
+    await expect(warning).not.toContainText("KC_F13");
+});
+
+test("a pointing mode name counts bytes and flags one past the limit instead of cutting it off", async ({page}) => {
+    await openControls(page, "pointing", {pdSlot: 4});
+    const name = field(page, "Name");
+    const count = editor(page).locator("[data-name-count]");
+    await name.fill("é".repeat(17));
+    await expect(name).toHaveValue("é".repeat(17));
+    await expect(count).toHaveText("34 / 32 bytes");
+    await expect(count).toHaveClass(/warn/);
+    await name.fill("a".repeat(32));
+    await expect(count).toHaveText("32 / 32 bytes");
+    await expect(count).not.toHaveClass(/warn/);
+});

@@ -3,7 +3,7 @@ import test from "node:test";
 import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {buildDeviceModel} = require("../../core/session/device-model");
-import {modifierBits, keyName, modifierNames, modifierPick, pickerModifierProblem, macroIndex, pointingMacro} from "../../webview/view/keyvalues.mjs";
+import {modifierBits, keyDisplayName, keyName, modifierNames, modifierPick, pickerModifierProblem, macroIndex, pointingMacro} from "../../webview/view/keyvalues.mjs";
 
 const model = {qmkKeycodes: [
     {keycode: 0x0004, value: "KC_A"},
@@ -66,6 +66,18 @@ test("pointing picks allow modified keyboard keys while mouse clicks and media s
         assert.equal(problem(key, []), "");
         assert.match(problem(key, ["C"]), /Only keyboard keys take modifiers/);
     }
+});
+
+test("a stored shortcut reads as the picker names it: a key's label, a macro's name", () => {
+    const named = {...buildDeviceModel(), viaMacros: [{keycode: "VIA_MACRO_17", name: "Copy line", empty: false}]};
+    named.qmkKeyLabels = {...named.qmkKeyLabels, "LGUI(KC_C)": "Cmd+C", "LCTL(LSFT(KC_C))": "Ctrl+Shift+C"};
+    assert.equal(keyDisplayName(named, 0x00d3), "Mouse Button 3");
+    assert.equal(keyDisplayName(named, 0x0052), "Up");
+    assert.equal(keyDisplayName(named, 0x0806), "Cmd+C", "G(KC_C) by the label the profile gives LGUI(KC_C)");
+    assert.equal(keyDisplayName(named, 0x0306), "Ctrl+Shift+C");
+    assert.equal(keyDisplayName(named, 0x7711), "Copy line");
+    assert.equal(keyDisplayName(named, 0), "");
+    assert.equal(keyDisplayName({}, 0x7e61), "0x7E61", "a value nobody names keeps its number");
 });
 
 test("pointing macro identities use the stored slot and current profile name", () => {

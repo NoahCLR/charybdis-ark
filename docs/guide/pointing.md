@@ -1,7 +1,7 @@
 # Pointing
 
 Two screens set up the trackball. **Mouse** is how it moves the pointer.
-**Pointing modes** make it do something else while a key is held or toggled:
+**Pointing modes** make it do something else while a key is held or locked:
 scroll, or send arrows and shortcuts as it moves.
 
 Hover any label on Mouse for what it does.
@@ -40,8 +40,8 @@ cards, with the empty slots as numbered chips beneath them. An empty chip in
 amber still has keys pointing at it.
 
 Each slot has two keys: one that runs the mode while it is held, and one that
-toggles it on until pressed again. The picker shows them as **Hold** and
-**Toggle** under Pointing modes.
+locks it on until pressed again. The picker shows them as **Hold** and
+**Lock** under Pointing modes.
 
 ### Starting a mode
 
@@ -55,15 +55,17 @@ it.
 
 ### Every mode
 
-- **Name**.
+- **Name**: up to 32 bytes, counted under it as on the other names; an
+  accented letter takes two.
 - **Movement**: **Directional keys / shortcuts** or **Scrolling**.
 - **Pointer speed while active**: the mode's own DPI, or **Normal pointer
   speed** to keep the Mouse setting.
 - **Duplicate** copies the mode into the first empty slot. **Clear slot**
   empties it.
 
-Under the editor, **Keys** shows where the mode's hold and toggle keys sit,
-with **Place on a layer…**. **Light** shows its colour and where it paints,
+Under the editor, **Keys** shows where the mode's hold and lock keys sit,
+with **Place on a key…**, which puts its hold key on a key you pick on the
+board. **Light** shows its colour and where it paints,
 with **Edit in Lighting**.
 
 ### Directional modes
@@ -72,7 +74,9 @@ Moving the ball sends a key or shortcut for each direction.
 
 - **Reads**: **Dominant axis**, **Eight directions** (adds the diagonals),
   **Vertical only** or **Horizontal only**.
-- Each direction takes a key or shortcut, typed in or chosen with **Pick…**.
+- Each direction takes a key or shortcut, chosen with **Pick…** or typed as a
+  QMK keycode name. The field shows it as the picker does: "Mouse Button 3",
+  a macro by its name.
 - **When a direction is empty**: its neighbours take over, send both
   neighbours (eight directions only), or nothing.
 - **How often it sends**: **Every step** sends again each time the ball moves

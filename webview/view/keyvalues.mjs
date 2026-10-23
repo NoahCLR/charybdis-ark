@@ -1,6 +1,7 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {vocabulary} from "./vocabulary.mjs";
+import {actionLabel, canonicalKeycode} from "./keyface.mjs";
 
 // Numeric keycodes, named.
 //
@@ -33,6 +34,16 @@ export function keyName(/** @type {Model} */ model, /** @type {number} */ code) 
         }
     }
     return `0x${code.toString(16).toUpperCase()}`;
+}
+
+// A stored shortcut as the picker and the rest of Ark name it: a macro by its
+// name, any other keycode by the label the keyboard's profile gives it
+// ("Mouse Button 3", "Cmd+C"). keyName stays the form a field stages.
+export function keyDisplayName(/** @type {Model} */ model, /** @type {number} */ code) {
+    if (!code) return "";
+    const macro = pointingMacro(model, code);
+    if (macro) return macro.name;
+    return actionLabel(model, canonicalKeycode(model, keyName(model, code)));
 }
 
 // The modifiers a compact keycode carries (0x0100–0x1fff, as KC_EXLM is

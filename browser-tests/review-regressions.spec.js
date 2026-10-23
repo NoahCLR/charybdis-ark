@@ -91,3 +91,37 @@ test("zero brightness retains editable HSV channels and LED black does not inher
     expect(text).toContain("HSV(85, 255, 0)");
     expect(text).not.toContain("inherits the stage colour");
 });
+
+test("a layer name counts bytes and flags one past the limit instead of cutting it off", async ({page}) => {
+    await openControls(page, "keys", {layersOpen: true});
+    const row = page.locator('.layerpanel .lp-row[data-row="1"]');
+    const name = row.locator("[data-name]");
+    const count = row.locator("[data-name-count]");
+    await name.fill("é".repeat(17));
+    await expect(name).toHaveValue("é".repeat(17));
+    await expect(count).toHaveText("34 / 32 bytes");
+    await expect(count).toHaveClass(/warn/);
+    await name.fill("a".repeat(32));
+    await expect(count).toHaveText("32 / 32 bytes");
+    await expect(count).not.toHaveClass(/warn/);
+});
+
+test("the picker offers each pointing slot's Hold and Lock keys and picks the lock keycode", async ({page}) => {
+    await openControls(page, "keys");
+    await page.evaluate(async () => {
+        const {openPicker} = await import("/webview/ui/picker.mjs");
+        const {post} = await import("/webview/store.mjs");
+        const {setKey} = await import("/webview/view/edits.mjs");
+        openPicker({title: "Key", seed: ["KC_A"], onPick: key => post(setKey("Layer 0", 0, key))});
+    });
+    const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+    await picker.locator('[data-sec="modes"]').click();
+    const lock = picker.locator('[data-pick="PD_SLOT_0_LOCK"]');
+    await expect(picker.locator('[data-pick="PD_SLOT_0"] .l')).toHaveText("Hold");
+    await expect(lock.locator(".l")).toHaveText("Lock");
+    await expect(picker.locator(".pk-note")).toContainText("Lock keeps the mode on");
+    await expect(picker).not.toContainText(/toggle/i);
+    await lock.click();
+    await picker.locator('[data-act="use"]').click();
+    await expect.poll(() => page.evaluate(() => JSON.stringify(window.__posted))).toContain('"keycode":"PD_SLOT_0_LOCK"');
+});

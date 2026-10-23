@@ -304,7 +304,7 @@ export function reachGroups(model, stack, at, namesOf, all) {
                     const rows = reachOf(name)[from ? "belowRows" : "directRows"];
                     // The action matters as well as the behaviour: a pointing
                     // mode answers to two keycodes, and which one a branch
-                    // sends is the difference between holding and toggling it.
+                    // sends is the difference between holding and locking it.
                     if (!rows.some((entry) => entry.keycode === row.keycode && entry.action === tier.action)) {
                         rows.push({keycode: row.keycode, action: tier.action, layer: from, whileHeld});
                     }
@@ -376,7 +376,7 @@ export const macroReach = (model, stack, at) => reachGroups(model, stack, at, ma
 
 /**
  * Pointing modes, grouped the same four ways. A mode is reached by the key that
- * holds or toggles it, by a transparent key letting a lower one do so, or by a
+ * holds or locks it, by a transparent key letting a lower one do so, or by a
  * behaviour branch that sends its keycode.
  */
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
@@ -403,21 +403,21 @@ export function pointingSlotFor(model, keycode) {
 }
 
 // Which of a slot's two keycodes this is. Everything else about the mode is the
-// same either way, so holding it or toggling it on is the only thing a route
+// same either way, so holding it or locking it on is the only thing a route
 // has to carry beyond the slot itself.
 /** @param {ViewModel} model @param {string | number | undefined} keycode */
 export function pointingVariant(model, keycode) {
     const alias = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
-    if (/_LOCK$/.test(String(alias))) return "toggle";
+    if (/_LOCK$/.test(String(alias))) return "lock";
     const slot = pointingSlotFor(model, keycode);
     const value = typeof keycode === "number" ? keycode
         : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
-    if (slot && Number.isInteger(value) && slotKeycodes(slot)[1] === value) return "toggle";
+    if (slot && Number.isInteger(value) && slotKeycodes(slot)[1] === value) return "lock";
     return "hold";
 }
 
 // A branch or combo action read as the pointing mode it sends: the slot, the
-// name it goes by, and whether the key holds the mode or toggles it on. Null
+// name it goes by, and whether the key holds the mode or locks it on. Null
 // for any other action. An empty slot keeps its keycodes, so it still
 // resolves, marked empty.
 /** @param {ViewModel} model @param {string} action */
@@ -455,7 +455,7 @@ export function namedAction(model, action) {
     return null;
 }
 
-// The two values a slot answers to: hold and toggle, as the host's binding
+// The two values a slot answers to: hold and lock, as the host's binding
 // registry gives them. Matching on the numbers rather than on names matters
 // for an empty slot, whose record carries no name for the model to resolve —
 // the keycode exists on the keyboard either way.

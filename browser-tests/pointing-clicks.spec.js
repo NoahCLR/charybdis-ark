@@ -43,7 +43,22 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             draft.stage(messages[0]);
             expect(validateSnapshot(draft.document).pdModes[4].directions[direction].keycode).toBe(0xd0 + button);
             await publish();
-            await expect(page.locator(`[data-f="pointing:4:dir:${direction}"]`)).toHaveValue(`QK_MOUSE_BUTTON_${button}`);
+            await expect(page.locator(`[data-f="pointing:4:dir:${direction}"]`)).toHaveValue(`Mouse Button ${button}`);
+        }
+        // A QMK name or alias typed into a field stages that keycode; the
+        // fields left as shown keep theirs.
+        for (const [direction, typed] of [["up", "MS_BTN3"], ["down", "QK_MOUSE_BUTTON_3"]]) {
+            await clearPosts(page);
+            const input = page.locator(`[data-f="pointing:4:dir:${direction}"]`);
+            await input.fill(typed);
+            await input.dispatchEvent("change");
+            const messages = await posted(page);
+            expect(messages).toHaveLength(1);
+            expect(messages[0].config.directions).toMatchObject({[direction]: {keycode: typed}, left: {keycode: "QK_MOUSE_BUTTON_3"}, right: {keycode: "QK_MOUSE_BUTTON_4"}});
+            draft.stage(messages[0]);
+            expect(validateSnapshot(draft.document).pdModes[4].directions[direction].keycode).toBe(0xd3);
+            await publish();
+            await expect(input).toHaveValue("Mouse Button 3");
         }
         expect(draft.changes().find(row => row.unit === "pd:4").fields.filter(field => ["Left", "Right"].includes(field.label)).map(field => field.after))
             .toEqual(["Mouse Button 3 · Inherit modifiers", "Mouse Button 4 · Inherit modifiers"]);

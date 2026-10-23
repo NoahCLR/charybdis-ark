@@ -218,6 +218,8 @@ function editDeviceProfile(bytes, message, context = {}) {
         case "saveRgbReusableLedGroup": {
             const group = message.group;
             const leds = (/** @type {number[]} */ (group.ledIndices)).map(value => integer(value, 57, "LED index"));
+            // The keyboard accepts an empty group, but saving one is never meant.
+            if (!leds.length) throw invalid("Pick LEDs on the board before saving them as a group.");
             if (group.originalName) {
                 const target = existing(rgb.groups, row => row.id === namedId(group.originalName, "Group"), "LED group");
                 const twin = rgb.groups.find(row => row !== target && sameLeds(row.leds, leds));

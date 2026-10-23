@@ -1418,6 +1418,12 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .title-name-input:focus { border-color: var(--line-3); outline: none; background: var(--surface-2); }
 .title-name-count { position: absolute; top: 100%; left: 6px; opacity: 0; pointer-events: none; font-size: 10px; }
 .title-name:focus-within .title-name-count, .title-name-count.warn { opacity: 1; }
+/* A name field's byte count where its row has no room for it (Rename & Reorder):
+   under the field, while it is edited or too long. */
+.name-bytes { position: relative; display: block; min-width: 0; }
+.name-bytes > .input { width: 100%; }
+.name-bytes-count { position: absolute; top: 100%; left: 6px; z-index: 1; opacity: 0; pointer-events: none; font-size: 10px; }
+.name-bytes:focus-within .name-bytes-count, .name-bytes-count.warn { opacity: 1; }
 .macro-context { display: flex; gap: 10px 20px; flex-wrap: wrap; align-items: center; justify-content: space-between; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
 .macro-protection { display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--text-2); }
 .macro-protection select.input { width: auto; min-width: 135px; height: 30px; padding: 4px 26px 4px 8px; font-size: 11px; }
