@@ -131,8 +131,8 @@ class CandidateUploadCoordinator {
         this.requestTimeoutMs = options.requestTimeoutMs;
         this.onProgress = typeof options.onProgress === "function" ? options.onProgress : undefined;
         // Reads candidate status page 1 while the keyboard prepares the other
-        // half. Optional: without it the peer phase is waited out blind.
-        this.readPeerStatus = typeof options.readPeerStatus === "function" ? options.readPeerStatus : undefined;
+        // half. Optional: without it the slave-half phase is waited out blind.
+        this.readSlaveStatus = typeof options.readSlaveStatus === "function" ? options.readSlaveStatus : undefined;
         this.readEditProgress = options.readEditProgress;
         this.sleep = typeof options.sleep === "function" ? options.sleep : defaultSleep;
         this.now = typeof options.now === "function" ? options.now : Date.now;
@@ -635,7 +635,7 @@ class CandidateUploadCoordinator {
                 : await this.readStatus(context, {ambiguous: true});
             first = false;
             context.status = status;
-            if (status.state === CANDIDATE_STATE.PREPARING_PEER) await this.refreshPeerStatus(context);
+            if (status.state === CANDIDATE_STATE.PREPARING_PEER) await this.refreshSlaveStatus(context);
             this.emitProgress(context);
             assertCandidateIdentity(status, context);
             if (status.digest !== context.expectedDigest) {
@@ -643,8 +643,9 @@ class CandidateUploadCoordinator {
             }
             if (status.state === CANDIDATE_STATE.CONVERGING_PEER && context.afterDecision && !context.decisionHandled) {
                 // CONVERGING_PEER proves the one-store commit decision.
-                // Firmware completes peer commit and activation from here;
-                // this callback reports progress and sends no second-store writes.
+                // Firmware completes the slave half's commit and activation
+                // from here; this callback reports progress and sends no
+                // second-store writes.
                 context.decisionHandled = true;
                 await context.afterDecision({
                     transactionId: context.transactionId,
@@ -663,8 +664,8 @@ class CandidateUploadCoordinator {
             if (!COMMIT_IN_PROGRESS_STATES.includes(status.state)) {
                 throw uploadError("INVALID_COMMIT_STATE", `Firmware entered candidate state ${status.state} during commit.`, context, {status, safeToRetry: false});
             }
-            // The copy to the other half moving on counts as progress.
-            if (!this.statusBudgetAllowsAnotherPoll(budget, status, peerProgressFingerprint(context.peer))) break;
+            // The copy to the slave half moving on counts as progress.
+            if (!this.statusBudgetAllowsAnotherPoll(budget, status, slaveProgressFingerprint(context.slave))) break;
             await this.waitBeforePoll(context);
         }
         throw uploadError("COMMIT_OUTCOME_AMBIGUOUS", "Candidate commit made no observable progress within its firmware-aware wait window.", context, {
@@ -709,10 +710,10 @@ class CandidateUploadCoordinator {
     }
 
     /** @param {Context} context */
-    async refreshPeerStatus(context) {
-        if (!this.readPeerStatus) return;
+    async refreshSlaveStatus(context) {
+        if (!this.readSlaveStatus) return;
         try {
-            context.peer = await this.readPeerStatus(this.connection, {nextRequestId: () => this.requestIds.next(), timeoutMs: this.requestTimeoutMs});
+            context.slave = await this.readSlaveStatus(this.connection, {nextRequestId: () => this.requestIds.next(), timeoutMs: this.requestTimeoutMs});
         } catch {
             // Page 1 is advisory; the page-0 poll decides the commit's outcome.
         }
@@ -983,7 +984,7 @@ function candidatePayloadLength(context) {
 
 // Firmware performs at most one <=20-byte candidate/split work item per scan.
 // Ordinary staging therefore scales with the actual candidate, leaves room
-// for the split peer's 3-second liveness window, and expires before the 15-
+// for the slave half's 3-second liveness window, and expires before the 15-
 // second precommit inactivity cleanup. PREPARING_PEER is different: candidate
 // status cannot expose its internal acknowledged split offset, so the desktop
 // allows the firmware's full 60-second no-progress window plus enough time for
@@ -1049,16 +1050,16 @@ function assertNoActiveCandidate(status) {
     }
 }
 
-/** @param {import("./types.js").CandidatePeer | undefined} peer */
-function peerProgressFingerprint(peer) {
-    return peer ? [peer.phase, peer.transferOffset, peer.lastStatus].join(":") : "";
+/** @param {import("./types.js").CandidateSlave | undefined} slave */
+function slaveProgressFingerprint(slave) {
+    return slave ? [slave.phase, slave.transferOffset, slave.lastStatus].join(":") : "";
 }
 
 /** @param {Context} context @returns {Progress} */
 function progressFor(context) {
     return {
         adjustmentPending: context.adjustmentPending,
-        peer: context.peer ? {...context.peer} : null,
+        slave: context.slave ? {...context.slave} : null,
         phase: context.phase,
         transactionId: context.transactionId,
         operation: context.operation,

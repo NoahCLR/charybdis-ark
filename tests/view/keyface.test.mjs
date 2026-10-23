@@ -145,8 +145,8 @@ test("a behaviour cell reads by the core's name for its key, and by its keycode 
 });
 
 test("an empty tap inherits the key's own tap at every count the row reaches, once per press", () => {
-    const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(KC_NO)", label: "Shift"};
-    const tap = {helper: "TAP_SENDS", action: "KC_S", label: "S"};
+    const hold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(KC_NO)", label: "Shift"};
+    const tap = {style: "TAP_SENDS", action: "KC_S", label: "S"};
     const behaviour = {keycode: "MT(MOD_LSFT,KC_S)", builtIn: {tap, hold}, steps: [{tapCount: 2, hold: {action: "KC_A"}}]};
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "tap"), tap);
@@ -164,9 +164,9 @@ test("an empty tap inherits the key's own tap at every count the row reaches, on
 });
 
 test("an empty later tap repeats the row's own first tap, up to the deepest tap count", () => {
-    const tap = {helper: "TAP_SENDS", action: "KC_DELETE", label: "Delete"};
-    const first = {helper: "TAP_SENDS", action: "LGUI(KC_BSPC)"};
-    const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_K"};
+    const tap = {style: "TAP_SENDS", action: "KC_DELETE", label: "Delete"};
+    const first = {style: "TAP_SENDS", action: "LGUI(KC_BSPC)"};
+    const hold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_K"};
     const del = {keycode: "KC_DELETE", builtIn: {tap}, steps: [{tapCount: 1, hold}, {tapCount: 2, longHold: hold}]};
     assert.deepEqual(inheritedBranch(del, {tapCount: 2, longHold: hold}, "tap"), {...tap, times: 3}, "three quick taps, three Deletes");
     assert.equal(inheritedBranch(del, {tapCount: 3}, "tap"), null, "a fourth tap starts a new run, so that row is never reached");
@@ -175,29 +175,29 @@ test("an empty later tap repeats the row's own first tap, up to the deepest tap 
     assert.equal(inheritedBranch(set, {tapCount: 0, tap: first}, "tap"), null, "the first tap is its own cell");
     const custom = {keycode: "CUSTOM_KEY_0", builtIn: {}, steps: [{tapCount: 0, tap: first}, {tapCount: 1, hold}]};
     assert.deepEqual(inheritedBranch(custom, {tapCount: 1, hold}, "tap"), {...first, first: true, times: 2}, "a key with no tap of its own repeats its set first tap");
-    const thumb = {keycode: "KC_ESCAPE", builtIn: {tap}, steps: [{tapCount: 0, tap: first}, {tapCount: 2, tap: {helper: "TAP_SENDS", action: "KC_MPLY"}}]};
+    const thumb = {keycode: "KC_ESCAPE", builtIn: {tap}, steps: [{tapCount: 0, tap: first}, {tapCount: 2, tap: {style: "TAP_SENDS", action: "KC_MPLY"}}]};
     assert.deepEqual(inheritedBranch(thumb, {tapCount: 1}, "tap"), {...first, first: true, times: 2}, "an empty count inside the depth still repeats the first tap");
     assert.equal(inheritedBranch(thumb, {tapCount: 3}, "tap"), null, "past the depth the run types, so that row is never reached");
 });
 
 test("a plain key's fallback hold gives way to any authored first-press hold or long hold", () => {
-    const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", label: "-", fallback: true};
-    const behaviour = {keycode: "KC_MINUS", builtIn: {tap: {helper: "TAP_SENDS", action: "KC_MINUS", label: "-"}, hold}, steps: []};
+    const hold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", label: "-", fallback: true};
+    const behaviour = {keycode: "KC_MINUS", builtIn: {tap: {style: "TAP_SENDS", action: "KC_MINUS", label: "-"}, hold}, steps: []};
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
     assert.equal(inheritedBranch(behaviour, {tapCount: 0, longHold: {action: "KC_A"}}, "hold"), null);
     assert.equal(inheritedBranch(behaviour, {tapCount: 0, hold: {action: "KC_A"}}, "hold"), null);
 });
 
 test("with no Long hold set, a press's Hold carries on past the Long hold threshold", () => {
-    const tap = {helper: "TAP_SENDS", action: "KC_MINUS", label: "-"};
-    const fallback = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", label: "-", fallback: true};
+    const tap = {style: "TAP_SENDS", action: "KC_MINUS", label: "-"};
+    const fallback = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", label: "-", fallback: true};
     const plain = {keycode: "KC_MINUS", builtIn: {tap, hold: fallback, releaseTaps: true}, steps: []};
     assert.deepEqual(impliedBranch(plain, {tapCount: 0}, "long"), {meaning: "continues", hold: fallback}, "the fallback hold carries on");
-    for (const helper of ["PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) {
-        const hold = {helper, action: "KC_A"};
-        assert.deepEqual(impliedBranch(plain, {tapCount: 2, hold}, "long"), {meaning: "continues", hold}, helper);
+    for (const style of ["PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) {
+        const hold = {style, action: "KC_A"};
+        assert.deepEqual(impliedBranch(plain, {tapCount: 2, hold}, "long"), {meaning: "continues", hold}, style);
     }
-    const lt = {keycode: "LT(3,KC_SLASH)", builtIn: {tap, hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}}, steps: []};
+    const lt = {keycode: "LT(3,KC_SLASH)", builtIn: {tap, hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}}, steps: []};
     assert.equal(impliedBranch(lt, {tapCount: 0}, "long").hold.action, "MO(3)", "a built-in layer hold carries on");
     assert.equal(impliedBranch(plain, {tapCount: 0, longHold: {action: "KC_B"}}, "long"), null, "a set Long hold takes over");
     assert.equal(impliedBranch(plain, {tapCount: 1}, "long"), null, "no Hold, nothing to carry on");
@@ -205,13 +205,13 @@ test("with no Long hold set, a press's Hold carries on past the Long hold thresh
 });
 
 test("with only a Long hold set, a release before it sends the press's tap on keys whose tap survives a hold", () => {
-    const tap = {helper: "TAP_SENDS", action: "KC_MINUS", label: "-"};
-    const longHold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_B"};
-    const fallback = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", fallback: true};
+    const tap = {style: "TAP_SENDS", action: "KC_MINUS", label: "-"};
+    const longHold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_B"};
+    const fallback = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", fallback: true};
     const plain = {keycode: "KC_MINUS", builtIn: {tap, hold: fallback, releaseTaps: true}, steps: [{tapCount: 1, longHold}]};
     assert.deepEqual(impliedBranch(plain, {tapCount: 0, longHold}, "hold"), {meaning: "tapsBeforeLong", tap});
     assert.deepEqual(impliedBranch(plain, {tapCount: 1, longHold}, "hold"), {meaning: "tapsBeforeLong", tap: {...tap, times: 2}}, "the count's own built-in tap");
-    const set = {helper: "TAP_SENDS", action: "KC_C"};
+    const set = {style: "TAP_SENDS", action: "KC_C"};
     assert.deepEqual(impliedBranch(plain, {tapCount: 1, tap: set, longHold}, "hold"), {meaning: "tapsBeforeLong", tap: set}, "the count's set tap");
     assert.equal(impliedBranch(plain, {tapCount: 0, hold: {action: "KC_A"}, longHold}, "hold"), null, "a set Hold is the Hold");
     assert.equal(impliedBranch(plain, {tapCount: 0}, "hold"), null, "without a Long hold the fallback hold is shown instead");
@@ -220,7 +220,7 @@ test("with only a Long hold set, a release before it sends the press's tap on ke
     assert.deepEqual(impliedBranch(custom, {tapCount: 0, tap: set, longHold}, "hold"), {meaning: "tapsBeforeLong", tap: set});
     const layer = {keycode: "MO(3)", builtIn: {}, steps: [{tapCount: 0, tap: set, longHold}]};
     assert.equal(impliedBranch(layer, {tapCount: 0, tap: set, longHold}, "hold"), null, "a layer key sends no tap once held");
-    const lt = {keycode: "LT(3,KC_SLASH)", builtIn: {tap, hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}}, steps: []};
+    const lt = {keycode: "LT(3,KC_SLASH)", builtIn: {tap, hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}}, steps: []};
     assert.equal(impliedBranch(lt, {tapCount: 0, longHold}, "hold"), null, "a dual-role key's own hold fills the cell");
 });
 
@@ -251,13 +251,13 @@ test("the grid shows the tap counts in use and the next, or every one, and says 
 });
 
 test("a pointing-mode key holds its mode from the press, unless a later tap count holds another mode", () => {
-    const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_SLOT_0", fromPress: true};
+    const hold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_SLOT_0", fromPress: true};
     const behaviour = {keycode: "PD_SLOT_0", builtIn: {hold}, steps: []};
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
     const same = {...behaviour, steps: [{tapCount: 1, hold: {action: "PD_SLOT_0_LOCK"}}]};
     assert.equal(inheritedBranch(same, {tapCount: 0}, "hold").fromPress, true, "its own mode does not defer it");
     const other = {...behaviour, steps: [{tapCount: 1, longHold: {action: "PD_SLOT_3"}}]};
     assert.deepEqual(inheritedBranch(other, {tapCount: 0}, "hold"), {...hold, fromPress: false}, "another mode waits for Tap / hold");
-    const layer = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(2)", fromPress: true};
+    const layer = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(2)", fromPress: true};
     assert.equal(inheritedBranch({keycode: "MO(2)", builtIn: {hold: layer}, steps: [{tapCount: 1, hold: {action: "PD_SLOT_3"}}]}, {tapCount: 0}, "hold"), layer);
 });

@@ -498,7 +498,7 @@ test("a custom key is placed wherever it is sent, unnamed and with nothing but a
     const model = {
         customKeys: [0, 1].map((slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, name: "", hasBehavior: false, shortcut: {mods: slot ? 0 : 0x41, key: slot ? 0 : 0x0e}})),
         qmkKeycodeAliases: {},
-        keyBehaviors: [{keycode: "KC_A", enabled: true, allowedLayers: 0xffff, steps: [{tapCount: 1, tap: {helper: "TAP_SENDS", action: "CUSTOM_KEY_1"}}]}],
+        keyBehaviors: [{keycode: "KC_A", enabled: true, allowedLayers: 0xffff, steps: [{tapCount: 1, tap: {style: "TAP_SENDS", action: "CUSTOM_KEY_1"}}]}],
         combos: [],
     };
     const stack = withAnswers([{index: 0, name: "Base", positions: [at(0, "QK_USER_0", "CUSTOM_KEY_0"), at(1, "KC_A")]}]);

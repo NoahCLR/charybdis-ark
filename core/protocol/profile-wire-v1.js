@@ -36,7 +36,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 // D-F28, which retired every Profile Wire 1 bit). The bits are in firmware's
 // profile-wire-v1/hid-channel.md, "The feature word".
 const PROFILE_WIRE_FEATURES = Object.freeze({
-    // One half of a split pair: a save copies the profile to the other half.
+    // One half of a split pair: a save copies the profile to the slave half.
     SPLIT_KEYBOARD: 1 << 0,
     // Candidate writes (with reuse and streaming chunks), durable commit and
     // activation; set once the live-profile owner reports.
@@ -45,7 +45,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     POINTING: 1 << 2,
 });
 
-// Apply needs a build that saves and copies to the other half;
+// Apply needs a build that saves and copies to the slave half;
 // CURRENT_PAIR_FEATURES is everything the flashable pair reports. Reading needs
 // no bit: the version says what the keyboard does (session/firmware-support.js).
 const F = PROFILE_WIRE_FEATURES;
@@ -78,8 +78,8 @@ const PROFILE_STATE_FLAGS = Object.freeze({
     PEER_CONVERGED: 1 << 5,
     WAITING_SAFE_BOUNDARY: 1 << 6,
     DIGESTS_UNAVAILABLE: 1 << 7,
-    // A cancelled save's peer ABORT was never acknowledged. No save starts
-    // until the peer confirms; a peer that never does needs a restart.
+    // The slave half never acknowledged a cancelled save's ABORT. No save
+    // starts until it confirms; a slave half that never does needs a restart.
     PEER_CLEANUP_PENDING: 1 << 8,
     // A slot holds a profile in an earlier store format or retired test
     // layout (firmware D-F28). The
@@ -276,8 +276,8 @@ function decodeStatusPages(pages) {
         activeOriginHalf: generation[4],
         committedGeneration: readU32(generation, 5),
         committedOriginHalf: generation[9],
-        peerGeneration: readU32(generation, 10),
-        peerOriginHalf: generation[14],
+        slaveGeneration: readU32(generation, 10),
+        slaveOriginHalf: generation[14],
         candidateTransactionId: readU16(generation, 15),
         lastCommittedTransactionId: readU16(generation, 17),
         conflictCount: readU16(generation, 19),
@@ -291,7 +291,7 @@ function decodeStatusPages(pages) {
     for (const [label, value] of /** @type {[string, number][]} */ ([
         ["active origin half", decoded.activeOriginHalf],
         ["committed origin half", decoded.committedOriginHalf],
-        ["peer origin half", decoded.peerOriginHalf],
+        ["slave half's generation origin", decoded.slaveOriginHalf],
     ])) {
         if (value > 1) {
             throw new ProfileWireProtocolError("MALFORMED_RESPONSE", `${label} must be 0 or 1.`);
@@ -300,10 +300,10 @@ function decodeStatusPages(pages) {
     return {
         ...decoded,
         candidatePending: (decoded.stateFlags & PROFILE_STATE_FLAGS.CANDIDATE_PENDING) !== 0,
-        peerKnown: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_KNOWN) !== 0,
-        peerConverged: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) !== 0,
+        slaveKnown: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_KNOWN) !== 0,
+        slaveConverged: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) !== 0,
         waitingSafeBoundary: (decoded.stateFlags & PROFILE_STATE_FLAGS.WAITING_SAFE_BOUNDARY) !== 0,
-        peerCleanupPending: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING) !== 0,
+        slaveCleanupPending: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING) !== 0,
         storedEarlierFormat: (decoded.stateFlags & PROFILE_STATE_FLAGS.STORED_EARLIER_FORMAT) !== 0,
     };
 }

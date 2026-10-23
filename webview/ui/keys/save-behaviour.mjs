@@ -23,7 +23,7 @@ export function behaviourMessage(root, behaviour, change) {
     /** @param {string} identity */
     const field = (identity) => /** @type {HTMLInputElement | undefined} */ ([...root.querySelectorAll("[data-f]")]
         .find((node) => /** @type {HTMLElement} */ (node).dataset.f === `behaviour:${behaviour.keycode}:${identity}`));
-    const terms = Object.fromEntries(["tapHoldTerm", "longerHoldTerm", "multiTapTerm"].flatMap((name) => {
+    const terms = Object.fromEntries(["tapHoldTerm", "longHoldTerm", "multiTapTerm"].flatMap((name) => {
         const input = field(`timing:${name}`);
         return input ? [[name, input.dataset.stored]] : [];
     }));

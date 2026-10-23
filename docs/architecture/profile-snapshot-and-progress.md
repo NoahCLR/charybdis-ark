@@ -131,9 +131,9 @@ for the person, the [guide](../guide/review-and-apply.md#applying).
 6. `commit` polls the candidate states. `CONVERGING_PEER` proves the commit
    decision; from there the firmware finishes the slave half and activation.
 7. The final status must show the target digest committed and active, a newer
-   generation, this transaction, no conflict and, when the peer is visible,
-   its matching generation. A peer that dropped out after confirming is
-   reported as out of sight. The draft resets to the result, and
+   generation, this transaction, no conflict and, when the slave half is
+   visible, its matching generation. A slave half that dropped out after
+   confirming is reported as out of sight. The draft resets to the result, and
    `rereadKeyboard` reads layout, profile (`reuse`), combos and base lighting.
 
 `withFailure` pins a failure to its step, the keyboard's reason

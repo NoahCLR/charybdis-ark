@@ -7,7 +7,7 @@ import {behaviourGridSteps, keyFace, keyName, visibleKeycode} from "../../view/k
 import {currentLayer, getModel, positionAt, post, render, state, writable, canEdit as canEditArea} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
-import {holdHelpers} from "../../view/vocabulary.mjs";
+import {holdStyles} from "../../view/vocabulary.mjs";
 import {saveBehaviour} from "./save-behaviour.mjs";
 
 const {TIER_FIELDS} = edits;
@@ -76,9 +76,9 @@ function cellShortcut(action) {
         if (branch) { state.keyClipboard = {keycode: branch.action, label: branch.action}; navigator.clipboard?.writeText(branch.action).catch(() => {}); render(); }
     } else if (state.keyClipboard && canEditArea("behaviours")) {
         const pending = state.cellHow?.cell === state.cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
-        /** @type {Pick<import("../../../contracts/edits.js").BehaviorBranch, "helper" | "repeatHz">} */
-        const how = branch || pending || {helper: /** @type {import("../../../contracts/edits.js").BranchHelper | undefined} */ (holdHelpers(getModel(), kind)[0]?.[0])};
-        const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: state.keyClipboard.keycode, helper: how.helper, repeatHz: how.repeatHz});
+        /** @type {Pick<import("../../../contracts/edits.js").BehaviorBranch, "style" | "repeatHz">} */
+        const how = branch || pending || {style: /** @type {import("../../../contracts/edits.js").BranchStyle | undefined} */ (holdStyles(getModel(), kind)[0]?.[0])};
+        const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: state.keyClipboard.keycode, style: how.style, repeatHz: how.repeatHz});
         if (!edit.pending && edit.branch?.action !== branch?.action) { state.cellHow = null; change(edit.branch || null); }
     }
     return true;

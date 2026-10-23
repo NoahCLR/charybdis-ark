@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {SAVE_IN_PROGRESS, keyboardStatusLine, productName} from "../../webview/view/keyboard-view.mjs";
+import {RESTART_NEEDED, SAVE_IN_PROGRESS, halvesRows, keyboardStatusLine, productName} from "../../webview/view/keyboard-view.mjs";
 
 const connected = (keyboardName, label = "Bastard Keyboards Charybdis 4x6") => ({device: {connected: true, label}, keyboardName});
 
@@ -35,4 +35,23 @@ test("a restart the keyboard needs outranks a save in progress; otherwise, and i
     assert.equal(keyboardStatusLine(health({})), null);
     assert.equal(keyboardStatusLine({...health({recoveryPending: true}), demo: {active: true}}), null);
     assert.equal(keyboardStatusLine(null), null);
+});
+
+test("a slave half that missed a cancelled save reads the same on the rail and the Keyboard screen", () => {
+    const line = keyboardStatusLine(health({restartNeeded: true}));
+    assert.equal(line.text, RESTART_NEEDED.label);
+    assert.equal(line.tip, [RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" "), "the rail says what the Keyboard screen's callout says");
+    assert.match(RESTART_NEEDED.detail, /^The slave half did not confirm a cancelled save/);
+    assert.match(RESTART_NEEDED.steps[0], /^Unplug the USB cable from the master half \(not the cable between the halves\)/,
+        "Ark's Restart is only for a stopped keyboard (D-L67): the unplug steps stay");
+    assert.doesNotMatch(`${line.tip}`, /\b(left|right|other) half\b/i, "the halves are named by role");
+});
+
+test("the Keyboard screen names the halves by role, with the side as detail", () => {
+    const rows = (halves, connected = true) => halvesRows({device: {connected, health: {halves}}});
+    assert.deepEqual(rows("agree").map(row => [row.half, row.side, row.ok]),
+        [["Master half", "right, USB and trackball", true], ["Slave half", "left", true]]);
+    assert.equal(rows("alone")[1].words, "not answering: check the cable between the halves");
+    assert.equal(rows("apart")[1].words, "connected, but holding different saved settings");
+    assert.deepEqual(rows("agree", false).map(row => row.words), ["not connected", "not connected"]);
 });

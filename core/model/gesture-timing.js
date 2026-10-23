@@ -4,7 +4,7 @@
 // Conservative timing facts. Only an empty release interval is a proof of
 // impossibility; scan order, immediate holds and transparent inheritance are
 // deliberately not collapsed into the same rule.
-const {KEY_BEHAVIOR_HOLD_MODES: MODE} = require("../schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES: STYLE} = require("../schema/key-behavior-domain-v1");
 const {effectiveComboWindow} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {nativeCode, actionName} = require("../schema/actions");
@@ -30,15 +30,15 @@ function holdTermSetting(target) {
     const code = nativeCode(target);
     return DUAL_ROLE.some(([start, end]) => within(code, start, end)) ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM;
 }
-/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @returns {{hold: number | T, long: number | T, repeat: number | T}} */
+/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @returns {{hold: number | T, long: number | T, repeat: number | T}} */
 function effectiveTimings(row, values) {
     return {hold: row.tapHoldTerm || values[holdTermSetting(row.target)],
-        long: row.longerHoldTerm || values[SETTING.LONG_HOLD_TERM], repeat: row.multiTapTerm || values[SETTING.MULTI_TAP_TERM]};
+        long: row.longHoldTerm || values[SETTING.LONG_HOLD_TERM], repeat: row.multiTapTerm || values[SETTING.MULTI_TAP_TERM]};
 }
 /** @param {BehaviorStep} step @param {Timings} terms @returns {step is BehaviorStep & {hold: import("../schema/types.js").HoldBranch, longHold: import("../schema/types.js").HoldBranch}} */
 function releaseHoldUnreachable(step, terms) {
-    return step.hold?.mode === MODE.TAP_ON_RELEASE_AFTER_HOLD
-        && step.longHold?.mode === MODE.TAP_ON_RELEASE_AFTER_HOLD
+    return step.hold?.style === STYLE.TAP_ON_RELEASE_AFTER_HOLD
+        && step.longHold?.style === STYLE.TAP_ON_RELEASE_AFTER_HOLD
         && nativeCode(step.hold.action) !== 0 && nativeCode(step.longHold.action) !== 0
         && !transparent(step.hold.action) && !transparent(step.longHold.action)
         && Number.isInteger(terms.hold) && Number.isInteger(terms.long) && terms.long <= terms.hold;
@@ -61,7 +61,7 @@ function gestureTimingFindings(decoded) {
             } else if (step.longHold && Number.isInteger(terms.long) && Number.isInteger(terms.hold)) {
                 const gap = terms.long - terms.hold;
                 if (gap <= 0) add(`order:${step.tapIndex}`, `${branch} hold thresholds overlap`,
-                    `The Long hold threshold is ${terms.long} ms and the Tap / hold threshold is ${terms.hold} ms. Which actions run also depends on their hold modes, input delivery and scan order; the normal Hold-then-Long-hold progression is not available.`,
+                    `The Long hold threshold is ${terms.long} ms and the Tap / hold threshold is ${terms.hold} ms. Which actions run also depends on their hold styles, input delivery and scan order; the normal Hold-then-Long-hold progression is not available.`,
                     "Put the Long hold threshold after the Tap / hold threshold for distinct tiers. This warning does not claim both actions are impossible.");
                 else if (step.hold && gap < SHORT_WINDOW_MS) add(`narrow:${step.tapIndex}`, `${branch} has a narrow hold interval`,
                     `Only ${gap} ms separates Hold (${terms.hold} ms) from Long hold (${terms.long} ms). Selecting or using just the first tier may be difficult.`,

@@ -79,10 +79,10 @@ async function restartKeyboard({session, draft, saveRecovery}) {
         if (code === "UNHANDLED") throw refusal(`This keyboard's firmware cannot restart from Ark, so nothing happened. Unplug the keyboard and plug it back in.${inRecovery(recovery)}`, "RESTART_UNSUPPORTED");
         throw refusal(`The keyboard did not restart: ${messageOf(error)}.${inRecovery(recovery)}`, code);
     }
-    session.restart = {deviceId: device?.id, serialNumber: device?.serialNumber || "", kept, recovery, peerAcknowledged: result.peerAcknowledged};
+    session.restart = {deviceId: device?.id, serialNumber: device?.serialNumber || "", kept, recovery, slaveAcknowledged: result.slaveAcknowledged};
     const expected = expectRestart(session);
     // Said if the keyboard never comes back; replaced once it is read again.
-    if (expected) expected.after = `${inRecovery(recovery).trim()}${result.peerAcknowledged ? "" : UNANSWERED}`.trim();
+    if (expected) expected.after = `${inRecovery(recovery).trim()}${result.slaveAcknowledged ? "" : UNANSWERED}`.trim();
     session.notice = kept ? "Restarting the keyboard… Ark keeps its unsaved edits and puts them back once it is back." : "Restarting the keyboard…";
 }
 
@@ -112,23 +112,23 @@ async function putBackAfterRestart(session) {
 async function putBack(session, restart) {
     const draft = session.draft, keyboard = draft?.live?.keyboard;
     // Read again, the keyboard answered for both halves (a read refuses one
-    // without its other half), and since D-F34 a half that missed the restart
+    // without the slave half), and since D-F34 a half that missed the restart
     // rejoins by itself: an unanswered restart needs no replug now. It is said
     // only while the keyboard has not come back (above).
-    const peer = "";
-    if (keyboard?.stopped || keyboard?.peerStopped) {
-        return `It stopped saving again at once, so the fault is in its flash or its firmware, and restarting again will not help.${restart.kept ? ` Your unsaved edits were not put back.${inRecovery(restart.recovery)}` : ""}${peer}`.trim();
+    const slave = "";
+    if (keyboard?.stopped || keyboard?.slaveStopped) {
+        return `It stopped saving again at once, so the fault is in its flash or its firmware, and restarting again will not help.${restart.kept ? ` Your unsaved edits were not put back.${inRecovery(restart.recovery)}` : ""}${slave}`.trim();
     }
-    if (!restart.kept) return peer.trim();
-    if (!draft?.live) return `Your unsaved edits were not put back: the keyboard now takes edits by Apply.${inRecovery(restart.recovery)}${peer}`;
+    if (!restart.kept) return slave.trim();
+    if (!draft?.live) return `Your unsaved edits were not put back: the keyboard now takes edits by Apply.${inRecovery(restart.recovery)}${slave}`;
     try {
         const sent = await proposeLive(session, {document: restart.kept, label: RESTART_LABEL, origin: "edit", order: IDENTITY}, {confirmed: true, replaceWhenLarge: true});
-        if (!sent) return `Your unsaved edits were not put back: the keyboard changed meanwhile.${inRecovery(restart.recovery)}${peer}`;
+        if (!sent) return `Your unsaved edits were not put back: the keyboard changed meanwhile.${inRecovery(restart.recovery)}${slave}`;
     } catch (error) {
-        return `Your unsaved edits could not be put back: ${messageOf(error)}.${inRecovery(restart.recovery)}${peer}`;
+        return `Your unsaved edits could not be put back: ${messageOf(error)}.${inRecovery(restart.recovery)}${slave}`;
     }
     return `${draft.live?.mode === EDIT_MODE.LIVE ? "Your unsaved edits are back on the keyboard, which saves them in a moment."
-        : "Your unsaved edits are back on the keyboard, not saved yet: review and save them."}${peer}`;
+        : "Your unsaved edits are back on the keyboard, not saved yet: review and save them."}${slave}`;
 }
 
 module.exports = {RESTART_LABEL, restartKeyboard, putBackAfterRestart};

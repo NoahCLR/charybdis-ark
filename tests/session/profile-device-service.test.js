@@ -371,7 +371,7 @@ test("compatibility uses the exact Profile Wire and schema versions in capabilit
 test("persistent live apply requires every mutation capability", () => {
     const compatible = {compatible: true, reasons: []};
     const completeFlags = PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES;
-    const readyStatus = {peerKnown: true, peerConverged: true, candidatePending: false};
+    const readyStatus = {slaveKnown: true, slaveConverged: true, candidatePending: false};
     assert.equal(evaluateLiveMutationCompatibility({featureFlags: completeFlags, candidateChunkMax: 20}, compatible, true, readyStatus).available, true);
 
     const blocked = evaluateLiveMutationCompatibility({
@@ -387,20 +387,20 @@ test("persistent live apply requires a detected and converged second half", () =
         featureFlags: PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.SAVES,
         candidateChunkMax: 20,
     };
-    const peerMissing = evaluateLiveMutationCompatibility(
+    const slaveMissing = evaluateLiveMutationCompatibility(
         capabilities,
         {compatible: true, reasons: []},
         true,
-        {peerKnown: false, peerConverged: false, candidatePending: false}
+        {slaveKnown: false, slaveConverged: false, candidatePending: false}
     );
-    assert.equal(peerMissing.available, false);
-    assert.match(peerMissing.reasons.join("\n"), /slave half has not been detected/);
+    assert.equal(slaveMissing.available, false);
+    assert.match(slaveMissing.reasons.join("\n"), /slave half has not been detected/);
 
     const unconverged = evaluateLiveMutationCompatibility(
         capabilities,
         {compatible: true, reasons: []},
         true,
-        {peerKnown: true, peerConverged: false, candidatePending: false}
+        {slaveKnown: true, slaveConverged: false, candidatePending: false}
     );
     assert.equal(unconverged.available, false);
     assert.match(unconverged.reasons.join("\n"), /have not established a converged profile state/);
@@ -467,7 +467,7 @@ test("successful service restore installs the saved profile and returns normally
         assert.ok(f.keyboard.events.includes("decision") && f.keyboard.events.includes("activated"));
         assert.ok(adapter.keyboard.mutations.length > 0, "the real service sends all writes through its request coordinator");
         assert.deepEqual(f.keyboard.active, f.target.candidate);
-        assert.deepEqual(f.keyboard.local.macros, f.keyboard.peer.macros);
+        assert.deepEqual(f.keyboard.local.macros, f.keyboard.slave.macros);
         assert.equal(service.portable.fingerprint, result.fingerprint, "the service's post-Apply snapshot sees the saved target");
     } finally {await service.close();}
 });

@@ -135,7 +135,7 @@ async function withModel(page, change) {
 
 test("halves apart: the rail says so and the bar offers Revert, not Save", async ({page}) => {
     await openLive(page, "keys");
-    await withModel(page, model => {model.draft.live.apart = true; model.draft.live.converged = false;});
+    await withModel(page, model => {model.draft.live.slaveRefused = true; model.draft.live.converged = false;});
     await expect(page.locator(".rail-status")).toContainText("Halves apart");
     const bar = page.locator(".commit.live");
     await expect(bar).toContainText("the halves are apart");
@@ -269,7 +269,7 @@ test("in Live the keyboard's own save, a failed one and halves apart each say wh
     const set = (keyboard, unsaved = true) => page.evaluate(async ([keyboard, unsaved]) => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        model.draft.live = {...model.draft.live, unsaved, apart: false, keyboard: {...model.draft.live.keyboard, ...keyboard}};
+        model.draft.live = {...model.draft.live, unsaved, slaveRefused: false, keyboard: {...model.draft.live.keyboard, ...keyboard}};
         if (!unsaved) {model.draft.dirty = false; model.draft.changes = [];}
         store.setModel(model); store.render();
         window.__posted.length = 0;
@@ -291,7 +291,7 @@ test("in Live the keyboard's own save, a failed one and halves apart each say wh
         window.__posted.length = 0;
     }, change);
     await set({saveFailed: false});
-    await change({"draft.live": {...(await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().draft.live)), apart: true}});
+    await change({"draft.live": {...(await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().draft.live)), slaveRefused: true}});
     await expect(page.locator(".commit.live")).toContainText("the halves are apart");
     await expect(page.locator(".rail-status")).toContainText("Halves apart");
     await expect(page.locator('.commit.live [data-act="save-again"]')).toHaveCount(0);
@@ -321,7 +321,7 @@ test("a keyboard that stopped saving says so, for either half, and Restart posts
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        model.draft.live = {...model.draft.live, keyboard: {...model.draft.live.keyboard, stopped: false, peerStopped: true}};
+        model.draft.live = {...model.draft.live, keyboard: {...model.draft.live.keyboard, stopped: false, slaveStopped: true}};
         store.setModel(model); store.render();
     });
     await expect(page.locator(".commit.live.stopped")).toContainText("The keyboard stopped saving");

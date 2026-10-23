@@ -33,7 +33,7 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     // is the slot's ceiling, not the frame's.
     MAX_BLOB_SIZE: 130048,
     // Status page 0 (layout 2) is the candidate's progress, page 3 (layout 1)
-    // where its error is; pages 1 and 2 (layout 2) the copy to the other half.
+    // where its error is; pages 1 and 2 (layout 2) the copy to the slave half.
     STATUS_LAYOUT_VERSION: 2,
     ERROR_PAGE: 3,
     ERROR_LAYOUT_VERSION: 1,
@@ -381,8 +381,8 @@ function decodeCandidateErrorResponse(response, request) {
 }
 
 // Reads of page 0 before the error page's location is given up on. Validation,
-// commit and peer events can replace the error between the two reads; each
-// replacement moves the error sequence, and the pair is reread.
+// commit and slave-half events can replace the error between the two reads;
+// each replacement moves the error sequence, and the pair is reread.
 const ERROR_PAGE_ATTEMPTS = 3;
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
@@ -420,8 +420,8 @@ async function readCandidateStatus(connection, options = {}) {
     return /** @type {NonNullable<typeof status>} */ (status);
 }
 
-// Candidate status page 1: how far a save's copy to the other half has got,
-// and the other half's last answer. The phase names mirror
+// Candidate status page 1: how far a save's copy to the slave half has got,
+// and the slave half's last answer. The phase names mirror
 // noah_profile_candidate_v1_peer_phase_t; the reasons mirror
 // noah_profile_split_v1_status_t.
 const CANDIDATE_PEER_PHASE = Object.freeze({
@@ -432,44 +432,44 @@ const SPLIT_STATUS_NAMES = Object.freeze([
     "OK", "INVALID_FRAME", "INCOMPATIBLE", "STALE", "CONFLICT", "CORRUPT", "BUSY", "RANGE_ERROR", "DIGEST_MISMATCH", "STORAGE_ERROR", "VALIDATION_ERROR",
 ]);
 const CANDIDATE_PEER_FLAGS = Object.freeze({CLEANUP_PENDING: 1 << 0, MASTER: 1 << 1, WAITING_SAFE_BOUNDARY: 1 << 2, KNOWN_MASK: 0x07});
-// Why the other half last answered BUSY, and what it held then; these mirror
+// Why the slave half last answered BUSY, and what it held then; these mirror
 // noah_profile_split_v1_busy_reason_t, noah_profile_peer_store_state_t and
 // noah_profile_split_transfer_owner_t.
 const PEER_BUSY_REASON_NAMES = Object.freeze(["UNSPECIFIED", "ADMITTED", "MAILBOX_FULL", "OTHER_COPY", "NO_LEASE", "STORE_WORKING", "PULLING", "CONVERGENCE_ONLY"]);
 const PEER_STORE_STATE_NAMES = Object.freeze(["UNINITIALIZED", "IDLE", "RECEIVING", "VALIDATING", "PREPARING", "PREPARED", "COMMITTING", "COMMITTED", "REJECTED", "RECONCILE_REQUIRED"]);
 const PEER_TRANSFER_OWNER_NAMES = Object.freeze(["NONE", "REMOTE_PUSH", "LOCAL_PULL"]);
-// noah_profile_storage_admission_owner_t: who holds the peer's storage.
+// noah_profile_storage_admission_owner_t: who holds the slave half's storage.
 const PEER_ADMISSION_NAMES = Object.freeze(["NONE", "HOST", "PEER"]);
 
 /** @param {number} requestId */
-function buildCandidatePeerStatusRequest(requestId) {
-    return buildProfileGetRequest(PROFILE_CANDIDATE_V1.VALUE_STATUS, 1, assertU8(requestId, "Candidate peer status request id", {nonzero: true}));
+function buildCandidateSlaveStatusRequest(requestId) {
+    return buildProfileGetRequest(PROFILE_CANDIDATE_V1.VALUE_STATUS, 1, assertU8(requestId, "Candidate slave-half status request id", {nonzero: true}));
 }
 
 /** @param {Uint8Array} response @param {Uint8Array} request */
-function decodeCandidatePeerStatusResponse(response, request) {
+function decodeCandidateSlaveStatusResponse(response, request) {
     const payload = decodeProfileResponse(response, request);
     if (payload.length !== PROFILE_CANDIDATE_V1.STATUS_PAYLOAD_SIZE || payload[0] !== PROFILE_CANDIDATE_V1.PEER_STATUS_LAYOUT_VERSION) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported candidate peer status layout.");
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported candidate slave-half status layout.");
     }
     const phase = payload[1];
     const lastStatus = payload[2];
     const flags = payload[3];
     if (CANDIDATE_PEER_PHASE_NAMES[phase] === undefined) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown peer transfer phase ${phase}.`);
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown slave-half transfer phase ${phase}.`);
     }
     if (SPLIT_STATUS_NAMES[lastStatus] === undefined) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown peer status ${lastStatus}.`);
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown slave-half status ${lastStatus}.`);
     }
     if ((flags & ~CANDIDATE_PEER_FLAGS.KNOWN_MASK) !== 0) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Candidate peer status contains unknown flag bits.");
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Candidate slave-half status contains unknown flag bits.");
     }
     // Layout 2 packs the transfer owner (low nibble) and the storage admission
     // (high nibble) into the last byte.
     const [busyReason, busyStoreState] = payload.subarray(22, 24);
     const busyOwner = payload[24] & 0x0f, busyAdmission = payload[24] >> 4;
     if (PEER_BUSY_REASON_NAMES[busyReason] === undefined || PEER_STORE_STATE_NAMES[busyStoreState] === undefined || PEER_TRANSFER_OWNER_NAMES[busyOwner] === undefined || PEER_ADMISSION_NAMES[busyAdmission] === undefined) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unknown peer busy detail.");
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unknown slave-half busy detail.");
     }
     return {
         phase,
@@ -483,7 +483,7 @@ function decodeCandidatePeerStatusResponse(response, request) {
         transferLength: payload.readUInt32LE(8),
         retryCount: payload.readUInt32LE(12),
         transportFailureCount: payload.readUInt32LE(16),
-        // The other half's BUSY replies in a row, and the last one that said
+        // The slave half's BUSY replies in a row, and the last one that said
         // why (never the routine "admitted" reply to a new request).
         busyStreak: payload.readUInt16LE(20),
         busyReason: PEER_BUSY_REASON_NAMES[busyReason],
@@ -494,11 +494,11 @@ function decodeCandidatePeerStatusResponse(response, request) {
 }
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
-async function readCandidatePeerStatus(connection, options = {}) {
+async function readCandidateSlaveStatus(connection, options = {}) {
     if (typeof options.nextRequestId !== "function") throw new TypeError("nextRequestId must be a function.");
-    const request = buildCandidatePeerStatusRequest(assertNextRequestId(options.nextRequestId));
-    const response = await requestHandled(connection, request, {matchResponse: profileResponseMatcher, signal: options.signal, timeoutMs: options.timeoutMs}, "the candidate peer status read");
-    return decodeCandidatePeerStatusResponse(response, request);
+    const request = buildCandidateSlaveStatusRequest(assertNextRequestId(options.nextRequestId));
+    const response = await requestHandled(connection, request, {matchResponse: profileResponseMatcher, signal: options.signal, timeoutMs: options.timeoutMs}, "the candidate slave-half status read");
+    return decodeCandidateSlaveStatusResponse(response, request);
 }
 
 // The candidate is the complete profile; firmware assigns its one generation.
@@ -661,7 +661,7 @@ module.exports = {
     CANDIDATE_PEER_PHASE,
     CANDIDATE_PEER_PHASE_NAMES,
     SPLIT_STATUS_NAMES,
-    buildCandidatePeerStatusRequest,
-    decodeCandidatePeerStatusResponse,
-    readCandidatePeerStatus,
+    buildCandidateSlaveStatusRequest,
+    decodeCandidateSlaveStatusResponse,
+    readCandidateSlaveStatus,
 };

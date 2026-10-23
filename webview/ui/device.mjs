@@ -17,7 +17,7 @@ import {demoOf} from "../view/demo.mjs";
 import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {shellOf} from "../view/shell-panel.mjs";
 import {profileUsageView} from "../view/profile-usage.mjs";
-import {FIRMWARE_RELEASES, SAVE_IN_PROGRESS, firmwareLine, halvesRows, productName} from "../view/keyboard-view.mjs";
+import {FIRMWARE_RELEASES, RESTART_NEEDED, SAVE_IN_PROGRESS, firmwareLine, halvesRows, productName} from "../view/keyboard-view.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {firmwareFacts} from "../view/firmware-facts.mjs";
@@ -41,12 +41,12 @@ export function screenDevice() {
         : "Your Charybdis: its firmware, its two halves and how full it is.";
     const firmware = firmwareLine(model);
     const build = shellOf(model).build;
-    const restart = !demo && health?.restartNeeded ? `<div class="callout danger-note" role="alert"><strong>Restart the keyboard.</strong>
-        The left half did not confirm a cancelled save, so the keyboard refuses new saves until it restarts. Nothing was lost.
-        <ol class="steps"><li>Unplug the USB cable from the right half (not the cable between the halves).</li><li>Wait a few seconds, then plug it back in.</li><li>Choose Read keyboard below.</li></ol></div>` : "";
+    const restart = !demo && health?.restartNeeded ? `<div class="callout danger-note" role="alert"><strong>${esc(RESTART_NEEDED.label)}.</strong>
+        ${esc(RESTART_NEEDED.detail)}
+        <ol class="steps">${RESTART_NEEDED.steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol></div>` : "";
     const earlier = !demo && health?.earlierFormat ? `<p class="note">A saved profile uses an earlier format or test layout that this firmware does not read, so the keyboard runs its compiled defaults. Apply saves your profile in the current format.</p>` : "";
     const saving = !demo && health?.recoveryPending ? `<p class="note">${esc(SAVE_IN_PROGRESS.detail)}</p>` : "";
-    const halves = halvesRows(model).map((half) => `<span class="half ${half.ok ? "ok" : "warn"}">${esc(half.side)} · ${esc(half.role)} ${half.ok ? "✓" : "!"}<span class="note"> ${esc(half.words)}</span></span>`).join("");
+    const halves = halvesRows(model).map((half) => `<span class="half ${half.ok ? "ok" : "warn"}">${esc(half.half)} (${esc(half.side)}) ${half.ok ? "✓" : "!"}<span class="note"> ${esc(half.words)}</span></span>`).join("");
     const product = productName(model);
     const identity = kv([
         ...(product ? /** @type {const} */ ([["Product", esc(product)]]) : []),

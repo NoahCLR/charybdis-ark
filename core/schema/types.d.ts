@@ -43,7 +43,7 @@ export type BehaviorOptions = Partial<BehaviorLimits> & {
     actionLimits?: Partial<ActionLimits>;
 };
 
-export interface HoldInput {mode: number; repeatHz?: number; action: ActionInput}
+export interface HoldInput {style: number; repeatHz?: number; action: ActionInput}
 export interface BehaviorStepInput {
     tapIndex: number;
     tap?: ActionInput;
@@ -54,13 +54,13 @@ export interface BehaviorRowInput {
     target: ActionInput;
     steps: BehaviorStepInput[];
     tapHoldTerm?: number;
-    longerHoldTerm?: number;
+    longHoldTerm?: number;
     multiTapTerm?: number;
     keepsAutoMouseAnchored?: boolean;
     enabled?: boolean;
     allowedLayers?: number;
 }
-export interface HoldBranch {mode: number; repeatHz: number; action: SemanticAction}
+export interface HoldBranch {style: number; repeatHz: number; action: SemanticAction}
 export interface BehaviorStep {
     tapIndex: number;
     tap?: SemanticAction;
@@ -71,7 +71,7 @@ export interface BehaviorRow {
     target: SemanticAction;
     steps: BehaviorStep[];
     tapHoldTerm: number;
-    longerHoldTerm: number;
+    longHoldTerm: number;
     multiTapTerm: number;
     keepsAutoMouseAnchored: boolean;
     enabled: boolean;

@@ -6,7 +6,7 @@
 // a key's taps nor whether the keyboard handles the key, its timing applies
 // only to a key the keyboard handles anyway, and its switch and layers gate
 // only what it holds. Its auto-mouse anchor applies on any key. So a row
-// changes nothing when it has no steps, does not keep the mouse layer on and
+// changes nothing when it has no steps, does not keep the pointer layer on and
 // has no timing that applies to its key, and the keyboard runs the key exactly
 // as without it. The editor removes such a row rather than keep it, and the
 // review notes the ones it reads.
@@ -41,8 +41,8 @@ function timingAlone(target, shortcuts) {
     return ANY_LAYER.some(([start, end]) => code >= start && code <= end);
 }
 
-/** @param {Pick<BehaviorRow, "tapHoldTerm" | "longerHoldTerm" | "multiTapTerm">} row */
-const hasTiming = row => Boolean(row.tapHoldTerm || row.longerHoldTerm || row.multiTapTerm);
+/** @param {Pick<BehaviorRow, "tapHoldTerm" | "longHoldTerm" | "multiTapTerm">} row */
+const hasTiming = row => Boolean(row.tapHoldTerm || row.longHoldTerm || row.multiTapTerm);
 
 /** @param {BehaviorRow} row @param {Shortcuts | undefined} shortcuts */
 const changesNothing = (row, shortcuts) => !row.steps.length && !row.keepsAutoMouseAnchored
@@ -57,8 +57,8 @@ function inertBehaviorFindings(decoded) {
         return {kind: "inertBehavior", level: "notice", layers: [], identity: String(nativeCode(row.target)),
             title: `${keycode}: its behaviour changes nothing`,
             detail: hasTiming(row)
-                ? "It has no branches and does not keep the mouse layer on, and a timing alone does nothing on this key, so the keyboard runs the key as if it had no behaviour."
-                : "It has no branches, no timing of its own and does not keep the mouse layer on, so the keyboard runs the key as if it had no behaviour.",
+                ? "It has no branches and does not keep the pointer layer on, and a timing alone does nothing on this key, so the keyboard runs the key as if it had no behaviour."
+                : "It has no branches, no timing of its own and does not keep the pointer layer on, so the keyboard runs the key as if it had no behaviour.",
             fix: "Remove the behaviour, or give it a branch.", place: {kind: "behaviour", keycode}};
     });
 }

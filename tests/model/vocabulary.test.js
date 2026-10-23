@@ -3,7 +3,7 @@ const test = require("node:test"), assert = require("node:assert/strict");
 const {VOCABULARY, EDIT_MODE_WORDS, editModeWords, quietWords, word, layerName, slotName, branchName, modifierNames} = require("../../core/model/vocabulary");
 const rgb = require("../../core/schema/rgb-domain-v1");
 const pd = require("../../core/schema/pd-mode-domain-v1");
-const {KEY_BEHAVIOR_HOLD_MODES} = require("../../core/schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES} = require("../../core/schema/key-behavior-domain-v1");
 
 // Every value the keyboard can store has a word, so a new one cannot reach
 // the review or an editor unnamed — "Eight directions" once read `undefined`.
@@ -12,9 +12,9 @@ const coversNumbers = (list, values, label) => assert.deepEqual(list.map(([id]) 
 
 test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.macroProtection, require("../../core/schema/macro-payload").MACRO_PROTECTION, "macro protection");
-    covers(VOCABULARY.holdHelpers.hold, KEY_BEHAVIOR_HOLD_MODES, "hold helpers under Hold");
-    covers(VOCABULARY.holdHelpers.long, KEY_BEHAVIOR_HOLD_MODES, "hold helpers under Long hold");
-    covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_MODES, "holds without a long hold");
+    covers(VOCABULARY.holdStyles.hold, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Hold");
+    covers(VOCABULARY.holdStyles.long, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Long hold");
+    covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_STYLES, "holds without a long hold");
     covers(VOCABULARY.localities, rgb.RGB_LOCALITIES, "localities");
     covers(VOCABULARY.paintModes, rgb.RGB_LAYER_MODES, "layer paint modes");
     covers(VOCABULARY.fadeModes, rgb.RGB_AUTOMOUSE_MODES, "auto-mouse fades");

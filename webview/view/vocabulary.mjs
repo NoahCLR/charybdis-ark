@@ -9,7 +9,7 @@
 /** @typedef {{vocabulary?: import("../../contracts/model.js").Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
 
 /** @type {import("../../contracts/model.js").Vocabulary} */
-const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), editModes: {}, halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), editModes: {}, halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], ledTables: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], buttons: [],
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
@@ -32,12 +32,12 @@ export const stageOrder = (model) => vocabulary(model).stages;
 export const slotCalled = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.displayName || `Slot ${id}`;
 
 // How a tier runs, in the editor's words: a tap tier only sends, and a hold
-// helper names its own tier's threshold.
+// style names its own tier's threshold.
 /** @param {VocabularyModel | null | undefined} model @param {import("../../contracts/edits.js").Tier} kind */
-export const holdHelpers = (model, kind) => kind === "tap" ? [] : vocabulary(model).holdHelpers?.[kind] || [];
-/** @param {VocabularyModel | null | undefined} model @param {import("../../contracts/edits.js").Tier} kind @param {string} helper */
-export const helperWord = (model, kind, helper) => kind === "tap"
-    ? vocabulary(model).tapSends || "tap sends" : word(holdHelpers(model, kind), helper);
+export const holdStyles = (model, kind) => kind === "tap" ? [] : vocabulary(model).holdStyles?.[kind] || [];
+/** @param {VocabularyModel | null | undefined} model @param {import("../../contracts/edits.js").Tier} kind @param {string} style */
+export const styleWord = (model, kind, style) => kind === "tap"
+    ? vocabulary(model).tapSends || "tap sends" : word(holdStyles(model, kind), style);
 
 // A tier's name: Tap, Hold, Long hold.
 /** @param {VocabularyModel | null | undefined} model @param {import("../../contracts/edits.js").Tier} kind */

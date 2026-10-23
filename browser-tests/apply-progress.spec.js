@@ -28,10 +28,10 @@ for (const screen of ["macros", "keys", "device"]) {
                 {adapter: {listDevices: async () => [], connect: async () => {throw Error("fixture must not connect");}}});
             loop.session.draft = {id: model.draft.id, revision: model.draft.revision};
             const progress = new core.ApplyProgress();
-            progress.report("peer", {completed: 0, total: 1200});
+            progress.report("slave", {completed: 0, total: 1200});
             const before = window.__posted.length;
             for (let completed = 12; completed <= 1200; completed += 12) {
-                progress.report("peer", {completed, total: 1200});
+                progress.report("slave", {completed, total: 1200});
                 loop.session.service.reportApplyProgress(progress.view());
             }
             const preserved = main === document.querySelector(".main") && content === document.querySelector(".content")

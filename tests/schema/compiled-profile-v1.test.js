@@ -26,8 +26,8 @@ function minimalStudioModel() {
             tapHoldTerm: "180",
             steps: [{
                 tapCount: 0,
-                tap: {helper: "TAP_SENDS", action: "KC_A"},
-                hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(_BASE)"},
+                tap: {style: "TAP_SENDS", action: "KC_A"},
+                hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(_BASE)"},
             }],
         }],
         qmkKeycodeValues: {KC_A: 4},

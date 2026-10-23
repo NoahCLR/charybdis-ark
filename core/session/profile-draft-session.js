@@ -28,8 +28,8 @@ const {quietWords} = require("../model/vocabulary");
 // What the panel shows of the keyboard's own saving and its halves.
 /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
 const liveKeyboardView = keyboard => keyboard ? {saving: keyboard.saving, autoSaving: keyboard.autoSaving, savedByKeyboard: keyboard.savedByKeyboard,
-    adjustmentPending: keyboard.adjustmentPending, saveFailed: keyboard.saveFailed, storagePaused: keyboard.storagePaused || keyboard.peerStoragePaused,
-    stopped: Boolean(keyboard.stopped), peerStopped: Boolean(keyboard.peerStopped), quietMs: keyboard.quietMs, quietWords: quietWords(keyboard.quietMs)} : null;
+    adjustmentPending: keyboard.adjustmentPending, saveFailed: keyboard.saveFailed, storagePaused: keyboard.storagePaused || keyboard.slaveStoragePaused,
+    stopped: Boolean(keyboard.stopped), slaveStopped: Boolean(keyboard.slaveStopped), quietMs: keyboard.quietMs, quietWords: quietWords(keyboard.quietMs)} : null;
 /**
  * @typedef {import("../model/types.js").PortableDocument} Document
  * @typedef {import("../model/types.js").ProfileSnapshot} Snapshot
@@ -676,12 +676,12 @@ class ProfileDraftSession {
     // A live edit the keyboard confirmed: the draft moves to it, as staging
     // moves an Apply draft. `target.cursor` moves through the history (undo,
     // redo); otherwise the document is one more step.
-    /** @param {LiveTarget} target @param {{session: number, revision: number, bytes: Buffer, converged: boolean, apart?: boolean, unsaved?: boolean}} result */
+    /** @param {LiveTarget} target @param {{session: number, revision: number, bytes: Buffer, converged: boolean, slaveRefused?: boolean, unsaved?: boolean}} result */
     confirmLive(target, result) {
         const live = /** @type {import("./types.js").LiveState} */ (this.live);
         // A save that fails from here on fails these edits; one that failed
         // before them is no longer the news.
-        this.live = {...live, session: result.session, revision: result.revision, working: result.bytes, converged: result.converged, apart: result.apart ?? false,
+        this.live = {...live, session: result.session, revision: result.revision, working: result.bytes, converged: result.converged, slaveRefused: result.slaveRefused ?? false,
             unsaved: result.unsaved ?? (result.revision !== live.revision || live.unsaved),
             saveMark: live.keyboard?.lastSaveTransaction ?? live.saveMark,
             ...(live.keyboard ? {keyboard: {...live.keyboard, savedByKeyboard: false, saveFailed: false, saveError: 0}} : {})};
@@ -705,11 +705,11 @@ class ProfileDraftSession {
     observeLiveStatus(status) {
         const live = /** @type {import("./types.js").LiveState} */ (this.live);
         const keyboard = liveKeyboardStatus(status, live.saveMark ?? -1);
-        const converged = !status.peerRequired || status.peerConverged;
+        const converged = !status.slaveRequired || status.slaveConverged;
         const saved = live.unsaved && !status.unsaved && status.savedGeneration !== live.savedGeneration;
         const changed = JSON.stringify(keyboard) !== JSON.stringify(live.keyboard) || converged !== live.converged || status.unsaved !== live.unsaved
-            || status.peerRefused !== Boolean(live.apart);
-        this.live = {...live, keyboard, converged, apart: status.peerRefused};
+            || status.slaveRefused !== Boolean(live.slaveRefused);
+        this.live = {...live, keyboard, converged, slaveRefused: status.slaveRefused};
         if (saved) {this.confirmKeyboardSaved(status); return "saved";}
         if (status.unsaved !== live.unsaved) this.live.unsaved = status.unsaved;
         return changed ? "changed" : "same";
@@ -747,7 +747,7 @@ class ProfileDraftSession {
         this.referenceCache = new WeakMap(); this.reviewCache = new WeakMap(); this.checksCache = new WeakMap();
         this.history = [this.historyEntry(current.document, null, "Saved on the keyboard")]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
-        this.live = {...live, saved: live.working, unsaved: false, apart: false, savedGeneration: status.savedGeneration, savedOrigin: status.savedOrigin,
+        this.live = {...live, saved: live.working, unsaved: false, slaveRefused: false, savedGeneration: status.savedGeneration, savedOrigin: status.savedOrigin,
             session: status.session, revision: status.revision};
     }
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor].document).fingerprint, originHalf: this.deviceId};}
@@ -779,11 +779,11 @@ class ProfileDraftSession {
             changes: this.changes(),
             checks: this.checks(),
             // The live modes: whether the keyboard runs unsaved edits, whether
-            // both halves hold the last one, whether the other half refused
+            // both halves hold the last one, whether the slave half refused
             // it (the halves then run different profiles), and what the
             // keyboard says of its own saving.
             // What the keyboard said of its own saving holds only while it is connected.
-            live: this.live ? {unsaved: this.live.unsaved, converged: this.live.converged, apart: Boolean(this.live.apart), mode: this.live.mode, keyboard: connected ? liveKeyboardView(this.live.keyboard) : null} : null,
+            live: this.live ? {unsaved: this.live.unsaved, converged: this.live.converged, slaveRefused: Boolean(this.live.slaveRefused), mode: this.live.mode, keyboard: connected ? liveKeyboardView(this.live.keyboard) : null} : null,
             // What the keyboard says of itself in any edit mode: a live
             // draft's `live.keyboard`, or what the look between edits read
             // under an Apply draft.

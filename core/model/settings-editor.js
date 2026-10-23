@@ -65,7 +65,7 @@ const keyTiming = {id: "keyTiming", label: "Tap & hold timing", fields: [
     number("tappingTerm", SETTING.TAPPING_TERM, "Dual-role tap / hold threshold", "How long a key that types on tap and holds a layer or modifier waits before a press counts as a hold, with or without a behaviour, unless its behaviour sets its own.",
         {tooltip: "QMK's tapping term, used by LT(), MT(), OSM(), TT() and OSL() keys, and by their behaviours with an empty Tap / hold threshold."}),
     number("tapHoldTerm", SETTING.TAP_HOLD_TERM, "Behaviour tap / hold threshold", "Used when a behaviour on any other key leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
-    number("longerHoldTerm", SETTING.LONG_HOLD_TERM, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
+    number("longHoldTerm", SETTING.LONG_HOLD_TERM, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
     number("multiTapTerm", SETTING.MULTI_TAP_TERM, "Multi tap window", "How long after releasing a key the next press still counts as another tap. Used when a behaviour leaves its Multi tap window empty.", {governs: {kind: "branch", count: 2}}),
 ]};
 /** @type {import("../../contracts/model.js").SettingsSection[]} */
@@ -85,7 +85,7 @@ const sections = [
     ]},
     {id: "autoMouse", label: "Auto-mouse", area: "Mouse", fields: [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
-        layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Auto-mouse layer", "The layer activated by trackball movement when Auto-mouse is on."),
+        layer("pointerLayer", SETTING.AUTO_MOUSE_LAYER, "Pointer layer", "The layer that moving the trackball turns on when Auto-mouse is on."),
         number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
         number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update auto-mouse. Higher values ignore closely spaced movement events."}),
         number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can activate auto-mouse."),
@@ -349,9 +349,9 @@ function editSettings(snapshot, message, capabilities) {
     // defaults; unrelated settings edits never rewrite behaviour rows.
     let behaviorsChanged = false;
     for (const row of value.behaviors.rows) {
-        const old = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, before);
-        const next = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, value.settings.values);
-        for (const [field, term] of /** @type {const} */ ([["tapHoldTerm", "hold"], ["longerHoldTerm", "long"], ["multiTapTerm", "repeat"]])) {
+        const old = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, before);
+        const next = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, value.settings.values);
+        for (const [field, term] of /** @type {const} */ ([["tapHoldTerm", "hold"], ["longHoldTerm", "long"], ["multiTapTerm", "repeat"]])) {
             if (old[term] !== next[term] && row[field] !== 0 && row[field] === old[term]) {
                 row[field] = 0;
                 behaviorsChanged = true;

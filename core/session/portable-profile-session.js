@@ -4,7 +4,7 @@ const {readSettings} = require("../protocol/portable-profile-v1");
 const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
 const {ProfilePayloadReader, payloadMatchesActive} = require("./profile-payload-reader");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
-const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
+const {candidateMetadataForBlob, readCandidateSlaveStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
 const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {readEditProgress} = require("../protocol/profile-edit-v1");
@@ -48,8 +48,8 @@ function candidateBaseSource(before) {
 // Waiting for the halves to agree is pointless while the slave half is not
 // there at all: it would only time out, and hold the keyboard until it did.
 /** @param {Connection} connection @param {{nextRequestId: () => number}} options */
-async function requirePeer(connection, options) {
-    if (!(await readProfileStatus(connection, options)).peerKnown) {
+async function requireSlave(connection, options) {
+    if (!(await readProfileStatus(connection, options)).slaveKnown) {
         throw fail("KEYBOARD_NOT_READY", "The slave half is not connected. Connect the cable between the halves and read again.");
     }
 }
@@ -61,7 +61,7 @@ async function snapshotProfile(connection, ids, capabilities, onProgress = () =>
     if (payloadReader.connection !== connection) throw fail("PROFILE_CHANGED", "The profile reader belongs to another connection. Read the keyboard again.");
     const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the complete keyboard configuration");
-    await requirePeer(connection, options);
+    await requireSlave(connection, options);
     const before = await readProfileStatus(connection, options);
     if (!canSnapshot(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
     /** @param {string} label */
@@ -84,7 +84,7 @@ async function snapshotProfile(connection, ids, capabilities, onProgress = () =>
 /** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>}} [options] */
 async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
     const options = {nextRequestId: () => ids.next()};
-    await requirePeer(connection, options);
+    await requireSlave(connection, options);
     const before = await readProfileStatus(connection, options);
     if (!canReadIdentity(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
     const settings = await readSettings(connection, ids);
@@ -92,14 +92,14 @@ async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}
     if (statusKey(before) !== statusKey(after)) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
     return snapshotIdentity(after, settings);
 }
-// A peer that never acknowledged a cancelled save keeps its lease until it
-// restarts, and the keyboard refuses new saves until then. Best effort: the
+// A slave half that never acknowledged a cancelled save keeps its lease until
+// it restarts, and the keyboard refuses new saves until then. Best effort: the
 // save has already failed, so an unreadable status only loses the hint.
 /** @param {Connection} connection @param {import("../protocol/types.js").ReadOptions} options */
-async function peerRestartGuidance(connection, options) {
+async function slaveRestartGuidance(connection, options) {
     try {
         const status = await readProfileStatus(connection, options);
-        if (status?.peerCleanupPending) return " The slave half did not confirm the cancel. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in before saving again.";
+        if (status?.slaveCleanupPending) return " The slave half did not confirm the cancel. Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in before saving again.";
     } catch {}
     return "";
 }
@@ -119,7 +119,7 @@ async function authorityFailure(connection, options, error, transactionId) {
 // What the keyboard is doing for the "Copy the profile to the slave half" step,
 // from candidate status page 1.
 /** @type {Readonly<Record<string, string>>} */
-const PEER_DETAIL = Object.freeze({
+const SLAVE_DETAIL = Object.freeze({
     BEGINNING: "Starting the copy",
     SENDING: "Sending",
     PREPARING: "The slave half is checking and storing its copy",
@@ -131,7 +131,7 @@ const PEER_DETAIL = Object.freeze({
 // What the slave half says it is waiting on, once it has said BUSY a few
 // times in a row; a single BUSY is the routine first answer to a request.
 /** @type {Readonly<Record<string, string>>} */
-const PEER_BUSY_DETAIL = Object.freeze({
+const SLAVE_BUSY_DETAIL = Object.freeze({
     MAILBOX_FULL: "the slave half has not handled the last request yet",
     OTHER_COPY: "the slave half still holds an earlier copy",
     NO_LEASE: "the slave half dropped this copy; starting it again",
@@ -139,13 +139,13 @@ const PEER_BUSY_DETAIL = Object.freeze({
     PULLING: "the slave half is fetching a profile itself",
     CONVERGENCE_ONLY: "the slave half is finishing another save",
 });
-/** @param {import("./types.js").CandidatePeer | null | undefined} peer @returns {{detail: string, completed?: number, total?: number}} */
-function peerReport(peer) {
-    if (!peer) return {detail: "Waiting for the slave half"};
-    if (peer.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
-    const busy = peer.busyStreak >= 3 ? ` · ${PEER_BUSY_DETAIL[peer.busyReason] || "the slave half is busy"}` : "";
-    const report = {detail: `${PEER_DETAIL[peer.phaseName] || "Waiting for the slave half"}${busy}`};
-    if (peer.phaseName === "SENDING" || peer.phaseName === "BEGINNING") Object.assign(report, {completed: peer.transferOffset, total: peer.transferLength});
+/** @param {import("./types.js").CandidateSlave | null | undefined} slave @returns {{detail: string, completed?: number, total?: number}} */
+function slaveReport(slave) {
+    if (!slave) return {detail: "Waiting for the slave half"};
+    if (slave.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
+    const busy = slave.busyStreak >= 3 ? ` · ${SLAVE_BUSY_DETAIL[slave.busyReason] || "the slave half is busy"}` : "";
+    const report = {detail: `${SLAVE_DETAIL[slave.phaseName] || "Waiting for the slave half"}${busy}`};
+    if (slave.phaseName === "SENDING" || slave.phaseName === "BEGINNING") Object.assign(report, {completed: slave.transferOffset, total: slave.transferLength});
     return report;
 }
 // The coordinators report phases; each lands on the step it belongs to.
@@ -155,7 +155,7 @@ function coordinatorReport(progress, applyProgress) {
     if (["preflight", "begin", "writing"].includes(progress.phase)) applyProgress.report("upload", {completed: progress.bytesSent, total: progress.totalBytes,
         detail: progress.adjustmentPending ? "Waiting for a DPI or lighting key change to reach both halves" : ""});
     else if (["validate", "validating", "complete"].includes(progress.phase) && !progress.operation) applyProgress.report("validate");
-    else if (state === CANDIDATE_STATE.PREPARING_PEER) applyProgress.report("peer", peerReport(progress.peer));
+    else if (state === CANDIDATE_STATE.PREPARING_PEER) applyProgress.report("slave", slaveReport(progress.slave));
     else if (state === CANDIDATE_STATE.COMMITTING) applyProgress.report("commit", {detail: "Writing the profile"});
     else if (state === CANDIDATE_STATE.CONVERGING_PEER) applyProgress.report("converge");
     else if (state === CANDIDATE_STATE.ACTIVATING) applyProgress.report("verify", {detail: "Switching to the new profile"});
@@ -176,7 +176,7 @@ function withFailure(error, applyProgress, saved) {
     // A device reason found after the step failed (AUTHORITY_FAILED read
     // back) outranks the step's own error.
     const cause = error.deviceError ? error : error.cause || error;
-    const failure = applyProgress.fail({reason: failureReason(cause, cause.progress?.peer), saved});
+    const failure = applyProgress.fail({reason: failureReason(cause, cause.progress?.slave), saved});
     return Object.assign(error, {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved});
 }
 
@@ -229,7 +229,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Read the keyboard again and wait for it to finish before applying.");
         const coordinator = new CandidateUploadCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, sleep,
             readEditProgress: () => readEditProgress(connection, options),
-            readPeerStatus: readCandidatePeerStatus,
+            readSlaveStatus: readCandidateSlaveStatus,
             onProgress: progress => coordinatorReport(progress, applyProgress)});
         /** @type {import("./types.js").PreparedCandidate | undefined} */
         let prepared;
@@ -242,7 +242,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
                 if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before Apply could start.");
             }});
             mutated = true;
-            applyProgress.report("peer", peerReport(null));
+            applyProgress.report("slave", slaveReport(null));
             commitRequested = true;
             await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async () => {
                 decisionObserved = true;
@@ -253,23 +253,24 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             // The keyboard activates only after the slave half confirmed its
             // copy, so an active target is saved on both halves even when the
             // cable between them came out after that confirmation.
-            const peerUnseen = !(status.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED);
-            if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.candidate) || status.committedDigest !== fnv1a32(target.candidate) || status.conflictCount || status.activeGeneration <= Math.max(before.status.activeGeneration, before.status.committedGeneration) || (!peerUnseen && (status.peerGeneration !== status.activeGeneration || status.peerOriginHalf !== status.activeOriginHalf)) || status.activeGeneration !== status.committedGeneration || status.activeOriginHalf !== status.committedOriginHalf || status.lastCommittedTransactionId !== prepared.transactionId) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
+            const slaveUnseen = !(status.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED);
+            if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.candidate) || status.committedDigest !== fnv1a32(target.candidate) || status.conflictCount || status.activeGeneration <= Math.max(before.status.activeGeneration, before.status.committedGeneration) || (!slaveUnseen && (status.slaveGeneration !== status.activeGeneration || status.slaveOriginHalf !== status.activeOriginHalf)) || status.activeGeneration !== status.committedGeneration || status.activeOriginHalf !== status.committedOriginHalf || status.lastCommittedTransactionId !== prepared.transactionId) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
             const resultFingerprint = fingerprint(document);
             applyProgress.finish();
             // Both halves were just proved to hold the whole target bank.
-            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, encodeSettings(target.settings)), storage: heldStorage(target.candidate), recovery, peerUnseen,
+            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, encodeSettings(target.settings)), storage: heldStorage(target.candidate), recovery, slaveUnseen,
                 performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", profileBytes: target.candidate.length}};
         } catch (error) {
             let cancelled = false;
             if (prepared && !decisionObserved) {
                 // The keyboard returns to idle on ABORT only while no commit
                 // marker exists, so a completed abort proves nothing was saved.
-                // Firmware cancels the peer prepared record with the candidate.
+                // Firmware cancels the slave half's prepared record with the
+                // candidate.
                 try { await coordinator.abort(prepared.transactionId); cancelled = true; } catch {}
             }
             if (!mutated) throw error;
-            const restart = await peerRestartGuidance(connection, options);
+            const restart = await slaveRestartGuidance(connection, options);
             // Before the commit was sent, or once the keyboard confirmed the
             // cancel, the profile it had is still the one it runs.
             if (!decisionObserved && (!commitRequested || cancelled)) {
@@ -280,7 +281,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             if (authority) {
                 // Only a restart ends it, so the advice is to restart even when
                 // the master half may still be typing.
-                throw Object.assign(fail("RESTORE_INCOMPLETE", `Apply was interrupted. Keep both halves connected. The keyboard had already decided to save it, but the halves then stopped agreeing on the saved profile, so it cannot finish by itself. The keyboard keeps running a complete profile until it restarts. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in, then read the keyboard again. Only if it still shows the old profile: ${recoveryAdvice} ${/** @type {Error} */ (error).message}`), {cause: error, deviceError: authority.deviceError});
+                throw Object.assign(fail("RESTORE_INCOMPLETE", `Apply was interrupted. Keep both halves connected. The keyboard had already decided to save it, but the halves then stopped agreeing on the saved profile, so it cannot finish by itself. The keyboard keeps running a complete profile until it restarts. Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in, then read the keyboard again. Only if it still shows the old profile: ${recoveryAdvice} ${/** @type {Error} */ (error).message}`), {cause: error, deviceError: authority.deviceError});
             }
             // After the decision firmware owns commit recovery and activation.
             const finishing = decisionObserved ? "The keyboard had already decided to save it and finishes the same generation by itself once both halves are connected; read the keyboard again then. Only if it still shows the old profile: " : "";
@@ -288,4 +289,4 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         }
     }
 }
-module.exports = {requireReady, supportsCompleteProfile, snapshotProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};
+module.exports = {requireReady, supportsCompleteProfile, snapshotProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, slaveReport};

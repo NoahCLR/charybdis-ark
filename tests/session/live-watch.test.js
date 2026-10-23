@@ -93,14 +93,14 @@ test("an adjustment key's edit is read as news, not as a failure", async t => {
     assert.equal(model(shell).model.draft.live.keyboard.savedByKeyboard, true, "and the keyboard saves it in Live");
 });
 
-test("the other half refusing the edits, a save waiting for quiet and an unstored mode are shown", async t => {
+test("the slave half refusing the edits, a save waiting for quiet and an unstored mode are shown", async t => {
     const {keyboard, shell, key, look, send} = await open(t);
     await key(0, 12, "KC_V");
-    keyboard.raised.peerRefused = true; keyboard.raised.modeNotStored = true; keyboard.raised.peerStoragePaused = true;
+    keyboard.raised.slaveRefused = true; keyboard.raised.modeNotStored = true; keyboard.raised.slaveStoragePaused = true;
     assert.equal(await look(), true);
     const published = model(shell).model;
-    assert.deepEqual([published.draft.live.apart, published.editMode.notStored, published.draft.live.keyboard.storagePaused], [true, true, true]);
-    keyboard.raised.peerRefused = false;
+    assert.deepEqual([published.draft.live.slaveRefused, published.editMode.notStored, published.draft.live.keyboard.storagePaused], [true, true, true]);
+    keyboard.raised.slaveRefused = false;
     await send({type: "revertProfileDraft"});
     assert.equal(keyboard.working, null, "Revert is the way back");
 });

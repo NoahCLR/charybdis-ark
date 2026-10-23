@@ -91,7 +91,7 @@ function exerciseCore(core, inputs) {
     draft.id = "draft";
     const staged = messages.map((message) => attempt(() => draft.stage({draftId: draft.id, draftRevision: draft.revision, ...message})));
     const state = {selectedDeviceId: deviceId, connected: true, busy: false, capabilities,
-        status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, peerGeneration: 42},
+        status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, slaveGeneration: 42},
         devices: [{id: deviceId, label: "Charybdis 4x6 · web build", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"}]};
     const panel = {service: {portable: null}, draft, portableLayers: core.startLayerEdit(snapshot, draft.revision)};
     const model = core.buildPanelModel(panel, state);

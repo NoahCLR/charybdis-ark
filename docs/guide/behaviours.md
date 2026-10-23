@@ -77,8 +77,9 @@ says so.
   running, until you turn it on again.
 - **Layers it runs on**: the layers a key can come from for this behaviour to
   run.
-- **Keeps the mouse layer on**: pressing this key counts as using the mouse,
-  so it keeps the auto-mouse layer on instead of turning it off.
+- **Keeps the pointer layer on**: pressing this key counts as using the
+  trackball, so auto-mouse keeps the pointer layer on instead of turning it
+  off.
 
 These, and the timings, wait until the behaviour does something. On a plain
 key such as Tab, a timing does nothing until the behaviour has a branch.
@@ -86,7 +87,7 @@ key such as Tab, a timing does nothing until the behaviour has a branch.
 ## Keeping, moving and removing
 
 A behaviour joins your draft only when it changes something: a cell, a
-timing that matters for the key, or Keeps the mouse layer on. One that ends
+timing that matters for the key, or Keeps the pointer layer on. One that ends
 up changing nothing is removed again, and Undo brings it back. A behaviour
 already on the keyboard that changes nothing says so, so you can remove it or
 give it a branch.

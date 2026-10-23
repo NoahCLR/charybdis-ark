@@ -61,8 +61,8 @@ export interface DraftView {
     reason: DraftBlock;
     canUndo: boolean; canRedo: boolean; undoLabel: string | null; redoLabel: string | null; historyLength: number; reviewed: boolean;
     changes: ReviewChange[]; checks: Check[]; steps?: HistoryStep[];
-    /** Live modes: the keyboard runs unsaved edits; both halves hold the last one; the other half refused it (apart until Revert); what it says of its own saving. Null for an Apply draft. */
-    live: {unsaved: boolean; converged: boolean; apart: boolean; mode: number; keyboard: LiveKeyboardView | null} | null;
+    /** Live modes: the keyboard runs unsaved edits; both halves hold the last one; the slave half refused it (the halves stay apart until Revert); what it says of its own saving. Null for an Apply draft. */
+    live: {unsaved: boolean; converged: boolean; slaveRefused: boolean; mode: number; keyboard: LiveKeyboardView | null} | null;
     /** What the keyboard says of itself in any edit mode (an Apply draft's from the look between edits); null while it is not connected or has said nothing. */
     keyboard: LiveKeyboardView | null;
 }
@@ -78,7 +78,7 @@ export interface LiveKeyboardView {
     storagePaused: boolean;
     /** The master half stopped saving, or the slave half did: only a restart clears it (firmware D-F34). */
     stopped: boolean;
-    peerStopped: boolean;
+    slaveStopped: boolean;
     quietMs: number;
     /** How long Live waits before the keyboard saves, in words ("3 seconds"; core/model/vocabulary.js quietWords). */
     quietWords: string;

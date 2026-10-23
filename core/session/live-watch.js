@@ -10,7 +10,7 @@
 //   - The revision moved without Ark (an adjustment key such as DPI or an RGB
 //     key, another app's edit): the keyboard is read again, as news, not as
 //     a failure.
-//   - Its halves and flags: the other half refusing the working copy, a save
+//   - Its halves and flags: the slave half refusing the working copy, a save
 //     waiting for a quiet keyboard, the edit mode not yet stored.
 //   - Under an Apply draft: a change its keys made and it then saved is read
 //     again, as a Refresh would; until then, what it says of itself (an

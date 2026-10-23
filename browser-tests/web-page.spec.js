@@ -540,7 +540,7 @@ test("the web shell reads, edits and Applies one profile generation without VIA"
     await expect(dpi).toBeEnabled({timeout: 20000});
     await expect(dpi).toHaveValue(next);
     expect(keyboard.generation).toBe(8);
-    expect(keyboard.local.profile).toEqual(keyboard.peer.profile);
+    expect(keyboard.local.profile).toEqual(keyboard.slave.profile);
     const document = {format: "charybdis-profile", version: 5, keyboard: "charybdis-4x6", actionAbiDigest: pdDocument().actionAbiDigest, profile: keyboard.active.toString("base64")};
     expect(validateSnapshot(document).settings.values[require("../core/schema/settings-domain-v1").SETTING.DEFAULT_DPI]).toBe(Number(next));
     expect(keyboard.events).toEqual(["begin", "validated", "commit", "decision", "activated"]);

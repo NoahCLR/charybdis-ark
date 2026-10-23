@@ -68,7 +68,7 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
     await clearPosts(page);
     await change(page.locator('[data-f="behaviour:CUSTOM_KEY_5:0-long:action"]'), "KC_B");
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({
-        keycode: "CUSTOM_KEY_5", tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0",
+        keycode: "CUSTOM_KEY_5", tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0",
         steps: [{tapCount: 0, longHold: expect.objectContaining({action: "KC_B"})}]})})]);
     const fromHere = (await posted(page))[0];
 
@@ -110,9 +110,9 @@ test("once stored, the behaviour shows its dashed cells and can be removed from 
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        model.keyBehaviors.push({keycode: "CUSTOM_KEY_5", tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false,
+        model.keyBehaviors.push({keycode: "CUSTOM_KEY_5", tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false,
             enabled: true, allowedLayers: 0xffff, builtIn: model.behaviorEditing.keyDefaults.CUSTOM_KEY_5.builtIn,
-            steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_A"}, longHold: {helper: "HOLD_WHILE_HELD", action: "KC_B", repeatHz: "0"}}]});
+            steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}, longHold: {style: "HOLD_WHILE_HELD", action: "KC_B", repeatHz: "0"}}]});
         model.customKeys[5].hasBehavior = true;
         store.setModel(model); store.render();
     });
@@ -276,9 +276,9 @@ test("Delete on Custom keys clears the open cell of the selected key's behaviour
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        model.keyBehaviors.push({keycode: "CUSTOM_KEY_5", tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false,
+        model.keyBehaviors.push({keycode: "CUSTOM_KEY_5", tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false,
             enabled: true, allowedLayers: 0xffff, builtIn: model.behaviorEditing.keyDefaults.CUSTOM_KEY_5.builtIn,
-            steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_A"}, longHold: {helper: "HOLD_WHILE_HELD", action: "KC_B", repeatHz: "0"}}]});
+            steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}, longHold: {style: "HOLD_WHILE_HELD", action: "KC_B", repeatHz: "0"}}]});
         model.customKeys[5].hasBehavior = true;
         store.setModel(model); store.render();
     });

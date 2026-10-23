@@ -6,7 +6,7 @@
 // The feature word only describes the build (firmware D-F28). The gates answer
 // different questions. A read needs the current base; a complete document also
 // needs every domain, current layers and a known action ABI. Complete Apply
-// adds a build that saves and copies to the other half. The live mutation
+// adds a build that saves and copies to the slave half. The live mutation
 // diagnostic additionally checks the link, candidate transfer and established
 // read compatibility.
 const {LAYERS} = require("../data/charybdis-layout");
@@ -158,16 +158,16 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     }
     if (connected && !status) {
         reasons.push("Live profile status has not been read yet.");
-    } else if (status && !status.peerKnown) {
+    } else if (status && !status.slaveKnown) {
         reasons.push("The slave half has not been detected over the cable between the halves.");
-    } else if (status && !status.peerConverged) {
+    } else if (status && !status.slaveConverged) {
         reasons.push("The two keyboard halves have not established a converged profile state yet.");
     }
     return {
         available: reasons.length === 0,
         reasons,
         requiredFeatureMask: REQUIRED_LIVE_MUTATION_FEATURES,
-        peerReady: Boolean(status?.peerKnown && status?.peerConverged),
+        slaveReady: Boolean(status?.slaveKnown && status?.slaveConverged),
         recoveryPending: Boolean(status?.candidatePending),
     };
 }

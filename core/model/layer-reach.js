@@ -37,7 +37,7 @@ const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {layerLockOfCode} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
 const {layerName} = require("./vocabulary");
@@ -143,7 +143,7 @@ function keyEffects(code, row, values) {
             if (part === "hold" && values && row && releaseHoldUnreachable(step, effectiveTimings(row, values))) continue;
             const hold = step[part];
             for (const effect of actionEffects(hold?.action)) {
-                const press = hold?.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE;
+                const press = hold?.style === KEY_BEHAVIOR_HOLD_STYLES.PRESS_AND_HOLD_UNTIL_RELEASE;
                 if (effect.kind === "hold" && !press) continue;
                 effects.push({...effect, how: holdPhrase(step.tapIndex, codeName(code), longer), note: sends(hold?.action)});
             }

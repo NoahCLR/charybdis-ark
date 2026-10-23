@@ -87,20 +87,20 @@ test("stored playback warnings refresh when Auto loses its detected host", () =>
 test("default timing edits move matching behaviours, report inherited effects, and discard atomically", () => {
     const {draft: seed, caps} = fixture();
     const defaults = validateSnapshot(seed.document).settings.values;
-    for (const [keycode, tapHoldTerm, longerHoldTerm] of [
+    for (const [keycode, tapHoldTerm, longHoldTerm] of [
         ["KC_Q", 0, 0], ["KC_W", defaults[1], defaults[2]],
         ["KC_E", 333, 633], ["LT(3,KC_F)", defaults[0], defaults[2]],
-    ]) stage(seed, {type: "saveBehavior", behavior: {keycode, tapHoldTerm, longerHoldTerm, multiTapTerm: defaults[3], steps: []}});
+    ]) stage(seed, {type: "saveBehavior", behavior: {keycode, tapHoldTerm, longHoldTerm, multiTapTerm: defaults[3], steps: []}});
     const draft = new ProfileDraftSession(seed.current, "board", caps);
     const baseline = draft.current.fingerprint;
     const row = keycode => behaviorRowsForView(validateSnapshot(draft.document).behaviors).find(entry => entry.keycode === keycode);
     stage(draft, {type: "saveBehavior", behavior: {...row("KC_Q"), keepsAutoMouseAnchored: true}});
     const anchored = draft.current.fingerprint;
-    stage(draft, settings(draft, "keyTiming", {longerHoldTerm: "500"}));
-    assert.equal(row("KC_Q").longerHoldTerm, "0");
-    assert.equal(row("KC_W").longerHoldTerm, "0", "an explicit old-default match adopts inheritance");
-    assert.equal(row("KC_E").longerHoldTerm, "633", "custom timing stays fixed");
-    assert.equal(row("LT(3,KC_F)").longerHoldTerm, "0");
+    stage(draft, settings(draft, "keyTiming", {longHoldTerm: "500"}));
+    assert.equal(row("KC_Q").longHoldTerm, "0");
+    assert.equal(row("KC_W").longHoldTerm, "0", "an explicit old-default match adopts inheritance");
+    assert.equal(row("KC_E").longHoldTerm, "633", "custom timing stays fixed");
+    assert.equal(row("LT(3,KC_F)").longHoldTerm, "0");
     const changes = draft.changes(), setting = changes.find(entry => entry.unit === "settings:keyTiming");
     const effect = setting.fields.find(field => field.label === "Q · Long hold threshold");
     assert.deepEqual([effect.before, effect.after], [`default · ${defaults[2]} ms`, "default · 500 ms"]);
@@ -112,8 +112,8 @@ test("default timing edits move matching behaviours, report inherited effects, a
     draft.undo(draft.revision);
     assert.equal(draft.current.fingerprint, anchored);
     draft.redo(draft.revision);
-    stage(draft, settings(draft, "keyTiming", {longerHoldTerm: "550"}));
-    assert.equal(row("KC_W").longerHoldTerm, "0", "it continues following subsequent defaults");
+    stage(draft, settings(draft, "keyTiming", {longHoldTerm: "550"}));
+    assert.equal(row("KC_W").longHoldTerm, "0", "it continues following subsequent defaults");
     draft.discard(draft.revision, draft.changes().find(entry => entry.unit === "settings:keyTiming").group);
     assert.equal(draft.current.fingerprint, anchored, "discard restores defaults and explicit matching bytes, keeping the anchor edit");
     draft.discard(draft.revision, draft.changes()[0].group);
@@ -253,7 +253,7 @@ test("bounded history and a new branch retain each step's time, label, document 
 test("draft staging takes owned layer keys and QMK functions in a behaviour", () => {
     const {snapshot, caps} = fixture();
     for (const [name, code] of [["TG(2)", 0x5262], ["DPI_MOD", 0x7e00]]) {
-        const edit = {type: "saveBehavior", behavior: {keycode: "KC_F24", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: name}}]}};
+        const edit = {type: "saveBehavior", behavior: {keycode: "KC_F24", steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: name}}]}};
         const allowed = new ProfileDraftSession(snapshot, "board", caps);
         stage(allowed, edit);
         const row = allowed.current.decoded.behaviors.rows.find(row => row.target.operand === 0x73);

@@ -259,7 +259,7 @@ test("a draft with a warning requires confirmation before writing a recovery cop
 test("an apply that finished with the slave half unplugged says so instead of claiming a readback", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = shell();
     const restore = session.service.restorePortableProfile;
-    session.service.restorePortableProfile = async (doc, options) => ({...await restore(doc, options), peerUnseen: true});
+    session.service.restorePortableProfile = async (doc, options) => ({...await restore(doc, options), slaveUnseen: true});
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     draft.review(draft.revision);
     await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);

@@ -40,7 +40,7 @@ const KEY_BEHAVIOR_DOMAIN_V1 = Object.freeze({
     KNOWN_STEP_MASK: 0x07,
 });
 
-const KEY_BEHAVIOR_HOLD_MODES = Object.freeze({
+const KEY_BEHAVIOR_HOLD_STYLES = Object.freeze({
     PRESS_AND_HOLD_UNTIL_RELEASE: 1,
     TAP_AT_HOLD_THRESHOLD: 2,
     REPEAT_WHILE_HELD: 3,
@@ -150,7 +150,7 @@ function decodeKeyBehaviorDomain(value, options = {}) {
         }
 
         const tapHoldTerm = bytes.readUInt16LE(bodyStart + 4);
-        const longerHoldTerm = bytes.readUInt16LE(bodyStart + 6);
+        const longHoldTerm = bytes.readUInt16LE(bodyStart + 6);
         const multiTapTerm = bytes.readUInt16LE(bodyStart + 8);
         const flags = bytes[bodyStart + 10];
         const stepCount = bytes[bodyStart + 11];
@@ -191,7 +191,7 @@ function decodeKeyBehaviorDomain(value, options = {}) {
         rows.push({
             target,
             tapHoldTerm,
-            longerHoldTerm,
+            longHoldTerm,
             multiTapTerm,
             keepsAutoMouseAnchored: (flags & KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED) !== 0,
             enabled: (flags & KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_DISABLED) === 0,
@@ -253,7 +253,7 @@ function normalizeRow(row, limits, actionLimits, rowIndex) {
         target,
         targetBytes,
         tapHoldTerm: assertU16(row.tapHoldTerm ?? 0, "tapHoldTerm"),
-        longerHoldTerm: assertU16(row.longerHoldTerm ?? 0, "longerHoldTerm"),
+        longHoldTerm: assertU16(row.longHoldTerm ?? 0, "longHoldTerm"),
         multiTapTerm: assertU16(row.multiTapTerm ?? 0, "multiTapTerm"),
         keepsAutoMouseAnchored: assertBoolean(row.keepsAutoMouseAnchored ?? false, "keepsAutoMouseAnchored"),
         enabled: assertBoolean(row.enabled ?? true, "enabled"),
@@ -270,7 +270,7 @@ function encodeRow(row) {
     output.writeUInt16LE(bodyLength, 0);
     row.targetBytes.copy(output, 2);
     output.writeUInt16LE(row.tapHoldTerm, 6);
-    output.writeUInt16LE(row.longerHoldTerm, 8);
+    output.writeUInt16LE(row.longHoldTerm, 8);
     output.writeUInt16LE(row.multiTapTerm, 10);
     output[12] = (row.keepsAutoMouseAnchored ? KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED : 0) | (row.enabled ? 0 : KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_DISABLED);
     output[13] = row.steps.length;
@@ -361,24 +361,24 @@ function normalizeHold(hold, limits, actionLimits, rowIndex, stepIndex, field) {
     if (!hold || typeof hold !== "object") {
         throw new TypeError(`${field} must be an object.`);
     }
-    const mode = assertU8(hold.mode, `${field}.mode`);
-    if (!/** @type {number[]} */ (Object.values(KEY_BEHAVIOR_HOLD_MODES)).includes(mode)) {
-        throw behaviorError("INVALID_HOLD_MODE", `Unsupported ${field} mode ${mode}.`, {row: rowIndex, step: stepIndex});
+    const style = assertU8(hold.style, `${field}.style`);
+    if (!/** @type {number[]} */ (Object.values(KEY_BEHAVIOR_HOLD_STYLES)).includes(style)) {
+        throw behaviorError("INVALID_HOLD_MODE", `Unsupported ${field} style ${style}.`, {row: rowIndex, step: stepIndex});
     }
     const repeatHz = assertU8(hold.repeatHz ?? 0, `${field}.repeatHz`);
-    if (mode === KEY_BEHAVIOR_HOLD_MODES.REPEAT_WHILE_HELD) {
+    if (style === KEY_BEHAVIOR_HOLD_STYLES.REPEAT_WHILE_HELD) {
         if (repeatHz < 1 || repeatHz > limits.maxRepeatHz) {
             throw behaviorError("INVALID_REPEAT_RATE", `Repeat frequency must be 1 through ${limits.maxRepeatHz} Hz.`, {row: rowIndex, step: stepIndex});
         }
     } else if (repeatHz !== 0) {
-        throw behaviorError("INVALID_REPEAT_RATE", "Non-repeat hold modes require repeat frequency zero.", {row: rowIndex, step: stepIndex});
+        throw behaviorError("INVALID_REPEAT_RATE", "Non-repeat hold styles require repeat frequency zero.", {row: rowIndex, step: stepIndex});
     }
-    return {mode, repeatHz, ...normalizeAction(hold.action, actionLimits, rowIndex, stepIndex, field)};
+    return {style, repeatHz, ...normalizeAction(hold.action, actionLimits, rowIndex, stepIndex, field)};
 }
 
 /** @param {ReturnType<typeof normalizeHold>} hold */
 function encodeHold(hold) {
-    return Buffer.concat([Buffer.from([hold.mode, hold.repeatHz]), hold.bytes]);
+    return Buffer.concat([Buffer.from([hold.style, hold.repeatHz]), hold.bytes]);
 }
 
 /** @param {Buffer} bytes @param {number} offset @param {number} rowEnd @param {import("./types.js").BehaviorLimits} limits @param {Partial<import("./types.js").ActionLimits> | undefined} actionLimits @param {number} rowIndex @param {number} stepIndex @param {string} field */
@@ -388,7 +388,7 @@ function decodeHold(bytes, offset, rowEnd, limits, actionLimits, rowIndex, stepI
     }
     /** @type {import("./types.js").HoldBranch & {bytes?: Buffer}} */
     const normalized = normalizeHold({
-        mode: bytes[offset],
+        style: bytes[offset],
         repeatHz: bytes[offset + 1],
         action: readBoundedAction(bytes, offset + 2, rowEnd, actionLimits, rowIndex, stepIndex).action,
     }, limits, actionLimits, rowIndex, stepIndex, field);
@@ -458,7 +458,7 @@ function behaviorError(code, message, details = {}) {
 
 module.exports = {
     KEY_BEHAVIOR_DOMAIN_V1,
-    KEY_BEHAVIOR_HOLD_MODES,
+    KEY_BEHAVIOR_HOLD_STYLES,
     KEY_BEHAVIOR_LIMITS,
     decodeKeyBehaviorDomain,
     decodeKeyBehaviorDomainEnvelope,

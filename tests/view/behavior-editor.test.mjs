@@ -1,13 +1,13 @@
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behaviourThresholds, helperDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
+import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behaviourThresholds, styleDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 import {impliedBranch} from "../../webview/view/keyface.mjs";
 import {VOCABULARY} from "../../core/model/vocabulary.js";
 
 test("opening an unstored behaviour leaves the model unchanged and takes built-ins from the core", () => {
-    const builtIn = {tap: {helper: "TAP_SENDS", action: "KC_F"}};
-    const timing = {tapHoldTerm: "210", multiTapTerm: "150", longerHoldTerm: "400"};
+    const builtIn = {tap: {style: "TAP_SENDS", action: "KC_F"}};
+    const timing = {tapHoldTerm: "210", multiTapTerm: "150", longHoldTerm: "400"};
     const model = {keyBehaviors: [], behaviorEditing: {keyDefaults: {"LT(3,KC_F)": {builtIn, timing}}}};
     const before = structuredClone(model);
     const row = behaviourEditorRow(model, "LT(3, KC_F)");
@@ -25,12 +25,12 @@ test("an unstored custom key's grid shows the tap a release before Long hold sen
     const model = {keyBehaviors: [], behaviorEditing: {keyDefaults: {CUSTOM_KEY_9: {builtIn: {releaseTaps: true}, timing: {}}}}};
     const unplaced = behaviourEditorRow(model, "CUSTOM_KEY_9");
     assert.equal(unplaced.stored, false);
-    const step = {tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_A"}, longHold: {helper: "HOLD_WHILE_HELD", action: "KC_B"}};
+    const step = {tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}, longHold: {style: "HOLD_WHILE_HELD", action: "KC_B"}};
     assert.equal(impliedBranch({...unplaced, steps: [step]}, step, "hold")?.meaning, "tapsBeforeLong");
 });
 
 test("an existing row is selected through its semantic alias without changing it", () => {
-    const existing = {keycode: "CUSTOM_KEY_0", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_A"}}]};
+    const existing = {keycode: "CUSTOM_KEY_0", steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}}]};
     const model = {keyBehaviors: [existing], qmkKeycodeAliases: {QK_USER_0: "CUSTOM_KEY_0"}};
     const row = behaviourEditorRow(model, "QK_USER_0");
     assert.equal(row.stored, true);
@@ -97,15 +97,15 @@ test("timing fields show effective defaults but keep their stored inheritance ze
 
 test("each timing placeholder names where its default comes from, and storing is unchanged", () => {
     const {timingSources} = VOCABULARY;
-    const timing = {tapHoldTerm: "200", multiTapTerm: "150", longerHoldTerm: "400"};
-    const sources = (hold) => ({tapHoldTerm: hold, longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"});
+    const timing = {tapHoldTerm: "200", multiTapTerm: "150", longHoldTerm: "400"};
+    const sources = (hold) => ({tapHoldTerm: hold, longHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"});
     const model = {keyBehaviors: [], vocabulary: {timingSources}, behaviorEditing: {keyDefaults: {
         "LT(3,KC_F)": {builtIn: {}, timing, timingSources: sources("tappingTerm")},
         KC_A: {builtIn: {}, timing: {...timing, tapHoldTerm: "150"}, timingSources: sources("tapHoldTerm")}}}};
     const dual = behaviourEditorRow(model, "LT(3,KC_F)"), plain = behaviourEditorRow(model, "KC_A");
     assert.equal(behaviourTimingField(dual, "tapHoldTerm").placeholder, "200 · dual-role");
     assert.equal(behaviourTimingField(plain, "tapHoldTerm").placeholder, "150 · behaviour default");
-    assert.equal(behaviourTimingField(plain, "longerHoldTerm").placeholder, "400 · default");
+    assert.equal(behaviourTimingField(plain, "longHoldTerm").placeholder, "400 · default");
     assert.equal(behaviourTimingField(plain, "multiTapTerm").placeholder, "150 · default");
     assert.equal(behaviourTimingField({...plain, timingDefaults: {}}, "tapHoldTerm").placeholder, "ms", "no default reads ms");
     const unsourced = behaviourEditorRow({...model, behaviorEditing: {keyDefaults: {"LT(3,KC_F)": {builtIn: {}, timing}}}}, "LT(3,KC_F)");
@@ -135,39 +135,39 @@ test("a row opened from the selected key follows it when the preview changes; a 
 });
 
 test("a behaviour names the thresholds it runs on, its own or the keyboard's", () => {
-    const model = {behaviorTimingDefaults: {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"}, keyBehaviors: []};
-    const behaviour = {keycode: "KC_LEFT", tapHoldTerm: "100", longerHoldTerm: "0", multiTapTerm: "0", steps: [
-        {tapCount: 0, hold: {action: "LALT(KC_LEFT)", helper: "TAP_ON_RELEASE_AFTER_HOLD"}, longHold: {action: "LGUI(KC_LEFT)", helper: "TAP_AT_HOLD_THRESHOLD"}}]};
+    const model = {behaviorTimingDefaults: {tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "150"}, keyBehaviors: []};
+    const behaviour = {keycode: "KC_LEFT", tapHoldTerm: "100", longHoldTerm: "0", multiTapTerm: "0", steps: [
+        {tapCount: 0, hold: {action: "LALT(KC_LEFT)", style: "TAP_ON_RELEASE_AFTER_HOLD"}, longHold: {action: "LGUI(KC_LEFT)", style: "TAP_AT_HOLD_THRESHOLD"}}]};
     model.keyBehaviors.push(behaviour);
     const terms = behaviourThresholds(model, behaviour);
-    assert.deepEqual(terms.used, ["tapHoldTerm", "longerHoldTerm"], "no branch starts on a later tap");
+    assert.deepEqual(terms.used, ["tapHoldTerm", "longHoldTerm"], "no branch starts on a later tap");
     assert.deepEqual(terms.tapHoldTerm, {name: "tapHoldTerm", ms: "100"}, "its own time");
-    assert.deepEqual(terms.longerHoldTerm, {name: "longerHoldTerm", ms: "400"}, "the keyboard default it follows");
+    assert.deepEqual(terms.longHoldTerm, {name: "longHoldTerm", ms: "400"}, "the keyboard default it follows");
     assert.deepEqual(behaviourThresholds(model, {...behaviour, steps: []}).used, ["tapHoldTerm"], "a behaviour with no branches keeps its tap / hold term");
     assert.deepEqual(behaviourThresholds(model, {...behaviour, steps: [{tapCount: 1, tap: {action: "KC_A"}}]}).used, ["multiTapTerm"]);
 });
 
 test("a hold tier states its own threshold when it waits for one, and its rate when it repeats", () => {
-    const terms = {tapHoldTerm: {name: "tapHoldTerm", ms: "150"}, longerHoldTerm: {name: "longerHoldTerm", ms: "400"}, multiTapTerm: {name: "multiTapTerm", ms: "100"}, used: []};
-    assert.equal(helperDetail("hold", {helper: "TAP_AT_HOLD_THRESHOLD"}, terms), "150 ms");
-    assert.equal(helperDetail("long", {helper: "TAP_ON_RELEASE_AFTER_HOLD"}, terms), "400 ms");
-    assert.equal(helperDetail("hold", {helper: "REPEAT_WHILE_HELD", repeatHz: "100"}, terms), "100 Hz", "a repeat runs at its rate, not a gap between taps");
-    assert.equal(helperDetail("hold", {helper: "REPEAT_WHILE_HELD", repeatHz: "0"}, terms), "0 Hz", "the stored rate is reported as it is");
-    assert.equal(helperDetail("hold", {helper: "PRESS_AND_HOLD_UNTIL_RELEASE"}, terms), "");
-    assert.equal(helperDetail("tap", {helper: "TAP_AT_HOLD_THRESHOLD"}, terms), "");
+    const terms = {tapHoldTerm: {name: "tapHoldTerm", ms: "150"}, longHoldTerm: {name: "longHoldTerm", ms: "400"}, multiTapTerm: {name: "multiTapTerm", ms: "100"}, used: []};
+    assert.equal(styleDetail("hold", {style: "TAP_AT_HOLD_THRESHOLD"}, terms), "150 ms");
+    assert.equal(styleDetail("long", {style: "TAP_ON_RELEASE_AFTER_HOLD"}, terms), "400 ms");
+    assert.equal(styleDetail("hold", {style: "REPEAT_WHILE_HELD", repeatHz: "100"}, terms), "100 Hz", "a repeat runs at its rate, not a gap between taps");
+    assert.equal(styleDetail("hold", {style: "REPEAT_WHILE_HELD", repeatHz: "0"}, terms), "0 Hz", "the stored rate is reported as it is");
+    assert.equal(styleDetail("hold", {style: "PRESS_AND_HOLD_UNTIL_RELEASE"}, terms), "");
+    assert.equal(styleDetail("tap", {style: "TAP_AT_HOLD_THRESHOLD"}, terms), "");
 });
 
 test("a behaviour changes nothing without a branch, the anchor or a timing that applies to its key", () => {
-    const empty = {keycode: "KC_DELETE", tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 65535, steps: [], timingAlone: false};
+    const empty = {keycode: "KC_DELETE", tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 65535, steps: [], timingAlone: false};
     assert.equal(behaviourChangesNothing(empty), true);
     assert.equal(behaviourChangesNothing({...empty, tapHoldTerm: "150"}), true, "a timing alone does nothing on a plain key");
     assert.equal(behaviourChangesNothing({...empty, timingAlone: true, tapHoldTerm: "150"}), false, "it does on a key the keyboard handles anyway");
     assert.equal(behaviourChangesNothing({...empty, timingAlone: undefined, tapHoldTerm: "150"}), false, "unknown counts as doing something");
-    assert.equal(behaviourChangesNothing({...empty, steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_A"}}]}), false);
+    assert.equal(behaviourChangesNothing({...empty, steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}}]}), false);
     assert.equal(behaviourChangesNothing({...empty, keepsAutoMouseAnchored: true}), false, "the anchor applies on any key");
     // Its switch and layers gate only what it holds (firmware D-F27 "Rows without steps").
     assert.equal(behaviourChangesNothing({...empty, allowedLayers: 1, enabled: false}), true);
-    assert.equal(behaviourHasTiming({tapHoldTerm: "", longerHoldTerm: "00", multiTapTerm: undefined}), false, "empty and zero follow the default");
+    assert.equal(behaviourHasTiming({tapHoldTerm: "", longHoldTerm: "00", multiTapTerm: undefined}), false, "empty and zero follow the default");
     assert.equal(behaviourHasTiming({tapHoldTerm: "0.0"}), true, "anything else is written, for the keyboard to judge");
 });
 

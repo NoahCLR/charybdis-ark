@@ -14,7 +14,7 @@ const candidateMutations = f => f.keyboard.mutations.filter(r => [7, 9].includes
 const payloadReads = f => f.keyboard.requests.filter(r => r[0] === 8 && [4, 5, 6].includes(r[2]));
 function assertTarget(f) {
     assert.deepEqual(f.keyboard.local.profile, f.target.candidate);
-    assert.deepEqual(f.keyboard.peer.profile, f.target.candidate);
+    assert.deepEqual(f.keyboard.slave.profile, f.target.candidate);
     assert.deepEqual(f.keyboard.active, f.target.candidate);
     assert.ok(f.keyboard.mutations.every(r => [7, 9].includes(r[0]) && r[1] === 0 &&
         [C.VALUE_BEGIN, C.VALUE_STREAM_CHUNK, C.VALUE_CHUNK, C.VALUE_REUSE, C.VALUE_VALIDATE, C.VALUE_COMMIT, C.VALUE_ABORT].includes(r[2])), "only Profile Wire candidate commands are written");
@@ -32,13 +32,13 @@ test("restore saves recovery first, uploads one candidate and verifies one gener
     const f = fixture(), views = [];
     f.options.onApplyProgress = view => views.push(view);
     const result = await f.restore();
-    assert.deepEqual([...new Set(views.map(view => view.current))], ["check", "backup", "upload", "validate", "peer", "converge", "verify"]);
+    assert.deepEqual([...new Set(views.map(view => view.current))], ["check", "backup", "upload", "validate", "slave", "converge", "verify"]);
     assert.equal(views.at(-1).state, "done");
     assert.equal(result.fingerprint, fingerprint(f.targetDocument));
     assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", profileBytes: f.target.candidate.length});
     assert.equal(result.status.activeGeneration, 5);
     assert.equal(result.status.committedGeneration, 5);
-    assert.equal(result.status.peerGeneration, 5);
+    assert.equal(result.status.slaveGeneration, 5);
     assert.equal(result.status.lastCommittedTransactionId, 1);
     assertTarget(f);
     assert.deepEqual(f.keyboard.events, ["backup", "begin", "validated", "commit", "decision", "activated"]);
@@ -101,11 +101,11 @@ test("validation refusal cancels the candidate before commit and leaves the old 
     assert.equal(f.keyboard.events.at(-1), "aborted");
     assert.deepEqual(f.keyboard.active, validateSnapshot(f.source).candidate);
 });
-test("a failure carries its real peer BUSY reason and the step where it happened", async t => {
+test("a failure carries its real slave-half BUSY reason and the step where it happened", async t => {
     const f = fixture(), views = []; stall(f, t); f.options.onApplyProgress = view => views.push(view);
-    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && error.step === "peer"
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && error.step === "slave"
         && error.stepLabel === "Copy the profile to the slave half" && error.reason === "The slave half stopped handling requests from the master half." && error.saved === "none");
-    assert.equal(views.at(-1).state, "failed"); assert.equal(views.at(-1).failure.step, "peer");
+    assert.equal(views.at(-1).state, "failed"); assert.equal(views.at(-1).failure.step, "slave");
 });
 test("a sent commit the keyboard cancels is reported as not saved", async t => {
     const f = fixture(); stall(f, t);
@@ -117,16 +117,16 @@ test("a sent commit without a confirmed cancel keeps its recovery copy and unkno
     await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && error.saved === "unknown" && error.message.includes("/recovery.json"));
     assert.equal(f.keyboard.events.at(-1), "abort refused");
 });
-test("unconfirmed peer cleanup adds restart guidance; unreadable status loses only that hint", async t => {
+test("unconfirmed slave-half cleanup adds restart guidance; unreadable status loses only that hint", async t => {
     const f = fixture(); stall(f, t, {cleanupPending: true});
-    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && /Unplug the USB cable \(not the cable between the halves\)/.test(error.message));
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && /Unplug the USB cable from the master half \(not the cable between the halves\)/.test(error.message));
     const g = fixture(); g.keyboard.faults.stallCommit = true; g.options.sleep = f.options.sleep;
     g.keyboard.faults.beforeRequest = (r, keyboard) => {if (keyboard.events.includes("aborted") && r[0] === 8 && r[2] === 2) throw Error("unreadable");};
     await assert.rejects(g.restore(), error => error.code === "RESTORE_NOT_SAVED" && !/Unplug/.test(error.message));
 });
-test("an active target with the peer out of sight is saved, while wrong digest, generation or transaction fails", async () => {
-    const f = fixture(); f.keyboard.faults.peerUnseen = true;
-    assert.equal((await f.restore()).peerUnseen, true); assertTarget(f);
+test("an active target with the slave half out of sight is saved, while wrong digest, generation or transaction fails", async () => {
+    const f = fixture(); f.keyboard.faults.slaveUnseen = true;
+    assert.equal((await f.restore()).slaveUnseen, true); assertTarget(f);
     for (const [page, offset] of [[0, 12], [1, 0], [1, 17]]) {
         const g = fixture();
         g.keyboard.faults.afterRequest = (r, response, keyboard) => {
@@ -311,7 +311,7 @@ test("a complete snapshot preserves Unicode bank bytes", async () => {
 
 test("a keyboard without its slave half refuses a snapshot at once, without waiting for the halves", async () => {
     const source = backup32();
-    const keyboard = fakeKeyboard({document: source, compiled: factoryProfile(source), peerKnown: false});
+    const keyboard = fakeKeyboard({document: source, compiled: factoryProfile(source), slaveKnown: false});
     const {connection, ids} = wired(keyboard);
     let waits = 0;
     await assert.rejects(snapshotProfile(connection, ids, snapshotCapabilities, undefined, false, false, {sleep: async () => {waits += 1;}}),

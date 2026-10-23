@@ -67,7 +67,7 @@ test("a stopped keyboard says so instead of 'not ready' or 'catching up', and re
     const {shell, send, session} = await stoppedWithEdits(t);
     const live = model(shell).draft.live;
     assert.equal(live.keyboard.stopped, true);
-    assert.equal(live.keyboard.peerStopped, false);
+    assert.equal(live.keyboard.slaveStopped, false);
     await send({type: "reviewProfileDraft"});
     await send({type: "saveProfileDraft", confirmChecks: true});
     const said = notices(shell).at(-1);

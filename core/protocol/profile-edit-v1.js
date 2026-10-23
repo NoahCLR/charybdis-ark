@@ -65,7 +65,7 @@ const EDIT_FLAGS = Object.freeze({
     MODE_CONFLICT: 1 << 7,
     WAITING_SAFE: 1 << 8,
     STORAGE_PAUSED: 1 << 9,
-    // The other half's save waits for a quiet keyboard; the other half
+    // The slave half's save waits for a quiet keyboard; the slave half
     // refused this working copy, as an edit and as a whole copy (apart until
     // Revert or an Apply; Save is BUSY); the edit mode is not stored yet.
     PEER_STORAGE_PAUSED: 1 << 10,
@@ -189,7 +189,7 @@ function decodeEditReply(response, request) {
     if (!(result in EDIT_RESULT_NAMES)) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", `Unknown edit result ${result}.`);
     if (flags & ~KNOWN_EDIT_FLAGS) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", "The edit reply has unknown flags.");
     return {result, resultName: EDIT_RESULT_NAMES[result], phase: report[6], session: report.readUInt32LE(7), revision: report.readUInt32LE(11), flags,
-        ...(restart ? {peerAcknowledged: report[17] === 1} : {})};
+        ...(restart ? {slaveAcknowledged: report[17] === 1} : {})};
 }
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {Buffer} request @param {import("./types.js").ReadOptions} [options] */
@@ -201,35 +201,35 @@ async function sendEditRequest(connection, request, options = {}) {
 /** @param {number} flags */
 const flagsOf = flags => ({
     unsaved: Boolean(flags & EDIT_FLAGS.UNSAVED),
-    peerRequired: Boolean(flags & EDIT_FLAGS.PEER_REQUIRED),
-    peerConverged: Boolean(flags & EDIT_FLAGS.PEER_CONVERGED),
-    peerKnown: Boolean(flags & EDIT_FLAGS.PEER_KNOWN),
+    slaveRequired: Boolean(flags & EDIT_FLAGS.PEER_REQUIRED),
+    slaveConverged: Boolean(flags & EDIT_FLAGS.PEER_CONVERGED),
+    slaveKnown: Boolean(flags & EDIT_FLAGS.PEER_KNOWN),
     editsBlocked: Boolean(flags & EDIT_FLAGS.EDITS_BLOCKED),
     savedCompiled: Boolean(flags & EDIT_FLAGS.SAVED_COMPILED),
     saving: Boolean(flags & EDIT_FLAGS.SAVING),
     modeConflict: Boolean(flags & EDIT_FLAGS.MODE_CONFLICT),
     waitingSafe: Boolean(flags & EDIT_FLAGS.WAITING_SAFE),
     storagePaused: Boolean(flags & EDIT_FLAGS.STORAGE_PAUSED),
-    peerStoragePaused: Boolean(flags & EDIT_FLAGS.PEER_STORAGE_PAUSED),
-    peerRefused: Boolean(flags & EDIT_FLAGS.PEER_REFUSED),
+    slaveStoragePaused: Boolean(flags & EDIT_FLAGS.PEER_STORAGE_PAUSED),
+    slaveRefused: Boolean(flags & EDIT_FLAGS.PEER_REFUSED),
     modeNotStored: Boolean(flags & EDIT_FLAGS.MODE_NOT_STORED),
     adjustmentPending: Boolean(flags & EDIT_FLAGS.ADJUSTMENT_PENDING),
     stopped: Boolean(flags & EDIT_FLAGS.STOPPED),
-    peerStopped: Boolean(flags & EDIT_FLAGS.PEER_STOPPED),
+    slaveStopped: Boolean(flags & EDIT_FLAGS.PEER_STOPPED),
 });
 
-// Edit status: page 0 this half, page 1 the other half and the save, page 2
+// Edit status: page 0 this half, page 1 the slave half and the save, page 2
 // where the last refused edit failed, page 3 the keyboard's own saves.
 /** @param {Buffer[]} pages @returns {import("./types.js").EditStatus} */
-function decodeEditStatusPages([local, peer, error, auto]) {
-    for (const page of [peer, error]) if (!page || page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "An edit status page has 25 bytes.");
+function decodeEditStatusPages([local, slave, error, auto]) {
+    for (const page of [slave, error]) if (!page || page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "An edit status page has 25 bytes.");
     if (error.subarray(22).some(byte => byte !== 0)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Reserved edit status bytes must be zero.");
     return {
         ...decodeEditProgress(local),
-        peer: {phase: peer[0], lastResult: peer[1], transactionId: peer.readUInt16LE(2), session: peer.readUInt32LE(4), revision: peer.readUInt32LE(8),
-            unsaved: Boolean(peer[12] & 1), savedCompiled: Boolean(peer[12] & 2), mode: peer[24]},
-        save: {phase: peer[13], lastResult: peer[14], lastError: peer[15], transactionId: peer.readUInt16LE(16), lastTransactionId: peer.readUInt16LE(18)},
-        insertedReceived: peer.readUInt32LE(20),
+        slave: {phase: slave[0], lastResult: slave[1], transactionId: slave.readUInt16LE(2), session: slave.readUInt32LE(4), revision: slave.readUInt32LE(8),
+            unsaved: Boolean(slave[12] & 1), savedCompiled: Boolean(slave[12] & 2), mode: slave[24]},
+        save: {phase: slave[13], lastResult: slave[14], lastError: slave[15], transactionId: slave.readUInt16LE(16), lastTransactionId: slave.readUInt16LE(18)},
+        insertedReceived: slave.readUInt32LE(20),
         refusal: {validatorResult: error[0], domainId: error[1], tableId: error[2], row: error.readUInt16LE(3), step: error[5], field: error[6],
             byteOffset: error.readUInt32LE(7), detailKind: error[11], detailCode: error.readUInt16LE(12)},
         safeBoundaryReasons: error.readUInt32LE(14), activeLength: error.readUInt32LE(18),
@@ -238,7 +238,7 @@ function decodeEditStatusPages([local, peer, error, auto]) {
 }
 
 // Page 3: the saves the keyboard made by itself (Live, and adjustment keys in
-// Apply) since this USB half booted. The counter names an event between
+// Apply) since this master half booted. The counter names an event between
 // polls; only a success counts, and a failure is the save's on page 1.
 /** @param {Buffer} page @returns {import("./types.js").AutoSaveStatus} */
 function decodeAutoSavePage(page) {
@@ -290,8 +290,8 @@ async function readEditStatus(connection, options) {
 function decodeEditModePage(page) {
     if (page.length !== 11) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "The edit mode page has 11 bytes.");
     if (page[10] & ~7) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", "The edit mode page has unknown flags.");
-    return {mode: page[0], counter: page.readUInt32LE(1), peerMode: page[5], peerCounter: page.readUInt32LE(6),
-        peerKnown: Boolean(page[10] & 1), conflict: Boolean(page[10] & 2), agreed: Boolean(page[10] & 4)};
+    return {mode: page[0], counter: page.readUInt32LE(1), slaveMode: page[5], slaveCounter: page.readUInt32LE(6),
+        slaveKnown: Boolean(page[10] & 1), conflict: Boolean(page[10] & 2), agreed: Boolean(page[10] & 4)};
 }
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions & {nextRequestId: () => number}} options */
 async function readEditMode(connection, options) {

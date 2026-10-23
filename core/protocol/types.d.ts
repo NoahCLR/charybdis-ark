@@ -72,29 +72,29 @@ export interface ReuseSource {kind: number; origin: number; generation: number; 
 
 // Live edits (profile-edit-v1.js, firmware D-F32).
 export interface EditSplice {domainId: number; offset: number; remove: number; insert: number; create?: boolean; drop?: boolean}
-export interface EditReply {result: number; resultName: string; phase: number; session: number; revision: number; flags: number; /** A restart's answer only: the slave half acknowledged it. */ peerAcknowledged?: boolean}
+export interface EditReply {result: number; resultName: string; phase: number; session: number; revision: number; flags: number; /** A restart's answer only: the slave half acknowledged it. */ slaveAcknowledged?: boolean}
 export interface EditStatusFlags {
-    unsaved: boolean; peerRequired: boolean; peerConverged: boolean; peerKnown: boolean; editsBlocked: boolean;
+    unsaved: boolean; slaveRequired: boolean; slaveConverged: boolean; slaveKnown: boolean; editsBlocked: boolean;
     savedCompiled: boolean; saving: boolean; modeConflict: boolean; waitingSafe: boolean; storagePaused: boolean;
-    peerStoragePaused: boolean; peerRefused: boolean; modeNotStored: boolean; adjustmentPending: boolean;
+    slaveStoragePaused: boolean; slaveRefused: boolean; modeNotStored: boolean; adjustmentPending: boolean;
     /** Profile storage stopped on the master half, or the slave half says its did: only a restart clears it (firmware D-F34). */
-    stopped: boolean; peerStopped: boolean;
+    stopped: boolean; slaveStopped: boolean;
 }
 export interface EditProgress extends EditStatusFlags {
     phase: number; flags: number; session: number; revision: number; savedGeneration: number; savedOrigin: number;
     lastResult: number; lastTransactionId: number; transactionId: number; mode: number; splicesReceived: number;
 }
 export interface EditStatus extends EditProgress {
-    peer: {phase: number; lastResult: number; transactionId: number; session: number; revision: number; unsaved: boolean; savedCompiled: boolean; mode: number};
+    slave: {phase: number; lastResult: number; transactionId: number; session: number; revision: number; unsaved: boolean; savedCompiled: boolean; mode: number};
     save: {phase: number; lastResult: number; lastError: number; transactionId: number; lastTransactionId: number};
     insertedReceived: number;
     refusal: {validatorResult: number; domainId: number; tableId: number; row: number; step: number; field: number; byteOffset: number; detailKind: number; detailCode: number};
     safeBoundaryReasons: number; activeLength: number;
     autoSave: AutoSaveStatus;
 }
-/** The keyboard's own saves since its USB half booted (edit status page 3). */
+/** The keyboard's own saves since its master half booted (edit status page 3). */
 export interface AutoSaveStatus {inProgress: boolean; lastWasAutomatic: boolean; count: number; revision: number; generation: number; quietMs: number}
-export interface EditModeRead {mode: number; counter: number; peerMode: number; peerCounter: number; peerKnown: boolean; conflict: boolean; agreed: boolean}
+export interface EditModeRead {mode: number; counter: number; slaveMode: number; slaveCounter: number; slaveKnown: boolean; conflict: boolean; agreed: boolean}
 export interface RuntimeToggle {master: boolean; override: boolean}
 export interface RuntimeRead {
     combos: RuntimeToggle; behaviours: RuntimeToggle;

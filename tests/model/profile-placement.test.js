@@ -7,13 +7,13 @@ const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {bytes} = require("../fixtures/device-profile");
 
 const code = operand => ({kind: 1, flags: 0, operand});
-const row = (target, step) => ({target, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false, steps: [{tapIndex: 0, ...step}]});
+const row = (target, step) => ({target, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false, steps: [{tapIndex: 0, ...step}]});
 const options = {layerCount: 8};
 
 test("a behaviour row is checked where each of its actions sits", () => {
     assert.equal(behaviorPlacementProblem([row(code(0x04), {tap: code(0x05)})], options), undefined);
-    assert.equal(behaviorPlacementProblem([row(code(0x04), {hold: {mode: 1, repeatHz: 0, action: {kind: 2, flags: 0, operand: 2}}})], options), undefined);
-    assert.match(behaviorPlacementProblem([row(code(0x04), {hold: {mode: 2, repeatHz: 0, action: {kind: 2, flags: 0, operand: 2}}})], options), /^The behaviour on KC_A: MO\(2\) holds a layer/);
+    assert.equal(behaviorPlacementProblem([row(code(0x04), {hold: {style: 1, repeatHz: 0, action: {kind: 2, flags: 0, operand: 2}}})], options), undefined);
+    assert.match(behaviorPlacementProblem([row(code(0x04), {hold: {style: 2, repeatHz: 0, action: {kind: 2, flags: 0, operand: 2}}})], options), /^The behaviour on KC_A: MO\(2\) holds a layer/);
     assert.match(behaviorPlacementProblem([row(code(0x04), {tap: {kind: 2, flags: 0, operand: 2}})], options), /MO\(2\) holds a layer/);
     assert.match(behaviorPlacementProblem([row(code(0x5241), {tap: code(0x05)})], options), /^The behaviour on DF\(1\)/);
 });
@@ -41,7 +41,7 @@ test("a layout key takes every layer key the keyboard owns, and refuses DF, PDF 
 // The keyboard sends QMK and keyboard functions from a behaviour as a
 // synthetic QMK record, so they work there as on a key or a combo.
 test("a behaviour sends QMK and keyboard functions as a key or a combo does", () => {
-    const hold = (operand, mode = 1) => ({hold: {mode, repeatHz: 0, action: code(operand)}});
+    const hold = (operand, style = 1) => ({hold: {style, repeatHz: 0, action: code(operand)}});
     for (const sendable of [0x04, 0x021e, 0x1f04, 0x00cd, 0x2104, 0x52a1, 0x7700, 0x7e80, 0x7ea7, 0x7ec2, 0x7e06, 0x7e00, 0x7c00, 0x7820, 0x7e08]) {
         assert.equal(behaviorPlacementProblem([row(code(sendable), {tap: code(sendable)}), row(code(0x05), hold(sendable, 2)), row(code(0x06), hold(sendable))], options), undefined, sendable.toString(16));
         assert.equal(keyPlacementProblem(sendable, options), undefined, `${sendable.toString(16)} on a key`);

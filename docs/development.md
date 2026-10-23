@@ -210,10 +210,10 @@ Tests use injected device adapters (`core/transport/fake-device-adapter.js`).
   answers byte for byte. It backs the preview and the browser tests (through
   `browser-tests/fake-hid.js`).
 - `tests/fixtures/writable-keyboard.js` takes Apply: candidate and store
-  reports, both halves' profile records, the durable decision, the peer commit
-  and activation. Its faults exercise BUSY, lost replies, cancellation and
-  disconnected recovery. Restore tests call `restoreProfile` with a request
-  connection, as both shells do.
+  reports, both halves' profile records, the durable decision, the slave
+  half's commit and activation. Its faults exercise BUSY, lost replies,
+  cancellation and disconnected recovery. Restore tests call `restoreProfile`
+  with a request connection, as both shells do.
 
 These fakes model protocol state and transfer correctness, not flash
 durability, split scheduling or a physical interruption. A successful

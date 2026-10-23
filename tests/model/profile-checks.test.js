@@ -30,8 +30,8 @@ test("whole-profile findings retain new and fixed status beside the keyboard", (
 test("timing changes report new, existing and fixed findings, including inherited defaults", () => {
     const keyboard = validateSnapshot(document());
     const action = operand => ({kind: 1, flags: 0, operand});
-    keyboard.behaviors.rows = [{target: action(4), tapHoldTerm: 0, longerHoldTerm: 0,
-        steps: [{tapIndex: 0, hold: {mode: 4, action: action(5)}, longHold: {mode: 4, action: action(6)}}]}];
+    keyboard.behaviors.rows = [{target: action(4), tapHoldTerm: 0, longHoldTerm: 0,
+        steps: [{tapIndex: 0, hold: {style: 4, action: action(5)}, longHold: {style: 4, action: action(6)}}]}];
     keyboard.settings.values[1] = 100; keyboard.settings.values[2] = 200;
     const draft = structuredClone(keyboard); draft.settings.values[2] = 100;
     const checks = (before, after) => draftProfileChecks(before, after, undefined, {})
@@ -45,8 +45,8 @@ test("a behaviour step that sends a custom key without a shortcut is flagged, an
     const decoded = validateSnapshot(document());
     const customKey = operand => ({kind: 7, flags: 0, operand});
     decoded.behaviors.rows = [{target: {kind: 1, flags: 0, operand: 4}, steps: [
-        {tapIndex: 0, tap: customKey(3), hold: {mode: 0, repeatHz: 0, action: customKey(5)}},
-        {tapIndex: 1, longHold: {mode: 0, repeatHz: 0, action: customKey(3)}},
+        {tapIndex: 0, tap: customKey(3), hold: {style: 0, repeatHz: 0, action: customKey(5)}},
+        {tapIndex: 1, longHold: {style: 0, repeatHz: 0, action: customKey(3)}},
     ]}];
     decoded.settings.customKeyShortcuts[5] = {mods: 0, key: 0xd1};
     decoded.settings.customKeyNames[3] = "";

@@ -12,10 +12,10 @@ const {editKeyBehaviors} = require("../../core/model/key-behavior-edits");
 const payload = decodeProfileBlob(bytes).domains[1].payload;
 const original = decodeKeyBehaviorDomain(payload);
 const views = behaviorRowsForView(original);
-const disabled = () => ({helper: "", action: "", repeatHz: ""});
-const form = () => ({keycode: "KC_A", tapHoldTerm: "", longerHoldTerm: "0", multiTapTerm: "250", keepsAutoMouseAnchored: true,
-    steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "G(KC_N)"}, hold: disabled(), longHold: disabled()},
-        {tapCount: 4, tap: disabled(), hold: {helper: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: "25"}, longHold: disabled()}]});
+const disabled = () => ({style: "", action: "", repeatHz: ""});
+const form = () => ({keycode: "KC_A", tapHoldTerm: "", longHoldTerm: "0", multiTapTerm: "250", keepsAutoMouseAnchored: true,
+    steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "G(KC_N)"}, hold: disabled(), longHold: disabled()},
+        {tapCount: 4, tap: disabled(), hold: {style: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: "25"}, longHold: disabled()}]});
 const edit = (message, caps = capabilities, input = payload) => editKeyBehaviors(input, message, caps);
 const rowFor = (input, name) => decodeKeyBehaviorDomain(input).rows.find(row => actionName(row.target) === name);
 
@@ -32,7 +32,7 @@ test("behaviour creation, edit and deletion preserve unrelated rows and profile 
     assert.equal(decodeKeyBehaviorDomain(added).rowCount, original.rowCount + 1);
     assert.deepEqual(row.steps.map(step => step.tapIndex), [0, 4]);
     assert.deepEqual(row.steps[0].tap, {kind: 1, flags: 0, operand: 0x0811});
-    assert.deepEqual(row.steps[1].hold, {mode: 3, repeatHz: 25, action: {kind: 1, flags: 0, operand: 0x004f}});
+    assert.deepEqual(row.steps[1].hold, {style: 3, repeatHz: 25, action: {kind: 1, flags: 0, operand: 0x004f}});
     assert.equal(row.tapHoldTerm, 0); assert.equal(row.multiTapTerm, 250); assert.equal(row.keepsAutoMouseAnchored, true);
     const changed = edit({type: "saveBehavior", behavior: {...form(), tapHoldTerm: "180", steps: []}}, capabilities, added);
     assert.equal(rowFor(changed, "KC_A").tapHoldTerm, 180);
@@ -44,22 +44,22 @@ test("behaviour creation, edit and deletion preserve unrelated rows and profile 
     assert.deepEqual(decodeKeyBehaviorDomain(added).rows.filter(row => actionName(row.target) !== "KC_A"), original.rows);
 });
 
-test("simple additions and all hold modes produce canonical rows", () => {
-    const next = edit({type: "saveBehavior", behavior: {keycode: "KC_A", tapHoldTerm: "90", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_TRNS"}}]}});
+test("simple additions and all hold styles produce canonical rows", () => {
+    const next = edit({type: "saveBehavior", behavior: {keycode: "KC_A", tapHoldTerm: "90", steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_TRNS"}}]}});
     assert.equal(rowFor(next, "KC_A").steps[0].tap.operand, 1);
     // A layer hold only works as "Press and hold until release"; the other hold
-    // modes carry a lock, as the keyboard requires.
-    for (const [helper, mode, action, kind] of [["PRESS_AND_HOLD_UNTIL_RELEASE", 1, "MO(2)", 2], ["TAP_AT_HOLD_THRESHOLD", 2, "LOCK_LAYER(2)", 3], ["TAP_ON_RELEASE_AFTER_HOLD", 4, "LOCK_LAYER(2)", 3]]) {
-        const result = edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, hold: {helper, action, repeatHz: "25"}, longHold: {helper, action: "LOCK_LAYER(3)"}}]}});
+    // styles carry a lock, as the keyboard requires.
+    for (const [name, style, action, kind] of [["PRESS_AND_HOLD_UNTIL_RELEASE", 1, "MO(2)", 2], ["TAP_AT_HOLD_THRESHOLD", 2, "LOCK_LAYER(2)", 3], ["TAP_ON_RELEASE_AFTER_HOLD", 4, "LOCK_LAYER(2)", 3]]) {
+        const result = edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, hold: {style: name, action, repeatHz: "25"}, longHold: {style: name, action: "LOCK_LAYER(3)"}}]}});
         const step = rowFor(result, "KC_A").steps[0];
-        assert.deepEqual(step.hold, {mode, repeatHz: 0, action: {kind, flags: 0, operand: 2}});
+        assert.deepEqual(step.hold, {style, repeatHz: 0, action: {kind, flags: 0, operand: 2}});
         assert.equal(step.longHold.action.kind, 3);
     }
-    for (const [field, helper] of [["tap", "TAP_SENDS"], ["hold", "TAP_AT_HOLD_THRESHOLD"], ["longHold", "TAP_ON_RELEASE_AFTER_HOLD"]]) {
-        assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, [field]: {helper, action: "MO(2)"}}]}}),
+    for (const [field, style] of [["tap", "TAP_SENDS"], ["hold", "TAP_AT_HOLD_THRESHOLD"], ["longHold", "TAP_ON_RELEASE_AFTER_HOLD"]]) {
+        assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, [field]: {style, action: "MO(2)"}}]}}),
             /The behaviour on KC_A: MO\(2\) holds a layer/, field);
     }
-    assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, tap: {helper: "TAP_SENDS", action: "LT(1,KC_A)"}}]}}), /makes its own tap\/hold decision/);
+    assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, tap: {style: "TAP_SENDS", action: "LT(1,KC_A)"}}]}}), /makes its own tap\/hold decision/);
 });
 
 test("native aliases update existing semantic targets without duplicating or renumbering them", () => {
@@ -81,19 +81,19 @@ test("stable semantic actions and standard shortcuts do not require a known cust
     for (const row of views) assert.deepEqual(edit({type: "saveBehavior", behavior: row}, unknown), payload);
     assert.equal(rowFor(edit({type: "saveBehavior", behavior: form()}, unknown), "KC_A").steps[0].tap.operand, 0x0811);
     // DPI_MOD is a native keycode, not a custom action.
-    assert.equal(rowFor(edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "DPI_MOD"}}]}}, unknown), "KC_A").steps[0].tap.operand, 0x7e00);
+    assert.equal(rowFor(edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "DPI_MOD"}}]}}, unknown), "KC_A").steps[0].tap.operand, 0x7e00);
 });
 
 test("invalid edits and references are rejected before upload", () => {
     const save = behavior => edit({type: "saveBehavior", behavior});
     for (const value of [-1, 65536, "abc", "1.5", true]) assert.throws(() => save({...form(), tapHoldTerm: value}));
-    for (const steps of [undefined, [{tapCount: 5}], [{tapCount: 0}, {tapCount: 0}], [{tapCount: 0, tap: {helper: "" , action: "KC_A"}}], [{tapCount: 0, tap: {helper: "BOGUS", action: "KC_A"}}]]) {
+    for (const steps of [undefined, [{tapCount: 5}], [{tapCount: 0}, {tapCount: 0}], [{tapCount: 0, tap: {style: "" , action: "KC_A"}}], [{tapCount: 0, tap: {style: "BOGUS", action: "KC_A"}}]]) {
         assert.throws(() => save({...form(), steps}));
     }
     for (const action of ["", "UNKNOWN", "MO(16)", "LOCK_LAYER(16)", "VIA_MACRO_128", "MACRO_16", "DF(2)", "G(MO(2))"]) {
-        assert.throws(() => save({...form(), steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action}}]}), undefined, action);
+        assert.throws(() => save({...form(), steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action}}]}), undefined, action);
     }
-    for (const repeatHz of ["", "0", "101", "-1", "2.5"]) assert.throws(() => save({...form(), steps: [{tapCount: 0, hold: {helper: "REPEAT_WHILE_HELD", action: "KC_A", repeatHz}}]}));
+    for (const repeatHz of ["", "0", "101", "-1", "2.5"]) assert.throws(() => save({...form(), steps: [{tapCount: 0, hold: {style: "REPEAT_WHILE_HELD", action: "KC_A", repeatHz}}]}));
     assert.throws(() => save({...form(), keepsAutoMouseAnchored: "false"}), /flag/);
     assert.throws(() => edit({type: "deleteBehavior", keycode: "KC_A"}), /no longer/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, supportedDomainMask: 1}), /firmware/);
@@ -148,17 +148,17 @@ test("behaviours send DPI and other QMK functions in every position", () => {
     const save = (step) => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, ...step}]}});
     const stepOf = (output) => rowFor(output, "KC_A").steps[0];
     for (const [name, code] of [["DPI_MOD", 0x7e00], ["S_D_RMOD", 0x7e03], ["QK_RGB_MATRIX_TOGGLE", 0x7842], ["QK_BOOT", 0x7c00]]) {
-        assert.equal(stepOf(save({tap: {helper: "TAP_SENDS", action: name}})).tap.operand, code, name);
+        assert.equal(stepOf(save({tap: {style: "TAP_SENDS", action: name}})).tap.operand, code, name);
     }
     // SNIPING holds sniping while held, as it does on a key.
-    assert.equal(stepOf(save({hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "SNIPING", repeatHz: ""}})).hold.action.operand, 0x7e04);
+    assert.equal(stepOf(save({hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "SNIPING", repeatHz: ""}})).hold.action.operand, 0x7e04);
 });
 
 test("behaviours take TG, TO, TT and OSL where they can run, through the keyboard's layer ownership", () => {
     const owning = capabilities;
     const save = (step, caps) => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, ...step}]}}, caps);
-    const tap = action => ({tap: {helper: "TAP_SENDS", action}});
-    const hold = (helper, action) => ({hold: {helper, action, repeatHz: ""}});
+    const tap = action => ({tap: {style: "TAP_SENDS", action}});
+    const hold = (style, action) => ({hold: {style, action, repeatHz: ""}});
     const stepOf = (output) => rowFor(output, "KC_A").steps[0];
     for (const [name, code] of [["TG(2)", 0x5262], ["TO(0)", 0x5200], ["OSL(2)", 0x5282]]) {
         const action = stepOf(save(tap(name), owning)).tap;

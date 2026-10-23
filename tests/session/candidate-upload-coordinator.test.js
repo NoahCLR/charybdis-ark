@@ -455,7 +455,7 @@ test("a COMMIT the keyboard already finished is confirmed from status, never sen
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 1);
 });
 
-test("a split commit polls through peer preparation and convergence before activation", async () => {
+test("a split commit polls through slave-half preparation and convergence before activation", async () => {
     const harness = new CandidateFirmwareHarness({
         splitBarrier: true,
         prepareReads: 2,
@@ -693,7 +693,7 @@ test("a queued operation that never advances returns bounded structured ambiguit
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_BEGIN).length, 1);
 });
 
-test("default status stall timing scales and gives peer preparation its unobservable-progress window", () => {
+test("default status stall timing scales and gives slave-half preparation its unobservable-progress window", () => {
     const minimum = candidateStatusStallTimeoutMs(PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE);
     const maximum = candidateStatusStallTimeoutMs(PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE);
     const preparing = candidateStatusStallTimeoutMs(
@@ -731,25 +731,25 @@ test("observable split state progress renews the stall deadline", async () => {
     assert.equal(now > 2, true);
 });
 
-test("the copy to the other half moving on keeps a long peer preparation alive, and reaches progress", async () => {
-    const run = async (readPeerStatus) => {
+test("the copy to the slave half moving on keeps a long slave-half preparation alive, and reaches progress", async () => {
+    const run = async (readSlaveStatus) => {
         let now = 0;
-        const peers = [];
+        const slaveOffsets = [];
         const harness = new CandidateFirmwareHarness({splitBarrier: true, prepareReads: 12, commitReads: 1, convergenceReads: 1, activationReads: 1});
         const client = new CandidateUploadCoordinator(harness, {
             pollIntervalMs: 1, statusStallTimeoutMs: 3, now: () => now, async sleep(ms) { now += ms; },
-            readPeerStatus, onProgress: (progress) => { if (progress.peer) peers.push(progress.peer.transferOffset); },
+            readSlaveStatus, onProgress: (progress) => { if (progress.slave) slaveOffsets.push(progress.slave.transferOffset); },
         });
         const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
-        return {result: await client.commit(prepared.transactionId, {digest: prepared.metadata.digest}), peers};
+        return {result: await client.commit(prepared.transactionId, {digest: prepared.metadata.digest}), slaveOffsets};
     };
     // Page 0 stays identical through PREPARING_PEER, so without page 1 the
-    // short stall window expires before the peer is ready.
+    // short stall window expires before the slave half is ready.
     await assert.rejects(run(undefined), (error) => error.code === "COMMIT_OUTCOME_AMBIGUOUS");
     let offset = 0;
-    const {result, peers} = await run(async () => ({phase: 3, phaseName: "SENDING", lastStatus: 0, lastStatusName: "OK", transferOffset: offset += 10, transferLength: 200, retryCount: 0, transportFailureCount: 0}));
+    const {result, slaveOffsets} = await run(async () => ({phase: 3, phaseName: "SENDING", lastStatus: 0, lastStatusName: "OK", transferOffset: offset += 10, transferLength: 200, retryCount: 0, transportFailureCount: 0}));
     assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
-    assert.ok(peers.length >= 10 && peers.every((value, index) => index === 0 || value >= peers[index - 1]), "each peer read reaches progress");
+    assert.ok(slaveOffsets.length >= 10 && slaveOffsets.every((value, index) => index === 0 || value >= slaveOffsets[index - 1]), "each slave-half status read reaches progress");
 });
 
 test("an unexpected polling failure cleans up the admitted candidate before retry", async () => {

@@ -6,7 +6,7 @@ const {timingAlone, changesNothing, inertBehaviorFindings} = require("../../core
 const key = operand => ({kind: 1, flags: 0, operand});
 const shortcuts = Array.from({length: 128}, () => ({mods: 0, key: 0}));
 shortcuts[2] = {mods: 0x02, key: 0x06};
-const row = (target, fields = {}) => ({target, steps: [], tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0,
+const row = (target, fields = {}) => ({target, steps: [], tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0,
     keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 0xffff, ...fields});
 
 test("a timing alone does something only on a key the keyboard handles anyway, as the firmware classifies it", () => {

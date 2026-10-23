@@ -12,7 +12,7 @@ const {macroEditorView} = require("./macro-editor");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
-const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
 const {VOCABULARY, word, layerName: layerCalled, slotName, modifierNames} = require("./vocabulary");
 
@@ -158,12 +158,12 @@ function behaviourFields(row, defaults, names) {
     // Each timing is marked with what it decides, as Settings marks its default.
     /** @param {number} value @param {number} fallback @param {Mark} labelMark @returns {Field} */
     const timing = (value, fallback, labelMark) => ({text: value ? `${value} ms` : `default · ${fallback} ms`, key: value, labelMark});
-    const inherited = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, defaults);
+    const inherited = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, defaults);
     /** @type {Fields} */
     const fields = new Map([
         ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
         ["Tap / hold threshold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
-        ["Long hold threshold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
+        ["Long hold threshold", timing(row.longHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
         ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
         ["Enabled", row.enabled ? "on" : "off"],
         ["Allowed layers", allowedLayers(row.allowedLayers, names)],
@@ -174,13 +174,13 @@ function behaviourFields(row, defaults, names) {
         const hold = tier === "tap" ? undefined : /** @type {import("../schema/types.js").HoldBranch} */ (branch);
         const reaches = hold ? hold.action : /** @type {Action} */ (branch);
         if (tier === "tap" && !reaches.kind) continue;
-        const how = tier === "tap" ? "" : ` · ${word(VOCABULARY.holdHelpers[name], Object.entries(KEY_BEHAVIOR_HOLD_MODES).find(([, id]) => id === hold?.mode)?.[0])}${hold?.repeatHz ? ` · ${hold?.repeatHz} Hz` : ""}`;
+        const how = tier === "tap" ? "" : ` · ${word(VOCABULARY.holdStyles[name], Object.entries(KEY_BEHAVIOR_HOLD_STYLES).find(([, id]) => id === hold?.style)?.[0])}${hold?.repeatHz ? ` · ${hold?.repeatHz} Hz` : ""}`;
         // A tier is named as the grid names it, and carries which branch and
         // tier it is, so the review can colour it as the grid does.
         // Compared by what is stored, so a renamed or cleared pointing mode
         // or layer is a change where it was made, not to every behaviour
         // that reaches it.
-        fields.set(`${step.tapIndex + 1}× ${VOCABULARY.tiers[name].toLowerCase()}`, {text: `${action(reaches, names)}${how}`, detail: `${action(reaches, names, true)}${how}`, key: JSON.stringify([reaches, hold?.mode, hold?.repeatHz]),
+        fields.set(`${step.tapIndex + 1}× ${VOCABULARY.tiers[name].toLowerCase()}`, {text: `${action(reaches, names)}${how}`, detail: `${action(reaches, names, true)}${how}`, key: JSON.stringify([reaches, hold?.style, hold?.repeatHz]),
             labelMark: {kind: "tier", tier: name, branch: step.tapIndex + 1}, mark: actionMark(reaches)});
     }
     return fields;
@@ -511,7 +511,7 @@ function profileReview(before, after, capabilities) {
             const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(next.target));
             if (!old) continue;
             const oldTimes = effectiveTimings(old, a.settings.values), nextTimes = effectiveTimings(next, b.settings.values);
-            for (const [field, term, label] of /** @type {const} */ ([["multiTapTerm", "repeat", "Multi tap window"], ["tapHoldTerm", "hold", "Tap / hold threshold"], ["longerHoldTerm", "long", "Long hold threshold"]])) {
+            for (const [field, term, label] of /** @type {const} */ ([["multiTapTerm", "repeat", "Multi tap window"], ["tapHoldTerm", "hold", "Tap / hold threshold"], ["longHoldTerm", "long", "Long hold threshold"]])) {
                 // Normalized explicit matches already have a stored behaviour
                 // change above; include inherited-only effects here.
                 if (old[field] !== 0 || next[field] !== 0 || oldTimes[term] === nextTimes[term]) continue;

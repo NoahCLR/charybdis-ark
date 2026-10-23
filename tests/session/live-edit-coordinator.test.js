@@ -67,16 +67,16 @@ test("a stale edit is refused with the keyboard's current pair; a refused one ch
     assert.equal(service.snapshot().error.code, "LIVE_EDIT_REFUSED", "a refusal is recorded like any failed operation");
 });
 
-test("an edit waits for the other half before it says both halves hold it", async t => {
+test("an edit waits for the slave half before it says both halves hold it", async t => {
     const {service, keyboard} = await live(t);
     const read = await service.readKeyboardProfile();
-    keyboard.faults.peerLag = 3;
+    keyboard.faults.slaveLag = 3;
     const result = await service.postLiveEdit({from: read.live.working, to: target(layers => {layers[1][0] = 0x08;}), defaults: read.live.defaults, identity: read.live});
     assert.equal(result.converged, true);
-    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, sleep: async () => {}, timing: {peerMs: -1}});
-    keyboard.faults.peerLag = 50;
+    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, sleep: async () => {}, timing: {slaveMs: -1}});
+    keyboard.faults.slaveLag = 50;
     const late = await coordinator.post({from: result.bytes, to: target(layers => {layers[1][1] = 0x09;}), defaults: read.live.defaults, identity: result, capacity: 130048});
-    assert.equal(late.converged, false, "an edit the other half has not taken yet is not shown as applied on both");
+    assert.equal(late.converged, false, "an edit the slave half has not taken yet is not shown as applied on both");
 });
 
 test("a lost answer ends the connection; reading again says whether the edit landed, and nothing is replayed", async t => {
@@ -129,16 +129,16 @@ test("the edit mode is set and confirmed, and refused while edits are unsaved", 
     assert.equal(applyRead.live, undefined);
 });
 
-test("an edit mode change says to connect an unplugged other half at once, and waits for a key change to reach both halves", async t => {
+test("an edit mode change says to connect an unplugged slave half at once, and waits for a key change to reach both halves", async t => {
     const {service, keyboard} = await live(t);
     await service.readKeyboardProfile();
     const modeChanges = () => keyboard.requests.filter(r => r[0] === 0x07 && r[2] === 0x27).length;
-    // The keyboard stays BUSY until the other half is back: asked once, never again.
-    keyboard.faults.peerAbsent = true;
+    // The keyboard stays BUSY until the slave half is back: asked once, never again.
+    keyboard.faults.slaveAbsent = true;
     const before = modeChanges();
-    await assert.rejects(service.setEditMode(EDIT_MODE.APPLY), error => error.code === "LIVE_PEER_ABSENT" && /Connect the cable between the halves/.test(error.message));
-    assert.equal(modeChanges() - before, 1, "no silent retry while the other half is unplugged");
-    delete keyboard.faults.peerAbsent;
+    await assert.rejects(service.setEditMode(EDIT_MODE.APPLY), error => error.code === "LIVE_SLAVE_ABSENT" && /Connect the cable between the halves/.test(error.message));
+    assert.equal(modeChanges() - before, 1, "no silent retry while the slave half is unplugged");
+    delete keyboard.faults.slaveAbsent;
     // A DPI or lighting key change not yet saved: NOT_CLEAN, said as such.
     keyboard.raised.adjustmentPending = true;
     await assert.rejects(service.setEditMode(EDIT_MODE.APPLY), error => error.code === "LIVE_EDIT_NOT_CLEAN" && /key change has not reached both halves/.test(error.message));
@@ -177,24 +177,24 @@ const beginElsewhere = (keyboard, transactionId) => {
     assert.equal(keyboard.receiving, transactionId);
 };
 
-test("an edit the other half refuses is sent to it whole once; refused again, the halves are apart until Revert", async t => {
+test("an edit the slave half refuses is sent to it whole once; refused again, the halves are apart until Revert", async t => {
     const connected = await live(t), {service, keyboard} = connected;
     const read = await service.readKeyboardProfile();
     // Refused once: the whole copy follows, and the next edit waits for it.
-    keyboard.faults.peerRefuses = 1; keyboard.faults.peerCatchUp = 40;
-    const first = await coordinatorOf(connected, {peerMs: -1}).post({from: read.live.working, to: target(layers => {layers[1][2] = 0x04;}), defaults: read.live.defaults, identity: read.live, capacity: 130048});
-    assert.deepEqual([first.converged, first.apart], [false, false], "catching up, not apart");
+    keyboard.faults.slaveRefuses = 1; keyboard.faults.slaveCatchUp = 40;
+    const first = await coordinatorOf(connected, {slaveMs: -1}).post({from: read.live.working, to: target(layers => {layers[1][2] = 0x04;}), defaults: read.live.defaults, identity: read.live, capacity: 130048});
+    assert.deepEqual([first.converged, first.slaveRefused], [false, false], "catching up, not apart");
     const second = await service.postLiveEdit({from: first.bytes, to: target(layers => {layers[1][2] = 0x04; layers[1][3] = 0x05;}), defaults: read.live.defaults, identity: first});
-    assert.deepEqual([second.converged, second.apart], [true, false], "the next edit waited for the other half to catch up");
+    assert.deepEqual([second.converged, second.slaveRefused], [true, false], "the next edit waited for the slave half to catch up");
     // Refused twice: apart. Save and new edits stop at once, saying Revert.
-    keyboard.faults.peerRefuses = 2;
+    keyboard.faults.slaveRefuses = 2;
     const third = await service.postLiveEdit({from: second.bytes, to: target(layers => {layers[1][4] = 0x06;}), defaults: read.live.defaults, identity: second});
-    assert.deepEqual([third.converged, third.apart], [false, true]);
+    assert.deepEqual([third.converged, third.slaveRefused], [false, true]);
     await assert.rejects(service.saveWorkingCopy(third), error => error.code === "LIVE_HALVES_APART" && /Revert/.test(error.message));
     await assert.rejects(service.postLiveEdit({from: third.bytes, to: target(layers => {layers[1][5] = 0x07;}), defaults: read.live.defaults, identity: third}), {code: "LIVE_HALVES_APART"});
-    assert.equal((await service.readKeyboardProfile()).live.apart, true, "a read says the halves are apart");
+    assert.equal((await service.readKeyboardProfile()).live.slaveRefused, true, "a read says the halves are apart");
     const reverted = await service.revertWorkingCopy(third);
-    assert.deepEqual([reverted.converged, reverted.apart], [true, false]);
+    assert.deepEqual([reverted.converged, reverted.slaveRefused], [true, false]);
 });
 
 test("an edit being received holds the keyboard for 15 s, then ends ABORTED", async t => {
@@ -241,7 +241,7 @@ test("Ark records the bytes it sent and checks the keyboard holds a profile of t
     assert.ok(replaced.bytes.equals(to)); assert.ok(keyboard.working.equals(to));
 });
 
-test("a save waiting for a quiet keyboard on the other half says so", async t => {
+test("a save waiting for a quiet keyboard on the slave half says so", async t => {
     const {service, keyboard} = await live(t);
     const read = await service.readKeyboardProfile();
     const edited = await service.postLiveEdit({from: read.live.working, to: target(layers => {layers[3][2] = 0x04;}), defaults: read.live.defaults, identity: read.live});
@@ -289,7 +289,7 @@ test("flushing (leaving Live) waits for the keyboard's own save, saves what is l
     assert.equal(saved.revision, keyboard.revision);
     assert.ok(read.live);
     keyboard.externalEdit(target(layers => {layers[0][9] = 0x08;}));
-    keyboard.raised.peerRefused = true;
+    keyboard.raised.slaveRefused = true;
     await assert.rejects(coordinator.flush(), {code: "LIVE_HALVES_APART"});
 });
 
@@ -369,7 +369,7 @@ test("restart is sent with its confirmation and says whether the slave half took
         keyboard.raised.stopped = true;
         if (unanswered) keyboard.faults.restartUnacknowledged = true;
         const coordinator = service.liveCoordinator();
-        assert.deepEqual(await coordinator.restart(), {peerAcknowledged: !unanswered});
+        assert.deepEqual(await coordinator.restart(), {slaveAcknowledged: !unanswered});
         const sent = keyboard.mutations.at(-1);
         assert.equal(sent[2], 0x28);
         assert.equal(sent.subarray(5, 9).toString("latin1"), "REST");
@@ -379,17 +379,17 @@ test("restart is sent with its confirmation and says whether the slave half took
 
 test("a stopped keyboard's refusals name the stop and carry their own code", async t => {
     const {service, keyboard} = await live(t);
-    keyboard.raised.peerStopped = true;
+    keyboard.raised.slaveStopped = true;
     const status = await service.liveCoordinator().status();
-    assert.deepEqual([status.stopped, status.peerStopped], [false, true]);
+    assert.deepEqual([status.stopped, status.slaveStopped], [false, true]);
     await assert.rejects(service.liveCoordinator().save({session: status.session, revision: status.revision}),
         error => error.code === "LIVE_KEYBOARD_STOPPED" && /The keyboard did not save: the keyboard stopped saving\. Restart it to continue\./.test(error.message));
-    // BUSY with flag 15 (the other half stopped) ends only by a restart: asked once.
+    // BUSY with flag 15 (the slave half stopped) ends only by a restart: asked once.
     const modeChanges = () => keyboard.requests.filter(r => r[0] === 0x07 && r[2] === 0x27).length;
     const before = modeChanges();
     await assert.rejects(service.liveCoordinator().setMode(EDIT_MODE.LIVE), {code: "LIVE_KEYBOARD_STOPPED"});
     assert.equal(modeChanges() - before, 1, "no retry while a half is stopped");
-    keyboard.raised.peerStopped = false;
+    keyboard.raised.slaveStopped = false;
     await assert.rejects(service.liveCoordinator().post({from: keyboard.saved, to: target(layers => {layers[0][3] = 0x05;}), identity: {session: 0, revision: 0}, capacity: 130048}),
         error => error.code !== "LIVE_KEYBOARD_STOPPED", "a keyboard that is not stopped is refused as before");
 });

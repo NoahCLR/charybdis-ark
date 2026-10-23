@@ -66,7 +66,7 @@ no colour shows the background effect; **Give it a colour** adds one.
 
 ### Auto-mouse fade
 
-How the auto-mouse layer's light fades when the layer drops out:
+How the pointer layer's light fades when auto-mouse turns it off:
 
 - **Fade mode**: follow the real destination, or fade to an **End colour**
   where the background effect would show, or on all keys.

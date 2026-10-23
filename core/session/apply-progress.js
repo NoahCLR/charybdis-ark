@@ -6,7 +6,7 @@
  * @typedef {import("../../contracts/model.js").ApplyStep} ApplyStep
  * @typedef {{name?: string, domainId?: number, rowIndex?: number}} DeviceFailure
  * @typedef {{message?: string, deviceError?: DeviceFailure, status?: {error?: DeviceFailure}}} FailureDetails
- * @typedef {{waitingSafeBoundary?: boolean, lastStatusName?: string, busyStreak?: number, busyReason?: string, transportFailureCount?: number}} PeerFailure
+ * @typedef {{waitingSafeBoundary?: boolean, lastStatusName?: string, busyStreak?: number, busyReason?: string, transportFailureCount?: number}} SlaveFailure
  */
 
 // The steps of one Apply, as the person watching it sees them.
@@ -23,7 +23,7 @@ const APPLY_STEPS = Object.freeze(/** @type {const} */ ([
     {id: "backup", label: "Save a recovery copy"},
     {id: "upload", label: "Send the profile"},
     {id: "validate", label: "Keyboard checks the profile"},
-    {id: "peer", label: "Copy the profile to the slave half"},
+    {id: "slave", label: "Copy the profile to the slave half"},
     {id: "commit", label: "Save it on the master half"},
     {id: "converge", label: "Finish the slave half"},
     {id: "verify", label: "Check both halves"},
@@ -34,7 +34,7 @@ const STEP_INDEX = Object.freeze(Object.fromEntries(APPLY_STEPS.map((step, index
 // Up to this step nothing reaches durable storage; the commit decision is made
 // inside "commit". Where a failure lands decides what can honestly be said
 // about what was saved, together with whether the keyboard confirmed a cancel.
-const LAST_UNSAVED_STEP = STEP_INDEX.peer;
+const LAST_UNSAVED_STEP = STEP_INDEX.slave;
 
 /** @param {number | undefined} completed @param {number | undefined} total */
 function bytes(completed, total) {
@@ -149,7 +149,7 @@ const DEVICE_REASONS = Object.freeze({
 // The slave half's last answer to the split transfer, when the keyboard
 // reports it (candidate status page 1).
 /** @type {Readonly<Record<string, string>>} */
-const PEER_REASONS = Object.freeze({
+const SLAVE_REASONS = Object.freeze({
     BUSY: "The slave half kept answering that it was busy.",
     STALE: "The slave half already had a newer profile.",
     CONFLICT: "The slave half holds a conflicting profile.",
@@ -171,7 +171,7 @@ function locate(error) {
 
 // Why the slave half kept answering BUSY, when it said.
 /** @type {Readonly<Record<string, string>>} */
-const PEER_BUSY_REASONS = Object.freeze({
+const SLAVE_BUSY_REASONS = Object.freeze({
     MAILBOX_FULL: "The slave half stopped handling requests from the master half.",
     OTHER_COPY: "The slave half was still holding an earlier, unfinished copy.",
     NO_LEASE: "The slave half dropped the copy partway and did not take it up again.",
@@ -182,21 +182,21 @@ const PEER_BUSY_REASONS = Object.freeze({
 
 // The keyboard's own reason when it gave one, else the slave half's last
 // answer, else Ark's own message.
-/** @param {FailureDetails | null | undefined} error @param {PeerFailure | null | undefined} peer */
-function failureReason(error, peer) {
+/** @param {FailureDetails | null | undefined} error @param {SlaveFailure | null | undefined} slave */
+function failureReason(error, slave) {
     const device = error?.deviceError || error?.status?.error;
     if (device?.name && device.name !== "NONE") {
         // The copy was ready; the save waited for the master half to go idle.
-        if (device.name === "TIMEOUT" && peer?.waitingSafeBoundary) return "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
+        if (device.name === "TIMEOUT" && slave?.waitingSafeBoundary) return "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
         // The copy to the slave half stopped: its last answer says why.
-        if (device.name === "PEER_TRANSFER_FAILED" && peer?.lastStatusName && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
+        if (device.name === "PEER_TRANSFER_FAILED" && slave?.lastStatusName && SLAVE_REASONS[slave.lastStatusName]) return SLAVE_REASONS[slave.lastStatusName];
         const known = DEVICE_REASONS[device.name];
         if (known) return device.name === "VALIDATION_REJECTED" ? `${known}${locate(device)}.` : known;
         return `The keyboard reported ${device.name}.`;
     }
-    if (peer && (peer.busyStreak ?? 0) >= 3 && peer.busyReason && PEER_BUSY_REASONS[peer.busyReason]) return PEER_BUSY_REASONS[peer.busyReason];
-    if (peer && peer.lastStatusName && peer.lastStatusName !== "OK" && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
-    if (peer && (peer.transportFailureCount ?? 0) > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
+    if (slave && (slave.busyStreak ?? 0) >= 3 && slave.busyReason && SLAVE_BUSY_REASONS[slave.busyReason]) return SLAVE_BUSY_REASONS[slave.busyReason];
+    if (slave && slave.lastStatusName && slave.lastStatusName !== "OK" && SLAVE_REASONS[slave.lastStatusName]) return SLAVE_REASONS[slave.lastStatusName];
+    if (slave && (slave.transportFailureCount ?? 0) > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
     return error?.message || "The keyboard stopped answering.";
 }
 
