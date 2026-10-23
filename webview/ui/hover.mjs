@@ -227,7 +227,7 @@ function reachSections(model, layer, position, index,
             <span>${esc(slot.displayName || `Slot ${slot.id}`)}</span>
             <span class="hc-life">${slot.kind === KIND.SCROLLING ? "scrolling" : slot.kind ? "directional" : "empty slot"}</span></div>
             <div class="hc-sub hc-foot">${slot.kind
-                ? `Its colour paints ${esc(localityText(row?.locality))} while the mode runs — not this key.`
+                ? `Its colour paints ${esc(localityText(row?.locality))} while the mode runs.`
                 : "This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way."}</div></div>`);
     }
     if (combos.length) {

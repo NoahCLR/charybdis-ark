@@ -32,6 +32,14 @@ test("every stored enum value has a word", () => {
     assert.ok(VOCABULARY.hostLayouts.some(([, name]) => name === "German (Windows)") && VOCABULARY.hostLayouts[0][1] === "US");
 });
 
+test("every LED group row table has a word, by the target its edits name", () => {
+    assert.deepEqual(VOCABULARY.ledTables.map(([id]) => id), ["layer", "pdMode", "combo", "keyBehavior"]);
+});
+
+test("tap commit names the taps it flashes for: a double tap or more", () => {
+    assert.equal(word(VOCABULARY.tapCommit, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS"), "Double taps and more");
+});
+
 test("an unknown value reads as itself, never as nothing", () => {
     assert.equal(word(VOCABULARY.localities, "RGB_LEFT_HALF"), "Left half");
     assert.equal(word(VOCABULARY.localities, "RGB_SOMEWHERE"), "RGB_SOMEWHERE");

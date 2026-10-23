@@ -1,12 +1,13 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {NAME_MAX_BYTES, NAME_TIP} from "../../view/names.mjs";
+import {NAME_TIP} from "../../view/names.mjs";
 import {KIND, dpiOptions, readConfig, scrollStarter, settleButtons, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
 import {post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {slotLight} from "../marks.mjs";
 import {bindingName, words} from "./common.mjs";
 import {formControls} from "./form-controls.mjs";
+import {countNameBytes} from "../title-name.mjs";
 import {movement} from "./movement.mjs";
 import {slotReach} from "./reach.mjs";
 import {advancedControls} from "./advanced.mjs";
@@ -40,8 +41,11 @@ export function editor(model, slot, canEdit, slots) {
         <div class="card-b pd-identity"></div></div>`);
     const headBody = /** @type {HTMLElement} */ (head.querySelector(".card-b"));
     const name = el(`<label class="field"><span>Name</span>
-        <input data-f="pointing:${slot.id}:name" class="input" value="${esc(slot.name)}" maxlength="${NAME_MAX_BYTES}" data-tip="${esc(NAME_TIP)}" ${disabled}></label>`);
-    form.name = () => /** @type {HTMLInputElement} */ (name.querySelector("input")).value.trim();
+        <input data-f="pointing:${slot.id}:name" class="input" value="${esc(slot.name)}" data-tip="${esc(NAME_TIP)}" ${disabled}>
+        <span class="note" data-name-count></span></label>`);
+    const nameInput = /** @type {HTMLInputElement} */ (name.querySelector("input"));
+    countNameBytes(nameInput, /** @type {HTMLElement} */ (name.querySelector("[data-name-count]")));
+    form.name = () => nameInput.value.trim();
     headBody.append(name);
     headBody.append(select("Movement", words(model).kinds.filter(([value]) => value), kind, "kind",
         // Switching movement only redraws the form for the other kind: its

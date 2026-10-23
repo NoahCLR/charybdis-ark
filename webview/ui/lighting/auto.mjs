@@ -2,7 +2,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff, label as hsvLabel} from "../../lib/colour.mjs";
 import {canEdit as canEditArea, post, render, state, writable} from "../../store.mjs";
-import {stageIdle} from "../../view/lighting.mjs";
+import {offWording, stageIdle} from "../../view/lighting.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -85,7 +85,7 @@ export function stageAuto(model) {
     endColour.append(unused
         ? el(`<div class="row colour-head unused"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
             <div><div class="colour-title">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
-        : colourControl(model, {colour: fade.end_color, canEdit: editFade, title: "Fade destination",
+        : colourControl(model, {colour: fade.end_color, canEdit: editFade, title: "Fade destination", ...offWording("auto"),
             onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
     if (unused) endColour.append(el(`<p class="note">Follow-the-real-destination lands on whatever the board would show once the auto-mouse layer drops out, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
     node.append(policy, endColour, fadeTiming(model, idle));

@@ -3,6 +3,7 @@ import {el} from "../../lib/dom.mjs";
 import {post, writable} from "../../store.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
+import {offWording} from "../../view/lighting.mjs";
 import {comboBadge, comboInputsMarked} from "../marks.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 
@@ -17,7 +18,7 @@ export function stageCombo(model) {
     const colour = section("Colour");
     colour.append(colourControl(model, {
         colour: combo.color, canEdit, title: "Combo feedback",
-        offNote: "No colour is stored, so combo keys are not repainted while their inputs are held.",
+        ...offWording("combo"),
         onChange: (next) => { if (combo.locality !== undefined) post(edits.comboFeedback(combo.locality, next)); },
     }));
     const where = section("Where it paints");

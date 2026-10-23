@@ -35,10 +35,14 @@ Every stage uses the same colour editor: drag in the square and along the
 **Hue** strip, or type **H**, **S** and **V**. Brightness stops at the limit
 the keyboard reports.
 
-**Turn off** clears the colour. A layer with no colour, or an LED row with
-none, lets what is underneath show through. A colour with brightness at zero but some hue and
-saturation is different: it paints black, and keeps its hue and saturation
-for when you raise the brightness again.
+**Turn off** stores HSV(0, 0, 0), and what that does depends on the stage. A
+layer with no colour paints nothing, so what is underneath shows through, and
+an LED row with none takes its stage's colour. Everywhere else black is
+black: a pointing mode, combo feedback or a key feedback colour turned off
+paints its area black while it runs, and the auto-mouse fade ends on black.
+To paint nothing there, switch the tab's **Stage on** off. A colour with
+brightness at zero but some hue and saturation also paints black, and keeps
+its hue and saturation for when you raise the brightness again.
 
 ### Background effect
 
@@ -55,8 +59,10 @@ shows it.
 ### Layer colours
 
 Pick a layer in the list to give it a colour. **Which keys light up**: **Keys
-mapped on this layer only**, or **All keys**. A layer with no colour shows the
-background effect; **Give it a colour** adds one.
+mapped on this layer only** leaves the keys that are transparent or empty on
+the layer unpainted, so what is beneath shows there; **All keys** paints
+every key. Transparent keys keep their ▽ on the board either way. A layer with
+no colour shows the background effect; **Give it a colour** adds one.
 
 ### Auto-mouse fade
 
@@ -74,10 +80,18 @@ this stage paints nothing.
 ### Pointing modes
 
 Each pointing mode can light while it runs, over whatever the layer paints.
-Pick a mode, give it a colour, and choose where it paints: **Both halves**,
-**Left half**, **Right half**, **The half holding the trigger key** or **Only
-the trigger key**. It never paints the key that runs it. **Preview it active
-on the board** shows it.
+Pick a mode, give it a colour, and choose where it paints:
+
+- **Both halves**, **Left half** or **Right half**: that area, whichever key
+  started the mode.
+- **The half holding the trigger key**: the whole half the key that started
+  the mode is on, that key included; both halves when a combo's keys span
+  them.
+- **Only the trigger key**: just the key that started the mode, or every key
+  of the combo that did.
+
+A mode with no known trigger key paints every key under the last two.
+**Preview it active on the board** shows it.
 
 ### Combo feedback
 
@@ -86,12 +100,16 @@ combo badges on the board take their outline from it.
 
 ### Key feedback
 
-The colours a key flashes as a behaviour fires: a tap, a hold, a long hold,
-and each tap count from the double tap on. Under **When and where**:
+The colours a key flashes as a behaviour fires: **Tap committed**, **Hold
+active**, **Long hold active**, and one for each tap count from the double tap
+on. **On the board** shows the same colours under the same names. Under
+**When and where**:
 
-- **Tap commit**: **Non-base taps** flashes when a double tap or more fires;
+- **Tap commit**: **Double taps and more** flashes when a double tap or more
+  fires, unless it sends a layer or pointing key, whose own stage shows it;
   **Off** doesn't flash for taps.
-- **Where**: where the flash paints, with the same choices as a pointing mode.
+- **Locality**: where the flash paints, with the same choices as a pointing
+  mode.
 - **Flash interval**: how long each on or off phase lasts.
 
 These are also the colours of the behaviour dots on the board.
@@ -107,6 +125,10 @@ The **LED groups** tab paints single LEDs, over a stage's own colour.
    all of them), and its colour.
 3. **Keep row in draft**.
 
-**Save selection as a group** keeps the LEDs as a reusable group for other
-rows. Rows apply in order, so a later row wins on an LED they share. A row
-whose colour is turned off takes its stage's colour.
+**Save selection as a group** keeps the selected LEDs as a reusable group for
+other rows; with nothing selected there is nothing to save. Groups are
+numbered by the LEDs they hold, so saving or removing one can renumber the
+others; every row keeps its LEDs. **Used by** lists the tables and owners
+whose rows use a group, and a group in use cannot be removed. Rows apply in
+order, so a later row wins on an LED they share. A row whose colour is turned
+off takes its stage's colour.

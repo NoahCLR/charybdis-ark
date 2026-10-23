@@ -46,7 +46,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
     assert.equal(model.pdModes[7].name, "History");
     assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7" && key.keycode === 0x7e87 && key.label === "History · hold"));
-    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7_LOCK" && key.keycode === 0x7ea7 && key.label === "History · toggle"));
+    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7_LOCK" && key.keycode === 0x7ea7 && key.label === "History · lock"));
     assert(!model.qmkKeycodes.some(key => key.value === "SLOT_7_MODE"));
     assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_6" && key.keycode === 0x7e86 && key.label === "Slot 6 · hold (empty)"),
         "an unconfigured slot still offers its keycodes, so a button can be placed before the mode exists");

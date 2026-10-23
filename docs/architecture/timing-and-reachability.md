@@ -158,7 +158,7 @@ steps, no anchor and no timing that applies to its key.
 
 `timingAlone` follows the firmware key runtime's classification. It is
 narrower than the contract's words ("dual-role, layer and pd-mode keys"):
-`TO()`, `TG()`, `LOCK_LAYER()`, pointing-mode toggles, `DF()` and `PDF()` are
+`TO()`, `TG()`, `LOCK_LAYER()`, pointing-mode locks, `DF()` and `PDF()` are
 not handled anyway. A firmware change to it is an Ark follow-up.
 
 The rule crosses to the interface twice. `device-profile-view.js` publishes

@@ -1,6 +1,6 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {keyName, pointingMacro} from "../../view/keyvalues.mjs";
+import {keyDisplayName, keyName, pointingMacro} from "../../view/keyvalues.mjs";
 import {modifierGrid} from "../modifier-grid.mjs";
 import {render} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
@@ -30,16 +30,21 @@ export function formControls(model, slot, canEdit, stageCurrent) {
     /** @param {string} label @param {import("../../../contracts/edits.js").Scalar | undefined} code @param {string} key @param {import("../surface-types.js").ShortcutOptions} [options] */
     const shortcut = (label, code, key, options = {}) => {
         const name = options.name ?? keyName(model, Number(code ?? 0));
+        // The field shows the key as the picker names it. Left as shown it
+        // stages the stored keycode; a QMK name or alias typed over it stages
+        // that.
+        const shown = options.name ?? keyDisplayName(model, Number(code ?? 0));
         const node = el(`<label class="field ${options.klass || ""}"><span>${options.labelHtml || esc(label)}</span>
-            <div class="input-row"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(name)}" placeholder="nothing" ${disabled}>
+            <div class="input-row"><input data-f="pointing:${slot.id}:${esc(key)}" class="input" value="${esc(shown)}" placeholder="nothing" ${disabled}
+                data-tip="${esc(name ? `Stored as ${name}. Type a QMK keycode name, or pick one.` : "Type a QMK keycode name, or pick one.")}">
             <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
         const macro = pointingMacro(model, code);
         if (macro) {
-            node.append(el(`<span class="note">${esc(macro.name)}${macro.empty ? " · empty: does nothing yet" : ""}</span>`));
+            if (macro.empty) node.append(el(`<span class="note">Empty macro: does nothing yet</span>`));
             if (!key.startsWith("button:") && slot.directionOutput === 0) node.append(el(`<span class="note" data-tip="Triggers while a macro is playing are dropped. Choose Once per movement under How often it sends for a longer macro.">Busy triggers are dropped · try Once per movement</span>`));
         }
         const input = /** @type {HTMLInputElement} */ (node.querySelector("input"));
-        form[key] = () => input.value.trim();
+        form[key] = () => input.value.trim() === shown ? name : input.value.trim();
         /** @type {HTMLButtonElement} */ (node.querySelector("[data-pick]")).addEventListener("click", (event) => {
             event.preventDefault();   // inside a <label>, a click would also focus the input
             // Only what the keyboard sends from a pointing mode is offered

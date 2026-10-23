@@ -175,7 +175,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the background effect would show"],
         ["END_COLOR_ON_ALL_KEYS", "End colour on all keys"],
     ],
-    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Non-base taps"]],
+    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Double taps and more"]],
     feedbackOwners: [
         ["KEY_FEEDBACK_GROUP_ALL", "Every feedback state"],
         ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Tap branch pending"],
@@ -183,6 +183,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Hold active"],
         ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold active"],
     ],
+    // The four tables of LED group rows, by the target an LED row edit names.
+    ledTables: [["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]],
     // The lighting stages in the order the firmware paints them. A stage is
     // found by its id or bit, never by its words.
     stages: [

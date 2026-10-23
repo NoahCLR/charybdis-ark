@@ -2,7 +2,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
 import {currentLayer, layerName, layers, post, render, showLayer, state, writable} from "../../store.mjs";
-import {layerColourRow, layerPaints} from "../../view/lighting.mjs";
+import {layerColourRow, layerPaints, offWording} from "../../view/lighting.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -34,7 +34,7 @@ export function stageLayers(model) {
     const colour = section(`${layerName(layer)} colour`);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${layerName(layer)} layer`,
-        offNote: "No colour is stored for this layer, so the background effect shows through wherever it would paint.",
+        ...offWording("layers"),
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));
     const where = section("Where it paints");
@@ -44,7 +44,7 @@ export function stageLayers(model) {
         </select></label>`);
     /** @type {HTMLSelectElement} */ (mode.querySelector("select")).addEventListener("change", (event) =>
         { if (row) post(edits.layerColour(row.layer, /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
-    where.append(stack(mode, el(`<p class="note">Pass-through leaves whatever is underneath visible; transparent keys keep their ▽ on the board either way. The board above is already showing this.</p>`)));
+    where.append(stack(mode, el(`<p class="note">Keys mapped on this layer only leaves the keys that are transparent or empty on this layer unpainted, so what is beneath shows there; All keys paints every key. Transparent keys keep their ▽ on the board either way, and the board above already shows the choice.</p>`)));
     const overrides = section("LED overrides on this layer", `<span class="right"><button class="btn tiny ghost" data-act="groups">Edit groups</button></span>`);
     overrides.className = "span";
     overrides.append(groupRowsTable(model.rgb.layerLedGroups, "layer"));

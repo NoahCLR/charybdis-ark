@@ -33,8 +33,8 @@ export function tabPointing(body, right) {
         const row = pdColourRow(model, slot.id);
         // Named by the keycode the row is about, as a macro row is; a row that
         // is not one of the two names both.
-        const keycodes = variant === "toggle" ? [slot.binding.lock] : variant === "hold" ? [slot.binding.hold] : [slot.binding.hold, slot.binding.lock];
-        const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs — not this key.` : "";
+        const keycodes = variant === "lock" ? [slot.binding.lock] : variant === "hold" ? [slot.binding.hold] : [slot.binding.hold, slot.binding.lock];
+        const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs.` : "";
         return `<tr${reachAttrs("pointing", group, slot.id)}>
             <td><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${slotLight(model, slot).swatch()}</span>
                 ${esc(slot.displayName || `Slot ${slot.id}`)}${variant ? ` · ${esc(variant)}` : ""} <code class="dim">${esc(keycodes.join(" · "))}</code>${changedSlots.has(slot.id) ? draftDot() : ""}</td>
@@ -44,7 +44,7 @@ export function tabPointing(body, right) {
             <td class="muted">${reachedBy}</td>
             <td class="reach-edit"><button class="btn tiny ghost" data-editpd="${slot.id}">Edit</button></td></tr>`;
     };
-    // Holding a mode and toggling it on are the same mode reached two ways, so
+    // Holding a mode and locking it on are the same mode reached two ways, so
     // the card is named for the one its route uses. A route that uses both
     // keeps them in the line beneath, where they can be told apart per key.
     /** @param {string} group */

@@ -23,9 +23,10 @@ export function slotReach(model, slot, canEdit) {
             <span class="lbl">Keys</span>
             <div class="val">
                 <span class="act"><span class="k">${esc(bindingName(slot))}</span><span class="how">hold</span></span>
-                <span class="act"><span class="k">${esc(slot.binding?.lock || "")}</span><span class="how">toggle</span></span>
+                <span class="act"><span class="k">${esc(slot.binding?.lock || "")}</span><span class="how">lock</span></span>
                 <span class="note">${esc(placedOn(model, slot))}</span></div>
-            <button class="btn tiny ghost" data-act="place" ${disabled}>Place on a layer…</button>
+            <button class="btn tiny ghost" data-act="place" ${disabled}
+                data-tip="Put this mode's hold key on a key you pick on the board.">Place on a key…</button>
             <span class="lbl">Light</span>
             <div class="val">${light.swatch()}<span class="note">${lightText}</span></div>
             <button class="btn tiny ghost" data-act="lighting">Edit in Lighting</button>
