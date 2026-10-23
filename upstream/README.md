@@ -13,7 +13,8 @@ to locate task worktrees and distinguish current source from this pinned baselin
 | Directory | Purpose | Owner |
 | --- | --- | --- |
 | `firmware/tests/fixtures/` | Golden wire bytes and current-format profiles that the firmware's own tests check | Firmware project |
-| `firmware/docs/architecture/` | Profile Wire, domain, transaction, ownership and resource specifications used when developing the client | Firmware project |
+| `firmware/docs/spec/` | Firmware's specs, all of them: Profile Wire (`profile-wire-v1/`), domains, split, transaction, storage and resource policy | Firmware project |
+| `firmware/GLOSSARY.md` | Firmware's words for the keyboard, its halves and the wire | Firmware project |
 | `qmk/data/constants/keycodes/` | Numeric keycode definitions and US aliases used by the catalog generator | QMK fork |
 | `qmk/keyboards/bastardkb/charybdis/` | Keyboard keycode declarations and the 4×6 matrix layout contract | QMK fork |
 | `qmk/version.txt` | Catalog's original QMK version stamp, synthesized for reproducible generation without a QMK Git checkout | Import metadata |
@@ -66,7 +67,10 @@ Node dependencies have been installed.
    stay as written; every other relative link is pinned to the source commit.
    Never edit fixture bytes simply to match the app.
 3. To add a file, list it in the manifest (`path`, `source`, `sourcePath`), then
-   refresh. Import format samples only: never a fixture the firmware
+   refresh; to move or drop one, change or remove its entry, and the refresh
+   deletes every file here the manifest no longer lists (`--check` fails on
+   one). Documentation mirrors the source layout, so a moved firmware spec
+   moves here too. Import format samples only: never a fixture the firmware
    regenerates from its keymap or authored defaults. Agreement requires every
    imported fixture to equal the firmware's, so such a file would block a
    firmware release on an ordinary keymap edit, which agreement deliberately

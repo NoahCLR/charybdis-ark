@@ -39,7 +39,8 @@ go into app code or ordinary tests.
 Two sources of firmware truth, for two questions:
 
 - **What firmware does now**: the firmware checkout itself (its `AGENTS.md`,
-  `docs/adr/`, `docs/architecture/` and `users/noah/`). It may be dirty; give
+  `GLOSSARY.md`, `docs/adr/`, `docs/spec/`, `docs/architecture/` and
+  `users/noah/`). It may be dirty; give
   its revision and dirty state when comparing behaviour. Reading it is
   developer inspection and does not couple the app to it; editing it needs a
   task that covers it.

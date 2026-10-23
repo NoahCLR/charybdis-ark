@@ -471,7 +471,7 @@ Automatic's effect with Host and an explicit choice with its macro (no test).
 
 Ark exposes the firmware's participation contract at every scope (D-L55),
 whose rules are in
-[participation-policy.md](../../upstream/firmware/docs/architecture/participation-policy.md):
+[participation-policy.md](../../upstream/firmware/docs/spec/participation-policy.md):
 switches in Settings, enabled and allowed layers on shared behaviours and
 combos, and **Use behaviour** / **Join combos** on placements
 (`browser-tests/participation.spec.js`).

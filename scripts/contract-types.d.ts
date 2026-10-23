@@ -69,6 +69,8 @@ export interface RefreshReport {
     content: string[];
     links: string[];
     fixtures: string[];
+    /** Files under upstream/ the manifest no longer lists, now deleted. */
+    removed: string[];
 }
 export interface CatalogEntry { value: number; name: string; label: string; group: string; aliases: string[] }
 export interface KeycodeCatalog {

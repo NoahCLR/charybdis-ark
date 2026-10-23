@@ -3,7 +3,7 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {SETTINGS, SHORTCUT_KEYS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, validSetting, validShortcutKey, defaultLayerRecord, encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
 
-// Compiled defaults as the firmware sets them (portable-profile-v1.md):
+// Compiled defaults as the firmware sets them (profile-wire-v1/settings-domain.md):
 // scalar 27 retired at zero, behaviours on, every layer in both masks, every
 // layer referring combos to itself with nothing bypassed or excluded.
 const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff],
@@ -21,7 +21,7 @@ const withLayer = (layer, record) => { const value = defaults(); value.layers[la
 test("the layout constants are the firmware's version 8 domain", () => {
     assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, SETTINGS.CUSTOM_KEY_SHORTCUTS], [8, 31, 16, 128, 128, 128]);
     // 128 two-byte shortcuts at 404, then 273 counted names: 16 layers, 128
-    // macros, 128 custom keys and the keyboard (portable-profile-v1.md).
+    // macros, 128 custom keys and the keyboard (profile-wire-v1/settings-domain.md).
     assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SHORTCUTS_OFFSET, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 132, 404, 660, 933, 9669]);
     assert.deepEqual([SETTING.UNICODE_HOST_MODE, SETTING.BEHAVIORS_ENABLED, SETTING.LAYER_BEHAVIORS, SETTING.LAYER_COMBOS], [27, 28, 29, 30]);
     assert.equal(MATRIX_POSITIONS, 60);
@@ -41,7 +41,7 @@ test("the stored field table determines scalar geometry and layer-reference rewr
 });
 
 // Every stored value by the firmware's name (profile_settings_v1.h), with the
-// values either side of each limit portable-profile-v1.md gives it: accepted,
+// values either side of each limit profile-wire-v1/settings-domain.md gives it: accepted,
 // then refused, in a sixteen-layer bank.
 const EDGES = {
     TAPPING_TERM: [[0, 65535], [65536]], TAP_HOLD_TERM: [[0, 65535], [65536]], LONG_HOLD_TERM: [[0, 65535], [65536]], MULTI_TAP_TERM: [[0, 65535], [65536]],

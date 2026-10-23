@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-// Live edits on the wire (firmware D-F32, profile-wire-v1.md "Live Edits"):
+// Live edits on the wire (firmware D-F32, profile-wire-v1/live-edits.md):
 // the frames that send an edit to the keyboard's working copy, Save it,
 // Revert it, set the edit mode and restart the keyboard (firmware D-F34),
 // and the reads that say where the working copy is. One report per call; the order of an edit, polling and retries are

@@ -3,8 +3,8 @@
 How a read, an Apply and a live edit run through Ark's layers, and what holds
 across them ([D-L11](../adr/0011-current-state-comes-from-the-keyboard.md),
 [D-L19](../adr/0019-one-whole-profile-draft-and-review.md)). Firmware owns the
-[one-store transaction](../../upstream/firmware/docs/architecture/logical-profile-transaction-v1.md)
-and [Profile Wire](../../upstream/firmware/docs/architecture/profile-wire-v1.md).
+[one-store transaction](../../upstream/firmware/docs/spec/logical-profile-transaction-v1.md)
+and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
 
 ## Who does what
 

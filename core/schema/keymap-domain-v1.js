@@ -3,7 +3,7 @@
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {copyBytes, protocolError} = require("./bytes");
 
-// Keymap domain 0x60, version 1 (firmware portable-profile-v1.md): sixteen
+// Keymap domain 0x60, version 1 (firmware profile-wire-v1/keymap-domain.md): sixteen
 // layers of sixty matrix positions, row first, then column, each a
 // little-endian uint16 QMK keycode. The four unwired matrix positions are
 // included. There is no header: the payload is exactly 1,920 bytes. Which

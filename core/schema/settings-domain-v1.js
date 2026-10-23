@@ -38,7 +38,7 @@ const LAYER = {...rule((v, layers) => v < layers), layerReference: /** @type {co
 const LAYER_MASK = {...rule((v, layers) => v < 2 ** layers), layerReference: /** @type {const} */ ("mask"), layerReorder: /** @type {const} */ ("storage")};
 // The 31 stored values, each once, in ID order: the firmware's name for it
 // (profile_settings_v1.h, without NOAH_SETTING_) and what it accepts
-// (portable-profile-v1.md, "Settings domain 0x40"). The editor's words for
+// (firmware profile-wire-v1/settings-domain.md). The editor's words for
 // them are in model/settings-editor.js.
 const STORED = /** @type {const} */ ([
     ["TAPPING_TERM", UINT16], ["TAP_HOLD_TERM", UINT16], ["LONG_HOLD_TERM", UINT16], ["MULTI_TAP_TERM", UINT16],
