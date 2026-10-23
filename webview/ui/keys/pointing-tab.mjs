@@ -19,7 +19,7 @@ export function tabPointing(body, right) {
     const model = getModel();
     const reach = {...pointingReach(model, layers(), state.layer), inView: pointingView(model)};
     right.replaceChildren();
-    const open = el(`<button class="btn tiny ghost">Open the Pointing modes view</button>`);
+    const open = el(`<button class="btn tiny ghost">Open the Pointing modes screen</button>`);
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
     right.appendChild(open);
 

@@ -38,7 +38,7 @@ const {PROFILE_EDIT_V1: E, EDIT_RESULT: R, EDIT_FLAGS: F, EDIT_PHASE} = require(
 /** @typedef {{loseReply?: number, busy?: number, refuse?: number, peerLag?: number, stale?: boolean, saveFails?: number, peerRefuses?: number, peerCatchUp?: number, savePauses?: number, modeWriteFails?: boolean, modeReadFails?: number, lengthSkew?: number, autoSaveFails?: number, restartUnacknowledged?: boolean, noRestart?: boolean, stopsAgain?: boolean, workingReadFails?: boolean, peerAbsent?: boolean}} LiveFaults */
 const LEASE_MS = 15000;
 
-/** @param {import('./types.js').FakeKeyboardOptions & {mode?: number, session?: number, combosOverride?: boolean, behavioursOverride?: boolean, autoSaveAfterReads?: number}} options */
+/** @param {import('./types.js').FakeKeyboardOptions & {mode?: number, session?: number, combosOverride?: boolean, behavioursOverride?: boolean, autoSaveAfterReads?: number, quietMs?: number}} options */
 function liveKeyboard(options) {
     const actionAbiDigest = options.document.actionAbiDigest;
     const compiled = options.compiled || validateSnapshot(options.document).candidate;
@@ -143,7 +143,7 @@ function liveKeyboard(options) {
     }
     function statusPage3() {
         const p = Buffer.alloc(25); p[0] = E.AUTO_SAVE_LAYOUT; p[1] = (auto.inProgress ? 1 : 0) | (auto.lastWasAutomatic ? 2 : 0);
-        p.writeUInt32LE(auto.count, 2); p.writeUInt32LE(auto.revision, 6); p.writeUInt32LE(auto.generation, 10); p.writeUInt16LE(3000, 14); return p;
+        p.writeUInt32LE(auto.count, 2); p.writeUInt32LE(auto.revision, 6); p.writeUInt32LE(auto.generation, 10); p.writeUInt16LE(options.quietMs ?? 3000, 14); return p;
     }
     /** @param {Uint8Array} report */
     function answer(report) {

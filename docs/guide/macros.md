@@ -27,7 +27,7 @@ Add steps with the buttons above the sequence:
 
 - **+ Text** types what you type or paste, exactly: code, braces, line
   breaks, accents and emoji included.
-- **+ Key / chord** taps a key, or up to 16 keys together, such as ⌘C.
+- **+ Key or chord** taps a key, or up to 16 keys together, such as ⌘C.
 - **+ Delay** waits, in milliseconds.
 - **+ Press** holds a key down, and **+ Release** lets it go.
 
@@ -49,7 +49,10 @@ Text fields keep their own typing undo.
 A step that can't work, such as a key let go before it was pressed or still
 held at the end, is marked ! and explained. Ark keeps such an edit out of
 your draft until it is fixed, and never loses the last good version.
-**Discard local edits** drops an edit that isn't in the draft yet.
+**Discard local edits** drops an edit that isn't in the draft yet. The chip
+beside it says where the macro stands: **edited here** while an edit is not in
+the draft yet, **changed in draft** once the draft changes the macro, and
+**as read** when it matches the keyboard (in the demo, the demo setup).
 
 **Clear macro** empties the slot. **Place on a key…** takes you to the Keys
 screen to put the macro on a key. Beside the title, chips name the layers

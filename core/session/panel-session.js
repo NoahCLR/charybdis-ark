@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {PHASE} = require("../model/vocabulary");
+const {PHASE, editModeWords, quietWords} = require("../model/vocabulary");
 
 // The panel's side of a session: what extension.js used to decide inline.
 //
@@ -138,8 +138,11 @@ function buildPanelModel(session, state) {
         if (draft.matching) {
             model.profileIdentity = session.draft.identity();
         }
+        // Live's words say the quiet interval the keyboard reports.
+        const quietMs = (draft.live?.keyboard || draft.keyboard)?.quietMs;
+        if (quietMs && model.vocabulary) model.vocabulary = {...model.vocabulary, editModes: editModeWords(quietMs)};
         if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === 1
-            ? "The keyboard runs these edits now · it saves them by itself after 3 seconds without typing"
+            ? `The keyboard runs these edits now · it saves them by itself after ${quietWords(quietMs)} without typing`
             : "The keyboard runs these edits now · Save makes them permanent; unplugging it puts back what is saved";
         else if (draft.dirty && draft.matching && !draft.live) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
     }

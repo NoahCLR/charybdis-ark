@@ -66,9 +66,9 @@ an older Ark don't record those, and are named "Recovery copy" and when.
 
 A backup restores onto the same firmware release. Ark works with the current
 firmware only and converts nothing: when a firmware update changes how the
-profile is stored, the keyboard starts from its built-in defaults and older
+profile is stored, the keyboard starts from its compiled defaults and older
 backups no longer import. Check the firmware's release notes before updating,
 and export a fresh backup afterwards.
 
-**Start from the firmware's defaults** is not available yet. Until then,
+**Start from the compiled defaults** is not available yet. Until then,
 restore a backup made before your changes.

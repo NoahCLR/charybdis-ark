@@ -190,3 +190,36 @@ test("two payloads are the same macro when their keys differ only by alias", asy
     assert.equal(samePayload("{KC_LGUI", "{KC_LEFT_GUI}", aliases), false);
     assert.equal(samePayload("", undefined), true);
 });
+
+test("each macro step kind has one name, on its add button and in the step editor", async () => {
+    const {STEP_KINDS, addStepLabel, stepKindName} = await import("../../webview/view/macro.mjs");
+    assert.deepEqual(STEP_KINDS.map(([kind]) => kind), ["text", "tap", "delay", "press", "release"]);
+    assert.deepEqual(STEP_KINDS.map(([, name]) => name), ["Text", "Key or chord", "Delay", "Press", "Release"], "the glossary's macro steps");
+    for (const [kind, name] of STEP_KINDS) {
+        assert.equal(stepKindName(kind), name);
+        assert.equal(addStepLabel(kind), `+ ${name}`);
+    }
+});
+
+test("a macro's chip tells an unkept edit, a change kept in the draft and the macro as read apart", async () => {
+    const {macroLocalState} = await import("../../webview/view/macro.mjs");
+    const {createRequire} = await import("node:module"), require = createRequire(import.meta.url);
+    const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
+    const portable = require("../../core/model/portable-profile");
+    const {document} = require("../fixtures/portable-profile");
+    const value = document();
+    const {DEMO_CAPABILITIES} = require("../../core/session/demo-session");
+    const draft = new ProfileDraftSession({document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)}, "test-device", DEMO_CAPABILITIES);
+    const changes = () => draft.view({selectedDeviceId: "test-device", connected: true}).changes;
+    assert.equal(macroLocalState(changes(), "VIA_MACRO_0", false).text, "as read");
+    assert.deepEqual(macroLocalState(changes(), "VIA_MACRO_0", true), {state: "local", dot: "draft", text: "edited here"});
+    draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "Hi"});
+    assert.deepEqual(macroLocalState(changes(), "VIA_MACRO_0", false), {state: "draft", dot: "draft", text: "changed in draft"});
+    assert.equal(macroLocalState(changes(), "VIA_MACRO_1", false).text, "as read", "another macro is as read");
+    assert.equal(macroLocalState(changes(), "VIA_MACRO_0", true).text, "edited here", "an unkept edit over it still says so");
+    draft.jump(draft.revision, 0);
+    assert.equal(macroLocalState(changes(), "VIA_MACRO_0", false).text, "as read", "undone, it is as read again");
+    // A playback change Your computer caused is listed under the macro, but it
+    // is not a change to the macro.
+    assert.equal(macroLocalState([{unit: "settings:host"}], "VIA_MACRO_0", false).text, "as read");
+});

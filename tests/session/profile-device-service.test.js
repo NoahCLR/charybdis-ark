@@ -322,7 +322,7 @@ for (const method of ["readKeyboardProfile", "readPortableProfile", "restorePort
                 assert.equal(after.phase, before.phase);
                 assert.equal(after.busy, before.busy, "a refused call cannot finish the operation already running");
                 assert.equal(adapter.lastConnection()?.writes.length || 0, writes, "no HID request is sent");
-                assert.equal(recoveries, 0, "restore does not write a recovery file");
+                assert.equal(recoveries, 0, "restore does not write a recovery copy");
             } finally {
                 release?.();
                 await pending;

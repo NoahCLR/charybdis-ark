@@ -139,9 +139,9 @@ test("in the demo an edit stages, checks and shows in the review; Apply is refus
         assert.equal(last(host).model.draft.reviewed, true);
         await send(loop, host, {type: "applyProfileDraft", confirmChecks: true});
         ({notice} = last(host));
-        assert.match(notice, /^Failed \[DEMO_REFUSED\]: Apply needs a keyboard/);
+        assert.match(notice, /^Failed: Apply needs a keyboard/);
         await send(loop, host, {type: "rebaseProfileDraft"});
-        assert.match(last(host).notice, /DEMO_REFUSED/);
+        assert.match(last(host).notice, /^Failed: Apply needs a keyboard/, "refused as Apply is");
         assert.equal(last(host).model.draft.dirty, true, "the draft is kept");
 
         // Undo and Discard all work on the demo's draft as on a keyboard's.
@@ -186,11 +186,11 @@ test("leaving or replacing the demo with edits not exported is refused until the
         await loop.handleMessage({type: "openDemo"});
         await send(loop, host, dpiEdit);
         await loop.handleMessage({type: "leaveDemo"});
-        assert.match(last(host).notice, /^Failed \[DEMO_UNSAVED\]/);
+        assert.match(last(host).notice, /^Failed: The demo has edits that were not exported/);
         assert.equal(last(host).model.demo.active, true);
         host.chosen.push({text: JSON.stringify(pdDocument()), name: "mine.charybdis.json"});
         await loop.handleMessage({type: "openDemoProfile"});
-        assert.match(last(host).notice, /DEMO_UNSAVED/);
+        assert.match(last(host).notice, /^Failed: The demo has edits that were not exported/);
         assert.equal(host.chosen.length, 1, "the file chooser is not opened for a refused replacement");
         await loop.handleMessage({type: "leaveDemo", discardDemo: true});
         assert.equal(last(host).model.demo.active, false);
@@ -263,7 +263,7 @@ test("reading a keyboard leaves the demo, once the panel has asked about edits n
         await send(loop, host, dpiEdit);
         plugIn();
         await loop.handleMessage({type: "refresh"});
-        assert.match(last(host).notice, /DEMO_UNSAVED/);
+        assert.match(last(host).notice, /^Failed: The demo has edits that were not exported/);
         assert.equal(last(host).model.demo.active, true);
 
         await loop.handleMessage({type: "refresh", discardDemo: true});
@@ -276,7 +276,7 @@ test("reading a keyboard leaves the demo, once the panel has asked about edits n
         assert.notEqual(loop.session.draft.deviceId, DEMO_DEVICE_ID);
 
         await loop.handleMessage({type: "openDemo"});
-        assert.match(last(host).notice, /^Failed \[DEMO_REFUSED\]: A keyboard is connected/);
+        assert.match(last(host).notice, /^Failed: A keyboard is connected/);
     } finally {
         await loop.close();
     }

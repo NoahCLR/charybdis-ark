@@ -1,20 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {categorySummary, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
+import {categorySummary, changesKept, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
 
 const item = (area, title, group, extra = {}) => ({area, title, group, status: "changed", fields: [], ...extra});
 
 test("every item sits under its own area; a group that spans areas shows its part in each", () => {
     const changes = [
         item("Behaviours", "Esc", 0, {groupTitle: "Moved a behaviour", status: "removed"}),
-        item("Layout", "Base · Left · row 1, column 1", 0, {groupTitle: "Moved a behaviour"}),
+        item("Keys", "Base · Left · row 1, column 1", 0, {groupTitle: "Moved a behaviour"}),
         item("Behaviours", "Q", 0, {groupTitle: "Moved a behaviour", status: "added"}),
-        item("Layout", "Base · Left thumb 1", 1),
+        item("Keys", "Base · Left thumb 1", 1),
         item("Macros", "Macro 3", 2),
         item("Lighting", "Navigation colour", 0, {groupTitle: "Moved a behaviour"}),
     ];
     const sections = reviewBlocks(changes);
-    assert.deepEqual(sections.map((section) => section.area), ["Layout", "Behaviours", "Macros", "Lighting"], "areas in rail order");
+    assert.deepEqual(sections.map((section) => section.area), ["Keys", "Behaviours", "Macros", "Lighting"], "areas in rail order");
     const [layout, behaviours, , lighting] = sections;
     assert.deepEqual(layout.blocks.map((block) => block.items.map((entry) => entry.title)),
         [["Base · Left · row 1, column 1"], ["Base · Left thumb 1"]], "the group's key sits with the other keys, in host order");
@@ -26,7 +26,7 @@ test("every item sits under its own area; a group that spans areas shows its par
         assert.equal(part.title, "Moved a behaviour");
         assert.equal(part.size, 4, "every part knows the whole group, for its Discard");
     }
-    assert.deepEqual(behaviours.blocks[0].elsewhere, ["Layout", "Lighting"], "the other areas it reaches, in rail order");
+    assert.deepEqual(behaviours.blocks[0].elsewhere, ["Keys", "Lighting"], "the other areas it reaches, in rail order");
     assert.equal(layout.blocks[1].size, 1);
     assert.deepEqual(layout.blocks[1].elsewhere, []);
 });
@@ -38,16 +38,16 @@ test("a recovery item with no group is a block of its own", () => {
 
 test("a group's header says how much of it is here and where the rest is", () => {
     const [layout, behaviours] = reviewBlocks([
-        item("Layout", "a", 0), item("Behaviours", "b", 0), item("Behaviours", "c", 0), item("Combos", "d", 0), item("Lighting", "e", 0),
-        item("Layout", "f", 1), item("Layout", "g", 1),
+        item("Keys", "a", 0), item("Behaviours", "b", 0), item("Behaviours", "c", 0), item("Combos", "d", 0), item("Lighting", "e", 0),
+        item("Keys", "f", 1), item("Keys", "g", 1),
     ]);
     assert.equal(groupNote(layout.blocks[0]), "1 of 5 here, the rest in Behaviours, Combos and Lighting · discarded together");
-    assert.equal(groupNote(behaviours.blocks[0]), "2 of 5 here, the rest in Layout, Combos and Lighting · discarded together");
+    assert.equal(groupNote(behaviours.blocks[0]), "2 of 5 here, the rest in Keys, Combos and Lighting · discarded together");
     assert.equal(groupNote(layout.blocks[1]), "2 changes, discarded together");
 });
 
 test("the header counts items by what happened to them", () => {
-    const changes = [item("Layout", "a", 0), item("Layout", "b", 1, {status: "added"}), item("Macros", "c", 2, {status: "added"})];
+    const changes = [item("Keys", "a", 0), item("Keys", "b", 1, {status: "added"}), item("Macros", "c", 2, {status: "added"})];
     assert.equal(statusSummary(changes), "2 added · 1 changed");
     assert.equal(statusBesideCount(changes), "2 added · 1 changed", "a mix says what kinds");
     assert.equal(statusBesideCount([{status: "changed"}, {status: "changed"}]), "", "only changes repeat the count beside it");
@@ -137,4 +137,9 @@ test("a profile file's differences are counted by what they configure, split as 
     assert.deepEqual(rows("Other"), ["Stored profile 1"]);
     assert.deepEqual(rows("Macros"), [], "a category that is its one row shows no rows");
     assert.equal(groups[0].status, "1 added · 6 changed · 1 removed");
+});
+
+test("a stale draft says how many changes it keeps, in agreement", () => {
+    assert.equal(changesKept(1), "your 1 change is kept");
+    assert.equal(changesKept(2), "your 2 changes are kept");
 });

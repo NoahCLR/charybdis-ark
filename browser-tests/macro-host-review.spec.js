@@ -50,12 +50,12 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             store.state.overlay = "review"; store.render();
         });
         const review = page.getByRole("dialog", {name: "Review changes"});
-        await expect(review).toContainText("Playback changes because of Settings → Host");
+        await expect(review).toContainText("Playback changes because of Settings → Your computer");
         await expect(review).toContainText('layout keys: "é"');
         await expect(review).toContainText('Unicode entry (macOS): "é"');
-        await expect(review).toContainText("Macro 1 cannot play with this Host setup");
-        await expect(review).not.toContainText("Macro 2 · host setup");
-        await expect(review).not.toContainText("Macro 3 · host setup");
+        await expect(review).toContainText("Macro 1 cannot play with the settings in Your computer");
+        await expect(review).not.toContainText("Macro 2 · Your computer settings");
+        await expect(review).not.toContainText("Macro 3 · Your computer settings");
         await page.screenshot({path: `/tmp/ark-macro-host-review-${theme}.png`, fullPage: true});
         const group = draft.changes().find(row => row.unit === "settings:host").group;
         await review.locator(`[data-discard="${group}"]`).first().click();

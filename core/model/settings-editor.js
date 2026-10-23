@@ -228,7 +228,7 @@ function settingsSections(snapshot, settings) {
         layerGroup: {label: "On these layers", hint: "A key can be part of a combo only when the layer it comes from is on here."}, fields:
         [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."), keyboardKeys: true},
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
-                hint: "Off, combos still fire but use their normal output action. Physical-key behaviours stay eligible. A bypassed custom key sends its shortcut, or nothing if it has none."},
+                hint: "Off, combos still fire but use their normal output action. A key pressed on its own still uses its behaviour where its participation allows. A bypassed custom key sends its shortcut, or nothing if it has none."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", search: "combo reference", description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:

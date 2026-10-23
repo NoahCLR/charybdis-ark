@@ -34,6 +34,7 @@ export interface BehaviorView extends Omit<Behavior, 'steps'> {
     builtIn?: BuiltIn;
     steps: {tapCount: number; tapCountName?: string; tap?: Branch; hold?: Branch; longHold?: Branch}[];
     timingDefaults?: Record<string, Scalar | undefined>;
+    timingWords?: Record<string, string>;
     changesNothing?: boolean;
 }
 export interface ComboView extends Combo {inputPositions?: number[]; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
@@ -79,6 +80,8 @@ export interface LiveKeyboardView {
     stopped: boolean;
     peerStopped: boolean;
     quietMs: number;
+    /** How long Live waits before the keyboard saves, in words ("3 seconds"; core/model/vocabulary.js quietWords). */
+    quietWords: string;
 }
 export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
 export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]}
@@ -139,7 +142,8 @@ export interface PublishedModel {
     /** QMK spellings the encoder accepts beyond the catalogue: mod-tap shorthands (name → MT modifiers), deprecated wrappers (name → wrapper) and names (name → expression). */
     qmkSpellings: {modTaps: Record<string, string>; wrappers: Record<string, string>; names: Record<string, string>};
     diagnostics: string[];
-    device: {connected: boolean; label: string; summary: string; subtitle: string; health: {profile: string; converged: boolean; halves: import('./model.js').HalvesId; recoveryPending: boolean; restartNeeded: boolean; earlierFormat: boolean; busy: boolean; phase: PhaseId; error: string}};
+    /** `summary` names the saved profile's generation and digest (Diagnostics); `savedProfile` the same in words, without the digest. */
+    device: {connected: boolean; label: string; summary: string; savedProfile: string; subtitle: string; health: {profile: string; converged: boolean; halves: import('./model.js').HalvesId; recoveryPending: boolean; restartNeeded: boolean; earlierFormat: boolean; busy: boolean; phase: PhaseId; error: string}};
     devices: {id: string; label: string}[];
     selectedDeviceId: string;
     draft?: DraftView;

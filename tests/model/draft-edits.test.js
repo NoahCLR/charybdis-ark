@@ -43,7 +43,7 @@ test("the registry, the contract and the interface's builders name the same edit
 
 test("every registered edit names its editor, its words and, on the profile, its domain", () => {
     for (const [type, entry] of Object.entries(DRAFT_EDIT_TYPES)) {
-        assert.ok(["layout", "settings", "macro", "customKey", "keyboardName", "profile"].includes(entry.editor), type);
+        assert.ok(["keymap", "settings", "macro", "customKey", "keyboardName", "profile"].includes(entry.editor), type);
         assert.equal("domain" in entry, entry.editor === "profile", type);
         if (entry.editor === "profile") assert.ok(["placement", "pointing", "combos", "behaviours", "lighting"].includes(entry.domain), type);
         assert.ok(typeof entry.label === "function" || (typeof entry.label === "string" && entry.label), type);
@@ -52,7 +52,7 @@ test("every registered edit names its editor, its words and, on the profile, its
     }
     for (const type of ["applyAllChanges", "constructor", "toString", ...NOT_DRAFT_EDITS]) {
         assert.equal(DRAFT_EDITS.has(type), false, type);
-        assert.equal(editedBy({type}, "layout") || editedBy({type}, "profile"), false, type);
+        assert.equal(editedBy({type}, "keymap") || editedBy({type}, "profile"), false, type);
     }
 });
 

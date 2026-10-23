@@ -6,6 +6,7 @@
 
 import {editModeWords} from "./vocabulary.mjs";
 import {confirmText} from "./checks.mjs";
+import {shortcut} from "./shortcuts.mjs";
 
 export const APPLY = 0;
 export const LIVE = 1;
@@ -51,7 +52,7 @@ export function switchQuestion(model, mode) {
 /** @param {'saveOrRevert' | 'sendOrDiscard'} question @param {number} changes @param {{mode?: number, from?: number, label?: string, checks?: readonly import("../../contracts/model.js").Check[]}} [context] */
 export function questionWords(question, changes, {mode = question === "saveOrRevert" ? APPLY : LIVE_REVIEW, from, label = "the new mode", checks = []} = {}) {
     const count = `${changes} change${changes === 1 ? "" : "s"}`;
-    const confirm = checks.length ? ` ${confirmText(checks, question === "saveOrRevert" ? "save" : "send")}` : "";
+    const confirm = checks.length ? ` ${confirmText(checks, question === "saveOrRevert" ? "save" : "sendDraft")}` : "";
     if (question === "saveOrRevert") {
         const why = mode === from ? "Choosing the mode again settles halves that stored different ones, and the keyboard does that only with nothing unsaved"
             : mode === APPLY ? "In Apply, edits wait in Ark until you apply them, so the keyboard can switch only with nothing unsaved"
@@ -83,6 +84,11 @@ export const STOPPED_WORDS = Object.freeze({
 const ADJUSTMENT = Object.freeze({kind: /** @type {const} */ ("adjustment"), tone: /** @type {const} */ ("draft"), title: "Keyboard adjustment pending",
     detail: "A DPI or lighting key change is waiting to reach both halves. Release held keys; Ark will read it when it takes effect.", action: null});
 
+// How long the keyboard in Live waits with no edit and no key held before it
+// saves, in the words core gives the interval it reports (`quietWords`).
+/** @param {{quietWords?: string} | null | undefined} keyboard */
+export const quietWords = (keyboard) => keyboard?.quietWords || "a few seconds";
+
 /**
  * Where a live keyboard's edits stand, by what it says (edit status), as one
  * line with its tone and the one action that helps. Null when there is
@@ -101,16 +107,15 @@ export function liveSaveState(draft, {adjustment = true} = {}) {
     // a stopped keyboard used to look like.
     if (keyboard?.stopped || keyboard?.peerStopped) return {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"};
     if (live.apart) return {kind: "refused", tone: "err", title: "Halves apart",
-        detail: "The slave half refused these edits, so the halves run different profiles and nothing can be saved. Revert puts both back on the saved profile; Undo (⌘Z) sends the edits again.", action: "revert"};
+        detail: `The slave half refused these edits, so the halves run different profiles and nothing can be saved. Revert puts both back on the saved profile; Undo (${shortcut("Z")}) sends the edits again.`, action: "revert"};
     if (adjusting) return ADJUSTMENT;
     if (keyboard?.saveFailed && live.unsaved) return {kind: "failed", tone: "err", title: "The keyboard could not save",
         detail: "Its edits still run, unsaved; unplugging it now loses them. Save again, or Revert to the saved profile.", action: "save"};
     if (live.mode !== LIVE) return null;
-    const seconds = Math.round((keyboard?.quietMs || 3000) / 1000);
     if (live.unsaved && keyboard?.saving) return {kind: "saving", tone: "draft", title: "Saving on the keyboard",
         detail: keyboard.storagePaused ? "The keyboard writes flash once no key is held." : "The keyboard is writing these edits to both halves.", action: null};
     if (live.unsaved) return {kind: "pending", tone: "draft", title: "Not saved yet",
-        detail: `The keyboard saves these edits by itself after ${seconds} second${seconds === 1 ? "" : "s"} without typing, with or without Ark. Unplugging it sooner loses them.`, action: null};
+        detail: `The keyboard saves these edits by itself after ${quietWords(keyboard)} without typing, with or without Ark. Unplugging it sooner loses them.`, action: null};
     if (keyboard?.savedByKeyboard) return {kind: "saved", tone: "ok", title: "Saved by the keyboard",
         detail: "The keyboard saved its edits by itself; they survive a replug.", action: null};
     return null;

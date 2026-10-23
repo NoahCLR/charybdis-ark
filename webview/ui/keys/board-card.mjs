@@ -13,6 +13,7 @@ import {getModel, heldLayers, layerName, layers, render, state, writable} from "
 import {draftDot} from "../../view/review.mjs";
 import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
 import {comboInputLabel} from "./combo-builder.mjs";
+import {shortcut} from "../../view/shortcuts.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
 // order they win. Clicking any tab goes back to one layer.
@@ -52,7 +53,7 @@ export function legend(model) {
         <span class="legend-item">${comboBadge(model, "C0")} combo input</span>
         <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
         ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}
-        <span class="legend-item dim">${writable() ? "double-click to pick a keycode" : "select a key to read it"}${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys · delete makes a key transparent" : " · ⌘C copies a key"}</span>
+        <span class="legend-item dim">${writable() ? "double-click to pick a keycode" : "select a key to read it"}${writable() ? ` · drag one key onto another to swap · ${shortcut("C")} and ${shortcut("V")} copy between keys · delete makes a key transparent` : ` · ${shortcut("C")} copies a key`}</span>
         ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
     </div>`);
 }

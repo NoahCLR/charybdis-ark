@@ -95,7 +95,7 @@ test("a key picked in the interface lands at its position on the layer the board
         const changed = layer.filter((code, slot) => code !== before[index][slot]).length;
         assert.equal(changed, index === 3 ? 1 : 0, `layer ${index}`);
     });
-    assert.deepEqual(reviewAreas(draft), ["Layout"], "the change is reviewable before it is applied");
+    assert.deepEqual(reviewAreas(draft), ["Keys"], "the change is reviewable before it is applied");
 });
 
 test("Delete stores the key as transparent, and nothing else moves", () => {

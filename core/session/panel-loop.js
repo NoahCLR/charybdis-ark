@@ -152,12 +152,12 @@ async function handleMessage(session, message, host) {
         else publish(session, host);
     } catch (error) {
         const text = error instanceof Error ? error.message : String(error);
-        const failure = /** @type {import("./types.js").OperationFailure | null | undefined} */ (error);
-        const code = failure?.code ? ` [${failure.code}]` : "";
         host.showError?.(text);
         // Put it in the panel too. A toast is easy to miss and disappears,
-        // and the panel is where someone looks when it seems stuck.
-        session.notice = `Failed${code}: ${text}`;
+        // and the panel is where someone looks when it seems stuck. It reads
+        // as the sentence the failure says; its code (OperationFailure.code)
+        // is for the code that handles it, not for the person.
+        session.notice = `Failed: ${text}`;
         publish(session, host);
     }
 }

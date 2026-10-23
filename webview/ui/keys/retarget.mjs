@@ -9,6 +9,7 @@ import {getModel, post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
 import {actionMarked} from "../marks.mjs";
+import {shortcut} from "../../view/shortcuts.mjs";
 
 // A behaviour belongs to the key it listens to, so changing that key moves the
 // whole row. A key that already has a row is never replaced silently: the
@@ -65,7 +66,7 @@ export function retargetPrompt(behaviour) {
             <ul class="note">
                 <li><b>Overwrite</b> replaces it; ${actionMarked(model, behaviour.keycode)} then sends its plain keycode.</li>
                 <li><b>Swap</b> gives each key the other's behaviour.</li></ul></div>
-        <div class="sheet-f"><span class="note">Both are one step in the draft, so ⌘Z takes them back.</span>
+        <div class="sheet-f"><span class="note">Both are one step in the draft, so ${shortcut("Z")} takes them back.</span>
             <span class="right"><button class="btn" data-act="cancel">Cancel</button>
                 <button class="btn" data-act="swap">Swap</button>
                 <button class="btn primary" data-act="overwrite">Overwrite</button></span></div>

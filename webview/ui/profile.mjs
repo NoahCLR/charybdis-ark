@@ -93,7 +93,7 @@ const RECOVERY_NOTE = "Before every Apply, Save and restart, and before leaving 
 // firmware’s complete defaults, but has no whole-defaults draft control yet.
 function defaultsCard() {
     return el(`<div class="card profile-defaults">
-        <div class="card-h"><h3>Start from the firmware's defaults</h3><span class="right"><span class="chip">Not yet available</span></span></div>
+        <div class="card-h"><h3>Start from the compiled defaults</h3><span class="right"><span class="chip">Not yet available</span></span></div>
         <div class="card-b"><p class="note">A draft of the setup the firmware was built with. The firmware reports its complete defaults, but Ark does not yet offer them as a whole draft. Until then, restore a backup made before your changes.</p></div>
     </div>`);
 }

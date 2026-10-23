@@ -4,7 +4,7 @@
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
-import {samePayload} from "../../view/macro.mjs";
+import {STEP_KINDS, addStepLabel, macroLocalState, samePayload} from "../../view/macro.mjs";
 import {macroPlacements} from "../../view/reach.mjs";
 import {titleName, attachTitleName} from "../title-name.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../../view/reach-groups.mjs";
@@ -12,7 +12,7 @@ import {getModel, layerName, layers, macroForm, post, render, setMacroForm, stat
 import * as edits from "../../view/edits.mjs";
 import {layerSwatch} from "../layerbar.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
-import {STEP_KINDS, insertStep, sequenceEditor, saveSteps, focusSteps} from "./steps.mjs";
+import {insertStep, sequenceEditor, saveSteps, focusSteps} from "./steps.mjs";
 import {inspectEdit, paintFeedback, matchingValidation, requestInspection} from "./validation.mjs";
 import {ensureMacroHistory, finishMacroHistoryGroup, rememberMacroEdit} from "./history.mjs";
 import {cancelRecording, recorder} from "./recorder.mjs";
@@ -26,12 +26,13 @@ export function editor(model, slot, canEdit) {
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
     const dirty = form.draft !== undefined && !samePayload(payload, slot.payload, model.qmkKeycodeAliases);
+    const chip = macroLocalState(model.draft?.changes, slot.keycode, dirty);
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
     const wrap = el(`<div class="stack"></div>`);
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
         <div class="card-h name-titlebar macro-titlebar">${nameField(model, slot, canEdit)}
             <span class="tag">M${esc(slot.keycode.split("_").at(-1))}</span>
-            <span class="right row actions"><span class="chip" data-local-state><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
+            <span class="right row actions"><span class="chip" data-local-state><i class="dot ${chip.dot}"></i>${chip.text}</span>
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button>
                 <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"}>Discard local edits</button>
                 <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
@@ -41,7 +42,7 @@ export function editor(model, slot, canEdit) {
                 ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label></div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
-                ${STEP_KINDS.map(([value, label]) => `<button class="btn" data-insert-kind="${value}" data-act="macro-insert:${esc(slot.keycode)}:${value}" ${editable ? "" : "disabled"}>+ ${value === "tap" ? "Key / chord" : value === "press" ? "Press" : label}</button>`).join("")}
+                ${STEP_KINDS.map(([value]) => `<button class="btn" data-insert-kind="${value}" data-act="macro-insert:${esc(slot.keycode)}:${value}" ${editable ? "" : "disabled"}>${esc(addStepLabel(value))}</button>`).join("")}
                 <label class="sw macro-raw-toggle"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:raw-toggle" data-raw-toggle aria-controls="macro-raw-${esc(slot.keycode)}" ${rawOpen ? "checked" : ""}><span class="track"></span><span>Raw payload</span></label>
             </div>
             <details class="macro-raw" id="macro-raw-${esc(slot.keycode)}" data-raw ${rawOpen ? "open" : ""}>
@@ -52,7 +53,7 @@ export function editor(model, slot, canEdit) {
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${esc(model.macroUnicode?.layoutName || "Host")} · Host settings ↗</button>
+            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}Your computer ↗</button>
                 <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">Typing & playback help</button>
             </div>
             <details class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "open" : ""}>
@@ -178,8 +179,8 @@ function showOnLayer(keycode, at) {
 function unicodeSetup(model, slot) {
     const {mode, os, layout, layoutFits, layoutName} = model?.macroUnicode || {mode: 0};
     const typed = layoutFits === false
-        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Host, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
-        : `Text types through the ${layoutName} layout chosen in Settings → Host, accented letters included; keep that layout active on the computer.`;
+        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Your computer, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
+        : `Text types through the ${layoutName} layout chosen in Settings → Your computer, accented letters included; keep that layout active on the computer.`;
     const entry = mode
         ? ["", "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source.",
             "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",

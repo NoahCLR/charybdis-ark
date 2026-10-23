@@ -43,7 +43,7 @@ function activate(context) {
     context.subscriptions.push(status);
 
     adoptFormerRecoveries(context.globalStorageUri.fsPath).catch((error) => {
-        vscode.window.showWarningMessage(`Charybdis Ark could not copy recovery files saved as Charybdis Live: ${error.message}`);
+        vscode.window.showWarningMessage(`Charybdis Ark could not copy the recovery copies Charybdis Live saved: ${error.message}`);
     });
 }
 

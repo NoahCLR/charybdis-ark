@@ -49,7 +49,7 @@ so and what the key sends instead.
 From the keyboard: Space or Enter selects a key, and Enter on the selected key
 opens its picker.
 
-Off a Mac, use Ctrl where this guide says ⌘.
+Off a Mac, use Ctrl where this guide says ⌘; Ark's own tips say Ctrl there.
 
 ## Layers
 

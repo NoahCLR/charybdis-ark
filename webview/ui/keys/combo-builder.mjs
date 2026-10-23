@@ -78,7 +78,7 @@ export function comboBuilder(canEdit, holdTerm) {
             <div class="field">
                 <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                     <span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions.useOutputBehavior))}</span></label>
-                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output, made))} The behaviour master and Settings · Combos · Combo outputs use behaviours must also be on.</p>
+                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output, made))} Settings · Behaviours · Enabled and Settings · Combos · Combo outputs use behaviours must also be on.</p>
             </div>
             <div class="row combo-flags">
                 ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],

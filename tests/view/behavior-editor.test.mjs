@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behaviourThresholds, helperDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 import {impliedBranch} from "../../webview/view/keyface.mjs";
+import {VOCABULARY} from "../../core/model/vocabulary.js";
 
 test("opening an unstored behaviour leaves the model unchanged and takes built-ins from the host", () => {
     const builtIn = {tap: {helper: "TAP_SENDS", action: "KC_F"}};
@@ -92,6 +93,28 @@ test("timing fields show effective defaults but keep their stored inheritance ze
     assert.equal(behaviourTimingEdit("", custom), "0");
     assert.equal(behaviourTimingField({timingDefaults: {multiTapTerm: "0"}}, "multiTapTerm").placeholder, "0 · default");
     assert.equal(behaviourTimingField({}, "multiTapTerm").value, "", "unknown defaults are not invented");
+});
+
+test("each timing placeholder names where its default comes from, and storing is unchanged", () => {
+    const {timingSources} = VOCABULARY;
+    const timing = {tapHoldTerm: "200", multiTapTerm: "150", longerHoldTerm: "400"};
+    const sources = (hold) => ({tapHoldTerm: hold, longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"});
+    const model = {keyBehaviors: [], vocabulary: {timingSources}, behaviorEditing: {keyDefaults: {
+        "LT(3,KC_F)": {builtIn: {}, timing, timingSources: sources("tappingTerm")},
+        KC_A: {builtIn: {}, timing: {...timing, tapHoldTerm: "150"}, timingSources: sources("tapHoldTerm")}}}};
+    const dual = behaviourEditorRow(model, "LT(3,KC_F)"), plain = behaviourEditorRow(model, "KC_A");
+    assert.equal(behaviourTimingField(dual, "tapHoldTerm").placeholder, "200 · dual-role");
+    assert.equal(behaviourTimingField(plain, "tapHoldTerm").placeholder, "150 · behaviour default");
+    assert.equal(behaviourTimingField(plain, "longerHoldTerm").placeholder, "400 · default");
+    assert.equal(behaviourTimingField(plain, "multiTapTerm").placeholder, "150 · default");
+    assert.equal(behaviourTimingField({...plain, timingDefaults: {}}, "tapHoldTerm").placeholder, "ms", "no default reads ms");
+    const unsourced = behaviourEditorRow({...model, behaviorEditing: {keyDefaults: {"LT(3,KC_F)": {builtIn: {}, timing}}}}, "LT(3,KC_F)");
+    assert.equal(behaviourTimingField(unsourced, "tapHoldTerm").placeholder, "200 · default", "without the host's sources, no source is guessed");
+    for (const row of [dual, plain]) {
+        const field = behaviourTimingField(row, "tapHoldTerm");
+        assert.equal(behaviourTimingEdit(field.fallback, field), "0", "typing the default follows it");
+        assert.equal(behaviourTimingEdit("", field), "0", "an empty field follows it");
+    }
 });
 
 test("an explicit timing matching the default is muted without rewriting its stored override", () => {

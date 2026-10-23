@@ -50,6 +50,8 @@ test("the shared memory is the only size limit, and counts the replaced slot's b
 
 test("inspection refuses setup and syntax errors without throwing or mutating context", () => {
     assert.equal(inspectMacroInput("café", {...context, mode: 0}).code, "UNICODE_SETUP_REQUIRED");
+    // The advice names the Settings card as it is titled.
+    assert.match(inspectMacroInput("café", {...context, mode: 0}).error, /Settings → Your computer/);
     assert.equal(inspectMacroInput("hello", {...context, enabled: false, mode: 0}).error, "");
     // ASCII is typed with ordinary keys, so a held key may span it.
     assert.equal(inspectMacroInput("{+KC_A}text{-KC_A}", context).error, "");

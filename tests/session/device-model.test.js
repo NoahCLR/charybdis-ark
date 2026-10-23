@@ -241,6 +241,8 @@ test("the header reports the keyboard, not a profile directory", () => {
     assert.equal(connected.label, "bastardkb Charybdis 4x6");
     assert.match(connected.summary, /generation 7/);
     assert.match(connected.summary, /0xABCD1234/);
+    assert.equal(connected.savedProfile, "saved profile generation 7 · both halves connected", "the review's footer: words, no digest");
+    assert.doesNotMatch(connected.savedProfile, /0x/i);
     const state = {capabilities: {}, device: {manufacturer: "bastardkb", product: "Charybdis 4x6"}};
     assert.equal(buildDeviceModel({...state, storedKeyboardName: ""}).device.label, "bastardkb Charybdis 4x6", "the built-in name keeps its maker");
     assert.equal(buildDeviceModel({...state, storedKeyboardName: "Noah’s board"}).device.label, "Noah’s board", "a name the person gave stands alone");
@@ -438,6 +440,7 @@ test("an uncommitted keyboard does not claim generation 0 as a generation", () =
     });
     assert.match(model.device.summary, /no committed profile/);
     assert.doesNotMatch(model.device.summary, /generation 0/);
+    assert.match(model.device.savedProfile, /^no saved profile · running the compiled defaults/);
 });
 
 test("a committed profile is still reported as committed", () => {

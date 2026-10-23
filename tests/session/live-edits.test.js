@@ -378,6 +378,23 @@ test("Live + review into Live with unsaved edits asks Save or Revert first, as t
     assert.match(model(host).notice, /saves them by itself/);
 });
 
+test("Live's words say the quiet interval the keyboard reports", async t => {
+    const {session, key, send, host} = await open(t, {mode: EDIT_MODE.LIVE, quietMs: 5000});
+    assert.equal(session.draft.live.keyboard.quietMs, 5000);
+    assert.equal(model(host).model.draft.live.keyboard.quietWords, "5 seconds", "core words it for the interface");
+    await key(0, 17, "KC_Q");
+    const published = model(host).model;
+    assert.match(published.vocabulary.editModes[EDIT_MODE.LIVE].detail, /after 5 seconds with no edit/);
+    assert.match(published.device.subtitle, /after 5 seconds without typing/);
+    await send({type: "saveProfileDraft"});
+    assert.match(model(host).notice, /after 5 seconds with no edit and no key held/, "Save's refusal");
+    await send({type: "revertProfileDraft"});
+    await send({type: "setEditMode", mode: EDIT_MODE.LIVE_REVIEW});
+    await send({type: "setEditMode", mode: EDIT_MODE.LIVE});
+    assert.match(model(host).notice, /saves them by itself after 5 seconds/, "the switch's notice");
+    for (const words of [JSON.stringify(model(host).model.vocabulary.editModes), model(host).notice]) assert.doesNotMatch(words, /3 seconds/);
+});
+
 test("Apply into Live with a draft asks to send it live or discard it", async t => {
     const {keyboard, session, key, send, host} = await open(t, {mode: EDIT_MODE.APPLY});
     await key(0, 18, "KC_P");
