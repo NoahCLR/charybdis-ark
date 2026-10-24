@@ -12,7 +12,7 @@ static uint8_t memory[NOAH_PROFILE_STORAGE_REGION_SIZE];
 static uint8_t source[NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE];
 static noah_profile_store_t store;
 static noah_profile_candidate_store_backend_t backend;
-static noah_effective_profile_provider_t provider;
+static noah_active_profile_provider_t provider;
 static noah_profile_candidate_transaction_t transaction;
 static bool read_memory(void *context, noah_profile_storage_address_t offset, uint8_t *bytes, uint32_t length) {
     (void)context;
@@ -51,14 +51,14 @@ int main(int argc, char **argv) {
     if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) {fprintf(stderr, "source invalid: %u at %zu\n", result, error.byte_offset); return 1;}
     noah_profile_validator_v1_profile_t profile;
     assert(noah_profile_validator_v1_profile(&validator, &profile, &error) == NOAH_PROFILE_VALIDATOR_V1_VALID);
-    noah_effective_profile_snapshot_t snapshot;
-    assert(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0, &snapshot) == NOAH_EFFECTIVE_PROFILE_OK);
-    assert(noah_effective_profile_provider_init(&provider, &snapshot, safe, NULL, NULL, 0) == NOAH_EFFECTIVE_PROFILE_OK);
+    noah_active_profile_snapshot_t snapshot;
+    assert(noah_active_profile_snapshot_make_compiled(&profile, &reader, 0, &snapshot) == NOAH_ACTIVE_PROFILE_OK);
+    assert(noah_active_profile_provider_init(&provider, &snapshot, safe, NULL, NULL, 0) == NOAH_ACTIVE_PROFILE_OK);
     memset(memory, 0xff, sizeof(memory));
     noah_profile_store_init(&store, (noah_profile_store_io_t){.read = read_memory, .write = write_memory},
         (noah_profile_store_compatibility_t){.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = 0, .compiled_default_digest = digest, .action_abi_digest = abi});
     noah_profile_store_record_t selected;
-    assert(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    assert(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     noah_profile_candidate_store_backend_init(&backend, &store, &provider, &compatibility, digest, 0);
     noah_profile_candidate_backend_t callbacks = noah_profile_candidate_store_backend_interface(&backend);
     noah_profile_candidate_compatibility_t candidate_compat = {.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = 0, .supported_domain_mask = domains, .max_payload_length = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE, .action_abi_digest = abi};

@@ -2,7 +2,7 @@
 
 Whether a press uses its keycode's behaviour and whether it can join a combo
 is decided by one firmware policy (D-F14,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0014-bigger-profiles.md)): the combo decision at the physical
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0014-bigger-profiles.md)): the combo decision at the physical
 press, the behaviour decision when the press is delivered. The stored
 switches are in the [settings domain](profile-wire-v1/settings-domain.md)
 (scalars and layer records), the [key-behaviour domain](profile-wire-v1/key-behavior-domain.md)
@@ -64,9 +64,9 @@ A physical press uses its keycode's behaviour row only if:
 Otherwise the press takes its normal action: the keycode as if it had no
 row, with the usual modifier, layer and pointing ownership. An `LT()`, `MT()`
 or `OSM()` key stays the key runtime's and keeps its default, as without a row
-(D-F27, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0027-a-keys-hold-decides-how-later-keys-meet-it.md)). A
+(D-F27, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0027-a-keys-hold-decides-how-later-keys-meet-it.md)). A
 custom key's normal action is its shortcut, held from press to release (D-F26,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0026-custom-key-carries-a-shortcut.md)); without one it does
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0026-custom-key-carries-a-shortcut.md)); without one it does
 nothing. One row serves every placement of its keycode, so bypassing it at one
 placement leaves the others as they were.
 
@@ -74,7 +74,7 @@ The decision is held by the press's owner through its release and any pending
 gesture. A layer change while the key is held cannot move it to another owner
 or lose its release.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`pd_mode_key_runtime_integration_test.c`, `test_qmk_bypassed_authored_layer_tap_keeps_default`, `test_qmk_bypassed_custom_key_does_nothing`, `test_qmk_tapping_engine_classifies_no_supported_key`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_qmk_bypassed_authored_layer_tap_keeps_default`, `test_qmk_bypassed_custom_key_does_nothing`, `test_qmk_tapping_engine_classifies_no_supported_key`).
 
 ## A press that waited
 
@@ -93,7 +93,7 @@ that decision, even when the position is pressed again before the release is
 delivered. A delivered press that record admission holds back settles again
 when it is replayed.
 
-Held by: `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_qmk_queued_participation_is_per_press`, `test_qmk_waiting_key_participates_on_hold_layer`, `test_qmk_waiting_key_uses_hold_layer`, `test_qmk_buffered_member_uses_hold_layer`), `tests/host/run_participation_tests.sh` (`test_record_context_is_immutable`).
+Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_qmk_queued_participation_is_per_press`, `test_qmk_waiting_key_participates_on_hold_layer`, `test_qmk_waiting_key_uses_hold_layer`, `test_qmk_buffered_member_uses_hold_layer`), `tests/host/run_participation_tests.sh` (`test_record_context_is_immutable`).
 
 ## Combo decision
 
@@ -117,14 +117,14 @@ source layer as the permission context. A policy change while a chord is
 partly pressed settles ordinary keys once, and an active combo's output still
 gets its release.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_combo_rows`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_qmk_excluded_duplicate_preserves_chord`, `test_qmk_excluded_member_keeps_chord_from_forming`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_combo_rows`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_qmk_excluded_duplicate_preserves_chord`, `test_qmk_excluded_member_keeps_chord_from_forming`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`).
 
 ## Combo outputs
 
 Placement applies to physical presses only; a combo's output and a
 behaviour's generated records have no placement. Whether a combo fires and
 whether its output uses its keycode's behaviour are independent (D-F24,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0024-combo-output-behaviour-permission.md)). The output uses its
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0024-combo-output-behaviour-permission.md)). The output uses its
 behaviour only if:
 
 1. the behaviour master and override allow it;
@@ -149,18 +149,18 @@ output behind native tapping, and travels with the output's record through
 tapping and admission to its release. Each delivered output takes the oldest
 fired completion not yet delivered, so two chords with one output that wait
 together keep their own decisions
-([pairing](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/users/noah/lib/compat/README.md#combo-origin-pairing)). A change
+([pairing](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/users/noah/lib/compat/README.md#combo-origin-pairing)). A change
 to a switch, a definition or the layers cannot reclassify a completed output
 or lose its release; a suppressed completion drops its permission. When the
 origin cannot be reconstructed, the output bypasses its behaviour if any
 combo with that output bypasses it.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_generated_outputs`, `test_combo_output_permissions`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_qmk_combo_output_permissions`, `test_qmk_same_output_chords_wait_together`, `test_qmk_generated_custom_uses_owner_layer`, `test_qmk_combo_output_gui_behaviour`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_output_permission_survives_queues_and_release`), `tests/fixtures/combo_output_behaviors_v1.fixture`.
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_generated_outputs`, `test_combo_output_permissions`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_qmk_combo_output_permissions`, `test_qmk_same_output_chords_wait_together`, `test_qmk_generated_custom_uses_owner_layer`, `test_qmk_combo_output_gui_behaviour`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_output_permission_survives_queues_and_release`), `tests/fixtures/combo_output_behaviors_v1.fixture`.
 
 ## Where it runs
 
 `users/noah/lib/key/behavior/participation.{c,h}` owns the decision; callers
-pass the press and act on the answer. It reads the effective settings,
+pass the press and act on the answer. It reads the active profile's settings,
 behaviour and combo views, never storage.
 
 - **At the press**, the pre-process hook reads the source layer, asks both
@@ -191,4 +191,4 @@ The `user_data` byte:
 | 4 | uses its behaviour | uses its behaviour |
 | 0–3 | source layer | origin layer |
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_record_context_is_immutable`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_qmk_queued_participation_is_per_press`, `test_qmk_combo_origin_survives_delivery_after_deactivation`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_record_context_is_immutable`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_qmk_queued_participation_is_per_press`, `test_qmk_combo_origin_survives_delivery_after_deactivation`).

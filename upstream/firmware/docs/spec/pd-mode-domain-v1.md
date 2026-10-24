@@ -22,17 +22,17 @@ The pointing domain is required in every profile the keyboard validates
 (`MISSING_DOMAIN` otherwise, [errors](profile-wire-v1/errors.md#validation-results)).
 A profile stores a slot's colour only in the lighting domain, one row per slot
 whether or not the slot is stored here (D-F09,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md)).
 
-Held by: `tests/host/run_pd_mode_tests.sh` (`pd_mode_profile_registry_test.c`), `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the required domain mask).
+Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registry_test.c`), `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the required domain mask).
 
 ## Keycodes
 
 Each userspace keycode family owns one fixed block in QMK's user range,
 reserved beyond what is supported, so adding slots or layers renumbers nothing
-(D-F51, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)). A slot
+(D-F51, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)). A slot
 keycode names its slot; the mode comes from the active profile (D-F50,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0050-pointing-keycodes-name-slots.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0050-pointing-keycodes-name-slots.md)).
 
 | Block | Keycodes | Supported |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ Profiles store slot keys as action kinds 4 (held) and 5 (locked)
 ([action encoding](profile-wire-v1/blob-and-digests.md#action-encoding)), so
 a block move changes the action-ABI digest and nothing else.
 
-Held by: `tests/host/run_pd_mode_tests.sh` (`pd_mode_profile_registry_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the keycode assertions).
+Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registry_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the keycode assertions).
 
 ## Header
 
@@ -198,8 +198,8 @@ A tap's keycode is one of:
 | Keycodes | What |
 | --- | --- |
 | `0x0004..0x00c2` | keyboard `0x04..0xa4`, system `0xa5..0xa7`, consumer `0xa8..0xc2` |
-| `0x00d1..0x00d8` | mouse buttons 1–8, a click (D-F22, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0022-pointing-modes-click-mouse-buttons.md)) |
-| `0x7700..0x777f` | macro slots 0–127, a macro start, policy 0 and mask 0 only (D-F23, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0023-pointing-outputs-start-macros.md)) |
+| `0x00d1..0x00d8` | mouse buttons 1–8, a click (D-F22, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0022-pointing-modes-click-mouse-buttons.md)) |
+| `0x7700..0x777f` | macro slots 0–127, a macro start, policy 0 and mask 0 only (D-F23, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0023-pointing-outputs-start-macros.md)) |
 | high byte `0x01..0x1f` with a low-nibble modifier bit, low byte `0x04..0xa4` | a modified keyboard key |
 
 Everything else is refused: standalone modifiers, mouse movement, wheel and
@@ -264,7 +264,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 Changing modes releases only the old mode's outputs and clears its banked
 motion, axis and movement state.
 
-Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_an_empty_slot_hold_key_owns_nothing`, the owner tests), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`pd_mode_key_runtime_integration_test.c`, `test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_momentary_hold`, `test_upper_slot_hold_lock_dpi_and_disabled_slot`, `test_last_slot_hold_lock_dpi_and_disabled_slot`).
+Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_an_empty_slot_hold_key_owns_nothing`, the owner tests), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_interrupted_locked_pointing_mode_press_unlocks_on_press_and_releases_momentary_hold`, `test_upper_slot_hold_lock_dpi_and_disabled_slot`, `test_last_slot_hold_lock_dpi_and_disabled_slot`).
 
 ## Pointer layer and DPI
 
@@ -280,13 +280,13 @@ a directional mode's DPI when it has one; otherwise the normal DPI. The normal
 and sniping DPI are [settings](profile-wire-v1/settings-domain.md#scalars)
 scalars 18 and 19.
 
-Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_state_set_*`, `test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset`), `tests/host/run_pointer_layer_policy_tests.sh`, `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_upper_slot_hold_lock_dpi_and_disabled_slot`).
+Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_state_set_*`, `test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset`), `tests/host/run_pointer_layer_policy_tests.sh`, `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_upper_slot_hold_lock_dpi_and_disabled_slot`).
 
 ## Directional movement
 
 One engine runs every directional mode (D-F45,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0045-one-directional-engine.md); D-F42,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0042-directional-modes-read-eight-directions.md)). The axis says
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0045-one-directional-engine.md); D-F42,
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0042-directional-modes-read-eight-directions.md)). The axis says
 which directions exist: vertical up and down, horizontal left and right,
 dominant axis the four straight ones, eight directions all eight. A
 directional mode never moves the pointer.
@@ -314,14 +314,14 @@ acts as `0`); `2` its motion is consumed and sends nothing, each step still
 counting as one output against the per-report limit.
 
 Byte 87, how often a direction sends: `0` once per threshold step; `1` once
-per movement (D-F07, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0007-directional-mode-can-send-once-per-movement.md)).
+per movement (D-F07, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0007-directional-mode-can-send-once-per-movement.md)).
 A movement starts with the first motion after the mode starts or after
 150 ms without motion. Its first step that sends anything spends it; from then
 on only a direction more than 90° from the one that sent may send, a whole
 step of its own, and its sending spends the movement in turn. Other motion is
 dropped, not banked. A step that sends nothing leaves the movement unspent.
 
-Held by: `tests/host/run_pd_mode_handlers_tests.sh` (`pd_mode_handlers_test.c`, `test_configured_eight_directions`, `test_configured_empty_directions_and_single_axes`, `test_configured_dominant_axis`, `test_configured_once_per_movement`).
+Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handlers_test.c`, `test_configured_eight_directions`, `test_configured_empty_directions_and_single_axes`, `test_configured_dominant_axis`, `test_configured_once_per_movement`).
 
 ## Scrolling movement
 
@@ -342,13 +342,13 @@ saturates at ±2^24 counts.
 - Still for longer than the axis timeout releases the axis; longer than the
   expiry drops the banks too.
 - Byte 3 limits which axes scroll (D-F08,
-  [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0008-scrolling-mode-can-scroll-one-axis.md)). A gesture held
+  [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0008-scrolling-mode-can-scroll-one-axis.md)). A gesture held
   on an axis the mode does not scroll runs as above but sends nothing, so its
   motion neither scrolls later nor leaks into the other axis.
 - Held modifiers are owned for as long as the mode runs. Keys typed meanwhile
   do not see a modifier only the mode holds.
 
-Held by: `tests/host/run_pd_mode_handlers_tests.sh` (`pd_mode_handlers_test.c`, the `test_dragscroll_*` tests, `test_configured_scroll_one_axis`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_pinch_masks_mode_owned_gui_*`, `test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing`).
+Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handlers_test.c`, the `test_dragscroll_*` tests, `test_configured_scroll_one_axis`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_pinch_masks_mode_owned_gui_*`, `test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing`).
 
 ## Outputs
 
@@ -371,7 +371,7 @@ Held by: `tests/host/run_pd_mode_handlers_tests.sh` (`pd_mode_handlers_test.c`, 
   when playback starts. An empty, unplayable or busy slot sends nothing; a
   refused start is not queued.
 
-Held by: `tests/host/run_pd_mode_handlers_tests.sh` (`pd_mode_handlers_test.c`, `test_configured_mouse_button_clicks`, `test_configured_macro_start_accounting`; `pd_output_ownership_test.c`), `tests/host/run_owned_keycode_tests.sh` (`owned_keycode_test.c`, `test_literal_tap_never_releases_another_owners_usage`, `test_click_never_releases_a_physically_held_button`, `test_fresh_modifier_settles_before_a_mouse_button`).
+Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handlers_test.c`, `test_configured_mouse_button_clicks`, `test_configured_macro_start_accounting`; `pd_output_ownership_test.c`), `tests/host/run_owned_keycode_tests.sh` (`owned_keycode_test.c`, `test_literal_tap_never_releases_another_owners_usage`, `test_click_never_releases_a_physically_held_button`, `test_fresh_modifier_settles_before_a_mouse_button`).
 
 ## Button overrides at runtime
 
@@ -382,7 +382,7 @@ press the mode takes never reaches the button's own behaviour, and its release
 goes to the mode that took it, even after another mode replaced it. The
 release of a press the mode did not take stays with the behaviour.
 
-Held by: `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_consumed_buttons_run_no_authored_behavior`, `test_button_release_follows_its_press_across_mode_changes`, `test_configured_consume_button_runs_nothing`, `test_configured_button_click_runs_no_behaviour`, `test_factory_arrow_paste_button_never_holds_itself`), `tests/host/run_pd_mode_handlers_tests.sh` (`test_configured_release_ownership_and_custom_slot`).
+Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_consumed_buttons_run_no_authored_behavior`, `test_button_release_follows_its_press_across_mode_changes`, `test_configured_consume_button_runs_nothing`, `test_configured_button_click_runs_no_behaviour`, `test_factory_arrow_paste_button_never_holds_itself`), `tests/host/run_pointing_mode_handlers_tests.sh` (`test_configured_release_ownership_and_custom_slot`).
 
 ## Effective slots and publication
 
@@ -408,7 +408,7 @@ Held by: `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integrati
 ## Compatibility
 
 The firmware reads only version 3 (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0010-firmware-accepts-only-current-formats.md)): another
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0010-firmware-accepts-only-current-formats.md)): another
 envelope version is `UNKNOWN_DOMAIN_VERSION`, and a version-2 payload's
 header is `INVALID_HEADER` at 0. Nothing is translated. A saved profile in an
 older format or action vocabulary is not used; the

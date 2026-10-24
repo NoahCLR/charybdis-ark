@@ -16,7 +16,7 @@ lighting ceilings a build reports are on
 All integers are unsigned; multibyte integers are little-endian. A colour is
 three bytes, hue, saturation, value. Hue and saturation take `0..255`; value
 is at most the build's `RGB_MATRIX_MAXIMUM_BRIGHTNESS`, which GET `0x08`
-page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
+page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
 [editor metadata](profile-wire-v1/settings-domain.md#editor-metadata--get-0x08)).
 Black (`0, 0, 0`) is literal black, except in a group row
 ([below](#group-rows)) and in a layer colour, where saturation and value `0`
@@ -113,7 +113,7 @@ key runtime reads the tap-commit policy, so it changes, like every profile
 change, only at the safe boundary. Tap-branch colour `n` is the pending colour
 for tap count `n + 2`; a deeper tap count takes the last one.
 
-Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, the locality, mapped-only and auto-mouse tests; `rgb_key_effective_test.c`, `test_tap_commit_policy_fails_closed_on_stale_read`), `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`).
+Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, the locality, mapped-only and auto-mouse tests; `rgb_key_active_profile_test.c`, `test_tap_commit_policy_fails_closed_on_stale_read`), `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`).
 
 ## Reusable groups
 
@@ -137,7 +137,7 @@ naming one semantic. In a group row, black means the stage's own colour (the
 layer's, the slot's, the feedback colour), so a black layer row on a layer
 whose colour is black paints nothing; a coloured row still paints. Every row names a group below `G`.
 
-Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_preview_preserves_later_group_override_order`, the `*_led_groups_*` tests; `rgb_pd_effective_test.c`; `rgb_combo_effective_test.c`).
+Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_preview_preserves_later_group_override_order`, the `*_led_groups_*` tests; `rgb_pd_active_profile_test.c`; `rgb_combo_active_profile_test.c`).
 
 ## Complete surfaces
 
@@ -278,14 +278,14 @@ it never rebuilds tables from the authored sources. A frame that began before
 a new generation or working copy activated is refused as stale and draws
 nothing from the old view. A build without RGB Matrix has no lighting domain.
 
-Held by: `tests/host/run_effective_rgb_runtime_tests.sh` (`effective_rgb_runtime_test.c`), `tests/host/run_rgb_layer_render_tests.sh` (`rgb_pd_effective_test.c`, `rgb_key_effective_test.c`, `rgb_combo_effective_test.c`, `test_compiled_and_live_*_rendering`), `tests/host/run_rgb_validation_tests.sh` (`rgb_validation_test.c`).
+Held by: `tests/host/run_active_profile_rgb_runtime_tests.sh` (`active_profile_rgb_runtime_test.c`), `tests/host/run_rgb_layer_render_tests.sh` (`rgb_pd_active_profile_test.c`, `rgb_key_active_profile_test.c`, `rgb_combo_active_profile_test.c`, `test_compiled_and_live_*_rendering`), `tests/host/run_rgb_validation_tests.sh` (`rgb_validation_test.c`).
 
 ## Compatibility
 
 The firmware reads only version 4 (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 3 and
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 3 and
 earlier are `INVALID_VERSION` and are not translated. The 32 pointing-colour
-rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
-the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0014-bigger-profiles.md)).
+rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
+the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0014-bigger-profiles.md)).
 
 Held by: `tests/host/run_profile_rgb_v4_tests.sh` (`profile_rgb_v4_test.c`), `tests/fixtures/rgb_domain_v4.json` (`version-3`, `version-2`).

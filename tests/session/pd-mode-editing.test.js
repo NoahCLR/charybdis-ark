@@ -89,7 +89,7 @@ test("logical Apply declares schema four, all seven domains and storage format s
 test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes", () => {
     // The mode keycodes are a fixed registry in the firmware, and its runtime
     // refuses to activate a slot whose record is empty rather than misbehaving
-    // (`noah_effective_pd_for_mask` returns nothing, and both activate and lock
+    // (`noah_active_profile_pd_for_mask` returns nothing, and both activate and lock
     // bail out on that). So clearing a slot leaves an inert button on the
     // board, not a broken profile — and the validated profile counts what still
     // reaches the empty slot so the interface can say the key does nothing.

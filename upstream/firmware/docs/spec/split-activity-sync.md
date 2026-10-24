@@ -13,7 +13,7 @@ value ids are listed in
 - Both halves run the split serial link at a fixed 460,800 baud
   (`SERIAL_USART_SPEED`, set in `users/noah/lib/compat/qmk_split_transport.mk`).
   There is no speed selector: `NOAH_SPLIT_BAUD` fails the build (D-F52,
-  [0052](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0052-split-activity-coalescing-and-fixed-baud.md)).
+  [0052](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0052-split-activity-coalescing-and-fixed-baud.md)).
 - `SERIAL_USART_TIMEOUT` is 5 ms, for each wait on the serial FIFO.
 - Every split data frame carries the fork's frame CRC8 by default
   (`SPLIT_TRANSPORT_CRC`); `NOAH_SPLIT_CRC=no` builds without it. The build
@@ -71,7 +71,7 @@ build's packed C struct, sent whole.
 
 | RPC | Packet |
 | --- | --- |
-| `PUT_SPLIT_RUNTIME_BASE_SYNC` | auto-mouse fade progress, active and locked pointing slot, the pointing mode's owning half and keys (when `RGB_PD_MODE_ACTIVE_HALF_ENABLE`), key preview layer |
+| `PUT_SPLIT_RUNTIME_BASE_SYNC` | auto-mouse fade progress, active and locked pointing slot, the pointing mode's owning half and keys (when `RGB_POINTING_MODE_ACTIVE_HALF_ENABLE`), key preview layer |
 | `PUT_SPLIT_COMBO_FEEDBACK_SYNC` | combo feedback underlay and overlay key bitmaps |
 | `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` | key feedback flash visibility and semantic map |
 | `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC` | key feedback owner map and tap branch map |
@@ -212,7 +212,7 @@ arming and just after, and summarises the windows wholly between them, stage
 times included. It also estimates the poll rate with measured split time
 removed, a comparison between builds rather than a prediction. Install its
 dependencies with `npm ci --prefix tools`. Capture with the procedure in
-[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/measurements/pointing-cadence/README.md),
+[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/measurements/pointing-cadence/README.md),
 which also keeps the recorded sets.
 
 Held by: `tests/host/run_split_activity_tests.sh` (`split_diagnostics_tool_test.cjs`).

@@ -433,7 +433,7 @@ const SPLIT_STATUS_NAMES = Object.freeze([
 ]);
 const CANDIDATE_PEER_FLAGS = Object.freeze({CLEANUP_PENDING: 1 << 0, MASTER: 1 << 1, WAITING_SAFE_BOUNDARY: 1 << 2, KNOWN_MASK: 0x07});
 // Why the slave half last answered BUSY, and what it held then; these mirror
-// noah_profile_split_v1_busy_reason_t, noah_profile_peer_store_state_t and
+// noah_profile_split_v1_busy_reason_t, noah_profile_other_half_store_state_t and
 // noah_profile_split_transfer_owner_t.
 const PEER_BUSY_REASON_NAMES = Object.freeze(["UNSPECIFIED", "ADMITTED", "MAILBOX_FULL", "OTHER_COPY", "NO_LEASE", "STORE_WORKING", "PULLING", "CONVERGENCE_ONLY"]);
 const PEER_STORE_STATE_NAMES = Object.freeze(["UNINITIALIZED", "IDLE", "RECEIVING", "VALIDATING", "PREPARING", "PREPARED", "COMMITTING", "COMMITTED", "REJECTED", "RECONCILE_REQUIRED"]);

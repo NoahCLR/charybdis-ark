@@ -12,7 +12,7 @@ pages carry are [blob-and-digests.md](blob-and-digests.md).
 ## Raw HID reports
 
 The firmware answers Raw HID itself (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
 usage page `0xFF60`, 32-byte reports both ways. Every report goes to the
 Profile Wire handlers and is sent back exactly once, in place, as the reply,
 with the same length.
@@ -131,7 +131,7 @@ Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, th
 
 Capability page 0 bytes 9–12. It holds only what a build varies by; no
 firmware behaviour depends on a bit, the word only describes the build (D-F28,
-[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 
 | Bit | Meaning |
 | ---: | --- |
@@ -163,7 +163,7 @@ Page 0:
 | 8–11 | compiled-default digest |
 | 12–15 | active digest: the active profile's payload digest; for the working copy, its revision |
 | 16–19 | pending digest: a generation waiting to activate |
-| 20–23 | saved-profile (committed) digest |
+| 20–23 | saved-profile digest |
 | 24 | active kind, below |
 
 Page 1:
@@ -284,7 +284,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 ## Flash pauses — GET `0x0D`
 
 Each half measures how long its profile-slot flash work stops the keyboard
-(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
+(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
 Byte page `0` is the master half's figures; page `1` the slave half's, as the
 master half last pulled them over the split link; page 2 and above answer
 status `2`. Page 1 answers status `3` until a pull has succeeded.
