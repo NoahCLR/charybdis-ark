@@ -282,6 +282,24 @@ test("an error with a code reaches the panel as its sentence, without the code",
     assert.equal(shell.posted.length, 2);
 });
 
+// An Apply or Save cut short says first what happened to the profile
+// (interruption.js), so its notice is that sentence with no "Failed:" ahead
+// of it; the reply still says it is a failure.
+test("a failure that states its verdict is the notice as it is, still marked as a failure", async () => {
+    const verdict = "Nothing was saved: the keyboard kept the profile it had.";
+    const cut = async () => {throw Object.assign(new Error(`${verdict} The keyboard was disconnected or restarted.`), {code: "DISCONNECTED", verdict});};
+    const shell = fakeShell(), loop = loopWithDraft(shell, {readPortableProfile: cut});
+    await loop.handleMessage({type: "exportPortableProfile"});
+    assert.equal(last(shell).notice, `${verdict} The keyboard was disconnected or restarted.`);
+    assert.equal(last(shell).failed, true);
+    const other = fakeShell(), plain = loopWithDraft(other, {readPortableProfile: async () => {throw new Error("The keyboard did not answer.");}});
+    await plain.handleMessage({type: "exportPortableProfile"});
+    assert.equal(last(other).notice, "Failed: The keyboard did not answer.");
+    assert.equal(last(other).failed, true);
+    await plain.handleMessage({type: "somethingElse"});
+    assert.equal(last(other).failed, undefined, "a later reply carries no failure");
+});
+
 test("export hands the shell what to save, and says where it went", async () => {
     const shell = fakeShell(), loop = loopWithDraft(shell);
     await loop.handleMessage({type: "exportPortableProfile"});

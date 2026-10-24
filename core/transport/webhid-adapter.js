@@ -229,7 +229,7 @@ class WebHidConnectedDevice {
             if (event?.device === this.device) {
                 this.fail(liveLinkError(
                     LIVE_LINK_ERROR_CODES.DISCONNECTED,
-                    `Charybdis Raw HID interface ${this.deviceId} disconnected.`,
+                    "The keyboard was disconnected.",
                     {deviceId: this.deviceId}
                 ));
             }
@@ -243,7 +243,7 @@ class WebHidConnectedDevice {
         if (this.disconnected) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.DISCONNECTED,
-                `Charybdis Raw HID interface ${this.deviceId} is disconnected.`,
+                "The keyboard is not connected.",
                 {deviceId: this.deviceId}
             );
         }
@@ -253,7 +253,7 @@ class WebHidConnectedDevice {
         } catch (cause) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.WRITE_FAILED,
-                `Could not write to Charybdis Raw HID interface ${this.deviceId}.`,
+                "Ark could not send a report to the keyboard.",
                 {cause, deviceId: this.deviceId}
             );
         }
@@ -309,7 +309,7 @@ class WebHidConnectedDevice {
         } catch (cause) {
             this.fail(liveLinkError(
                 LIVE_LINK_ERROR_CODES.INVALID_REPORT,
-                `Charybdis Raw HID interface ${this.deviceId} returned an invalid input report.`,
+                "The keyboard sent a report Ark could not read.",
                 {cause, deviceId: this.deviceId}
             ));
             return;

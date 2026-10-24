@@ -9,7 +9,8 @@ const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const {EDIT_MODE, EDIT_RESULT} = require("../../core/protocol/profile-edit-v1");
+const {EDIT_MODE, EDIT_RESULT, PROFILE_EDIT_V1} = require("../../core/protocol/profile-edit-v1");
+const EDIT_VALUE_SAVE = PROFILE_EDIT_V1.VALUE_SAVE;
 
 function fakeShell() {
     const shell = {
@@ -311,6 +312,62 @@ test("reconnecting shows the unsaved edits; a replug shows them gone", async t =
     assert.equal(session.draft.live.unsaved, false);
     assert.equal(model(shell).model.draft.live.unsaved, false);
     assert.match(model(shell).notice, /restarted .* unsaved edits are gone/);
+});
+
+// The keyboard restarting during a Save (keyboard session, 2026-10-24): Ark
+// can't tell whether it finished, keeps the edits as a recovery copy, and
+// says what the next read shows became of them.
+for (const [when, saves, moves] of /** @type {const} */ ([["before it saved", false, false], ["once it had saved", true, false],
+    ["before it saved, back under a new device id", false, true]])) test(`a Save cut short ${when} says Ark can't tell, then what the read shows`, async t => {
+    const keyboard = liveKeyboard({document: document()});
+    const shell = fakeShell();
+    const adapter = fakeKeyboardAdapter({keyboard});
+    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 300, sleep: async () => {}, reconnect: {sleep: () => new Promise(resolve => setTimeout(resolve, 5)), waitMs: 5000}});
+    t.after(() => loop.close());
+    await loop.handleMessage({type: "refresh"});
+    /** @param {object} message */
+    const send = message => loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, ...message});
+    await send({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 6, keycode: "KC_V"}]});
+    const edits = Buffer.from(keyboard.working);
+    await send({type: "reviewProfileDraft"});
+    // The keyboard restarts under the Save, or just after it saved, and its
+    // connection goes with it.
+    const answer = keyboard.answer;
+    let saving = false;
+    const restart = () => {
+        keyboard.answer = answer; keyboard.replug();
+        queueMicrotask(() => {
+            adapter.lastConnection().emitDisconnect(new Error("USB unplugged"));
+            // A restarted keyboard may be listed under a new path; its serial number stays.
+            if (moves) adapter.devices = [{id: "fake-charybdis-2", product: "Charybdis 4x6", manufacturer: "Bastard Keyboards", serialNumber: "FAKE-1"}];
+        });
+        return [];
+    };
+    keyboard.answer = report => {
+        const save = report[0] === 0x07 && report[2] === EDIT_VALUE_SAVE;
+        if (save && !saves) return restart();
+        if (!save && saving) return restart();
+        saving ||= save;
+        return answer(report);
+    };
+    await send({type: "saveProfileDraft", confirmChecks: true});
+    const failed = shell.posted.filter(message => message.type === "model" && message.failed).at(-1);
+    assert.ok(failed, "the Save's failure is published as one");
+    assert.match(failed.notice, /^Ark can't tell whether the save finished\. The keyboard was disconnected or restarted\. /);
+    assert.doesNotMatch(failed.notice, /DevSrvsID|Device \S+ disconnected|Raw HID|fake-charybdis|Candidate|mutation|ambiguous|wait window|decision/);
+    for (const sentence of failed.notice.split(/(?<=[.!?])\s+/)) assert.match(sentence, /^[A-Z(]/, sentence);
+    // The recovery copy before Save is the saved profile; the Save cut short
+    // keeps the edits too, which a restart may have lost.
+    assert.deepEqual(shell.made.map(about => about.cause), ["save", "save"]);
+    assert.equal(shell.recoveries[0].profile, document().profile);
+    assert.equal(shell.recoveries[1].profile, edits.toString("base64"), "the second copy holds the edits");
+    assert.match(failed.notice, /A recovery copy on Backups has your edits \(\/recovery\/2\.json\)\./);
+    await loop.reconnected();
+    const said = posted(shell).at(-1);
+    if (saves) assert.match(said, /The save finished: the keyboard saved your edits\.$/);
+    else assert.match(said, /The save did not finish, so the keyboard's unsaved edits are gone: it runs its saved profile again\. The recovery copy on Backups has them \(\/recovery\/2\.json\)\.$/);
+    assert.doesNotMatch(said, /restarted since Ark last read it/, "the Save's result is said once, not beside the restart's");
+    assert.equal(loop.session.saveCutShort, undefined, "said once");
 });
 
 test("leaving Live + review with unsaved edits asks Save or Revert first", async t => {

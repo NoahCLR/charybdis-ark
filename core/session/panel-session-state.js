@@ -18,8 +18,9 @@
 //   endRead          …and ends, ready to edit or not
 //   whilePanelBusy   a draft, backup or demo control runs; the panel takes nothing else
 //   whileApplying    an Apply and its readback run, step by step
-//   takeOutbox       what the next model carries once: a notice, the accepted
-//                    edit, and whether the forms start again from the model
+//   takeOutbox       what the next model carries once: a notice (and whether
+//                    it is a failure), the accepted edit, and whether the
+//                    forms start again from the model
 
 /**
  * @typedef {import("./types.js").PanelSession} Session
@@ -159,10 +160,12 @@ async function whileApplying(session, work) {
 }
 
 // What the next model carries once, then forgets.
-/** @param {Pick<Session, "notice" | "acceptedEdit" | "resetDraftForms">} session */
+/** @param {Pick<Session, "notice" | "noticeFailed" | "acceptedEdit" | "resetDraftForms">} session */
 function takeOutbox(session) {
-    const outbox = {notice: session.notice, acceptedEdit: session.acceptedEdit, resetDraftForms: session.resetDraftForms};
+    const outbox = {notice: session.notice, acceptedEdit: session.acceptedEdit, resetDraftForms: session.resetDraftForms,
+        ...(session.noticeFailed && session.notice ? {failed: true} : {})};
     session.notice = undefined;
+    session.noticeFailed = undefined;
     session.acceptedEdit = undefined;
     session.resetDraftForms = undefined;
     return outbox;

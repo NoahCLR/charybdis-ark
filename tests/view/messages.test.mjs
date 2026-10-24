@@ -109,3 +109,22 @@ test("a macro inspection goes to its editor, and an unknown reply changes nothin
     assert.equal(getModel(), model);
     assert.deepEqual([calls.refresh, calls.render], [0, 0]);
 });
+
+// An Apply or Save cut short starts with its verdict, not "Failed:"; the
+// reply marks it a failure, so the rail shows it as one.
+test("a notice the core marks as a failure is shown as one, whatever its first word", (t) => {
+    const previousDocument = globalThis.document;
+    globalThis.document = {documentElement: {dataset: {}}};
+    t.after(() => { globalThis.document = previousDocument; state.error = ""; state.notice = ""; });
+    const {receive} = surface();
+    const model = {...reading(), load: {state: "ready"}, draft: {id: "d1", revision: 2}};
+    const said = "Nothing was saved: the keyboard kept the profile it had. The keyboard was disconnected or restarted.";
+    receive({type: "model", model, notice: said, failed: true});
+    assert.equal(state.error, said);
+    assert.equal(state.notice, "");
+    receive({type: "model", model, notice: "Read the layout and committed profile generation 7."});
+    assert.equal(state.error, "");
+    assert.equal(state.notice, "Read the layout and committed profile generation 7.");
+    receive({type: "model", model, notice: "Failed: The keyboard did not answer."});
+    assert.equal(state.error, "Failed: The keyboard did not answer.");
+});

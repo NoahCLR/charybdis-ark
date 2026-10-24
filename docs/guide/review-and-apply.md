@@ -55,6 +55,13 @@ up** and the next edit waits. If the slave half refuses the edits, the rail
 says **Halves apart**: the halves now run different profiles, nothing can be
 saved, and **Revert** puts both back on the saved profile.
 
+If the keyboard is unplugged or restarts during a save, Ark says **Ark can't
+tell whether the save finished.**, then why. It keeps your edits as a recovery
+copy on [Backups](backups.md), since a restart loses unsaved edits. Once it
+reads the keyboard again it says what happened: the save finished; or it did
+not and the keyboard still runs your edits, unsaved, so Save them again; or it
+did not and the restart lost them, and the recovery copy has them.
+
 ### Live
 
 Live works like Live + review, with the same undo, redo and trap question, but
@@ -200,16 +207,22 @@ A save is all or nothing. Release held keys and unlock layers first: the
 keyboard waits for them, and if they stay held it gives up and nothing
 changes.
 
-If Apply stops, the bar keeps the step it stopped at and the keyboard's reason
-until you dismiss it, with one of three outcomes:
+If Apply stops, the bar keeps the step it stopped at and why until you
+dismiss it, with one of three outcomes:
 
-- Nothing was saved. The keyboard kept the profile it had.
-- The keyboard had already decided to save, and finishes by itself once both
-  halves are connected. Read the keyboard then.
+- Nothing was saved: the keyboard kept the profile it had.
+- The keyboard had already decided to save the new profile, and finishes it by
+  itself once both halves are connected. Read the keyboard then.
 - Ark can't tell which profile was saved. Read the keyboard to see what it
-  runs.
+  runs now.
 
-Either way the recovery copy is on the [Backups](backups.md) screen.
+The message beside the rail starts with the same outcome, then says why in
+plain words and what to do. If the keyboard was unplugged or restarted, that
+is the reason given: **The keyboard was disconnected or restarted.** Ark says
+**Keep both halves connected** only while the keyboard is still connected.
+Either way the recovery copy is on the [Backups](backups.md) screen. The
+device's own error, for whoever looks into it, is under **Diagnostics** on the
+Keyboard screen.
 
 ## When the keyboard stops saving
 

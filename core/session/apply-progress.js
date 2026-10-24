@@ -5,9 +5,11 @@
  * @typedef {import("../../contracts/model.js").ApplyView} ApplyView
  * @typedef {import("../../contracts/model.js").ApplyStep} ApplyStep
  * @typedef {{name?: string, domainId?: number, rowIndex?: number}} DeviceFailure
- * @typedef {{message?: string, deviceError?: DeviceFailure, status?: {error?: DeviceFailure}}} FailureDetails
+ * @typedef {{name?: string, code?: string, message?: string, cause?: unknown, deviceError?: DeviceFailure, status?: {error?: DeviceFailure}}} FailureDetails
  * @typedef {{waitingSafeBoundary?: boolean, lastStatusName?: string, busyStreak?: number, busyReason?: string, transportFailureCount?: number}} SlaveFailure
  */
+
+const {APPLY_VERDICTS, INTERRUPTION_REASONS, interruption} = require("./interruption");
 
 // The steps of one Apply, as the person watching it sees them.
 //
@@ -88,7 +90,8 @@ class ApplyProgress {
     fail({reason = "", saved = "unknown"} = {}) {
         if (this.failure) return this.failure;
         const step = APPLY_STEPS[Math.max(this.index, 0)];
-        this.failure = {step: step.id, label: step.label, reason, saved};
+        const verdict = APPLY_VERDICTS[/** @type {keyof typeof APPLY_VERDICTS} */ (saved)] || APPLY_VERDICTS.unknown;
+        this.failure = {step: step.id, label: step.label, reason, saved, verdict};
         this.onChange(this.view());
         return this.failure;
     }
@@ -180,24 +183,51 @@ const SLAVE_BUSY_REASONS = Object.freeze({
     CONVERGENCE_ONLY: "The slave half was finishing another save.",
 });
 
-// The keyboard's own reason when it gave one, else the slave half's last
-// answer, else Ark's own message.
-/** @param {FailureDetails | null | undefined} error @param {SlaveFailure | null | undefined} slave */
+// Ark's own wait running out, from the upload coordinator: the keyboard kept
+// answering but made no progress Ark could see.
+const STALLED = new Set(["COMMIT_OUTCOME_AMBIGUOUS", "VALIDATION_OUTCOME_AMBIGUOUS", "OPERATION_OUTCOME_AMBIGUOUS", "MAILBOX_BUSY", "UPLOAD_BUSY"]);
+const HELD = "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
+const HELD_ARK_WAIT = "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard waited to save until Ark stopped waiting for it.";
+
+// Errors whose text is for diagnostics only: the coordinators' and the
+// transport's. Two coordinator codes carry whatever stopped them (CARRIED).
+const CARRIED = new Set(["UPLOAD_FAILED", "COMMIT_FAILED"]);
+/** @param {FailureDetails | null | undefined} error */
+const diagnosticOnly = error => error?.name === "CandidateUploadError" || error?.name === "LiveLinkTransportError";
+
+// Why an Apply stopped, in the words of the person who pressed it: a lost
+// connection anywhere in the cause first (a restarted keyboard makes the slave
+// half look busy), then the keyboard's own reason, then the slave half's last
+// answer. The coordinators' and the transport's text is never said: it stays
+// in the cause and the diagnostics. Ark's own sentences are.
+/** @param {FailureDetails | null | undefined} error @param {SlaveFailure | null | undefined} slave @returns {string} */
 function failureReason(error, slave) {
+    const cut = interruption(error);
+    if (cut === "lost") return INTERRUPTION_REASONS.lost;
     const device = error?.deviceError || error?.status?.error;
     if (device?.name && device.name !== "NONE") {
         // The copy was ready; the save waited for the master half to go idle.
-        if (device.name === "TIMEOUT" && slave?.waitingSafeBoundary) return "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
+        if (device.name === "TIMEOUT" && slave?.waitingSafeBoundary) return HELD;
         // The copy to the slave half stopped: its last answer says why.
         if (device.name === "PEER_TRANSFER_FAILED" && slave?.lastStatusName && SLAVE_REASONS[slave.lastStatusName]) return SLAVE_REASONS[slave.lastStatusName];
         const known = DEVICE_REASONS[device.name];
         if (known) return device.name === "VALIDATION_REJECTED" ? `${known}${locate(device)}.` : known;
         return `The keyboard reported ${device.name}.`;
     }
+    // Ark's own wait ran out while the keyboard waited for a safe moment.
+    if (slave?.waitingSafeBoundary && STALLED.has(error?.code || "")) return HELD_ARK_WAIT;
     if (slave && (slave.busyStreak ?? 0) >= 3 && slave.busyReason && SLAVE_BUSY_REASONS[slave.busyReason]) return SLAVE_BUSY_REASONS[slave.busyReason];
     if (slave && slave.lastStatusName && slave.lastStatusName !== "OK" && SLAVE_REASONS[slave.lastStatusName]) return SLAVE_REASONS[slave.lastStatusName];
     if (slave && (slave.transportFailureCount ?? 0) > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
-    return error?.message || "The keyboard stopped answering.";
+    if (cut === "unanswered") return INTERRUPTION_REASONS.unanswered;
+    if (STALLED.has(error?.code || "")) return "The keyboard stopped making progress, so Ark stopped waiting for it.";
+    if (diagnosticOnly(error)) {
+        // An Ark refusal the coordinator carried (a keyboard that changed
+        // under the upload) is said as Ark says it.
+        const cause = /** @type {FailureDetails | undefined} */ (error?.cause);
+        return CARRIED.has(error?.code || "") && cause?.message && !diagnosticOnly(cause) ? failureReason(cause, slave) : "The keyboard answered in a way Ark did not expect.";
+    }
+    return error?.message || INTERRUPTION_REASONS.unanswered;
 }
 
 module.exports = {APPLY_STEPS, ApplyProgress, failureReason};

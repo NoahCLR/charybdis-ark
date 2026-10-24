@@ -134,7 +134,7 @@ test("a keyboard that fails again soon after Ark reconnected it is left for the 
     const model = models().at(-1);
     assert.equal(model.device.connected, false, "no second automatic reconnect within the guard");
     assert.equal(adapter.connectionHistory.length, connections);
-    assert.match(model.device.health.error, /did not respond within 50 ms/, "the failure stays on the Connect screen");
+    assert.match(model.device.health.error, /^The keyboard did not answer within 50 ms\.$/, "the failure stays on the Connect screen");
     assert.equal(notices().at(-1), LOST_WORDS.again);
 
     // The person connects it; a loss well after is followed again.

@@ -583,3 +583,18 @@ test("compiled defaults download once across reconnects, and across runs where t
     assert.equal(compiledChunks(), 0, "Ark opened again reuses the shell's copy");
     assert.equal(store.sets, 1, "the same defaults are not stored again");
 });
+
+// A person reads the failure's sentence; whoever looks into it reads what
+// lay under it, with the device it named, in the diagnostics.
+test("a failure's cause chain and device are kept in the diagnostics, its sentence in the error", () => {
+    const service = new ProfileDeviceService({adapter: new FakeDeviceAdapter()});
+    const lost = Object.assign(new Error("The keyboard was disconnected."), {code: "DISCONNECTED", deviceId: "DevSrvsID:4295254514"});
+    const coordinator = Object.assign(new Error("Candidate status could not be read after a mutation; its outcome is ambiguous."), {code: "TRANSPORT_OUTCOME_AMBIGUOUS", cause: lost});
+    const verdict = "Nothing was saved: the keyboard kept the profile it had.";
+    service.setError(Object.assign(new Error(`${verdict} The keyboard was disconnected or restarted.`), {code: "RESTORE_NOT_SAVED", cause: coordinator, verdict}));
+    const {error, diagnostics} = service.snapshot();
+    assert.equal(error.message, `${verdict} The keyboard was disconnected or restarted.`);
+    assert.equal(error.verdict, verdict, "the verdict is published with the failure");
+    assert.equal(diagnostics.at(-1), "RESTORE_NOT_SAVED: Nothing was saved: the keyboard kept the profile it had. The keyboard was disconnected or restarted."
+        + " (TRANSPORT_OUTCOME_AMBIGUOUS: Candidate status could not be read after a mutation; its outcome is ambiguous.; DISCONNECTED: The keyboard was disconnected. [DevSrvsID:4295254514])");
+});

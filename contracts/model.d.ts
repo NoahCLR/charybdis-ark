@@ -50,7 +50,8 @@ export interface StatusModel {
 
 export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'slave' | 'commit' | 'converge' | 'verify';
 /** `saved`: "none" nothing was saved; "decided" the keyboard decided to save and finishes by itself; "unknown". */
-export interface ApplyFailure {step: ApplyStep; label: string; reason: string; saved: string}
+/** `verdict` is the sentence for `saved` (core/session/interruption.js APPLY_VERDICTS) that every notice about this Apply starts with. */
+export interface ApplyFailure {step: ApplyStep; label: string; reason: string; saved: string; verdict: string}
 /** What the connected firmware reports about itself (core/session/firmware-support.js firmwareView). */
 export interface FirmwareView {
     version: string | null; versionWord: string | null; defaultsDigest: string | null;

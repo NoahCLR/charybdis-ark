@@ -9,7 +9,7 @@ const {PHASE} = require("../model/vocabulary");
  * @typedef {import("./types.js").ReadSnapshot} ReadSnapshot
  * @typedef {import("./types.js").CompleteReadSnapshot} CompleteReadSnapshot
  * @typedef {import("./types.js").RestoredProfile} Restored
- * @typedef {import("./types.js").PublicError & Partial<Record<'step' | 'stepLabel' | 'reason' | 'saved', string>>} PublishedError
+ * @typedef {import("./types.js").PublicError & Partial<Record<'step' | 'stepLabel' | 'reason' | 'saved' | 'verdict', string>>} PublishedError
  */
 const {requireReady, PROFILE_DOMAIN_FLAGS, SUPPORTED_PROFILE_PROTOCOL, SUPPORTED_PROFILE_SCHEMA,
     REQUIRED_PROFILE_DOMAIN_MASK, REQUIRED_LIVE_MUTATION_FEATURES,
@@ -1146,7 +1146,7 @@ class ProfileDeviceService {
     /** @param {unknown} error */
     setError(error) {
         this.error = publicError(error);
-        this.addDiagnostic(`${this.error.code}: ${this.error.message}`);
+        this.addDiagnostic(`${this.error.code}: ${this.error.message}${causeText(error)}`);
     }
 
     /** @param {string} message */
@@ -1286,11 +1286,29 @@ function publicError(value) {
         code: cleanText(error?.code) || cleanText(error?.name) || "LIVE_LINK_ERROR",
         message: cleanText(error?.message) || String(error || "Unknown live-link error."),
     };
-    // Where an Apply failed, why, and what was saved (see apply-progress.js).
-    for (const key of /** @type {const} */ (["step", "stepLabel", "reason", "saved"])) {
+    // Where an Apply failed, why, and what was saved (see apply-progress.js
+    // and interruption.js).
+    for (const key of /** @type {const} */ (["step", "stepLabel", "reason", "saved", "verdict"])) {
         if (typeof error?.[key] === "string" && error[key]) result[key] = cleanText(error[key]);
     }
     return result;
+}
+
+// What lies under a failure, for the diagnostics: the coordinators' and the
+// transport's own words, with the device they name. A person reads the
+// failure's sentence; this is for whoever looks into it.
+/** @param {unknown} error */
+function causeText(error) {
+    const own = /** @type {{deviceId?: unknown} | null | undefined} */ (error)?.deviceId;
+    const parts = typeof own === "string" ? [`device ${own}`] : [];
+    let cause = /** @type {{cause?: unknown} | null | undefined} */ (error)?.cause;
+    for (let depth = 0; cause && typeof cause === "object" && depth < 8; depth++) {
+        const item = /** @type {{code?: unknown, name?: unknown, message?: unknown, deviceId?: unknown, cause?: unknown}} */ (cause);
+        const device = typeof item.deviceId === "string" ? ` [${item.deviceId}]` : "";
+        parts.push(`${cleanText(item.code) || cleanText(item.name) || "cause"}: ${cleanText(item.message)}${device}`);
+        cause = item.cause;
+    }
+    return parts.length ? ` (${parts.join("; ")})` : "";
 }
 
 // What a failed operation rejects with: the error it recorded, as a thrown

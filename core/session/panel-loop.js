@@ -156,10 +156,15 @@ async function handleMessage(session, message, shell) {
         // Put it in the panel too. A toast is easy to miss and disappears,
         // and the panel is where someone looks when it seems stuck. It reads
         // as the sentence the failure says; its code (OperationFailure.code)
-        // is for the code that handles it, not for the person.
-        // A request refused while the keyboard holds an edit for released
-        // keys is no failure: its words say what to do (live-edits.js).
-        session.notice = /** @type {{code?: string}} */ (error)?.code === "LIVE_EDIT_HELD" ? text : `Failed: ${text}`;
+        // is for the code that handles it, not for the person. A request
+        // refused while the keyboard holds an edit for released keys is no
+        // failure: its words say what to do (live-edits.js). An Apply or Save
+        // cut short starts with its verdict (interruption.js), which says what
+        // happened better than "Failed".
+        const held = /** @type {{code?: string}} */ (error)?.code === "LIVE_EDIT_HELD";
+        const verdict = /** @type {{verdict?: unknown}} */ (error)?.verdict;
+        session.notice = held || (typeof verdict === "string" && verdict && text.startsWith(verdict)) ? text : `Failed: ${text}`;
+        session.noticeFailed = !held;
         publish(session, shell);
     }
 }
