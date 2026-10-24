@@ -1,6 +1,6 @@
 "use strict";
 // Restarting the keyboard from Ark (firmware D-F34), through the panel loop
-// both shells run, against a keyboard with a working copy that can stop saving
+// the page runs, against a keyboard with a working copy that can stop saving
 // and restart: the unsaved edits are kept with a recovery copy, the keyboard
 // restarts, comes back and is read again, and the edits go back unsaved.
 const assert = require("node:assert/strict");

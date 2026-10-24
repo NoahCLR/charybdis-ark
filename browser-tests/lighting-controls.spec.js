@@ -19,7 +19,7 @@ const stages = [
             tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", locality: "RGB_KEY_HALF"})})},
 ];
 
-async function openStage(page, stage, theme = "plain") {
+async function openStage(page, stage, theme = "dark") {
     await openControls(page, "lighting", {stage, layer: 1, pdSlot: 0, feedbackRow: "holdActiveColor"}, theme);
     if (stage === "auto") {
         await page.evaluate(async () => {
@@ -66,7 +66,7 @@ for (const stage of stages) {
     });
 }
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`colour field focus survives the shell's cascade (${theme})`, async ({page}) => {
         await openStage(page, "layers", theme);
         await change(channel(page, 0), 77);

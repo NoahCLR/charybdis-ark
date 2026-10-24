@@ -19,5 +19,5 @@ declare global {
     const __ARK_SLEEP_WORKER__: string;
     const __ARK_PANEL__: string;
     interface Navigator {hid?: WebHid}
-    interface Window {acquireVsCodeApi: () => ReturnType<typeof import('./panel-channel.mjs').connectPanel>['api']}
+    interface Window {acquirePanelApi: () => ReturnType<typeof import('./panel-channel.mjs').connectPanel>['api']}
 }

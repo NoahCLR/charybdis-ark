@@ -1,10 +1,9 @@
 // @ts-check
-// Recovery copies in this browser's storage (IndexedDB), where the extension
-// keeps them as files. Apply, Import, Save and a restart save one before they
-// write anything to the keyboard; if saving fails they write nothing. Each
-// records what made it and the keyboard it came from; copies stored before
-// that was recorded have neither. They stay until the site's data is
-// cleared, which deletes them too.
+// Recovery copies in this browser's storage (IndexedDB). Apply, Import, Save
+// and a restart save one before they write anything to the keyboard; if
+// saving fails they write nothing. Each records what made it and the keyboard
+// it came from; copies stored before that was recorded have neither. They
+// stay until the site's data is cleared, which deletes them too.
 
 import {recoveryFileName} from "./core.mjs";
 
@@ -39,7 +38,7 @@ export function openRecoveries(indexedDB) {
     const store = async () => (await database()).transaction(STORE, "readonly").objectStore(STORE);
     return {
         // Resolves to the copy's name once it is stored: the file name it
-        // downloads as, the extension's name for it.
+        // downloads as.
         /** @param {Parameters<import("../core/session/types.js").ShellSaveRecovery>[0]} document @param {import("../core/session/types.js").RecoveryAbout} about */
         async save(document, {cause, keyboard}, now = new Date()) {
             const name = recoveryFileName(document, {cause, keyboard}, now);

@@ -1,6 +1,5 @@
-// core/ and contracts/ alone, with Node types and nothing else. tsconfig.json
-// adds the extension shell, whose `vscode` import brings global types (such as
-// Thenable) that core/ must not lean on; this check fails if it does.
+// core/ and contracts/ alone, with Node types and nothing else: this check
+// fails if core/ leans on a type only something above it brings.
 {
   "extends": "./tsconfig.json",
   "include": [

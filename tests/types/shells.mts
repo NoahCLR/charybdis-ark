@@ -9,7 +9,7 @@ function shells(environment: WebEnvironment, response: PanelResponse) {
     const channel = connectPanel({receive: request => {const command: PanelRequest = request; void command;}});
     channel.post(response);
     api.postMessage({type: 'downloadRecovery', id: 1});
-    // @ts-expect-error The web page and the extension share the same theme command.
+    // @ts-expect-error The theme command takes only the panel's two themes.
     api.postMessage({type: 'setTheme', theme: 'blue'});
     // @ts-expect-error A model reply carries the complete published model.
     channel.post({type: 'model', model: {layers: []}});

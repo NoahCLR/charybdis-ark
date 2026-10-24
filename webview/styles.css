@@ -61,7 +61,7 @@
   --sans: -apple-system, "SF Pro Text", "Inter", system-ui, "Segoe UI", sans-serif;
   color-scheme: dark;
 }
-:root[data-theme="light"], body.vscode-light {
+:root[data-theme="light"] {
   --bg: #f4f4f2;
   --bg-deep: #ececea;
   --surface: #ffffff;
@@ -89,9 +89,6 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
-  /* The panel this runs in injects `body { padding: 0 20px }` and a set of
-     rules for <code>. They are in a cascade layer, so anything declared here
-     wins — but only for properties this sheet actually names. */
   margin: 0;
   padding: 0;
   background: var(--bg);
@@ -105,8 +102,8 @@ p { margin: 0; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 input, select, textarea { font: inherit; color: inherit; }
 code, .mono { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0; }
-/* VS Code paints <code> as a chip in its own theme colours. This interface is
-   black and white and marks its own code, so take the dressing back off. */
+/* This interface is black and white and marks its own code: <code> carries
+   no dressing of its own. */
 code { color: inherit; background: none; padding: 0; border-radius: 0; }
 .muted { color: var(--text-2); }
 .dim { color: var(--text-3); }
@@ -200,8 +197,8 @@ select.rail-picker:disabled { cursor: default; color: var(--text-2); }
 .rail-foot .rail-history { margin-right: auto; margin-left: -9px; color: var(--text-3); }
 .rail-foot .rail-history:hover { color: var(--text); }
 .rail-history .c { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-left: 5px; }
-/* What the web shell adds to the rail: its picker, what it is doing, and
-   the build it is. The extension has none of them. */
+/* What the page adds to the rail: its picker, what it is doing, and the
+   build it is. */
 .rail-choose { margin-top: 16px; display: grid; gap: 8px; }
 .rail-choose .btn { width: 100%; justify-content: center; min-height: 28px; }
 .rail-progress { margin: 0 12px 10px; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
@@ -1680,7 +1677,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .token { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
 .token .sw { display: block; height: 52px; }
 .token .m { padding: 8px 10px; font-family: var(--mono); font-size: 10.5px; color: var(--text-2); }
-.scr-toggle { position: fixed; right: 16px; bottom: 16px; z-index: 70; display: flex; gap: 6px; padding: 6px; border-radius: 10px; background: color-mix(in srgb, var(--surface-3) 90%, transparent); border: 1px solid var(--line-2); backdrop-filter: blur(12px); box-shadow: var(--shadow); }
 @media (max-width: 1240px) {
   .workspace { grid-template-columns: minmax(0,1fr); }
   .inspector { border-left: 0; border-top: 1px solid var(--line); }
@@ -1697,12 +1693,6 @@ details > summary { list-style: none; }
 details > summary .chev { width: 10px; height: 10px; flex: none; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
 details[open] > summary .chev { transform: rotate(90deg); }
 
-
-/* ── panel fit ─────────────────────────────────────────────────────────── */
-/* The prototype had a floating theme toggle; the panel follows VS Code's own
-   light and dark instead, and nothing floats over the commit bar. */
-.scr-toggle { display: none; }
-/* The light palette is declared once, at the top of this sheet, rings and all. */
 
 /* ── states the real app has and the prototype faked ───────────────────── */
 .screen-stub { display: grid; gap: 10px; padding: 26px; border: 1px dashed var(--line-2);

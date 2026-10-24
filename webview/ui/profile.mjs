@@ -151,28 +151,25 @@ function wireProfileDrop(card) {
 }
 
 // The recovery copies Ark keeps before an Apply, a Save, a restart, leaving
-// Live or restoring a backup, each named by what made it and its keyboard. A
+// Live or restoring a backup, each named by what made it and its keyboard. The
 // browser keeps them in its storage, each usable as a draft (through the same
-// comparison as a backup file), downloadable as a file, or deletable. VS Code
-// saves them as files in its storage folder, named by the notice after them.
-/** @param {import("../../contracts/model.js").RecoveryCopy[] | null} recoveries */
+// comparison as a backup file), downloadable as a file, or deletable.
+/** @param {import("../../contracts/model.js").RecoveryCopy[]} recoveries */
 function recoveriesCard(recoveries) {
     const canImport = canEditArea("import");
     const node = el(`<div class="card recoveries">
-        <div class="card-h"><h3>Recovery copies</h3>${recoveries ? `<span class="right note">${recoveries.length} in this browser</span>` : ""}</div>
-        ${recoveries?.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
+        <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
+        ${recoveries.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
             <span class="recovery-name" title="${esc(copy.name)}">${esc(copyTitle(copy))}</span>
             <span class="right row gap-4">
                 <button class="btn compact" data-use="${esc(copy.id)}" ${canImport ? "" : "disabled"}>Use as draft</button>
                 <button class="btn text" data-recovery="${esc(copy.id)}">Download</button>
                 <button class="btn text destructive" data-delete="${esc(copy.id)}">Delete</button></span></div>`).join("")}</div>` : ""}
-        <div class="card-b"><p class="note">${recoveries
-            ? `${recoveries.length ? "" : "None yet. "}${RECOVERY_NOTE} here. They stay in this browser until you delete them or clear the site's data, so download any you want to keep.`
-            : `${RECOVERY_NOTE} as a file in VS Code's storage for Ark; the message after an Apply, a Save or a restart says where. Import one with Choose profile…`}</p></div>
+        <div class="card-b"><p class="note">${recoveries.length ? "" : "None yet. "}${RECOVERY_NOTE} here. They stay in this browser until you delete them or clear the site's data, so download any you want to keep.</p></div>
     </div>`);
     /** @param {string} attribute @param {(id: string | number) => Parameters<typeof post>[0]} message */
     const wire = (attribute, message) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll(`[${attribute}]`)).forEach((button) => button.addEventListener("click", () => {
-        const copy = (recoveries || []).find((entry) => String(entry.id) === button.getAttribute(attribute));
+        const copy = recoveries.find((entry) => String(entry.id) === button.getAttribute(attribute));
         if (copy) post(message(copy.id));
     }));
     wire("data-use", useRecovery);

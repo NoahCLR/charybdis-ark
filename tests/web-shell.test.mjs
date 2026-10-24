@@ -1,12 +1,11 @@
-// The web shell's pieces that need no browser: the acquireVsCodeApi
-// stand-in, the worker's sleep, and the shell's small decisions. The page
+// The web shell's pieces that need no browser: the panel channel, the worker's sleep, and the shell's small decisions. The page
 // itself, over a fake WebHID keyboard, is browser-tests/web-page.spec.js's.
 
 import assert from "node:assert/strict";
 import test from "node:test";
 import {connectPanel} from "../web/panel-channel.mjs";
 import {workerSleep} from "../web/sleep.mjs";
-import {BLOCKED, COMPILED_DEFAULTS_KEY, PROFILE_FILE_LIMIT, WEB_WORDS, compiledDefaultsStore, initialTheme, leaving, readProfileFile} from "../web/web-shell.mjs";
+import {BLOCKED, COMPILED_DEFAULTS_KEY, PROFILE_FILE_LIMIT, compiledDefaultsStore, initialTheme, leaving, readProfileFile} from "../web/web-shell.mjs";
 import {listed} from "../web/recoveries.mjs";
 
 // A MessageChannel delivers on a later task, but not within any fixed time: a
@@ -28,7 +27,7 @@ test("the stand-in delivers both ways later and as copies, and shows the click i
         assert.equal(gestures.length, 1, "the shell sees the message inside the click");
         assert.deepEqual(gestures[0], sent);
         assert.notEqual(gestures[0], sent, "as a copy");
-        assert.deepEqual(received, [], "the message itself arrives later, as in VS Code");
+        assert.deepEqual(received, [], "the message itself arrives later, as across a real channel");
         sent.changes[0].keycode = "KC_B";
         await delivered(received);
         assert.equal(received.length, 1);
@@ -102,7 +101,7 @@ test("in the demo, leaving asks only about edits not exported", () => {
     assert.equal(leaving({demo: {exported: null}, draft: {dirty: false}}), false);
 });
 
-test("a chosen profile file has the extension's size limit", async () => {
+test("a chosen profile file has the portable document's size limit", async () => {
     assert.equal(await readProfileFile(undefined), undefined);
     const file = (size) => ({size, name: "mine.charybdis.json", text: async () => "{}"});
     assert.deepEqual(await readProfileFile(file(PROFILE_FILE_LIMIT)), {text: "{}", name: "mine.charybdis.json"});
@@ -117,8 +116,7 @@ test("a stored recovery copy lists with what made it and its keyboard, an older 
         {id: 1, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt});
 });
 
-test("the page's words are its own", () => {
-    for (const words of Object.values(WEB_WORDS)) assert.match(words, /Choose keyboard/);
+test("the page says why a tab cannot reach a keyboard", () => {
     assert.match(BLOCKED.unsupported.title, /Chrome or Edge/);
     assert.match(BLOCKED.unsupported.detail, /HTTPS/);
     assert.match(BLOCKED.otherTab.title, /another tab/);

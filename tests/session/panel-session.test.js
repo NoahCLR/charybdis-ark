@@ -510,9 +510,12 @@ test("the profile meter follows the draft, and is absent without a keyboard or a
 
 test("the model says what its shell offers, in the shell's words", () => {
     const {SHELL_WORDS} = require("../../core/session/panel-session");
-    // A session with no shell describes the extension's: nothing extra, its words.
+    // A session with no shell (the preview, tests) describes the web page's:
+    // Choose keyboard, the theme toggle, the Backups list, the page's words.
     const plain = buildPanelModel(panelWithDraft(), connected());
-    assert.deepEqual(plain.shell, {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {...SHELL_WORDS}});
+    assert.deepEqual(plain.shell, {chooseKeyboard: true, blocked: null, theme: "dark", recoveries: [], build: null, progress: null, words: {...SHELL_WORDS}});
+    assert.match(plain.shell.words.noKeyboard, /Choose keyboard/);
+    assert.match(plain.shell.words.noneFound, /Choose keyboard/);
 
     const session = panelWithDraft();
     const recoveries = [{id: 1, name: "recovery-1.charybdis.json", savedAt: "2026-10-06T09:00:00.000Z"}];
@@ -522,8 +525,9 @@ test("the model says what its shell offers, in the shell's words", () => {
     assert.deepEqual(model.shell, {chooseKeyboard: true, blocked: null, theme: "light", recoveries, build: {version: "1", commit: "abc"}, progress: "Reading",
         words: {...SHELL_WORDS, noKeyboard: "Choose keyboard to connect one."}});
     session.shell.panel = () => ({theme: "sepia", blocked: {title: "No", detail: "Why"}});
-    assert.equal(buildPanelModel(session, connected()).shell.theme, null, "only a theme the panel has");
+    assert.equal(buildPanelModel(session, connected()).shell.theme, "dark", "only a theme the panel has");
     assert.deepEqual(buildPanelModel(session, connected()).shell.blocked, {title: "No", detail: "Why"});
+    assert.equal(buildPanelModel(session, connected()).shell.chooseKeyboard, false, "a tab that cannot reach a keyboard offers no picker");
 });
 
 test("no shell or firmware brings back the retired PD upgrade export", () => {

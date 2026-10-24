@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {afterDraftChange, draftChangePolicies, initialState, kept, resets, resetsTo} from "../../webview/view/state-fields.mjs";
 
-globalThis.acquireVsCodeApi = () => ({postMessage() {}});
+globalThis.acquirePanelApi = () => ({postMessage() {}});
 const {STATE_FIELDS, closeComboBuilder, openComboBuilder, resetDraftForms, setModel, state} = await import("../../webview/store.mjs");
 
 test("a state starts from fresh copies of its declared values", () => {

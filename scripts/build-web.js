@@ -2,8 +2,8 @@
 "use strict";
 
 // The web build: the web version of Ark as a complete static site in
-// dist/web/, ready to publish as it is. The VS Code extension never uses it and
-// has no build step; core/ and webview/ stay the sources it runs as they are.
+// dist/web/, ready to publish as it is. core/ and webview/ stay the sources
+// it bundles as they are.
 //
 //     index.html                the page (web/index.html, with the names below)
 //     _headers                  what Cloudflare Pages sends with it (web/_headers)
@@ -28,9 +28,9 @@
 // keeps index.html from being cached and lets every hashed file be cached for
 // good, by one rule per file the build wrote.
 //
-// The build fails if node-hid, fs, vscode or any other Node built-in would
-// reach a bundle. node-hid-adapter.js is the one module core/ loads that cannot
-// run in a browser; web/no-native-hid.js takes its place.
+// The build fails if node-hid, its adapter (core/transport/node-hid-adapter.js,
+// which only Node scripts load), fs or any other Node built-in would reach a
+// bundle. The page passes the WebHID adapter to the device service itself.
 
 const {execFileSync} = require("node:child_process");
 const fs = require("node:fs");
@@ -44,12 +44,11 @@ const OUTDIR = path.join(APP_ROOT, "dist", "web");
 /** @param {string} outdir */
 const manifestFileFor = (outdir) => path.join(path.dirname(outdir), `${path.basename(outdir)}-manifest.json`);
 const NODE_HID_ADAPTER = path.join(APP_ROOT, "core", "transport", "node-hid-adapter.js");
-const NO_NATIVE_HID = path.join(APP_ROOT, "web", "no-native-hid.js");
 
 // A current Chrome, which WebHID needs anyway.
 const TARGET = ["chrome120"];
 const NODE_BUILTINS = new Set(builtinModules);
-const EXTENSION_PACKAGES = ["vscode", "node-hid"];
+const NATIVE_PACKAGES = ["node-hid"];
 // What a bundle may take from node_modules: the buffer package and its two dependencies.
 /** @type {Record<"core" | "panel" | "worker", string[]>} */
 const PACKAGES = {core: ["buffer", "base64-js", "ieee754"], panel: [], worker: []};
@@ -74,13 +73,12 @@ const browserOnly = {
     setup(build) {
         build.onResolve({filter: /.*/}, (args) => {
             const name = args.path.split("/")[0];
-            if (NODE_BUILTINS.has(args.path) || args.path.startsWith("node:") || EXTENSION_PACKAGES.includes(name)) {
+            if (NODE_BUILTINS.has(args.path) || args.path.startsWith("node:") || NATIVE_PACKAGES.includes(name)) {
                 const importer = args.importer ? path.relative(APP_ROOT, args.importer) : "the entry";
                 return {errors: [{text: `${args.path} cannot be in the web build (imported by ${importer})`}]};
             }
-            if (args.path.startsWith(".") && args.importer
-                && path.resolve(path.dirname(args.importer), args.path).replace(/\.js$/, "") === NODE_HID_ADAPTER.replace(/\.js$/, "")) {
-                return {path: NO_NATIVE_HID};
+            if (args.importer && path.resolve(path.dirname(args.importer), args.path).replace(/\.js$/, "") === NODE_HID_ADAPTER.replace(/\.js$/, "")) {
+                return {errors: [{text: `${path.relative(APP_ROOT, NODE_HID_ADAPTER)} cannot be in the web build (imported by ${path.relative(APP_ROOT, args.importer)})`}]};
             }
             return undefined;
         });

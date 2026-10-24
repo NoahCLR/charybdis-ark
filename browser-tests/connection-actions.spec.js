@@ -3,14 +3,14 @@
 const {test, expect} = require("@playwright/test");
 
 test("a disconnected web page offers Choose keyboard and a demo without Read keyboard", async ({page}) => {
-    await page.goto("/preview/index.html?shell=web-none");
+    await page.goto("/preview/index.html?shell=none");
     await expect(page.locator('.read-actions [data-act="choose-keyboard"]')).toBeVisible();
     await expect(page.locator('.read-actions [data-act="retry"]')).toHaveCount(0);
     await expect(page.locator('.read-actions [data-act="explore-demo"]')).toBeVisible();
 });
 
 test("a connected read failure retains the retry action", async ({page}) => {
-    await page.goto("/preview/index.html?shell=web");
+    await page.goto("/preview/index.html");
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());

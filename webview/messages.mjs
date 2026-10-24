@@ -61,11 +61,8 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
         const demoNow = Boolean(message.model?.demo?.active);
         if (inDemo && !demoNow) state.screen = "keys";
         inDemo = demoNow;
-        // A shell that leaves the theme to the panel says which; otherwise the
-        // shell's own theme (VS Code's body class) holds.
-        const theme = shellOf(message.model).theme;
-        if (theme) document.documentElement.dataset.theme = theme;
-        else delete document.documentElement.dataset.theme;
+        // The page's theme, as its toggle last set it.
+        document.documentElement.dataset.theme = shellOf(message.model).theme;
         // The core marks a failure's notice (most say "Failed: …"; an Apply or
         // Save cut short starts with its verdict instead), so it is shown as
         // one rather than as a neutral message.

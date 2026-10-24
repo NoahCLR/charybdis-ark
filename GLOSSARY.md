@@ -182,17 +182,21 @@ _Avoid_: layer stack, overlay view
 ## Where Ark runs
 
 **Shell**:
-The program that runs Ark: the VS Code extension or the web page in Chrome.
+What runs Ark around its core: the web page's code (`web/`), which gives the
+panel what a browser has (Chrome's keyboard picker, its storage, files and
+downloads). Ark has one (D-L71).
 _Avoid_: host (for this), platform, container
 
 **Panel**:
-Ark's window inside VS Code.
-_Avoid_: webview (for the window), tab, view
+Ark's interface (`webview/`), filling the page's tab; it renders the model
+and posts edits back.
+_Avoid_: webview (for the panel), window, view
 
-**Ark branch**:
-A branch of Ark opened from its own worktree in a new VS Code window, to try
-it before it lands.
-_Avoid_: preview build, dev build
+**Pull request preview**:
+A branch's Ark as Cloudflare builds and serves it for its pull request, at the
+Branch Preview URL that follows the branch's latest build (**Try this PR**),
+to try it before it lands.
+_Avoid_: Ark branch (the retired VS Code window), preview build, dev build
 
 ## Agreement with the firmware
 

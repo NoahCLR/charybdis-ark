@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {buildLine, copyTitle, deleteRecovery, useRecovery, chooseKeyboard, forgetKeyboard, commitUrl, downloadRecovery, githubMark, shellOf, otherTheme, savedWhen, setTheme, themeLabel} from "../../webview/view/shell-panel.mjs";
 
-test("a model without a shell description offers nothing extra", () => {
-    assert.deepEqual(shellOf(undefined), {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {}});
-    const shell = shellOf({shell: {chooseKeyboard: true, theme: "dark", words: {noKeyboard: "Choose keyboard."}}});
+test("before its first model the panel offers no picker yet, a theme and an empty Backups list", () => {
+    assert.deepEqual(shellOf(undefined), {chooseKeyboard: false, blocked: null, theme: "dark", recoveries: [], build: null, progress: null, words: {}});
+    const shell = shellOf({shell: {chooseKeyboard: true, theme: "light", words: {noKeyboard: "Choose keyboard."}}});
     assert.equal(shell.chooseKeyboard, true);
+    assert.equal(shell.theme, "light");
     assert.equal(shell.words.noKeyboard, "Choose keyboard.");
 });
 

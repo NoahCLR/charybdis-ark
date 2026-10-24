@@ -9,7 +9,7 @@ const {buildSnapshotModel} = require("../core/session/device-model");
 const {draftBinding} = require("../core/session/panel-session-state");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`retired user keys stay readable but cannot be picked (${theme})`, async ({page}) => {
         await openControls(page, "keys", {tab: "key", selected: 0}, theme);
         // Publish a real draft with named custom keys and a retained retired code.

@@ -10,7 +10,7 @@ import {initialReachGroups} from "./view/reach-groups.mjs";
 import {leaving} from "./view/demo.mjs";
 import {afterDraftChange, initialState, kept, resets, resetsTo} from "./view/state-fields.mjs";
 
-const vscode = acquireVsCodeApi();
+const panelApi = acquirePanelApi();
 
 /** @typedef {import("./state.js").PanelState} PanelState */
 
@@ -171,7 +171,7 @@ export const render = () => renderer();
 /** @param {import("../contracts/messages.js").PanelCommand} message */
 export function post(message) {
     const draft = model?.draft;
-    vscode.postMessage(draft ? {draftId: draft.id, draftRevision: draft.revision, ...message} : message);
+    panelApi.postMessage(draft ? {draftId: draft.id, draftRevision: draft.revision, ...message} : message);
 }
 
 export const layers = () => getModel()?.layers || [];

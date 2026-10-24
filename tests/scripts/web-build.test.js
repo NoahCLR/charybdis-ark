@@ -45,7 +45,7 @@ test("every file the build writes is named by its content, and the manifest besi
         // core/ for a browser is the core entry with the chunk it shares with the shell.
         const core = [manifest.core, ...chunks].map((file) => fs.readFileSync(path.join(outdir, file), "utf8")).join("\n");
         assert.ok(!core.includes("node-hid-adapter.js") && !/require\("(node:)?(fs|crypto|path)"\)/.test(core), "the core bundle carries no Node module");
-        assert.ok(core.includes("web/no-native-hid.js"), "the native adapter's stand-in takes its place");
+        assert.ok(core.includes("core/transport/webhid-adapter.js"), "the page's own adapter is the one it carries");
         const panel = fs.readFileSync(path.join(outdir, manifest.panel), "utf8");
         assert.ok(!panel.includes("core/"), "the panel bundle is the renderer alone");
         assert.deepEqual(checkStaticSite(outdir, {project: root}), [], "what the build writes is ready to publish");
@@ -63,7 +63,7 @@ test("the page names its files itself, carries its policy, and says what it was 
         assert.ok(!page.includes("{{"), "every name is filled in");
         assert.ok(page.includes(`href="./${manifest.styles}"`));
         // The page runs only the shell. The shell loads the panel once it has
-        // defined acquireVsCodeApi, or on a phone never does; the page only
+        // defined acquirePanelApi, or on a phone never does; the page only
         // fetches the panel early.
         assert.ok(page.includes(`<script type="module" src="./${manifest.shell}"></script>`));
         assert.ok(!page.includes(`src="./${manifest.panel}"`), "the panel is not a script of the page's own");
@@ -75,6 +75,13 @@ test("the page names its files itself, carries its policy, and says what it was 
             assert.ok(policy.split("; ").includes(rule), rule);
         }
         assert.doesNotMatch(policy, /script-src[^;]*unsafe/, "no inline script");
+        // The interface authors inline layout and device-colour styles; the
+        // policy keeps them, and only as attributes.
+        const ui = fs.readdirSync(path.join(__dirname, "..", "..", "webview", "ui")).filter((name) => name.endsWith(".mjs"))
+            .map((name) => fs.readFileSync(path.join(__dirname, "..", "..", "webview", "ui", name), "utf8")).join("\n");
+        assert.match(ui, /style=/, "the interface still authors inline styles");
+        assert.ok(policy.split("; ").includes("style-src-attr 'unsafe-inline'"), "the policy keeps the interface's inline styles");
+        assert.doesNotMatch(policy, /style-src [^;]*unsafe/, "and no inline style sheet");
         assert.doesNotMatch(page, /<script(?![^>]*\bsrc=)/, "every script is a file");
         // The page fetches nothing once loaded: the shell names the worker it
         // starts, and nothing it bundles opens a connection.
@@ -133,7 +140,7 @@ test("the commit comes from git unless the environment names it", () => {
     assert.match(buildInfo({}).commit, /^([0-9a-f]{7,}(-dirty)?|unknown)$/);
 });
 
-test("the build fails when something would pull node-hid, fs or vscode into a bundle", async () => {
+test("the build fails when something would pull node-hid, its adapter or fs into a bundle", async () => {
     const outdir = temporary();
     try {
         for (const [name, source] of [
@@ -141,17 +148,10 @@ test("the build fails when something would pull node-hid, fs or vscode into a bu
             ["fs", 'module.exports = require("fs");'],
             ["node:fs", 'module.exports = require("node:fs");'],
             ["node:crypto", 'module.exports = require("node:crypto");'],
-            ["vscode", 'module.exports = require("vscode");'],
-            ["the node-hid adapter's own dependency", `module.exports = require(${JSON.stringify(path.join(__dirname, "..", "..", "core", "transport", "node-hid-adapter.js"))});`],
+            ["core/transport/node-hid-adapter.js", `module.exports = require(${JSON.stringify(path.join(__dirname, "..", "..", "core", "transport", "node-hid-adapter.js"))});`],
         ]) {
             const entry = path.join(outdir, "entry.js");
             fs.writeFileSync(entry, source);
-            if (name.startsWith("the node-hid adapter")) {
-                // From outside core/ the adapter is not swapped, so its own
-                // require("node-hid") is what the build has to refuse.
-                await assert.rejects(buildWeb({outdir: path.join(outdir, "out"), entries: {core: entry}}), /node-hid cannot be in the web build/);
-                continue;
-            }
             await assert.rejects(buildWeb({outdir: path.join(outdir, "out"), entries: {core: entry}}), new RegExp(`${name} cannot be in the web build`), name);
         }
     } finally {
@@ -166,9 +166,4 @@ test("the entry exports what it names, under Node as in the bundle", async () =>
     assert.equal(core.Buffer, Buffer, "under Node the entry's Buffer is Node's own");
     assert.equal(typeof core.ProfileDraftSession, "function");
     assert.equal(typeof core.profileBlob.decodeProfileBlob, "function");
-});
-
-test("without an adapter, the browser's device service fails with a stable code", () => {
-    const {NodeHidDeviceAdapter} = require("../../web/no-native-hid");
-    assert.throws(() => new NodeHidDeviceAdapter(), {code: "NATIVE_MODULE_UNAVAILABLE"});
 });

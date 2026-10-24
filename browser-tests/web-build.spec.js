@@ -148,7 +148,7 @@ test("the bundled panel renders the model the bundled core builds, and posts its
     const {files, errors} = await openBuild(page, `<div id="root"></div>
 <script>
 window.__posted = [];
-window.acquireVsCodeApi = () => ({
+window.acquirePanelApi = () => ({
     postMessage: (message) => {
         window.__posted.push(message);
         if (message.type === "ready") window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: window.__model}}));

@@ -8,7 +8,7 @@ const shortcut = (mods, key) => expect.objectContaining({type: "updateCustomKeyS
 // The Shortcut field is set in the keycode picker, with the modifier row the
 // Keys screen uses: here left and right mix, and modifiers alone or a key
 // alone are a shortcut. Use posts the whole shortcut; Clear posts none.
-for (const theme of ["plain", "vscode-dark"]) {
+for (const theme of ["dark"]) {
     test(`a custom key's shortcut is picked with mixed-side modifiers, and cleared (${theme})`, async ({page}) => {
         await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"}, theme);
         await expect(page.locator('[data-f^="custom-key:1:shortcut:modifier"]'), "no separate modifier grid").toHaveCount(0);

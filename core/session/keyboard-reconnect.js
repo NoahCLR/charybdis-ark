@@ -7,20 +7,20 @@
 // reconnecting rather than reporting a failure, waits a bounded time for the
 // same keyboard to come back, connects it and reads it again.
 //
-// "The same keyboard" is the one with the same serial number where the shell
-// shows serial numbers (node-hid; the serial is the master half's hardware ID
+// "The same keyboard" is the one with the same serial number where the
+// adapter shows serial numbers (node-hid, in a Node script; the serial is the master half's hardware ID
 // and survives the restart). A browser shows none, so there it is the one
 // reporting the new name, excluding keyboards present before the save. A name
 // shared with another keyboard, or an unknown built-in name after clearing it,
 // cannot establish identity: the person chooses.
 //
-// The wait polls the device list, since VS Code has no hotplug events; the
+// The wait polls the device list, as node-hid has no hotplug events; the
 // web page stops following Chrome's own events while it runs (web-shell.mjs).
 //
 // A keyboard lost unexpectedly is waited for the same way when nothing else
 // would notice it come back: it left a request unanswered (Ark then closes
 // the connection, but the keyboard stays plugged in), or it dropped off USB
-// where the shell shows serial numbers (node-hid). A web page follows Chrome's
+// where the adapter shows serial numbers (node-hid). A web page follows Chrome's
 // own connect events for a keyboard that drops off (web-shell.mjs), and Chrome
 // shows no serial to tell a returning keyboard by. The same keyboard is the
 // one still listed under the same device, or else found as a renamed one is.
@@ -156,7 +156,7 @@ function reconnectTarget(expected, devices) {
 }
 
 // The keyboard a follow-back found is the one it waited for, though the
-// shell may list it under a new device id (node-hid gives it a new path at
+// adapter may list it under a new device id (node-hid gives it a new path at
 // every enumeration): what Ark keeps for that keyboard goes with it, the
 // draft, a restart's kept edits, a Save cut short and the copy from before an
 // Apply, so the read after it is that keyboard's.

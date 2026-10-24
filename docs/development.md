@@ -1,7 +1,6 @@
 # Developing Ark
 
-Ark is its own repository: the VS Code extension and the web page (D-L52),
-with its tests, fixture preview and keycode catalog generation. Ordinary app
+Ark is its own repository: the web page (D-L71), with its tests, fixture preview and keycode catalog generation. Ordinary app
 commands read only this checkout (D-L44). Firmware compilation, authored C
 profiles, hardware measurements and diagnostics belong to the firmware
 repository. How a change is made and handed back is in
@@ -54,32 +53,24 @@ as they are, so agree a quiet period with agents changing them and pass the
 paths actually under test. Firmware's contract probe, which the bridge and
 [agreement](#agreement-with-a-firmware-contract) call, runs in firmware's
 build image, so Docker must be running. Nothing reserves the keyboard:
-coordinate before using it, close other Ark or diagnostic sessions first, and
+coordinate before using it, close other Ark tabs or diagnostic sessions first, and
 never flash or Apply just to check an editor change. The fixture preview and
 app tests need no keyboard.
 
-## Development and installation
+## Development
 
 ### Working on Ark
 
-Open this folder in VS Code. Use Node 26.10.0 (`nvm use` reads `.nvmrc`),
-run `npm ci`, then `npm run check`. **Run Charybdis Ark** (F5,
-`.vscode/launch.json`) starts an Extension Development Host with a debugger;
-**Check Charybdis Ark** is the default test task. No firmware or QMK checkout
-is needed. Only the cross-repository commands (`test:compat`, `agreement`,
-`pins`, `upstream`) and `npm run keycodes -- --qmk PATH` read another
-checkout, and only the ones you name.
+Use Node 26.10.0 (`nvm use` reads `.nvmrc`), run `npm ci`, then
+`npm run check`. `npm run web` serves the page you are working on in Chrome
+([the web build](#the-web-build)); `npm run preview` the interface against the
+test fixtures. No firmware or QMK checkout is needed. Only the
+cross-repository commands (`test:compat`, `agreement`, `pins`, `upstream`) and
+`npm run keycodes -- --qmk PATH` read another checkout, and only the ones you
+name.
 
-The extension is `noah.charybdis-ark`, its commands `charybdisArk.*` (D-L47).
-VS Code keys storage by extension identity, so on start Ark copies recovery
-copies saved under the former identities (`noah.charybdis-live`,
-`noah.charybdis-live-v2`) into its own storage, never moving an original or
-overwriting a file. Recovery copies live in VS Code's extension-global
-storage, outside every checkout; keep them and backups when switching
-checkouts. For a local install, check the extension symlink points at the
-checkout you mean; F5 runs a worktree without retargeting it.
-
-`.editorconfig` sets whitespace; `.vscode/settings.json` picks the formatters
+`.editorconfig` sets whitespace; in VS Code, **Check Charybdis Ark** is the
+default test task and `.vscode/settings.json` picks the formatters
 and leaves Markdown unformatted on save.
 
 ### Commands
@@ -92,7 +83,7 @@ npm run keycodes -- --check  # the vendored catalog reproduces from upstream/qmk
 npm run preview              # preview/ from the test fixtures
 npm run preview -- --device  # …or from the keyboard plugged in, read-only
 npm run test:browser         # every Playwright spec, Chromium required
-npm run probe:live-link      # list matching HID interfaces without opening one
+npm run probe:live-link      # list matching HID interfaces over node-hid, opening none
 npm run build:web            # the web page into dist/web/
 npm run web                  # build, then serve it at http://localhost:8975/
 npm run check:site           # dist/web/ is static files only
@@ -107,9 +98,7 @@ The cross-repository commands are described [below](#upstream-pins).
 ### The code's layout
 
 ```
-extension.js     the VS Code shell: command, panel, and what it gives the shared panel loop
-panel-html.js    the panel's HTML; the only shell file that knows webview URIs
-core/            the app, with no shell dependency (no vscode import, D-L02)
+core/            the app, with no shell dependency and no DOM (D-L71)
   transport/     device adapters and the request coordinator
   schema/        profile byte formats and domain codecs
   protocol/      wire formats spoken to the keyboard
@@ -123,7 +112,6 @@ webview/         the interface: browser ES modules, no build step
   styles.css     the design system
 web/             the web shell and build entries
 scripts/         developer entry points and build steps
-tools/           developer tools outside the app (the branch-window extension)
 tests/           mirrors core/; view/ the interface, scripts/ the developer tools,
                  integration/ the bridge's runners, types/ compile-time cases
 browser-tests/   Playwright specs: the preview's controls and the built page
@@ -134,8 +122,8 @@ preview/ dist/   ignored output of `npm run preview` and `npm run build:web`
 `core/` imports one way (D-L10); the layer table is in
 [architecture](architecture/README.md) and `tests/layering.test.js` enforces it. The
 webview receives the model as a message and imports nothing from `core/`.
-`web/` may import `core/` through `web/core.mjs`; the extension never loads
-`web/`, and `webview/` never imports it. How `core/` reads, edits and applies
+`web/` imports `core/` through `web/core.mjs`, and `webview/` never imports
+`web/`. How `core/` reads, edits and applies
 is in [`core/README.md`](../core/README.md).
 
 The app runtime never reads the firmware repository. These developer-only
@@ -151,8 +139,13 @@ them:
   ([agreement](#agreement-with-a-firmware-contract)).
 - `scripts/preview.js` renders the interface against the test fixtures.
 - `scripts/build-web.js` builds [the web page](#the-web-build).
-- `tools/branch-window/` [opens an Ark branch](#trying-a-branch-before-it-lands).
-  It is its own VS Code extension, so it may import `vscode`.
+- `scripts/probe-live-link.js` lists the keyboards node-hid sees.
+
+node-hid is a development dependency, for Node scripts and agents that drive a
+keyboard: they pass `new NodeHidDeviceAdapter()`
+(`core/transport/node-hid-adapter.js`) to the device service themselves, which
+has no default adapter (`npm run preview -- --device` does). The page passes
+WebHID's, and the web build refuses node-hid.
 
 ### Type checking
 
@@ -163,21 +156,18 @@ automatically:
 
 | Configuration | Checks | Environment |
 | --- | --- | --- |
-| `tsconfig.foundation.json` | `core/`, `contracts/` | Node types only; fails if core leans on a global the `vscode` types bring (such as `Thenable`) |
-| `tsconfig.json` | core plus `extension.js`, `panel-html.js` | Node and the VS Code types at the minimum supported version (1.90) |
+| `tsconfig.foundation.json` | `core/`, `contracts/` | Node types only; fails if core leans on a type only something above it brings |
+| `tsconfig.json` | core and its type tests | Node |
 | `tsconfig.shells.json` | `web/` | page DOM, no Node globals |
 | `tsconfig.webview.json` | `webview/` | page DOM, no Node types |
 | `tsconfig.worker.json` | `web/sleep-worker.js` | WebWorker |
 | `tsconfig.developer.json` | `scripts/`, `tests/fixtures/`, integration corpora | Node |
 | `tsconfig.preview.json` | the preview builder and macro inspector | Node and DOM |
-| `tsconfig.branch-window.json` | `tools/branch-window/` | its own minimum VS Code (1.85) |
 
-Two gotchas in the web shell's check. `Buffer` is its one Node-shaped global:
+One gotcha in the web shell's check. `Buffer` is its one Node-shaped global:
 the build injects the `buffer` package (`web/buffer.mjs`), and
 `web/bundled-buffer.d.ts` declares the members core uses, so a new one is
-added there. Where the build swaps in `web/no-native-hid.js`, the check
-resolves `core/transport/node-hid-adapter.browser.d.ts` (`moduleSuffixes`),
-keeping node-hid out.
+added there.
 
 Rules for typed code:
 
@@ -192,9 +182,9 @@ Rules for typed code:
   still go through the runtime validators. Use concrete types or `unknown` at
   unvalidated inputs; an assertion needs a checked invariant.
 - Mark a covered module `// @ts-check`. `npm run typecheck` uses the
-  configuration's `checkJs`, but VS Code only finds `tsconfig.json`, so without
-  the pragma the editor shows no errors for the interface, the web shell or
-  tools.
+  configuration's `checkJs`, but an editor finds only `tsconfig.json`, so
+  without the pragma it shows no errors for the interface, the web shell or
+  scripts.
 - Compile-time cases live in `tests/types/`; a rejection case uses
   `@ts-expect-error`, so a missing error fails the check.
 
@@ -213,33 +203,32 @@ Tests use injected device adapters (`core/transport/fake-device-adapter.js`).
   reports, both halves' profile records, the durable decision, the slave
   half's commit and activation. Its faults exercise BUSY, lost replies,
   cancellation and disconnected recovery. Restore tests call `restoreProfile`
-  with a request connection, as both shells do.
+  with a request connection, as the shell does.
 
 These fakes model protocol state and transfer correctness, not flash
 durability, split scheduling or a physical interruption. A successful
 `npm run probe:live-link` proves only that node-hid loads and enumerates.
+A Node script that drives a keyboard passes the node-hid adapter to the
+device service itself:
+
+```js
+const {ProfileDeviceService} = require("./core/session/profile-device-service");
+const {NodeHidDeviceAdapter} = require("./core/transport/node-hid-adapter");
+const service = new ProfileDeviceService({adapter: new NodeHidDeviceAdapter()});
+```
+
+Close any Ark tab first: one connection at a time holds the keyboard.
 
 ### Running it without a keyboard
 
 Run `npm run preview`, serve the folder (`node scripts/serve.js . --port 8972`)
-and open `preview/index.html`. The page stands in for the shell: it answers
-the panel's `ready` with one fixture model and logs every edit posted back.
-`?shell=` answers as other shells and states (the web page, no keyboard, the
-demo, a live keyboard; each is commented in `scripts/preview.js`), and `?screen=lighting` opens a screen.
-`npm run preview -- --multiple` adds a second keyboard to the selector.
-
-### Checking it the way the panel renders it
-
-`preview/index.html` is the interface alone. In VS Code the panel runs inside
-VS Code's default webview stylesheet, in a cascade layer: it loses to every
-property `styles.css` declares and wins every one it does not. That has
-already bitten twice: `body { padding: 0 20px }` squeezed the app, and its
-`code` rule turned every inline keycode into a coloured chip.
-
-`npm run preview -- --vscode` also writes `preview/vscode-dark.html` and
-`preview/vscode-light.html`, with VS Code's real stylesheet and theme colours
-read from the installed app (macOS, `/Applications/Visual Studio Code.app`;
-skipped without one). Look at a new screen there too.
+and open `preview/index.html`. The page stands in for the web shell: it
+answers the panel's `ready` with one fixture model, turns the theme toggle,
+and logs every edit posted back. `?shell=` answers in other states (no
+keyboard, a browser without WebHID, the demo, a live keyboard; each is
+commented in `scripts/preview.js`), `?theme=light` starts in the light theme,
+and `?screen=lighting` opens a screen. `npm run preview -- --multiple` adds a
+second keyboard to the selector. Look at a new screen in both themes.
 
 ### Proving a control is wired
 
@@ -266,7 +255,7 @@ While working, run the targeted tests, then `npm run check`,
 `npm run preview` (driving a new control) and `npm run test:browser`; preview
 or setup changes add `npm run preview`. A docs-only change may skip the runtime checks; say so.
 
-The handoff gate is the work-queue vault's `verify`. For an Ark branch it
+The handoff gate is the work-queue vault's `verify`. For a branch of Ark it
 always runs `npm ci`, loads node-hid, `npm run check`, catalog reproduction,
 `upstream/` reproduction from the pins, the compatibility bridge and agreement
 against the pinned firmware and QMK, docs-only changes included. Interface,
@@ -283,24 +272,19 @@ on its published trunk. No automated check is hardware acceptance.
 
 ### Trying a branch before it lands
 
-`tools/branch-window/` is a separate developer extension
-(`noah.charybdis-ark-branch`), not part of Ark. Link it once from the main
-checkout and reload VS Code:
-
-```sh
-ln -s "$PWD/tools/branch-window" ~/.vscode/extensions/noah.charybdis-ark-branch-0.1.0
-```
-
-Its **Ark branch** button lists every Ark worktree on a branch, the main
-checkout first, then the most recently committed. Picking one opens a new
-window running that checkout's Ark, as F5 does but without a debugger; the
-installed Ark keeps running elsewhere. It installs nothing: a branch has the
-modules `verify` installed in its worktree, and disappears when `land`
-removes the worktree.
+A branch is tried through its pull request's preview: Cloudflare Pages builds
+every pull request's head and serves the branch at its Branch Preview URL,
+which follows the branch's latest build, given in Cloudflare's comment or
+check on the pull request. Open that **Try this PR** link in Chrome or Edge
+once the build has succeeded and the page's footer shows the head's commit
+([publishing the web page](#publishing-the-web-page)).
+The preview has its own origin, so its recovery copies and remembered
+keyboard are its own; close any other Ark tab first, since one tab holds the
+keyboard. To try a branch locally instead, `npm run web` in its worktree.
 
 ### The web build
 
-The web page (D-L52) runs `core/` and the panel in Chrome or Edge.
+The web page (D-L71) runs `core/` and the panel in Chrome or Edge.
 `npm run build:web` writes the complete static site into the ignored
 `dist/web/`; the file list, content hashing, version stamp (`ARK_COMMIT`
 overrides git), Content Security Policy (`POLICY`, written once) and
@@ -309,16 +293,15 @@ overrides git), Content Security Policy (`POLICY`, written once) and
 for tests and is never published. `npm run check:site` refuses anything Pages
 would run as server code.
 
-It is a separate output, not a step of the extension: `core/` and `webview/`
-stay unbuilt source, and no module of `core/` is rewritten for the browser.
-The build fails if node-hid, `vscode` or any Node built-in would reach a
-bundle, or a bundle takes any package but `buffer`. To give the web shell more
-of `core/`, export it from `web/core.mjs`.
+`core/` and `webview/` stay unbuilt source, and no module of `core/` is
+rewritten for the browser. The build fails if node-hid, its adapter or any
+Node built-in would reach a bundle, or a bundle takes any package but
+`buffer`. To give the web shell more of `core/`, export it from
+`web/core.mjs`.
 
-Both shells run the same `core/` and interface through the shared panel loop;
-what differs reaches the interface only as `model.shell`, so the interface
-never asks which shell it is in. What the web shell does differently, and
-why, is in the file comments of `web/`: the click-time `gesture` path Chrome's
+The shell runs `core/` and the interface through the shared panel loop; what
+it offers reaches the interface as `model.shell`. What it does, and why, is
+in the file comments of `web/`: the click-time `gesture` path Chrome's
 keyboard picker and file chooser need (`web/panel-channel.mjs`), the Web Lock
 that makes a second tab wait, the `beforeunload` warning, the worker clock
 that background tabs do not throttle, recovery copies in IndexedDB, and the
@@ -326,16 +309,15 @@ phone notice (`web/phone.mjs`). A browser shell needs a secure context
 (HTTPS or localhost) for WebHID and the draft's `crypto.randomUUID()`.
 
 To try it, `npm run web` and open `http://localhost:8975/` in Chrome or Edge.
-Close any Ark session in VS Code first: the page holds the keyboard as the
-extension does. Recovery copies made there stay in that origin's storage.
+Close any other Ark tab, and any Node script holding the keyboard, first.
+Recovery copies made there stay in that origin's storage.
 
 `npm run test:browser` builds the fixture preview and the page and runs every
-spec in Chromium: the screens' controls and the edits they post, the VS Code
-stylesheet cascade, the bundle against Node (it must decode and re-encode
-every profile fixture exactly), and the built page against a fake
-`navigator.hid` whose keyboard is the read-only fake. Install the browser once
-with `npx playwright install chromium`. None of this tests Ark inside
-VS Code or on a keyboard.
+spec in Chromium: the screens' controls and the edits they post, in both
+themes, the bundle against Node (it must decode and re-encode every profile
+fixture exactly), and the built page against a fake `navigator.hid` whose
+keyboard is the read-only fake. Install the browser once with
+`npx playwright install chromium`. None of this tests Ark on a keyboard.
 
 ### Publishing the web page
 
@@ -356,9 +338,10 @@ static-output contract (`tests/scripts/web-build.test.js`,
 `tests/scripts/check-static-site.test.js`).
 
 A pull request handoff includes a **Try this PR** link only once that head's
-Cloudflare build has succeeded and the page's footer shows that commit. Take
-the address from Cloudflare's pull request comment or check, never from the
-branch name.
+Cloudflare build has succeeded and the page's footer shows that commit. The
+link is the Branch Preview URL from Cloudflare's pull request comment or
+check, which follows the branch, so the same link stays current as the
+branch moves; never build the address from the branch name yourself.
 
 Until the next release, `main` still carries the former uploader
 (`publish-web.yml`), so a `main` push can trigger it. Once both branches are

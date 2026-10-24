@@ -1,7 +1,7 @@
 # Ark's architecture
 
-Ark is a core with no shell dependency, two shells that run it, and an
-interface that only renders what the core posts. The keyboard is the source
+Ark is a core with no shell dependency, the web page's shell that runs it,
+and an interface that only renders what the core posts. The keyboard is the source
 of truth (D-L11); every edit goes through one draft (D-L19, D-L35).
 
 ## The layers
@@ -12,31 +12,31 @@ of truth (D-L11); every edit goes through one draft (D-L19, D-L35).
 | Layer | Owns | May import |
 | --- | --- | --- |
 | `core/data/` | Inert vendored data: the keycode catalog, the key layout, pointing-mode bindings, host keyboard layouts, the demo profile | nothing |
-| `core/transport/` | Device adapters (node-hid, WebHID, a fake) and the request coordinator that serialises requests to the keyboard | `data/` |
+| `core/transport/` | Device adapters (WebHID for the page, node-hid for Node scripts, a fake) and the request coordinator that serialises requests to the keyboard | `data/` |
 | `core/schema/` | Profile byte formats and domain decoders: each domain's layout, limits and canonical encoding | `data/` |
 | `core/protocol/` | What is spoken to the keyboard over Profile Wire: framing, pages, live edits, candidate transfers | `transport/`, `schema/`, `data/` |
 | `core/model/` | Complete profiles as documents: snapshots, backups, draft edits, Review's changes and checks, reachability, vocabulary | `schema/`, `data/` |
-| `core/session/` | Everything that holds state across a connection: reads, the draft, Apply, Save, live edits, recovery copies, and the panel loop every shell runs | all of the above |
+| `core/session/` | Everything that holds state across a connection: reads, the draft, Apply, Save, live edits, recovery copies, and the panel loop the shell runs | all of the above |
 
 Every layer may import from itself, type-only imports follow the same rules,
 and any layer may use the inert type declarations in `contracts/`.
 
 Around the core:
 
-- **Shells** (D-L02, D-L52). `extension.js` and `panel-html.js` are the VS Code
-  shell and the only app files that import `vscode` (the developer tool
-  `tools/branch-window/` is its own extension); `web/` is the web page.
-  A shell reaches the core only through `core/session/` and passes in what only
-  it has: posting to the panel, toasts, progress, a file chooser and saving a
-  file. `core/session/panel-loop.js` routes each panel message, runs it and
-  publishes the model for both.
+- **The shell** (D-L71), `web/`: the web page. It passes in what only it
+  has: its device adapter (WebHID; the device service has no default), posting
+  to the panel, progress, a file chooser, downloads and the browser's storage
+  for recovery copies. `core/session/panel-loop.js` routes each panel
+  message, runs it and publishes the model. Node scripts that drive a keyboard
+  (`scripts/probe-live-link.js`, `npm run preview -- --device`) pass the
+  node-hid adapter themselves; the web build refuses it.
 - **The interface**, `webview/`: browser ES modules with no build step.
   It imports nothing from `core/`, not even types; it renders the model the
   shell posts and posts edits back. `webview/view/` turns the model into what
   is drawn and builds every posted edit, purely; `webview/ui/` holds the
   frame (`frame.mjs`), the screens and their components; `webview/lib/` the
   DOM, focus and colour helpers.
-- **`contracts/`**: type declarations shared by the core, the shells and the
+- **`contracts/`**: type declarations shared by the core, the shell and the
   interface for what crosses the panel boundary. No runtime code.
 
 ## Where new work goes

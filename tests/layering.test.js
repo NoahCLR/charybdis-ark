@@ -53,7 +53,6 @@ test("type dependencies follow the runtime layer rules", () => {
     for (const file of sourceFiles("core", true)) {
         const layer = path.basename(path.dirname(file));
         for (const target of typeImportsIn(file)) {
-            assert.notEqual(target, "vscode", `${file} imports the VS Code shell's types below it`);
             if (!target.startsWith(".")) continue;
             const relative = path.relative(APP_ROOT, path.resolve(path.dirname(file), target));
             if (relative.startsWith(`contracts${path.sep}`)) continue;
@@ -114,28 +113,6 @@ test("core layers import only downward", () => {
     }
 });
 
-test("the extension shell reaches core only through session/", () => {
-    // What a shell does with a panel is core/session/panel-loop.js; a shell that
-    // needed a lower layer would be doing the loop's work itself.
-    const core = requiresIn(path.join(APP_ROOT, "extension.js")).filter((target) => target.startsWith("./core/"));
-    assert.ok(core.length, "extension.js runs the shared panel loop");
-    for (const target of core) {
-        assert.ok(target.startsWith("./core/session/"), `extension.js imports ${target}; only core/session/ is the shell's`);
-    }
-});
-
-test("only the extension shell knows about VS Code", () => {
-    for (const dir of ["core", "scripts", "webview", "web"]) {
-        for (const file of sourceFiles(dir)) {
-            const text = fs.readFileSync(file, "utf8");
-            assert.ok(
-                !/require\("vscode"\)|from "vscode"/.test(text),
-                `${path.relative(APP_ROOT, file)} imports vscode; only extension.js may`
-            );
-        }
-    }
-});
-
 test("the webview stays a renderer", () => {
     // The interface renders the model the core posts and nothing else. It does
     // not reach into core/ at all — not even the vendored catalog, which
@@ -154,7 +131,7 @@ test("the webview stays a renderer", () => {
 test("nothing we author mentions the firmware repository", () => {
     // The one sanctioned QMK reader is the catalog generator, which is a build
     // step producing a checked-in file rather than a runtime dependency.
-    const authored = [...sourceFiles("core"), ...sourceFiles("webview"), ...sourceFiles("web"), path.join(APP_ROOT, "extension.js")];
+    const authored = [...sourceFiles("core"), ...sourceFiles("webview"), ...sourceFiles("web")];
     for (const file of authored) {
         const text = fs.readFileSync(file, "utf8");
         // Matched on word boundaries: the rule is about the firmware's files,

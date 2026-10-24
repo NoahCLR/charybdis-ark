@@ -1,5 +1,5 @@
 "use strict";
-// Live + review through the panel loop both shells run: edits, undo, the trap
+// Live + review through the panel loop the page runs: edits, undo, the trap
 // check, Save, Revert, reconnect and replug, and the mode switch, against a
 // keyboard with a working copy (firmware D-F32).
 const assert = require("node:assert/strict");

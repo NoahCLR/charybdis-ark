@@ -15,7 +15,7 @@ async function sendLayout(page, effective, layout, macosIso = false) {
     }, patch);
 }
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`the picker board and search follow the host layout (${theme})`, async ({page}) => {
         await openPreview(page, theme);
         await page.evaluate(async () => {

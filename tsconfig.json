@@ -19,8 +19,6 @@
     "core/**/*.js",
     "core/**/*.d.ts",
     "contracts/**/*.d.ts",
-    "tests/types/core.ts",
-    "extension.js",
-    "panel-html.js"
+    "tests/types/core.ts"
   ]
 }

@@ -52,18 +52,7 @@ nothing connected.
 ## Install
 
 Open **<https://ark.ncleroy.dev>** in Chrome or Edge on your computer. Nothing
-to install.
-
-Ark also runs in VS Code, installed from a checkout:
-
-```sh
-git clone https://github.com/NoahCLR/charybdis-ark.git
-cd charybdis-ark
-npm ci
-ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0   # then reload VS Code
-```
-
-Then click **Charybdis Ark** in the status bar.
+to install: Ark is a web page.
 
 The keyboard needs both halves from the
 [latest firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest).

@@ -19,6 +19,19 @@ const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {connectedService} = require("../fixtures/connected-service");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 
+test("the device service talks only through the adapter its caller passes", async () => {
+    // The page passes WebHID's; a Node script passes the node-hid adapter
+    // itself. Nothing falls back to the native module unasked.
+    assert.throws(() => new ProfileDeviceService(), {name: "TypeError", message: /adapter/});
+    assert.throws(() => new ProfileDeviceService({onChange: () => {}}), {name: "TypeError", message: /adapter/});
+    const adapter = new FakeDeviceAdapter();
+    let listed = 0;
+    adapter.listDevices = async () => {listed++; return [];};
+    const service = new ProfileDeviceService({adapter});
+    await service.enumerate();
+    assert.equal(listed, 1, "the passed adapter lists the keyboards");
+});
+
 test("Apply progress has a separate notification and cannot let a closed panel stop a save", () => {
     let changes = 0;
     const progress = [];

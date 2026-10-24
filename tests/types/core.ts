@@ -184,7 +184,9 @@ function orchestrationContracts(connection: Awaited<ReturnType<InstanceType<type
     // @ts-expect-error Shells save a recovery path, not a success flag.
     openPanelLoop({post: () => {}, saveExport: async () => undefined, saveRecovery: async () => true});
     // @ts-expect-error Read counters and portable read text use different payloads.
-    new ProfileDeviceService().reportReadProgress('layout', 'Loading');
+    new ProfileDeviceService({adapter: new FakeDeviceAdapter()}).reportReadProgress('layout', 'Loading');
+    // @ts-expect-error The device service has no default transport: its caller passes the adapter.
+    new ProfileDeviceService({onChange: () => {}});
     // @ts-expect-error Theme choices are shared across the renderer and shell.
     const request: PanelRequest = {type: 'setTheme', theme: 'blue'};
     void request; void jump;

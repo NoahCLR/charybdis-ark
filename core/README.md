@@ -1,6 +1,6 @@
 # Charybdis Ark core
 
-The app without a shell: no `vscode` import, no DOM (D-L02), layers that
+The app without a shell: no DOM and no shell import (D-L71), layers that
 import one way (D-L10, [architecture](../docs/architecture/README.md)). This page maps the modules
 and the contracts a shell or adapter must keep. The rules for reading, the
 draft, Apply and the live modes are in
@@ -41,12 +41,13 @@ splices it per domain (`schema/profile-splices.js`), and
 
 ## The panel loop
 
-`session/panel-loop.js` is the loop every shell runs: route a message, run it,
-publish the model, turn a failure into the panel's notice. A shell passes in
-only what it has, as listed at the top of that file, plus the device
-service's `adapter` and `sleep(ms)`. A background tab throttles timers, so
-the web page passes a `sleep` kept by a worker; otherwise `setTimeout` is
-used. What differs between shells reaches the panel only as `model.shell`.
+`session/panel-loop.js` is the loop the web page's shell runs: route a
+message, run it, publish the model, turn a failure into the panel's notice.
+The shell passes in only what it has, as listed at the top of that file, plus
+the device service's `adapter` and `sleep(ms)`. A background tab throttles
+timers, so the page passes a `sleep` kept by a worker; otherwise `setTimeout`
+is used. What the page offers reaches the panel as `model.shell`, whose
+defaults are the page's (`SHELL_WORDS` in `session/panel-session.js`).
 (`tests/session/panel-loop.test.js`)
 
 ## Current firmware, in one place each
@@ -119,7 +120,14 @@ anything else is `INVALID_REPORT`. Every adapter matches the same four Raw HID
 identifiers (`transport/device-adapter.js`), and every error carries a stable
 `code` from `LIVE_LINK_ERROR_CODES`: branch on it, never on the message.
 
-**Native** (`NodeHidDeviceAdapter`). node-hid loads at the first
+The device service has no default adapter: `new ProfileDeviceService({adapter})`
+takes the one its caller passes, and throws a `TypeError` without one, so the
+page can never reach for a native module.
+
+**Native** (`NodeHidDeviceAdapter`), for development: Node scripts and agents
+pass it to drive a keyboard (`scripts/probe-live-link.js`,
+`npm run preview -- --device`); node-hid is a development dependency and the
+web build refuses it. node-hid loads at the first
 `listDevices()` or `connect()`, not on `require`, so a missing native module
 is `NATIVE_MODULE_UNAVAILABLE`, not a crash. It opens only a path its last
 enumeration returned, and on macOS opens it non-exclusively. node-hid wants a

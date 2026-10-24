@@ -2,16 +2,16 @@
 "use strict";
 const {PHASE, editModeWords, heldWords, quietWords} = require("../model/vocabulary");
 
-// The panel's side of a session: what extension.js used to decide inline.
+// The panel's side of a session.
 //
 // A panel session is a plain object the shell keeps per window — the device
 // service, the draft, the layer editor, and the outbox the next model carries
 // (a notice, an accepted edit, a request to reset forms). Whether its draft
 // may be edited, and the changes that move several of its fields at once, are
 // panel-session-state.js's. Everything here is
-// free of VS Code, so it is tested like the rest of core/; panel-loop.js runs
-// it for every shell, and extension.js keeps only VS Code's dialogs, files and
-// progress.
+// free of the page, so it is tested like the rest of core/; panel-loop.js runs
+// it, and the web shell (web/web-shell.mjs) keeps only the browser's picker,
+// storage, files and progress.
 
 /**
  * @typedef {import("./types.js").PanelSession} Session
@@ -40,29 +40,31 @@ const WORK_ROUTES = new Set(["draft", "portable", "demo", "read"]);
 const BUSY_REFUSAL = "Wait for the current operation to finish before starting another.";
 
 // What the panel says and offers that depends on its shell, published as
-// `model.shell`, so the panel never asks which shell it is in. A shell passes
-// `words` that differ from these, and `panel()` for what it offers now:
+// `model.shell`. The web page is the one shell (D-L71); these defaults are
+// its words and what it offers, so a session without a shell (the preview,
+// tests) describes the page. A shell passes `words` that differ from these,
+// and `panel()` for what it offers now:
 //
-//   chooseKeyboard   the panel offers Choose keyboard, which opens the shell's picker
-//   blocked          {title, detail}: why this shell cannot reach a keyboard at all
-//   theme            "light" or "dark" when the panel offers its own theme toggle
-//   recoveries       [{id, name, savedAt}]: recovery copies the panel lists, each downloadable
-//   build            {version, commit} the shell was built from
-//   progress         what the shell is doing, where it has no indicator of its own
-//
-// A session without a shell (the preview, tests) describes the extension's.
+//   chooseKeyboard   the panel offers Choose keyboard, which opens Chrome's picker;
+//                    offered unless the tab is `blocked`
+//   blocked          {title, detail}: why this tab cannot reach a keyboard at all
+//   theme            "light" or "dark": the theme the panel's toggle switches from
+//   recoveries       [{id, name, savedAt}]: the recovery copies Backups lists
+//   build            {version, commit} the page was built from
+//   progress         what the page is doing, where it has no indicator of its own
 const SHELL_WORDS = Object.freeze({
-    noKeyboard: "No keyboard is connected. Connect one and choose Read keyboard.",
-    connectHint: "Connect a Charybdis, then read it to begin editing.",
+    noKeyboard: "No keyboard is connected. Choose keyboard to connect one.",
+    connectHint: "Plug in your Charybdis, then pick it in Chrome's list with Choose keyboard.",
+    noneFound: "Chrome has no Charybdis this page may open yet. Choose keyboard and pick yours.",
 });
 /** @param {import("./types.js").PanelShell | null | undefined} shell @returns {import("../../contracts/model.js").ShellPanel} */
 function shellModel(shell) {
     const offered = shell?.panel?.() || {};
     return {
-        chooseKeyboard: Boolean(offered.chooseKeyboard),
+        chooseKeyboard: offered.chooseKeyboard ?? !offered.blocked,
         blocked: offered.blocked || null,
-        theme: offered.theme === "light" || offered.theme === "dark" ? offered.theme : null,
-        recoveries: Array.isArray(offered.recoveries) ? offered.recoveries : null,
+        theme: offered.theme === "light" ? "light" : "dark",
+        recoveries: Array.isArray(offered.recoveries) ? offered.recoveries : [],
         build: offered.build || null,
         progress: offered.progress || null,
         words: {...SHELL_WORDS, ...shell?.words},

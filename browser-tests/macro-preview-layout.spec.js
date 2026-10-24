@@ -3,7 +3,7 @@
 const {test, expect} = require("@playwright/test");
 const {openPreview} = require("./shell-page");
 
-for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`long literal macro text stays inside its row (${theme})`, async ({page}) => {
         await openPreview(page, theme);
         await page.evaluate(async () => {

@@ -1,9 +1,8 @@
 // @ts-check
-// The web shell: in a page, what extension.js does in VS Code. It runs the
-// shared panel loop (core/session/panel-loop.js) over WebHID and hands the
-// panel what a browser has — Chrome's keyboard picker, IndexedDB for recovery
-// copies, the file chooser, downloads, and the page itself for progress and
-// errors. web/page.mjs starts it with the page's own globals; everything it
+// The web shell, Ark's one shell (D-L71). It runs the shared panel loop
+// (core/session/panel-loop.js) over WebHID and hands the panel what a browser
+// has — Chrome's keyboard picker, IndexedDB for recovery copies, the file
+// chooser, downloads, and the page itself for progress and errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
 import {closingLoses, demoUnsaved, FILE_MAX_BYTES, openPanelLoop, WebHidDeviceAdapter, writingProfile} from "./core.mjs";
@@ -11,13 +10,6 @@ import {connectPanel} from "./panel-channel.mjs";
 import {nativePopups} from "./native-popups.mjs";
 import {openRecoveries} from "./recoveries.mjs";
 import {workerSleep} from "./sleep.mjs";
-
-// What the panel says about connecting in a browser (model.shell.words).
-export const WEB_WORDS = Object.freeze({
-    noKeyboard: "No keyboard is connected. Choose keyboard to connect one.",
-    connectHint: "Plug in your Charybdis, then pick it in Chrome's list with Choose keyboard.",
-    noneFound: "Chrome has no Charybdis this page may open yet. Choose keyboard and pick yours.",
-});
 
 // Why a tab cannot reach a keyboard at all (model.shell.blocked). `demo` says
 // the demo is still offered there: it needs no keyboard. A tab waiting on
@@ -31,7 +23,7 @@ export const BLOCKED = Object.freeze({
         detail: "One tab holds the keyboard at a time. Keep working in the other Ark tab, or close it: this tab takes over when it does."}),
 });
 
-// Both shells use the portable document's byte ceiling.
+// A chosen file is held to the portable document's byte ceiling.
 export const PROFILE_FILE_LIMIT = FILE_MAX_BYTES;
 export const THEME_KEY = "charybdis-ark.theme";
 export const COMPILED_DEFAULTS_KEY = "charybdis-ark.compiled-defaults";
@@ -102,7 +94,6 @@ export function startWebShell(env) {
             download(document, window, file.fileName, file.text);
             return `${file.fileName} in your downloads`;
         },
-        words: WEB_WORDS,
         panel: () => ({chooseKeyboard: Boolean(hid) && !blocked, blocked, theme, recoveries: recoveryList, build, progress}),
     };
 

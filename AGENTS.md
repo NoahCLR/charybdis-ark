@@ -1,6 +1,7 @@
 # Charybdis Ark — Agent Instructions
 
-Ark edits the connected keyboard over Raw HID, in VS Code and as a web page.
+Ark edits the connected keyboard over Raw HID, as a web page in Chrome or Edge
+(D-L71).
 It is a client of the keyboard, never of the firmware repository: the runtime
 reads no firmware file (D-L11, held by `tests/layering.test.js`).
 

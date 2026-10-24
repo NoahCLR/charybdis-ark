@@ -9,7 +9,7 @@ import {editModeChoices, questionWords, switchQuestion} from "../view/edit-mode.
 import {editModeWords} from "../view/vocabulary.mjs";
 import {checksToConfirm, confirmText} from "../view/checks.mjs";
 
-// A select, so it reads the same in VS Code and on the web page; its words
+// A select, so it reads as the browser draws one; its words
 // say what each mode does on hover.
 /** @param {boolean} busy */
 export function editModeSwitch(busy) {

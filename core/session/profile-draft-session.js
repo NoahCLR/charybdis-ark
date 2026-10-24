@@ -107,7 +107,7 @@ class ProfileDraftSession {
         this.connectionToken = connectionToken ?? null;
         this.latestConnectionToken = this.connectionToken;
         this.connectionChanged = false;
-        // Web Crypto, which Node and the browser both have, so one line serves both shells.
+        // Web Crypto, which Node and the browser both have, so one line serves the page and the tests.
         this.id = globalThis.crypto.randomUUID();
         this.capabilities = copy(capabilities);
         this.latestCapabilities = copy(capabilities);

@@ -1,10 +1,10 @@
 // @ts-check
-// The panel and its shell in one page: a stand-in for VS Code's
-// acquireVsCodeApi(). The panel cannot tell the difference, and must not be
-// able to: in VS Code every message crosses a process boundary, so it arrives
-// later and as a copy. Here a MessageChannel does both — it delivers on a later
-// task and clones what it carries — so the panel can never change the core's
-// draft by touching an object it was sent, nor the core the panel's.
+// The panel and its shell in one page, joined as if by a process boundary:
+// the panel reaches the shell only through acquirePanelApi(), and every
+// message arrives later and as a copy. A MessageChannel does both — it
+// delivers on a later task and clones what it carries — so the panel can never
+// change the core's draft by touching an object it was sent, nor the core the
+// panel's.
 //
 // One exception is made, synchronously and on a copy: `gesture(message)` sees
 // each message while the panel's click handler is still running. Chrome opens

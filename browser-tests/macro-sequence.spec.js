@@ -14,7 +14,7 @@ async function payload(page, text) {
 }
 const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateMacro"));
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`fixed tiles, full names and retained name/protection controls (${theme})`, async ({page}) => {
         await openControls(page, "macros", {macroSlot: "MACRO_17"}, theme);
         await payload(page, "{+KC_LGUI}{KC_A}{-KC_LGUI}{65535}{KC_LGUI,KC_LSFT,KC_LALT,KC_ENT}" + "long text ".repeat(100));

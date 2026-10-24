@@ -59,7 +59,7 @@ test("Keyboard: the title renames the keyboard, and memory and diagnostics live 
 });
 
 test("Backups: a recovery copy is named by what made it and its keyboard, can be used as a draft or deleted, and a chosen file opens as a sheet", async ({page}) => {
-    await page.goto("/preview/index.html?shell=web");
+    await page.goto("/preview/index.html");
     await page.locator('[data-screen="profile"]').click();
     await expect(page.locator(".card.usage")).toHaveCount(0);
     const names = page.locator(".recovery-row .recovery-name");

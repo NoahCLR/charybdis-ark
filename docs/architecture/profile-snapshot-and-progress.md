@@ -8,11 +8,11 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
 
 ## Who does what
 
-- The shell (`extension.js`, `web/web-shell.mjs`) supplies recovery copies
+- The shell (`web/web-shell.mjs`) supplies its device adapter, recovery copies
   (each kept with what made it and the keyboard's name, which
-  `core/session/recovery-copy.js` puts in its file name), file choosers, downloads, progress, a store for compiled defaults and, on
-  the web, a sleep that tab throttling cannot slow.
-- `core/session/panel-loop.js`, shared by both shells, hands each message to
+  `core/session/recovery-copy.js` puts in its file name), file choosers, downloads, progress, a store for compiled defaults and a
+  sleep that tab throttling cannot slow.
+- `core/session/panel-loop.js` hands each message to
   `routeMessage` (`core/session/panel-session.js`), runs `panel-controls.js` or `live-edits.js` and publishes
   the model with the session's outbox (notice, `resetDraftForms`).
 - `core/session/profile-device-service.js` owns the connection: one operation
@@ -308,7 +308,7 @@ without Ark, which starts no timer. Save is refused until that save fails;
 **Save again** then saves after a recovery copy, with no review, since every
 edit was checked before it was sent.
 
-`core/session/live-watch.js`, run by `panel-loop.js` for both shells, looks at
+`core/session/live-watch.js`, run by `panel-loop.js`, looks at
 the edit status about once a second. It skips while an operation, an Apply or
 a proposal holds the keyboard, and drops a look that raced one. A look is a
 background read (`softTimeout`): a missed answer skips it and keeps the
