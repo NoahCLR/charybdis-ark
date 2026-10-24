@@ -229,7 +229,7 @@ Keyboard screen.
 Rarely, a keyboard stops saving: a flash write failed, or something else it
 can't safely carry on from. Typing still works, but it refuses edits, Save
 and Revert until it restarts. The rail says **Stopped saving · Restart** and
-the bar says **The keyboard stopped saving**.
+the bar says **The keyboard stopped saving**, in Apply as in the live modes.
 
 **Restart**, in the bar, restarts both halves without unplugging:
 
@@ -239,6 +239,11 @@ the bar says **The keyboard stopped saving**.
    finish starting, then reads it again.
 3. Ark sends your unsaved edits back, still unsaved. In Live + review, review
    and save them; in Live the keyboard saves them by itself.
+
+In Apply your draft lives in Ark, not on the keyboard, so a restart loses
+nothing: the draft and its history stay as they are, ready to review and
+apply once the keyboard is back. Apply waits for that: until the restart, it
+says the keyboard stopped saving.
 
 Unplugging the keyboard works too, but loses the unsaved edits. Ark never
 restarts the keyboard on its own. If the keyboard stops saving again straight

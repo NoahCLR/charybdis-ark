@@ -203,6 +203,23 @@ test("under an Apply draft, a queued key adjustment reaches the panel too", asyn
     assert.equal(model(shell).model.draft.keyboard.adjustmentPending, false);
 });
 
+for (const flag of ["stopped", "slaveStopped"]) test(`under an Apply draft, a ${flag === "stopped" ? "master" : "slave"} half that stopped saving reaches the panel`, async t => {
+    const {keyboard, shell, session, look, key} = await open(t, {mode: EDIT_MODE.APPLY});
+    await key(0, 11, "KC_R");
+    assert.equal(await look(), false, "the first look only notes where the keyboard is");
+    keyboard.raised[flag] = true;
+    assert.equal(await look(), true);
+    const published = model(shell).model.draft;
+    assert.equal(published.live, null, "still an Apply draft");
+    assert.equal(published.keyboard[flag], true);
+    assert.equal(published.changes.length, 1, "the draft keeps its edit");
+    assert.equal(await look(), false, "nothing new while it stays stopped");
+    keyboard.raised[flag] = false;
+    assert.equal(await look(), true);
+    assert.equal(model(shell).model.draft.keyboard[flag], false);
+    assert.equal(session.draft.dirty, true);
+});
+
 test("an automatic save racing a reread is read again at once, and the draft synchronizes", async t => {
     const {keyboard, session, look} = await open(t);
     const changed = validateSnapshot(document()).layers; changed[3][1] = 0x05;

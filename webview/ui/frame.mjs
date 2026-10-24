@@ -59,7 +59,8 @@ export function rail() {
         : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
 
     const keyboardLine = keyboardStatusLine(model);
-    // Under an Apply draft the keyboard says only that an adjustment is pending.
+    // Under an Apply draft the keyboard says only that it stopped saving or
+    // that an adjustment is pending.
     const applySaving = draft && !draft.live ? railSaveLines(draft) : [];
 
     const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
@@ -306,6 +307,9 @@ export function commitBar() {
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }
+    // A keyboard that stopped saving, in any edit mode: Restart is the one way on.
+    const saving = liveSaveState(draft);
+    if (saving?.kind === "stopped") return stoppedBar(draft, saving);
     if (draft.live) return liveCommitBar(draft);
     if (!draft.dirty) return null;
 
@@ -327,6 +331,22 @@ export function commitBar() {
     return node;
 }
 
+// A keyboard that stopped saving (firmware D-F34), for either half and in
+// every edit mode. A live draft's unsaved edits are kept in a recovery copy
+// and put back; an Apply draft is Ark's own, so the restart leaves it as it is.
+/** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft @param {NonNullable<ReturnType<typeof liveSaveState>>} saving */
+function stoppedBar(draft, saving) {
+    const tip = draft.live ? "Restart both halves. A recovery copy of any unsaved edits is saved first; the keyboard comes back in a moment and Ark puts them back."
+        : "Restart both halves. Your draft stays as it is in Ark; the keyboard comes back in a moment and Ark reads it again.";
+    const node = el(`<div class="commit${draft.live ? " live" : ""} stopped">
+        <span class="n"><i class="dot err"></i> <strong>${esc(saving.title)}</strong>
+        <span class="muted">${esc(saving.detail)}</span></span>
+        <span class="sep"></span>
+        <button class="btn primary" data-act="restart" ${draft.connected ? "" : "disabled"} data-tip="${esc(tip)}">Restart</button></div>`);
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restart"]')).addEventListener("click", () => post(controls.restartKeyboard()));
+    return node;
+}
+
 // The live modes: the keyboard already runs the edits. In Live + review the
 // review leads to Save; in Live the keyboard saves by itself, so the bar only
 // says where that stands. Revert puts back what is saved (undo sends the
@@ -336,16 +356,6 @@ export function commitBar() {
 function liveCommitBar(draft) {
     const live = /** @type {NonNullable<typeof draft.live>} */ (draft.live);
     const saving = liveSaveState(draft);
-    if (saving?.kind === "stopped") {
-        const node = el(`<div class="commit live stopped">
-            <span class="n"><i class="dot err"></i> <strong>${esc(saving.title)}</strong>
-            <span class="muted">${esc(saving.detail)}</span></span>
-            <span class="sep"></span>
-            <button class="btn primary" data-act="restart" ${draft.connected ? "" : "disabled"}
-                data-tip="Restart both halves. A recovery copy of any unsaved edits is saved first; the keyboard comes back in a moment and Ark puts them back.">Restart</button></div>`);
-        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restart"]')).addEventListener("click", () => post(controls.restartKeyboard()));
-        return node;
-    }
     if (saving?.kind === "failed") {
         const node = el(`<div class="commit live ${esc(saving.kind)}">
             <span class="n"><i class="dot ${esc(saving.tone)}"></i> <strong>${esc(saving.title)}</strong>

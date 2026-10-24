@@ -14,7 +14,8 @@
 //     waiting for a quiet keyboard, the edit mode not yet stored.
 //   - Under an Apply draft: a change its keys made and it then saved is read
 //     again, as a Refresh would; until then, what it says of itself (an
-//     adjustment still reaching both halves) is shown.
+//     adjustment still reaching both halves, a half that stopped saving) is
+//     shown.
 //
 // It never runs while an operation or the panel holds the keyboard, and a
 // look that raced with one (the draft moved meanwhile) is dropped. It pauses
@@ -100,7 +101,7 @@ function retryPending(session, draft) {
 /** @param {import("./types.js").RunningPanelSession} session @param {NonNullable<import("./types.js").RunningPanelSession["draft"]>} draft @param {import("../protocol/types.js").EditStatus} status */
 async function checkApply(session, draft, status) {
     // What it says of itself meanwhile, such as an adjustment still reaching
-    // both halves, is shown as it is.
+    // both halves or a half that stopped saving, is shown as it is.
     const told = draft.observeApplyStatus(status);
     const seen = session.applyWatch?.draftId === draft.id ? session.applyWatch : undefined;
     session.applyWatch = {draftId: draft.id, session: status.session, revision: status.revision, savedGeneration: status.savedGeneration};

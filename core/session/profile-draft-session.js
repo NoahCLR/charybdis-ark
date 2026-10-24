@@ -23,7 +23,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis
 const keycodes = require("../data/keycode-catalog");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {liveKeyboardStatus} = require("./live-profile-session");
-const {quietWords} = require("../model/vocabulary");
+const {LIVE_RESULT_WORDS, quietWords} = require("../model/vocabulary");
 
 // What the panel shows of the keyboard's own saving and its halves.
 /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
@@ -196,6 +196,9 @@ class ProfileDraftSession {
     get dirty() {return this.decode(this.history[this.cursor].document).fingerprint !== this.base.fingerprint;}
     // A live draft is the keyboard's own state, so only a lost connection or
     // a read it has not taken makes it stale; a confirmed edit is progress.
+    // What the keyboard last said of itself, in any edit mode: a live draft's
+    // `live.keyboard`, or what the look between edits read under an Apply draft.
+    get keyboardStatus() {return this.live ? this.live.keyboard : this.applyKeyboard;}
     get stale() {return Boolean(this.needsRead || this.connectionChanged || (!this.live && this.latest.fingerprint !== this.base.fingerprint));}
     /** @param {import("./types.js").ConnectionToken} connectionToken */
     noteConnection(connectionToken) {
@@ -229,6 +232,20 @@ class ProfileDraftSession {
     /** @param {string} deviceId */
     followDevice(deviceId) {
         this.deviceId = deviceId;
+    }
+    // The keyboard Ark restarted, back and read over a new connection
+    // (keyboard-restart.js). An Apply draft's edits are Ark's own, so if the
+    // read shows the keyboard still holds what the draft began from, the new
+    // connection is the draft's: its edits and history stay, with nothing to
+    // review again. True when it took it.
+    /** @param {import("./types.js").ConnectionToken} connectionToken */
+    followRestart(connectionToken) {
+        const token = connectionToken ?? null;
+        if (this.live || this.needsRead || this.latestConnectionToken !== token || this.latest.incomplete
+            || this.latest.fingerprint !== this.base.fingerprint || JSON.stringify(this.latestCapabilities) !== JSON.stringify(this.capabilities)) return false;
+        this.connectionToken = token;
+        this.connectionChanged = false;
+        return true;
     }
     // Whether this draft belongs to the keyboard `state` describes: the one it
     // was read from, connected through the connection it was read over. ""
@@ -679,6 +696,9 @@ class ProfileDraftSession {
         const bound = this.bindingTo(service.snapshot());
         if (bound === "connection-changed") throw fail("Review this draft against the connected keyboard before applying it.");
         if (bound) throw fail("Reconnect the keyboard this draft belongs to.");
+        // A keyboard that stopped saving (firmware D-F34) refuses the copy as
+        // not ready; said as what it is, before a recovery copy or a write.
+        if (this.keyboardStatus?.stopped || this.keyboardStatus?.slaveStopped) throw Object.assign(new Error(`Apply refused: ${LIVE_RESULT_WORDS.STOPPED}`), {code: "LIVE_KEYBOARD_STOPPED"});
         try {
             const result = await service.restorePortableProfile(this.document, {expectedFingerprint: this.base.fingerprint, saveRecovery});
             if (result.fingerprint !== this.current.fingerprint) {this.needsRead = true; throw fail("The saved profile did not match the draft. Keep the recovery copy and read the keyboard again.");}
@@ -768,13 +788,17 @@ class ProfileDraftSession {
         return changed ? "changed" : "same";
     }
     // A look at the keyboard between edits under an Apply draft
-    // (live-watch.js): what it says of itself. The panel says only a key
-    // adjustment still reaching both halves there, so true when that changed.
-    /** @param {import("../protocol/types.js").EditStatus} status */
+    // (live-watch.js): what it says of itself. The panel says there a key
+    // adjustment still reaching both halves and a half that stopped saving,
+    // so true when either changed. No status (a restarted keyboard not yet
+    // looked at) forgets what an earlier boot said.
+    /** @param {import("../protocol/types.js").EditStatus | undefined} status */
     observeApplyStatus(status) {
-        const before = Boolean(this.applyKeyboard?.adjustmentPending);
-        this.applyKeyboard = liveKeyboardStatus(status);
-        return before !== this.applyKeyboard.adjustmentPending;
+        /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard */
+        const panelFlags = keyboard => [keyboard?.adjustmentPending, keyboard?.stopped, keyboard?.slaveStopped].map(Boolean).join();
+        const before = panelFlags(this.applyKeyboard);
+        this.applyKeyboard = status ? liveKeyboardStatus(status) : undefined;
+        return before !== panelFlags(this.applyKeyboard);
     }
     // The keyboard saved what it runs by itself (Live): what is saved moves
     // to it, and the history stays, so undo still sends the last edits back.
@@ -840,7 +864,7 @@ class ProfileDraftSession {
             // What the keyboard says of itself in any edit mode: a live
             // draft's `live.keyboard`, or what the look between edits read
             // under an Apply draft.
-            keyboard: connected ? liveKeyboardView(this.live ? this.live.keyboard : this.applyKeyboard) : null};
+            keyboard: connected ? liveKeyboardView(this.keyboardStatus) : null};
     }
 }
 // The router (panel-session.js) and the web build take the registry's list from here.

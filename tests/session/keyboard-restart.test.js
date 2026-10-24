@@ -15,6 +15,9 @@ const {RESTART_LABEL} = require("../../core/session/keyboard-restart");
 const {PHASE} = require("../../core/model/vocabulary");
 const {STARTING, STARTING_WORDS} = require("../../core/session/keyboard-starting");
 const {PROFILE_ACTIVE_KIND} = require("../../core/protocol/profile-wire-v1");
+const {validateSnapshot} = require("../../core/model/portable-profile");
+const {replaceDomain} = require("../../core/schema/profile-domains");
+const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 
 function fakeShell({recoveryFails = false} = {}) {
     const shell = {
@@ -267,6 +270,111 @@ test("a keyboard that stops again at once is told apart: the edits stay in the r
     const said = notices(shell).at(-1);
     assert.match(said, /stopped saving again at once, so the fault is in its flash or its firmware/);
     assert.match(said, /not put back\. Your unsaved edits are in the recovery copy: \/recovery\/1\.json/);
+});
+
+// Under an Apply draft the edits are Ark's own, not the keyboard's: a restart
+// loses nothing, so there is no recovery copy and nothing to put back, and
+// the draft stays as it was once the keyboard is back.
+/** @param {import("node:test").TestContext} t @param {"stopped" | "slaveStopped"} flag @param {Parameters<typeof open>[1]} [options] */
+async function stoppedUnderApply(t, flag, options) {
+    const opened = await open(t, {mode: EDIT_MODE.APPLY, ...options});
+    await opened.key(10, "KC_X");
+    await opened.key(11, "KC_Y");
+    opened.keyboard.raised[flag] = true;
+    // The live watch's look under an Apply draft.
+    opened.loop.session.draft.observeApplyStatus(await opened.loop.session.service.readLiveStatus());
+    opened.loop.publish();
+    return opened;
+}
+
+for (const [flag, half] of [["stopped", "master"], ["slaveStopped", "slave"]]) {
+    test(`under an Apply draft, Restart of a stopped ${half} half keeps the draft and clears the stopped state`, async t => {
+        const {keyboard, shell, loop, send, session} = await stoppedUnderApply(t, flag);
+        const draft = session.draft, edited = draft.current.fingerprint, steps = draft.history.length;
+        assert.equal(model(shell).draft.keyboard[flag], true, "the panel shows the stopped half");
+        await send({type: "restartKeyboard"});
+        assert.equal(shell.recoveries.length, 0, "nothing on the keyboard to lose");
+        assert.equal(keyboard.restarting.restarts, 1);
+        assert.equal(notices(shell).at(-1), "Restarting the keyboard…");
+        await loop.reconnected();
+        assert.equal(keyboard.working, null, "nothing was sent to the keyboard");
+        assert.equal(loop.session.draft, draft, "the same draft");
+        assert.equal(draft.live, null, "still an Apply draft");
+        assert.equal(draft.current.fingerprint, edited, "with its edits");
+        assert.equal(draft.history.length, steps, "and its draft history");
+        assert.equal(draft.stale, false, "bound to the keyboard it restarted, over its new connection: nothing to review again");
+        const published = model(shell);
+        assert.equal(published.device.connected, true);
+        assert.equal(published.draft.changes.length, 2);
+        assert.equal(published.draft.keyboard.stopped, false);
+        assert.equal(published.draft.keyboard.slaveStopped, false);
+        assert.equal(notices(shell).at(-1), RESTART_WORDS.back());
+        // Bound to it, so Apply goes ahead as it would have before the stop.
+        assert.equal(draft.bindingTo(loop.session.service.snapshot()), "");
+        assert.equal(published.draft.editable, true);
+    });
+}
+
+test("under an Apply draft, a keyboard changed across the restart leaves the draft to review again", async t => {
+    const {keyboard, loop, send, session} = await stoppedUnderApply(t, "stopped");
+    const draft = session.draft;
+    // Saved by the keyboard's own keys as it came back.
+    const layers = validateSnapshot(document()).layers; layers[3][2] = 0x06;
+    const restarted = keyboard.restarting.onRestart;
+    keyboard.restarting.onRestart = () => {
+        keyboard.externalEdit(replaceDomain(keyboard.saved, 0x60, () => encodeKeymapDomain(layers)));
+        keyboard.autoSave();
+        restarted?.();
+    };
+    await send({type: "restartKeyboard"});
+    await loop.reconnected();
+    assert.equal(loop.session.draft, draft);
+    assert.equal(draft.stale, true, "what the keyboard holds is no longer what the draft began from");
+});
+
+test("under an Apply draft, Apply of a keyboard that stopped saving is refused as stopped, before any recovery copy or write", async t => {
+    const {keyboard, shell, send, session} = await stoppedUnderApply(t, "slaveStopped");
+    const before = keyboard.mutations.length;
+    await send({type: "reviewProfileDraft"});
+    await send({type: "applyProfileDraft", confirmChecks: true});
+    const said = notices(shell).at(-1);
+    assert.match(said, /stopped saving\. Restart it to continue/);
+    assert.doesNotMatch(said, /not ready/);
+    assert.equal(shell.recoveries.length, 0);
+    assert.equal(keyboard.mutations.length, before, "nothing was written");
+    assert.equal(session.draft.dirty, true, "the draft is kept");
+    assert.equal(model(shell).apply, null, "no Apply began, so the bar still offers Restart");
+});
+
+test("under an Apply draft, a look skipped after the restart forgets what the old boot said; the next look says what it finds", async t => {
+    const {keyboard, shell, loop, send, session} = await stoppedUnderApply(t, "stopped");
+    keyboard.faults.stopsAgain = true;
+    const service = session.service, look = service.readLiveStatus;
+    await send({type: "restartKeyboard"});
+    // The put-back's look is skipped, as one is while the keyboard is busy.
+    let skipped = false;
+    service.readLiveStatus = async () => {if (!skipped) {skipped = true; return undefined;} return look.call(service);};
+    await loop.reconnected();
+    assert.ok(skipped);
+    assert.equal(model(shell).draft.keyboard, null, "nothing said of the new boot yet, and nothing of the old one");
+    assert.equal(notices(shell).at(-1), RESTART_WORDS.back());
+    assert.equal(session.draft.observeApplyStatus(await service.readLiveStatus()), true, "the next look finds it stopped");
+    assert.equal(session.draft.applyKeyboard?.stopped, true);
+});
+
+test("under an Apply draft, a keyboard that stops again at once says so and keeps the draft", async t => {
+    const {keyboard, shell, loop, send, session} = await stoppedUnderApply(t, "stopped", {newId: true});
+    const draft = session.draft, edited = draft.current.fingerprint;
+    keyboard.faults.stopsAgain = true;
+    await send({type: "restartKeyboard"});
+    await loop.reconnected();
+    assert.equal(loop.session.draft, draft);
+    assert.equal(draft.current.fingerprint, edited, "the draft keeps its edits");
+    assert.equal(draft.stale, false);
+    assert.equal(model(shell).draft.keyboard.stopped, true, "still stopped");
+    const said = notices(shell).at(-1);
+    assert.match(said, /stopped saving again at once, so the fault is in its flash or its firmware/);
+    assert.doesNotMatch(said, /unsaved edits/, "an Apply draft had none on the keyboard");
 });
 
 test("a keyboard that does not come back says so and names the recovery copy", async t => {

@@ -17,6 +17,8 @@
 //                         keyboard saves them by itself, in Live + review they
 //                         wait for Save), and the panel says how it went,
 //                         naming the recovery copy whenever something failed.
+//                         An Apply draft had nothing on the keyboard: it stays
+//                         as it is, and the keyboard is looked at at once.
 //
 // Ark never restarts the keyboard by itself.
 
@@ -116,6 +118,14 @@ async function putBackAfterRestart(session) {
         followed.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined);
         session.observedPortable = portable;
     }
+    // An Apply draft takes the new connection when the keyboard still holds
+    // what it began from. Its read says nothing of the keyboard's saving:
+    // look at it now, so a keyboard that stopped again is told from one that
+    // is back.
+    else if (followed && !followed.live && followed.deviceId === state.selectedDeviceId) {
+        followed.followRestart(state.connectionToken ?? null);
+        followed.observeApplyStatus(await session.service.readLiveStatus());
+    }
     const outcome = await putBack(session, restart, portable);
     // A restart's own wait said its recovery copy in case the keyboard never
     // came back; any other follow-back keeps what it says already.
@@ -126,7 +136,7 @@ async function putBackAfterRestart(session) {
 
 /** @param {Session} session @param {NonNullable<Session["restart"]>} restart @param {import("../model/types.js").ProfileSnapshot | null | undefined} read @returns {Promise<string>} */
 async function putBack(session, restart, read) {
-    const draft = session.draft, keyboard = draft?.live?.keyboard;
+    const draft = session.draft, keyboard = draft?.keyboardStatus;
     // Read again, the keyboard answered for both halves (a read refuses one
     // without the slave half), and since D-F34 a half that missed the restart
     // rejoins by itself: an unanswered restart needs no replug now. It is said

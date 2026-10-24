@@ -326,7 +326,8 @@ back input reports then, and while hidden (`web/native-popups.mjs`).
   the first look compares with the snapshot's saved generation and origin.
   Until then the draft keeps what the keyboard says of itself
   (`observeApplyStatus`) and publishes it as `draft.keyboard`, so the rail
-  says an adjustment is pending in Apply too.
+  says an adjustment is pending, and the bar and rail that a half stopped
+  saving, in Apply too.
 - A read refused `PROFILE_CHANGED` is retried, up to three times per draft.
 - A live draft whose follow-back read failed that way stays bound to the old
   device id or connection. When the keyboard connected now names the
@@ -353,15 +354,22 @@ starts from a fresh read.
 
 ### A stopped keyboard and Restart
 
-A stopped half outranks every other live state, and refusals then fail
+A stopped half outranks every other state the keyboard reports, and refusals then fail
 `LIVE_KEYBOARD_STOPPED`. `restartKeyboard` (`keyboard-restart.js`) saves the
 unsaved working copy (read, or else the draft's copy) as a recovery copy
 first, and restarts only once it is saved. It then expects the keyboard to
 drop off USB, follows it back, reads it once it has finished starting
 (`keyboard-starting.js`,
 [D-L70](../adr/0070-a-keyboard-is-read-once-it-has-started.md)), and
-`putBackAfterRestart` sends the kept edits as one unsaved live edit. Ark offers Restart only when the keyboard says it
-stopped.
+`putBackAfterRestart` sends the kept edits as one unsaved live edit. Under
+an Apply draft there is nothing to keep: the draft stays as it is, and takes
+the new connection when the keyboard still holds what the draft began from
+(`followRestart`), so its history is not lost to a review against the
+keyboard. `putBackAfterRestart` then looks at the edit status at once, since
+the read says nothing of it, so a keyboard that stopped again is told apart.
+Apply of a draft whose keyboard said it stopped is refused as stopped before
+any recovery copy or write. Ark offers
+Restart only when the keyboard says it stopped, in any edit mode.
 
 ## Backups
 

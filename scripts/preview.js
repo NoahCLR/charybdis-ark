@@ -109,6 +109,8 @@ async function webShells() {
         "live-stopped": WEB_SHELL,
         // An edit the keyboard holds until a key and a modifier are let go.
         "live-held": WEB_SHELL,
+        // A keyboard in Apply, with a draft of edits, that stopped saving.
+        "apply-stopped": WEB_SHELL,
         // An Apply cut short by the keyboard restarting during the copy to
         // the slave half: the bar and the notice it leaves.
         "apply-cut-short": WEB_SHELL,
@@ -150,7 +152,15 @@ const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed"
 // (`mode` 1), waiting to save the edit by itself; ?shell=live-stopped one that
 // stopped saving (firmware D-F34, `stopped`), with Restart; ?shell=live-held
 // one holding Ark's next edit until a key and a modifier are let go (`held`),
-// with Cancel edit.
+// with Cancel edit. ?shell=apply-stopped is a keyboard in Apply that stopped
+// saving (`stopped` without `live`), under a draft holding one edit.
+// What the keyboard says of its own saving: nothing pending, its master half
+// stopped when `stopped`.
+/** @param {boolean} stopped @returns {import("../core/session/types.js").LiveKeyboardStatus} */
+const keyboardStatus = (stopped) => ({saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, saveError: 0, lastSaveTransaction: 0,
+    adjustmentPending: false, storagePaused: false, slaveStoragePaused: false, slaveRefused: false, modeNotStored: false,
+    stopped, slaveStopped: false, quietMs: 3000});
+
 /** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean, held?: boolean, apply?: import("../contracts/model.js").ApplyView}} [options] */
 function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false, held = false, apply} = {}) {
     const doc = fillPreviewLayer(document32());
@@ -168,11 +178,15 @@ function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false,
         const bytes = Buffer.from(working.profile, "base64"), saved = Buffer.from(doc.profile, "base64");
         liveSnapshot = {...snapshot, document: working, fingerprint: portable.fingerprint(working), summary: portable.summary(working), saved: snapshot,
             runtime: null, live: {mode, session: 0x5e550001, revision: 1, savedGeneration: 42, savedOrigin: 0, unsaved: true, converged: true, working: bytes, saved, defaults: saved,
-                keyboard: {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, saveError: 0, lastSaveTransaction: 0,
-                    adjustmentPending: false, storagePaused: false, slaveStoragePaused: false, slaveRefused: false, modeNotStored: false,
-                    stopped, slaveStopped: false, quietMs: 3000}}};
+                keyboard: keyboardStatus(stopped)}};
     }
     const session = new ProfileDraftSession(/** @type {any} */ (liveSnapshot || snapshot), deviceId, capabilities);
+    if (stopped && !live) {
+        // What the look between edits would have read of it.
+        const edit = {...DEMO_EDIT, draftId: session.id, draftRevision: session.revision};
+        session.stage(edit);
+        session.applyKeyboard = keyboardStatus(true);
+    }
     /** @type {import("../core/session/types.js").PanelDeviceState} */
     const state = {
         selectedDeviceId: deviceId,
@@ -270,7 +284,7 @@ for (const [name, shell] of Object.entries(shells)) {
         fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify({model: buildModel(shell, {apply: cutShort.view}), notice: cutShort.notice, failed: true}));
         continue;
     }
-    const web = name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "live-held" ? buildModel(shell, {live: true, held: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
+    const web = name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "live-held" ? buildModel(shell, {live: true, held: true}) : name === "apply-stopped" ? buildModel(shell, {stopped: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
 const page = `<!doctype html>
