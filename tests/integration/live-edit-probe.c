@@ -20,8 +20,8 @@
 static uint8_t                                   saved[NOAH_PROFILE_BLOB_V1_MAX_SIZE];
 static uint8_t                                   working[NOAH_PROFILE_BLOB_V1_MAX_SIZE];
 static noah_profile_validator_v1_compatibility_t rules;
-static noah_effective_profile_provider_t         provider;
-static noah_effective_profile_snapshot_t         snapshot;
+static noah_active_profile_provider_t            provider;
+static noah_active_profile_snapshot_t            snapshot;
 static noah_profile_working_copy_t               copy;
 // What the owner adds to the working copy's own status.
 static noah_profile_owner_working_status_t owner;
@@ -66,7 +66,7 @@ noah_profile_working_result_t noah_profile_store_runtime_revert(uint16_t transac
 // identity Ark named and answers as the owner would before any flash work.
 noah_profile_working_result_t noah_profile_store_runtime_save(uint16_t transaction_id, uint32_t session, uint32_t revision) {
     if (session != copy.session || revision != copy.revision) return NOAH_PROFILE_WORKING_STALE;
-    if (owner.peer_refused) return NOAH_PROFILE_WORKING_BUSY;
+    if (owner.slave_refused) return NOAH_PROFILE_WORKING_BUSY;
     saving.transaction = transaction_id;
     saving.session     = session;
     saving.revision    = revision;
@@ -107,9 +107,9 @@ static bool set(const char *name, unsigned long value) {
         target = value; \
         return true; \
     }
-    FIELD("peer_required", owner.peer_required)
+    FIELD("peer_required", owner.other_half_required)
     FIELD("halves_agree", owner.halves_agree) /* edit status flag 2 */
-    FIELD("peer_known", owner.peer.known)
+    FIELD("peer_known", owner.slave.known)
     FIELD("edits_blocked", owner.edits_blocked)
     FIELD("saved_compiled", owner.saved_compiled)
     FIELD("save_phase", owner.save.phase)
@@ -120,23 +120,23 @@ static bool set(const char *name, unsigned long value) {
     FIELD("mode_conflict", owner.mode_conflict)
     FIELD("safe_reasons", owner.safe_boundary_reason_mask)
     FIELD("storage_paused", owner.storage_paused)
-    FIELD("peer_storage_paused", owner.peer_storage_paused)
-    FIELD("peer_refused", owner.peer_refused)
+    FIELD("peer_storage_paused", owner.slave_storage_paused)
+    FIELD("peer_refused", owner.slave_refused)
     FIELD("mode_store_failed", owner.mode_store_failed)
     FIELD("adjustment_pending", owner.adjustment_pending)
     FIELD("stopped", owner.stopped)
-    FIELD("peer_stopped", owner.peer_stopped)
+    FIELD("peer_stopped", owner.slave_stopped)
     FIELD("restart_acknowledged", restart_acknowledged)
     FIELD("saved_generation", owner.saved_generation)
     FIELD("saved_origin", owner.saved_origin)
-    FIELD("peer_phase", owner.peer.phase)
-    FIELD("peer_last_result", owner.peer.last_result)
-    FIELD("peer_transaction", owner.peer.transaction_id)
-    FIELD("peer_session", owner.peer.session)
-    FIELD("peer_revision", owner.peer.revision)
-    FIELD("peer_flags", owner.peer.flags)
-    FIELD("peer_mode", owner.peer.mode)
-    FIELD("peer_mode_counter", owner.peer.mode_counter)
+    FIELD("peer_phase", owner.slave.phase)
+    FIELD("peer_last_result", owner.slave.last_result)
+    FIELD("peer_transaction", owner.slave.transaction_id)
+    FIELD("peer_session", owner.slave.session)
+    FIELD("peer_revision", owner.slave.revision)
+    FIELD("peer_flags", owner.slave.flags)
+    FIELD("peer_mode", owner.slave.mode)
+    FIELD("peer_mode_counter", owner.slave.mode_counter)
     FIELD("combos_master", values[0])
     FIELD("combos_override", values[1])
     FIELD("behaviours_master", values[2])
@@ -177,8 +177,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     assert(noah_profile_validator_v1_profile(&validator, &profile, &error) == NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0, &snapshot) == NOAH_EFFECTIVE_PROFILE_OK);
-    assert(noah_effective_profile_provider_init(&provider, &snapshot, safe, NULL, NULL, 0) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(noah_active_profile_snapshot_make_compiled(&profile, &reader, 0, &snapshot) == NOAH_ACTIVE_PROFILE_OK);
+    assert(noah_active_profile_provider_init(&provider, &snapshot, safe, NULL, NULL, 0) == NOAH_ACTIVE_PROFILE_OK);
     noah_profile_working_copy_init(&copy, working, sizeof(working), &provider, &rules, &rules, 0x5E550001u);
     owner.supported      = true;
     owner.saved_compiled = true;

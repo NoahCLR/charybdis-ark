@@ -161,7 +161,7 @@ function validateSnapshot(value, capabilities) {
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
     // activate a slot whose record is empty rather than misbehaving
-    // (`noah_effective_pd_for_mask` returns nothing, and both activate and lock
+    // (`noah_active_profile_pd_for_mask` returns nothing, and both activate and lock
     // bail out on that). So a pointing-mode key stays where it is and does
     // nothing until its slot is configured again. They are counted here so the
     // interface can say so before anyone wonders why a key went quiet.

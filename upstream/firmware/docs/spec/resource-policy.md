@@ -36,9 +36,9 @@ The fixed linked prefix runs from the bank's start to `__heap_base__`: all of
 `.data` and `.bss`. The largest static claims in it are the working copy,
 `runtime_working_bytes`, one slot payload (130,048 bytes,
 `NOAH_PROFILE_PAYLOAD_MAX`) of `.bss` (D-F32,
-[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0032-live-edits-working-copy-and-save.md)); QMK's RAM mirror
+[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0032-live-edits-working-copy-and-save.md)); QMK's RAM mirror
 of the 4 KiB logical EEPROM (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0031-via-is-not-supported.md)); and the split slave thread's
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0031-via-is-not-supported.md)); and the split slave thread's
 1,200-byte working area. The working copy is static, never allocated, so the
 core-memory span says exactly what is left. No RAM copy of a profile slot
 exists: slots are read in place through XIP.
@@ -115,12 +115,12 @@ engineering regression policies, not SRAM limits:
 | --- | ---: | --- |
 | Live-profile owner | 16,384 | `NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT` |
 | Split reconciler | 1,024 | `NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT` |
-| Effective-profile provider | 784 | `NOAH_EFFECTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT` |
-| Effective key-behaviour runtime | 768 | `NOAH_EFFECTIVE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT` |
+| Active-profile provider | 784 | `NOAH_ACTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT` |
+| Active-profile key-behaviour runtime | 768 | `NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT` |
 | Whole-profile validator | 400 | `NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET` |
 | Profile store | 384 | `NOAH_PROFILE_STORE_STATE_BUDGET_32BIT` |
-| Peer store | 256 | `NOAH_PROFILE_PEER_STORE_STATE_BUDGET_32BIT` |
-| Effective lighting runtime / frame | 192 / 80 | `NOAH_EFFECTIVE_RGB_RUNTIME_STATE_BUDGET_32BIT`, `NOAH_EFFECTIVE_RGB_FRAME_BUDGET_32BIT` |
+| Other-half store | 256 | `NOAH_PROFILE_OTHER_HALF_STORE_STATE_BUDGET_32BIT` |
+| Active-profile lighting runtime / frame | 192 / 80 | `NOAH_ACTIVE_PROFILE_RGB_RUNTIME_STATE_BUDGET_32BIT`, `NOAH_ACTIVE_PROFILE_RGB_FRAME_BUDGET_32BIT` |
 | Split authority | 128 | `NOAH_PROFILE_SPLIT_AUTHORITY_STATE_BUDGET_32BIT` |
 | Key-behaviour domain handle / its validation | 128 / 128 | `key_behavior_domain_v1.c`, `NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Lighting domain view / its validation | 40 / 72 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |
@@ -177,7 +177,7 @@ the budgets against the real ELF only in a resource build.
 `tests/host/run_firmware_stack_budget_checks.sh` and
 `tests/host/run_live_profile_owner_stack_budget_checks.sh` check a plain
 `qmk compile` image, which leaves out the live-profile owner (D-F35,
-[`0035`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0035-live-profile-owner-on-by-default.md)) and is not the
+[`0035`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0035-live-profile-owner-on-by-default.md)) and is not the
 firmware anyone flashes.
 
 ## Flash
@@ -187,7 +187,7 @@ The firmware image must end below 1 MiB: the link fails if it reaches
 (`users/noah/lib/compat/qmk_profile_flash.ld`). The two 128 KiB slots, QMK's
 8 KiB wear-leveling backing at the top of the assumed 2 MiB, the slot record,
 the flash pauses and every profile ceiling (D-F14,
-[`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0014-bigger-profiles.md)) are in
+[`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0014-bigger-profiles.md)) are in
 [the device-resident profile](device-resident-profile.md#where-the-profile-is-stored).
 
 Held by: `tests/host/run_profile_storage_layout_tests.sh` (the linker guard

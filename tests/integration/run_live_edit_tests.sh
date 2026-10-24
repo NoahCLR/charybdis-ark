@@ -35,7 +35,7 @@ build_and_run() {
         "$CHARYBDIS_ARK_ROOT/tests/integration/live-edit-probe.c" \
         "$ROOT/users/noah/lib/compat/qmk_profile_edit_channel.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \

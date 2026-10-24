@@ -111,7 +111,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_mailbox_
 The frame is malformed when the mask sets a bit outside the registry
 (offset `7`), the length is out of range (offset `8`), or any of bytes
 24–31 is nonzero. There is no flags byte and no store-format byte: Profile
-Wire 2.0 implies store format 6 ([D-F28](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+Wire 2.0 implies store format 6 ([D-F28](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 
 Processing a begin checks, in order, the schema version
 (`INCOMPATIBLE_SCHEMA`), the mask against the domains this build supports
@@ -157,7 +157,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_sequenti
 
 A client may build the candidate from ranges of the active profile (reuse)
 and stream the rest without reading status between chunks, so an Apply
-sends only what changed ([D-F18](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0018-differential-upload-builds-complete-candidate.md)).
+sends only what changed ([D-F18](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0018-differential-upload-builds-complete-candidate.md)).
 Both come with saves; a client may still send every byte as ordinary chunks.
 They only build the candidate: it is still complete, validated whole and
 saved as any other.
@@ -236,7 +236,7 @@ half's active profile is not that source. The other half still receives,
 validates and prepares the complete candidate. The client sends nothing
 different ([split protocol](../profile-split-v1.md), payload reuse).
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`test_committed_reuse_saves_both_halves_and_reboots`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`test_saved_reuse_saves_both_halves_and_reboots`).
 
 ## What validation holds a candidate to
 
@@ -292,7 +292,7 @@ repeated abort never repeats storage work. An abort for another transaction
 answers `WRONG_TRANSACTION`; one after the decision (committing, converging,
 activating, authority failed) answers `INVALID_STATE` and changes nothing.
 
-Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_abort_reset_and_no_timeout`), `tests/host/run_profile_owner_tests.sh` (`test_host_abort_is_coordinated_at_each_prepare_boundary`, `test_host_abort_ends_when_peer_never_acknowledges`).
+Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_abort_reset_and_no_timeout`), `tests/host/run_profile_owner_tests.sh` (`test_host_abort_is_coordinated_at_each_prepare_boundary`, `test_host_abort_ends_when_other_half_never_acknowledges`).
 
 ## Retries and lost replies
 
@@ -309,14 +309,14 @@ never by the reply alone.
 - A repeated commit or abort is a no-op ([commit](#commit), [abort](#abort)).
 - A lost commit reply is resolved by reading status: transaction, digest,
   state, last operation and operation sequence on page 0, and the profile
-  status's committed generation.
+  status's saved generation.
 
 Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_begin_retry_requires_identical_metadata`, `test_conflicting_begin_preserves_durable_phases`, `test_sequential_chunks_and_duplicate_rules`, `test_commit_activation_and_idempotent_retry`).
 
 ## Lease and cancellation
 
 Only the keyboard ends a candidate
-([D-F48](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0048-only-the-keyboard-ends-a-candidate.md)). Before the
+([D-F48](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0048-only-the-keyboard-ends-a-candidate.md)). Before the
 decision, every way a candidate ends releases it on this half and aborts
 the other half's prepared copy; after the decision nothing cancels it. What
 the client sees of each, on page 0:
@@ -348,7 +348,7 @@ with `TIMEOUT`. A reset or power loss discards the mailbox and the
 candidate; the marker-last record keeps an unfinished candidate from ever
 being booted ([the logical profile transaction](../logical-profile-transaction-v1.md)).
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`test_empty_boot_live_commit_and_timeout`, `test_prepare_uses_extended_no_progress_timeout`, `test_prepare_phase_progress_extends_only_once`, `test_waiting_for_a_quiet_keyboard_never_ends_a_save`, `test_peer_authority_supersedes_only_precommit_host_generation`, `test_simultaneous_hosts_choose_stable_physical_origin_before_durability`, `test_peer_store_write_failure_retries_then_fails_fast`, `test_prepared_peer_is_aborted_before_host_timeout_releases_candidate`, `test_host_abort_ends_when_peer_never_acknowledges`, `test_every_precommit_cancel_releases_the_candidate`), `tests/host/run_profile_candidate_transaction_tests.sh` (`test_explicit_precommit_expiry_never_crosses_durable_boundary`, `test_supersession_discards_a_partly_copied_reuse`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`test_empty_boot_live_commit_and_timeout`, `test_prepare_uses_extended_no_progress_timeout`, `test_prepare_phase_progress_extends_only_once`, `test_waiting_for_a_quiet_keyboard_never_ends_a_save`, `test_other_half_authority_supersedes_only_precommit_host_generation`, `test_simultaneous_hosts_choose_stable_physical_origin_before_durability`, `test_other_half_store_write_failure_retries_then_fails_fast`, `test_prepared_other_half_is_aborted_before_host_timeout_releases_candidate`, `test_host_abort_ends_when_other_half_never_acknowledges`, `test_every_precommit_cancel_releases_the_candidate`), `tests/host/run_profile_candidate_transaction_tests.sh` (`test_explicit_precommit_expiry_never_crosses_durable_boundary`, `test_supersession_discards_a_partly_copied_reuse`).
 
 ## Candidate operation status, GET 0x18
 
@@ -458,7 +458,7 @@ so the person can release what holds it; if it does not clear within the
 60 s window the save ends with `TIMEOUT` and nothing changes. After the
 decision the save simply waits.
 
-Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_peer_status_page`), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, `test_hook_rejects_unsupported_or_malformed_commands`), `tests/host/run_profile_owner_tests.sh` (`test_host_abort_ends_when_peer_never_acknowledges`, `test_commit_waits_for_a_safe_boundary_then_activates`).
+Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_copy_status_page`), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, `test_hook_rejects_unsupported_or_malformed_commands`), `tests/host/run_profile_owner_tests.sh` (`test_host_abort_ends_when_other_half_never_acknowledges`, `test_commit_waits_for_a_safe_boundary_then_activates`).
 
 ### Page 2: reuse counters of the copy
 
@@ -482,7 +482,7 @@ acknowledgement or source-unavailable reply. Page 1 and page 2 are each
 coherent but not one capture: read page 1 before and after page 2 and drop
 a sample that crosses a phase or offset change.
 
-Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_peer_status_page`), `tests/host/run_profile_owner_tests.sh` (`test_committed_reuse_saves_both_halves_and_reboots`).
+Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_copy_status_page`), `tests/host/run_profile_owner_tests.sh` (`test_saved_reuse_saves_both_halves_and_reboots`).
 
 ## Fixtures
 

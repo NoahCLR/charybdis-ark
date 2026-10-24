@@ -51,7 +51,7 @@ left out:
    bytes are one profile; anything else means it changed during the read.
 
 The settings in a backup are the stored settings, never QMK's live copies
-(D-F32, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0032-live-edits-working-copy-and-save.md)). GET `0x07`
+(D-F32, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0032-live-edits-working-copy-and-save.md)). GET `0x07`
 reads the active settings domain alone, or the compiled defaults' when none is
 active ([settings domain](profile-wire-v1/settings-domain.md#settings-readback--get-0x07)).
 A keyboard adjustment (DPI or a lighting key) shows in QMK at once and reaches
@@ -102,7 +102,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`folded_keyboar
 ## Layers and their references
 
 The bank has sixteen layers, ids 0–15 (D-F14,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0014-bigger-profiles.md)); layer 0 is the base layer. A layer
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0014-bigger-profiles.md)); layer 0 is the base layer. A layer
 has no identity beyond its index, so the profile names layers by index
 throughout. `LT()` and `LM()` hold their layer in four bits, so every layer
 they can express is a bank layer; the five-bit layer actions (`MO()`, `TG()`,
@@ -138,7 +138,7 @@ The keyboard validates the whole blob against the running firmware: schema,
 every domain version, the declared action-ABI digest, every ceiling and every
 action's placement. It becomes the next generation on both halves or nothing
 does. No part of a backup is translated (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0010-firmware-accepts-only-current-formats.md)): a blob in an
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0010-firmware-accepts-only-current-formats.md)): a blob in an
 earlier schema or domain version, or declared under another action-ABI digest,
 is refused.
 
