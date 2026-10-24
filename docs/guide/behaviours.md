@@ -31,6 +31,13 @@ A **Hold** or **Long hold** cell also sets **How it runs**:
 
 A Tap cell fires when you let go before the Tap / hold threshold.
 
+A cell that acts on a layer or runs a pointing mode names it the same way:
+an icon for what it is (the board's outline for a layer, the Pointing modes
+icon for a pointing mode) in its colour, its name and a tag for what the
+action does, such as **HOLD** or **LOCK**. An icon with no colour means that
+colour, or its lighting, is off. The line under it starts with **layer** or
+**pointing mode**. The hover card names them the same way.
+
 ### What an empty cell does
 
 An empty cell isn't nothing. Where the key would do something on its own, the

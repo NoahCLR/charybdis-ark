@@ -1,5 +1,5 @@
 // @ts-check
-import {behaviourFor, keyMeaning} from "./keyface.mjs";
+import {actionLabel, behaviourFor, canonicalKeycode, keyMeaning, layerOfKeycode} from "./keyface.mjs";
 import {reachablePositions, resolvedPositions, downTheStack} from "./layer-resolution.mjs";
 import {comboGroups, comboOutput, combosInView, comboInputOn} from "./combo-reach.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
@@ -9,6 +9,7 @@ import {comboGroups, comboOutput, combosInView, comboInputOn} from "./combo-reac
 /** @typedef {import("./keyface-types.js").BehaviorCombo} BehaviorCombo */
 /** @typedef {import("./keyface-types.js").ComboRoute} ComboRoute */
 /** @typedef {import("./keyface-types.js").ReachEntry} ReachEntry */
+/** @typedef {import("./keyface-types.js").BranchCell} BranchCell */
 /** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
 // Generated outputs use the last declared input's physical source, even
@@ -82,6 +83,22 @@ export function behavioursInView(model, stack, at, held = []) {
 
 // Macros and pointing modes share the same view routes: a visible key, a
 // behaviour on a visible key, or a combo that fires under this exact stack.
+// Every branch of a behaviour that sends something, with the cell of its grid
+// it sits in: the branch by how many taps start it, and the tier. A route names
+// the cell, so "double tap and hold locks it" reads as that, not as the key.
+/** @param {BehaviorView} row @param {(action: string, cell: BranchCell) => void} record */
+const branchActions = (row, record) => {
+    for (const step of row.steps || []) {
+        for (const [tier, branch] of /** @type {const} */ ([["tap", step.tap], ["hold", step.hold], ["long", step.longHold]])) {
+            if (branch?.action) record(branch.action, {branch: step.tapCount + 1, tier});
+        }
+    }
+};
+/** @param {BranchCell[]} cells @param {BranchCell} cell */
+const addCell = (cells, cell) => {
+    if (!cells.some((item) => item.branch === cell.branch && item.tier === cell.tier)) cells.push(cell);
+};
+
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {import("./keyface-types.js").NamesOf} namesOf */
 export function reachInView(model, stack, at, held, namesOf) {
     /** @type {Map<string, ReachEntry>} */
@@ -92,36 +109,33 @@ export function reachInView(model, stack, at, held, namesOf) {
         // The entry was inserted above whenever it was absent.
         return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name));
     };
-    /** @param {BehaviorView} row @param {(action: string) => void} record */
-    const branchActions = (row, record) => {
-        for (const step of row.steps || []) for (const tier of [step.tap, step.hold, step.longHold]) {
-            if (tier?.action) record(tier.action);
-        }
-    };
     for (const key of resolvedPositions(stack, at, held)) {
         for (const name of namesOf(keyMeaning(key.position))) add(name).keys.push(key);
         const row = behaviourFor(model, keyMeaning(key.position));
-        if (row) branchActions(row, (action) => {
+        if (row) branchActions(row, (action, cell) => {
             for (const name of namesOf(action)) {
                 const entry = add(name);
-                if (!entry.behaviours.some((item) => item.keycode === row.keycode && item.action === action))
-                    entry.behaviours.push({keycode: row.keycode, action, layer: key.fellThrough ? key.layer : null, whileHeld: key.whileHeld});
+                const found = entry.behaviours.find((item) => item.keycode === row.keycode && item.action === action);
+                if (found) addCell(found.cells, cell);
+                else entry.behaviours.push({keycode: row.keycode, action, layer: key.fellThrough ? key.layer : null, whileHeld: key.whileHeld, cells: [cell]});
             }
         });
     }
     for (const {combo, keys} of combosInView(model, stack, at, held)) {
         const output = comboOutput(model, combo);
-        /** @param {string} action @param {string | null} [via] */
-        const sent = (action, via = null) => {
+        /** @param {string} action @param {string | null} [via] @param {BranchCell} [cell] */
+        const sent = (action, via = null, cell) => {
             for (const name of namesOf(action)) {
                 const entry = add(name);
-                if (!entry.combos.some((item) => item.combo === combo && item.action === action))
-                    entry.combos.push({combo, keys, via, action});
+                const found = entry.combos.find((item) => item.combo === combo && item.action === action);
+                const route = found || {combo, keys, via, action, cells: []};
+                if (!found) entry.combos.push(route);
+                if (cell) addCell(route.cells, cell);
             }
         };
         sent(output);
         const row = comboBehaviourFor(model, combo, keys, stack, at, held);
-        if (row) branchActions(row, (action) => sent(action, output));
+        if (row) branchActions(row, (action, cell) => sent(action, output, cell));
     }
     return [...found.values()];
 }
@@ -297,20 +311,17 @@ export function reachGroups(model, stack, at, namesOf, all) {
     const {here, through} = behaviourGroups(model, stack, at);
     for (const {row, from, whileHeld} of [...here.map((row) => ({row, from: null, whileHeld: false})),
         ...through.map((item) => ({row: item.row, from: item.layer, whileHeld: item.whileHeld}))]) {
-        for (const step of row.steps || []) {
-            for (const tier of [step.tap, step.hold, step.longHold]) {
-                if (!tier) continue;
-                for (const name of namesOf(tier.action)) {
-                    const rows = reachOf(name)[from ? "belowRows" : "directRows"];
-                    // The action matters as well as the behaviour: a pointing
-                    // mode answers to two keycodes, and which one a branch
-                    // sends is the difference between holding and locking it.
-                    if (!rows.some((entry) => entry.keycode === row.keycode && entry.action === tier.action)) {
-                        rows.push({keycode: row.keycode, action: tier.action, layer: from, whileHeld});
-                    }
-                }
+        branchActions(row, (action, cell) => {
+            for (const name of namesOf(action)) {
+                const rows = reachOf(name)[from ? "belowRows" : "directRows"];
+                // The action matters as well as the behaviour: a pointing
+                // mode answers to two keycodes, and which one a branch
+                // sends is the difference between holding and locking it.
+                const found = rows.find((entry) => entry.keycode === row.keycode && entry.action === action);
+                if (found) addCell(found.cells, cell);
+                else rows.push({keycode: row.keycode, action, layer: from, whileHeld, cells: [cell]});
             }
-        }
+        });
     }
 
     // A combo's output is processed like a key press, so it reaches what it
@@ -323,17 +334,17 @@ export function reachGroups(model, stack, at, namesOf, all) {
     for (const [entries, below] of comboRoutes) {
         for (const {combo, keys, held} of entries) {
             const output = comboOutput(model, combo);
-            /** @type {{action: string; via: string | null}[]} */
+            /** @type {{action: string; via: string | null; cell?: BranchCell}[]} */
             const sends = [{action: output, via: null}];
-            for (const step of comboBehaviourFor(model, combo, keys, stack, at, held.map(layer => layer.index))?.steps || []) {
-                for (const tier of [step.tap, step.hold, step.longHold]) {
-                    if (tier?.action) sends.push({action: tier.action, via: output});
-                }
-            }
-            for (const {action, via} of sends) {
+            const row = comboBehaviourFor(model, combo, keys, stack, at, held.map(layer => layer.index));
+            if (row) branchActions(row, (action, cell) => sends.push({action, via: output, cell}));
+            for (const {action, via, cell} of sends) {
                 for (const name of namesOf(action)) {
                     const routes = reachOf(name)[below ? "belowCombos" : "directCombos"];
-                    if (!routes.some((route) => route.combo === combo && route.action === action)) routes.push({combo, via, action, keys});
+                    const found = routes.find((route) => route.combo === combo && route.action === action);
+                    const route = found || {combo, via, action, keys, cells: []};
+                    if (!found) routes.push(route);
+                    if (cell) addCell(route.cells, cell);
                 }
             }
         }
@@ -443,13 +454,32 @@ export function macroAction(model, action) {
     return {slot, keycode, name: slot?.name || `Macro ${keycode.split("_").at(-1)}`, empty: Boolean(slot?.empty)};
 }
 
-// An action that names something the person set up — a pointing mode or a
-// macro — as that thing: what kind it is, its name, and the tags that qualify
-// it. Null for a plain keycode, which reads as itself.
+// A branch or combo action read as the layer it acts on: the layer, the name
+// it goes by, and what the action does to it, in the words the key's name puts
+// beside the layer's ("Hold", "Lock", "+ Shift"; core/model/key-names.js). Null
+// for any other action, for a layer-tap, which is a tap and a layer at once,
+// and for a name that does not carry the layer's.
+/** @param {ViewModel} model @param {string} action */
+export function layerAction(model, action) {
+    const at = layerOfKeycode(model, action);
+    if (at === null || /^LT\(/.test(canonicalKeycode(model, action))) return null;
+    const layer = model?.layers?.[at];
+    const name = layer ? layer.displayName || layer.name : "";
+    const label = actionLabel(model, action);
+    if (!name) return null;
+    const how = label.endsWith(name) ? label.slice(0, -name.length) : label.startsWith(name) ? label.slice(name.length) : null;
+    return how === null ? null : {layer: at, name, how: how.trim()};
+}
+
+// An action that names something the person set up — a layer, a pointing mode
+// or a macro — as that thing: what kind it is, its name, and the tags that
+// qualify it. Null for a plain keycode, which reads as itself.
 /** @param {ViewModel} model @param {string} action @returns {import("./keyface-types.js").NamedAction | null} */
 export function namedAction(model, action) {
     const pd = pointingAction(model, action);
     if (pd) return {kind: "pointing", word: "pointing mode", name: pd.name, slot: pd.slot, tags: [pd.how, ...(pd.empty ? ["empty"] : [])]};
+    const layer = layerAction(model, action);
+    if (layer) return {kind: "layer", word: "layer", name: layer.name, layer: layer.layer, tags: layer.how ? [layer.how] : []};
     const macro = macroAction(model, action);
     if (macro) return {kind: "macro", word: "macro", name: macro.name, slot: macro.slot, tags: macro.empty ? ["empty"] : []};
     return null;
@@ -461,6 +491,9 @@ export function namedAction(model, action) {
 // the keycode exists on the keyboard either way.
 /** @param {PointingSlot} slot */
 export const slotKeycodes = (slot) => slot.binding ? [slot.binding.holdCode, slot.binding.lockCode] : [];
+// The same two keycodes by the names the model knows them by: hold, then lock.
+/** @param {PointingSlot} slot */
+export const slotKeycodeNames = (slot) => slot.binding ? [slot.binding.hold, slot.binding.lock] : [];
 
 // What still reaches a pointing slot. The keyboard keeps its mode keycodes
 // whatever a slot holds, so a key bound to an empty slot is inert rather than
@@ -469,7 +502,7 @@ export const slotKeycodes = (slot) => slot.binding ? [slot.binding.holdCode, slo
 export function bindingsForSlot(model, slot) {
     if (!slot) return {keys: [], behaviours: [], combos: [], layers: []};
     const values = new Set(slotKeycodes(slot));
-    const names = new Set([slot.binding?.hold, slot.binding?.lock].filter((name) => name !== undefined));
+    const names = new Set(slotKeycodeNames(slot));
     for (const entry of model?.qmkKeycodes || []) {
         if (values.has(entry.keycode)) names.add(entry.value);
     }

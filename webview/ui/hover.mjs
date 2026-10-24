@@ -13,7 +13,7 @@ import {behaviourRuns} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, macroSteps, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, macroSteps, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {styleWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {KIND} from "../view/pointing-config.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
@@ -175,16 +175,19 @@ function reachSections(model, layer, position, index,
     if (role) {
         // A row that does not run is ignored, its own threshold with it: the
         // key waits its default, the dual-role threshold.
-        const fallback = behaviourEditorRow(model, keyMeaning(position))?.timingDefaults?.tapHoldTerm ?? model?.behaviorTimingDefaults?.tappingTerm;
+        const row = behaviourEditorRow(model, keyMeaning(position));
+        const fallback = row?.timingDefaults?.tapHoldTerm ?? model?.behaviorTimingDefaults?.tappingTerm;
         const term = runs && behaviour ? behaviourThresholds(model, behaviour).tapHoldTerm : {ms: fallback === undefined ? "" : String(fallback)};
-        const hold = "layer" in role.hold
-            ? marked(model, {kind: "layer", layer: role.hold.layer}, role.hold.name)
-            : esc(role.hold.modifier);
+        // A layer-tap's hold reads as the grid's built-in Hold does: the layer
+        // action the core says it holds.
+        const layerHold = "layer" in role.hold && row?.builtIn?.hold ? sends(model, row.builtIn.hold.action) : "";
+        const hold = layerHold || `<span class="hc-name">${"layer" in role.hold
+            ? marked(model, {kind: "layer", layer: role.hold.layer}, role.hold.name) : esc(role.hold.modifier)}</span>`;
         const note = inertNote || (behaviour && !runs ? `Its behaviour row is not used here (${use.reasons.join("; ")}), so the key keeps this tap and hold.` : "");
         sections.push(`<div class="hc-sect"><div class="hc-h">Tap / hold</div>
             <div class="hc-sub">tap / hold ${esc(threshold(term))}</div>
             <div class="hc-act"><span class="hc-stage">Tap</span><span><span class="hc-name">${esc(role.tap)}</span></span></div>
-            <div class="hc-act"><span class="hc-stage">Hold</span><span><span class="hc-name">${hold}</span></span></div>
+            <div class="hc-act"><span class="hc-stage">Hold</span><span>${hold}</span></div>
             ${note ? `<div class="hc-sub hc-foot hc-quiet">${esc(note)}</div>` : ""}</div>`);
     } else if (inert) {
         sections.push(`<div class="hc-sect"><div class="hc-sub hc-quiet">${esc(inertNote)}</div></div>`);
@@ -224,9 +227,8 @@ function reachSections(model, layer, position, index,
     if (slot) {
         const row = pdColourRow(model, slot.id);
         sections.push(`<div class="hc-sect"><div class="hc-h">Pointing mode</div>
-            <div class="hc-flow">${mark(model, {kind: "pointing", slot: slot.id})}
-            <span>${esc(slot.displayName || `Slot ${slot.id}`)}</span>
-            <span class="hc-life">${slot.kind === KIND.SCROLLING ? "scrolling" : slot.kind ? "directional" : "empty slot"}</span></div>
+            <div class="hc-flow">${sends(model, keyMeaning(position))}
+            ${slot.kind ? `<span class="hc-life">${slot.kind === KIND.SCROLLING ? "scrolling" : "directional"}</span>` : ""}</div>
             <div class="hc-sub hc-foot">${slot.kind
                 ? `Its colour paints ${esc(localityText(row?.locality))} while the mode runs.`
                 : "This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way."}</div></div>`);

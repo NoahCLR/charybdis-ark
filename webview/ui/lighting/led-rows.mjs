@@ -18,7 +18,7 @@ export function usageName(model, usage) {
 const ownerName = (model, target, owner) => rowOwners(model, target).find(([value]) => value === owner)?.[1] ?? owner ?? "—";
 
 // A row's owner by the name its dropdown offers, with the owner's mark —
-// the layer's colour, the pointing mode's light, the feedback tier's dot —
+// the layer's or pointing mode's icon in its colour, the feedback tier's dot —
 // as the review shows the same row.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} target @param {string} owner */
 function ownerCell(model, target, owner) {

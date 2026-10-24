@@ -773,11 +773,12 @@ button.tier:hover { background: var(--surface-3); }
 .ce-body { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, .8fr) auto; gap: 14px; padding: 13px; align-items: end; }
 
 .stacklist { display: grid; gap: 2px; }
-.stackrow { display: grid; grid-template-columns: 14px 92px minmax(0, 1fr) auto; gap: 9px; align-items: center;
+.stackrow { display: grid; grid-template-columns: 32px 92px minmax(0, 1fr) auto; gap: 9px; align-items: center;
   padding: 6px 8px; border-radius: 6px; text-align: left; font-size: 12px; }
 .stackrow:hover { background: var(--surface-2); }
 .stackrow.on { background: var(--surface-3); }
 .stackrow .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stackrow .val .sends.inline .sends-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .reach { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 10px; align-items: center;
   width: 100%; text-align: left; padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); font-size: 12px; }
 .reach:hover { border-color: var(--line-3); }
@@ -807,7 +808,6 @@ button.tier:hover { background: var(--surface-3); }
 .key-more > summary:hover { color: var(--text-2); }
 .key-more > .kv { margin-top: 8px; }
 .stackrow.folded .nm { color: var(--text-2); }
-.stackrow .swatch-lg { width: 12px; height: 12px; border-radius: 4px; }
 .key-reaches { gap: 8px; }
 .key-participation { gap: 9px; margin-top: 16px; }
 .key-participation > .sect-h { margin: 6px 0 2px; }
@@ -931,15 +931,50 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .rv-swatch { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
 /* Marks (ui/marks.mjs): one size wherever a label or value carries one. */
 .mk { display: inline-flex; align-items: center; gap: 6px; }
+/* A marked name keeps its words whole beside the mark in a column that breaks anywhere,
+   and moves under the words before it instead; only a word wider than the column breaks. */
+.mk > span { overflow-wrap: break-word; }
+/* The words carry the baseline, so they line up with the words around them however tall the mark. */
+.mk > span:last-child { align-self: baseline; }
 /* Reserve separate branch and tier tracks even when one mark is absent. */
 .mk-slot { display: inline-grid; grid-template-columns: 24px 7px; justify-items: end; align-items: center; gap: 4px; width: 35px; flex: none; }
 .mk-slot > .fbdot { grid-column: 2; }
+/* A layer's or pointing mode's icon takes the whole slot, ending where the dots do: the board is wider than a badge. */
+.mk-slot > .kind-icon { grid-column: 1 / -1; }
 .mk-slot.title { display: inline-flex; width: 34px; justify-content: flex-start; }
-/* A branch that sends a pointing mode or a macro reads as that thing (ui/marks.mjs sends). */
+/* A branch that acts on a layer, or sends a pointing mode or a macro, reads as that thing: its kind's icon in its colour (its mark), its name and its tags (ui/marks.mjs sends). */
 .sends { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; font-family: var(--sans); font-size: 11px; color: var(--text); font-weight: 520; vertical-align: middle; }
 .sends-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sends-tag { flex: none; font-family: var(--mono); font-size: 9px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-2); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 4px; line-height: 14px; }
+.kind-icon { display: inline-flex; flex: none; }
+.kind-icon svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linejoin: round; }
+/* The icon wears the thing's colour, which is the keyboard's own: a faint fill and a rim in the
+   theme's quiet text colour keep a dark one, such as a deep blue on the dark theme, readable. */
+.kind-icon:not(.off) svg { width: 14px; height: 14px; stroke-width: 1.5; fill: currentColor; fill-opacity: .12; filter: drop-shadow(0 0 .5px var(--text-3)); }
+/* A layer's icon is the board as the rail draws it, solid in the layer's colour: wider than
+   the line icons, as tall as their drawing, and no rim, which would blur its keys. */
+.kind-icon.layer svg, .kind-icon.layer:not(.off) svg { width: 32px; height: 14px; stroke: none; fill: currentColor; fill-opacity: 1; filter: none; }
+/* A thing whose colour or stage is off: its icon has no colour, in the quiet text colour. */
+.kind-icon.off { color: var(--text-3); }
+/* A built-in cell keeps its dim words when they name a thing. */
+.bcell.inherited .sends { color: var(--text-2); font-weight: 400; }
+/* Named inline, in a sentence, a table or the review (ui/marks.mjs keyNameMarked), an action keeps
+   the words' own type and colour and their baseline; a name too long for its column wraps between words. */
+.sends.inline { font: inherit; color: inherit; vertical-align: baseline; align-items: baseline; }
+/* A named thing reads in the interface's own face wherever it is named, in a
+   monospace keycode cell or key box included, so it looks the same everywhere. */
+.sends, .sends.inline { font-family: var(--sans); letter-spacing: normal; }
+/* In a row of key boxes (a combo's inputs) a named thing is not one more box:
+   its icon, name and tag already set it apart. */
+.hc-key:has(> .sends), .hc-key.here:has(> .sends), .tok:has(> .sends) { border-color: transparent; background: none; padding: 0; font-size: 12px; }
+/* The hovered key's own input is told apart by its weight alone. */
+.hc-key.here:has(> .sends) .sends-name { font-weight: 650; }
+.sends.inline > .kind-icon { align-self: center; }
+.sends.inline .sends-name { overflow: visible; white-space: normal; overflow-wrap: normal; }
+/* The keyboard's side of the review strikes the whole action through, its tag too. */
+.del .sends { text-decoration: inherit; }
+.del .sends-tag { color: inherit; }
 .mk-swatch { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
 .mk-swatch.lead { vertical-align: -1px; margin-right: 7px; }
 /* A tier whose colour is off, or whose stage is off, is drawn hollow. */
@@ -1256,9 +1291,15 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .slotchip > .draft-dot.corner { top: 3px; right: 3px; }
 .pd-swatch { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
 .pd-swatch.lg { width: 16px; height: 16px; border-radius: 5px; }
+/* A slot named in a table: its mark on the line of its name and keycodes. */
+.slot-named { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.slot-named > span:first-child { display: inline-flex; }
+/* A slot's own header marks it larger, as its title. */
+.mark-lg { display: inline-flex; }
+.mark-lg .kind-icon svg, .mark-lg .kind-icon:not(.off) svg { width: 18px; height: 18px; }
 .t td .pd-swatch { margin-right: 6px; vertical-align: -1px; }
 .slotcard {
-  display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 3px; align-items: center; align-content: start;
+  display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 3px; align-items: center; align-content: start;
   padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-align: left;
   transition: border-color .12s ease, background .12s ease;
 }

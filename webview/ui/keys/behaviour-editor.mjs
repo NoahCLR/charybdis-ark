@@ -79,6 +79,11 @@ export function behaviourEditor(behaviour) {
                 placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 
+    // An action as the grid names it: a layer, pointing mode or macro as that
+    // thing, anything else by its name with its layer marked.
+    /** @param {string} label @param {string} action */
+    const actionNamed = (label, action) => sends(model, action) || keyNameMarked(model, label, action);
+
     /** @param {import("../../../contracts/panel.js").BehaviorView["steps"][number]} step @param {import("../../../contracts/edits.js").Tier} kind */
     const cellFor = (step, kind) => {
         const branch = step[TIER_FIELDS[kind]];
@@ -94,7 +99,7 @@ export function behaviourEditor(behaviour) {
                     ? `What this key does on its own: its tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
                     : "What this key does on its own. Set an action here to replace it.";
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${esc(id)}" data-tip="${esc(tip)}">
-                <span class="bk named">${keyNameMarked(model, label, inherited.action)}</span>
+                <span class="bk named">${actionNamed(label, inherited.action)}</span>
                 <span class="bl">${esc([inherited.first ? "first tap" : "built in", `${styleLabel(kind, inherited.style)}${times}`].join(" · "))}</span></button>`;
         }
         const implied = branch ? null : impliedBranch(behaviour, step, kind);
@@ -105,7 +110,7 @@ export function behaviourEditor(behaviour) {
             const label = hold.style === "TAP_AT_HOLD_THRESHOLD" ? "Nothing more" : cellLabel(model, hold);
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${esc(id)}"
                 data-tip="No Long hold is set, so nothing takes over at the Long hold threshold: the Hold carries on. Set an action here to add a Long hold.">
-                <span class="bk named">${hold.style === "TAP_AT_HOLD_THRESHOLD" ? esc(label) : keyNameMarked(model, label, hold.action)}</span>
+                <span class="bk named">${hold.style === "TAP_AT_HOLD_THRESHOLD" ? esc(label) : actionNamed(label, hold.action)}</span>
                 <span class="bl">${esc([tierName(model, "hold"), word(vocabulary(model).holdWithoutLongHold, hold.style)].join(" · "))}</span></button>`;
         }
         if (implied?.meaning === "tapsBeforeLong") {
@@ -113,7 +118,7 @@ export function behaviourEditor(behaviour) {
             const times = tap.times ? ` ×${tap.times}` : "";
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${esc(id)}"
                 data-tip="No Hold is set: let go after the Tap / hold threshold but before the Long hold threshold and the key sends its tap. Set an action here to add a Hold.">
-                <span class="bk named">${keyNameMarked(model, cellLabel(model, tap), tap.action)}</span>
+                <span class="bk named">${actionNamed(cellLabel(model, tap), tap.action)}</span>
                 <span class="bl">${esc(["released before Long hold threshold", `${styleLabel("tap", tap.style)}${times}`].join(" · "))}</span></button>`;
         }
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${esc(id)}"><span class="plus">+</span></button>`;
@@ -121,7 +126,7 @@ export function behaviourEditor(behaviour) {
         const label = cellLabel(model, branch);
         const named = Boolean(sends(model, branch.action)) || label !== branch.action;
         return `<button class="bcell ${open ? "on" : ""}" data-cell="${esc(id)}"${named ? ` data-tip="${esc(branch.action)}"` : ""}>
-            <span class="bk ${named ? "named" : ""}">${sends(model, branch.action) || keyNameMarked(model, label, branch.action)}</span>
+            <span class="bk ${named ? "named" : ""}">${actionNamed(label, branch.action)}</span>
             <span class="bl">${esc([sendsKind(model, branch.action), styleLabel(kind, branch.style)].filter(Boolean).join(" · "))}</span></button>`;
     };
 

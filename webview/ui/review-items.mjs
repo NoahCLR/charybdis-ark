@@ -6,7 +6,7 @@
 import {esc} from "../lib/dom.mjs";
 import {css, isOff} from "../lib/colour.mjs";
 import {FIELDS_SHOWN} from "../view/review.mjs";
-import {layerNameMarked, mark, marked} from "./marks.mjs";
+import {keyNameMarked, mark, marked, valueMarked} from "./marks.mjs";
 import {tierName} from "../view/vocabulary.mjs";
 
 // A colour is shown as the keyboard would light it, beside its value; an
@@ -16,14 +16,16 @@ const swatch = (colour) => colour
     ? `<i class="rv-swatch ${isOff(colour) ? "swatch-off" : ""}" style="${isOff(colour) ? "" : `background:${css(colour)}`}"></i>` : "";
 // Everything with a colour of its own carries its mark, drawn as every
 // editor draws it (ui/marks.mjs): a tier's dot, a branch badge, a layer's
-// or pointing mode's light, a combo badge, a stage's on/off dot.
-// A value naming a layer ("Hold Numbers") carries the layer's mark before the
-// layer's name, as an action reads on every other surface.
+// or pointing mode's icon in its colour, a combo badge, a stage's on/off dot.
+// A value that is an action on a layer or a pointing mode ("Hold Numbers",
+// "Zoom · lock") reads as an action does on every other surface: the mark,
+// the name and what it does as a tag; one naming a layer otherwise carries
+// the layer's mark before the layer's name (valueMarked).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/edits.js").Scalar | null} text @param {string} klass @param {import("../../contracts/edits.js").Colour | null | undefined} colour @param {import("../../contracts/model.js").ReviewMark | null | undefined} marker */
 const value = (model, text, klass, colour, marker) => {
     if (text === null) return "";
-    const inline = marker?.kind === "layer" ? layerNameMarked(model, marker.layer, String(text)) : "";
-    return inline && inline !== esc(String(text))
+    const inline = valueMarked(model, marker, String(text));
+    return inline
         ? `<span class="rv-val">${swatch(colour)}<span class="${klass}">${inline}</span></span>`
         : `<span class="rv-val">${swatch(colour)}${mark(model, marker)}<span class="${klass}">${esc(text)}</span></span>`;
 };
@@ -60,13 +62,19 @@ const fields = (model, item) => {
         ? `<details class="rv-more"><summary>Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
 };
 
+// A behaviour is titled by its key's name, named as every surface names that
+// key: a pointing mode or a layer action with its mark, name and tag.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewChange} entry */
+const titleText = (model, entry) => entry.place?.kind === "behaviour" && entry.place.keycode
+    ? keyNameMarked(model, entry.title, entry.place.keycode) : esc(entry.title);
+
 // An item is one row of the grid: a status gutter, the title, the fields,
 // and two action slots that are always in the same place — Show, then
 // Discard at the edge — whether or not an item has them.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewChange} entry @param {{show?: string, discard?: string, titleSlot?: boolean, sourceLabel?: string}} [options] */
 export const reviewItem = (model, entry, {show = "", discard = "", titleSlot = false, sourceLabel = ""} = {}) => `<div class="rv-item">
     <span class="rv-gutter"><span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span></span>
-    <div class="rv-title">${titleSlot ? `<span class="mk"><span class="mk-slot title">${mark(model, entry.titleMark)}</span><span class="t">${esc(entry.title)}</span></span>` : `<span class="t">${esc(entry.title)}</span>`}
+    <div class="rv-title">${titleSlot ? `<span class="mk"><span class="mk-slot title">${mark(model, entry.titleMark)}</span><span class="t">${titleText(model, entry)}</span></span>` : `<span class="t">${titleText(model, entry)}</span>`}
         ${entry.note ? titleSlot ? `<span class="mk"><span class="mk-slot title"></span><span class="rv-note">${esc(entry.note)}</span></span>` : `<span class="rv-note">${esc(entry.note)}</span>` : ""}
         ${sourceLabel ? `<span class="rv-source-label">${esc(sourceLabel)}</span>` : ""}</div>
     ${fields(model, entry)}

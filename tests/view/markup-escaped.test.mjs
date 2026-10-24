@@ -40,6 +40,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/custom-keys.mjs", ['keyFields(model, key).join("")'], "an empty slot and placedOn()'s layer chips, both markup templates"],
     ["webview/ui/device.mjs", ["value"], "kv() rows hold markup their callers escaped, as its @param says"],
     ["webview/ui/groups.mjs", ['group.rows.join("")'], "each tab's table rows, markup templates built by that tab"],
+    ["webview/ui/groups.mjs", ["detail"], "a group's detail, markup its tab built: the Combos tab's selected key, named through keyNameMarked"],
     ["webview/ui/hover.mjs", ['own.join("")', 'reachSections(model, layer, target, -1, [], {foot: false}).join("")', 'sections.join("")'], "reachSections() returns the hover card's sections, markup templates it pushes"],
     ["webview/ui/keys/behaviours-tab.mjs", ["note"], "viewBehaviourNote() and comboNote(): escaped layer names and marked combo keys"],
     ["webview/ui/keys/combos-tab.mjs", ["reachedBy"], "keysReach() and reachText(): marked key names and escaped layer names"],
@@ -50,6 +51,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/macros/editor.mjs", ["placedOn(model, slot)", "chips"], "layer chips, markup templates of escaped names and layer swatches"],
     ["webview/ui/pointing/form-controls.mjs", ["options.labelHtml"], "the movement arms' labels: an arrow constant and an escaped label (pointing/movement.mjs)"],
     ["webview/ui/review-items.mjs", ['head.map(row).join("")', 'rest.map(row).join("")', "show", "discard"], "field rows from field(), and the Show and Discard buttons the review overlay builds"],
+    ["webview/ui/marks.mjs", ["SCREENS.pointing.icon", "look"], "the Pointing modes screen's authored SVG icon (view/screens.mjs), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],
     ["webview/ui/frame.mjs", ["definition.icon", "liveStatus(draft)"], "a screen's authored SVG icon (view/screens.mjs), and the live status lines, markup templates"],
     ["webview/view/geometry.mjs", ['keys.join("")'], "the outline's key rectangles, templates of GEO numbers"],
 ];

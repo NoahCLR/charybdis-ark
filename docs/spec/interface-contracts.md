@@ -31,6 +31,12 @@ layers in view reach:
 - Tab counts count what the selected layer stores; the Key tab counts mapped
   keys, not transparent or disabled ones (`tests/view/lighting.test.mjs`).
   Reach rows name keys as the board does, never by layout index (no test).
+  A route through a behaviour names its key, then each cell that sends the
+  row's thing as Review marks a tier (branch badge, tier dot, tier name),
+  joined by "or"; a combo through a behaviour does the same after its
+  "through". A behaviour on a key the row already names follows that key
+  instead of naming it again (`tests/view/reach.test.mjs`,
+  `browser-tests/marks.spec.js`).
 - The Keys tabs share one minimum height, and a taller editor carries its
   height into the next render, so changing tabs keeps the scroll position
   (`tests/view/scroll.test.mjs`).
@@ -91,23 +97,48 @@ Each thing with a colour of its own has exactly one mark, drawn by
 | --- | --- |
 | A behaviour tier (tap, hold, long hold) | the dot the keyboard flashes when it resolves (`tierDot`) |
 | A tap count (2× and up) | its branch badge in its tap-branch colour (`branchBadge`) |
-| A layer | its layer colour |
-| A pointing mode | the light its slot paints (`slotLight`) |
+| A layer | the board's icon in its layer colour (`kindIcon`) |
+| A pointing mode | the Pointing modes screen's icon in the light its slot paints (`kindIcon`, `slotLight`) |
 | A combo | its badge in the combo feedback colour (`comboBadge`) |
 | A lighting stage | its on/off dot |
 
 - A thing is marked where it is the subject and where it is referred to. A
-  setting carries the mark of what it governs (`governs` in
-  `core/model/settings-editor.js`) in Settings, the editors and the review
+  swatch shows a layer's or pointing mode's colour, and is not its mark, only
+  where the colour is the subject (Lighting's colour fields and its lists of
+  layer and pointing-mode colours, colour values in the review, a pointing
+  slot's Light value) or where every item is a layer (the layer bar, the
+  "On layers" chips on Custom keys and Macros); a pointing slot is named by
+  its mark everywhere, its slot card, editor header and the Keys tab's
+  Pointing modes table included; those call `layerSwatch` or
+  `slotLight` directly, never `mark` (`browser-tests/marks.spec.js`).
+  Otherwise a setting carries the mark of what it governs (`governs` in
+  `core/model/settings-editor.js`) in Settings, its per-layer switches and
+  layer matching included, the editors and the review
   (`tests/model/profile-review.test.js`).
-- A key or action that acts on a layer is named with that layer's mark first,
-  "Hold ■ Numbers", through `actionMarked` or `keyNameMarked`; only attributes
-  and plain-text messages carry the words alone
-  (`tests/view/key-names-marked.test.mjs`). Which layer a keycode acts on is
+- A key or action is named through `actionMarked` or `keyNameMarked`; only
+  attributes and plain-text messages carry the words alone
+  (`tests/view/key-names-marked.test.mjs`). One that acts on a layer or runs a
+  pointing mode, named in the core's words for it ("Hold Numbers", "Zoom ·
+  lock"), is drawn as `sends` draws it, inline: the mark, the name and the
+  action as a tag, never the action's word as text; the review's values read
+  the same (`valueMarked`; `browser-tests/marks.spec.js`). Any other name
+  carries the mark of the layer it acts on before the layer's name ("/ / ▦
+  Navigation" for a layer-tap). Which layer a keycode acts on is
   `keyLayer` in `core/model/key-names.js`, published as `qmkKeyLayers`
   (`tests/session/device-model.test.js`).
-- A stage that is off draws its marks off. A colour is the keyboard's own, so
-  a dark one reads dark; a badge keeps its count in the text colour (no test).
+- In the behaviour grid and the hover card, a branch or combo action that
+  acts on a layer, runs a pointing mode or plays a macro reads as that thing
+  (`sends`): its mark (a macro has none), then its name and its tags
+  ("Navigation `HOLD`", "Arrow `LOCK`"), and the line under it leads with its
+  kind ("layer", "pointing mode"; `namedAction` in `webview/view/reach.mjs`).
+  A built-in cell draws it the same way, dim and dashed, and says "built in"
+  (`browser-tests/behaviour-named-actions.spec.js`).
+- A stage that is off draws its marks off; an icon loses its colour. A
+  colour is the keyboard's own, so a dark one reads dark; a badge keeps its
+  count in the text colour (no test).
+- Where marked labels share a fixed mark slot (`marked(…, {slot: true})`), a
+  layer's or pointing mode's icon fills the whole slot and ends where the tier
+  dots do, so the words after it still start at one edge (no test).
 - The draft's dot is not one of these marks
   ([Draft marks](#draft-marks-and-draft-history)).
 
