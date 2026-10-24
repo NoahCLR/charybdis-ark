@@ -4,7 +4,7 @@ import test from "node:test";
 import {keyMeaning, behaviourFor} from "../../webview/view/keyface.mjs";
 import {resolvedPositions, reachablePositions} from "../../webview/view/layer-resolution.mjs";
 import {combosInView, combosForKey} from "../../webview/view/combo-reach.mjs";
-import {reachKeys, reachText, behavioursInView, reachInView, behaviourGroups, behaviourRouteKeys, macroKeycodes, macroPlacements, customKeyPlacements, macroReach, pointingReach, pointingSlotFor, pointingAction, macroAction, namedAction, slotKeycodes, bindingsForSlot, bindingKeycode} from "../../webview/view/reach.mjs";
+import {reachKeys, reachText, behavioursInView, reachInView, behaviourGroups, behaviourRouteKeys, macroKeycodes, macroPlacements, customKeyPlacements, macroReach, pointingReach, pointingSlotFor, pointingAction, macroAction, namedAction, slotKeycodes, slotKeycodeNames, bindingsForSlot, bindingKeycode} from "../../webview/view/reach.mjs";
 import {createRequire} from "node:module";
 const {PD_SLOT_BINDINGS: PD_BINDINGS} = createRequire(import.meta.url)("../../core/data/pd-bindings.js");
 const slotWith = (fields) => ({...fields, binding: PD_BINDINGS[fields.id]});
@@ -39,6 +39,20 @@ test("pointing modes and macros read as what they are; plain keycodes read as th
     const macro = namedAction(model, "MACRO_2");
     assert.deepEqual([macro.kind, macro.word, macro.name, macro.tags], ["macro", "macro", "Macro 2", ["empty"]]);
     assert.equal(namedAction(model, "KC_A"), null);
+});
+
+test("a layer action reads as its layer, tagged with what it does to it", () => {
+    const model = {
+        layers: [{index: 0, name: "Base"}, {index: 1, name: "Numbers"}, {index: 2, name: "L2", displayName: "Navigation"}],
+        qmkKeyLabels: {"MO(2)": "Hold Navigation", "TG(1)": "Lock Numbers", "LM(1,MOD_LSFT)": "Numbers + Shift", "LT(2,KC_F)": "F / Navigation", QK_LAYER_LOCK: "Layer Lock"},
+        qmkKeyLayers: {"MO(2)": 2, "TG(1)": 1, "LM(1,MOD_LSFT)": 1, "LT(2,KC_F)": 2},
+    };
+    const hold = namedAction(model, "MO(2)");
+    assert.deepEqual([hold.kind, hold.word, hold.name, hold.layer, hold.tags], ["layer", "layer", "Navigation", 2, ["Hold"]]);
+    assert.deepEqual(namedAction(model, "TG(1)").tags, ["Lock"]);
+    assert.deepEqual(namedAction(model, "LM(1,MOD_LSFT)").tags, ["+ Shift"], "the words after the layer's name tag it too");
+    assert.equal(namedAction(model, "LT(2,KC_F)"), null, "a layer-tap is a tap and a layer, not a layer action");
+    assert.equal(namedAction(model, "QK_LAYER_LOCK"), null, "a key that names no layer is itself");
 });
 
 test("macro and pointing-mode keycodes resolve to the slots the keyboard reported", () => {
@@ -118,6 +132,7 @@ test("an empty slot's bindings are found by the keyboard's own values, not by a 
     // the same two numbers, so that is what the lookup matches on.
     assert.deepEqual(slotKeycodes(slotWith({id: 0})), [0x7e80, 0x7ea0], "hold and toggle for a named slot");
     assert.deepEqual(slotKeycodes(slotWith({id: 6})), [0x7e86, 0x7ea6], "and for a numbered one");
+    assert.deepEqual(slotKeycodeNames(slotWith({id: 0})), ["PD_SLOT_0", "PD_SLOT_0_LOCK"], "and by name, hold then lock");
     const model = {
         qmkKeycodes: [{keycode: 0x7e86, value: "QK_USER_32"}],
         layers: [{name: "Layer 0", displayName: "Base", positions: [
@@ -279,8 +294,8 @@ test("a macro fired from a behaviour branch is reached, though no key shows it",
     assert.deepEqual(base.fromBranches.map((entry) => entry.name), ["MACRO_1", "MACRO_2"],
         "both branches are found, tap and long hold alike");
     assert.deepEqual(base.fromBranches[0].behaviours,
-        [{keycode: "KC_ESCAPE", action: "MACRO_1", layer: null, whileHeld: false}],
-        "named by the behaviour that fires it and by what its branch sends");
+        [{keycode: "KC_ESCAPE", action: "MACRO_1", layer: null, whileHeld: false, cells: [{branch: 2, tier: "tap"}]}],
+        "named by the behaviour that fires it, the cell that does and what it sends");
     assert.deepEqual(base.fromBranchesBelow, [], "nothing lies under the base layer to reach a behaviour through");
     assert.deepEqual(base.elsewhere, [], "an empty slot is not a macro this layer is missing");
 
@@ -369,8 +384,39 @@ test("a branch keeps which of a pointing mode's two keycodes it sends", () => {
     assert.deepEqual(reach.onKeys.map((entry) => entry.name), ["0"], "the key holds the mode");
     assert.deepEqual(reach.fromBranches.map((entry) => entry.name), ["0"], "and its own behaviour toggles it");
     assert.deepEqual(reach.fromBranches[0].behaviours,
-        [{keycode: "PD_SLOT_0", action: "PD_SLOT_0_LOCK", layer: null, whileHeld: false}],
+        [{keycode: "PD_SLOT_0", action: "PD_SLOT_0_LOCK", layer: null, whileHeld: false, cells: [{branch: 1, tier: "hold"}]}],
         "so the branch keeps the toggle keycode, not just the slot it lands on");
+});
+
+test("a branch route names every cell that sends it, once", () => {
+    // A row says which cell fires the thing ("2× hold"), so a behaviour that
+    // sends it from two cells is one route with both, and a key the stack
+    // reaches twice does not list a cell twice.
+    const model = {
+        pdModes: [{id: 3, name: "Zoom", kind: 1, binding: {hold: "PD_SLOT_3", lock: "PD_SLOT_3_LOCK", holdCode: 0x7e53, lockCode: 0x7e59}}],
+        qmkKeycodeAliases: {},
+        keyBehaviors: [
+            {keycode: "KC_Q", steps: [{tapCount: 0, longHold: {action: "PD_SLOT_3"}}, {tapCount: 1, hold: {action: "PD_SLOT_3"}, tap: {action: "PD_SLOT_3_LOCK"}}]},
+            {keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, tap: {action: "PD_SLOT_3_LOCK"}}]},
+        ],
+        combos: [{id: 5, badge: "C5", inputs: ["KC_D", "KC_F"], output: "KC_RIGHT_ALT", useOutputBehavior: true, enabled: true, allowedLayers: 0xffff}],
+    };
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, semantic: keycode, display: keycode});
+    const stack = withAnswers([{index: 0, name: "Base", positions: [at(0, "KC_Q"), at(1, "KC_Q"), at(2, "KC_D"), at(3, "KC_F")]}]);
+    const names = (keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; };
+
+    const [zoom] = reachInView(model, stack, 0, [], names);
+    assert.deepEqual(zoom.behaviours.map(({action, cells}) => [action, cells]), [
+        ["PD_SLOT_3", [{branch: 1, tier: "long"}, {branch: 2, tier: "hold"}]],
+        ["PD_SLOT_3_LOCK", [{branch: 2, tier: "tap"}]],
+    ], "one route per keycode sent, each with its cells, though two keys carry the behaviour");
+    assert.deepEqual(zoom.combos.map(({via, action, cells}) => [via, action, cells]), [["KC_RIGHT_ALT", "PD_SLOT_3_LOCK", [{branch: 1, tier: "tap"}]]],
+        "a combo through a behaviour names the cell of that behaviour");
+
+    const groups = pointingReach(model, stack, 0);
+    assert.deepEqual(groups.fromBranches[0].behaviours.map(({cells}) => cells),
+        [[{branch: 1, tier: "long"}, {branch: 2, tier: "hold"}], [{branch: 2, tier: "tap"}]], "the grouped routes carry the same cells");
+    assert.deepEqual(groups.fromCombos[0].combos.map(({cells}) => cells), [[{branch: 1, tier: "tap"}]]);
 });
 
 test("a combo reaches the macro it sends, and what a behaviour it sends reaches", () => {

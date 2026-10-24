@@ -4,15 +4,15 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {keyMeaning} from "../../view/keyface.mjs";
-import {pointingReach, pointingVariant, reachInView} from "../../view/reach.mjs";
+import {pointingReach, pointingVariant, reachInView, slotKeycodeNames} from "../../view/reach.mjs";
 import {pdColourRow} from "../../view/lighting.mjs";
 import {getModel, layers, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
-import {slotLight} from "../marks.mjs";
+import {mark, slotNamedWithKeycodes} from "../marks.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
-import {branchReach, comboReach, keysReach, pointingView} from "./reach.mjs";
+import {pointingView, reachLabel} from "./reach.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabPointing(body, right) {
@@ -31,13 +31,14 @@ export function tabPointing(body, right) {
         const slot = (model?.pdModes || []).find((entry) => entry.id === Number(slotId));
         if (!slot) return "";
         const row = pdColourRow(model, slot.id);
-        // Named by the keycode the row is about, as a macro row is; a row that
-        // is not one of the two names both.
-        const keycodes = variant === "lock" ? [slot.binding.lock] : variant === "hold" ? [slot.binding.hold] : [slot.binding.hold, slot.binding.lock];
+        // Named by the keycode the row is about, as a macro row is, with its
+        // hold or lock chip; a row that is not one of the two names both.
+        const [hold, lock] = slotKeycodeNames(slot);
+        const keycodes = /** @type {[string, string][]} */ ([["hold", hold], ["lock", lock]]).filter(([how, code]) => code && (!variant || variant === how));
         const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs.` : "";
         return `<tr${reachAttrs("pointing", group, slot.id)}>
-            <td><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${slotLight(model, slot).swatch()}</span>
-                ${esc(slot.displayName || `Slot ${slot.id}`)}${variant ? ` · ${esc(variant)}` : ""} <code class="dim">${esc(keycodes.join(" · "))}</code>${changedSlots.has(slot.id) ? draftDot() : ""}</td>
+            <td><span class="slot-named"><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${mark(model, {kind: "pointing", slot: slot.id})}</span>
+                ${slotNamedWithKeycodes(slot.displayName || `Slot ${slot.id}`, keycodes)}${changedSlots.has(slot.id) ? draftDot() : ""}</span></td>
             <td class="muted">${slot.kind
                 ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${esc(slot.dpi)} DPI` : " · normal pointer speed"}`
                 : "Empty · these keys do nothing yet"}</td>
@@ -55,11 +56,7 @@ export function tabPointing(body, right) {
             ...(entry.combos || []).map((route) => pointingVariant(model, route.action)),
         ])];
         const only = variants.length === 1 ? variants[0] : "";
-        return card(group, entry.name, [
-            entry.keys.length ? keysReach(entry.keys) : "",
-            entry.behaviours?.length ? branchReach(model, entry, !only) : "",
-            entry.combos?.length ? comboReach(model, entry, !only) : "",
-        ].filter(Boolean).join(" · "), only);
+        return card(group, entry.name, reachLabel(model, entry, !only), only);
     };
 
     /** @type {{id: string, rows: string[], empty: string, drafted?: boolean, ids?: string[]}[]} */

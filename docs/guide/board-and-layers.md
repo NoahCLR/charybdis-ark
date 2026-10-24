@@ -58,6 +58,15 @@ shows and which one you edit. Each tab shows the layer's colour, name and
 number. The highest layer that is on wins; a transparent key takes what the
 next layer down does; the base layer is always on.
 
+Where Ark names a layer in passing (a key's name, a combo, the review), a
+small drawing of the board in the layer's colour sits before its name. A
+pointing mode has the Pointing modes icon in its light. A grey icon means
+that colour, or its lighting, is off. Lists of layers alone, such as these
+tabs, show just the colour. A key or combo that acts on a layer or a pointing
+mode reads the same way everywhere, as the behaviour grid draws it: the icon,
+the name and a tag for what it does, such as **HOLD** or **LOCK**. A layer-tap
+key keeps its name ("/ / Navigation"), with the icon before the layer.
+
 ### Rename & Reorder
 
 **Rename & Reorder**, after the last tab, opens the layer list over the
@@ -109,7 +118,10 @@ Under the board, the workbench works on the selected key. Its tabs are:
 - **Behaviours**: its taps and holds. See [Behaviours](behaviours.md).
 - **Combos**: the combos on this layer. See [Combos](combos.md).
 - **Macros** and **Pointing modes**: the macros and pointing modes this layer
-  reaches, through keys, behaviours or combos. **Edit** opens one on its
-  own screen.
+  reaches, through keys, behaviours or combos. **Reached by** names a
+  behaviour's key and then the branch that sends it, as the behaviour grid
+  heads it: "from Right Option · 1× tap". When that key is already in the
+  row, the branch follows it: "Dragscroll hold · 2× hold sends Dragscroll
+  lock". **Edit** opens one on its own screen.
 
 Each tab counts what it holds for this layer, and a dot marks a draft change.

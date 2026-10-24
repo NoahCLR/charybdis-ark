@@ -165,6 +165,15 @@ _Avoid_: tooltip, key card, popover
 The dialog that chooses what a key, branch, shortcut or output sends.
 _Avoid_: key picker, keycode chooser, selector
 
+**Mark**:
+The small sign Ark draws beside anything with a colour of its own on the
+keyboard, in that colour (D-L31): a tier's dot, a branch badge, a combo badge,
+a stage's dot, and the board icon for a layer or the Pointing modes icon for a
+pointing mode. A **swatch** is a plain square of a colour, shown where the
+colour itself is the subject or where only the colour tells the items apart;
+it is not a mark.
+_Avoid_: tag, chip (for a mark), dot (for a layer's mark)
+
 **Layer preview**:
 Showing several layers stacked on the board the way the keyboard would
 resolve them.

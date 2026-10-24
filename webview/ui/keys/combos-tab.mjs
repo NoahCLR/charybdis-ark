@@ -11,6 +11,7 @@ import {reachAttrs, reachTable} from "../groups.mjs";
 import {setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
+import {keyMeaning, keyName} from "../../view/keyface.mjs";
 import {comboBuilder} from "./combo-builder.mjs";
 import {keysReach} from "./reach.mjs";
 
@@ -71,7 +72,7 @@ export function tabCombos(body, right) {
         .flatMap(([group, entries]) => entries.map((entry) => /** @type {[number, {group: string, entry: import("../../view/keyface-types.js").ComboGroupEntry}]} */ ([entry.combo.id, {group, entry}])));
     const routes = new Map(listed);
     const comboGroupRows = [
-        {id: "key", detail: onKey.position ? onKey.position.editLabel || onKey.position.display || onKey.position.keycode : "nothing answers here",
+        {id: "key", detail: onKey.position ? keyNameMarked(model, keyName(onKey.position), keyMeaning(onKey.position)) : "nothing answers here",
             rows: onKey.combos.map((combo) => {
                 const route = routes.get(combo.id);
                 return route ? row("key", route.entry, reachedBy(route.group, route.entry)) : row("key", {combo}, "—");
@@ -89,7 +90,7 @@ export function tabCombos(body, right) {
             empty: "Every combo on the board fires from this layer."},
     ];
     const comboTable = reachTable("combos", comboGroupRows, [
-        ["", "7%"], ["Inputs", "31%"], ["Sends", "15%"], ["Window", "10%"],
+        ["", "7%"], ["Inputs", "25%"], ["Sends", "21%"], ["Window", "10%"],
         ["Conditions", "13%"], ["Reached by", "24%"]]);
     /** @type {HTMLElement} */ (node.querySelector("#comboTable")).replaceWith(comboTable);
 

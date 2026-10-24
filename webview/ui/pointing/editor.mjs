@@ -4,7 +4,7 @@ import {NAME_TIP} from "../../view/names.mjs";
 import {KIND, dpiOptions, readConfig, scrollStarter, settleButtons, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
 import {post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
-import {slotLight} from "../marks.mjs";
+import {mark} from "../marks.mjs";
 import {bindingName, words} from "./common.mjs";
 import {formControls} from "./form-controls.mjs";
 import {countNameBytes} from "../title-name.mjs";
@@ -22,7 +22,6 @@ export function editor(model, slot, canEdit, slots) {
     // startingRecord spreads the supplied slot, retaining its presentation fields.
     if (kind !== slot.kind) slot = /** @type {import("../surface-types.js").PresentedSlot} */ (startingRecord(slot, kind, scrollStarter(slots)));
     const scrolling = kind === KIND.SCROLLING;
-    const light = slotLight(model, slot);
     const wrap = el(`<div class="pd-editor stack"></div>`);
     let stageCurrent = () => {};
     const {form, disabled, field, select, shortcut, modifiers} = formControls(model, slot, canEdit, () => stageCurrent());
@@ -30,7 +29,7 @@ export function editor(model, slot, canEdit, slots) {
     const empties = slots.some((candidate) => !candidate.kind);
     const head = el(`<div class="card">
         <div class="card-h">
-            ${light.swatch("lg")}
+            <span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>
             <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${esc(slot.id)} · ${esc(bindingName(slot))}</span>
             <span class="right">
                 ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${esc(disabled)}

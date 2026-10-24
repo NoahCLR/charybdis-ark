@@ -1,5 +1,5 @@
 // @ts-check
-// The layer tabs, and the swatch a layer is shown with wherever it is named.
+// The layer tabs, and the swatch a layer shows its colour with.
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
@@ -9,8 +9,9 @@ import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
 
-// A layer's swatch and how it is lit, the same wherever a layer is named: a
-// layer whose colour is off, or whose stage is off, shows as unlit.
+// A layer's swatch and how it is lit, the same wherever its colour is shown,
+// and the colour its mark wears (ui/marks.mjs): a layer whose colour is off, or
+// whose stage is off, shows as unlit.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Pick<import("../../contracts/panel.js").Layer, "index"> & Partial<import("../../contracts/panel.js").Layer>} layer @param {string} [className] */
 export function layerSwatch(model, layer, className = "") {
     const row = layerColourRow(model, layer.index);

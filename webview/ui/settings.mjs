@@ -160,7 +160,7 @@ function comboReferenceFold(model, section, shown, canEdit, searching) {
         const layer = layers().find((entry) => entry.index === at);
         const editable = canEdit && !field.readOnly;
         const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${shown.includes(field) ? "" : "hidden"}>
-            <span class="txt">${marked(model, field.governs, layer ? layerName(layer) : field.label)}</span>
+            <span class="txt">${layerCell(model, field, layer)}</span>
             <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
             ${layers().map((entry) => `<option value="Layer ${esc(entry.index)}" ${field.value === `Layer ${entry.index}` ? "selected" : ""}>${esc(entry.displayName || entry.name)}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (cell.querySelector("select")).addEventListener("change", submit);
@@ -281,7 +281,14 @@ function layerFold(model, section, row, searching, summary) {
     return node;
 }
 
-// One switch per layer, each named by its layer and marked in its colour, in
+// A cell of a grid of one switch or choice per layer: the layer named by its
+// mark, as everywhere a layer is named (D-L31).
+/** @param {Model | null} model @param {Field} field @param {import("../../contracts/panel.js").Layer | undefined} layer */
+const layerCell = (model, field, layer) => layer
+    ? marked(model, {kind: "layer", layer: layer.index}, layerName(layer))
+    : marked(model, field.governs, field.label);
+
+// One switch per layer, each named by its layer and shown in its colour, in
 // the order the layer tabs read. Each keeps its own field identity, so the
 // section still saves whole and a search still finds a single layer.
 /** @param {{label: string, hint: string}} group @param {Field[]} fields @param {Field[]} shown @param {boolean} canEdit @param {() => void} submit */
@@ -299,7 +306,7 @@ function layerGroupRow(group, fields, shown, canEdit, submit) {
         const tip = [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" ");
         const node = el(`<label class="sw" data-tip="${esc(tip)}" ${shown.includes(field) ? "" : "hidden"}>
             <input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
-            <span class="track"></span><span class="txt">${marked(model, field.governs, layer ? layerName(layer) : field.label)}</span></label>`);
+            <span class="track"></span><span class="txt">${layerCell(model, field, layer)}</span></label>`);
         /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
         grid.appendChild(node);
     }

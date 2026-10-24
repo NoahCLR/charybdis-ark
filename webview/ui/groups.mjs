@@ -12,12 +12,13 @@ import {GROUP_TITLES, inGroupOrder, setReachGroupOpen} from "../view/reach-group
 
 // A folded group holding something the draft changed says so on its header;
 // open, its rows carry their own marks.
-// A group whose rows depend on a choice elsewhere names it after the title.
+// A group whose rows depend on a choice elsewhere names it after the title,
+// as markup: a key is named as every surface names it (ui/marks.mjs).
 /** @param {string} tab @param {string} id @param {number} count @param {boolean} [drafted] @param {string} [detail] */
 export function groupHeader(tab, id, count, drafted = false, detail = "") {
     const open = state.reachGroups[id];
     return `<button class="group-h" data-group-tab="${esc(tab)}" data-group="${esc(id)}" aria-expanded="${esc(open)}">
-        ${DISCLOSURE}<span class="ttl">${esc(GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (id)])}${detail ? ` <span class="mono dim">· ${esc(detail)}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
+        ${DISCLOSURE}<span class="ttl">${esc(GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (id)])}${detail ? ` <span class="mono dim">· ${detail}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
         <span class="n">${count}</span></button>`;
 }
 

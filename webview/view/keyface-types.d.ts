@@ -7,8 +7,10 @@ export type Tier = 'tap' | 'hold' | 'long';
 export type BehaviorRoute = 'view' | 'here' | 'through' | 'combos' | 'belowCombos';
 export interface ResolvedKey {position: Position; layer: Layer; fellThrough: boolean; whileHeld: boolean; reference?: boolean}
 export interface ComboRoute {combo: ComboView; keys: ResolvedKey[]}
-export interface ReachedBehavior {keycode: string; action: string; layer: Layer | null; whileHeld: boolean}
-export interface ReachedCombo extends ComboRoute {via: string | null; action: string}
+// The cell of a behaviour's grid a branch sits in: its tap count, from 1, and its tier.
+export interface BranchCell {branch: number; tier: Tier}
+export interface ReachedBehavior {keycode: string; action: string; layer: Layer | null; whileHeld: boolean; cells: BranchCell[]}
+export interface ReachedCombo extends ComboRoute {via: string | null; action: string; cells: BranchCell[]}
 export interface ReachEntry {name: string; keys: ResolvedKey[]; behaviours: ReachedBehavior[]; combos: ReachedCombo[]}
 export interface ReachGroup {onKeys: ReachEntry[]; fromBranches: ReachEntry[]; fromCombos: ReachEntry[]; throughKeys: ReachEntry[]; fromBranchesBelow: ReachEntry[]; fromCombosBelow: ReachEntry[]; elsewhere: string[]}
 export interface SortableReach {layer?: Layer | null; keys?: ResolvedKey[]; behaviours?: ReachedBehavior[]; combos?: ComboRoute[]}
@@ -24,5 +26,6 @@ export type ImpliedBranch = {meaning: 'continues'; hold: InheritedBranch} | {mea
 
 export interface KeyFace {main: string; sub: string; kind: 'none' | 'transparent' | 'disabled' | 'layer' | 'key'}
 export type NamedAction =
+    | {kind: 'layer'; word: 'layer'; name: string; layer: number; tags: string[]}
     | {kind: 'pointing'; word: 'pointing mode'; name: string; slot: PointingSlot; tags: string[]}
     | {kind: 'macro'; word: 'macro'; name: string; slot: PublishedModel['macros'][number] | undefined; tags: string[]};

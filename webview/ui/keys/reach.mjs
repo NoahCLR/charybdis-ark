@@ -12,7 +12,8 @@ import {comboGroups, combosInView} from "../../view/combo-reach.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
 import {getModel, heldLayers, layerName, layers, state} from "../../store.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
-import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked} from "../marks.mjs";
+import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked, marked} from "../marks.mjs";
+import {tierName} from "../../view/vocabulary.mjs";
 import {behaviourRoute} from "./behaviour-selection.mjs";
 
 // The keys the board rings: the ones that reach whatever row is picked in the
@@ -67,10 +68,13 @@ export const sourceLabel = (entry) =>
 
 // The keys are named as the board names them; a combo's row already names
 // its inputs, so it says only where they come from (reachText).
-/** @param {(ReturnType<typeof resolvedPositions>[number] & {reference?: boolean})[]} keys @param {{names?: boolean}} [options] */
-export const keysReach = (keys, {names = true} = {}) => {
+// A key whose own behaviour also reaches the row says which of its cells
+// does, after its name (`branches`), rather than naming the key twice.
+/** @param {(ReturnType<typeof resolvedPositions>[number] & {reference?: boolean})[]} keys @param {{names?: boolean, branches?: (keycode: string) => string}} [options] */
+export const keysReach = (keys, {names = true, branches} = {}) => {
     const model = getModel();
-    const named = names ? [...new Set(keys.map((entry) => keyNameMarked(model, keyName(entry.position), keyMeaning(entry.position))))] : [];
+    const named = names ? [...new Set(keys.map((entry) => keyNameMarked(model, keyName(entry.position), keyMeaning(entry.position))
+        + (branches?.(keyMeaning(entry.position)) || "")))] : [];
     const sources = [...new Set(keys.filter((entry) => entry.fellThrough).map(sourceLabel))];
     const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => esc(layerName(entry.layer))))];
     return reachText({named, sources, matched}, {names});
@@ -78,8 +82,9 @@ export const keysReach = (keys, {names = true} = {}) => {
 // A behaviour that only answers through a transparent key still fires its
 // branches, so it belongs here — named with the layer that holds it, because
 // that is the part this layer does not store.
-// A branch names both what it sends and the behaviour it comes from — but only
-// when those differ from what the row is already titled with. A macro row is
+// A branch names the behaviour it comes from, the cell that fires (key, then
+// cell, as a key's own behaviour reads), and what it sends — but only when that
+// differs from what the row is already titled with. A macro row is
 // its own macro, so repeating it would be noise; a pointing mode is a slot, and
 // which of its two keycodes a branch sends is the whole point.
 // A key named in a reach reads as it does in the table's first column: its
@@ -89,33 +94,54 @@ const namedKey = (model, keycode) => {
     const label = actionLabel(model, keycode);
     return label === String(keycode) ? esc(label) : `${actionMarked(model, keycode, label)} <code class="dim">${esc(keycode)}</code>`;
 };
+// The cells a branch sits in, as Review and the grid head them: the branch's
+// badge, the tier's dot and the tier's name, "2× ● hold". Any of them sends it, so
+// several read "1× ● long hold or 2× ● hold".
+/** @param {Model} model @param {import("../../view/keyface-types.js").BranchCell[]} cells */
+const cellsMarked = (model, cells) => cells
+    .map((cell) => marked(model, {kind: "tier", ...cell}, tierName(model, cell.tier).toLowerCase())).join(" or ");
+/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry @param {{action: string}} route @param {boolean} showSends */
+const sendsOf = (model, entry, route, showSends) => showSends && route.action && String(entry.name) !== String(route.action)
+    ? `sends ${namedKey(model, route.action)}` : "";
 /** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
 export const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
-    const from = `from ${namedKey(model, row.keycode)}`
+    const sent = sendsOf(model, entry, row, showSends);
+    return `from ${namedKey(model, row.keycode)} · ${cellsMarked(model, row.cells)}${sent ? ` ${sent}` : ""}`
         + (row.layer ? ` · on ${sourceLabel(row)}` : "");
-    return showSends && row.action && String(entry.name) !== String(row.action)
-        ? `sends ${namedKey(model, row.action)} · ${from}` : from;
 }).join(", ");
 
 // A combo is named by its badge and the keys chorded to fire it; one that
 // fires a behaviour says so, since its branch is what sends the thing, and one
 // that needs a transparent key names the layer answering for it.
 /** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
-export const comboReach = (model, entry, showSends = true) => entry.combos.map(({combo, via, action, keys}) => {
+export const comboReach = (model, entry, showSends = true) => entry.combos.map(({combo, via, action, keys, cells}) => {
     const sources = [...new Set(keys.filter((key) => key.fellThrough).map(sourceLabel))];
+    const sent = sendsOf(model, entry, {action}, showSends);
     return `${comboBadge(model, combo.badge)} ${comboInputsMarked(model, combo)}`
-        + (via ? ` · through ${namedKey(model, via)}` : "")
-        + (showSends && action && String(entry.name) !== String(action) ? ` · sends ${namedKey(model, action)}` : "")
+        + (via ? ` · through ${namedKey(model, via)} · ${cellsMarked(model, cells)}${sent ? ` ${sent}` : ""}` : sent ? ` · ${sent}` : "")
         + (sources.length ? ` · on ${sources.join(", ")}` : "");
 }).join(", ");
 
 // Every way this layer reaches one thing, not only the way it was grouped by.
 // A macro can sit on a key here *and* be fired from a behaviour's branch; the
 // board rings both sets of keys, so the row has to name both or the two
-// disagree about the same entry.
+// disagree about the same entry. A behaviour on one of those keys is that
+// key's: "Dragscroll hold · 2× ● hold sends Dragscroll lock", the cell after
+// the key, which is not named a second time. A cell sending what the key
+// already sends adds nothing to it and is left out.
 /** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
-export const reachLabel = (model, entry) => [
-    entry.keys?.length ? keysReach(entry.keys) : "",
-    entry.behaviours?.length ? branchReach(model, entry) : "",
-    entry.combos?.length ? comboReach(model, entry) : "",
-].filter(Boolean).join(" · ");
+export const reachLabel = (model, entry, showSends = true) => {
+    const onKeys = new Set((entry.keys || []).map((key) => keyMeaning(key.position)));
+    const own = (entry.behaviours || []).filter((row) => onKeys.has(row.keycode));
+    const apart = (entry.behaviours || []).filter((row) => !onKeys.has(row.keycode));
+    /** @param {string} keycode */
+    const branches = (keycode) => own.filter((row) => row.keycode === keycode).flatMap((row) => {
+        const sent = sendsOf(model, entry, row, showSends);
+        return sent ? [` · ${cellsMarked(model, row.cells)} ${sent}`] : [];
+    }).join("");
+    return [
+        entry.keys?.length ? keysReach(entry.keys, {branches}) : "",
+        apart.length ? branchReach(model, {...entry, behaviours: apart}, showSends) : "",
+        entry.combos?.length ? comboReach(model, entry, showSends) : "",
+    ].filter(Boolean).join(" · ");
+};

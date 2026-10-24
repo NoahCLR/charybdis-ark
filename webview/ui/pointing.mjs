@@ -12,7 +12,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {KIND} from "../view/pointing-config.mjs";
 import {bindingsForSlot} from "../view/reach.mjs";
 import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
-import {slotLight} from "./marks.mjs";
+import {mark} from "./marks.mjs";
 import {word} from "../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./frame.mjs";
@@ -51,11 +51,10 @@ export function screenPointing() {
     const pick = (slot) => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; state.pdTaps = null; render(); };
     for (const slot of slots) {
         if (compact && !slot.kind) continue;
-        const {swatch} = slotLight(model, slot);
         const bindings = !slot.kind ? bindingsForSlot(model, slot) : null;
         const inert = bindings ? bindings.keys.length + bindings.behaviours.length + bindings.combos.length : 0;
         const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${esc(slot.id)}" aria-current="${state.pdSlot === slot.id}">
-            ${swatch()}
+            ${mark(model, {kind: "pointing", slot: slot.id})}
             <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${esc(slot.id)}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? `Scrolling${slot.axis ? ` · ${esc(word(words(model).scrollAxes, slot.axis))}` : ""}` : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
             ${inert ? `<span class="meta warn">${inert} action${inert === 1 ? "" : "s"} reach it · inert</span>` : ""}</button>`);
