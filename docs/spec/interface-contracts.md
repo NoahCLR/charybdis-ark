@@ -595,3 +595,39 @@ drops off USB in a shell that shows serial numbers) is followed back the same
 way, with `lost: true`, at most once in 30 s; a web page follows Chrome's
 connect events instead (`tests/session/lost-keyboard.test.js`). The
 diagnostics name the first bytes of the unanswered request (no test).
+
+A keyboard a follow-back found is the one it waited for, though node-hid
+lists it under a new device id at every enumeration: before the read, the
+draft, a Restart's kept edits, a Save cut short and the copy from before an
+Apply move to that id (`followKeyboard`), so the read is the draft's and
+Save, Apply and Restart's put-back reach the keyboard
+(`tests/session/keyboard-restart.test.js`, `tests/session/keyboard-starting.test.js`).
+Restart's put-back sends only to the session the read found, and says the
+edits are back only once the draft confirms them unsaved.
+
+### Reading a keyboard that has just come back
+
+A keyboard answers over USB before it has decided which profile runs
+(firmware D-F61). Before the editor's read, on every read Ark follows back
+(a restart, a rename, a lost keyboard) and on Read keyboard, Ark polls profile
+status until the keyboard has started (D-L70; `core/session/keyboard-starting.js`,
+`tests/session/keyboard-starting.test.js`, `tests/session/keyboard-restart.test.js`):
+
+- Started: active kind not 3 (pending) and flag 7 (digests unavailable)
+  clear, and the halves agree as the health's `agree` does
+  (`halvesConverged`): the slave half known (flag 4) and holding the same saved
+  profile (flag 5), the active, saved and slave half's generations equal, and
+  conflict count 0.
+- Meanwhile the service runs in phase `starting`, whose words, "Waiting for
+  the keyboard to finish starting…", the loading screen and the bar show.
+- The wait is at most 15 s on the service's clock, polling every 200 ms.
+  Within it, a read refused `KEYBOARD_NOT_READY`, `ACTIVE_PROFILE_UNAVAILABLE`,
+  `PROFILE_CHANGED` or `GENERATION_UNSTABLE` waits again and reads again.
+- Past it, a keyboard still pending (kind 3 or flag 7) with its slave half
+  known fails `KEYBOARD_STARTING`: the notice says it has not finished
+  starting and names the recovery copy of a Restart or a Save cut short. Any
+  other keyboard is read as it is, so a missing slave half gets the read's
+  own words; a keyboard whose halves never agree waits the whole bound
+  before each such read.
+- After Restart, the put-back of the kept edits runs once that read is ready,
+  whether the follow-back's read or a later Read keyboard.

@@ -12,7 +12,7 @@ pages carry are [blob-and-digests.md](blob-and-digests.md).
 ## Raw HID reports
 
 The firmware answers Raw HID itself (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
 usage page `0xFF60`, 32-byte reports both ways. Every report goes to the
 Profile Wire handlers and is sent back exactly once, in place, as the reply,
 with the same length.
@@ -131,7 +131,7 @@ Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, th
 
 Capability page 0 bytes 9–12. It holds only what a build varies by; no
 firmware behaviour depends on a bit, the word only describes the build (D-F28,
-[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 
 | Bit | Meaning |
 | ---: | --- |
@@ -209,14 +209,25 @@ The live-edit status has its own flag word (GET `0x20`,
 | 0 | the compiled defaults; flag 0 is set |
 | 1 | the saved profile |
 | 2 | never reported |
-| 3 | pending: the active profile's pointing slots are not published yet. Flag 7 is set, flag 0 clear, the active digest and generation are zero, and the last error is `17` |
+| 3 | pending: the keyboard has not yet decided which profile runs. Flag 7 is set, flag 0 clear, and the active digest and generation are zero |
 | 4 | the working copy: unsaved edits over the saved generation page 1 names ([live-edits.md](live-edits.md)) |
+
+A half reports pending from reset until it activates the profile its boot
+settles on (D-F61): while it validates its compiled defaults, selects and
+validates its saved profile, waits until both halves hold the same saved
+profile, and activates it. It runs its compiled defaults meanwhile
+([owner states](../authority-state-table.md#owner-states)), and the last error
+is `0`. Flags 1, 4 and 5 and the saved generation say what the boot has found
+so far. A boot that finds nothing usable saved reports the compiled defaults
+(kind 0) once it has decided; one waiting for a slave half that never answers
+stays pending. Outside the boot, pending means the active profile's pointing
+slots were never published: the half stopped, and the last error is `17`.
 
 A build without the live-profile owner reports the compiled defaults with
 flags 0 and 7 always set, flag 1 and the saved generation when its store
 found a saved profile, and conflict count `1` on a generation conflict.
 
-Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, the status-page test; `qmk_profile_channel_test.c`, the read-only and owner snapshots, page 1 paired with page 0, the working copy, the pending kind and flag 9), `tests/fixtures/profile_wire_v1_reads.fixture`.
+Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, the status-page test; `qmk_profile_channel_test.c`, the read-only and owner snapshots, page 1 paired with page 0, the working copy, the pending kind through the boot and after a failed activation, and flag 9), `tests/fixtures/profile_wire_v1_reads.fixture`, `tests/host/run_profile_owner_tests.sh` (`profile_owner_test.c`, `test_boot_status_is_pending_until_activation`).
 
 ## Payload readback — GET `0x04` and `0x05`
 
@@ -273,7 +284,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 ## Flash pauses — GET `0x0D`
 
 Each half measures how long its profile-slot flash work stops the keyboard
-(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
+(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
 Byte page `0` is the master half's figures; page `1` the slave half's, as the
 master half last pulled them over the split link; page 2 and above answer
 status `2`. Page 1 answers status `3` until a pull has succeeded.

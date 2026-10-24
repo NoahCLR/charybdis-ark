@@ -199,6 +199,48 @@ function comboPages(table, references) {
     return rehash([metadata, referencePage, ...pages]);
 }
 
+// What a keyboard reports while it starts (firmware D-F61), as Noah's did
+// after a restart on 2026-10-24: pending with nothing known yet, then pending
+// with both halves holding the same saved profile, then that profile.
+const BOOT = Object.freeze([{activeKind: PROFILE_ACTIVE_KIND.PENDING, stateFlags: 0x80, reads: 8},
+    {activeKind: PROFILE_ACTIVE_KIND.PENDING, stateFlags: 0xb2, reads: 8}]);
+
+// Any fake keyboard, made to start up again whenever `boot(stages)` is called
+// (a restart or a replug): its profile status reports each stage in turn, for
+// that many reads of page 0 (Infinity: it never finishes), pending with no
+// active digest or generation, then the keyboard as it is. Page 1 reports the
+// stage the last page-0 read showed, as the firmware pairs them.
+/** @template {import("./types.js").FakeKeyboard} K @param {K} keyboard @returns {K & {boot: (stages?: readonly {activeKind: number, stateFlags: number, reads: number}[]) => void}} */
+function booting(keyboard) {
+    /** @type {{activeKind: number, stateFlags: number, reads: number}[]} */
+    let stages = [];
+    /** @type {{activeKind: number, stateFlags: number} | null} */
+    let shown = null;
+    const answer = keyboard.answer.bind(keyboard);
+    const at = PROFILE_WIRE_V1.PAYLOAD_OFFSET;
+    return Object.assign(keyboard, {
+        boot(/** @type {readonly {activeKind: number, stateFlags: number, reads: number}[]} */ boot = BOOT) {stages = boot.map(stage => ({...stage}));},
+        answer(/** @type {Uint8Array} */ report) {
+            const responses = answer(report), request = Buffer.from(report);
+            if (request[0] !== PROFILE_WIRE_V1.COMMAND_GET || request[1] !== PROFILE_WIRE_V1.CHANNEL || request[2] !== VALUE.STATUS || !responses[0]) return responses;
+            const page = request[4] | (request[5] << 8), response = Buffer.from(responses[0]);
+            if (page === 0) {
+                shown = stages[0] || null;
+                if (stages[0] && --stages[0].reads <= 0) stages.shift();
+            }
+            if (!shown) return responses;
+            if (page === 0) {
+                response.writeUInt16LE(shown.stateFlags, at + 2);
+                response.writeUInt32LE(0, at + 12);
+                response[at + 24] = shown.activeKind;
+            } else if (page === 1 && shown.activeKind === PROFILE_ACTIVE_KIND.PENDING) {
+                response.writeUInt32LE(0, at);
+            }
+            return [response];
+        },
+    });
+}
+
 // A FakeDeviceAdapter wired to a fake keyboard: each written report is
 // answered on a microtask, as a real device answers after the write returns.
 // `adapter.keyboard` is the keyboard, for its records; replacing it answers
@@ -217,4 +259,4 @@ function fakeKeyboardAdapter(options) {
     return adapter;
 }
 
-module.exports = {fakeKeyboard, fakeKeyboardAdapter};
+module.exports = {BOOT, booting, fakeKeyboard, fakeKeyboardAdapter};

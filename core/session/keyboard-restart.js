@@ -27,7 +27,8 @@
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {IDENTITY} = require("../model/layer-order");
 const {snapshotOf} = require("./live-profile-session");
-const {expectRestart} = require("./keyboard-reconnect");
+const {expectRestart, followKeyboard} = require("./keyboard-reconnect");
+const {fingerprint} = require("../model/portable-profile");
 const {proposeLive} = require("./live-edits");
 
 const RESTART_LABEL = "Put back the unsaved edits from before the restart";
@@ -97,19 +98,34 @@ function sameKeyboard(session, restart) {
 }
 
 // After the restarted keyboard was read again. What happened is said after
-// the reconnect's own words when its wait is still running, else at once.
+// the follow-back's own words when one is running, else at once.
 /** @param {Session} session */
 async function putBackAfterRestart(session) {
     const restart = session.restart;
     if (!restart || !sameKeyboard(session, restart)) return;
     session.restart = undefined;
-    const outcome = await putBack(session, restart);
+    // The same keyboard, perhaps listed under a new device id since: its
+    // draft follows it and takes the read just made, which the shell may not
+    // have shown it yet, so the edits go to the session it runs now.
+    const state = session.service.snapshot(), portable = session.service.portable;
+    if (state.selectedDeviceId) followKeyboard(session, restart.deviceId || "", state.selectedDeviceId);
+    const followed = session.draft;
+    // A live draft takes a live read; anything else is the panel's, which
+    // asks before a draft changes its kind (observePortable).
+    if (portable && "live" in portable && portable.live && followed?.live && followed.deviceId === state.selectedDeviceId) {
+        followed.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined);
+        session.observedPortable = portable;
+    }
+    const outcome = await putBack(session, restart, portable);
+    // A restart's own wait said its recovery copy in case the keyboard never
+    // came back; any other follow-back keeps what it says already.
     if (session.reconnect?.restart) session.reconnect.after = outcome;
+    else if (session.reconnect) session.reconnect.after = [session.reconnect.after, outcome].filter(Boolean).join(" ");
     else if (outcome) session.notice = `${session.notice ? `${session.notice} ` : ""}${outcome}`;
 }
 
-/** @param {Session} session @param {NonNullable<Session["restart"]>} restart @returns {Promise<string>} */
-async function putBack(session, restart) {
+/** @param {Session} session @param {NonNullable<Session["restart"]>} restart @param {import("../model/types.js").ProfileSnapshot | null | undefined} read @returns {Promise<string>} */
+async function putBack(session, restart, read) {
     const draft = session.draft, keyboard = draft?.live?.keyboard;
     // Read again, the keyboard answered for both halves (a read refuses one
     // without the slave half), and since D-F34 a half that missed the restart
@@ -121,9 +137,17 @@ async function putBack(session, restart) {
     }
     if (!restart.kept) return slave.trim();
     if (!draft?.live) return `Your unsaved edits were not put back: the keyboard now takes edits by Apply.${inRecovery(restart.recovery)}${slave}`;
+    // Only to the keyboard just read, at the session it runs now.
+    const readSession = read && "live" in read ? /** @type {import("./types.js").LiveSnapshot} */ (read).live?.session : undefined;
+    if (draft.deviceId !== session.service.snapshot().selectedDeviceId || readSession === undefined || draft.live.session !== readSession) {
+        return `Your unsaved edits were not put back: Ark could not tell that this is the keyboard it restarted.${inRecovery(restart.recovery)}${slave}`;
+    }
+    const kept = fingerprint(restart.kept);
     try {
         const sent = await proposeLive(session, {document: restart.kept, label: RESTART_LABEL, origin: "edit", order: IDENTITY}, {confirmed: true, replaceWhenLarge: true});
-        if (!sent) return `Your unsaved edits were not put back: the keyboard changed meanwhile.${inRecovery(restart.recovery)}${slave}`;
+        // They are back once the keyboard confirmed them, unsaved.
+        const back = session.draft === draft && draft.live?.unsaved && draft.current.fingerprint === kept;
+        if (!sent || !back) return `Your unsaved edits were not put back: the keyboard changed meanwhile.${inRecovery(restart.recovery)}${slave}`;
     } catch (error) {
         return `Your unsaved edits could not be put back: ${messageOf(error)}.${inRecovery(restart.recovery)}${slave}`;
     }

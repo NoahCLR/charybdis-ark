@@ -22,7 +22,7 @@ The pointing domain is required in every profile the keyboard validates
 (`MISSING_DOMAIN` otherwise, [errors](profile-wire-v1/errors.md#validation-results)).
 A profile stores a slot's colour only in the lighting domain, one row per slot
 whether or not the slot is stored here (D-F09,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md)).
 
 Held by: `tests/host/run_pd_mode_tests.sh` (`pd_mode_profile_registry_test.c`), `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the required domain mask).
 
@@ -30,9 +30,9 @@ Held by: `tests/host/run_pd_mode_tests.sh` (`pd_mode_profile_registry_test.c`), 
 
 Each userspace keycode family owns one fixed block in QMK's user range,
 reserved beyond what is supported, so adding slots or layers renumbers nothing
-(D-F51, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)). A slot
+(D-F51, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)). A slot
 keycode names its slot; the mode comes from the active profile (D-F50,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0050-pointing-keycodes-name-slots.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0050-pointing-keycodes-name-slots.md)).
 
 | Block | Keycodes | Supported |
 | --- | --- | --- |
@@ -198,8 +198,8 @@ A tap's keycode is one of:
 | Keycodes | What |
 | --- | --- |
 | `0x0004..0x00c2` | keyboard `0x04..0xa4`, system `0xa5..0xa7`, consumer `0xa8..0xc2` |
-| `0x00d1..0x00d8` | mouse buttons 1–8, a click (D-F22, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0022-pointing-modes-click-mouse-buttons.md)) |
-| `0x7700..0x777f` | macro slots 0–127, a macro start, policy 0 and mask 0 only (D-F23, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0023-pointing-outputs-start-macros.md)) |
+| `0x00d1..0x00d8` | mouse buttons 1–8, a click (D-F22, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0022-pointing-modes-click-mouse-buttons.md)) |
+| `0x7700..0x777f` | macro slots 0–127, a macro start, policy 0 and mask 0 only (D-F23, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0023-pointing-outputs-start-macros.md)) |
 | high byte `0x01..0x1f` with a low-nibble modifier bit, low byte `0x04..0xa4` | a modified keyboard key |
 
 Everything else is refused: standalone modifiers, mouse movement, wheel and
@@ -285,8 +285,8 @@ Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_
 ## Directional movement
 
 One engine runs every directional mode (D-F45,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0045-one-directional-engine.md); D-F42,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0042-directional-modes-read-eight-directions.md)). The axis says
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0045-one-directional-engine.md); D-F42,
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0042-directional-modes-read-eight-directions.md)). The axis says
 which directions exist: vertical up and down, horizontal left and right,
 dominant axis the four straight ones, eight directions all eight. A
 directional mode never moves the pointer.
@@ -314,7 +314,7 @@ acts as `0`); `2` its motion is consumed and sends nothing, each step still
 counting as one output against the per-report limit.
 
 Byte 87, how often a direction sends: `0` once per threshold step; `1` once
-per movement (D-F07, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0007-directional-mode-can-send-once-per-movement.md)).
+per movement (D-F07, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0007-directional-mode-can-send-once-per-movement.md)).
 A movement starts with the first motion after the mode starts or after
 150 ms without motion. Its first step that sends anything spends it; from then
 on only a direction more than 90° from the one that sent may send, a whole
@@ -342,7 +342,7 @@ saturates at ±2^24 counts.
 - Still for longer than the axis timeout releases the axis; longer than the
   expiry drops the banks too.
 - Byte 3 limits which axes scroll (D-F08,
-  [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0008-scrolling-mode-can-scroll-one-axis.md)). A gesture held
+  [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0008-scrolling-mode-can-scroll-one-axis.md)). A gesture held
   on an axis the mode does not scroll runs as above but sends nothing, so its
   motion neither scrolls later nor leaks into the other axis.
 - Held modifiers are owned for as long as the mode runs. Keys typed meanwhile
@@ -408,7 +408,7 @@ Held by: `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integrati
 ## Compatibility
 
 The firmware reads only version 3 (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0010-firmware-accepts-only-current-formats.md)): another
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0010-firmware-accepts-only-current-formats.md)): another
 envelope version is `UNKNOWN_DOMAIN_VERSION`, and a version-2 payload's
 header is `INVALID_HEADER` at 0. Nothing is translated. A saved profile in an
 older format or action vocabulary is not used; the

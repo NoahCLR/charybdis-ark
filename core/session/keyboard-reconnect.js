@@ -29,6 +29,10 @@
 //
 // A keyboard Ark restarted (firmware D-F34, keyboard-restart.js) is followed
 // back the same way: the same keyboard, under the same name, read again.
+//
+// Whichever way it came back, the read waits first for the keyboard to finish
+// starting (keyboard-starting.js, D-L70); one that never finishes is said in
+// words of its own rather than as a failed read.
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -36,6 +40,7 @@
  * @typedef {{id: string, product?: string, serialNumber?: string}} Listed
  */
 const {storedKeyboardName} = require("../model/keyboard-name");
+const {isStartingTimeout, startingTimeout} = require("./keyboard-starting");
 
 const RECONNECT = Object.freeze({WAIT_MS: 10000, POLL_MS: 500});
 const RECONNECT_WORDS = Object.freeze({
@@ -150,6 +155,20 @@ function reconnectTarget(expected, devices) {
     return named.length === 1 ? {device: named[0]} : {ambiguous: true};
 }
 
+// The keyboard a follow-back found is the one it waited for, though the
+// shell may list it under a new device id (node-hid gives it a new path at
+// every enumeration): what Ark keeps for that keyboard goes with it, the
+// draft, a restart's kept edits, a Save cut short and the copy from before an
+// Apply, so the read after it is that keyboard's.
+/** @param {Session} session @param {string} from @param {string} to */
+function followKeyboard(session, from, to) {
+    if (from === to) return;
+    if (session.draft?.deviceId === from) session.draft.followDevice(to);
+    for (const kept of [session.restart, session.saveCutShort, session.beforeApply]) {
+        if (kept?.deviceId === from) kept.deviceId = to;
+    }
+}
+
 /**
  * Waits for the renamed keyboard to drop off and come back, then reads it
  * with `read`, which resolves false when the keyboard is not ready to edit
@@ -197,13 +216,15 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
         if (session.reconnect !== expected) return;
         const target = reconnectTarget(expected, service.snapshot().devices || []);
         if (target && "device" in target) {
+            followKeyboard(session, expected.deviceId, target.device.id);
             // A read that rejects, or says it is not ready (its complete
             // profile could not be read), failed.
             let failed = false;
             try {failed = await read(target.device.id) === false;} catch {failed = true;}
             const back = service.snapshot();
             // What the save said comes first, so its recovery copy is not lost.
-            const outcome = failed || !back.connected || back.error ? words.failed : words.back(expected.name);
+            const outcome = isStartingTimeout(back.error) ? startingTimeout(session)
+                : failed || !back.connected || back.error ? words.failed : words.back(expected.name);
             finish(outcome);
             return;
         }
@@ -215,4 +236,4 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
 /** @param {number} ms */
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-module.exports = {RECONNECT, RECONNECT_WORDS, LOST_WORDS, RESTART_WORDS, LOST_GUARD_MS, renamedTo, expectReconnect, expectRestart, expectLost, endReconnect, reconnectTarget, awaitReconnect};
+module.exports = {RECONNECT, RECONNECT_WORDS, LOST_WORDS, RESTART_WORDS, LOST_GUARD_MS, renamedTo, expectReconnect, expectRestart, expectLost, endReconnect, reconnectTarget, followKeyboard, awaitReconnect};

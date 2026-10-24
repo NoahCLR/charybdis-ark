@@ -31,6 +31,7 @@ const {IDENTITY, compose} = require("../model/layer-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, retryRead, saveCutShortResult, setEditMode} = require("./live-edits");
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
+const {isStartingTimeout, readOnceStarted, startingTimeout} = require("./keyboard-starting");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {keyboardLabel} = require("./device-model");
 
@@ -125,9 +126,23 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         session.notice = FIRMWARE_UPDATE;
         return false;
     }
-    let macroFailure = "", portable;
-    try {portable = await run(shell, "Reading the complete keyboard configuration", () => service.readKeyboardProfile());}
+    // A keyboard that has just come back is read once it has finished
+    // starting, and read again while it changes under the read
+    // (keyboard-starting.js); one that never finishes says so.
+    const timedOut = () => {
+        session.notice = startingTimeout(session);
+        return false;
+    };
+    let started;
+    try {started = await service.awaitStarted?.();}
     catch (error) {
+        if (isStartingTimeout(error)) return timedOut();
+        throw error;
+    }
+    let macroFailure = "", portable;
+    try {portable = await run(shell, "Reading the complete keyboard configuration", () => readOnceStarted(service, started, () => service.readKeyboardProfile()));}
+    catch (error) {
+        if (isStartingTimeout(error)) return timedOut();
         if (/** @type {Error & {code?: string}} */ (error).code === "FIRMWARE_UPDATE_REQUIRED") {
             session.notice = /** @type {Error} */ (error).message;
             return false;

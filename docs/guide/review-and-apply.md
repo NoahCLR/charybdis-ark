@@ -235,7 +235,8 @@ the bar says **The keyboard stopped saving**.
 
 1. With unsaved edits, Ark first keeps them as a recovery copy. If it can't,
    it doesn't restart.
-2. The keyboard restarts and comes back a moment later. Ark reads it again.
+2. The keyboard restarts and comes back a moment later. Ark waits for it to
+   finish starting, then reads it again.
 3. Ark sends your unsaved edits back, still unsaved. In Live + review, review
    and save them; in Live the keyboard saves them by itself.
 
