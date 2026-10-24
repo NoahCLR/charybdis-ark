@@ -101,3 +101,5 @@ export interface RuntimeRead {
     live: {defaultDpi: number; snipingDpi: number; rgbMode: number; rgbColor: number; defaultLayers: number; keymapOptions: number};
 }
 export interface ActiveProfileMetadata {length: number; session: number; revision: number; savedGeneration: number; savedOrigin: number; domainMask: number; unsaved: boolean}
+export type FlashPauses = import('../../contracts/model.js').FlashPauseFigures;
+export interface FlashPauseRead {master: FlashPauses | null; slave: FlashPauses | null}

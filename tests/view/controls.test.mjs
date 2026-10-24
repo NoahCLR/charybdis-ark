@@ -13,6 +13,9 @@ test("draft and read controls post their type and the one value they carry", () 
     assert.deepEqual(controls.jumpDraft(0), {type: "jumpProfileDraft", step: 0});
     assert.deepEqual(controls.selectDevice("kb"), {type: "selectDevice", deviceId: "kb"});
     assert.deepEqual(controls.abortLiveEdit(), {type: "abortLiveEdit"}, "Cancel edit names no edit: only one is ever held");
+    assert.deepEqual(controls.readKeyboard(), {type: "refresh"});
+    assert.deepEqual(controls.readKeyboard(true), {type: "refresh", flashPauses: true}, "Diagnostics is open: its figures follow the read");
+    assert.deepEqual(controls.readFlashPauses(), {type: "readFlashPauses"});
 });
 
 test("the layer panel posts every typed name with a toggle, a move and a save", () => {

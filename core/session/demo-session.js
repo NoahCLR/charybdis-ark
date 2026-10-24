@@ -267,8 +267,15 @@ function demoModel(session, state) {
     };
 }
 
+// What the demo shows as each half's flash pauses: figures a keyboard read
+// after one save, the master half the right one.
+/** @type {Extract<import("../../contracts/model.js").FlashPausesView, {state: "read"}>} */
+const DEMO_FLASH_PAUSES = Object.freeze({state: "read",
+    master: Object.freeze({physicalHalf: 1, longestEraseUs: 49045, longestProgramUs: 632, longestStorageStepUs: 49310, lastSaveUs: 790000, lastSaveFlashUs: 114000, saves: 1}),
+    slave: Object.freeze({physicalHalf: 0, longestEraseUs: 48708, longestProgramUs: 1007, longestStorageStepUs: 48990, lastSaveUs: 410000, lastSaveFlashUs: 117000, saves: 1})});
+
 // The rail's header in the demo, in the device's place: no keyboard, no
-// generation, no halves to agree.
+// generation, no halves to agree; sample flash pauses.
 /** @param {Pick<OpenSession, "demo">} session @param {boolean} busy */
 function demoHeader(session, busy) {
     return {
@@ -278,6 +285,7 @@ function demoHeader(session, busy) {
         summary: `No keyboard · ${session.demo.name}`,
         savedProfile: "",
         subtitle: "Nothing here was read from a keyboard, and nothing can be applied to one.",
+        flashPauses: DEMO_FLASH_PAUSES,
         health: {profile: "demo", converged: false, halves: /** @type {import("../../contracts/model.js").HalvesId} */ ("unread"), recoveryPending: false, earlierFormat: false, restartNeeded: false, busy: Boolean(busy), phase: PHASE.DEMO, error: ""},
     };
 }

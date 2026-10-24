@@ -143,7 +143,7 @@ export interface PublishedModel {
     qmkSpellings: {modTaps: Record<string, string>; wrappers: Record<string, string>; names: Record<string, string>};
     diagnostics: string[];
     /** `summary` names the saved profile's generation and digest (Diagnostics); `savedProfile` the same in words, without the digest. */
-    device: {connected: boolean; label: string; summary: string; savedProfile: string; subtitle: string; health: {profile: string; converged: boolean; halves: import('./model.js').HalvesId; recoveryPending: boolean; restartNeeded: boolean; earlierFormat: boolean; busy: boolean; phase: PhaseId; error: string}};
+    device: {connected: boolean; label: string; summary: string; savedProfile: string; subtitle: string; /** Each half's flash pauses as last read (GET 0x0D); null until read; the demo's are samples. */ flashPauses: import('./model.js').FlashPausesView | null; health: {profile: string; converged: boolean; halves: import('./model.js').HalvesId; recoveryPending: boolean; restartNeeded: boolean; earlierFormat: boolean; busy: boolean; phase: PhaseId; error: string}};
     devices: {id: string; label: string}[];
     selectedDeviceId: string;
     draft?: DraftView;

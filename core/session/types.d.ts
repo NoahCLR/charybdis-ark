@@ -72,6 +72,8 @@ export interface DeviceModelInput {
     editMode?: (import('../protocol/types.js').EditModeRead & {notStored?: boolean}) | null;
     /** The toggles' stored masters and runtime overrides. */
     runtime?: import('../protocol/types.js').RuntimeRead | null;
+    /** Each half's flash pauses as last read (GET 0x0D); null until read on this connection. */
+    flashPauses?: import('../../contracts/model.js').FlashPausesView | null;
 }
 
 export type CandidateStatus = Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus>>;
@@ -295,6 +297,10 @@ export interface ControlService extends DraftApplyService {
     readonly busy?: boolean;
     flushWorkingCopy(saveRecovery: (document: import('../model/types.js').PortableDocument) => Promise<string | undefined>): Promise<import('../protocol/types.js').EditStatus & {saved: boolean}>;
     readLiveStatus(): Promise<import('../protocol/types.js').EditStatus | undefined>;
+    /** The wait between polls, the shell's when it gave one (a browser tab's cannot be throttled). */
+    readonly sleep?: (ms: number) => Promise<void>;
+    /** Each half's flash pauses into the snapshot, a background read; false when skipped (flash-pauses.js). */
+    readFlashPauses(): Promise<boolean>;
     close(): Promise<void>;
     emitChange?(): void;
     /** A save renamed the keyboard, or Ark restarted it: its coming disconnect is expected (keyboard-reconnect.js). */

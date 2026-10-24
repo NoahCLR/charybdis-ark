@@ -57,7 +57,8 @@ export interface ControlPayloads {
     };
     read: {
         ready: {discardDemo?: boolean};
-        refresh: {discardDemo?: boolean};
+        /** `flashPauses`: the Keyboard screen's Diagnostics is open, so each half's flash pauses are read after the keyboard. */
+        refresh: {discardDemo?: boolean; flashPauses?: boolean};
         selectDevice: {deviceId: string; discardDemo?: boolean};
     };
     view: {
@@ -74,6 +75,10 @@ export interface ControlPayloads {
     };
     inspect: {
         validateMacro: Omit<Extract<PanelEdit, {type: 'validateMacro'}>, 'type'>;
+    };
+    diagnose: {
+        /** Read each half's flash pauses (GET 0x0D) for the Keyboard screen's Diagnostics. */
+        readFlashPauses: Record<never, never>;
     };
 }
 export type ControlsOn<R extends keyof ControlPayloads> = {[T in keyof ControlPayloads[R]]: {type: T} & ControlPayloads[R][T]}[keyof ControlPayloads[R]];

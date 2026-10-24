@@ -301,6 +301,8 @@ function routeMessage(session, message, state) {
         throw new Error(BUSY_REFUSAL);
     }
     if (control?.route === "demo") return "demo";
+    // The demo has no flash to measure: its figures are samples.
+    if (control?.route === "diagnose") return session.demo ? "none" : "diagnose";
     // A panel that loads again in the demo stays in it; reading a keyboard
     // leaves it first (panel-loop.js), so nothing reads one from here.
     if (session.demo && control?.route === "read") return "none";

@@ -37,6 +37,8 @@ export interface FakeKeyboard {
     mutations: Buffer[];
     unhandled: Buffer[];
     answer(report: Uint8Array): Buffer[];
+    /** GET 0x0D: each half's page, and the pulls the master half has made of the slave half's. */
+    flashPauses?: {master: Buffer; slave: Buffer; pulled: boolean; asked: boolean; pulls: number; answer(request: Buffer, reply: Buffer): Buffer | undefined};
 }
 export type FakeKeyboardAdapterOptions = FakeKeyboardOptions & {keyboard?: FakeKeyboard} | {keyboard: FakeKeyboard};
 export type FakeKeyboardAdapter = InstanceType<typeof import('../../core/transport/fake-device-adapter.js').FakeDeviceAdapter> & {keyboard: FakeKeyboard};
