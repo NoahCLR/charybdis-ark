@@ -220,15 +220,6 @@ function spinner() {
     return `<span class="spin" aria-hidden="true" style="animation-delay:-${Math.round(time % 800)}ms"></span>`;
 }
 
-/** @type {Readonly<Record<string, string>>} */
-// What can honestly be said about what was saved when Apply stops: a save is
-// all or nothing, so never "part of it" (core's failure.saved).
-const SAVED_VERDICT = {
-    none: "Nothing was saved. The keyboard kept the profile it had.",
-    decided: "The keyboard had already decided to save the new profile, and finishes it by itself about 15 seconds after both halves are connected. Read the keyboard then.",
-    unknown: "Ark can't tell which profile was saved. Read the keyboard to see what it runs now.",
-};
-
 export function commitBar() {
     const model = getModel();
     const draft = model?.draft;
@@ -250,12 +241,13 @@ export function commitBar() {
             <span class="readback-note">Editing resumes when this read finishes.</span></div>`);
     }
     // A failed Apply stays on screen until it is dismissed, so where it
-    // stopped and why can be read after the fact.
+    // stopped and why can be read after the fact. What was saved is core's
+    // verdict, in the words the notice starts with too.
     if (!draft.busy && apply?.state === "failed" && state.applyDismissed !== apply.id) {
         const node = el(`<div class="commit ap failed">
             <div class="ap-head"><i class="dot err"></i><strong>Apply stopped at: ${esc(apply.failure?.label)}</strong></div>
             <p class="ap-reason">${esc(apply.failure?.reason)}</p>
-            <p class="ap-saved">${esc(SAVED_VERDICT[apply.failure?.saved ?? ""] || SAVED_VERDICT.unknown)}</p>
+            <p class="ap-saved">${esc(apply.failure?.verdict)}</p>
             ${applySteps(apply)}
             <div class="ap-actions"><button class="btn ghost tiny" data-act="dismiss">Dismiss</button>
                 <button class="btn tiny" data-act="read">Read keyboard</button></div></div>`);

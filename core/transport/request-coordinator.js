@@ -138,7 +138,7 @@ class CoordinatedDeviceConnection {
         } catch (cause) {
             const error = liveLinkError(
                 LIVE_LINK_ERROR_CODES.CONNECT_FAILED,
-                `Could not subscribe to device ${this.deviceId}.`,
+                "Ark could not listen to the keyboard.",
                 {cause, deviceId: this.deviceId}
             );
             void this.terminate(error, {activeError: error, closeDevice: true});
@@ -162,7 +162,7 @@ class CoordinatedDeviceConnection {
         if (!this.connected) {
             return Promise.reject(liveLinkError(
                 LIVE_LINK_ERROR_CODES.NOT_CONNECTED,
-                `Device ${this.deviceId} is not connected.`,
+                "The keyboard is not connected.",
                 {deviceId: this.deviceId}
             ));
         }
@@ -233,7 +233,7 @@ class CoordinatedDeviceConnection {
     async disconnect() {
         const reason = liveLinkError(
             LIVE_LINK_ERROR_CODES.DISCONNECTED,
-            `Device ${this.deviceId} was disconnected by Charybdis Ark.`,
+            "Ark disconnected the keyboard.",
             {deviceId: this.deviceId}
         );
         await this.terminate(reason, {activeError: reason, closeDevice: true});
@@ -281,7 +281,7 @@ class CoordinatedDeviceConnection {
         } catch (cause) {
             const invalidReport = liveLinkError(
                 LIVE_LINK_ERROR_CODES.INVALID_REPORT,
-                `Device ${this.deviceId} returned an invalid report.`,
+                "The keyboard sent a report Ark could not read.",
                 {cause, deviceId: this.deviceId}
             );
             void this.terminate(invalidReport, {
@@ -317,7 +317,7 @@ class CoordinatedDeviceConnection {
         } catch (error) {
             const matchError = liveLinkError(
                 LIVE_LINK_ERROR_CODES.RESPONSE_MATCH_FAILED,
-                `Response matcher failed for device ${this.deviceId}.`,
+                "Ark could not match the keyboard's answer to its request.",
                 {cause: error, deviceId: this.deviceId}
             );
             void this.terminate(matchError, {
@@ -358,7 +358,7 @@ class CoordinatedDeviceConnection {
     handleDeviceDisconnect(reason) {
         const error = liveLinkError(
             LIVE_LINK_ERROR_CODES.DISCONNECTED,
-            `Device ${this.deviceId} disconnected.`,
+            "The keyboard was disconnected.",
             {cause: reason instanceof Error ? reason : undefined, deviceId: this.deviceId}
         );
         void this.terminate(error, {activeError: error, closeDevice: false, queuedError: error});
@@ -371,7 +371,7 @@ class CoordinatedDeviceConnection {
         }
         const error = liveLinkError(
             LIVE_LINK_ERROR_CODES.TIMEOUT,
-            `Device ${this.deviceId} did not respond within ${operation.timeoutMs} ms.`,
+            `The keyboard did not answer within ${operation.timeoutMs} ms.`,
             // Which request went unanswered, for the diagnostics.
             {deviceId: this.deviceId, timeoutMs: operation.timeoutMs, request: operation.report.subarray(0, 5).toString("hex")}
         );
@@ -420,7 +420,7 @@ class CoordinatedDeviceConnection {
         }
         const error = liveLinkError(
             LIVE_LINK_ERROR_CODES.WRITE_FAILED,
-            `Could not write a report to device ${this.deviceId}.`,
+            "Ark could not send a report to the keyboard.",
             {cause, deviceId: this.deviceId}
         );
         void this.terminate(error, {
@@ -534,7 +534,7 @@ function defaultResponseMatcher(response, request) {
 function cancelledError(deviceId) {
     return liveLinkError(
         LIVE_LINK_ERROR_CODES.CANCELLED,
-        `Request for device ${deviceId} was cancelled.`,
+        "A request to the keyboard was cancelled.",
         {deviceId}
     );
 }
@@ -543,7 +543,7 @@ function cancelledError(deviceId) {
 function disconnectedAfter(deviceId, cause) {
     return liveLinkError(
         LIVE_LINK_ERROR_CODES.DISCONNECTED,
-        `Device ${deviceId} connection was invalidated after ${cause.code || "a transport failure"}.`,
+        "Ark closed the connection to the keyboard after a request to it failed.",
         {cause, deviceId}
     );
 }

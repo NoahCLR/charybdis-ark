@@ -108,6 +108,9 @@ async function webShells() {
         "live-stopped": VSCODE_SHELL,
         // An edit the keyboard holds until a key and a modifier are let go.
         "live-held": VSCODE_SHELL,
+        // An Apply cut short by the keyboard restarting during the copy to
+        // the slave half: the bar and the notice it leaves.
+        "apply-cut-short": VSCODE_SHELL,
         "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
         "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
     };
@@ -149,8 +152,8 @@ const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed"
 // stopped saving (firmware D-F34, `stopped`), with Restart; ?shell=live-held
 // one holding Ark's next edit until a key and a modifier are let go (`held`),
 // with Cancel edit.
-/** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean, held?: boolean}} [options] */
-function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = false, held = false} = {}) {
+/** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean, held?: boolean, apply?: import("../contracts/model.js").ApplyView}} [options] */
+function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = false, held = false, apply} = {}) {
     const doc = fillPreviewLayer(document32());
     const snapshot = {
         document: doc,
@@ -190,12 +193,35 @@ function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = fal
         editMode: {mode: live ? mode : 0, counter: 1, slaveMode: live ? mode : 0, slaveCounter: 1, slaveKnown: true, conflict: false, agreed: true},
         runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true},
             live: {defaultDpi: 1200, snipingDpi: 400, rgbMode: 1, rgbColor: 0, defaultLayers: 1, keymapOptions: 0}} : null,
+        liveApply: apply || null,
     };
     // The shell's own model builder, so the preview cannot drift from it. The
     // layer editor is open so Rename & Reorder has something to show.
     const panel = {service: {portable: null}, shell, draft: session, portableLayers: startLayerEdit(snapshot, session.revision)};
     const model = buildPanelModel(panel, state);
     return model;
+}
+
+// `apply-cut-short`: the real Apply against the test fixtures' writable
+// keyboard, which restarts (its connection lost) while the slave half takes
+// its copy. What the bar shows is that Apply's view, and the notice is the
+// sentence its failure carries, as the panel loop would say it.
+async function cutShortApply() {
+    const {fixture} = require("../tests/fixtures/portable-restore");
+    const {liveLinkError, LIVE_LINK_ERROR_CODES} = require("../core/transport/device-adapter");
+    const f = fixture();
+    f.keyboard.faults.stallCommit = true;
+    f.keyboard.faults.beforeRequest = (/** @type {Buffer} */ request, /** @type {{events: string[], faults: {disconnected?: boolean}}} */ keyboard) => {
+        if (!keyboard.events.includes("commit") || request[0] !== 8) return;
+        keyboard.faults.disconnected = true;
+        throw liveLinkError(LIVE_LINK_ERROR_CODES.DISCONNECTED, "The keyboard was disconnected.", {deviceId: "preview"});
+    };
+    /** @type {import("../contracts/model.js").ApplyView | undefined} */
+    let view;
+    f.options.onApplyProgress = (/** @type {import("../contracts/model.js").ApplyView} */ applied) => {view = applied;};
+    f.options.saveRecovery = async () => "recovery-2026-10-24T09-12-00-000Z-before-apply-charybdis.charybdis.json";
+    const failure = await f.restore().then(() => {throw new Error("the preview's Apply was meant to be cut short");}, (/** @type {Error} */ error) => error);
+    return {view: /** @type {import("../contracts/model.js").ApplyView} */ (view), notice: failure.message};
 }
 
 // `--device` renders the interface against the keyboard that is plugged in,
@@ -269,10 +295,15 @@ function writeShellPages(page) {
 const previewDir = path.join(__dirname, "..", "preview");
 const macroShell = require("./build-web").bundle("core", {macroShell: "scripts/preview-macro-shell.mjs"}, previewDir,
     {inject: [path.join(__dirname, "..", "web", "buffer.mjs")]});
-Promise.all([model, webShells(), macroShell]).then(([model, shells, macroShell]) => {
+Promise.all([model, webShells(), macroShell, cutShortApply()]).then(([model, shells, macroShell, cutShort]) => {
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
 for (const [name, shell] of Object.entries(shells)) {
+    // A shell model may carry the notice its publish brings (`notice`, `failed`).
+    if (name === "apply-cut-short") {
+        fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify({model: buildModel(shell, {apply: cutShort.view}), notice: cutShort.notice, failed: true}));
+        continue;
+    }
     const web = name === "web" ? buildModel(shell) : name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "live-held" ? buildModel(shell, {live: true, held: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
@@ -287,11 +318,13 @@ const page = `<!doctype html>
 // answers as the web shell does instead, and turns its theme toggle.
 // ?shell=none is the extension with no keyboard; Explore a demo there opens
 // ?shell=demo's model, the bundled demo (demo-edited has an edit staged).
+// ?shell=apply-cut-short is an Apply the keyboard's restart cut short.
 const posted = [];
-let model = null, wanted = false;
+let model = null, wanted = false, said = null;
 const publish = () => {
     if (!model || !wanted) return;
-    window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model, ...(said || {})}}));
+    said = null;
 };
 window.acquireVsCodeApi = () => ({
     postMessage: (message) => {
@@ -307,7 +340,11 @@ window.acquireVsCodeApi = () => ({
 });
 window.__posted = posted;
 const shell = new URLSearchParams(location.search).get("shell");
-fetch(shell ? "./model-" + shell + ".json" : "./model.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });
+// ?shell=apply-cut-short also says the notice that model's publish brings.
+fetch(shell ? "./model-" + shell + ".json" : "./model.json").then((response) => response.json()).then((loaded) => {
+    if (loaded.model) { said = {notice: loaded.notice, failed: loaded.failed}; model = loaded.model; } else model = loaded;
+    publish();
+});
 // ?screen=lighting opens a screen by clicking its rail button, the way a
 // person would, so the preview needs no hook inside the app.
 const wantedScreen = new URLSearchParams(location.search).get("screen");

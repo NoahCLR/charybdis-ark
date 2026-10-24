@@ -29,7 +29,7 @@ const {applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable
 const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY, compose} = require("../model/layer-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
-const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, retryRead, setEditMode} = require("./live-edits");
+const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, retryRead, saveCutShortResult, setEditMode} = require("./live-edits");
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {keyboardLabel} = require("./device-model");
@@ -163,8 +163,16 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     // A live keyboard that restarted (a replug, a lost connection) since Ark
     // knew of unsaved edits: in Live it may have saved them first.
     const restarted = session.draft?.restartedWithUnsaved;
+    // A Save cut short says what became of its edits, which also tells the restart.
+    const saveResult = saveCutShortResult(session, portable);
+    if (saveResult) {
+        session.notice += ` ${saveResult}`;
+        // A keyboard Ark followed back says so after this read: the result
+        // goes with what it says.
+        if (session.reconnect) session.reconnect.after = [session.reconnect.after, saveResult].filter(Boolean).join(" ");
+    }
     // A restart Ark asked for kept the edits itself and says what became of them.
-    if (restarted && session.draft && !session.restart) {
+    else if (restarted && session.draft && !session.restart) {
         session.notice += restarted.kept ? " The keyboard restarted since Ark last read it and kept your edits: it saved them first."
             : restarted.mode === EDIT_MODE.LIVE ? " The keyboard restarted before it saved your last edits, so those are gone: it runs what it saved."
             : " The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";

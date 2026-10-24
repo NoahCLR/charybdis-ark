@@ -15,6 +15,8 @@
 //                 Send/Discard first where work would be lost; leaving Live
 //                 has the keyboard save first, with no question
 //   closingLoses  whether closing Ark now loses edits
+//   saveCutShortResult  after a Save the connection cut short, what the next
+//                 read shows became of the edits
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -29,6 +31,7 @@ const {IDENTITY} = require("../model/layer-order");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
 const {expectReconnect, renamedTo} = require("./keyboard-reconnect");
+const {INTERRUPTION_REASONS, SAVE_WORDS, interruption, saveResult} = require("./interruption");
 
 /** @param {string} message @param {string} [code] */
 const refusal = (message, code = "LIVE_EDIT_REFUSED") => Object.assign(new Error(message), {code});
@@ -164,6 +167,45 @@ async function revertTo(session, draft, target) {
     return true;
 }
 
+// A Save the connection cut short: the keyboard may have saved, or may have
+// restarted and lost the edits with its RAM. Ark can't tell, so it says so,
+// keeps the edits (what the keyboard ran) as a recovery copy, and says what
+// became of them once a read shows it (`saveCutShortResult`). The returned
+// error starts with that verdict; the transport's own is its cause.
+/** @param {Session} session @param {Draft} draft @param {unknown} error @param {LiveContext["saveRecovery"]} saveRecovery */
+async function saveCutShort(session, draft, error, saveRecovery) {
+    /** @type {string | undefined} */
+    let recovery;
+    try {recovery = await saveRecovery(draft.current.document);} catch {}
+    const state = session.service.snapshot();
+    const serialNumber = (state.devices || []).find(device => device.id === draft.deviceId)?.serialNumber || "";
+    session.saveCutShort = {deviceId: draft.deviceId, serialNumber, edits: draft.current.fingerprint, recovery};
+    await reread(session);
+    const reason = INTERRUPTION_REASONS[/** @type {"lost" | "unanswered"} */ (interruption(error))];
+    const read = session.service.snapshot().connected ? saveCutShortResult(session, session.observedPortable) : "";
+    return Object.assign(new Error([SAVE_WORDS.cutShort, reason, read || SAVE_WORDS.later(recovery)].join(" ")),
+        {code: codeOf(error) || "LIVE_SAVE_CUT_SHORT", cause: error, verdict: SAVE_WORDS.cutShort});
+}
+
+// After a Save cut short, what `read` (a live read of the same keyboard)
+// shows became of the edits, said once; "" until there is one. A restarted
+// keyboard may come back under a new device id: it is the same one by its
+// serial number, or because Ark followed it back (keyboard-reconnect.js).
+// A read of another keyboard forgets the Save, which it cannot tell about.
+/** @param {Session} session @param {import("../model/types.js").ProfileSnapshot | undefined} read */
+function saveCutShortResult(session, read) {
+    const cut = session.saveCutShort;
+    if (!cut || !read) return "";
+    const state = session.service.snapshot();
+    const serialNumber = (state.devices || []).find(device => device.id === state.selectedDeviceId)?.serialNumber || "";
+    const same = state.selectedDeviceId === cut.deviceId || (Boolean(cut.serialNumber) && serialNumber === cut.serialNumber)
+        || session.reconnect?.lost !== undefined;
+    if (!same) {session.saveCutShort = undefined; return "";}
+    const said = saveResult(cut, /** @type {Parameters<typeof saveResult>[1]} */ (read));
+    if (said) session.saveCutShort = undefined;
+    return said;
+}
+
 // The keyboard as it is now, after a refusal or a lost answer. A failed read
 // leaves the draft stale, which says to read again.
 /** @param {Session} session */
@@ -248,6 +290,7 @@ const LIVE_ACTIONS = Object.freeze({
             session.notice = `Saved on both halves. Recovery copy of what was saved before: ${recovery}`;
         } catch (error) {
             if (codeOf(error) === "LIVE_HALVES_APART") markApart(draft);
+            else if (interruption(error)) throw await saveCutShort(session, draft, error, saveRecovery);
             else await reread(session);
             throw error;
         }
@@ -378,4 +421,4 @@ function closingLoses(session) {
     return draft.live.unsaved || draft.dirty;
 }
 
-module.exports = {LIVE_ACTIONS, CHANGED_ELSEWHERE, closingLoses, liveEdit, proposeLive, reread, retryRead, setEditMode};
+module.exports = {LIVE_ACTIONS, CHANGED_ELSEWHERE, closingLoses, liveEdit, proposeLive, reread, retryRead, saveCutShortResult, setEditMode};

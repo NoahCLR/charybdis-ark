@@ -6,6 +6,7 @@ const {ProfilePayloadReader, payloadMatchesActive} = require("./profile-payload-
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidateSlaveStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
 const {ApplyProgress, failureReason} = require("./apply-progress");
+const {interruption} = require("./interruption");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {readEditProgress} = require("../protocol/profile-edit-v1");
 const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
@@ -99,9 +100,9 @@ async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}
 async function slaveRestartGuidance(connection, options) {
     try {
         const status = await readProfileStatus(connection, options);
-        if (status?.slaveCleanupPending) return " The slave half did not confirm the cancel. Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in before saving again.";
+        if (status?.slaveCleanupPending) return ["The slave half did not confirm the cancel.", "Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in before saving again."];
     } catch {}
-    return "";
+    return [];
 }
 // AUTHORITY_FAILED cannot finish without a restart. No input fence exists:
 // until activation each half continues running a complete old generation.
@@ -170,14 +171,45 @@ function progressText(view) {
 }
 
 // Every failure leaves with the step it happened in, the keyboard's reason,
-// and what can honestly be said about what was saved.
-/** @param {Failure} error @param {InstanceType<typeof ApplyProgress>} applyProgress @param {string} saved */
-function withFailure(error, applyProgress, saved) {
+// and what can honestly be said about what was saved. An Apply cut short (once
+// the upload began, or by a lost connection or a keyboard that stopped
+// answering at any step) says so in whole
+// sentences: its verdict, the bar's words, then why, then what to do. Keep
+// both halves connected is said only while the keyboard still is. The
+// coordinators' and the transport's own text stays in `cause` (and the
+// device diagnostics). A refusal before the upload keeps its own sentence.
+/** @typedef {Failure & {outcome?: "none" | "decided" | "unknown", advice?: string[], keepConnected?: boolean}} Interrupted */
+/** @param {Interrupted} error @param {InstanceType<typeof ApplyProgress>} applyProgress @param {Connection} connection */
+function withFailure(error, applyProgress, connection) {
+    const cut = interruption(error), lost = cut === "lost";
+    const cutShort = Boolean(error.outcome) || Boolean(cut);
+    const saved = error.outcome || "none";
     // A device reason found after the step failed (AUTHORITY_FAILED read
     // back) outranks the step's own error.
-    const cause = error.deviceError ? error : error.cause || error;
-    const failure = applyProgress.fail({reason: failureReason(cause, cause.progress?.slave), saved});
-    return Object.assign(error, {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved});
+    const cause = /** @type {Failure} */ (error.deviceError ? error : error.cause || error);
+    const failure = applyProgress.fail({reason: failureReason(cause, slaveOf(error)), saved});
+    const fields = {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved};
+    if (!cutShort) return Object.assign(error, fields);
+    const connected = !lost && /** @type {{connected?: boolean}} */ (connection).connected !== false;
+    const sentences = [failure.verdict, failure.reason, connected && error.keepConnected ? "Keep both halves connected." : "", ...(error.advice || [])];
+    return Object.assign(fail(error.code || "RESTORE_NOT_SAVED", sentences.filter(Boolean).join(" ")),
+        {cause: error.outcome ? error.cause : error, deviceError: error.deviceError}, fields, {verdict: failure.verdict});
+}
+// What the slave half last said, from the coordinator's error in the cause.
+/** @param {unknown} error @returns {import("./types.js").CandidateSlave | undefined} */
+function slaveOf(error) {
+    for (let cause = /** @type {Failure | undefined} */ (error), depth = 0; cause && depth < 8; cause = cause.cause, depth++) {
+        if (cause.progress?.slave) return cause.progress.slave;
+    }
+    return undefined;
+}
+// Where the profile from before Apply is, as whole sentences; `ifOld` when
+// it matters only if the keyboard still shows the old profile once read.
+/** @param {boolean | undefined} incomplete @param {string} recovery @param {boolean} ifOld */
+function recoveryAdvice(incomplete, recovery, ifOld) {
+    if (incomplete) return [ifOld ? "If it still shows the old profile then, restore your original complete backup again." : "Restore your original complete backup again.",
+        `Interrupted data was saved for diagnosis at ${recovery}.`];
+    return [ifOld ? `If it still shows the old profile then, use the copy saved before Apply (${recovery}) on Backups.` : `The copy saved before Apply is on Backups (${recovery}).`];
 }
 
 /** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {unknown} input @param {import("./types.js").RestoreOptions} [options] */
@@ -191,11 +223,9 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
     try {
         return await restoreSteps();
     } catch (error) {
-        // Nothing reached the keyboard before the upload; after it, the
+        // Nothing reached the keyboard before the upload; from it on, the
         // inner handler has already said whether anything was saved.
-        // After the decision, unless the halves stopped agreeing, the keyboard
-        // finishes the new profile by itself: "decided".
-        throw withFailure(/** @type {Failure} */ (error), applyProgress, !mutated || /** @type {Failure} */ (error).code === "RESTORE_NOT_SAVED" ? "none" : /** @type {Failure & {verdict?: string}} */ (error).verdict || "unknown");
+        throw withFailure(/** @type {Interrupted} */ (error), applyProgress, connection);
     }
 
     async function restoreSteps() {
@@ -269,23 +299,29 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
                 // candidate.
                 try { await coordinator.abort(prepared.transactionId); cancelled = true; } catch {}
             }
-            if (!mutated) throw error;
+            // The upload cut short: nothing is saved before the commit.
+            // It keeps the code it failed with: the draft needs no read.
+            if (!mutated) throw Object.assign(fail(/** @type {Failure} */ (error).code || "RESTORE_NOT_SAVED", "Nothing was saved."), {cause: error, outcome: "none"});
             const restart = await slaveRestartGuidance(connection, options);
             // Before the commit was sent, or once the keyboard confirmed the
             // cancel, the profile it had is still the one it runs.
             if (!decisionObserved && (!commitRequested || cancelled)) {
-                throw Object.assign(fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${/** @type {Error} */ (error).message}${restart}`), {cause: error});
+                throw Object.assign(fail("RESTORE_NOT_SAVED", "Nothing was saved."), {cause: error, outcome: "none", advice: restart});
             }
-            const recoveryAdvice = before.incomplete ? `Restore your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `use the copy saved before Apply (${recovery}) on Backups.`;
             const authority = prepared ? await authorityFailure(connection, options, /** @type {Failure} */ (error), prepared.transactionId) : null;
             if (authority) {
                 // Only a restart ends it, so the advice is to restart even when
                 // the master half may still be typing.
-                throw Object.assign(fail("RESTORE_INCOMPLETE", `Apply was interrupted. Keep both halves connected. The keyboard had already decided to save it, but the halves then stopped agreeing on the saved profile, so it cannot finish by itself. The keyboard keeps running a complete profile until it restarts. Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in, then read the keyboard again. Only if it still shows the old profile: ${recoveryAdvice} ${/** @type {Error} */ (error).message}`), {cause: error, deviceError: authority.deviceError});
+                throw Object.assign(fail("RESTORE_INCOMPLETE", "Apply was cut short after the keyboard decided to save."), {cause: error, deviceError: authority.deviceError, outcome: "unknown", keepConnected: true,
+                    advice: ["The keyboard had already decided to save it, but the halves then stopped agreeing on the saved profile, so it cannot finish by itself.",
+                        "The keyboard keeps running a complete profile until it restarts.",
+                        "Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in, then read the keyboard again.",
+                        ...recoveryAdvice(before.incomplete, recovery, true)]});
             }
-            // After the decision firmware owns commit recovery and activation.
-            const finishing = decisionObserved ? "The keyboard had already decided to save it and finishes the same generation by itself once both halves are connected; read the keyboard again then. Only if it still shows the old profile: " : "";
-            throw Object.assign(fail("RESTORE_INCOMPLETE", `Apply was interrupted. Keep both halves connected. ${finishing}${recoveryAdvice} ${/** @type {Error} */ (error).message}${restart}`), {cause: error, verdict: decisionObserved ? "decided" : "unknown"});
+            // After the decision firmware owns commit recovery and activation:
+            // the keyboard finishes the new profile by itself ("decided").
+            throw Object.assign(fail("RESTORE_INCOMPLETE", "Apply was cut short."), {cause: error, outcome: decisionObserved ? "decided" : "unknown", keepConnected: true,
+                advice: [...recoveryAdvice(before.incomplete, recovery, decisionObserved), ...restart]});
         }
     }
 }

@@ -27,7 +27,8 @@ test("a failure is pinned to the running step, and nothing moves after it", () =
     progress.report("slave");
     assert.equal(progress.beforeDecision, true, "the copy to the slave half comes before the commit decision");
     const failure = progress.fail({reason: "The slave half kept answering that it was busy.", saved: "none"});
-    assert.deepEqual(failure, {step: "slave", label: "Copy the profile to the slave half", reason: "The slave half kept answering that it was busy.", saved: "none"});
+    assert.deepEqual(failure, {step: "slave", label: "Copy the profile to the slave half", reason: "The slave half kept answering that it was busy.", saved: "none",
+        verdict: "Nothing was saved: the keyboard kept the profile it had."});
     progress.report("commit");
     const view = progress.view();
     assert.equal(view.state, "failed");
@@ -55,7 +56,40 @@ test("the reason is the keyboard's own when it gave one, else the slave half's l
     assert.equal(failureReason({deviceError: {name: "SOMETHING_NEW"}}), "The keyboard reported SOMETHING_NEW.");
     assert.equal(failureReason({message: "made no observable progress"}, {lastStatusName: "BUSY"}), "The slave half kept answering that it was busy.");
     assert.equal(failureReason({message: "made no observable progress"}, {lastStatusName: "OK", transportFailureCount: 3}), "The link between the halves stopped answering.");
-    assert.equal(failureReason({message: "disconnected"}), "disconnected");
+    assert.equal(failureReason({code: "RESTORE_VERIFY_FAILED", message: "The keyboard did not confirm the imported profile on both halves."}),
+        "The keyboard did not confirm the imported profile on both halves.", "Ark's own sentence is said as it is");
+});
+
+test("each verdict is the bar's sentence, and an unknown one says Ark can't tell", () => {
+    for (const [saved, verdict] of [["none", /^Nothing was saved: /], ["decided", /^The keyboard had already decided to save/], ["unknown", /^Ark can't tell which profile was saved\./], ["", /^Ark can't tell/]]) {
+        const progress = new ApplyProgress();
+        progress.report("commit");
+        assert.match(progress.fail({reason: "", saved}).verdict, verdict);
+        assert.match(progress.view().failure.verdict, verdict, "the view carries the verdict the bar draws");
+    }
+});
+
+// The keyboard restarting mid-copy makes the slave half look busy or slow;
+// the lost connection is what happened (keyboard session, 2026-10-24).
+test("a lost connection is the reason, ahead of anything the slave half last said", () => {
+    const lost = {code: "TRANSPORT_OUTCOME_AMBIGUOUS", message: "Candidate status could not be read after a mutation; its outcome is ambiguous.",
+        cause: {code: "DISCONNECTED", message: "Device DevSrvsID:4295254514 disconnected."}};
+    for (const slave of [{lastStatusName: "BUSY"}, {lastStatusName: "OK", busyStreak: 12, busyReason: "STORE_WORKING"}, {waitingSafeBoundary: true}, null]) {
+        assert.equal(failureReason(lost, slave), "The keyboard was disconnected or restarted.");
+    }
+    assert.equal(failureReason({code: "WRITE_FAILED", message: "Could not write a report to device DevSrvsID:1."}), "The keyboard was disconnected or restarted.");
+    assert.equal(failureReason({code: "TIMEOUT", message: "Device DevSrvsID:1 did not respond within 1000 ms."}), "The keyboard stopped answering.");
+});
+
+test("the coordinators' own words never reach a person", () => {
+    const stalled = code => ({name: "CandidateUploadError", code, message: `Candidate ${code} made no observable progress within its firmware-aware wait window.`});
+    // Ark's wait for the commit ran out while the keyboard waited for keys.
+    assert.match(failureReason(stalled("COMMIT_OUTCOME_AMBIGUOUS"), {waitingSafeBoundary: true}), /^A key stayed held, or a layer or pointer mode stayed locked/);
+    for (const code of ["COMMIT_OUTCOME_AMBIGUOUS", "VALIDATION_OUTCOME_AMBIGUOUS", "MAILBOX_BUSY", "INVALID_COMMIT_STATE", "UPLOAD_FAILED"]) {
+        const reason = failureReason(stalled(code), null);
+        assert.doesNotMatch(reason, /Candidate|candidate|mutation|ambiguous|wait window|decision|commit/, reason);
+        assert.match(reason, /^The keyboard /);
+    }
 });
 
 test("a copy that stopped on the slave half names its answer", () => {

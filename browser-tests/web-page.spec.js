@@ -169,7 +169,10 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     const anyway = page.locator('[data-act="apply-anyway"]');
     if (await anyway.count()) await anyway.click();
     await expect(page.locator(".commit.failed")).toBeVisible({timeout: 20000});
-    await expect(page.locator(".commit.failed")).toContainText("Nothing was saved");
+    await expect(page.locator(".commit.failed .ap-saved")).toHaveText("Nothing was saved: the keyboard kept the profile it had.");
+    // The notice starts with the same verdict and is shown as a failure.
+    await expect(page.locator(".rail-message.err > span")).toHaveText(/^Nothing was saved: the keyboard kept the profile it had\. [A-Z]/);
+    await expect(page.locator(".rail-message")).not.toContainText(/Failed|Candidate|mutation|ambiguous|wait window/);
     expect(keyboard.mutations.length).toBeGreaterThan(0);
     expect(keyboard.mutations.every((report) => keyboard.unhandled.includes(report))).toBe(true);
     await page.locator('.commit.failed [data-act="dismiss"]').click();

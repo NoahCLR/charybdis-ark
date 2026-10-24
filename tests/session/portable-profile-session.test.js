@@ -10,6 +10,8 @@ const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {capabilities, fixture} = require("../fixtures/portable-restore");
 const {document32: document, backup32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
 const {profileMacros, editLayers, editMacros} = require("../fixtures/profile-document");
+const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
+const {APPLY_VERDICTS} = require("../../core/session/interruption");
 const candidateMutations = f => f.keyboard.mutations.filter(r => [7, 9].includes(r[0]));
 const payloadReads = f => f.keyboard.requests.filter(r => r[0] === 8 && [4, 5, 6].includes(r[2]));
 function assertTarget(f) {
@@ -25,6 +27,25 @@ function stall(f, t, extra = {}) {
     Object.assign(f.keyboard.faults, {stallCommit: true, ...extra});
     f.options.sleep = async () => t.mock.timers.tick(120000);
 }
+// What a person reads about an Apply cut short: its verdict first, whole
+// sentences, none of the transport's or the coordinators' words.
+const DEVELOPER_TEXT = /DevSrvsID|Device \S+ disconnected|Candidate|candidate|mutation|ambiguous|wait window|decision/;
+/** @param {any} error @param {keyof typeof APPLY_VERDICTS} saved */
+function saysVerdict(error, saved) {
+    assert.equal(error.saved, saved);
+    assert.equal(error.verdict, APPLY_VERDICTS[saved]);
+    assert.ok(error.message.startsWith(`${APPLY_VERDICTS[saved]} `), error.message);
+    assert.doesNotMatch(error.message, DEVELOPER_TEXT);
+    for (const sentence of error.message.split(/(?<=[.!?])\s+/)) assert.match(sentence, /^[A-Z(]/, `"${sentence}" starts lowercase in: ${error.message}`);
+    return true;
+}
+// The keyboard restarting under a request, as the real transport says it.
+const unplug = keyboard => {
+    keyboard.faults.disconnected = true;
+    throw liveLinkError(LIVE_LINK_ERROR_CODES.DISCONNECTED, "Device DevSrvsID:4295254514 disconnected.", {deviceId: "DevSrvsID:4295254514"});
+};
+const lostSaid = error => error.reason === "The keyboard was disconnected or restarted." && error.message.includes(error.reason)
+    && !/Keep both halves connected/.test(error.message) && !/slave half (kept answering|did not finish)/.test(error.message);
 async function fullUpload(f) {
     const snapshot = await f.snapshot(); delete snapshot.storage; f.options.baseSnapshot = snapshot;
 }
@@ -109,17 +130,19 @@ test("a failure carries its real slave-half BUSY reason and the step where it ha
 });
 test("a sent commit the keyboard cancels is reported as not saved", async t => {
     const f = fixture(); stall(f, t);
-    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && /no observable progress/.test(error.message) && !/Unplug/.test(error.message));
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && saysVerdict(error, "none") && error.cause?.code === "COMMIT_OUTCOME_AMBIGUOUS"
+        && /^Nothing was saved: the keyboard kept the profile it had\. The slave half stopped handling requests from the master half\.$/.test(error.message));
     assert.equal(f.keyboard.durable, false); assert.equal(f.keyboard.events.at(-1), "aborted");
 });
 test("a sent commit without a confirmed cancel keeps its recovery copy and unknown outcome", async t => {
     const f = fixture(); stall(f, t, {abortRejected: true});
-    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && error.saved === "unknown" && error.message.includes("/recovery.json"));
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && saysVerdict(error, "unknown") && error.message.includes("/recovery.json")
+        && /Keep both halves connected\./.test(error.message), "still connected, the keyboard needs both halves to finish");
     assert.equal(f.keyboard.events.at(-1), "abort refused");
 });
 test("unconfirmed slave-half cleanup adds restart guidance; unreadable status loses only that hint", async t => {
     const f = fixture(); stall(f, t, {cleanupPending: true});
-    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && /Unplug the USB cable from the master half \(not the cable between the halves\)/.test(error.message));
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && saysVerdict(error, "none") && /Unplug the USB cable from the master half \(not the cable between the halves\)/.test(error.message));
     const g = fixture(); g.keyboard.faults.stallCommit = true; g.options.sleep = f.options.sleep;
     g.keyboard.faults.beforeRequest = (r, keyboard) => {if (keyboard.events.includes("aborted") && r[0] === 8 && r[2] === 2) throw Error("unreadable");};
     await assert.rejects(g.restore(), error => error.code === "RESTORE_NOT_SAVED" && !/Unplug/.test(error.message));
@@ -139,17 +162,16 @@ test("an observed decision followed by disconnect needs no roll-forward from Ark
     const f = fixture(); f.keyboard.faults.stallConvergence = true;
     let seen = false;
     f.options.onApplyProgress = view => {if (view.current === "converge") seen = true;};
-    f.keyboard.faults.beforeRequest = (r, keyboard) => {
-        if (seen && keyboard.durable) {keyboard.faults.disconnected = true; throw Object.assign(Error("disconnected"), {code: "DISCONNECTED"});}
-    };
-    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && error.saved === "decided" && /finishes the same generation by itself/.test(error.message));
+    f.keyboard.faults.beforeRequest = (r, keyboard) => {if (seen && keyboard.durable) unplug(keyboard);};
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && saysVerdict(error, "decided") && lostSaid(error)
+        && error.message.includes("/recovery.json"));
     assert.equal(f.keyboard.events.includes("aborted"), false);
     delete f.keyboard.faults.beforeRequest; f.keyboard.recover(); assertTarget(f);
     assert.equal((await f.snapshot()).fingerprint, fingerprint(f.targetDocument));
 });
 test("an unobserved durable decision refuses abort and firmware completes the same profile", async () => {
     const f = fixture(); f.keyboard.faults.disconnectAfterDecision = true; f.keyboard.faults.stallConvergence = true;
-    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && error.saved === "unknown" && error.message.includes("/recovery.json"));
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && saysVerdict(error, "unknown") && lostSaid(error) && error.message.includes("/recovery.json"));
     assert.equal(f.keyboard.durable, true); f.keyboard.faults.disconnected = false;
     await assert.rejects(new CandidateUploadCoordinator(f.connection, {requestIds: f.ids, sleep: async () => {}}).abort(1));
     assert.equal(f.keyboard.events.at(-1), "abort refused");
@@ -159,7 +181,7 @@ test("an unobserved durable decision refuses abort and firmware completes the sa
 for (const error of [E.POSTCOMMIT_AUTHORITY_LOST, E.PEER_COMMIT_CONFLICT]) {
     test(`post-decision authority failure ${error} requires restart without inventing an input fence`, async () => {
         const f = fixture(); f.keyboard.faults.authorityFailed = {error};
-        await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE" && failure.saved === "unknown"
+        await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE" && saysVerdict(failure, "unknown")
             && failure.cause.code === "AUTHORITY_FAILED" && /Unplug the USB cable/.test(failure.message)
             && /keeps running a complete profile/.test(failure.message) && !/types nothing|ACCEPT/.test(failure.message));
         assert.equal(f.keyboard.events.includes("activated"), false);
@@ -170,13 +192,40 @@ test("lost replies retain ambiguous upload ownership; a commit is safe only afte
     for (const value of [C.VALUE_STREAM_CHUNK, C.VALUE_COMMIT]) {
         const f = fixture(); await fullUpload(f); f.keyboard.faults.loseReply = value;
         if (value === C.VALUE_COMMIT) f.keyboard.faults.stallCommit = true;
-        await assert.rejects(f.restore(), error => value === C.VALUE_STREAM_CHUNK ? error.code === "TRANSPORT_OUTCOME_AMBIGUOUS" : error.code === "RESTORE_NOT_SAVED");
+        await assert.rejects(f.restore(), error => saysVerdict(error, "none") && (value === C.VALUE_STREAM_CHUNK ? error.code === "TRANSPORT_OUTCOME_AMBIGUOUS" && error.cause.ambiguous : error.code === "RESTORE_NOT_SAVED"));
         if (value === C.VALUE_STREAM_CHUNK) {
             assert.equal(f.keyboard.events.at(-1), "begin");
             await new CandidateUploadCoordinator(f.connection, {requestIds: f.ids}).abort(1);
         }
         assert.equal(f.keyboard.events.at(-1), "aborted"); assert.equal(f.keyboard.durable, false);
     }
+});
+// The keyboard restarted at each point of an Apply (keyboard session,
+// 2026-10-24): the notice says the verdict, then that the connection went.
+test("an Apply cut short by a lost connection says its verdict first and the disconnect as the reason", async () => {
+    for (const [point, saved, trigger] of /** @type {const} */ ([
+        ["before the upload", "none", (r, keyboard) => keyboard.events.includes("backup") && r[0] === 8 && r[2] === C.VALUE_STATUS],
+        ["during the upload", "none", (r) => r[0] === 7 && r[2] === C.VALUE_STREAM_CHUNK],
+        ["during the copy to the slave half", "unknown", (r, keyboard) => keyboard.events.includes("commit") && r[0] === 8],
+    ])) {
+        const f = fixture(); await fullUpload(f);
+        f.keyboard.faults.stallCommit = true;
+        f.keyboard.faults.beforeRequest = (r, keyboard) => {if (trigger(r, keyboard)) unplug(keyboard);};
+        const views = []; f.options.onApplyProgress = view => views.push(view);
+        await assert.rejects(f.restore(), error => saysVerdict(error, saved) && lostSaid(error) && error.cause?.code !== undefined, point);
+        assert.equal(views.at(-1).failure.reason, "The keyboard was disconnected or restarted.", `${point}: the bar gives the same reason`);
+        assert.equal(views.at(-1).failure.verdict, APPLY_VERDICTS[saved]);
+        assert.equal(f.keyboard.durable, false, `${point}: nothing was saved`);
+    }
+});
+test("an Apply whose keyboard stopped answering before the upload says nothing was saved, without the transport's words", async () => {
+    const f = fixture();
+    f.keyboard.faults.beforeRequest = (r, keyboard) => {
+        if (keyboard.events.includes("backup") && r[0] === 8 && r[2] === C.VALUE_STATUS) throw liveLinkError(LIVE_LINK_ERROR_CODES.TIMEOUT, "Device DevSrvsID:1 did not respond within 1000 ms.", {timeoutMs: 1000});
+    };
+    await assert.rejects(f.restore(), error => saysVerdict(error, "none") && error.reason === "The keyboard stopped answering."
+        && error.message === "Nothing was saved: the keyboard kept the profile it had. The keyboard stopped answering." && error.cause.code === "TIMEOUT");
+    assert.deepEqual(f.keyboard.mutations, []);
 });
 test("BUSY admission retries real status without duplicating accepted bytes", async () => {
     const f = fixture(); await fullUpload(f); f.keyboard.faults.busy = C.VALUE_STREAM_CHUNK;

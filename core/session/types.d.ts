@@ -149,6 +149,8 @@ export interface DemoSession {
     resetDraftForms?: boolean;
     historyOpen?: boolean;
     notice?: string;
+    /** The notice is a failure's, said with or without "Failed:" (panel-loop.js). */
+    noticeFailed?: boolean;
     portableReview?: unknown;
     portableLayers?: unknown;
     observedPortable?: import('../model/types.js').ProfileSnapshot;
@@ -178,6 +180,8 @@ export interface PanelSession extends DemoSession {
     applyRunning?: boolean;
     postApplyReadStep?: import('../../contracts/messages.js').ReadStep;
     reconnect?: ExpectedReconnect;
+    /** A Save cut short (live-edits.js): the edits' fingerprint and where Ark kept them, until a read says what became of them. */
+    saveCutShort?: {deviceId: string; serialNumber: string; edits: string; recovery?: string};
     /** When Ark last connected a lost keyboard again by itself (keyboard-reconnect.js). */
     lostAt?: number;
     /** What the keyboard held before the last successful Apply, for "Put back what it had". */

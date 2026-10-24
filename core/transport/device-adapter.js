@@ -26,6 +26,9 @@ const LIVE_LINK_ERROR_CODES = Object.freeze({
     WRITE_FAILED: "WRITE_FAILED",
 });
 
+// A transport failure: its `code` is what code acts on; its message is a
+// person's sentence naming no device path, since a shell may show it. Which
+// device it was is `deviceId`, which the diagnostics record.
 class LiveLinkTransportError extends Error {
     /**
      * @param {import("./types.js").TransportErrorCode} code

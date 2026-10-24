@@ -151,6 +151,25 @@ answered BUSY while a DPI or lighting key change awaits publication waits
 within the status budget and says so; any frame waits while a live edit or
 save holds admission.
 
+What is said about an Apply or a Save cut short comes from one place,
+`interruption.js`. Its three verdicts (`APPLY_VERDICTS`: none, decided,
+unknown) go out as `apply.failure.verdict`, which the bar draws, and every
+notice about an Apply cut short (from the upload on, or at any step by a lost
+connection or a keyboard that stopped answering) starts with the same
+sentence. The panel loop leaves "Failed:"
+off a failure that carries its `verdict`, and marks the reply `failed`. Then
+come whole sentences: the reason, "Keep both halves connected" only while
+Ark's connection still stands, and what to do. A lost connection
+(`DISCONNECTED`, `WRITE_FAILED` or `NOT_CONNECTED` anywhere in the cause) is
+the reason ahead of any slave-half answer, since a restart makes the slave
+half look busy. Ark's own commit wait running out while the keyboard waits
+for a safe boundary gets the held-keys reason. The coordinators' text, in
+developer words (candidate, mutation, ambiguous, wait window), and the
+transport's, which names no device path but says less than the reason, never
+reach a person in these notices: they stay in `cause`, and the service's
+diagnostics record the cause chain with the device id. A refusal before the
+upload keeps its own sentence, which already says nothing changed.
+
 `ApplyProgress` (`apply-progress.js`) names eight steps and only moves
 forward, since polling can report an earlier phase late. Each view goes out
 as an `applyProgress` message tagged with draft id and revision and is kept in
@@ -273,6 +292,14 @@ the working copy as it was. **Discard all** is Revert, one history step that
 undo sends back. When Revert's confirmed saved generation or origin differs
 from the draft's, another client saved meanwhile, and Ark reads the pair
 again instead of trusting its cached saved profile.
+
+A save the connection cut short may or may not have finished, and a restart
+loses the unsaved edits: Ark says "Ark can't tell whether the save
+finished.", keeps the edits as a second recovery copy and records
+`saveCutShort`. The next read of that keyboard (`readKeyboard`, also when
+Ark follows it back; by its serial number when it returns under a new device
+id) says what it shows: saved, still unsaved, or gone with the copy that has
+them (`saveCutShortResult`). A read of another keyboard forgets it.
 
 ### Live, and looking between edits
 

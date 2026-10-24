@@ -101,7 +101,7 @@ _Avoid_: coverage, navigability, escape analysis
 
 **Recovery copy**:
 A backup Ark saves automatically before an Apply, a Save or a restart, of what
-that operation could lose.
+that operation could lose, and of the unsaved edits when a Save is cut short.
 _Avoid_: recovery file, Before Apply copy, safety backup, snapshot
 
 **Backup**:

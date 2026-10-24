@@ -92,7 +92,7 @@ export type ReadStep = 'layout' | 'profile' | 'combos' | 'baseRgb';
 export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProgress} | {source: 'portable'; progress: string}) & {operationId: number; phase: PhaseId; selectedDeviceId: string; connectionToken: number | string | null};
 export type MacroValidation = MacroInspection | {error: string; code: string};
 export type PanelResponse<M = import('./panel.js').PublishedModel> =
-    | {type: 'model'; model: M; notice?: string; resetDraftForms?: boolean; acceptedEdit?: {message: {type: string}; previousFingerprint: string; fingerprint: string}}
+    | {type: 'model'; model: M; notice?: string; failed?: boolean; resetDraftForms?: boolean; acceptedEdit?: {message: {type: string}; previousFingerprint: string; fingerprint: string}}
     | ({type: 'applyProgress'; apply: ApplyView} & Partial<DraftIdentity>)
     | ({type: 'readProgress'; read: ReadProgress} & Partial<DraftIdentity>)
     | ({type: 'macroValidation'; keycode: string; payload: string; requestId: number; validation: MacroValidation} & Partial<DraftIdentity>);

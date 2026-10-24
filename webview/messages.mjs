@@ -66,10 +66,11 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
         const theme = shellOf(message.model).theme;
         if (theme) document.documentElement.dataset.theme = theme;
         else delete document.documentElement.dataset.theme;
-        // The core reports a refused edit as a notice prefixed "Failed"; that is a
-        // failure, so it is shown as one rather than as a neutral message.
+        // The core marks a failure's notice (most say "Failed: …"; an Apply or
+        // Save cut short starts with its verdict instead), so it is shown as
+        // one rather than as a neutral message.
         if (message.notice) {
-            const failed = /^Failed/.test(message.notice);
+            const failed = Boolean(message.failed) || /^Failed/.test(message.notice);
             state.error = failed ? message.notice : "";
             state.notice = failed ? "" : message.notice;
         }
@@ -78,7 +79,7 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
         // the edit, and stays open with its fields when the core refuses it. A
         // builder for a combo that no longer exists closes too.
         if (state.combo.awaiting) {
-            if (/^Failed/.test(message.notice || "")) state.combo.awaiting = false;
+            if (message.failed || /^Failed/.test(message.notice || "")) state.combo.awaiting = false;
             else closeComboBuilder();
         }
         if (state.combo.editId !== null && !(message.model?.combos || []).some((combo) => combo.id === state.combo.editId)) closeComboBuilder();

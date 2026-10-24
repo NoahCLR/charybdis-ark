@@ -157,7 +157,7 @@ export function startWebShell(env) {
             case "downloadRecovery": {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
                 if (copy) download(document, window, copy.name, copy.text);
-                else loop.session.notice = "Failed: That recovery copy is no longer in this browser.";
+                else Object.assign(loop.session, {notice: "Failed: That recovery copy is no longer in this browser.", noticeFailed: true});
                 return loop.publish();
             }
             // A recovery copy opens as a backup file does: its comparison
@@ -165,14 +165,14 @@ export function startWebShell(env) {
             case "useRecovery": {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
                 if (!copy) {
-                    loop.session.notice = "Failed: That copy is no longer in this browser.";
+                    Object.assign(loop.session, {notice: "Failed: That copy is no longer in this browser.", noticeFailed: true});
                     return loop.publish();
                 }
                 const draft = loop.session.draft;
                 return loop.handleMessage({type: "reviewPortableProfile", text: copy.text, name: copy.name, ...(draft ? {draftId: draft.id, draftRevision: draft.revision} : {})});
             }
             case "deleteRecovery": {
-                await recoveries.delete(message.id).catch(() => {loop.session.notice = "Failed: That copy could not be deleted.";});
+                await recoveries.delete(message.id).catch(() => {Object.assign(loop.session, {notice: "Failed: That copy could not be deleted.", noticeFailed: true});});
                 recoveryList = await recoveries.list().catch(() => recoveryList);
                 return loop.publish();
             }
@@ -181,7 +181,8 @@ export function startWebShell(env) {
                 picking = undefined;
                 if (failure === undefined) return loop.publish();
                 if (failure) {
-                    loop.session.notice = failure.code === "CANCELLED" ? "No keyboard was chosen." : `Failed: ${failure.message}`;
+                    if (failure.code === "CANCELLED") loop.session.notice = "No keyboard was chosen.";
+                    else Object.assign(loop.session, {notice: `Failed: ${failure.message}`, noticeFailed: true});
                     return loop.publish();
                 }
                 // The chosen keyboard lists first; select it by that, so the
