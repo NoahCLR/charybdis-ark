@@ -93,8 +93,9 @@ export const quietWords = (keyboard) => keyboard?.quietWords || "a few seconds";
  * Where a live keyboard's edits stand, by what it says (edit status), as one
  * line with its tone and the one action that helps. Null when there is
  * nothing to say. Live + review's ordinary "unsaved" is the commit bar's own.
- * Under an Apply draft the keyboard can say only that an adjustment is
- * pending. `adjustment: false` asks what stands beneath one.
+ * Under an Apply draft the keyboard can say only that it stopped saving or
+ * that an adjustment is pending. `adjustment: false` asks what stands beneath
+ * one.
  * @param {Draft | null | undefined} draft
  * @param {{adjustment?: boolean}} [options]
  * @returns {null | {kind: 'stopped' | 'refused' | 'failed' | 'adjustment' | 'saving' | 'pending' | 'saved', tone: 'err' | 'warn' | 'draft' | 'ok', title: string, detail: string, action: null | 'restart' | 'revert' | 'save'}}
@@ -102,10 +103,10 @@ export const quietWords = (keyboard) => keyboard?.quietWords || "a few seconds";
 export function liveSaveState(draft, {adjustment = true} = {}) {
     const live = draft?.live, keyboard = live ? live.keyboard : draft?.keyboard;
     const adjusting = adjustment && keyboard?.adjustmentPending;
-    if (!live) return adjusting ? ADJUSTMENT : null;
-    // Stopped outranks everything: "catching up" and "not ready" were what
-    // a stopped keyboard used to look like.
+    // Stopped outranks everything, in every edit mode: "catching up" and "not
+    // ready" were what a stopped keyboard used to look like.
     if (keyboard?.stopped || keyboard?.slaveStopped) return {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"};
+    if (!live) return adjusting ? ADJUSTMENT : null;
     if (live.slaveRefused) return {kind: "refused", tone: "err", title: "Halves apart",
         detail: `The slave half refused these edits, so the halves run different profiles and nothing can be saved. Revert puts both back on the saved profile; Undo (${shortcut("Z")}) sends the edits again.`, action: "revert"};
     if (adjusting) return ADJUSTMENT;

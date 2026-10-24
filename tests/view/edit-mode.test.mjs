@@ -103,6 +103,21 @@ test("a keyboard that stopped saving outranks every other state and offers Resta
     assert.notEqual(liveSaveState(draft({keyboard}))?.kind, "stopped", "a keyboard catching up is not stopped");
 });
 
+// Under an Apply draft too: the look between edits reads the same flags, so a
+// stopped half is said with Restart, ahead of a pending adjustment, and not
+// as a keyboard that is not ready.
+test("an Apply draft's keyboard that stopped saving says so for either half and offers Restart", () => {
+    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, adjustmentPending: false, stopped: false, slaveStopped: false, quietMs: 3000};
+    /** @param {object} flags @param {number} [count] */
+    const apply = (flags, count = 2) => /** @type {any} */ ({changes: Array.from({length: count}, () => ({})), dirty: count > 0, live: null, keyboard: {...keyboard, ...flags}});
+    for (const flag of ["stopped", "slaveStopped"]) for (const count of [0, 2]) {
+        const draft = apply({adjustmentPending: true, [flag]: true}, count);
+        assert.deepEqual(liveSaveState(draft), {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"}, `${flag}, ${count} changes`);
+        assert.deepEqual(railSaveLines(draft), [{kind: "stopped", tone: "err", text: STOPPED_WORDS.rail, tip: STOPPED_WORDS.tip}], "one line, in place of the adjustment's");
+    }
+    assert.equal(liveSaveState(apply({})), null, "a keyboard saving normally says nothing");
+});
+
 test("leaving Live + review with unsaved edits asks Save or Revert; entering it with a draft asks Send or Discard", () => {
     assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}), APPLY), "saveOrRevert");
     assert.equal(switchQuestion(model({live: {unsaved: false}, dirty: false}), APPLY), null);

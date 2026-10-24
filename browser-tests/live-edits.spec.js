@@ -348,3 +348,37 @@ test("a keyboard that stopped saving says so, for either half, and Restart posts
     });
     await expect(page.locator(".commit.live.stopped")).toContainText("The keyboard stopped saving");
 });
+
+// The same under an Apply draft: the look between edits reads the same flags,
+// and Restart is the one action, not Review and apply.
+test("an Apply draft's keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
+    await page.goto("/preview/index.html?shell=apply-stopped");
+    const bar = page.locator(".commit.stopped");
+    await expect(bar).toContainText("The keyboard stopped saving");
+    await expect(bar).toContainText("Restart it to continue.");
+    await expect(bar).not.toHaveClass(/\blive\b/);
+    await expect(page.locator(".rail-status")).toContainText("Stopped saving · Restart");
+    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator("body")).not.toContainText("not ready");
+    await expect(page.locator('.commit [data-act="review"], .commit [data-act="discard"]')).toHaveCount(0);
+    await clearPosts(page);
+    await bar.locator('[data-act="restart"]').click();
+    await expectPost(page, {type: "restartKeyboard"});
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.draft.keyboard = {...model.draft.keyboard, stopped: false, slaveStopped: true};
+        store.setModel(model); store.render();
+    });
+    await expect(page.locator(".commit.stopped")).toContainText("The keyboard stopped saving");
+    await expect(page.locator(".rail-status")).toContainText("Stopped saving · Restart");
+    // Back saving: the draft's own bar again.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.draft.keyboard = {...model.draft.keyboard, stopped: false, slaveStopped: false};
+        store.setModel(model); store.render();
+    });
+    await expect(page.locator(".commit.stopped")).toHaveCount(0);
+    await expect(page.locator('.commit [data-act="review"]')).toHaveText("Review and apply");
+});
