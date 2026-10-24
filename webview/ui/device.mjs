@@ -3,7 +3,8 @@
 // rename), then what it is and runs (product, firmware against this Ark,
 // Ark's own version, the two halves, a restart when one is needed), how full
 // its memory is, then folded, what its firmware was built with and the
-// diagnostics of what was read.
+// diagnostics of what was read, with each half's flash pauses: read when
+// the fold opens and by its Read keyboard, and only then.
 //
 // In the demo it says what stands in for a keyboard, and that it is not one;
 // reading a keyboard from there leaves the demo, asking first.
@@ -17,6 +18,7 @@ import {demoOf} from "../view/demo.mjs";
 import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {shellOf} from "../view/shell-panel.mjs";
 import {profileUsageView} from "../view/profile-usage.mjs";
+import {flashPausesView} from "../view/flash-pauses.mjs";
 import {FIRMWARE_RELEASES, RESTART_NEEDED, SAVE_IN_PROGRESS, firmwareLine, halvesRows, productName} from "../view/keyboard-view.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
@@ -57,6 +59,12 @@ export function screenDevice() {
     ]);
     const usage = model?.portable?.available ? profileUsageView(model.portable.usage, model?.macroBank) : null;
     const diagnosticsOpen = (state.settingsOpen || []).includes("diagnostics");
+    // Diagnostics reads each half's flash pauses when it opens, and once for
+    // each connection while it stays open: a keyboard reconnected or chosen
+    // meanwhile is read too, when nothing else holds it.
+    const connection = model?.load?.connectionToken ?? null;
+    const askFlashPauses = () => {state.flashPausesAsked = connection; post(controls.readFlashPauses());};
+    const unread = diagnosticsOpen && !demo && device?.connected && !device.flashPauses && !health?.busy && connection !== null && state.flashPausesAsked !== connection;
     const facts = firmwareFacts(model);
     const main = el(`<div class="main">
         <header class="topbar keyboard-topbar"><div class="keyboard-title">${title}${dirty ? draftDot() : ""}
@@ -76,7 +84,7 @@ export function screenDevice() {
                     ["Phase", esc(phaseWords(model, health?.phase)?.label || "")],
                     ["Firmware word", esc(model?.firmware?.versionWord || "")],
                     ["Compiled defaults", esc(model?.firmware?.defaultsDigest || "")],
-                ])}</div>
+                ])}${demo || device?.connected ? flashPausesSection(flashPausesView(model), demo) : ""}</div>
                 <div class="list">${(model?.diagnostics || []).map((note) =>
                     `<div class="list-row note-row"><span class="note">${esc(note)}</span></div>`).join("")
                     || `<div class="list-row"><span class="note">Nothing has been read yet.</span></div>`}</div>
@@ -85,18 +93,36 @@ export function screenDevice() {
     /** @type {NodeListOf<HTMLDetailsElement>} */ (main.querySelectorAll("details[data-section]")).forEach((fold) => fold.addEventListener("toggle", () => {
         const id = /** @type {string} */ (fold.dataset.section);
         const others = (state.settingsOpen || []).filter((entry) => entry !== id);
+        // Drawn open again, it was already open: only opening it reads.
+        const opened = fold.open && others.length === (state.settingsOpen || []).length;
         state.settingsOpen = fold.open ? [...others, id] : others;
+        if (opened && id === "diagnostics" && !demo) askFlashPauses();
     }));
+    if (unread) askFlashPauses();
     const read = /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]'));
     // The button sits in the fold's title; pressing it does not fold.
     read.addEventListener("click", (event) => {
         event.preventDefault();
-        if (demo) postLeavingDemo(controls.control("refresh"));
-        else post(controls.control("refresh"));
+        const message = controls.readKeyboard(/** @type {HTMLDetailsElement} */ (read.closest("details")).open);
+        if (demo) postLeavingDemo(message);
+        else post(message);
     });
     if (keyboard) attachTitleName(/** @type {HTMLElement} */ (main.querySelector(".keyboard-title")), {stored: keyboard.name, perName: keyboard.perName || NAME_MAX_BYTES,
         rename: (name) => { post(edits.keyboardNameMessage(name, keyboard.identity)); render(); }});
     return main;
+}
+
+// Each half's flash pauses: a column per half, a row per figure, each with
+// what it measures and the exact microseconds in its tip.
+/** @param {ReturnType<typeof flashPausesView>} view @param {boolean} demo */
+function flashPausesSection(view, demo) {
+    const about = demo ? "Sample figures: the demo has no flash to measure." : "How long each half stopped to work on its flash since it started, read while Diagnostics is open.";
+    const body = !view ? `<p class="note">Not read yet.</p>`
+        : "failed" in view ? `<p class="note warn-words">${esc(view.failed)}</p>`
+        : `<table class="t flash-pauses"><thead><tr><th></th>${view.halves.map((half) => `<th class="num">${esc(half)}</th>`).join("")}</tr></thead>
+            <tbody>${view.rows.map((row) => `<tr><td data-tip="${esc(row.hint)}">${esc(row.label)}</td>${row.values.map((value) =>
+                `<td class="mono num"${value.tip ? ` data-tip="${esc(value.tip)}"` : ""}>${esc(value.text)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    return `<div class="flash-pauses-section"><div class="sect-h"><h4>Flash pauses</h4></div><p class="note">${esc(about)}</p>${body}</div>`;
 }
 
 // What this firmware was built with, read-only, folded beside the memory its

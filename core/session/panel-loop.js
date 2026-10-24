@@ -47,6 +47,7 @@ const {awaitReconnect, endReconnect, expectLost} = require("./keyboard-reconnect
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 const {liveEdit} = require("./live-edits");
 const {watchLive} = require("./live-watch");
+const {readFlashFigures} = require("./flash-pauses");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
 const {FILE_MAX_BYTES} = require("../model/portable-profile");
@@ -146,7 +147,11 @@ async function handleMessage(session, message, shell) {
         }
         else if (route === "demo") await demoMessage(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message), shell);
         else if (route === "portable") await portableMessage(session, /** @type {import("../../contracts/messages.js").PortableControl} */ (message), shell);
-        else if (route === "read") await connectAndRead(session, message?.type === "selectDevice" ? message.deviceId : undefined, shell);
+        else if (route === "read") {
+            await connectAndRead(session, message?.type === "selectDevice" ? message.deviceId : undefined, shell);
+            if (message?.type === "refresh" && message.flashPauses) await diagnose(session, shell);
+        }
+        else if (route === "diagnose") await diagnose(session, shell);
         // A staged edit, and even an unrecognised message, is answered, so the
         // panel is never left waiting on a reply.
         else publish(session, shell);
@@ -166,6 +171,13 @@ async function handleMessage(session, message, shell) {
         session.noticeFailed = !held;
         publish(session, shell);
     }
+}
+
+// Each half's flash pauses, published as each read lands (flash-pauses.js).
+/** @param {Session} session @param {Shell} shell */
+async function diagnose(session, shell) {
+    const sleep = session.service.sleep;
+    if (!await readFlashFigures(session, {publish: () => publish(session, shell), ...(sleep ? {sleep} : {})})) publish(session, shell);
 }
 
 // After a save that renamed the keyboard, or after losing it, wait for it to

@@ -160,6 +160,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     halves: HALVES_WORDS,
     editModes: EDIT_MODE_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
+    // The side a half reports itself as (GET 0x0D's physical half).
+    physicalHalves: [[0, "left"], [1, "right"], [0xff, "side not set"]],
     macroPlayback: {setup: "setup", blocked: "blocked", unavailable: "unavailable"},
     macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
     // A host layout names its OS, since German on macOS and on Windows differ.

@@ -20,6 +20,7 @@ const {RAW_HID_UNHANDLED} = require("../../core/protocol/raw-hid-unhandled");
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 const {COMBO_READBACK_V1} = require("../../core/protocol/combo-readback-v1");
+const {FLASH_PAUSES_V1} = require("../../core/protocol/flash-pauses-v1");
 const {PROFILE_CANDIDATE_V1, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
 const {PROFILE_DOMAIN_IDS, crc32, decodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {nativeCode} = require("../../core/schema/actions");
@@ -103,8 +104,9 @@ function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = f
         [0x0b]: [Buffer.from([1, 0])],
         [VALUE.CANDIDATE_STATUS]: candidateStatus,
     };
+    const pauses = flashPauses();
     /** @type {import("./types.js").FakeKeyboard} */
-    const keyboard = {requests: [], mutations: [], unhandled: [], answer};
+    const keyboard = {requests: [], mutations: [], unhandled: [], answer, flashPauses: pauses};
     /** @param {Uint8Array} report */
     function answer(report) {
         const request = Buffer.alloc(RAW_HID_REPORT_SIZE);
@@ -123,11 +125,45 @@ function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = f
         switch (request[0]) {
             case PROFILE_WIRE_V1.COMMAND_GET:
                 if (request[1] !== PROFILE_WIRE_V1.CHANNEL) return undefined;
+                if (request[2] === FLASH_PAUSES_V1.VALUE) return pauses.answer(request, reply);
                 return profileValue(values[request[2]]?.[request[4] | (request[5] << 8)], reply);
             default: return undefined;
         }
     }
     return keyboard;
+}
+
+// GET 0x0D as the master half answers it: page 0 its own flash pauses, page 1
+// the slave half's once it has pulled them. Pulling takes a page-1 read to
+// ask for it and happens before the next one, so the first page-1 read
+// answers unavailable (status 3) and a read after it the figures. `pulls`
+// counts the pulls; `master` and `slave` are each half's 25-byte page.
+function flashPauses() {
+    const figures = (/** @type {number} */ half, /** @type {number[]} */ [erase, program, step, save, saveFlash], /** @type {number} */ saves) => page(25, (p) => {
+        p[0] = 1; p[1] = half;
+        [erase, program, step, save, saveFlash].forEach((value, index) => p.writeUInt32LE(value, 2 + 4 * index));
+        p.writeUInt16LE(saves, 22);
+    });
+    const pauses = {
+        master: figures(1, [49045, 632, 49310, 790000, 114000], 1),
+        slave: figures(0, [48708, 1007, 48990, 410000, 117000], 1),
+        pulled: false, asked: false, pulls: 0,
+        /** @param {Buffer} request @param {Buffer} reply */
+        answer(request, reply) {
+            const which = request[4] | (request[5] << 8);
+            if (which > 1) return status(reply, 2);
+            if (which === 0) return profileValue(pauses.master, reply);
+            if (pauses.asked) {pauses.pulled = true; pauses.pulls++;}
+            pauses.asked = true;
+            return pauses.pulled ? profileValue(pauses.slave, reply) : status(reply, 3);
+        },
+    };
+    return pauses;
+}
+/** @param {Buffer} reply @param {number} code */
+function status(reply, code) {
+    reply.fill(0, 5); reply[5] = code;
+    return reply;
 }
 
 // A Profile Wire answer: the request's correlation header, status OK, the

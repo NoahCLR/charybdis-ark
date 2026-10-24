@@ -28,6 +28,11 @@ A keyboard Ark can show but not edit, because its complete profile could not
 be read or another keyboard holds the draft.
 _Avoid_: locked, view-only, disabled
 
+**Flash pauses**:
+How long each half stopped to work on its flash since it started, as it
+measures them, shown under Diagnostics on the Keyboard screen.
+_Avoid_: stalls, latency, flash timing
+
 ## The draft
 
 **Draft**:

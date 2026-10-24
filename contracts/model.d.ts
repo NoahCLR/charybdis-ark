@@ -59,6 +59,16 @@ export interface FirmwareView {
     layers: number | null; tapCounts: number | null; behaviours: number | null; combos: number | null; keysPerCombo: number | null;
     macros: number | null; macroBytes: number | null; customKeys: number | null; leds: number | null; profileBytes: number | null; repeatHz: number;
 }
+/** One half's flash pauses as it reports them (GET 0x0D, firmware D-F29): µs from boot, verbatim. `physicalHalf` is 0 left, 1 right, 0xFF not provisioned. */
+export interface FlashPauseFigures {
+    physicalHalf: number;
+    longestEraseUs: number; longestProgramUs: number; longestStorageStepUs: number;
+    lastSaveUs: number; lastSaveFlashUs: number; saves: number;
+}
+/** Both halves' flash pauses as last read: a half with no figures yet is null. */
+export type FlashPausesView =
+    | {state: 'read'; master: FlashPauseFigures | null; slave: FlashPauseFigures | null}
+    | {state: 'unavailable'; error: string};
 export interface ApplyView {
     id: number;
     state: 'failed' | 'done' | 'applying';
@@ -77,6 +87,7 @@ export interface Vocabulary {
     halves: Readonly<Record<HalvesId, Readonly<{label: string; detail: string}>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];
     hostOs: WordList<number>;
+    physicalHalves: WordList<number>;
     macroPlayback?: Readonly<Record<string, string>>;
     macroProtection: WordList<'auto' | 'on' | 'off'>;
     hostLayouts: WordList<number>;

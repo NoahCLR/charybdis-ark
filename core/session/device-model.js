@@ -376,6 +376,7 @@ function deviceHeader(state) {
             summary: "",
             savedProfile: "",
             subtitle: "",
+            flashPauses: null,
             health: {
                 profile: "unavailable",
                 converged: false,
@@ -420,6 +421,8 @@ function deviceHeader(state) {
         summary,
         savedProfile,
         subtitle,
+        // Each half's flash pauses as last read, verbatim, for Diagnostics.
+        flashPauses: state.flashPauses || null,
         health: {
             profile: !status ? "unread" : converged ? "synced" : "attention",
             converged,

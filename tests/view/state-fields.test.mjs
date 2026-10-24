@@ -45,7 +45,7 @@ const RESETS = ["retarget", "pdKind", "pdButtons", "pdTaps", "lastTake"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
-    "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "keyDetailsOpen", "stackOpen", "cellHow", "placement",
+    "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "flashPausesAsked", "keyDetailsOpen", "stackOpen", "cellHow", "placement",
     "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "settingsSearch", "overlay", "leaveDemo", "modeAsk", "confirmChecks",

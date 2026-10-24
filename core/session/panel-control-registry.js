@@ -7,8 +7,8 @@ const {PHASE, PHASE_WORDS} = require("../model/vocabulary");
 // live in the controller modules; this inert table cannot import them. A
 // control `within` runs inside the operation already running, which it ends,
 // so the busy guard lets it through.
-/** @typedef {'draft' | 'portable' | 'demo' | 'read' | 'view' | 'shell' | 'inspect'} Route */
-/** @typedef {{route: Route, action: string, binding: 'none' | 'apply' | 'import' | 'profile' | 'inspect', demo: 'allow' | 'refuse' | 'ignore' | 'leave' | 'export' | 'open' | 'replace' | 'close' | 'shell-leave', phase: 'panel' | 'apply' | 'restore' | 'read' | 'view' | 'shell' | 'inspect' | 'within', identity: boolean}} Control */
+/** @typedef {'draft' | 'portable' | 'demo' | 'read' | 'view' | 'shell' | 'inspect' | 'diagnose'} Route */
+/** @typedef {{route: Route, action: string, binding: 'none' | 'apply' | 'import' | 'profile' | 'inspect', demo: 'allow' | 'refuse' | 'ignore' | 'leave' | 'export' | 'open' | 'replace' | 'close' | 'shell-leave', phase: 'panel' | 'apply' | 'restore' | 'read' | 'view' | 'shell' | 'inspect' | 'within' | 'diagnose', identity: boolean}} Control */
 /** @type {Readonly<Record<import('../../contracts/messages.js').ControlType, Readonly<Control>>>} */
 const CONTROLS = Object.freeze({
     reviewProfileDraft: Object.freeze({route: "draft", action: "review", binding: "none", demo: "allow", phase: "panel", identity: true}),
@@ -57,6 +57,9 @@ const CONTROLS = Object.freeze({
     useRecovery: Object.freeze({route: "shell", action: "useRecovery", binding: "none", demo: "refuse", phase: "shell", identity: false}),
     deleteRecovery: Object.freeze({route: "shell", action: "deleteRecovery", binding: "none", demo: "allow", phase: "shell", identity: false}),
     validateMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    // The Keyboard screen's Diagnostics opened: each half's flash pauses, a
+    // background read (flash-pauses.js) skipped while anything runs.
+    readFlashPauses: Object.freeze({route: "diagnose", action: "readFlashPauses", binding: "none", demo: "ignore", phase: "diagnose", identity: false}),
 });
 
 /** @param {string | null | undefined} type @returns {Readonly<Control> | undefined} */

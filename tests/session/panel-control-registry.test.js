@@ -44,11 +44,11 @@ test("every policy is complete and every routed action resolves", () => {
         assert.ok(Object.isFrozen(entry), type);
         assert.ok(["none", "apply", "import", "profile", "inspect"].includes(entry.binding), type);
         assert.ok(["allow", "refuse", "ignore", "leave", "export", "open", "replace", "close", "shell-leave"].includes(entry.demo), type);
-        assert.ok(["panel", "apply", "restore", "read", "view", "shell", "inspect", "within"].includes(entry.phase), type);
+        assert.ok(["panel", "apply", "restore", "read", "view", "shell", "inspect", "within", "diagnose"].includes(entry.phase), type);
         assert.equal(typeof entry.identity, "boolean", type);
         const handlers = {draft: DRAFT_ACTIONS, portable: PORTABLE_ACTIONS, demo: DEMO_ACTIONS}[entry.route];
         if (handlers && entry.action !== "export") assert.equal(typeof handlers[entry.action], "function", type);
-        else assert.ok(["export", "read", "select", "openHistory", "closeHistory", "chooseKeyboard", "forgetKeyboard", "setTheme", "downloadRecovery", "useRecovery", "deleteRecovery", "validateMacro"].includes(entry.action), type);
+        else assert.ok(["export", "read", "select", "openHistory", "closeHistory", "chooseKeyboard", "forgetKeyboard", "setTheme", "downloadRecovery", "useRecovery", "deleteRecovery", "validateMacro", "readFlashPauses"].includes(entry.action), type);
     }
     for (const [route, handlers] of Object.entries({draft: DRAFT_ACTIONS, portable: PORTABLE_ACTIONS, demo: DEMO_ACTIONS})) {
         const actions = Object.values(CONTROLS).filter(entry => entry.route === route && entry.action !== "export").map(entry => entry.action).sort();

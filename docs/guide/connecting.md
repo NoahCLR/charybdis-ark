@@ -126,7 +126,16 @@ how many layers, tap counts, macros, pointing modes and combos there are, the
 repeat ceiling and the DPI steps.
 
 **Diagnostics** holds the details of the last read and **Read keyboard**,
-which reads it again.
+which reads it again. It also shows each half's **flash pauses**: how long
+the master half and the slave half each stopped to work on their flash since
+they started. That is the longest erase of a sector, the longest write of a
+page, the most flash time in one scan, how long the last save took and how
+much of it was flash, and how many saves there have been. Hover over a figure
+for its exact microseconds. Ark reads them when you open Diagnostics, when a
+keyboard connects while it is open, and again with its **Read keyboard**; the
+slave half's arrive through the master half, so they show a moment after the
+master half's. A half with nothing to report yet says **not measured yet**.
+The demo shows sample figures.
 
 ## Light and dark
 

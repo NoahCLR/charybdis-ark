@@ -24,6 +24,7 @@ const {readSettings, readSettingsLimits} = require("../protocol/portable-profile
 const {deviceLabels, editorViews} = require("./device-model");
 const {storedKeyboardName} = require("../model/keyboard-name");
 const {readHostOs} = require("../protocol/host-os-v1");
+const {readFlashPauses} = require("../protocol/flash-pauses-v1");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {profileDomain} = require("../schema/profile-domains");
 const {profileDepthOptions} = require("../schema/profile-depth");
@@ -69,11 +70,17 @@ const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // starts (not connected, not yet refreshed, busy) rejects too. Two reads are
 // optional and degrade instead: readCombos and readBaseRgb never reject, and
 // record a failure as their own `{state: "unavailable", error}` so it neither
-// discards a usable profile nor masks an earlier error. disconnect() always
+// discards a usable profile nor masks an earlier error. Two are background
+// reads, one at a time and never during an operation, which waits for one
+// out: readLiveStatus and readFlashPauses, which never reject either. disconnect() always
 // leaves the keyboard disconnected and resolves, recording a failure to close
 // it cleanly.
 class ProfileDeviceService {
     #operationActive = false;
+    // A background read out now (the live watch's look, the flash pauses),
+    // settled when it ends: one at a time, and an operation waits for it.
+    /** @type {Promise<void> | undefined} */
+    #background = undefined;
 
     get busy() { return this.#operationActive || this.disconnecting; }
 
@@ -159,6 +166,9 @@ class ProfileDeviceService {
         this.baseRgb = undefined;
         /** @type {import("./types.js").ComboRead | undefined} */
         this.combos = undefined;
+        // Each half's flash pauses, read for the Keyboard screen's Diagnostics.
+        /** @type {import("../../contracts/model.js").FlashPausesView | undefined} */
+        this.flashPauses = undefined;
         /** @type {ReadSnapshot | Restored | undefined} */
         this.portable = undefined;
         this.portableProgress = "";
@@ -871,11 +881,10 @@ class ProfileDeviceService {
     // keyboard. An unanswered look is skipped too, and keeps the connection;
     // WATCH_MISSES of them in a row end it as a lost keyboard.
     async readLiveStatus() {
-        if (this.busy || !this.connection?.connected || !this.requestIds || !this.editMode) return undefined;
-        const connection = this.connection;
-        /** @type {import("../transport/types.js").RequestConnection} */
-        const background = {request: (report, options = {}) => connection.request(report, {...options, timeoutMs: this.watchTimeoutMs, softTimeout: true})};
-        try {
+        const connection = this.#quietConnection();
+        if (!connection || !this.editMode) return undefined;
+        const background = this.#backgroundConnection(connection);
+        return this.#inBackground(async () => {try {
             const status = await readEditStatus(background, this.liveCoordinator().options);
             this.missedLooks = 0;
             if (this.connection !== connection || !connection.connected) return undefined;
@@ -890,7 +899,48 @@ class ProfileDeviceService {
                 if (this.missedLooks >= WATCH_MISSES) await connection.abandon(error);
             }
             return undefined;
-        }
+        }});
+    }
+
+    // Each half's flash pauses (GET 0x0D) for the Keyboard screen's
+    // Diagnostics, into `flashPauses`: a background read like the watch's
+    // look, false when skipped because an operation holds the keyboard or
+    // another background read is out. A failure is the read's own
+    // `{state: "unavailable", error}`, never the keyboard's error.
+    async readFlashPauses() {
+        const connection = this.#quietConnection(), ids = this.requestIds;
+        if (!connection || !ids) return false;
+        return this.#inBackground(async () => {
+            /** @type {import("../../contracts/model.js").FlashPausesView} */
+            let read;
+            try {read = {state: "read", ...await readFlashPauses(this.#backgroundConnection(connection), ids)};}
+            catch (error) {read = {state: "unavailable", error: publicError(error).message};}
+            if (this.connection !== connection || !connection.connected) return false;
+            this.flashPauses = read;
+            this.emitChange();
+            return true;
+        });
+    }
+
+    // The connection a background read may start on: none while an operation
+    // holds the keyboard or another background read is out.
+    #quietConnection() {
+        return this.busy || this.#background || !this.connection?.connected || !this.requestIds ? undefined : this.connection;
+    }
+
+    // A read the caller can miss: each request waits the watch's timeout, and
+    // one unanswered fails alone and keeps the connection.
+    /** @param {Connection} connection @returns {import("../transport/types.js").RequestConnection} */
+    #backgroundConnection(connection) {
+        return {request: (report, options = {}) => connection.request(report, {...options, timeoutMs: this.watchTimeoutMs, softTimeout: true})};
+    }
+
+    /** @template T @param {() => Promise<T>} read @returns {Promise<T>} */
+    async #inBackground(read) {
+        const running = read();
+        const settled = this.#background = running.then(() => {}, () => {});
+        try {return await running;}
+        finally {if (this.#background === settled) this.#background = undefined;}
     }
 
     // How edits reach this keyboard, stored on both halves; refused while it
@@ -1030,6 +1080,7 @@ class ProfileDeviceService {
             committed: this.committed ? clone(this.committed) : null,
             baseRgb: this.baseRgb ? clone(this.baseRgb) : null,
             combos: this.combos ? clone(this.combos) : null,
+            flashPauses: this.flashPauses ? clone(this.flashPauses) : null,
             editMode: this.editMode ? {...this.editMode} : null,
             runtime: this.runtime ? clone(this.runtime) : null,
             error: this.error ? {...this.error} : null,
@@ -1052,6 +1103,8 @@ class ProfileDeviceService {
         try {
             initialize?.();
             this.emitChange();
+            // Not alongside a background read: it ends first.
+            if (this.#background) await this.#background;
             await operation();
         } catch (error) {
             if (this.reconnectExpected && !this.connection?.connected) {
@@ -1164,6 +1217,7 @@ class ProfileDeviceService {
         this.committed = undefined;
         this.baseRgb = undefined;
         this.combos = undefined;
+        this.flashPauses = undefined;
         this.disposeConnectionListener?.();
         this.disposeConnectionListener = undefined;
         this.connection = undefined;

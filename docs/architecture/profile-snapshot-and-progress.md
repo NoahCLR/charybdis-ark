@@ -311,7 +311,10 @@ edit was checked before it was sent.
 `core/session/live-watch.js`, run by `panel-loop.js`, looks at
 the edit status about once a second. It skips while an operation, an Apply or
 a proposal holds the keyboard, and drops a look that raced one. A look is a
-background read (`softTimeout`): a missed answer skips it and keeps the
+background read (`softTimeout`): one at a time with the Keyboard screen's
+flash pauses (`readFlashPauses`, the other background read), skipped while
+either is out, and an operation that starts meanwhile waits for it to end. A
+missed answer skips the look and keeps the
 connection, and the late reply is set aside; three misses in a row mean the
 keyboard is lost and Ark follows it back (`keyboard-reconnect.js`,
 [D-L62](../adr/0062-the-keyboard-is-named-in-its-profile.md)). The web page

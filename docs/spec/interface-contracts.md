@@ -547,6 +547,35 @@ output, independently of chord participation
 - The combo builder names a custom key output's shortcut, or says it sends
   nothing (no test).
 
+## Flash pauses
+
+The Keyboard screen's Diagnostics shows each half's flash pauses, GET `0x0D`
+(firmware D-F29; `upstream/firmware/docs/spec/profile-wire-v1/hid-channel.md`,
+"Flash pauses"), decoded by `core/protocol/flash-pauses-v1.js`
+(`tests/protocol/flash-pauses-v1.test.js`).
+
+- Page 0 is the master half's figures, page 1 the slave half's; each page is
+  checked as the spec's table says, and a page without figures, or page 1
+  answering status 3 before the master half has pulled the slave half's, is
+  null ("not measured yet"), never zeros. Figures are published verbatim, in
+  µs, as `model.device.flashPauses`; the view words them
+  (`webview/view/flash-pauses.mjs`, `tests/view/flash-pauses.test.mjs`).
+- They are read only when the fold opens (`readFlashPauses`), once for each
+  connection while it stays open and nothing holds the keyboard
+  (`state.flashPausesAsked` against `load.connectionToken`), and by its Read
+  keyboard (`refresh` with `flashPauses`, after the keyboard is read). Each
+  reads both pages, waits longer than the master half's one-second pull
+  interval and reads both again, as the firmware's spec says to get fresh
+  figures (`core/session/flash-pauses.js`;
+  `browser-tests/settings-screens.spec.js`).
+- Each read is a background read of the device service: skipped while an
+  operation, the panel or the live watch's look holds the keyboard; the watch
+  skips its look while one is out, and an operation that starts meanwhile
+  waits for it to end. The watch never reads them. A failed read is the
+  figures' own `unavailable`, never the keyboard's error, and keeps the
+  connection (`tests/session/flash-pauses.test.js`).
+- The demo reads nothing and shows sample figures.
+
 ## Keyboard name
 
 The keyboard's own name is one more counted name in the settings domain
