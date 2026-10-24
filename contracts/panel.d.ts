@@ -163,6 +163,8 @@ export interface PublishedModel {
     editMode: {mode: number; conflict: boolean; offered: number[]; /** A half could not store the mode yet (retrying): a replug now may lose it. */ notStored: boolean} | null;
     /** A live edit waiting for the person to confirm the traps or warnings it adds. */
     liveProposal: {id: number; label: string | null; checks: import('./model.js').Check[]} | null;
+    /** Ark's own live edit or Revert, held by the keyboard until no key is held: what to do, what holds it, and whether Cancel edit is offered (never for a Revert). */
+    liveWait: {title: string; detail: string; cancellable: boolean} | null;
     /** Toggles a key turned off over a stored "on": shown as turned off by key, never as a change. */
     runtime: {combosOffByKey: boolean; behavioursOffByKey: boolean} | null;
 }

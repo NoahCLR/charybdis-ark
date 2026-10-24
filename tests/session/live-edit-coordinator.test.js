@@ -6,7 +6,7 @@ const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {editLayers} = require("../fixtures/profile-document");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const {LiveEditCoordinator, TransactionIds} = require("../../core/session/live-edit-coordinator");
+const {LiveEditCoordinator, TransactionIds, DEFAULT_TIMING} = require("../../core/session/live-edit-coordinator");
 const {EDIT_MODE, EDIT_RESULT} = require("../../core/protocol/profile-edit-v1");
 const {PROFILE_ACTIVE_KIND} = require("../../core/protocol/profile-wire-v1");
 
@@ -113,6 +113,110 @@ test("Save writes the working copy as the saved profile; Revert puts the saved o
     const third = await service.postLiveEdit({from: keyboard.saved, to: target(layers => {layers[4][0] = 0x0e;}), defaults: read.live.defaults, identity: reverted});
     await assert.rejects(service.saveWorkingCopy(third), {code: "LIVE_EDIT_REFUSED"});
     assert.ok(keyboard.working, "a failed save leaves the working copy as it was");
+});
+
+// A coordinator on a clock of its own: every wait moves it on, and `at(ms,
+// run)` runs `run` once the clock has passed `ms`.
+/** @param {Awaited<ReturnType<typeof live>>["service"]} service */
+function clocked(service) {
+    const clock = {ms: 0}, due = /** @type {{at: number, run: () => void}[]} */ ([]);
+    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now: () => clock.ms, sleep: async ms => {
+        clock.ms += ms;
+        for (const job of due.filter(job => clock.ms >= job.at)) {due.splice(due.indexOf(job), 1); job.run();}
+    }});
+    return {coordinator, clock, at: (/** @type {number} */ at, /** @type {() => void} */ run) => {due.push({at, run});}};
+}
+const ABORT = 0x24;
+
+// The firmware never drops an edit waiting for a safe boundary: it publishes
+// once nothing is held (live-edits.md, "Checking and publishing"). Shift held
+// through a rename once made Ark call that edit failed after 5 s.
+test("an edit held by a key waits for the release with no limit, says what holds it, and is published once", async t => {
+    const {service, keyboard} = await live(t);
+    const read = await service.readKeyboardProfile();
+    const {coordinator, clock, at} = clocked(service);
+    keyboard.hold(0b1000_0001);
+    at(13000, () => keyboard.release());
+    /** @type {unknown[]} */
+    const seen = [];
+    const to = target(layers => {layers[0][3] = 0x05;});
+    const result = await coordinator.post({from: read.live.working, to, defaults: read.live.defaults, identity: read.live, capacity: 130048}, {onWaiting: waiting => {seen.push(waiting);}});
+    assert.ok(clock.ms >= 13000, "it waited for the release");
+    assert.equal(result.revision, read.live.revision + 1);
+    assert.ok(result.bytes.equals(keyboard.working));
+    assert.equal(result.cancelled, undefined);
+    assert.equal(keyboard.events.filter(event => event === "published").length, 1);
+    assert.ok(!keyboard.mutations.some(request => request[2] === ABORT), "nothing was aborted");
+    assert.deepEqual(seen[0], {kind: "edit", reasons: 0b1000_0001, cancelling: false}, "page 2 says a key and a one-shot layer hold it");
+    assert.equal(seen.at(-1), null, "the wait ends when the edit publishes");
+});
+
+test("Cancel edit aborts an edit held by a key, and the keyboard runs what it ran before", async t => {
+    const {service, keyboard} = await live(t);
+    const read = await service.readKeyboardProfile();
+    const {coordinator, at} = clocked(service);
+    keyboard.hold();
+    /** @type {boolean[]} */
+    const asked = [];
+    at(2000, () => {asked.push(coordinator.cancelWaiting());});
+    /** @type {unknown[]} */
+    const seen = [];
+    const result = await coordinator.post({from: read.live.working, to: target(layers => {layers[0][4] = 0x06;}), defaults: read.live.defaults, identity: read.live, capacity: 130048},
+        {onWaiting: waiting => {seen.push(waiting);}});
+    assert.deepEqual(asked, [true]);
+    assert.equal(result.cancelled, true);
+    assert.deepEqual([result.session, result.revision], [read.live.session, read.live.revision]);
+    assert.ok(result.bytes.equals(read.live.working));
+    assert.equal(keyboard.working, null, "nothing unsaved: the edit never took effect");
+    assert.equal(keyboard.mutations.filter(request => request[2] === ABORT).length, 1, "one abort");
+    assert.ok(seen.some(waiting => /** @type {{cancelling?: boolean} | null} */ (waiting)?.cancelling), "the wait says it is being cancelled");
+    assert.equal(coordinator.cancelWaiting(), false, "nothing waits now");
+    keyboard.release();
+    assert.equal(keyboard.events.filter(event => event === "published").length, 0);
+});
+
+test("Cancel edit that comes as the keys are let go finds the edit landed, and says so", async t => {
+    const {service, keyboard} = await live(t);
+    const read = await service.readKeyboardProfile();
+    const {coordinator, at} = clocked(service);
+    keyboard.hold();
+    at(1000, () => {coordinator.cancelWaiting(); keyboard.release();});
+    const result = await coordinator.post({from: read.live.working, to: target(layers => {layers[0][7] = 0x09;}), defaults: read.live.defaults, identity: read.live, capacity: 130048});
+    assert.equal(result.cancelled, undefined);
+    assert.equal(result.cancelTooLate, true);
+    assert.ok(result.bytes.equals(keyboard.working), "the edit runs");
+    assert.ok(!keyboard.mutations.some(request => request[2] === ABORT), "no abort for an edit already published");
+});
+
+test("a checking phase that never ends still times out after the short limit", async t => {
+    const {service, keyboard} = await live(t);
+    const read = await service.readKeyboardProfile();
+    const {coordinator, clock} = clocked(service);
+    keyboard.faults.checking = true;
+    await assert.rejects(coordinator.post({from: read.live.working, to: target(layers => {layers[0][5] = 0x07;}), defaults: read.live.defaults, identity: read.live, capacity: 130048}),
+        {code: "LIVE_EDIT_PENDING", message: /has not finished the edit/});
+    assert.ok(clock.ms > DEFAULT_TIMING.editMs && clock.ms < DEFAULT_TIMING.editMs + 1000, "the short limit, not an endless wait");
+});
+
+test("a Revert held by a key waits for the release the same way, and is not cancelled", async t => {
+    const {service, keyboard} = await live(t);
+    const read = await service.readKeyboardProfile();
+    const edited = await service.postLiveEdit({from: read.live.working, to: target(layers => {layers[0][6] = 0x08;}), defaults: read.live.defaults, identity: read.live});
+    const {coordinator, clock, at} = clocked(service);
+    keyboard.hold(1 << 4);
+    /** @type {boolean[]} */
+    const asked = [];
+    at(1000, () => {asked.push(coordinator.cancelWaiting());});
+    at(9000, () => keyboard.release());
+    /** @type {unknown[]} */
+    const seen = [];
+    const reverted = await coordinator.revert(edited, {onWaiting: waiting => {seen.push(waiting);}});
+    assert.ok(clock.ms >= 9000);
+    assert.equal(reverted.unsaved, false);
+    assert.equal(keyboard.working, null);
+    assert.deepEqual(asked, [false], "the keyboard refuses to abort its own Revert");
+    assert.deepEqual(seen[0], {kind: "revert", reasons: 1 << 4, cancelling: false});
+    assert.ok(!keyboard.mutations.some(request => request[2] === ABORT));
 });
 
 test("the edit mode is set and confirmed, and refused while edits are unsaved", async t => {

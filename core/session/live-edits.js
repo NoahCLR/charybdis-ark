@@ -35,6 +35,8 @@ const refusal = (message, code = "LIVE_EDIT_REFUSED") => Object.assign(new Error
 
 // What a read says when the working copy moved under the same session.
 const CHANGED_ELSEWHERE = "The keyboard's unsaved edits are not what Ark last saw (another app, a lost answer, or an edit that did not land as sent): the draft shows what it runs now, and its history starts again here.";
+// Cancel edit ended an edit the keyboard held for released keys.
+const CANCELLED = "Edit cancelled: the keyboard runs what it ran before.";
 // Refusals Ark makes before the keyboard's working copy could change: no
 // read is needed to know what it runs.
 const LOCAL_REFUSALS = new Set(["LIVE_EDIT_TOO_LARGE", "LIVE_HALVES_APART"]);
@@ -88,21 +90,34 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
         session.acceptedEdit = accepted;
         return true;
     }
+    // Once the keyboard has the edit whole, a read after a failure can tell
+    // whether it landed (ProfileDraftSession.expectLive).
+    /** @type {import("./profile-draft-session.js").LiveExpectation | undefined} */
+    let expected;
     try {
         const result = await session.service.postLiveEdit({from: live.working, to: Buffer.from(target.document.profile, "base64"), defaults: live.defaults,
-            identity: {session: live.session, revision: live.revision}, replaceWhenLarge: replaceWhenLarge && !live.unsaved});
+            identity: {session: live.session, revision: live.revision}, replaceWhenLarge: replaceWhenLarge && !live.unsaved},
+        {onCommitted: transactionId => {expected = draft.expectLive(target, transactionId);}});
+        if (result.cancelled) {
+            draft.expectedLive = undefined;
+            session.resetDraftForms = true;
+            session.notice = CANCELLED;
+            return false;
+        }
         draft.confirmLive(target, result);
-        session.acceptedEdit = accepted;
-        // A new keyboard name is taken by one USB restart once the keyboard
-        // is quiet (firmware D-F25): that loss is expected, as after a save.
-        if (!result.slaveRefused) expectReconnect(session, renamedTo(before, {...before, document: target.document, fingerprint: fingerprint(target.document)}));
-        if (result.slaveRefused) session.notice = "The slave half refused this edit, so the halves run different profiles. Revert puts both back on the saved profile.";
-        else if (!result.converged) session.notice = "The edit runs on the master half; the slave half is catching up. The next edit waits for it.";
+        landed(session, before, target, result, accepted);
+        if (result.cancelTooLate) session.notice = "The keyboard took the edit just before Cancel edit reached it: it runs now. Undo sends it back.";
         return true;
     } catch (error) {
         session.resetDraftForms = true;
         if (codeOf(error) === "LIVE_HALVES_APART") markApart(draft);
         if (!LOCAL_REFUSALS.has(codeOf(error))) await reread(session);
+        // The read shows exactly the edit Ark sent, published: whatever went
+        // wrong on the way, it landed, and the draft has confirmed it.
+        if (expected?.confirmed && session.draft === draft && draft.live) {
+            landed(session, before, target, draft.live, accepted);
+            return true;
+        }
         // The keyboard moved by itself first (an adjustment key, another
         // app): nothing failed, the edit was simply made against an older
         // state. The draft now shows the keyboard's; the person makes it again.
@@ -112,6 +127,18 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
         }
         throw error;
     }
+}
+
+// What a live edit the keyboard took leaves behind: the form learns its edit
+// was accepted, a rename's USB restart is expected, and the halves are said.
+/** @param {Session} session @param {Draft["current"]} before @param {Target} target @param {{converged: boolean, slaveRefused?: boolean}} result @param {Session["acceptedEdit"]} accepted */
+function landed(session, before, target, result, accepted) {
+    session.acceptedEdit = accepted;
+    // A new keyboard name is taken by one USB restart once the keyboard
+    // is quiet (firmware D-F25): that loss is expected, as after a save.
+    if (!result.slaveRefused) expectReconnect(session, renamedTo(before, {...before, document: target.document, fingerprint: fingerprint(target.document)}));
+    if (result.slaveRefused) session.notice = "The slave half refused this edit, so the halves run different profiles. Revert puts both back on the saved profile.";
+    else if (!result.converged) session.notice = "The edit runs on the master half; the slave half is catching up. The next edit waits for it.";
 }
 
 // Revert on the keyboard, recorded as `target` (a Revert step, or the history

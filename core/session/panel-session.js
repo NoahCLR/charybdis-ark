@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {PHASE, editModeWords, quietWords} = require("../model/vocabulary");
+const {PHASE, editModeWords, heldWords, quietWords} = require("../model/vocabulary");
 
 // The panel's side of a session: what extension.js used to decide inline.
 //
@@ -149,6 +149,11 @@ function buildPanelModel(session, state) {
     // How edits reach this keyboard, and an edit waiting on its trap check.
     const mode = state.editMode;
     const editMode = mode && state.connected && !session.demo ? {mode: mode.mode, conflict: mode.conflict, offered: [0, 1, 2], notStored: Boolean(mode.notStored)} : null;
+    // Ark's own edit or Revert the keyboard holds until no key is held, and
+    // whether Cancel edit can end it (a held Revert cannot be aborted).
+    const waiting = state.liveWaiting && state.connected && !session.demo ? state.liveWaiting : null;
+    const words = waiting ? heldWords(waiting) : null;
+    const liveWait = waiting && words ? {title: words.title, detail: words.detail, cancellable: waiting.kind === "edit" && !waiting.cancelling} : null;
     const proposal = session.liveProposal && session.draft && session.liveProposal.draftId === session.draft.id && session.liveProposal.revision === session.draft.revision
         ? {id: session.liveProposal.id, label: session.liveProposal.target.label, checks: session.liveProposal.checks} : null;
     // Toggles a key turned off on top of a stored "on" (plan answer 10): shown,
@@ -206,7 +211,7 @@ function buildPanelModel(session, state) {
     };
     // What the firmware says about itself and its ceilings (Keyboard, Settings).
     const firmware = firmwareView(state.capabilities);
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, shell, load, reconnecting, firmware, editMode, liveProposal: proposal, runtime};
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, shell, load, reconnecting, firmware, editMode, liveProposal: proposal, liveWait, runtime};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,
@@ -285,8 +290,12 @@ function routeMessage(session, message, state) {
     // Nothing starts while a read or backup runs, and a request that would is
     // refused out loud (panel-loop.js). A webview that loads again only asks
     // for the model, and shell controls start nothing here, so both are answered.
+    // Cancel edit is the one control taken meanwhile: it ends what runs.
     if (session.portableBusy || session.readBusy) {
+        if (control?.phase === "within") return control.route;
         if (type === "ready" || !(DRAFT_EDITS.has(type) || WORK_ROUTES.has(control?.route || ""))) return "none";
+        // Waiting for released keys nothing failed: the refusal says what to do.
+        if (state.liveWaiting) throw Object.assign(new Error(heldWords(state.liveWaiting).refusal), {code: "LIVE_EDIT_HELD"});
         throw new Error(BUSY_REFUSAL);
     }
     if (control?.route === "demo") return "demo";

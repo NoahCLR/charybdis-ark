@@ -41,6 +41,15 @@ If an edit would add a trap or a warning (see [Checks](#checks)), Ark holds it
 and asks first: **Go back** sends nothing, **Send anyway** sends it. An edit
 that would add a blocker is not sent at all.
 
+The keyboard takes an edit only at a moment nothing is held, so an edit made
+while you hold a key (Shift, a held layer, a one-shot, a locked layer or
+pointer mode) waits for you to let go. The bar says **Let go of the held keys
+to finish the edit**, and what is held when the keyboard says. Ark waits as
+long as it takes; the edit lands when you let go, as one step of the history
+like any other. **Cancel edit** cancels it instead, and the keyboard keeps
+running what it ran. Other edits wait until it is done. A **Revert** waits for
+your keys in the same way, without Cancel edit.
+
 Until the slave half has taken an edit, the rail says **Slave half catching
 up** and the next edit waits. If the slave half refuses the edits, the rail
 says **Halves apart**: the halves now run different profiles, nothing can be

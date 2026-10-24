@@ -12,6 +12,7 @@ test("draft and read controls post their type and the one value they carry", () 
     assert.deepEqual(controls.discardChanges(3), {type: "discardProfileDraftChanges", group: 3});
     assert.deepEqual(controls.jumpDraft(0), {type: "jumpProfileDraft", step: 0});
     assert.deepEqual(controls.selectDevice("kb"), {type: "selectDevice", deviceId: "kb"});
+    assert.deepEqual(controls.abortLiveEdit(), {type: "abortLiveEdit"}, "Cancel edit names no edit: only one is ever held");
 });
 
 test("the layer panel posts every typed name with a toggle, a move and a save", () => {

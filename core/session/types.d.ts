@@ -132,6 +132,8 @@ export interface PanelDeviceState extends DeviceModelInput, Omit<DraftDeviceCont
     devices?: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[];
     portableSummary?: Pick<import('../model/types.js').ProfileSummary, 'names'> | null;
     portableProgress?: string;
+    /** Ark's own live edit or Revert the keyboard holds until no key is held, while it waits. */
+    liveWaiting?: LiveWaiting | null;
     operationId?: number;
     diagnostics?: string[];
 }
@@ -191,7 +193,7 @@ export interface PanelEnvelope {type: string; draftId?: string; draftRevision?: 
 export type PanelMessage = PanelEnvelope | (DraftEdit & {draftId?: string});
 export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; editable: boolean; reason: DraftBlock; steps?: import('../../contracts/model.js').HistoryStep[]};
 /** What the panel adds to the device model; the posted shape is the contract's. */
-export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'shell' | 'load' | 'reconnecting' | 'firmware' | 'editMode' | 'liveProposal' | 'runtime'> & {draft?: PanelDraftView};
+export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'shell' | 'load' | 'reconnecting' | 'firmware' | 'editMode' | 'liveProposal' | 'liveWait' | 'runtime'> & {draft?: PanelDraftView};
 
 export type CompleteReadSnapshot = Extract<ReadSnapshot, import('../model/types.js').CompleteSnapshot>;
 /** Where the keyboard's working copy is (firmware D-F32), with the exact bytes a live edit is made against. */
@@ -215,6 +217,14 @@ export interface LiveState {
     keyboard?: LiveKeyboardStatus;
     /** The save transaction last seen when the working copy last changed; a failed save after it failed these edits (-1: any). */
     saveMark?: number;
+    /** The edit or Revert the keyboard finished last, as the read saw it: whether an edit whose answer Ark missed is Ark's. */
+    lastTransactionId?: number;
+}
+/** Ark's own live edit or Revert, held by the keyboard until no key is held (edit status phase 4 or 5, flag 8): page 2's reasons, and whether Cancel edit was asked. */
+export interface LiveWaiting {
+    kind: 'edit' | 'revert';
+    reasons: number;
+    cancelling: boolean;
 }
 export interface LiveKeyboardStatus {
     adjustmentPending: boolean;
@@ -269,7 +279,9 @@ export interface ControlService extends DraftApplyService {
     readPortableProfile(options?: {forRestore?: false; reuseReadback?: boolean}): Promise<CompleteReadSnapshot>;
     readPortableProfile(options: {forRestore: true; reuseReadback?: boolean}): Promise<ReadSnapshot>;
     restorePortableProfile(document: import('../model/types.js').PortableDocument, options: RestoreOptions): Promise<RestoredProfile>;
-    postLiveEdit(edit: {from: Buffer; to: Buffer; defaults: Buffer; identity: {session: number; revision: number}; replaceWhenLarge?: boolean}): Promise<{bytes: Buffer; session: number; revision: number; converged: boolean; slaveRefused: boolean; sent: number}>;
+    postLiveEdit(edit: {from: Buffer; to: Buffer; defaults: Buffer; identity: {session: number; revision: number}; replaceWhenLarge?: boolean}, options?: {onCommitted?: (transactionId: number) => void}): Promise<{bytes: Buffer; session: number; revision: number; converged: boolean; slaveRefused: boolean; sent: number; cancelled?: true; cancelTooLate?: true}>;
+    /** Cancel edit: aborts Ark's own live edit while the keyboard holds it until no key is held; false when nothing of Ark's can be cancelled. */
+    cancelLiveEdit?(): boolean;
     saveWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditStatus & {saved: boolean}>;
     revertWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditProgress & {converged: boolean; slaveRefused: boolean}>;
     setEditMode(mode: number): Promise<import('../protocol/types.js').EditModeRead | undefined>;
@@ -311,6 +323,8 @@ export interface DeviceServiceOptions {
     watchTimeoutMs?: number;
     requestIdStart?: number;
     sleep?: (ms: number) => Promise<void>;
+    /** The clock a live edit's waits are measured on; Date.now when omitted. */
+    now?: () => number;
     readCandidateStatus?: typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus;
     onChange?: (state?: PanelDeviceState) => void;
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;

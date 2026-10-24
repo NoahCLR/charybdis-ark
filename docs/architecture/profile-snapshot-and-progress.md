@@ -197,7 +197,8 @@ exact bytes are kept: every live edit is a splice against them.
 
 `ProfileDraftSession.observeLive` keeps the history only while the keyboard
 vouches for it (same session and revision, same saved and current
-fingerprints), also over a new connection. Anything else starts again from
+fingerprints), also over a new connection, or when it shows exactly the edit
+Ark sent last (below). Anything else starts again from
 the keyboard and says why: a new session is a restart, after which unsaved
 edits are gone or were saved first (`restartedWithUnsaved`); a moved revision
 is `changedElsewhere`. `follow` keeps the draft on the same keyboard listed
@@ -224,6 +225,33 @@ layer change goes through `proposeLive` (`live-edits.js`):
    up to 3 s for the slave half: not yet is "catching up", a refusal is
    "halves apart".
 5. Only then does `confirmLive` move the draft's history.
+
+Loading and checking an edit get 5 s. An edit the keyboard holds for its safe
+boundary (phase 4 with flag 8, Ark's own transaction in progress) waits with
+no limit, since the firmware publishes it once nothing is held and never drops
+it ([D-L69](../adr/0069-a-held-edit-waits-for-the-release.md)); the 5 s start
+again once it moves on. While it waits the coordinator reads edit status page
+2 each 50 ms and reports `{kind, reasons, cancelling}` through `onWaiting`; the
+service publishes it as `liveWaiting`, and the panel model as `liveWait`, in
+`heldWords` (`core/model/vocabulary.js`): "Let go of the held keys to finish
+the edit", naming a key, a locked layer or pointer mode, a modifier or
+one-shot, or a one-shot layer. **Cancel edit** (`abortLiveEdit`, registry
+phase `within`, the one control the busy guard lets through) has the
+coordinator send the edit's abort at its next look; aborted, `post` resolves
+`cancelled` and the draft stays as it was. An edit published before that look
+lands as usual, and the notice says Cancel edit came too late (`cancelTooLate`).
+A refusal while it waits is no failure: the panel shows its words without
+"Failed". Every other request meanwhile is
+refused as busy in the same words. A Revert held the same way (phase 5) waits
+alike, without Cancel edit: the keyboard answers its abort `BUSY`.
+
+Once the keyboard has the edit whole, `onCommitted` gives the draft its
+transaction (`expectLive`). If the edit's answer then fails (a lost reply, a
+checking phase past its limit, the length tripwire), the next read that shows
+exactly that edit published (same session, one revision on, the transaction
+the keyboard finished last, the target's fingerprint, the same saved profile)
+confirms it as the edit's step instead of starting the history again; in
+Live, a saved profile that is exactly that edit is the keyboard's own save.
 
 `sendWhenFree` retries a BUSY begin, Save, Revert or mode change for 3 s, 30 s
 while the slave half is catching up, and 120 s while a save runs (Live's own

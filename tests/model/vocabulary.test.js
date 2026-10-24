@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {VOCABULARY, EDIT_MODE_WORDS, editModeWords, quietWords, word, layerName, slotName, branchName, modifierNames} = require("../../core/model/vocabulary");
+const {VOCABULARY, EDIT_MODE_WORDS, editModeWords, heldWords, quietWords, word, layerName, slotName, branchName, modifierNames} = require("../../core/model/vocabulary");
 const rgb = require("../../core/schema/rgb-domain-v1");
 const pd = require("../../core/schema/pd-mode-domain-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../../core/schema/key-behavior-domain-v1");
@@ -124,4 +124,17 @@ test("Live's quiet interval is the one the keyboard reports, 3 seconds until it 
     assert.match(editModeWords(5000)[1].detail, /after 5 seconds with no edit/);
     assert.match(EDIT_MODE_WORDS[1].detail, /after 3 seconds with no edit/);
     assert.equal(editModeWords(5000)[0].detail, EDIT_MODE_WORDS[0].detail, "only Live's words carry it");
+});
+
+// Page 2's safe-boundary bits that a person lets go of are named; the rest
+// are said as held keys alone (profile-wire-v1/live-edits.md).
+test("an edit held for released keys says what to let go of, and a Revert says it too", () => {
+    const edit = heldWords({kind: "edit", reasons: 1 | 1 << 4 | 1 << 6 | 1 << 7, cancelling: false});
+    assert.equal(edit.title, "Let go of the held keys to finish the edit");
+    assert.match(edit.detail, /^Held now: a key, a locked layer or pointer mode, a modifier or one-shot and a one-shot layer\. /);
+    assert.equal(heldWords({kind: "edit", reasons: 1 << 9, cancelling: false}).detail, "The keyboard takes the edit the moment nothing is held; Ark waits for it.", "a combo is not named");
+    assert.equal(heldWords({kind: "edit", reasons: 1, cancelling: true}).title, "Cancelling the edit");
+    const revert = heldWords({kind: "revert", reasons: 1, cancelling: false});
+    assert.equal(revert.title, "Let go of the held keys to finish reverting");
+    assert.match(revert.refusal, /still reverting/);
 });

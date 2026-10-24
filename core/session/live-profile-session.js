@@ -132,7 +132,7 @@ async function readPair(connection, ids, capabilities, {payloadReader, onProgres
         live: {mode: mode.mode, modeConflict: mode.conflict, session: after.session, revision: after.revision,
             savedGeneration: after.savedGeneration, savedOrigin: after.savedOrigin, unsaved: after.unsaved,
             converged: !after.slaveRequired || after.slaveConverged, slaveRefused: after.slaveRefused, working: working.bytes, saved, defaults: defaults.bytes,
-            keyboard: liveKeyboardStatus(after), saveMark: -1}};
+            keyboard: liveKeyboardStatus(after), saveMark: -1, lastTransactionId: after.lastTransactionId}};
 }
 
 module.exports = {snapshotLive, liveKeyboardStatus, snapshotOf};

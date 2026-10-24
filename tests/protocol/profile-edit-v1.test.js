@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_MODE, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest,
     buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, decodeEditReply, decodeEditStatusPages, decodeEditModePage,
-    decodeRuntimePage, decodeActiveMetadata, readActiveProfile, sendEditRequest, decodeAutoSavePage} = require("../../core/protocol/profile-edit-v1");
+    decodeRuntimePage, decodeActiveMetadata, readActiveProfile, sendEditRequest, decodeAutoSavePage, decodeSafeBoundaryPage} = require("../../core/protocol/profile-edit-v1");
 const {crc32} = require("../../core/schema/profile-blob-v1");
 
 /** @param {string} hex */
@@ -106,6 +106,16 @@ test("edit status pages decode both halves, the save, the last refusal and the k
         assert.throws(() => decodeAutoSavePage(page), /automatic save|Reserved/);
     }
     assert.throws(() => decodeAutoSavePage(Buffer.alloc(24)), {code: "MALFORMED_RESPONSE"});
+});
+
+// While an edit waits for a safe boundary, page 2 alone says what holds it
+// (bytes 14–17), so a wait reads one page, not four.
+test("page 2 alone says why the keyboard is not at a safe boundary", () => {
+    const page = Buffer.alloc(25); page.writeUInt32LE(0b1100_0001, 14); page.writeUInt32LE(5000, 18);
+    assert.equal(decodeSafeBoundaryPage(page), 0b1100_0001);
+    const reserved = Buffer.from(page); reserved[23] = 1;
+    assert.throws(() => decodeSafeBoundaryPage(reserved), {code: "NONCANONICAL_RESPONSE"});
+    assert.throws(() => decodeSafeBoundaryPage(Buffer.alloc(24)), {code: "MALFORMED_RESPONSE"});
 });
 
 test("the mode, runtime and active-profile pages decode, refusing what they never carry", () => {
