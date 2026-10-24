@@ -267,6 +267,18 @@ export function commitBar() {
         return node;
     }
 
+    // Ark's own live edit or Revert, held by the keyboard until no key is
+    // held: what to let go of, and Cancel edit for an edit.
+    if (draft.busy && model?.liveWait) {
+        const wait = model.liveWait;
+        const node = el(`<div class="commit applying held" role="status" aria-live="polite">
+            <span class="n">${spinner()} <strong>${esc(wait.title)}</strong>
+            <span class="muted">${esc(wait.detail)}</span></span>
+            ${wait.cancellable ? `<span class="sep"></span>
+            <button class="btn ghost" data-act="cancel-edit" data-tip="Cancel this edit. The keyboard keeps running what it ran before.">Cancel edit</button>` : ""}</div>`);
+        /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="cancel-edit"]'))?.addEventListener("click", () => post(controls.abortLiveEdit()));
+        return node;
+    }
     if (draft.busy) {
         const busy = busyText(model?.device?.health?.phase, model);
         return el(`<div class="commit applying">

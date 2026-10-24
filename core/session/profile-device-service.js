@@ -91,6 +91,8 @@ class ProfileDeviceService {
         // whose timers are throttled (a background browser tab) passes its
         // own; the timer's is used otherwise.
         this.sleep = typeof options.sleep === "function" ? options.sleep : undefined;
+        // The clock a live edit's waits are measured on (Date.now when omitted).
+        this.now = typeof options.now === "function" ? options.now : undefined;
         this.requestIdStart = normalizeRequestId(options.requestIdStart === undefined ? 1 : options.requestIdStart);
         this.readCandidateStatus = typeof options.readCandidateStatus === "function"
             ? options.readCandidateStatus
@@ -154,6 +156,10 @@ class ProfileDeviceService {
         /** @type {ReadSnapshot | Restored | undefined} */
         this.portable = undefined;
         this.portableProgress = "";
+        // Ark's own live edit or Revert the keyboard holds until no key is
+        // held (live-edit-coordinator.js), while it waits.
+        /** @type {import("./types.js").LiveWaiting | null} */
+        this.liveWaiting = null;
         /** @type {ReturnType<typeof editorViews>["macroView"] | undefined} */
         this.macroView = undefined;
         /** @type {ReturnType<typeof editorViews>["customKeyView"] | undefined} */
@@ -685,22 +691,36 @@ class ProfileDeviceService {
     liveCoordinator() {
         const connection = this.connectedConnection();
         if (!this.liveEdits || this.liveEdits.connection !== connection) {
-            this.liveEdits = new LiveEditCoordinator(connection, {requestIds: this.requestSequence(), transactionIds: new TransactionIds(), sleep: this.sleep});
+            this.liveEdits = new LiveEditCoordinator(connection, {requestIds: this.requestSequence(), transactionIds: new TransactionIds(), sleep: this.sleep, now: this.now});
         }
         return this.liveEdits;
     }
 
+    // What the keyboard holds until no key is held, published as it changes.
+    /** @param {import("./types.js").LiveWaiting | null} waiting */
+    #showWaiting(waiting) {
+        if (JSON.stringify(waiting) === JSON.stringify(this.liveWaiting)) return;
+        this.liveWaiting = waiting;
+        this.emitChange();
+    }
+
     // A live edit from the working copy's exact bytes to `to` (firmware
-    // D-F32). Resolves with what the keyboard runs now; a refusal rejects
-    // and is recorded like any failed operation.
-    /** @param {{from: Buffer, to: Buffer, defaults: Buffer, identity: {session: number, revision: number}, replaceWhenLarge?: boolean}} edit */
-    async postLiveEdit(edit) {
+    // D-F32). Resolves with what the keyboard runs now, or `cancelled` when
+    // Cancel edit ended it while the keyboard held it; a refusal rejects
+    // and is recorded like any failed operation. `onCommitted` learns the
+    // transaction the keyboard took whole.
+    /** @param {{from: Buffer, to: Buffer, defaults: Buffer, identity: {session: number, revision: number}, replaceWhenLarge?: boolean}} edit
+     * @param {{onCommitted?: (transactionId: number) => void}} [options] */
+    async postLiveEdit(edit, {onCommitted} = {}) {
         if (!this.connection?.connected) this.refuse("Connect the keyboard before editing it.");
         /** @type {Awaited<ReturnType<InstanceType<typeof LiveEditCoordinator>["post"]>> | undefined} */
         let result;
         await this.runOperation(PHASE.LIVE_EDIT, async () => {
             const capabilities = this.profileCapabilities();
-            result = await this.liveCoordinator().post({...edit, capacity: capabilities.profileSlotPayload || 130048});
+            try {
+                result = await this.liveCoordinator().post({...edit, capacity: capabilities.profileSlotPayload || 130048},
+                    {onCommitted, onWaiting: waiting => this.#showWaiting(waiting)});
+            } finally {this.liveWaiting = null;}
         }, {after: () => this.#refreshLive()});
         if (!result) throw new Error("The keyboard operation returned no edit result.");
         return result;
@@ -731,9 +751,19 @@ class ProfileDeviceService {
         if (!this.connection?.connected) this.refuse("Connect the keyboard before reverting it.");
         /** @type {Awaited<ReturnType<InstanceType<typeof LiveEditCoordinator>["revert"]>> | undefined} */
         let result;
-        await this.runOperation(PHASE.LIVE_REVERT, async () => {result = await this.liveCoordinator().revert(identity);}, {after: () => this.#refreshLive()});
+        await this.runOperation(PHASE.LIVE_REVERT, async () => {
+            try {result = await this.liveCoordinator().revert(identity, {onWaiting: waiting => this.#showWaiting(waiting)});}
+            finally {this.liveWaiting = null;}
+        }, {after: () => this.#refreshLive()});
         if (!result) throw new Error("The keyboard operation returned no revert result.");
         return result;
+    }
+
+    // Cancel edit, taken while a live edit runs: the keyboard holds it until
+    // no key is held, and aborts it at Ark's next look. False when nothing
+    // of Ark's is held that can be cancelled.
+    cancelLiveEdit() {
+        return Boolean(this.liveWaiting && this.liveEdits?.cancelWaiting());
     }
 
     // Leaving Live: the keyboard saves at once what it has not saved yet
@@ -953,6 +983,7 @@ class ProfileDeviceService {
             storedKeyboardName: storedKeyboardName(this.portable) ?? this.committed?.domains?.settings?.keyboardName,
             portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index, names) => layerName(names, index))} : this.portable?.summary || null,
             portableProgress: this.portableProgress || "",
+            liveWaiting: this.liveWaiting ? {...this.liveWaiting} : null,
             settingsView: this.settingsView ? clone(this.settingsView) : null,
             macroView: this.macroView ? clone(this.macroView) : null,
             customKeyView: this.customKeyView ? clone(this.customKeyView) : null,

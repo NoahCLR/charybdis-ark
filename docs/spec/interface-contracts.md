@@ -277,7 +277,11 @@ only an operation stands in the way. The demo's draft is bound to the demo
   (`core/session/panel-control-registry.js`): route, draft identity, binding
   rule, demo policy, phase and action. History and local macro inspection run
   before the busy guard, which refuses with a notice rather than dropping work
-  (`tests/session/panel-control-registry.test.js`).
+  (`tests/session/panel-control-registry.test.js`). A control of phase
+  `within` (Cancel edit, `abortLiveEdit`) is the one the guard takes: it ends
+  the operation that is running. While the keyboard holds Ark's live edit for
+  released keys the refusal is that wait's words, not a failure
+  ([D-L69](../adr/0069-a-held-edit-waits-for-the-release.md)).
 - Device operation phases have stable IDs (`PHASE`) with their words and write
   fact beside them; progress compares IDs, so words never change routing
   (`tests/model/vocabulary.test.js`).

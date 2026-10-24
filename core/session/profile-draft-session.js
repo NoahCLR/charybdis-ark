@@ -61,6 +61,7 @@ const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLI
  * A document a live edit would leave the keyboard with, and how the history
  * takes it once the keyboard confirms it.
  * @typedef {{document: Document, cursor?: number | null, origin: string | null, label: string | null, order?: Order, keepReviewed?: boolean}} LiveTarget
+ * @typedef {{target: LiveTarget, transactionId: number, revision: number, fingerprint: string, confirmed: boolean}} LiveExpectation
  */
 // The saved profile of a live read, as the snapshot review compares with.
 /** @param {import("./types.js").LiveSnapshot} snapshot @returns {Complete} */
@@ -143,6 +144,8 @@ class ProfileDraftSession {
     restartedWithUnsaved;
     /** @type {boolean | undefined} A live keyboard's working copy changed under the same session without Ark (another app, a lost answer, an edit that did not land as sent); the next read says the draft started again. */
     changedElsewhere;
+    /** @type {LiveExpectation | undefined} Ark's own live edit the keyboard took whole but whose outcome Ark has not heard (live-edits.js): the next read confirms it if it shows exactly that edit. */
+    expectedLive;
     now() {return Date.now();}
     // A step keeps its document, edit grouping, words, time and layer order
     // together. All of them stay fixed as undo, branching and trimming move it.
@@ -273,7 +276,20 @@ class ProfileDraftSession {
         this.latestConnectionToken = token;
         this.latestCapabilities = copy(capabilities);
         if (!("live" in snapshot) || !snapshot.live) {this.needsRead = true; return;}
-        const liveSnapshot = /** @type {import("./types.js").LiveSnapshot} */ (snapshot), live = /** @type {import("./types.js").LiveState} */ (this.live);
+        const liveSnapshot = /** @type {import("./types.js").LiveSnapshot} */ (snapshot);
+        // Exactly Ark's own edit, published (one revision on, its transaction
+        // the last, the bytes it sent): the edit landed, so the draft
+        // confirms it and keeps its history.
+        // In Live the keyboard may have saved it by itself since.
+        const expected = this.expectedLive;
+        this.expectedLive = undefined;
+        if (expected && this.showsExpected(liveSnapshot, expected) && JSON.stringify(capabilities) === JSON.stringify(this.capabilities)) {
+            this.confirmLive(expected.target, {session: liveSnapshot.live.session, revision: liveSnapshot.live.revision, bytes: liveSnapshot.live.working,
+                converged: liveSnapshot.live.converged, slaveRefused: liveSnapshot.live.slaveRefused, unsaved: liveSnapshot.live.unsaved});
+            if (liveSnapshot.saved.fingerprint !== this.base.fingerprint) this.confirmKeyboardSaved(liveSnapshot.live);
+            expected.confirmed = true;
+        }
+        const live = /** @type {import("./types.js").LiveState} */ (this.live);
         const same = liveSnapshot.live.session === live.session && liveSnapshot.live.revision === live.revision
             && liveSnapshot.saved.fingerprint === this.base.fingerprint && liveSnapshot.fingerprint === this.current.fingerprint;
         if (same && JSON.stringify(capabilities) === JSON.stringify(this.capabilities)) {
@@ -288,8 +304,30 @@ class ProfileDraftSession {
         else if (liveSnapshot.live.revision !== live.revision || liveSnapshot.fingerprint !== this.current.fingerprint) this.changedElsewhere = true;
         this.resetLive(liveSnapshot);
     }
+    // Whether a read shows exactly the edit Ark sent, published: the same
+    // session, one revision on, its transaction the last the keyboard
+    // finished, its bytes, over the same saved profile (or, in Live, saved
+    // by the keyboard itself as exactly those bytes).
+    /** @param {import("./types.js").LiveSnapshot} snapshot @param {LiveExpectation} expected */
+    showsExpected(snapshot, expected) {
+        const live = snapshot.live;
+        const savedAsIs = snapshot.saved.fingerprint === this.base.fingerprint
+            || (live.mode === EDIT_MODE.LIVE && !live.unsaved && snapshot.saved.fingerprint === expected.fingerprint);
+        return live.session === this.live?.session && live.revision === expected.revision && live.lastTransactionId === expected.transactionId
+            && snapshot.fingerprint === expected.fingerprint && savedAsIs;
+    }
+    // Ark's own edit, taken whole by the keyboard (its transaction): until
+    // its outcome is heard, a read that shows exactly it confirms it.
+    /** @param {LiveTarget} target @param {number} transactionId @returns {LiveExpectation} */
+    expectLive(target, transactionId) {
+        const live = /** @type {import("./types.js").LiveState} */ (this.live);
+        this.expectedLive = {target, transactionId, revision: live.revision + 1,
+            fingerprint: fingerprint(validateSnapshot(target.document, this.capabilities).document), confirmed: false};
+        return this.expectedLive;
+    }
     /** @param {import("./types.js").LiveSnapshot} snapshot */
     resetLive(snapshot) {
+        this.expectedLive = undefined;
         this.acceptCapabilities(this.latestCapabilities);
         this.base = savedSnapshot(snapshot); this.latest = copy(this.base);
         this.hostOs = copy(snapshot.hostOs ?? null);
@@ -685,6 +723,7 @@ class ProfileDraftSession {
     /** @param {LiveTarget} target @param {{session: number, revision: number, bytes: Buffer, converged: boolean, slaveRefused?: boolean, unsaved?: boolean}} result */
     confirmLive(target, result) {
         const live = /** @type {import("./types.js").LiveState} */ (this.live);
+        this.expectedLive = undefined;
         // A save that fails from here on fails these edits; one that failed
         // before them is no longer the news.
         this.live = {...live, session: result.session, revision: result.revision, working: result.bytes, converged: result.converged, slaveRefused: result.slaveRefused ?? false,

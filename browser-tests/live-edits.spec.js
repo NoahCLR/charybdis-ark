@@ -304,6 +304,28 @@ test("in Live the keyboard's own save, a failed one and halves apart each say wh
     await expect(page.locator(".rail-mode .dot.warn")).toHaveCount(1);
 });
 
+// The keyboard holds an edit until nothing is held and takes it on release:
+// the bar says what to let go of, and Cancel edit posts its control.
+test("an edit the keyboard holds for released keys says what holds it, and Cancel edit posts", async ({page}) => {
+    await page.goto("/preview/index.html?shell=live-held");
+    const bar = page.locator(".commit.held");
+    await expect(bar).toContainText("Let go of the held keys to finish the edit");
+    await expect(bar).toContainText("Held now: a key and a modifier or one-shot.");
+    await expect(page.locator("body")).not.toContainText("Failed");
+    await clearPosts(page);
+    await bar.locator('[data-act="cancel-edit"]').click();
+    await expectPost(page, {type: "abortLiveEdit"});
+    // A held Revert cannot be cancelled: no button.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.liveWait = {...model.liveWait, title: "Let go of the held keys to finish reverting", cancellable: false};
+        store.setModel(model); store.render();
+    });
+    await expect(page.locator(".commit.held")).toContainText("finish reverting");
+    await expect(page.locator('.commit.held [data-act="cancel-edit"]')).toHaveCount(0);
+});
+
 // Firmware D-F34: a keyboard that stopped saving says so in one line where it
 // used to look "not ready" or "catching up", and Restart posts its control.
 test("a keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {

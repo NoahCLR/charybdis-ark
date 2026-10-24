@@ -106,6 +106,8 @@ async function webShells() {
         "live-auto": VSCODE_SHELL,
         // A keyboard that stopped saving (firmware D-F34), unsaved edits on it.
         "live-stopped": VSCODE_SHELL,
+        // An edit the keyboard holds until a key and a modifier are let go.
+        "live-held": VSCODE_SHELL,
         "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
         "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
     };
@@ -144,9 +146,11 @@ const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed"
 // its working copy, with one unsaved edit, and a combos key has turned combos
 // off for now. ?shell=live shows it; ?shell=live-auto the same keyboard in Live
 // (`mode` 1), waiting to save the edit by itself; ?shell=live-stopped one that
-// stopped saving (firmware D-F34, `stopped`), with Restart.
-/** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean}} [options] */
-function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = false} = {}) {
+// stopped saving (firmware D-F34, `stopped`), with Restart; ?shell=live-held
+// one holding Ark's next edit until a key and a modifier are let go (`held`),
+// with Cancel edit.
+/** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean, held?: boolean}} [options] */
+function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = false, held = false} = {}) {
     const doc = fillPreviewLayer(document32());
     const snapshot = {
         document: doc,
@@ -171,7 +175,8 @@ function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = fal
     const state = {
         selectedDeviceId: deviceId,
         connected: true,
-        busy: false,
+        busy: held,
+        ...(held ? {phase: PHASE.LIVE_EDIT, liveWaiting: {kind: /** @type {const} */ ("edit"), reasons: 1 | 1 << 6, cancelling: false}} : {}),
         capabilities,
         status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, slaveGeneration: 42},
         devices: [
@@ -268,7 +273,7 @@ Promise.all([model, webShells(), macroShell]).then(([model, shells, macroShell])
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
 for (const [name, shell] of Object.entries(shells)) {
-    const web = name === "web" ? buildModel(shell) : name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
+    const web = name === "web" ? buildModel(shell) : name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "live-held" ? buildModel(shell, {live: true, held: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
 const page = `<!doctype html>

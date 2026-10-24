@@ -222,8 +222,8 @@ const flagsOf = flags => ({
 // where the last refused edit failed, page 3 the keyboard's own saves.
 /** @param {Buffer[]} pages @returns {import("./types.js").EditStatus} */
 function decodeEditStatusPages([local, slave, error, auto]) {
-    for (const page of [slave, error]) if (!page || page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "An edit status page has 25 bytes.");
-    if (error.subarray(22).some(byte => byte !== 0)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Reserved edit status bytes must be zero.");
+    if (!slave || slave.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "An edit status page has 25 bytes.");
+    const safeBoundaryReasons = decodeSafeBoundaryPage(error);
     return {
         ...decodeEditProgress(local),
         slave: {phase: slave[0], lastResult: slave[1], transactionId: slave.readUInt16LE(2), session: slave.readUInt32LE(4), revision: slave.readUInt32LE(8),
@@ -232,9 +232,19 @@ function decodeEditStatusPages([local, slave, error, auto]) {
         insertedReceived: slave.readUInt32LE(20),
         refusal: {validatorResult: error[0], domainId: error[1], tableId: error[2], row: error.readUInt16LE(3), step: error[5], field: error[6],
             byteOffset: error.readUInt32LE(7), detailKind: error[11], detailCode: error.readUInt16LE(12)},
-        safeBoundaryReasons: error.readUInt32LE(14), activeLength: error.readUInt32LE(18),
+        safeBoundaryReasons, activeLength: error.readUInt32LE(18),
         autoSave: decodeAutoSavePage(auto),
     };
+}
+
+// Page 2's safe-boundary reasons (bytes 14–17): why the keyboard holds an
+// edit or Revert now. Bit 0 a key is pressed, 4 a lock, 6 a modifier or
+// one-shot, 7 a one-shot layer, and the rest (profile-wire-v1/live-edits.md).
+/** @param {Buffer} page */
+function decodeSafeBoundaryPage(page) {
+    if (!page || page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "An edit status page has 25 bytes.");
+    if (page.subarray(22).some(byte => byte !== 0)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Reserved edit status bytes must be zero.");
+    return page.readUInt32LE(14);
 }
 
 // Page 3: the saves the keyboard made by itself (Live, and adjustment keys in
@@ -277,6 +287,12 @@ function decodeEditProgress(local) {
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions & {nextRequestId: () => number}} options */
 async function readEditProgress(connection, options) {
     return decodeEditProgress(await getPage(connection, PROFILE_EDIT_V1.VALUE_STATUS, 0, options));
+}
+
+// Page 2 alone, while the keyboard holds an edit until nothing is held.
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions & {nextRequestId: () => number}} options */
+async function readSafeBoundaryReasons(connection, options) {
+    return decodeSafeBoundaryPage(await getPage(connection, PROFILE_EDIT_V1.VALUE_STATUS, 2, options));
 }
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions & {nextRequestId: () => number}} options */
@@ -358,5 +374,5 @@ async function readActiveProfile(connection, options) {
 module.exports = {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, EDIT_MODE, SPLICE_FLAGS, ProfileEditProtocolError,
     buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest, buildEditAbortRequest,
     buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, editReplyMatcher, decodeEditReply, sendEditRequest,
-    decodeEditStatusPages, decodeAutoSavePage, readEditStatus, decodeEditProgress, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,
+    decodeEditStatusPages, decodeAutoSavePage, decodeSafeBoundaryPage, readEditStatus, readSafeBoundaryReasons, decodeEditProgress, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,
     decodeActiveMetadata, readActiveProfile};

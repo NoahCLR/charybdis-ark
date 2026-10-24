@@ -33,6 +33,8 @@ export interface ControlPayloads {
         /** Send the edit waiting on its trap check, or drop it. */
         confirmLiveEdit: {proposal: number};
         cancelLiveEdit: {proposal: number};
+        /** Cancel edit: abort the live edit the keyboard holds until no key is held. */
+        abortLiveEdit: Record<never, never>;
         /** How edits reach the keyboard; `pending` says what happens to work in progress first. */
         setEditMode: {mode: 0 | 1 | 2; pending?: 'save' | 'revert' | 'send' | 'discard'; /** The question showed the draft's traps and warnings and the person went ahead. */ confirmChecks?: boolean};
         /** Restart both halves (firmware D-F34), keeping unsaved edits to put back. */

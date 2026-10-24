@@ -215,6 +215,11 @@ const DRAFT_ACTIONS = Object.freeze({
     revert: liveOr("revert"),
     confirmLive: liveOr("confirmLive"),
     cancelLive: async ({session}) => {session.liveProposal = undefined; session.resetDraftForms = true;},
+    // Taken while the edit runs (registry phase `within`): the edit's own
+    // path says how it ended (live-edits.js).
+    abortLive: async ({session, service}) => {
+        if (!service.cancelLiveEdit?.()) session.notice = "Nothing to cancel: the keyboard is not holding an edit of Ark's.";
+    },
     setMode: ({session, message, shell}) => setEditMode(session, /** @type {{mode: number, pending?: string, draftRevision: number}} */ (/** @type {unknown} */ (message)),
         (cause) => recoveryFor(shell, session, cause), shell),
     // A keyboard that stopped saving (firmware D-F34), in any edit mode.

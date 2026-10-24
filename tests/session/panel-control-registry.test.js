@@ -44,7 +44,7 @@ test("every policy is complete and every routed action resolves", () => {
         assert.ok(Object.isFrozen(entry), type);
         assert.ok(["none", "apply", "import", "profile", "inspect"].includes(entry.binding), type);
         assert.ok(["allow", "refuse", "ignore", "leave", "export", "open", "replace", "close", "shell-leave"].includes(entry.demo), type);
-        assert.ok(["panel", "apply", "restore", "read", "view", "shell", "inspect"].includes(entry.phase), type);
+        assert.ok(["panel", "apply", "restore", "read", "view", "shell", "inspect", "within"].includes(entry.phase), type);
         assert.equal(typeof entry.identity, "boolean", type);
         const handlers = {draft: DRAFT_ACTIONS, portable: PORTABLE_ACTIONS, demo: DEMO_ACTIONS}[entry.route];
         if (handlers && entry.action !== "export") assert.equal(typeof handlers[entry.action], "function", type);
@@ -63,8 +63,11 @@ test("every control keeps its route, including history before the busy guard", (
         const route = ["view", "shell", "inspect"].includes(entry.route) ? "none" : entry.route;
         assert.equal(routeMessage(current, message, state()), route, type);
         const busy = {...session(), readBusy: true};
-        // Work waits out loud; a model request and shell controls are answered.
-        if (["draft", "portable", "demo", "read"].includes(entry.route) && type !== "ready") assert.throws(() => routeMessage(busy, request(type, busy), state()), /current operation/, type);
+        // Work waits out loud; a model request and shell controls are
+        // answered; a control within the running operation (Cancel edit) is
+        // taken, since it ends that operation.
+        if (entry.phase === "within") assert.equal(routeMessage(busy, request(type, busy), state()), entry.route, type);
+        else if (["draft", "portable", "demo", "read"].includes(entry.route) && type !== "ready") assert.throws(() => routeMessage(busy, request(type, busy), state()), /current operation/, type);
         else assert.equal(routeMessage(busy, request(type, busy), state()), "none", type);
         if (entry.route === "view") assert.equal(busy.historyOpen, entry.action === "openHistory", type);
     }

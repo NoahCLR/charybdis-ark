@@ -23,18 +23,30 @@ function fakeShell() {
 }
 const model = shell => shell.posted.filter(message => message.type === "model").at(-1);
 
+// The service's clock: every wait moves it on, and `at(ms, run)` runs `run`
+// once it has passed `ms`, so a test can hold a key for 13 s in no time.
+function testClock() {
+    const clock = {ms: 0, due: /** @type {{at: number, run: () => void}[]} */ ([])};
+    return {now: () => clock.ms, at: (/** @type {number} */ at, /** @type {() => void} */ run) => {clock.due.push({at, run});},
+        sleep: async (/** @type {number} */ ms) => {
+            clock.ms += ms;
+            for (const job of clock.due.filter(job => clock.ms >= job.at)) {clock.due.splice(clock.due.indexOf(job), 1); job.run();}
+        }};
+}
+
 /** @param {import("node:test").TestContext} t @param {object} [options] */
 async function open(t, options = {}) {
     const keyboard = liveKeyboard({document: document(), ...options});
     const shell = fakeShell();
-    const loop = openPanelLoop(shell, {adapter: fakeKeyboardAdapter({keyboard}), defaultTimeoutMs: 300, sleep: async () => {}});
+    const clock = testClock();
+    const loop = openPanelLoop(shell, {adapter: fakeKeyboardAdapter({keyboard}), defaultTimeoutMs: 300, sleep: clock.sleep, now: clock.now});
     t.after(() => loop.close());
     await loop.handleMessage({type: "refresh"});
     /** @param {object} message */
     const send = message => loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, ...message});
     /** @param {number} layer @param {number} layoutIndex @param {string} keycode */
     const key = (layer, layoutIndex, keycode) => send({type: "updateLayoutKeys", layer: `Layer ${layer}`, changes: [{layoutIndex, keycode}]});
-    return {keyboard, shell, loop, send, key, session: loop.session};
+    return {keyboard, shell, loop, send, key, session: loop.session, at: clock.at};
 }
 /** @param {Buffer | null} bytes */
 const layers = bytes => validateSnapshot({format: "charybdis-profile", version: 5, keyboard: "charybdis-4x6", actionAbiDigest: document().actionAbiDigest, profile: /** @type {Buffer} */ (bytes).toString("base64")}).layers;
@@ -130,6 +142,107 @@ test("an edit that adds a trap waits for the person; cancelling sends nothing, c
     assert.equal(keyboard.events.filter(event => event === "published").length, published + 1);
     assert.equal(model(shell).model.liveProposal, null);
     assert.equal(session.draft.history.length, 2);
+});
+
+// Shift held through a rename once made Ark say "Failed" after 5 s and throw
+// the history away, though the keyboard took the edit on release (keyboard
+// session, 2026-10-24).
+const ABORT = 0x24;
+const notices = shell => shell.posted.filter(message => message.notice).map(message => message.notice);
+test("an edit held by a key waits for the release, says so, and lands as Ark's own edit", async t => {
+    const {keyboard, shell, session, key, send, at} = await open(t);
+    const draft = session.draft;
+    keyboard.hold(1);
+    /** @type {Promise<unknown>[]} */
+    const meanwhile = [];
+    at(3000, () => {meanwhile.push(key(0, 11, "KC_W"), send({type: "revertProfileDraft"}));});
+    at(13000, () => keyboard.release());
+    await key(0, 10, "KC_X");
+    await Promise.all(meanwhile);
+    const waited = shell.posted.filter(message => message.type === "model" && message.model.liveWait).map(message => message.model.liveWait);
+    assert.ok(waited.length, "the panel showed the wait");
+    assert.equal(waited[0].title, "Let go of the held keys to finish the edit");
+    assert.match(waited[0].detail, /Held now: a key\./);
+    assert.equal(waited[0].cancellable, true);
+    assert.equal(model(shell).model.liveWait, null, "and stopped once the edit landed");
+    assert.equal(keyboard.events.filter(event => event === "published").length, 1, "published once");
+    assert.ok(!keyboard.mutations.some(request => request[2] === ABORT), "nothing was aborted");
+    assert.equal(layers(keyboard.working)[0][11], 0, "the edit asked for meanwhile was not sent");
+    assert.equal(session.draft, draft);
+    assert.equal(draft.history.length, 2, "the history has the step");
+    assert.equal(draft.live.revision, keyboard.revision);
+    const said = notices(shell);
+    assert.ok(!said.some(notice => /not what Ark last saw/.test(notice)));
+    assert.ok(!said.some(notice => /^Failed/.test(notice)), "nothing failed");
+    assert.deepEqual(said.filter(notice => /^Let go/.test(notice)), [
+        "Let go of the held keys first: the keyboard is still taking the last edit.",
+        "Let go of the held keys first: the keyboard is still taking the last edit.",
+    ], "what was asked for meanwhile was refused, with words");
+    await send({type: "undoProfileDraft"});
+    assert.equal(keyboard.working, null, "undo sends the edit back");
+});
+
+test("Cancel edit aborts an edit held by a key; the keyboard and the draft stay as they were", async t => {
+    const {keyboard, shell, session, key, send, at} = await open(t);
+    const draft = session.draft, shown = draft.current.fingerprint;
+    keyboard.hold(1 << 6);
+    at(2000, () => {void send({type: "abortLiveEdit"});});
+    await key(0, 10, "KC_X");
+    assert.equal(keyboard.mutations.filter(request => request[2] === ABORT).length, 1, "the abort was sent");
+    assert.equal(keyboard.working, null, "the keyboard runs what it ran");
+    assert.equal(draft.history.length, 1);
+    assert.equal(draft.current.fingerprint, shown);
+    assert.equal(model(shell).notice, "Edit cancelled: the keyboard runs what it ran before.");
+    assert.ok(shell.posted.some(message => message.type === "model" && /a modifier or one-shot/.test(message.model.liveWait?.detail || "")));
+    keyboard.release();
+    assert.equal(keyboard.events.filter(event => event === "published").length, 0);
+    // Nothing is held now: Cancel edit says there is nothing to cancel.
+    await send({type: "abortLiveEdit"});
+    assert.match(model(shell).notice, /Nothing to cancel/);
+});
+
+test("a Revert held by a key waits for the release the same way, with no Cancel edit", async t => {
+    const {keyboard, shell, key, send, at} = await open(t);
+    await key(0, 10, "KC_X");
+    keyboard.hold(1 << 4);
+    at(8000, () => keyboard.release());
+    await send({type: "revertProfileDraft"});
+    assert.equal(keyboard.working, null);
+    const waited = shell.posted.filter(message => message.type === "model" && message.model.liveWait).map(message => message.model.liveWait);
+    assert.equal(waited[0].title, "Let go of the held keys to finish reverting");
+    assert.match(waited[0].detail, /a locked layer or pointer mode/);
+    assert.equal(waited[0].cancellable, false, "the keyboard refuses to abort its own Revert");
+    assert.match(model(shell).notice, /^Reverted/);
+});
+
+test("in Live, a read that finds Ark's edit already saved by the keyboard confirms it too", async t => {
+    // The keyboard saves by itself after two looks at its status.
+    const {keyboard, shell, session, key} = await open(t, {mode: EDIT_MODE.LIVE, autoSaveAfterReads: 2});
+    const draft = session.draft;
+    keyboard.faults.lengthSkew = 1;
+    await key(0, 4, "KC_Q");
+    assert.equal(keyboard.working, null, "saved by the keyboard before Ark read it again");
+    assert.equal(session.draft, draft);
+    assert.equal(draft.history.length, 2, "the step is kept");
+    assert.equal(draft.current.fingerprint, draft.base.fingerprint, "and is what the keyboard saved");
+    assert.equal(layers(keyboard.saved)[0][4], layers(Buffer.from(draft.current.document.profile, "base64"))[0][4]);
+    assert.ok(!notices(shell).some(notice => /not what Ark last saw|^Failed/.test(notice)));
+});
+
+// The tripwire after an edit (a length Ark did not expect) reads the
+// keyboard again; finding exactly Ark's edit there, the edit landed.
+test("a read after a failed answer that finds exactly Ark's edit confirms it, keeping the history", async t => {
+    const {keyboard, shell, session, key} = await open(t);
+    await key(0, 3, "KC_Z");
+    const draft = session.draft;
+    keyboard.faults.lengthSkew = 1;
+    await key(0, 4, "KC_Q");
+    assert.equal(session.draft, draft);
+    assert.equal(draft.history.length, 3, "the step is kept");
+    assert.equal(draft.cursor, 2);
+    assert.equal(layers(keyboard.working)[0][4], layers(Buffer.from(draft.current.document.profile, "base64"))[0][4]);
+    assert.ok(!notices(shell).some(notice => /not what Ark last saw|^Failed/.test(notice)));
+    assert.ok(model(shell).acceptedEdit, "the form learns its edit was taken");
 });
 
 test("a refused edit is said, and the draft is read again from the keyboard", async t => {

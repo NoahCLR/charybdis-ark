@@ -13,10 +13,17 @@
 // retrying blindly. A lost answer ends the connection (the transport closes
 // it on a timeout); reading the keyboard again then says whether the edit
 // landed. An edit is never replayed.
+//
+// An edit or Revert the keyboard holds until no key is held (phase 4 or 5
+// with flag 8) waits for the release, however long it takes: the firmware
+// never drops it, and publishes it once nothing is held (live-edits.md,
+// "Checking and publishing"). Meanwhile `onWaiting` says what holds it (page
+// 2), and `cancelWaiting()` aborts a held edit, which is legal before
+// publication. The short limit stays for every other phase.
 
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest,
     buildEditCommitRequest, buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, sendEditRequest,
-    readEditProgress, readEditStatus, readEditMode} = require("../protocol/profile-edit-v1");
+    readEditProgress, readEditStatus, readEditMode, readSafeBoundaryReasons} = require("../protocol/profile-edit-v1");
 const {diffProfiles, applySplices, spliceEditFits} = require("../schema/profile-splices");
 const {PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-domains");
@@ -28,8 +35,9 @@ const {LIVE_RESULT_WORDS} = require("../model/vocabulary");
 const REQUIRED_DOMAINS = Object.freeze([PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]);
 const DEFAULT_TIMING = Object.freeze({
     pollMs: 5,
-    // An edit waits for a safe boundary (held keys) and for the slave half;
-    // both are short on a keyboard in use, and a person is watching.
+    // An edit being loaded and checked, and the slave half, are short on a
+    // keyboard in use, and a person is watching. Held keys are waited for
+    // without a limit (the class comment).
     editMs: 5000,
     slaveMs: 3000,
     busyMs: 3000,
@@ -42,8 +50,9 @@ const DEFAULT_TIMING = Object.freeze({
     saveMs: 120000,
 });
 
-// How often a request the keyboard refuses while it saves is asked again.
-const SAVE_POLL_MS = 50;
+// How often a request the keyboard refuses while it saves is asked again,
+// and how often a held edit is looked at: either can last long.
+const SAVE_POLL_MS = 50, HELD_POLL_MS = 50;
 
 class LiveEditError extends Error {
     /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
@@ -99,6 +108,9 @@ class TransactionIds {
     }
 }
 
+/** @typedef {import("./types.js").LiveWaiting} LiveWaiting */
+/** @typedef {{onWaiting?: (waiting: LiveWaiting | null) => void}} WaitOptions */
+
 class LiveEditCoordinator {
     /** @param {import("../transport/types.js").RequestConnection} connection @param {{requestIds: import("../protocol/types.js").RequestIds, transactionIds?: TransactionIds, sleep?: (ms: number) => Promise<void>, now?: () => number, timing?: Partial<Record<keyof typeof DEFAULT_TIMING, number>>}} options */
     constructor(connection, {requestIds, transactionIds = new TransactionIds(), sleep, now = Date.now, timing = {}}) {
@@ -108,6 +120,46 @@ class LiveEditCoordinator {
         this.sleep = sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)));
         this.now = now;
         this.timing = {...DEFAULT_TIMING, ...timing};
+        /** @type {{transactionId: number, kind: "edit" | "revert", cancelRequested: boolean, abortSent: boolean} | undefined} Ark's own edit or Revert, held until no key is held */
+        this.held = undefined;
+    }
+
+    // Cancel edit: a held edit is aborted at the next look. False when
+    // nothing of Ark's is held, or what is held is a Revert, whose abort the
+    // keyboard refuses.
+    cancelWaiting() {
+        if (this.held?.kind !== "edit") return false;
+        this.held.cancelRequested = true;
+        return true;
+    }
+
+    // Whether the keyboard holds this transaction until no key is held.
+    /** @param {import("../protocol/types.js").EditProgress} progress @param {number} transactionId @param {number} phase */
+    static heldBy(progress, transactionId, phase) {
+        return progress.waitingSafe && progress.phase === phase && progress.transactionId === transactionId;
+    }
+
+    // One look at a held edit or Revert: says what holds it, aborts an edit
+    // the person cancelled (once), then waits a moment.
+    /** @param {number} transactionId @param {"edit" | "revert"} kind @param {WaitOptions["onWaiting"]} onWaiting */
+    async waitHeld(transactionId, kind, onWaiting = () => {}) {
+        const reasons = await readSafeBoundaryReasons(this.connection, this.options);
+        if (this.held?.transactionId !== transactionId) this.held = {transactionId, kind, cancelRequested: false, abortSent: false};
+        const held = this.held;
+        onWaiting({kind, reasons, cancelling: held.cancelRequested});
+        if (held.cancelRequested && !held.abortSent) {
+            held.abortSent = true;
+            // OK whether it ended the edit or the edit published first.
+            await this.send(buildEditAbortRequest(transactionId));
+        }
+        await this.sleep(Math.max(this.timing.pollMs, HELD_POLL_MS));
+    }
+
+    /** @param {WaitOptions["onWaiting"]} onWaiting */
+    endHeld(onWaiting = () => {}) {
+        if (!this.held) return;
+        this.held = undefined;
+        onWaiting(null);
     }
 
     status() {return readEditStatus(this.connection, this.options);}
@@ -157,8 +209,12 @@ class LiveEditCoordinator {
     // `to`, made against `identity`. Resolves with the bytes the keyboard
     // now runs, its new pair, whether the slave half holds them yet and
     // whether it refused them.
-    /** @param {{from: Buffer, to: Buffer, defaults?: Buffer, identity: {session: number, revision: number}, capacity: number, replaceWhenLarge?: boolean}} edit */
-    async post({from, to, defaults, identity, capacity, replaceWhenLarge = false}) {
+    // `onCommitted` learns the transaction once the keyboard has it whole, so
+    // a read after a failure can tell whether this edit landed.
+    /** @param {{from: Buffer, to: Buffer, defaults?: Buffer, identity: {session: number, revision: number}, capacity: number, replaceWhenLarge?: boolean}} edit
+     * @param {WaitOptions & {onCommitted?: (transactionId: number) => void}} [options]
+     * @returns {Promise<{bytes: Buffer, session: number, revision: number, converged: boolean, slaveRefused: boolean, sent: number, cancelled?: true, cancelTooLate?: true}>} */
+    async post({from, to, defaults, identity, capacity, replaceWhenLarge = false}, {onWaiting, onCommitted} = {}) {
         const diff = diffProfiles(from, to, {defaults, required: REQUIRED_DOMAINS});
         if (!diff.splices.length) return {bytes: from, ...identity, converged: true, slaveRefused: false, sent: 0};
         const result = applySplices(from, diff, {versions: PROFILE_DOMAIN_VERSIONS});
@@ -184,7 +240,12 @@ class LiveEditCoordinator {
             await this.send(buildEditAbortRequest(transactionId)).catch(() => {});
             throw error;
         }
-        const done = await this.settle(transactionId);
+        onCommitted?.(transactionId);
+        const {progress: done, cancelled} = await this.settle(transactionId, onWaiting);
+        // Cancelled before it took effect: nothing changed.
+        if (cancelled && done.lastResult === EDIT_RESULT.ABORTED && done.session === identity.session && done.revision === identity.revision) {
+            return {bytes: from, session: done.session, revision: done.revision, ...(await this.convergence(done.session, done.revision)), sent: 0, cancelled: true};
+        }
         const status = await this.status();
         if (done.lastResult !== EDIT_RESULT.OK) {
             const details = done.lastResult === EDIT_RESULT.VALIDATION_REJECTED ? {refusal: status.refusal} : {};
@@ -196,7 +257,9 @@ class LiveEditCoordinator {
         if (status.session !== done.session || status.revision !== done.revision || status.activeLength !== bytes.length) {
             throw new LiveEditError("LIVE_EDIT_MISMATCH", "The keyboard took the edit, but what it runs is not what Ark sent. Ark reads the keyboard again.", {session: status.session, revision: status.revision});
         }
-        return {bytes, session: done.session, revision: done.revision, ...(await this.convergence(done.session, done.revision)), sent: stream.length};
+        // Cancel edit came after the keyboard had taken the edit: it landed.
+        return {bytes, session: done.session, revision: done.revision, ...(await this.convergence(done.session, done.revision)), sent: stream.length,
+            ...(cancelled ? {cancelTooLate: /** @type {const} */ (true)} : {})};
     }
 
     /** @param {Buffer} request @param {string} what */
@@ -207,20 +270,25 @@ class LiveEditCoordinator {
     }
 
     // Waits for this half to finish the edit: its last finished transaction is
-    // this one and nothing is in progress.
-    /** @param {number} transactionId */
-    async settle(transactionId) {
-        const until = this.now() + this.timing.editMs;
-        for (;;) {
-            const progress = await this.progress();
-            if (progress.lastTransactionId === transactionId && progress.transactionId !== transactionId && progress.phase === EDIT_PHASE.IDLE) return progress;
-            if (this.now() > until) {
-                throw new LiveEditError("LIVE_EDIT_PENDING", progress.waitingSafe
-                    ? "The keyboard is waiting to take the edit until no key is held. Release held keys and locked layers; Ark reads the keyboard again."
-                    : "The keyboard has not finished the edit. Ark reads the keyboard again to see whether it did.", {session: progress.session, revision: progress.revision});
+    // this one and nothing is in progress. Held for no key to be held, it
+    // waits as long as that lasts; the short limit starts again after.
+    /** @param {number} transactionId @param {WaitOptions["onWaiting"]} [onWaiting] */
+    async settle(transactionId, onWaiting) {
+        let until = this.now() + this.timing.editMs, cancelled = false;
+        try {
+            for (;;) {
+                const progress = await this.progress();
+                if (progress.lastTransactionId === transactionId && progress.transactionId !== transactionId && progress.phase === EDIT_PHASE.IDLE) return {progress, cancelled};
+                if (LiveEditCoordinator.heldBy(progress, transactionId, EDIT_PHASE.WAITING_SAFE)) {
+                    await this.waitHeld(transactionId, "edit", onWaiting);
+                    cancelled ||= Boolean(this.held?.cancelRequested);
+                    until = this.now() + this.timing.editMs;
+                    continue;
+                }
+                if (this.now() > until) throw new LiveEditError("LIVE_EDIT_PENDING", "The keyboard has not finished the edit. Ark reads the keyboard again to see whether it did.", {session: progress.session, revision: progress.revision});
+                await this.sleep(this.timing.pollMs);
             }
-            await this.sleep(this.timing.pollMs);
-        }
+        } finally {this.endHeld(onWaiting);}
     }
 
     // Whether the slave half holds this session and revision, waiting a
@@ -302,19 +370,26 @@ class LiveEditCoordinator {
     }
 
     // Revert: the keyboard runs its saved profile again; no flash is written.
-    /** @param {{session: number, revision: number}} identity */
-    async revert(identity) {
+    /** @param {{session: number, revision: number}} identity @param {WaitOptions} [options] */
+    async revert(identity, {onWaiting} = {}) {
         const before = await this.progress();
         const transactionId = this.transactionIds.next(before.lastTransactionId, before.transactionId);
         const reply = await this.sendWhenFree(() => buildRevertRequest(transactionId, identity), "The keyboard did not revert");
         if (reply.result !== EDIT_RESULT.OK && reply.result !== EDIT_RESULT.QUEUED) throw refused(reply.result, "The keyboard did not revert", {session: reply.session, revision: reply.revision, flags: reply.flags});
-        const until = this.now() + this.timing.editMs;
-        for (;;) {
-            const progress = await this.progress();
-            if (!progress.unsaved && progress.phase === EDIT_PHASE.IDLE) return {...progress, ...(await this.convergence(progress.session, progress.revision))};
-            if (this.now() > until) throw new LiveEditError("LIVE_EDIT_PENDING", "The keyboard has not finished reverting. Release held keys; Ark reads the keyboard again.");
-            await this.sleep(this.timing.pollMs);
-        }
+        let until = this.now() + this.timing.editMs;
+        try {
+            for (;;) {
+                const progress = await this.progress();
+                if (!progress.unsaved && progress.phase === EDIT_PHASE.IDLE) return {...progress, ...(await this.convergence(progress.session, progress.revision))};
+                if (LiveEditCoordinator.heldBy(progress, transactionId, EDIT_PHASE.REVERTING)) {
+                    await this.waitHeld(transactionId, "revert", onWaiting);
+                    until = this.now() + this.timing.editMs;
+                    continue;
+                }
+                if (this.now() > until) throw new LiveEditError("LIVE_EDIT_PENDING", "The keyboard has not finished reverting. Ark reads the keyboard again.");
+                await this.sleep(this.timing.pollMs);
+            }
+        } finally {this.endHeld(onWaiting);}
     }
 
     // Restart both halves (firmware D-F34): the way out of a keyboard whose

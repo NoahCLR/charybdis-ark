@@ -157,7 +157,9 @@ async function handleMessage(session, message, shell) {
         // and the panel is where someone looks when it seems stuck. It reads
         // as the sentence the failure says; its code (OperationFailure.code)
         // is for the code that handles it, not for the person.
-        session.notice = `Failed: ${text}`;
+        // A request refused while the keyboard holds an edit for released
+        // keys is no failure: its words say what to do (live-edits.js).
+        session.notice = /** @type {{code?: string}} */ (error)?.code === "LIVE_EDIT_HELD" ? text : `Failed: ${text}`;
         publish(session, shell);
     }
 }

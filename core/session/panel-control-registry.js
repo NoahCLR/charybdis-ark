@@ -4,9 +4,11 @@ const {PHASE, PHASE_WORDS} = require("../model/vocabulary");
 
 // Panel controls have one policy: where they run, what they bind to, what
 // the demo permits and which operation surrounds them. The actions themselves
-// live in the controller modules; this inert table cannot import them.
+// live in the controller modules; this inert table cannot import them. A
+// control `within` runs inside the operation already running, which it ends,
+// so the busy guard lets it through.
 /** @typedef {'draft' | 'portable' | 'demo' | 'read' | 'view' | 'shell' | 'inspect'} Route */
-/** @typedef {{route: Route, action: string, binding: 'none' | 'apply' | 'import' | 'profile' | 'inspect', demo: 'allow' | 'refuse' | 'ignore' | 'leave' | 'export' | 'open' | 'replace' | 'close' | 'shell-leave', phase: 'panel' | 'apply' | 'restore' | 'read' | 'view' | 'shell' | 'inspect', identity: boolean}} Control */
+/** @typedef {{route: Route, action: string, binding: 'none' | 'apply' | 'import' | 'profile' | 'inspect', demo: 'allow' | 'refuse' | 'ignore' | 'leave' | 'export' | 'open' | 'replace' | 'close' | 'shell-leave', phase: 'panel' | 'apply' | 'restore' | 'read' | 'view' | 'shell' | 'inspect' | 'within', identity: boolean}} Control */
 /** @type {Readonly<Record<import('../../contracts/messages.js').ControlType, Readonly<Control>>>} */
 const CONTROLS = Object.freeze({
     reviewProfileDraft: Object.freeze({route: "draft", action: "review", binding: "none", demo: "allow", phase: "panel", identity: true}),
@@ -25,6 +27,9 @@ const CONTROLS = Object.freeze({
     revertProfileDraft: Object.freeze({route: "draft", action: "revert", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
     confirmLiveEdit: Object.freeze({route: "draft", action: "confirmLive", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
     cancelLiveEdit: Object.freeze({route: "draft", action: "cancelLive", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    // Cancel edit: aborts Ark's own edit while the keyboard holds it until no
+    // key is held, which is while the edit is still running.
+    abortLiveEdit: Object.freeze({route: "draft", action: "abortLive", binding: "none", demo: "refuse", phase: "within", identity: true}),
     setEditMode: Object.freeze({route: "draft", action: "setMode", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
     // A keyboard that stopped saving (firmware D-F34): restart both halves.
     // Bound to no Apply: a stopped keyboard's draft may be stale.

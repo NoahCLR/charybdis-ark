@@ -91,6 +91,25 @@ const LIVE_RESULT_WORDS = Object.freeze({
     STOPPED: "the keyboard stopped saving. Restart it to continue.",
 });
 
+// Ark's own live edit or Revert, held by the keyboard until no key is held
+// (edit status flag 8), in words the person can act on: what edit status
+// page 2 says holds it, where it names something a person lets go of
+// (profile-wire-v1/live-edits.md: bit 0 a key is pressed, 4 a lock, 6 a
+// modifier or one-shot, 7 a one-shot layer); other reasons are said as held
+// keys alone. `refusal` answers another edit asked for meanwhile.
+const SAFE_BOUNDARY_WORDS = Object.freeze(/** @type {const} */ ([[1 << 0, "a key"], [1 << 4, "a locked layer or pointer mode"], [1 << 6, "a modifier or one-shot"], [1 << 7, "a one-shot layer"]]));
+/** @param {{kind: "edit" | "revert", reasons: number, cancelling: boolean}} waiting @returns {{title: string, detail: string, refusal: string}} */
+function heldWords({kind, reasons, cancelling}) {
+    const held = SAFE_BOUNDARY_WORDS.filter(([bit]) => reasons & bit).map(([, words]) => words);
+    const list = held.length > 1 ? `${held.slice(0, -1).join(", ")} and ${held[held.length - 1]}` : held[0];
+    const now = list ? `Held now: ${list}. ` : "";
+    if (kind === "revert") return {title: "Let go of the held keys to finish reverting", detail: `${now}The keyboard puts back its saved profile the moment nothing is held; Ark waits for it.`,
+        refusal: "Let go of the held keys first: the keyboard is still reverting."};
+    return {title: cancelling ? "Cancelling the edit" : "Let go of the held keys to finish the edit",
+        detail: cancelling ? "The keyboard drops the edit and keeps running what it ran before." : `${now}The keyboard takes the edit the moment nothing is held; Ark waits for it.`,
+        refusal: "Let go of the held keys first: the keyboard is still taking the last edit."};
+}
+
 // How long a keyboard in Live waits, with no edit and no key held, before it
 // saves by itself, in words: the quiet interval it reports, or 3 seconds
 // until it has reported one (firmware D-F32).
@@ -257,4 +276,4 @@ const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
-module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, slotName, branchName, modifierNames};
+module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, slotName, branchName, modifierNames};
