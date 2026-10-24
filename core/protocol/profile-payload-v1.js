@@ -20,6 +20,7 @@ const {
     ProfileWireProtocolError,
     buildProfileGetRequest,
     decodeProfileResponse,
+    isUnknownPage,
     profileResponseMatcher,
 } = require("./profile-wire-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
@@ -102,7 +103,7 @@ async function readProfilePayload(connection, value, options = {}, previous) {
     /** @type {{expectedGeneration: number, actualGeneration: number} | undefined} */
     let lastMismatch;
 
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
+    attempts: for (let attempt = 0; attempt <= retries; attempt += 1) {
         const metadata = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
         // The same bytes, already in hand: an earlier verified read of this
         // payload, or bytes the keyboard just served from the same place
@@ -115,9 +116,26 @@ async function readProfilePayload(connection, value, options = {}, previous) {
         let written = 0;
 
         for (let chunk = 0; chunk < total; chunk += 1) {
-            const page = await requestPage(connection, value, chunk + 1, requestIds, options);
             const expected = Math.min(metadata.chunkSize, metadata.payloadLength - written);
-            if (page.length < expected) {
+            /** @type {Buffer | undefined} */
+            let page;
+            /** @type {unknown} */
+            let refusal;
+            try {page = await requestPage(connection, value, chunk + 1, requestIds, options);}
+            catch (error) {
+                if (!isUnknownPage(error)) throw error;
+                refusal = error;
+            }
+            if (!page || page.length < expected) {
+                // A page shorter than the metadata said, or past its end, is
+                // what a save landing mid-read looks like when it shortens the
+                // payload: page 0 says whether one did.
+                const now = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
+                if (!sameMetadata(now, metadata)) {
+                    lastMismatch = {expectedGeneration: metadata.generation, actualGeneration: now.generation};
+                    continue attempts;
+                }
+                if (!page) throw refusal;
                 throw protocolError(
                     "MALFORMED_RESPONSE",
                     `Chunk ${chunk} returned ${page.length} bytes where ${expected} were expected.`

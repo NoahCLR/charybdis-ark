@@ -208,3 +208,65 @@ test("bytes already read stand in for a payload only when they pass its checks",
         assert.deepEqual(fresh.requests, [0, 1, 2, 3, 0]);
     }
 });
+
+// A save that lands between the chunks (a Live keyboard's own save, after a
+// rename to a shorter name) shortens the payload under the read: the page
+// that comes back short, or past the new end, is the save showing, so page 0
+// is read again and the read retried when it moved. Seen on the keyboard on
+// 2026-10-24 as "Chunk 258 returned 1 bytes where 3 were expected."
+/** @param {{bytes: Buffer, generation: number}} first @param {{bytes: Buffer, generation: number}} second @param {number} landsAfter chunk page after which the save lands @param {{metadataMoves?: boolean}} [options] */
+function savingDuringRead(first, second, landsAfter, {metadataMoves = true} = {}) {
+    let state = first;
+    /** @type {number[]} */
+    const requests = [];
+    return {
+        requests,
+        /** @param {Uint8Array} report */
+        async request(report) {
+            const request = Buffer.from(report);
+            const page = request[4] | (request[5] << 8);
+            requests.push(page);
+            const offset = (page - 1) * 25;
+            const past = page !== 0 && offset >= state.bytes.length;
+            const payload = page === 0 ? metadataPage(metadataMoves ? state : first) : past ? Buffer.alloc(0) : state.bytes.subarray(offset, offset + 25);
+            if (page === landsAfter) state = second;
+            const response = Buffer.alloc(RAW_HID_REPORT_SIZE);
+            request.copy(response, 0, 0, 5);
+            response[5] = past ? PROFILE_WIRE_STATUS.UNKNOWN_PAGE : PROFILE_WIRE_STATUS.OK;
+            response[6] = payload.length;
+            payload.copy(response, PROFILE_WIRE_V1.PAYLOAD_OFFSET);
+            return response;
+        },
+    };
+}
+
+test("a save that shortens the payload between chunks is read again, not refused", async () => {
+    // 60 bytes become 58: the last chunk is 8 bytes where 10 were expected.
+    // 60 bytes become 50: page 3 is past the new end.
+    for (const length of [58, 50]) {
+        const first = {bytes: payloadOf(60), generation: 4}, second = {bytes: payloadOf(length).fill(9, 0, 1), generation: 5};
+        const device = savingDuringRead(first, second, 2);
+        const read = await readCommittedPayload(device);
+        assert.equal(read.metadata.generation, 5, `length ${length}`);
+        assert.deepEqual(read.bytes, second.bytes, "the new generation, not a mix of both");
+        assert.deepEqual(device.requests.slice(0, 5), [0, 1, 2, 3, 0], "page 0 is read again at the page that did not fit");
+    }
+});
+
+test("a short chunk under unchanged metadata is still a malformed response", async () => {
+    const bytes = payloadOf(60);
+    // The chunks shorten, but page 0 still names the first payload.
+    const device = savingDuringRead({bytes, generation: 4}, {bytes: bytes.subarray(0, 58), generation: 4}, 2, {metadataMoves: false});
+    await assert.rejects(readCommittedPayload(device), (error) => {
+        assert.equal(error.code, "MALFORMED_RESPONSE");
+        return true;
+    });
+    assert.deepEqual(device.requests, [0, 1, 2, 3, 0], "page 0 was read again before refusing");
+    // Past the end, under unchanged metadata: the keyboard's refusal stands.
+    const past = savingDuringRead({bytes, generation: 4}, {bytes: bytes.subarray(0, 50), generation: 4}, 2, {metadataMoves: false});
+    await assert.rejects(readCommittedPayload(past), (error) => {
+        assert.equal(error.code, "DEVICE_REJECTED");
+        return true;
+    });
+    assert.deepEqual(past.requests, [0, 1, 2, 3, 0]);
+});

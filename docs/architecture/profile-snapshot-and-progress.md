@@ -59,7 +59,10 @@ active bytes, kept only as the next Apply's reuse source.
 
 Every payload read (`core/protocol/profile-payload-v1.js`) reads metadata,
 chunks and metadata again, retries when the metadata moved, and verifies
-CRC32 and the FNV digest. The service then matches it to the active identity
+CRC32 and the FNV digest. A chunk shorter than the metadata said, or past its
+end ("unknown page"), reads the metadata at once: a save that shortened the
+payload mid-read retries the same way, and unchanged metadata is
+`MALFORMED_RESPONSE`. The service then matches it to the active identity
 (`payloadMatchesActive`: generation, digest and, for a saved record, origin
 half) and reads status again. A keyboard running compiled defaults is read
 from compiled bytes even when a newer saved record exists. GET `0x04` serves
@@ -176,13 +179,19 @@ working copy. All modes share the draft, review, checks and history.
 
 `snapshotLive` (`live-profile-session.js`) reads a pair. It waits for the edit
 status to go idle (no edit being received, checked or waiting for a held key;
-`LIVE_EDIT_PENDING` after 600 polls 50 ms apart). It reads the working copy
-(GET `0x21`) and checks its session, revision and saved generation, then the
-saved profile it began from (GET `0x04`, or the compiled defaults over
-generation 0). With nothing unsaved and the saved record running, the working
-copy's bytes serve as the saved bytes once they pass that record's fresh
-metadata (`sameAs`). Combos, toggles and the edit status follow; any move
-refuses the read as `PROFILE_CHANGED`. Both documents come from stored bytes
+`LIVE_EDIT_PENDING` after 600 polls 50 ms apart) and for a running save,
+the keyboard's own or Save, to end (status flag 6; `LIVE_SAVE_PENDING` after
+as long). It reads the working copy (GET `0x21`; a page that no longer fits
+reads its page 0 again, as a payload read does) and checks its session,
+revision and saved generation, then the saved profile it began from (GET
+`0x04`, or the compiled defaults over generation 0). With nothing unsaved and
+the saved record running, the working copy's bytes serve as the saved bytes
+once they pass that record's fresh metadata (`sameAs`). Combos, toggles and
+the edit status follow. Any move refuses that read as `PROFILE_CHANGED` (a
+saved profile that moved under every payload attempt, `GENERATION_UNSTABLE`,
+counts too), and the pair is read again, three times in all, before the read fails
+`PROFILE_CHANGED` ("kept changing"). In Live a rename restarts USB before the
+keyboard's own save, so the follow-back read is where that save lands. Both documents come from stored bytes
 alone (`materializeStored`, no readback overlay), and the working copy's
 exact bytes are kept: every live edit is a splice against them.
 
@@ -264,6 +273,15 @@ back input reports then, and while hidden (`web/native-popups.mjs`).
   (`observeApplyStatus`) and publishes it as `draft.keyboard`, so the rail
   says an adjustment is pending in Apply too.
 - A read refused `PROFILE_CHANGED` is retried, up to three times per draft.
+- A live draft whose follow-back read failed that way stays bound to the old
+  device id or connection. When the keyboard connected now names the
+  draft's edit session, it is the same keyboard on the same boot: the draft
+  follows it (`followSession`) and the look reads it again, within the same
+  bound. Another session (another keyboard, or a restart) ends the retry. The follow-back itself says its read failed (`awaitReconnect` takes
+  a read that is not ready as failed).
+- A notice never carries a decoder's text: an answer that did not decode
+  says so, and the diagnostics keep the detail (`failureWords`,
+  `panel-controls.js`).
 
 ### Switching edit modes
 

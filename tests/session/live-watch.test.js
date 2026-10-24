@@ -203,7 +203,7 @@ test("under an Apply draft, a queued key adjustment reaches the panel too", asyn
     assert.equal(model(shell).model.draft.keyboard.adjustmentPending, false);
 });
 
-test("an automatic save racing a reread stays eligible and synchronizes on the next poll", async t => {
+test("an automatic save racing a reread is read again at once, and the draft synchronizes", async t => {
     const {keyboard, session, look} = await open(t);
     const changed = validateSnapshot(document()).layers; changed[3][1] = 0x05;
     keyboard.externalEdit(replaceDomain(keyboard.saved, 0x60, () => encodeKeymapDomain(changed)));
@@ -213,13 +213,29 @@ test("an automatic save racing a reread stays eligible and synchronizes on the n
         if (!raced && report[0] === 0x08 && report[2] === 0x21) {raced = true; keyboard.autoSave();}
         return answer(report);
     };
-    await look();
+    assert.equal(await look(), true);
     assert.ok(raced);
+    assert.equal(session.draft.stale, false, "the moved pair is read again, not refused");
+    assert.equal(validateSnapshot(session.draft.current.document).layers[3][1], 0x05);
+    assert.equal(session.draft.live.savedGeneration, keyboard.generation);
+});
+
+test("a read that keeps racing stays eligible and synchronizes on the next poll", async t => {
+    const {keyboard, session, look} = await open(t);
+    keyboard.externalEdit(keyboard.saved);
+    const answer = keyboard.answer;
+    let races = 3;
+    keyboard.answer = report => {
+        // Each of the read's three tries moves under it.
+        if (races > 0 && report[0] === 0x08 && report[2] === 0x22) {races--; keyboard.externalEdit(keyboard.saved);}
+        return answer(report);
+    };
+    await look();
+    assert.equal(races, 0);
     assert.equal(session.draft.needsRead, true, "an incoherent snapshot is refused");
     assert.equal(await look(), true, "the next poll retries the automatic reread");
     assert.equal(session.draft.stale, false);
-    assert.equal(validateSnapshot(session.draft.current.document).layers[3][1], 0x05);
-    assert.equal(session.draft.live.savedGeneration, keyboard.generation);
+    assert.equal(session.draft.live.revision, keyboard.revision);
 });
 
 test("persistent coherence failures exhaust a bounded automatic reread budget", async t => {
@@ -235,7 +251,7 @@ test("persistent coherence failures exhaust a bounded automatic reread budget", 
         return answer(report);
     };
     for (let poll = 0; poll < 6; poll++) await look();
-    assert.equal(reads, 3, "three reads, then manual Read keyboard is required");
+    assert.equal(reads, 9, "three looks of three tries each, then manual Read keyboard is required");
     assert.equal(session.draft.needsRead, true);
 });
 

@@ -11,7 +11,7 @@ const {u8, u16, u32, asBytes, protocolError} = require("../schema/bytes");
 const {crc32} = require("../schema/profile-blob-v1");
 const {requestHandled} = require("./raw-hid-unhandled");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
-const {PROFILE_WIRE_V1, buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
+const {PROFILE_WIRE_V1, buildProfileGetRequest, isUnknownPage, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 
 const PROFILE_EDIT_V1 = Object.freeze({
     COMMAND_SET: 0x07,
@@ -331,15 +331,27 @@ function decodeActiveMetadata(page) {
 async function readActiveProfile(connection, options) {
     const metadata = decodeActiveMetadata(await getPage(connection, PROFILE_EDIT_V1.VALUE_ACTIVE, 0, options));
     if (metadata.length < 8 || metadata.length > (options.maxLength ?? 130048)) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", "The active profile's length is out of range.");
+    const requireUnmoved = async () => {
+        const after = decodeActiveMetadata(await getPage(connection, PROFILE_EDIT_V1.VALUE_ACTIVE, 0, options));
+        if (JSON.stringify(after) !== JSON.stringify(metadata)) throw Object.assign(new Error("The keyboard's profile changed while it was being read. Read it again."), {code: "PROFILE_CHANGED"});
+    };
     const bytes = Buffer.alloc(metadata.length);
     for (let offset = 0, page = 1; offset < metadata.length; offset += PROFILE_EDIT_V1.PAGE_SIZE, page++) {
-        const chunk = await getPage(connection, PROFILE_EDIT_V1.VALUE_ACTIVE, page, options);
-        if (chunk.length !== Math.min(PROFILE_EDIT_V1.PAGE_SIZE, metadata.length - offset)) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "Truncated active profile page.");
+        const expected = Math.min(PROFILE_EDIT_V1.PAGE_SIZE, metadata.length - offset);
+        // A page that no longer fits (short, or past the end) is what a
+        // change landing mid-read looks like: page 0 says whether one did.
+        const chunk = await getPage(connection, PROFILE_EDIT_V1.VALUE_ACTIVE, page, options).catch(async error => {
+            if (isUnknownPage(error)) await requireUnmoved();
+            throw error;
+        });
+        if (chunk.length !== expected) {
+            await requireUnmoved();
+            throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "Truncated active profile page.");
+        }
         chunk.copy(bytes, offset);
         options.onProgress?.({done: Math.min(metadata.length, offset + chunk.length), total: metadata.length});
     }
-    const after = decodeActiveMetadata(await getPage(connection, PROFILE_EDIT_V1.VALUE_ACTIVE, 0, options));
-    if (JSON.stringify(after) !== JSON.stringify(metadata)) throw Object.assign(new Error("The keyboard's profile changed while it was being read. Read it again."), {code: "PROFILE_CHANGED"});
+    await requireUnmoved();
     return {metadata, bytes};
 }
 

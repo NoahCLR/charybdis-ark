@@ -19,10 +19,15 @@ const {fnv1a32, PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
 /** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
 const CHANGED = "The keyboard changed while it was being read. Read it again.";
+const KEPT_CHANGING = "The keyboard kept changing while it was being read. Read it again.";
 // An edit the keyboard has not finished (a held key keeps it from a safe
-// boundary) makes any read a guess: wait for it this long, then give up and
-// leave the draft to be read again (600 polls 50 ms apart: at least 30 s).
+// boundary), or a save it is writing, makes any read a guess: wait for it
+// this long, then give up and leave the draft to be read again (600 polls
+// 50 ms apart: at least 30 s).
 const SETTLE_POLLS = 600, SETTLE_POLL_MS = 50;
+// A pair that moved under the read (the keyboard's own save landing, an
+// adjustment key, another app) is read again this many times in all.
+const PAIR_READS = 3;
 
 // What the keyboard says about its own saving and its halves, from the edit
 // status (pages 0, 1 and 3), in the words the panel needs. `saveMark` is the
@@ -59,14 +64,40 @@ function snapshotOf(capabilities, stored, defaults) {
 async function snapshotLive(connection, ids, capabilities, {payloadReader = new ProfilePayloadReader(connection), onProgress = () => {},
     sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
     requireReady(capabilities);
+    for (let read = 1; ; read++) {
+        try {return await readPair(connection, ids, capabilities, {payloadReader, onProgress, sleep});}
+        catch (error) {
+            // A saved profile that moved under every payload read is a move too.
+            const code = /** @type {{code?: string}} */ (error)?.code;
+            if (code !== "PROFILE_CHANGED" && code !== "GENERATION_UNSTABLE") throw error;
+            if (read >= PAIR_READS) throw fail("PROFILE_CHANGED", KEPT_CHANGING);
+        }
+    }
+}
+
+// One read of the pair; any move refuses it as PROFILE_CHANGED.
+/**
+ * @param {import("../transport/types.js").RequestConnection} connection
+ * @param {import("../protocol/types.js").RequestIds} ids
+ * @param {import("./types.js").DeviceCapabilities} capabilities
+ * @param {{payloadReader: InstanceType<typeof ProfilePayloadReader>, onProgress: (text: string) => void, sleep: (ms: number) => Promise<void>}} options
+ * @returns {Promise<import("./types.js").LiveSnapshot>}
+ */
+async function readPair(connection, ids, capabilities, {payloadReader, onProgress, sleep}) {
     const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the keyboard's working copy");
     const status = await readProfileStatus(connection, options);
     if (!status.slaveKnown) throw fail("KEYBOARD_NOT_READY", "The slave half is not connected. Connect the cable between the halves and read again.");
     let before = await readEditProgress(connection, options);
-    for (let polls = 0; before.phase !== EDIT_PHASE.IDLE; polls++, before = await readEditProgress(connection, options)) {
-        if (polls >= SETTLE_POLLS) throw fail("LIVE_EDIT_PENDING", "The keyboard is still taking an edit. Release held keys and locked layers, then read the keyboard again.");
-        onProgress("Waiting for the keyboard to finish an edit · release held keys");
+    // A save running (the keyboard's own, or Save) is about to move the saved
+    // profile under the read: wait for it as for an edit.
+    for (let polls = 0; before.phase !== EDIT_PHASE.IDLE || before.saving; polls++, before = await readEditProgress(connection, options)) {
+        const saving = before.phase === EDIT_PHASE.IDLE;
+        if (polls >= SETTLE_POLLS) {
+            throw saving ? fail("LIVE_SAVE_PENDING", "The keyboard is still saving. Release held keys, then read the keyboard again.")
+                : fail("LIVE_EDIT_PENDING", "The keyboard is still taking an edit. Release held keys and locked layers, then read the keyboard again.");
+        }
+        onProgress(saving ? "Waiting for the keyboard to finish saving" : "Waiting for the keyboard to finish an edit · release held keys");
         await sleep(SETTLE_POLL_MS);
     }
     const mode = await readEditMode(connection, options);

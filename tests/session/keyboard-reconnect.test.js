@@ -186,6 +186,16 @@ test("the wait gives way to the person, waits out a running operation, and says 
         assert.deepEqual(reads, ["a"], "read once the running operation ended");
         assert.equal(session.notice, RECONNECT_WORDS.failed);
     }
+    {
+        // A read that connected but did not come back ready (its complete
+        // profile could not be read, though no error stayed behind) failed.
+        const session = stubSession({connected: false, devices: [{id: "a", product: "Desk"}]}), timing = clock();
+        const expected = {deviceId: "kb", serialNumber: "", name: "Desk", otherDevices: [], startedAt: 0, dropped: true};
+        session.reconnect = expected;
+        await awaitReconnect(session, expected, {...timing, publish: () => {},
+            read: async (id) => {Object.assign(session.service.state, {connected: true, selectedDeviceId: id}); return false;}});
+        assert.equal(session.notice, RECONNECT_WORDS.failed);
+    }
 });
 
 test("an expected disconnect is no error to the device service; an unexpected one still is", async (t) => {

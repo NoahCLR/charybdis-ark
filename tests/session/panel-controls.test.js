@@ -79,6 +79,21 @@ test("a failed committed-profile read keeps the layout and the optional reads, a
     assert.equal(session.notice, "The keyboard profile could not be read: no answer. Macros and global settings could not be read: interrupted");
 });
 
+// The decoder's own text (which chunk, how many bytes) is for the
+// diagnostics; a notice says in words that an answer did not decode.
+test("a read whose answer did not decode says so in words, never in the decoder's", async () => {
+    const decodeError = () => Object.assign(new Error("Chunk 258 returned 1 bytes where 3 were expected."), {code: "MALFORMED_RESPONSE"});
+    const state = {connected: true, selectedDeviceId: "kb", devices: [device], capabilities,
+        layout: {state: "read", layers: []}, committed: {state: "reading"}, error: null};
+    const service = fakeService({snapshot: () => state, capabilities: state.capabilities,
+        readKeyboardProfile: async () => {throw decodeError();},
+        readCommittedProfile: async () => {state.error = {code: "MALFORMED_RESPONSE", message: decodeError().message}; throw decodeError();}});
+    const session = {service};
+    assert.equal(await readKeyboard(session, undefined, shell()), false);
+    assert.doesNotMatch(session.notice, /Chunk|bytes where/);
+    assert.match(session.notice, /^The keyboard profile could not be read: the keyboard answered with something Ark could not decode \(see the diagnostics\)\. Macros and global settings could not be read: the keyboard answered/);
+});
+
 test("a keyboard not on current firmware is read no further, and told to update", async () => {
     for (const older of [{...capabilities, supportedDomainMask: 3}, {...capabilities, protocol: {major: 1, minor: 0}, schema: {major: 3, minor: 0}}, {...capabilities, protocol: {major: 2, minor: 1}}]) {
         const service = fakeService({capabilities: older});

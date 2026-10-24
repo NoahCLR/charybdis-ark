@@ -117,7 +117,9 @@ firmware's built-in name. A name is up to 32 bytes: letters take one,
 accented letters two. The name is part of the profile, so it goes through
 Review like any edit, and backups carry it. Once the keyboard has it, your
 computer, Chrome and Ark all call it by that name. To take it, the keyboard
-drops off USB for a moment and comes back, and Ark follows it.
+drops off USB for a moment and comes back, and Ark follows it. In Live the
+keyboard is often saving the new name just then; Ark waits for the save and
+reads it again rather than asking you to.
 
 **This keyboard** shows the product, the firmware and whether it works with
 this Ark, Ark's own version, and the two halves. The product is the

@@ -169,6 +169,13 @@ function decodeProfileResponse(response, request, options = {}) {
     return report.subarray(PROFILE_WIRE_V1.PAYLOAD_OFFSET, PROFILE_WIRE_V1.PAYLOAD_OFFSET + payloadLength);
 }
 
+// The keyboard's answer to a page past the end of a paged value: what a
+// value that got shorter during a read answers (profile-payload-v1.js,
+// profile-edit-v1.js read page 0 again on it).
+/** @param {unknown} error */
+const isUnknownPage = error => error instanceof ProfileWireProtocolError && error.code === "DEVICE_REJECTED"
+    && /** @type {{status?: number}} */ (/** @type {unknown} */ (error)).status === PROFILE_WIRE_STATUS.UNKNOWN_PAGE;
+
 /** @param {Uint8Array} buffer @param {number} offset */
 function readU16(buffer, offset) {
     return buffer[offset] | (buffer[offset + 1] << 8);
@@ -382,6 +389,7 @@ module.exports = {
     decodeCapabilityPages,
     decodeProfileResponse,
     decodeStatusPages,
+    isUnknownPage,
     profileResponseMatcher,
     readProfileCapabilities,
     readProfilePages,
