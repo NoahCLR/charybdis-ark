@@ -2,7 +2,7 @@
 // The web shell, started with the page's own globals. The build bundles
 // this file and names the worker, the panel and the build it came from
 // (scripts/build-web.js). It loads the panel itself, once the shell is running:
-// the panel asks for acquireVsCodeApi() as it loads. On a phone it starts
+// the panel asks for acquirePanelApi() as it loads. On a phone it starts
 // neither, and shows only a notice (web/phone.mjs).
 
 import {isPhone, showPhoneNotice} from "./phone.mjs";
@@ -33,7 +33,7 @@ if (isPhone({matchMedia, screen: globalThis.screen})) {
         worker,
         build,
     });
-    window.acquireVsCodeApi = () => api;
+    window.acquirePanelApi = () => api;
     // A URL rather than a name, so the build leaves the panel its own file.
     import(new URL(__ARK_PANEL__, import.meta.url).href);
 }

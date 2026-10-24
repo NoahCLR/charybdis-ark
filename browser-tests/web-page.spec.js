@@ -367,7 +367,7 @@ test("a phone gets a notice that Ark runs on a computer, with the repositories, 
 
         // Nothing of Ark: no panel, and no shell behind it.
         await expect(page.locator(".app, .read-placeholder")).toHaveCount(0);
-        expect(await page.evaluate(() => typeof window.acquireVsCodeApi)).toBe("undefined");
+        expect(await page.evaluate(() => typeof window.acquirePanelApi)).toBe("undefined");
         expect(await page.evaluate(async () => {
             const locks = await navigator.locks.query();
             return {locks: locks.held.length + locks.pending.length, databases: (await indexedDB.databases()).length, hid: window.__fakeHid};

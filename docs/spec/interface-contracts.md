@@ -160,7 +160,9 @@ below.
 | Layer answers: which stack slots answer each position under which active layers, for reach and the published model alike; the interface never resolves transparency again | `core/model/layer-resolution.js` | `tests/model/layer-resolution.test.js`, `tests/view/layer-resolution.test.mjs` |
 | Idle lighting timeout: staged in milliseconds, edited in seconds or minutes; changing the unit stages nothing; zero means always on | `webview/view/duration.mjs` | `tests/view/duration.test.mjs`, `browser-tests/preview.spec.js` |
 | Shortcut words: ⌘ and ⇧⌘ on a Mac, Ctrl and Ctrl+Shift elsewhere, in text, tips and `aria-keyshortcuts`; no screen writes ⌘ itself | `webview/view/shortcuts.mjs` | `tests/view/shortcuts.test.mjs`, `browser-tests/shortcut-glyphs.spec.js` |
-| Panel sequencing; the shells supply dialogs, files, progress and toasts; a failure's notice is its sentence, never its code, and the reply marks it `failed` | `core/session/panel-controls.js`, `panel-loop.js` | `tests/session/panel-controls.test.js`, `tests/session/panel-loop.test.js`, `tests/view/messages.test.mjs` |
+| Panel sequencing; the page's shell supplies the file chooser, downloads, recovery storage and progress; a failure's notice is its sentence, never its code, and the reply marks it `failed` | `core/session/panel-controls.js`, `panel-loop.js` | `tests/session/panel-controls.test.js`, `tests/session/panel-loop.test.js`, `tests/view/messages.test.mjs` |
+| What the page offers (`model.shell`, D-L71): its words, Choose keyboard unless the tab is blocked, a light or dark theme, the Backups list, its build and progress; without a shell (the preview, tests) the page's defaults | `core/session/panel-session.js`, `webview/view/shell-panel.mjs` | `tests/session/panel-session.test.js`, `tests/view/shell-panel.test.mjs`, `browser-tests/preview.spec.js` |
+| The device service talks only through the adapter its caller passes (WebHID in the page, node-hid in a Node script); there is no default, and the web build refuses node-hid | `core/session/profile-device-service.js`, `scripts/build-web.js` | `tests/session/profile-device-service.test.js`, `tests/scripts/web-build.test.js` |
 | An Apply or Save cut short: the Apply verdicts (sent as `apply.failure.verdict`, which the bar draws), the sentence every such notice starts with, plain reasons for a lost connection, and the result a read shows after a Save cut short; no device path, code or developer word reaches a person | `core/session/interruption.js` | `tests/session/interruption.test.js`, `tests/session/portable-profile-session.test.js`, `tests/session/live-edits.test.js` |
 | Panel state fields declare their initial value and draft-replacement policy together | `webview/store.mjs`, `webview/view/state-fields.mjs` | `tests/view/state-fields.test.mjs` |
 | Lighting: one `webview/ui/lighting/` module per stage, posting the shared edit builders | `webview/ui/lighting.mjs` | `browser-tests/lighting-controls.spec.js` |
@@ -390,7 +392,7 @@ review's checks name what it leaves unreachable
 ## Import comparison
 
 **Choose profile…** and dropping one file on the Import profile card open the
-same validated review in both shells and the demo (D-L15). A drop works only
+same validated review with a keyboard and in the demo (D-L15). A drop works only
 when Import is editable, refuses several, unreadable or oversized files, and
 never navigates away (`browser-tests/preview.spec.js`,
 `tests/session/panel-loop.test.js`).
@@ -591,7 +593,7 @@ Ark expects it (`core/session/keyboard-reconnect.js`;
 ### Following a lost keyboard back
 
 A keyboard lost unexpectedly (a request Ark waits on goes unanswered, or it
-drops off USB in a shell that shows serial numbers) is followed back the same
+drops off USB where the adapter shows serial numbers, as node-hid does) is followed back the same
 way, with `lost: true`, at most once in 30 s; a web page follows Chrome's
 connect events instead (`tests/session/lost-keyboard.test.js`). The
 diagnostics name the first bytes of the unanswered request (no test).

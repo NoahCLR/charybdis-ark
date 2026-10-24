@@ -5,9 +5,9 @@
 // own controls (review, undo, discard, rebase, apply) and the portable flows
 // (import review, layer editing, restore).
 //
-// This used to live in extension.js. It is sequencing and session state, not
-// VS Code, so it sits here with a test; core/session/panel-loop.js runs it with
-// the shell's own functions as `shell`, of which these use three,
+// It is sequencing and session state, not the page, so it sits here with a
+// test; core/session/panel-loop.js runs it with the shell's own functions as
+// `shell`, of which these use three,
 //
 //   shell.progress(title, run)     runs `run` behind a progress indicator
 //   shell.saveRecovery(document, about)
@@ -15,7 +15,8 @@
 //                                  the keyboard's name, resolves to where it went
 //   shell.chooseProfile()          resolves to a chosen file's text, or undefined
 //
-// and `shell.words.noneFound`, when a shell says "no keyboard found" its own way.
+// and `shell.words.noneFound`, when a shell says "no keyboard found" its own
+// way (the page's words otherwise, SHELL_WORDS in panel-session.js).
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -25,7 +26,7 @@ const {panelControl} = require("./panel-control-registry");
 const {canEdit, hasCurrentLayers} = require("./firmware-support");
 const {validateSnapshot, FILE_MAX_BYTES} = require("../model/portable-profile");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
-const {applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
+const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY, compose} = require("../model/layer-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
@@ -107,7 +108,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     await service.enumerate();
     const devices = service.snapshot().devices;
     if (!devices.length) {
-        session.notice = shell.words?.noneFound || "No Charybdis Raw HID interface found. Connect the keyboard and choose Read keyboard again.";
+        session.notice = shell.words?.noneFound || SHELL_WORDS.noneFound;
         return false;
     }
     if (selectedDeviceId && !devices.some((device) => device.id === selectedDeviceId)) {

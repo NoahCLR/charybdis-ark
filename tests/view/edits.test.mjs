@@ -1083,7 +1083,7 @@ test("the fade slider previews exactly what the keyboard will store for every sh
 
 test("behaviour timing defaults follow the draft's Key Timing, and its undo", () => {
     const draft = session();
-    // what extension.js builds the webview's model from while a draft is open
+    // what the panel loop builds the webview's model from while a draft is open
     const timing = () => buildSnapshotModel(draft.current, draft.capabilities, {editable: true, reason: ""}).behaviorTimingDefaults;
     const before = timing().tapHoldTerm;
     assert.match(before, /^\d+$/, "the keyboard reports its default");

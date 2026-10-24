@@ -4,7 +4,7 @@ const {test, expect} = require("@playwright/test");
 const {openControls, publishAccepted} = require("./control-preview");
 const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateMacro"));
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`macro bank keeps its scroll when selecting, editing and recording a later slot (${theme})`, async ({page}) => {
         await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false}, theme);
         const bank = page.locator(".macros-library .macro-grid");
@@ -123,7 +123,7 @@ test("a blank Text starter is replaced by a shortcut; written text is retained b
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("{KC_C}hello{KC_ENTER}");
 });
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`sequence stays above optional guidance and recorder controls stay visible (${theme})`, async ({page}) => {
         await page.setViewportSize({width: 1400, height: 1200});
         await openControls(page, "macros", {macroSlot: "MACRO_17"}, theme);
@@ -241,7 +241,7 @@ test('read-only macro tiles cannot be deleted', async ({page}) => {
     expect(await updates(page)).toEqual([]);
 });
 
-for (const theme of ['vscode-dark', 'vscode-light']) {
+for (const theme of ["dark", "light"]) {
     test(`Raw payload is a persistent toggle on the right of the add row; tile focus has no extra outline (${theme})`, async ({page}) => {
         await page.setViewportSize({width: 1400, height: 1000});
         await openControls(page, 'macros', {macroSlot: 'MACRO_17'}, theme);

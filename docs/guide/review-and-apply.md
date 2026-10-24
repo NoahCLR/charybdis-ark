@@ -7,7 +7,7 @@ it becomes permanent, depends on the edit mode.
 ## Edit modes
 
 Pick the mode under **Edits** in the rail. The keyboard stores it, so the
-choice holds across replugs and in both Chrome and VS Code.
+choice holds across replugs and in every browser.
 
 | Mode | An edit… | It is kept when… | Unplugging before then… |
 | --- | --- | --- | --- |
@@ -88,7 +88,7 @@ The bar counts the changes in your draft and has two buttons:
 - **Review and apply** opens Review.
 - **Discard all** throws the draft away. Undo brings it back.
 
-The draft lives in the Ark window (in Chrome, the tab). Closing it loses
+The draft lives in the Ark tab. Closing it loses
 edits you haven't applied.
 
 ### Switching modes

@@ -3,7 +3,7 @@
 const {expect} = require("@playwright/test");
 const {openPreview} = require("./shell-page");
 
-async function openControls(page, screen, state = {}, theme = "plain") {
+async function openControls(page, screen, state = {}, theme = "dark") {
     await openPreview(page, theme);
     await expect(page.locator(`[data-screen="${screen}"]`)).toBeEnabled();
     await page.locator(`[data-screen="${screen}"]`).click();

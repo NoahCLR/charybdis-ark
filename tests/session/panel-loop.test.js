@@ -177,7 +177,7 @@ test("reading with no keyboard attached answers with a notice through the shell"
     await loop.handleMessage({type: "ready"});
     const reply = last(shell);
     assert.equal(reply.type, "model");
-    assert.match(reply.notice, /No Charybdis Raw HID interface found/);
+    assert.match(reply.notice, /Chrome has no Charybdis this page may open yet/);
     assert.equal(loop.session.readBusy, false);
     assert.equal(reply.model.selectedDeviceId, "");
     assert.deepEqual(shell.errors, []);
@@ -539,6 +539,6 @@ test("a read keeps the connected keyboard while it is still listed", async () =>
     service.snapshot().devices = [{...device, id: "other"}, device];
     const loop = openPanelLoop(shell, {service});
     await loop.handleMessage({type: "refresh"});
-    assert.ok(!service.calls.includes("connect"), "VS Code's chosen keyboard stays chosen");
+    assert.ok(!service.calls.includes("connect"), "the connected keyboard stays chosen");
     await loop.close();
 });

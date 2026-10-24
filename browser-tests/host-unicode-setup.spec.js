@@ -7,9 +7,8 @@ const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
 const {draftBinding} = require("../core/session/panel-session-state");
-const fs = require("node:fs");
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`macOS Unicode Hex Input warns about Option shortcuts (${theme})`, async ({page}) => {
         const {snapshot, capabilities} = hostMacros(1 | (2 << 16), []);
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
@@ -30,8 +29,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             draft.stage({...message, draftRevision: draft.revision});
             await publish();
         };
-        if (fs.existsSync(`preview/${theme}.html`)) await page.goto(`/preview/${theme}.html`);
-        else await openPreview(page, theme);
+        await openPreview(page, theme);
         await publish();
         await openFold(page, "host");
         const warning = page.locator('[data-section="host"] .callout.warn');
@@ -69,8 +67,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             await publish();
             return message;
         };
-        if (fs.existsSync(`preview/${theme}.html`)) await page.goto(`/preview/${theme}.html`);
-        else await openPreview(page, theme);
+        await openPreview(page, theme);
         await publish();
         await openFold(page, "host");
         const host = page.locator('[data-section="host"]');

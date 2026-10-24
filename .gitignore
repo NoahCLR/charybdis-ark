@@ -3,7 +3,6 @@ preview/
 dist/
 .DS_Store
 *.log
-*.vsix
 coverage/
 test-results/
 playwright-report/

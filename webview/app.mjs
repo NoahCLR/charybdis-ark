@@ -101,7 +101,7 @@ function render({keepScreen = false} = {}) {
 /** @param {NonNullable<ReturnType<typeof readScreen>>} read @param {import("../contracts/panel.js").PublishedModel | null} model */
 function readPlaceholder(read, model) {
     const loading = read.state === "loading";
-    // Without a keyboard, a shell with a picker offers it first.
+    // Without a keyboard, the page offers its picker first.
     const choose = shellOf(model).chooseKeyboard && !model?.device?.connected;
     // Without a keyboard the demo is offered beside it; a shell that cannot
     // reach one at all still offers it, where the shell says so.
@@ -115,7 +115,7 @@ function readPlaceholder(read, model) {
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
                 : read.state === "blocked" ? (demoHere ? `<div class="read-actions">${exploreButton("primary")}</div>` : "")
                 : `<div class="read-actions">${choose ? '<button class="btn primary" data-act="choose-keyboard">Choose keyboard</button>' : ""}
-                    ${model?.device?.connected || !shellOf(model).chooseKeyboard ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
+                    ${model?.device?.connected ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
                     ${demoHere ? exploreButton("ghost") : ""}
                     ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
         </div></div></div></div>`);
@@ -170,9 +170,8 @@ function refreshCommitBar() {
 }
 
 const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation});
-// Replies from the core cross the message boundary as copies; their authored
-// shapes are checked in both shells. Device values have already passed core's
-// validators.
+// Replies from the core cross the message boundary as copies, in the shapes
+// contracts/ declares. Device values have already passed core's validators.
 addEventListener("message", (event) => receivePanelMessage(/** @type {import("../contracts/messages.js").PanelResponse} */ (event.data)));
 
 // A field that holds text keeps its own undo: ⌘Z there edits the text, not
@@ -198,7 +197,7 @@ function historyShortcut(event) {
 }
 
 // Board and macro-step shortcuts take their keys before anything else on the page hears
-// them. An extension that turns Backspace into Back listens on the window from
+// them. A browser extension that turns Backspace into Back listens on the window from
 // before Ark loads, so Ark's ordinary listener would come too late, and deleting
 // a key would also leave Ark.
 addEventListener("keydown", (event) => {

@@ -14,8 +14,8 @@ export interface RecoveryCopy {id: string | number; name: string; savedAt: strin
 export interface ShellPanel {
     chooseKeyboard: boolean;
     blocked: {title: string; detail: string; demo?: boolean} | null;
-    theme: 'light' | 'dark' | null;
-    recoveries: RecoveryCopy[] | null;
+    theme: 'light' | 'dark';
+    recoveries: RecoveryCopy[];
     build: BuildInfo | null;
     progress: string | null;
     words: Record<string, string>;

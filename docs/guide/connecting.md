@@ -6,34 +6,17 @@ flashed to both halves. It works with the current firmware only.
 
 ## Where Ark runs
 
-**In Chrome or Edge.** Open <https://ark.ncleroy.dev> on your computer. There
-is nothing to install. The page reaches the keyboard over WebHID, which only
-Chrome and Edge have, and only over HTTPS. In another browser the page says
-Ark needs Chrome or Edge and offers only the demo. On a phone it shows a short
-notice instead: a phone can't reach the keyboard.
-
-**In VS Code.** Ark is also a VS Code extension, installed from a checkout:
-
-```sh
-git clone https://github.com/NoahCLR/charybdis-ark.git
-cd charybdis-ark
-npm ci
-ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0   # then reload VS Code
-```
-
-Click **Charybdis Ark** in the status bar, or run **Charybdis: Open Charybdis
-Ark** from the command palette. Each VS Code window has one Ark panel; running
-the command again brings it forward.
-
-Both work the same way. What differs is called out where it matters.
+Ark is a web page. Open <https://ark.ncleroy.dev> in Chrome or Edge on your
+computer. There is nothing to install. The page reaches the keyboard over
+WebHID, which only Chrome and Edge have, and only over HTTPS. In another
+browser the page says Ark needs Chrome or Edge and offers only the demo. On a
+phone it shows a short notice instead: a phone can't reach the keyboard.
 
 ## Reading the keyboard
 
-With no keyboard, Ark shows **Connect your keyboard**.
-
-- In Chrome, choose **Choose keyboard** and pick your Charybdis in Chrome's
-  list. After that the page connects to it by itself whenever it opens.
-- In VS Code, plug the keyboard in and choose **Read keyboard**.
+With no keyboard, Ark shows **Connect your keyboard**. Choose **Choose
+keyboard** and pick your Charybdis in Chrome's list. After that the page
+connects to it by itself whenever it opens.
 
 Ark then reads the whole profile the keyboard runs: keys, layers, behaviours,
 combos, macros, pointing modes, lighting and settings. The screen says what it
@@ -69,7 +52,7 @@ The column on the left is the rail. From the top:
   what to do.
 - **Edits**: how your edits reach the keyboard: **Apply**, **Live** or
   **Live + review**. See [Review and Apply](review-and-apply.md#edit-modes).
-- In Chrome, **Choose keyboard** and **Disconnect**. Disconnect lets go of
+- **Choose keyboard** and **Disconnect**. Disconnect lets go of
   the keyboard and takes back the page's permission to open it, until you
   choose it again.
 - The screens: **Keys**, **Lighting**, **Macros**, **Custom keys**, **Mouse**,
@@ -84,13 +67,10 @@ stays read-only until you switch back or discard the draft.
 
 ## One tab, one keyboard
 
-In Chrome, only one Ark tab holds the keyboard. A second tab says Ark is open
+Only one Ark tab holds the keyboard. A second tab says Ark is open
 in another tab, and takes over when that one closes. If closing or reloading
 the tab would lose something (edits not applied or saved, or a save still
 running), the browser asks first.
-
-In VS Code, closing the panel during a save doesn't stop the save. Ark
-finishes it and says so. Keep the keyboard plugged in until then.
 
 ## The demo
 
@@ -150,6 +130,5 @@ which reads it again.
 
 ## Light and dark
 
-In Chrome, the button at the top right of a screen switches between a light
-and a dark theme. Ark starts from your system's setting and remembers your
-choice. In VS Code, Ark follows VS Code's theme.
+The button at the top right of a screen switches between a light and a dark
+theme. Ark starts from your system's setting and remembers your choice.

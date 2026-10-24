@@ -321,9 +321,12 @@ export interface LoopShell extends ControlShell {
 }
 export type RunningPanelSession = Omit<PanelSession, 'service'> & {service: ControlService};
 
-export interface DeviceServiceOptions {
-    adapter?: import('../transport/types.js').DeviceAdapter;
-    coordinator?: InstanceType<typeof import('../transport/request-coordinator.js').DeviceRequestCoordinator>;
+/** The transport the service talks through: an adapter (WebHID in the page, node-hid in a Node script), or a coordinator already made over one. Neither has a default. */
+export type DeviceServiceTransport =
+    | {adapter: import('../transport/types.js').DeviceAdapter; coordinator?: InstanceType<typeof import('../transport/request-coordinator.js').DeviceRequestCoordinator>}
+    | {adapter?: undefined; coordinator: InstanceType<typeof import('../transport/request-coordinator.js').DeviceRequestCoordinator>};
+export type DeviceServiceOptions = DeviceServiceTransport & DeviceServiceSettings;
+export interface DeviceServiceSettings {
     defaultTimeoutMs?: number;
     /** How long each request of a background look waits (profile-device-service.js). */
     watchTimeoutMs?: number;

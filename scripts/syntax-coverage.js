@@ -15,8 +15,8 @@ function sourceFiles(root) {
         const name = path.join(directory, entry.name);
         return entry.isDirectory() ? walk(name) : /\.(m?js|sh)$/.test(name) ? [name] : [];
     });
-    return ["core", "tests", "tools", "web", "webview", "scripts", "browser-tests"].flatMap(walk)
-        .concat(["extension.js", "panel-html.js", "playwright.config.js"]);
+    return ["core", "tests", "web", "webview", "scripts", "browser-tests"].flatMap(walk)
+        .concat(["playwright.config.js"]);
 }
 
 /** @param {string} root */

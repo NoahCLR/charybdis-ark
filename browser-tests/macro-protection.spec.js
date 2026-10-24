@@ -6,9 +6,8 @@ const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
 const {draftBinding} = require("../core/session/panel-session-state");
 const {openPreview} = require("./shell-page");
-const fs = require("node:fs");
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`macro protection defaults to Unicode entry and its override posts and reviews (${theme})`, async ({page}) => {
         const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["é"]);
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
@@ -24,8 +23,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             const message = await page.evaluate(() => window.__posted.at(-1));
             draft.stage({...message, draftRevision: draft.revision}); await publish(); return message;
         };
-        if (fs.existsSync(`preview/${theme}.html`)) await page.goto(`/preview/${theme}.html`);
-        else await openPreview(page, theme);
+        await openPreview(page, theme);
         await publish();
         await page.evaluate(async () => {const store = await import("/webview/store.mjs"); store.state.screen = "macros"; store.state.macroSlot = "MACRO_0"; store.render();});
         const policy = page.locator("[data-protection]");

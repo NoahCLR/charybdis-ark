@@ -3,7 +3,7 @@
 const {test, expect} = require("@playwright/test");
 const {openControls, posted, expectPost} = require("./control-preview");
 
-for (const theme of ["plain", "vscode-light", "vscode-dark"]) {
+for (const theme of ["dark", "light"]) {
     test(`combo output permissions post from both controls (${theme})`, async ({page}) => {
         await openControls(page, "settings", {settingsOpen: ["comboSettings"]}, theme);
         const global = page.locator('label:has([data-f="setting:comboOutputBehaviors"])');

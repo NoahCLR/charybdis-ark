@@ -10,7 +10,7 @@ Single-context: one `GLOSSARY.md` and one `docs/adr/` at the repository root.
 /
 ├── GLOSSARY.md
 ├── docs/adr/
-│   ├── 0002-ark-runs-in-vs-code-and-a-web-page.md
+│   ├── 0071-ark-is-a-web-page.md
 │   └── 0067-a-stopped-keyboard-says-so-and-ark-restarts-it.md
 └── upstream/firmware/
     ├── GLOSSARY.md      the firmware's words, pinned

@@ -1,7 +1,6 @@
 // @ts-check
 // What the web shell needs from core/, as one module: the web build bundles
-// this file (scripts/build-web.js) and the page imports the bundle. It is a
-// build entry, not part of the extension, which requires core/ directly.
+// this file (scripts/build-web.js) and the page imports the bundle.
 //
 // Exporting more is a line here. The codecs come as namespaces, so a name two
 // modules share stays reachable under each.

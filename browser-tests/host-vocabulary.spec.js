@@ -16,7 +16,7 @@ async function sendHost(page, hostOs) {
     },patch);
     return patch;
 }
-for(const theme of ["vscode-dark","vscode-light"]) {
+for(const theme of ["dark","light"]) {
     test(`open editors refresh names through production model messages (${theme})`,async({page})=>{
         await openPreview(page, theme);
         await page.evaluate(async()=>{
@@ -79,7 +79,7 @@ for(const theme of ["vscode-dark","vscode-light"]) {
         }
     });
 }
-for(const theme of ['vscode-dark','vscode-light']) {
+for(const theme of ["dark", "light"]) {
     test(`behaviour retarget picker keeps current host context and posts its stable assignment (${theme})`,async({page})=>{
         await openPreview(page, theme);
         await page.evaluate(async()=>{
@@ -106,7 +106,7 @@ for(const theme of ['vscode-dark','vscode-light']) {
     });
 }
 
-for(const theme of ['vscode-dark','vscode-light']) {
+for(const theme of ["dark", "light"]) {
     test(`cell-action picker resolves live context and posts the selected code (${theme})`,async({page})=>{
         await openPreview(page, theme);
         await page.evaluate(async()=>{

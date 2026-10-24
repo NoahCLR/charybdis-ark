@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-globalThis.acquireVsCodeApi = () => ({postMessage() {}});
+globalThis.acquirePanelApi = () => ({postMessage() {}});
 const {getModel, setModel, writable, state} = await import("../../webview/store.mjs");
 const {createPanelMessages} = await import("../../webview/messages.mjs");
 const {SCREENS} = await import("../../webview/view/screens.mjs");

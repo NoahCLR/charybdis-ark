@@ -1,14 +1,15 @@
 // @ts-check
 // What the panel's shell offers and says, as the model carries it
-// (`model.shell`, core/session/panel-session.js). The panel never asks which
-// shell it runs in: Choose keyboard, the theme toggle and the recovery copies
-// appear where the shell says it has them, in the shell's own words.
+// (`model.shell`, core/session/panel-session.js): whether Choose keyboard is
+// offered, the theme, the recovery copies, the build, and the page's words.
+// Core owns the defaults; before the first model the panel offers no picker,
+// since the tab may turn out to be blocked.
 
 /** @type {import("../../contracts/model.js").ShellPanel} */
-const NONE = {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {}};
+const BEFORE_FIRST_MODEL = {chooseKeyboard: false, blocked: null, theme: "dark", recoveries: [], build: null, progress: null, words: {}};
 
 /** @param {{shell?: Partial<import("../../contracts/model.js").ShellPanel>} | null | undefined} model */
-export const shellOf = (model) => ({...NONE, ...model?.shell, words: {...model?.shell?.words}});
+export const shellOf = (model) => ({...BEFORE_FIRST_MODEL, ...model?.shell, words: {...model?.shell?.words}});
 
 // The messages these controls post. They are for the shell, not the draft.
 /** @returns {{type: "chooseKeyboard"}} */

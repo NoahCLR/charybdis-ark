@@ -11,8 +11,8 @@ firmware, or the demo.
 ## Export profile
 
 **Export profile…** saves the profile the keyboard runs as a backup. It
-changes nothing on the keyboard or in your draft. In Chrome the file goes to
-your downloads; VS Code asks where to save it. The file is named like
+changes nothing on the keyboard or in your draft. The file goes to your
+downloads, named like
 `charybdis-2026-10-23.charybdis.json`.
 
 In Live + review it exports what the keyboard runs, unsaved changes included.
@@ -54,13 +54,11 @@ Each copy is named by what made it, the keyboard it came from and when, for
 example "Before Save · Noah's Charybdis · 23 Oct 2026, 14:02". Copies kept by
 an older Ark don't record those, and are named "Recovery copy" and when.
 
-- **In Chrome** the copies are kept in the browser and listed under
-  **Recovery copies**, newest first, each with **Use as draft**, **Download**
-  and **Delete**. Use as draft opens the same comparison as a backup file.
-  Clearing the site's data deletes them, so download any you want to keep.
-- **In VS Code** they are files in VS Code's storage for Ark, named the same
-  way (`recovery-<when>-before-save-noah-s-charybdis.charybdis.json`). The
-  message after an Apply, a Save or a restart says where; open one with **Choose profile…**.
+The copies are kept in the browser and listed under **Recovery copies**,
+newest first, each with **Use as draft**, **Download** and **Delete**. Use as
+draft opens the same comparison as a backup file. A downloaded copy is named
+the same way (`recovery-<when>-before-save-noah-s-charybdis.charybdis.json`).
+Clearing the site's data deletes them, so download any you want to keep.
 
 ## Firmware updates
 

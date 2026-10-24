@@ -12,7 +12,7 @@ const {document} = require("./portable-profile");
 /**
  * @param {{after: (fn: () => unknown) => void}} t
  * @param {Partial<import("./types.js").FakeKeyboardOptions> & {keyboard?: import("./types.js").FakeKeyboard}} [keyboard]
- * @param {import("../../core/session/types.js").DeviceServiceOptions} [options]
+ * @param {import("../../core/session/types.js").DeviceServiceSettings} [options]
  */
 async function connectedService(t, keyboard = {}, options = {}) {
     const adapter = fakeKeyboardAdapter(keyboard.keyboard ? {keyboard: keyboard.keyboard} : {document: document(), ...keyboard});

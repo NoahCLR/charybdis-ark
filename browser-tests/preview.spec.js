@@ -4,8 +4,8 @@ const {test, expect} = require("@playwright/test");
 const {dropFiles} = require("./profile-drop");
 const {openPreview} = require("./shell-page");
 
-for (const shell of ["", "?shell=web", "?shell=demo"]) {
-    test(`Import card posts a dropped file and refuses multiple, oversized and unreadable files (${shell || "extension"})`, async ({page}) => {
+for (const shell of ["", "?shell=demo"]) {
+    test(`Import card posts a dropped file and refuses multiple, oversized and unreadable files (${shell || "keyboard"})`, async ({page}) => {
         await page.goto(`/preview/index.html${shell}`);
         await page.locator('[data-screen="profile"]').click();
         const card = page.locator("[data-profile-drop]");
@@ -91,7 +91,7 @@ test("dropping respects every Import gate and cancels a read when the surface ch
     });
     expect(await page.evaluate(() => window.__posted)).toEqual([]);
 });
-for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`Mouse edit posts its complete section (${theme})`, async ({page}) => {
         const errors = [];
         page.on("pageerror", error => errors.push(error.message));
@@ -105,12 +105,11 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
         await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([
             expect.objectContaining({type: "updateConfigDefaults", sectionId: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1400"}, {macro: "snipingDpi", value: "200"}]}),
         ]);
-        await expect(page.locator("body")).toHaveCSS("padding-left", "0px");
         expect(errors).toEqual([]);
     });
 }
 
-for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`idle timeout units post milliseconds without changing other settings (${theme})`, async ({page}) => {
         await openPreview(page, theme);
         await page.evaluate(async () => {
@@ -163,9 +162,9 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     });
 }
 
-// The web page's controls, where the model offers them (?shell=web is the web
-// shell's model, scripts/preview.js). Each has to post what it says it does.
-for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
+// The page's controls (scripts/preview.js stands in for the web shell). Each
+// has to post what it says it does.
+for (const theme of ["dark", "light"]) {
     test(`the keyboard's name is posted on change, with its byte count kept live (${theme})`, async ({page}) => {
         await openPreview(page, theme);
         // The name is the Keyboard screen's title (it was a Settings card).
@@ -189,7 +188,7 @@ test("the web shell's controls post their messages", async ({page}) => {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
     const posted = () => page.evaluate(() => window.__posted.filter((message) => message.type !== "ready"));
-    await page.goto("/preview/index.html?shell=web");
+    await page.goto("/preview/index.html");
     await expect(page.locator(".rail-build")).toHaveText(/^Ark .+ · preview$/);
 
     await page.evaluate(() => {window.__posted.length = 0;});
@@ -221,31 +220,34 @@ test("the web shell's controls post their messages", async ({page}) => {
 });
 
 test("with no keyboard the web shell offers its picker first, and without WebHID says why", async ({page}) => {
-    await page.goto("/preview/index.html?shell=web-none");
+    await page.goto("/preview/index.html?shell=none");
     const placeholder = page.locator(".read-placeholder");
     await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
     await page.evaluate(() => {window.__posted.length = 0;});
     await placeholder.locator('[data-act="choose-keyboard"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "chooseKeyboard"})]);
 
-    await page.goto("/preview/index.html?shell=web-unsupported");
+    await page.goto("/preview/index.html?shell=unsupported");
     await expect(page.locator(".read-placeholder h2")).toHaveText("Ark needs Chrome or Edge");
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
     await expect(page.locator('.rail [data-act="refresh"]')).toHaveCount(0);
 });
 
-test("the extension's panel has no theme toggle, picker, build line or browser recovery list", async ({page}) => {
+test("with no copies kept, Backups says none yet and lists none", async ({page}) => {
     await page.goto("/preview/index.html");
-    await expect(page.locator('[data-screen="keys"]')).toBeEnabled();
-    await expect(page.locator('[data-act="theme"]')).toHaveCount(0);
-    await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
-    await expect(page.locator(".rail-build")).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
-    // VS Code keeps its copies as files: the card says where, and lists none.
     await page.locator('[data-screen="profile"]').click();
+    await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(4);
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.shell.recoveries = [];
+        store.setModel(model);
+        store.render();
+    });
     await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(0);
-    await expect(page.locator(".card.recoveries")).toContainText("VS Code's storage");
-    await expect(page.locator('[data-act="upgrade"]')).toHaveCount(0, {message: "the retired PD upgrade export is offered by no shell"});
+    await expect(page.locator(".card.recoveries")).toContainText("0 in this browser");
+    await expect(page.locator(".card.recoveries")).toContainText("None yet.");
+    await expect(page.locator('[data-act="upgrade"]')).toHaveCount(0, {message: "the retired PD upgrade export is offered nowhere"});
 });
 
 // The demo's controls (scripts/preview.js builds the demo's models with the
@@ -256,18 +258,18 @@ test("the demo's controls post their messages", async ({page}) => {
     const posted = () => page.evaluate(() => window.__posted.filter((message) => message.type !== "ready"));
     const clear = () => page.evaluate(() => {window.__posted.length = 0;});
 
-    // With no keyboard the extension offers the demo beside Read keyboard, and
+    // With no keyboard the page offers the demo beside Choose keyboard, and
     // a browser without WebHID still offers it.
     await page.goto("/preview/index.html?shell=none");
     const placeholder = page.locator(".read-placeholder");
-    await expect(placeholder.locator('[data-act="retry"]')).toHaveText("Read keyboard");
+    await expect(placeholder.locator('[data-act="choose-keyboard"]')).toHaveText("Choose keyboard");
     await clear();
     await placeholder.locator('[data-act="explore-demo"]').click();
     await expect.poll(posted).toEqual([{type: "openDemo"}]);
     await expect(page.locator(".demo-banner")).toBeVisible();
-    await page.goto("/preview/index.html?shell=web-unsupported");
+    await page.goto("/preview/index.html?shell=unsupported");
     await expect(page.locator('.read-placeholder [data-act="explore-demo"]')).toHaveCount(1);
-    await page.goto("/preview/index.html?shell=web-none");
+    await page.goto("/preview/index.html?shell=none");
     await expect(page.locator('.read-placeholder [data-act="choose-keyboard"]')).toHaveCount(1);
     await expect(page.locator('.read-placeholder [data-act="explore-demo"]')).toHaveCount(1);
 

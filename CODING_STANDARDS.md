@@ -97,8 +97,8 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | --- | --- |
 | `core/` layers import one way, type imports included; `contracts/` is inert and imports only itself | `tests/layering.test.js` |
 | The interface imports nothing from `core/`, types included, and cannot touch the filesystem | `tests/layering.test.js` |
-| The runtime never reads the firmware repository: no `keymap.c`, `config.h`, `rgb_config.c` or QMK paths in `core/`, `webview/`, `web/` or `extension.js` | `tests/layering.test.js` |
-| Only the VS Code shell imports `vscode` in the app (`core/`, `webview/`, `web/`, `scripts/`), and it reaches the core only through `core/session/` | `tests/layering.test.js` |
+| The runtime never reads the firmware repository: no `keymap.c`, `config.h`, `rgb_config.c` or QMK paths in `core/`, `webview/` or `web/` | `tests/layering.test.js` |
+| The device service takes its adapter from its caller, with no default; the web build refuses node-hid and its adapter | `tests/session/profile-device-service.test.js`, `tests/scripts/web-build.test.js` |
 | Every `core/` module has a test in the matching `tests/` layer | `tests/layering.test.js` |
 | Every source module starts with `// @ts-check`; the strict type checks pass | `tests/scripts/conventions.test.js`, `npm run typecheck` |
 | Screens author no colour literals | `tests/scripts/conventions.test.js` |

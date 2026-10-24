@@ -7,9 +7,8 @@ const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
 const {draftBinding} = require("../core/session/panel-session-state");
-const fs = require("node:fs");
 
-for (const theme of ["vscode-dark", "vscode-light"]) {
+for (const theme of ["dark", "light"]) {
     test(`changing Host updates stored macros and reviews the effect (${theme})`, async ({page}) => {
         const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["café", "{+KC_A}é{-KC_A}", "hello", "{KC_A}"]);
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
@@ -21,10 +20,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
                 store.setModel({...store.getModel(), ...patch}); store.render();
             }, patch);
         };
-        // Use the installed VS Code's real stylesheet when available locally;
-        // CI uses the portable shell-cascade fixture.
-        if (fs.existsSync(`preview/${theme}.html`)) await page.goto(`/preview/${theme}.html`);
-        else await openPreview(page, theme);
+        await openPreview(page, theme);
         await publish();
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");

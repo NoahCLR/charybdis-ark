@@ -153,9 +153,8 @@ function liveStatus(draft) {
 /** @param {ReturnType<typeof railSaveLines>[number]} saving */
 const saveLine = (saving) => `<div class="stat live-save ${esc(saving.kind)}" data-tip="${esc(saving.tip)}"><i class="dot ${esc(saving.tone)}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(saving.text)}</div>`;
 
-// A shell that leaves the theme to the panel (a web page) gets its toggle at
-// the top right of every screen, the Keyboard screen's own header included; in
-// VS Code the panel follows VS Code's theme.
+// The theme toggle sits at the top right of every screen, the Keyboard
+// screen's own header included.
 /** @param {string} title @param {string} subtitle @param {string} [actions] */
 export const topbar = (title, subtitle, actions = "") => `<header class="topbar">
     <div><h1>${esc(title)}</h1><p class="sub">${esc(subtitle)}</p></div>
@@ -168,7 +167,6 @@ const THEME_ICONS = {
 };
 export function themeToggle() {
     const theme = shellOf(getModel()).theme;
-    if (!theme) return "";
     return `<button class="btn tiny ghost icon theme-toggle" data-act="theme" data-theme-now="${esc(theme)}"
         aria-label="${esc(themeLabel(theme))}" data-tip="${esc(themeLabel(theme))}">${THEME_ICONS[theme]}</button>`;
 }

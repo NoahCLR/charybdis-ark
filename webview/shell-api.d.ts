@@ -4,4 +4,4 @@ export interface PanelApi {
     getState(): unknown;
     setState(next: unknown): unknown;
 }
-declare global {function acquireVsCodeApi(): PanelApi}
+declare global {function acquirePanelApi(): PanelApi}

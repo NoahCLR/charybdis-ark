@@ -1,29 +1,8 @@
 {
   "name": "charybdis-ark",
-  "displayName": "Charybdis Ark",
-  "description": "Live firmware editor for the Charybdis: edits the connected keyboard over Raw HID.",
+  "description": "Live firmware editor for the Charybdis, as a web page: edits the connected keyboard over WebHID.",
   "version": "2026.10.7",
-  "publisher": "noah",
   "private": true,
-  "engines": {
-    "vscode": "^1.90.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onStartupFinished"
-  ],
-  "main": "./extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "charybdisArk.open",
-        "title": "Open Charybdis Ark",
-        "category": "Charybdis"
-      }
-    ]
-  },
   "scripts": {
     "check": "sh scripts/check.sh",
     "test": "node --test tests/",
@@ -38,18 +17,14 @@
     "pins": "node scripts/check-pins.js",
     "upstream": "node scripts/refresh-upstream.js",
     "agreement": "node scripts/check-agreement.js",
-    "typecheck": "tsc -p tsconfig.foundation.json && tsc -p tsconfig.json && tsc -p tsconfig.shells.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.developer.json && tsc -p tsconfig.preview.json && tsc -p tsconfig.branch-window.json"
-  },
-  "dependencies": {
-    "node-hid": "^3.4.0"
+    "typecheck": "tsc -p tsconfig.foundation.json && tsc -p tsconfig.json && tsc -p tsconfig.shells.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.developer.json && tsc -p tsconfig.preview.json"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@types/node": "26.6.5",
-    "@types/vscode": "1.90.0",
-    "@types/vscode-branch": "npm:@types/vscode@1.85.0",
     "buffer": "6.0.3",
     "esbuild": "0.28.2",
+    "node-hid": "^3.4.0",
     "typescript": "7.0.2"
   }
 }

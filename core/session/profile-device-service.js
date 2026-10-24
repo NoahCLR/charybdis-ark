@@ -28,7 +28,6 @@ const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {profileDomain} = require("../schema/profile-domains");
 const {profileDepthOptions} = require("../schema/profile-depth");
 const {snapshotProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
-const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {decodeKeymapDomain} = require("../schema/keymap-domain-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
@@ -78,10 +77,14 @@ class ProfileDeviceService {
 
     get busy() { return this.#operationActive || this.disconnecting; }
 
-    /** @param {import("./types.js").DeviceServiceOptions} [options] */
-    constructor(options = {}) {
-        const adapter = options.adapter || new NodeHidDeviceAdapter();
-        this.coordinator = options.coordinator || new DeviceRequestCoordinator(adapter, {
+    // The caller passes the transport: the page WebHID's, a Node script the
+    // node-hid adapter (core/README.md). There is no default, so the page can
+    // never reach for a native module.
+    /** @param {import("./types.js").DeviceServiceOptions} options */
+    constructor(options) {
+        const adapter = options?.adapter;
+        if (!adapter && !options?.coordinator) throw new TypeError("The device service needs the device adapter its shell talks through.");
+        this.coordinator = options.coordinator || new DeviceRequestCoordinator(/** @type {import("../transport/types.js").DeviceAdapter} */ (adapter), {
             defaultTimeoutMs: options.defaultTimeoutMs,
             onUnexpectedReport: ({reason}) => this.addDiagnostic(`Ignored an unexpected Raw HID report: ${reason}.`),
         });

@@ -7,10 +7,6 @@
       "DOM.Iterable"
     ],
     "types": [],
-    "moduleSuffixes": [
-      ".browser",
-      ""
-    ],
     "checkJs": true
   },
   "include": [

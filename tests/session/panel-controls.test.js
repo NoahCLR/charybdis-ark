@@ -59,7 +59,7 @@ test("reading the keyboard connects, reads in dependency order and says what it 
     assert.match(session.notice, /committed profile generation 7/);
     const empty = {service: fakeService({snapshot: () => ({devices: []})})};
     assert.equal(await readKeyboard(empty, undefined, shell()), false);
-    assert.match(empty.notice, /No Charybdis Raw HID interface/);
+    assert.match(empty.notice, /Chrome has no Charybdis this page may open yet/);
     const failed = {service: fakeService({readKeyboardProfile: async () => {throw new Error("interrupted");}})};
     assert.equal(await readKeyboard(failed, undefined, shell()), false);
     assert.match(failed.notice, /Macros and global settings could not be read/);

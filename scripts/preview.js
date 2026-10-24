@@ -78,41 +78,40 @@ const capabilities = {
     macroBytes: 34903,
 };
 
-// The shells the preview stands in for. The extension's is what it always was;
-// the web page's says what the page offers, in its words (web/web-shell.mjs),
-// with no keyboard yet, or in a browser without WebHID. preview/index.html
-// shows the extension's; ?shell=web, web-none or web-unsupported the others.
+// The web page's shell as the preview stands in for it: what the page offers
+// (web/web-shell.mjs) with four recovery copies kept, its words being the
+// panel's own. preview/index.html shows it with a keyboard read; the other
+// states are ?shell=<name>, among them none (no keyboard yet) and unsupported
+// (a browser without WebHID).
+const {version} = require("../package.json");
+/** @type {Partial<import("../contracts/model.js").ShellPanel>} */
+const OFFERED = {chooseKeyboard: true, theme: "dark", build: {version, commit: "preview"}, recoveries: [
+    // Made by different operations on two keyboards, and one stored
+    // before copies recorded either.
+    {id: 4, name: "recovery-2026-10-06T09-14-03-512Z-before-save-charybdis-home.charybdis.json", savedAt: "2026-10-06T09:14:03.512Z", cause: "save", keyboard: "Charybdis - Home"},
+    {id: 3, name: "recovery-2026-10-04T12-02-10-000Z-before-leave-live-charybdis-home.charybdis.json", savedAt: "2026-10-04T12:02:10.000Z", cause: "leave-live", keyboard: "Charybdis - Home"},
+    {id: 2, name: "recovery-2026-10-03T08-30-00-000Z-before-apply-charybdis-office.charybdis.json", savedAt: "2026-10-03T08:30:00.000Z", cause: "apply", keyboard: "Charybdis - Office"},
+    {id: 1, name: "recovery-2026-10-01T18-40-55-020Z.charybdis.json", savedAt: "2026-10-01T18:40:55.020Z"},
+]};
 /** @type {import("../core/session/types.js").PanelShell} */
-const VSCODE_SHELL = {};
+const WEB_SHELL = {panel: () => OFFERED};
 /** @returns {Promise<Record<string, import("../core/session/types.js").PanelShell>>} */
 async function webShells() {
-    const {BLOCKED, WEB_WORDS} = await import("../web/web-shell.mjs");
-    const {version} = require("../package.json");
-    /** @type {Partial<import("../contracts/model.js").ShellPanel>} */
-    const offered = {chooseKeyboard: true, theme: "dark", build: {version, commit: "preview"}, recoveries: [
-        // Made by different operations on two keyboards, and one stored
-        // before copies recorded either.
-        {id: 4, name: "recovery-2026-10-06T09-14-03-512Z-before-save-charybdis-home.charybdis.json", savedAt: "2026-10-06T09:14:03.512Z", cause: "save", keyboard: "Charybdis - Home"},
-        {id: 3, name: "recovery-2026-10-04T12-02-10-000Z-before-leave-live-charybdis-home.charybdis.json", savedAt: "2026-10-04T12:02:10.000Z", cause: "leave-live", keyboard: "Charybdis - Home"},
-        {id: 2, name: "recovery-2026-10-03T08-30-00-000Z-before-apply-charybdis-office.charybdis.json", savedAt: "2026-10-03T08:30:00.000Z", cause: "apply", keyboard: "Charybdis - Office"},
-        {id: 1, name: "recovery-2026-10-01T18-40-55-020Z.charybdis.json", savedAt: "2026-10-01T18:40:55.020Z"},
-    ]};
+    const {BLOCKED} = await import("../web/web-shell.mjs");
     return {
-        none: VSCODE_SHELL,
-        demo: VSCODE_SHELL,
-        "demo-edited": {words: WEB_WORDS, panel: () => offered},
-        web: {words: WEB_WORDS, panel: () => offered},
-        live: VSCODE_SHELL,
-        "live-auto": VSCODE_SHELL,
+        none: {panel: () => ({...OFFERED, recoveries: []})},
+        unsupported: {panel: () => ({...OFFERED, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
+        demo: WEB_SHELL,
+        "demo-edited": WEB_SHELL,
+        live: WEB_SHELL,
+        "live-auto": WEB_SHELL,
         // A keyboard that stopped saving (firmware D-F34), unsaved edits on it.
-        "live-stopped": VSCODE_SHELL,
+        "live-stopped": WEB_SHELL,
         // An edit the keyboard holds until a key and a modifier are let go.
-        "live-held": VSCODE_SHELL,
+        "live-held": WEB_SHELL,
         // An Apply cut short by the keyboard restarting during the copy to
         // the slave half: the bar and the notice it leaves.
-        "apply-cut-short": VSCODE_SHELL,
-        "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
-        "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
+        "apply-cut-short": WEB_SHELL,
     };
 }
 
@@ -153,7 +152,7 @@ const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed"
 // one holding Ark's next edit until a key and a modifier are let go (`held`),
 // with Cancel edit.
 /** @param {import("../core/session/types.js").PanelShell} [shell] @param {{live?: boolean, mode?: number, stopped?: boolean, held?: boolean, apply?: import("../contracts/model.js").ApplyView}} [options] */
-function buildModel(shell = VSCODE_SHELL, {live = false, mode = 2, stopped = false, held = false, apply} = {}) {
+function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false, held = false, apply} = {}) {
     const doc = fillPreviewLayer(document32());
     const snapshot = {
         document: doc,
@@ -230,7 +229,8 @@ async function cutShortApply() {
 // from looking at this.
 async function deviceModel() {
     const {ProfileDeviceService} = require("../core/session/profile-device-service");
-    const service = new ProfileDeviceService({onChange: () => {}});
+    const {NodeHidDeviceAdapter} = require("../core/transport/node-hid-adapter");
+    const service = new ProfileDeviceService({adapter: new NodeHidDeviceAdapter(), onChange: () => {}});
     try {
         await service.enumerate();
         const devices = service.snapshot().devices;
@@ -245,7 +245,8 @@ async function deviceModel() {
 
         // Exactly the model the panel would build for this keyboard.
         /** @type {import("../core/session/types.js").PanelSession} */
-        const panel = {service, shell: VSCODE_SHELL};
+        // The page's shell, keeping no recovery copies: the fixture's are not this keyboard's.
+        const panel = {service, shell: {panel: () => ({...OFFERED, recoveries: []})}};
         observeService(panel, service.snapshot());
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
@@ -257,41 +258,6 @@ async function deviceModel() {
 }
 
 const model = process.argv.includes("--device") ? deviceModel() : buildModel();
-// `--vscode` also writes the page as the panel actually renders it: the shell
-// puts its own stylesheet in front of this one (a cascade layer that dresses
-// <code> and pads the body) and hangs its theme class on <body>. Both of those
-// have broken this interface before, and neither is visible in preview/index.html.
-/** @param {string} page */
-function writeShellPages(page) {
-    const root = "/Applications/Visual Studio Code.app/Contents/Resources/app";
-    const frame = path.join(root, "out/vs/workbench/contrib/webview/browser/pre/index.html");
-    if (!fs.existsSync(frame)) {
-        console.log("skipped --vscode: no VS Code install at " + root);
-        return;
-    }
-    const source = fs.readFileSync(frame, "utf8");
-    const opening = source.indexOf("defaultStyles.textContent = `") + "defaultStyles.textContent = `".length;
-    const shellStyles = source.slice(opening, source.indexOf("`;", opening));
-    /** @param {string} name @returns {Record<string, string>} */
-    const theme = (name) => {
-        /** @type {import("./preview-types.js").ThemeFile} */
-        const data = JSON.parse(fs.readFileSync(path.join(root, "extensions/theme-defaults/themes", name), "utf8"));
-        const inherited = data.include ? theme(data.include.replace(/^\.\//, "")) : {};
-        return {...inherited, ...(data.colors || {})};
-    };
-    for (const [label, file, klass] of [["dark", "dark_modern.json", "vscode-dark"], ["light", "light_modern.json", "vscode-light"]]) {
-        const colours = theme(file);
-        const declarations = Object.entries(colours).map(([key, value]) => `  --vscode-${key.replace(/\./g, "-")}: ${value};`).join("\n");
-        const injected = `<style>\n${shellStyles}\n</style>\n<style>\n:root {\n`
-            + `  --vscode-font-family: -apple-system, sans-serif;\n  --vscode-font-size: 13px;\n`
-            + `  --monaco-monospace-font: "SF Mono", Menlo, monospace;\n${declarations}\n}\n`
-            + `html, body { background: var(--vscode-editor-background); }\n</style>\n`;
-        fs.writeFileSync(path.join(__dirname, "..", "preview", `vscode-${label}.html`),
-            page.replace("<body>", `<body class="vscode-body ${klass}">`).replace("<link rel=", injected + "<link rel="));
-        console.log(`written preview/vscode-${label}.html`);
-    }
-}
-
 const previewDir = path.join(__dirname, "..", "preview");
 const macroShell = require("./build-web").bundle("core", {macroShell: "scripts/preview-macro-shell.mjs"}, previewDir,
     {inject: [path.join(__dirname, "..", "web", "buffer.mjs")]});
@@ -304,7 +270,7 @@ for (const [name, shell] of Object.entries(shells)) {
         fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify({model: buildModel(shell, {apply: cutShort.view}), notice: cutShort.notice, failed: true}));
         continue;
     }
-    const web = name === "web" ? buildModel(shell) : name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "live-held" ? buildModel(shell, {live: true, held: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
+    const web = name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "live-held" ? buildModel(shell, {live: true, held: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
 const page = `<!doctype html>
@@ -312,13 +278,13 @@ const page = `<!doctype html>
 <title>Charybdis Ark — preview</title>
 <link rel="stylesheet" href="../webview/styles.css?built=${Date.now()}">
 <script>
-// Stand in for the VS Code shell: answer the webview's "ready" with one
-// fixture model, exactly as the real shell answers it after reading a keyboard,
-// and log every edit it posts back. ?shell=web (web-none, web-unsupported)
-// answers as the web shell does instead, and turns its theme toggle.
-// ?shell=none is the extension with no keyboard; Explore a demo there opens
+// Stand in for the web shell: answer the panel's "ready" with one fixture
+// model, exactly as the shell answers it after reading a keyboard, turn the
+// theme toggle, and log every edit the panel posts back. ?shell=none has no
+// keyboard and ?shell=unsupported no WebHID; Explore a demo opens
 // ?shell=demo's model, the bundled demo (demo-edited has an edit staged).
 // ?shell=apply-cut-short is an Apply the keyboard's restart cut short.
+// ?theme=light starts in the light theme.
 const posted = [];
 let model = null, wanted = false, said = null;
 const publish = () => {
@@ -326,7 +292,7 @@ const publish = () => {
     window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model, ...(said || {})}}));
     said = null;
 };
-window.acquireVsCodeApi = () => ({
+window.acquirePanelApi = () => ({
     postMessage: (message) => {
         posted.push(message);
         console.log("posted", JSON.stringify(message));
@@ -340,9 +306,11 @@ window.acquireVsCodeApi = () => ({
 });
 window.__posted = posted;
 const shell = new URLSearchParams(location.search).get("shell");
+const theme = new URLSearchParams(location.search).get("theme");
 // ?shell=apply-cut-short also says the notice that model's publish brings.
 fetch(shell ? "./model-" + shell + ".json" : "./model.json").then((response) => response.json()).then((loaded) => {
     if (loaded.model) { said = {notice: loaded.notice, failed: loaded.failed}; model = loaded.model; } else model = loaded;
+    if (theme && model.shell) model.shell.theme = theme;
     publish();
 });
 // ?screen=lighting opens a screen by clicking its rail button, the way a
@@ -359,7 +327,6 @@ if (wantedScreen) {
 </body></html>
 `;
 fs.writeFileSync(path.join(__dirname, "..", "preview", "index.html"), page);
-if (process.argv.includes("--vscode")) writeShellPages(page);
 console.log("layers", model.layers.length,
     "· behaviours", model.keyBehaviors.length,
     "· combos", model.combos.length,

@@ -2,9 +2,9 @@
 "use strict";
 
 // What a recovery copy records besides the profile it keeps: what made it and
-// the keyboard it came from, so the Backups screen can name it. Both shells
-// keep that: the browser stores it beside the copy, and VS Code's recovery
-// files, and the browser's downloads, carry it in the file name.
+// the keyboard it came from, so the Backups screen can name it. The browser
+// stores it beside the copy, and the copy's file name, which it downloads
+// as, carries it too.
 
 // The keyboard's name as letters and digits joined by "-", short enough for
 // a file name: "Noah's Charybdis" is "noah-s-charybdis".

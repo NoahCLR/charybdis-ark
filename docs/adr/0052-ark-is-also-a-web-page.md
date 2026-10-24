@@ -1,3 +1,7 @@
+---
+status: superseded by D-L71
+---
+
 # Ark is also a web page
 
 Cited as D-L52.

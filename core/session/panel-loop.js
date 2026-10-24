@@ -1,15 +1,15 @@
 // @ts-check
 "use strict";
 
-// The loop every shell runs for one open panel: take a message the panel
+// The loop the shell runs for one open panel: take a message the panel
 // posted, route it, run it, publish the model, and turn a failure into the
-// panel's notice. It used to live in extension.js; a second shell copying it
-// would drift from the first, so VS Code and any other shell share this one.
+// panel's notice. The web page runs it (web/web-shell.mjs), and so do the
+// tests, with stand-in shells.
 //
 // A shell passes in only what a shell has, as plain functions on `shell`:
 //
 //   shell.post(message)             delivers a message to the panel (the model)
-//   shell.showError(text)           optional: shows a failure outside the panel too
+//   shell.showError(text)           optional: hears each failure the panel's notice says
 //   shell.progress(title, run)      optional: runs `run` behind a progress indicator
 //   shell.saveRecovery(document, about)
 //                                   writes a recovery copy with what made it and the
@@ -24,7 +24,7 @@
 //                                   shell (`model.shell`; see panel-session.js)
 //
 // `options` go to the device service: `adapter` is the device adapter (see
-// core/README.md; the native one when omitted) and `sleep(ms)` the wait between
+// core/README.md; there is no default) and `sleep(ms)` the wait between
 // polls while reading and saving (the timer's when omitted; a browser tab passes
 // one its throttling cannot slow). Tests may pass a ready-made `service` instead.
 // `reconnect` tunes the wait for a renamed or lost keyboard to come back
@@ -54,11 +54,11 @@ const {FILE_MAX_BYTES} = require("../model/portable-profile");
 // Reading a keyboard leaves the demo first (asking about unexported edits is
 // the panel's, and a message that has not asked is refused).
 /** @typedef {{sleep?: (ms: number) => Promise<void>, now?: () => number, waitMs?: number, pollMs?: number}} ReconnectTiming */
-/** @param {Shell} shell @param {import("./types.js").DeviceServiceOptions & {service?: import("./types.js").ControlService, reconnect?: ReconnectTiming}} [options] */
-function openPanelLoop(shell, options = {}) {
+/** @param {Shell} shell @param {(import("./types.js").DeviceServiceOptions | (Partial<import("./types.js").DeviceServiceSettings> & {service: import("./types.js").ControlService})) & {reconnect?: ReconnectTiming}} options */
+function openPanelLoop(shell, options) {
     /** @type {Session} */
     let session;
-    const {service, reconnect: timing = {}, ...device} = options;
+    const {service, reconnect: timing = {}, ...device} = /** @type {import("./types.js").DeviceServiceOptions & {service?: import("./types.js").ControlService, reconnect?: ReconnectTiming}} */ (options);
     const waiting = {timing: {sleep: device.sleep, ...timing}, running: /** @type {Promise<void> | undefined} */ (undefined)};
     /** @type {ReturnType<typeof watchLive> | undefined} */
     let watching;
@@ -153,8 +153,7 @@ async function handleMessage(session, message, shell) {
     } catch (error) {
         const text = error instanceof Error ? error.message : String(error);
         shell.showError?.(text);
-        // Put it in the panel too. A toast is easy to miss and disappears,
-        // and the panel is where someone looks when it seems stuck. It reads
+        // The panel says it: that is where someone looks when it seems stuck. It reads
         // as the sentence the failure says; its code (OperationFailure.code)
         // is for the code that handles it, not for the person. A request
         // refused while the keyboard holds an edit for released keys is no
@@ -216,7 +215,7 @@ async function draftMessage(session, message, shell) {
 }
 
 // Exporting is split: what to save is decided here, saving it is the shell's
-// (a file dialog in VS Code, a download on a web page).
+// (a download on the web page).
 /** @param {Session} session @param {import("../../contracts/messages.js").PortableControl} message @param {Shell} shell */
 async function portableMessage(session, message, shell) {
     try {

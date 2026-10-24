@@ -1,3 +1,7 @@
+---
+status: superseded by D-L71
+---
+
 # Ark runs in VS Code and a web page
 
 Cited as D-L02.
