@@ -222,6 +222,14 @@ class ProfileDraftSession {
         this.deviceId = deviceId;
         return true;
     }
+    // The same keyboard listed again under a new device id, as a follow-back
+    // identified it (by its serial number, or as the one keyboard that came
+    // back; keyboard-reconnect.js): the draft goes with it, and the read that
+    // follows says whether it still runs what the draft knows.
+    /** @param {string} deviceId */
+    followDevice(deviceId) {
+        this.deviceId = deviceId;
+    }
     // Whether this draft belongs to the keyboard `state` describes: the one it
     // was read from, connected through the connection it was read over. ""
     // when it does, otherwise why not. Apply asks it of the device service;

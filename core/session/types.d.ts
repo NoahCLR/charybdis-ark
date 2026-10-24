@@ -275,6 +275,8 @@ export interface ControlService extends DraftApplyService {
     connect(id: string): Promise<unknown>;
     disconnect(): Promise<unknown>;
     refresh(): Promise<unknown>;
+    /** Waits until the keyboard has finished starting, within `deadline` (keyboard-starting.js). */
+    awaitStarted?(options?: {deadline?: number}): Promise<{started: boolean; deadline: number; late: boolean}>;
     readLayout(): Promise<unknown>;
     readCommittedProfile(options?: {reuse?: boolean}): Promise<unknown>;
     readCombos(): Promise<unknown>;

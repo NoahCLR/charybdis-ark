@@ -357,8 +357,10 @@ A stopped half outranks every other live state, and refusals then fail
 `LIVE_KEYBOARD_STOPPED`. `restartKeyboard` (`keyboard-restart.js`) saves the
 unsaved working copy (read, or else the draft's copy) as a recovery copy
 first, and restarts only once it is saved. It then expects the keyboard to
-drop off USB, follows it back, and `putBackAfterRestart` sends the kept edits
-as one unsaved live edit. Ark offers Restart only when the keyboard says it
+drop off USB, follows it back, reads it once it has finished starting
+(`keyboard-starting.js`,
+[D-L70](../adr/0070-a-keyboard-is-read-once-it-has-started.md)), and
+`putBackAfterRestart` sends the kept edits as one unsaved live edit. Ark offers Restart only when the keyboard says it
 stopped.
 
 ## Backups

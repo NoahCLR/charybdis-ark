@@ -172,6 +172,9 @@ test("in Live, renaming the keyboard expects its USB restart, and it is read aga
     await loop.reconnected();
     assert.equal(models().at(-1).device.connected, true);
     assert.equal(notices().at(-1), RECONNECT_WORDS.back("Desk"));
+    assert.equal(models().at(-1).draft.matching, true, "the draft follows it to its new device id");
+    await send({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 12, keycode: "KC_Q"}]});
+    assert.match(notices().at(-1) || "", /^(?!Failed)/, "an edit is taken there");
 });
 
 test("a keyboard that dropped off USB is waited for only where its serial identifies it; a web page follows Chrome's events instead", () => {

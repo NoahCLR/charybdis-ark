@@ -23,6 +23,9 @@ const PHASE = Object.freeze({
     ENUMERATE: "enumerate",
     CONNECT: "connect",
     REFRESH: "refresh",
+    // Waiting for a keyboard that has just come back to finish starting
+    // before reading it (keyboard-starting.js).
+    STARTING: "starting",
     READ_LAYOUT: "read-layout",
     READ_PROFILE: "read-profile",
     READ_COMPLETE: "read-complete",
@@ -50,6 +53,7 @@ const PHASE_WORDS = Object.freeze({
     [PHASE.ENUMERATE]: Object.freeze({label: "enumerating", read: "Looking for a keyboard", busy: "Looking for a keyboard", writes: false}),
     [PHASE.CONNECT]: Object.freeze({label: "connecting", read: "Connecting to the keyboard", busy: "Connecting to the keyboard", writes: false}),
     [PHASE.REFRESH]: Object.freeze({label: "refreshing", read: "Checking both halves", busy: "Checking both halves", writes: false}),
+    [PHASE.STARTING]: Object.freeze({label: "waiting for the keyboard to start", read: "Waiting for the keyboard to finish starting…", busy: "Waiting for the keyboard to finish starting…", writes: false}),
     [PHASE.READ_LAYOUT]: Object.freeze({label: "reading layout", read: "Reading keys and layers", busy: "Reading keys and layers", writes: false}),
     [PHASE.READ_PROFILE]: Object.freeze({label: "reading profile", read: "Reading lighting and behaviours", busy: "Reading lighting and behaviours", writes: false}),
     [PHASE.READ_COMPLETE]: Object.freeze({label: "reading complete profile", read: "Reading the complete profile", busy: "Reading the complete profile", writes: false}),

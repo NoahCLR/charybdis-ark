@@ -5,6 +5,8 @@ const assert = require("node:assert/strict");
 const {openPanelLoop} = require("../../core/session/panel-loop");
 const {validateSnapshot, fingerprint} = require("../../core/model/portable-profile");
 const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {STARTING} = require("../../core/session/keyboard-starting");
+const {PHASE} = require("../../core/model/vocabulary");
 const {backup32, document32} = require("../fixtures/pd-slots-32");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 const pdProfile = require("../fixtures/pd-profile");
@@ -166,20 +168,25 @@ for (const compiledOnly of [false, true]) {
     });
 }
 
-test("a configuration that changes during the shared read leaves only partial diagnostics and disables edits", async () => {
+test("a configuration that keeps changing through the shared read's wait leaves only partial diagnostics and disables edits", async () => {
     const source = document32(), shell = recordingShell(), adapter = fakeKeyboardAdapter({document: source});
     const original = adapter.keyboard.answer;
+    // A read it changes under is read again while the wait for it to start
+    // lasts (keyboard-starting.js), so it changes under every one of them:
+    // each status read during the shared read, never the wait's own.
+    const clock = {now: 0};
     let statusReads = 0;
     adapter.keyboard.answer = request => {
         const responses = original(request);
-        if (request[0] === 8 && request[1] === 0 && request[2] === 2 && request[4] === 1 && ++statusReads === 4) {
-            responses[0].writeUInt32LE(43, 7);
+        if (request[0] === 8 && request[1] === 0 && request[2] === 2 && request[4] === 1 && loop.session.service.phase === PHASE.READ_COMPLETE) {
+            responses[0].writeUInt32LE(43 + ++statusReads, 7);
         }
         return responses;
     };
-    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 200});
+    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 200, now: () => clock.now, sleep: async ms => {clock.now += ms;}});
     try {
         await loop.handleMessage({type: "ready"});
+        assert.ok(clock.now >= STARTING.WAIT_MS, "read again until the wait's bound");
         assert.equal(loop.session.readReady, false);
         assert.equal(loop.session.draft, undefined);
         assert.equal(loop.session.service.portable, undefined);

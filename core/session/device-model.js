@@ -541,4 +541,4 @@ function deviceLabels(devices) {
         : devices[index].serialNumber ? `${base} · ${devices[index].serialNumber}` : `Keyboard ${devices[index].number ?? index + 1} · ${base}`);
 }
 
-module.exports = {buildDeviceModel, buildSnapshotModel, deviceLabels, deviceSummary, editorViews, keyboardLabel};
+module.exports = {buildDeviceModel, buildSnapshotModel, deviceLabels, deviceSummary, editorViews, halvesConverged, keyboardLabel};

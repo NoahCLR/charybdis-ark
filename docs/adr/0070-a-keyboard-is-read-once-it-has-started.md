@@ -1,0 +1,9 @@
+# A keyboard is read once it has finished starting
+
+Cited as D-L70.
+
+A keyboard that has just come back, after Restart (D-L67), a rename or a lost connection (D-L62), answers over USB well before it has decided which profile runs; read then, the read fails and Restart never puts its kept edits back. So before the editor's read of a keyboard, on every read Ark follows back and on Read keyboard, Ark polls profile status until the keyboard has finished starting: the active profile is no longer pending (active kind 3) and its digests are reported (flag 7 clear, firmware D-F61), and the halves agree: the slave half is known and holds the same saved profile, at the same generation, with no conflict. The panel says "Waiting for the keyboard to finish starting…" meanwhile. The wait is bounded at 15 seconds; within it, a read refused because the keyboard was not ready yet or changed under it waits again and is read again rather than reported. Past it, a keyboard still pending with its slave half known gets a notice of its own, naming the recovery copy when Ark kept one; any other keyboard is read as it is, so one without its slave half is told so in the read's usual words. The rule is in [Reading a keyboard that has just come back](../spec/interface-contracts.md#reading-a-keyboard-that-has-just-come-back) (`core/session/keyboard-starting.js`).
+
+## Considered options
+
+Retrying the read after a fixed delay: rejected, because the keyboard says when it is ready, and a large profile takes almost twice as long to start as a small one. Waiting without a bound, as a held edit does (D-L69): rejected, because a master half whose slave half never answers stays pending, and a person must then be told to check it. Waiting only after a restart Ark asked for: rejected, because a replug, a rename and an Apply or Save cut short by a restart come back the same way, and Read keyboard pressed at once would fail the same way.

@@ -40,6 +40,11 @@ combos, macros, pointing modes, lighting and settings. The screen says what it
 is reading while it works, and the screens open once the read is done.
 Everything Ark shows comes from that read.
 
+A keyboard that has just been plugged in or restarted takes a few seconds to
+start. Ark says **Waiting for the keyboard to finish starting…** and reads it
+once it has. If it hasn't after 15 seconds, Ark says so; read it again in a
+moment, or unplug it and plug it back in.
+
 If the keyboard runs older firmware, Ark stops there and tells you to update
 both halves. Nothing on the keyboard changes. The Keyboard screen links to the
 firmware release.

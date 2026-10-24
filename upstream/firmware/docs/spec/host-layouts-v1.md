@@ -3,13 +3,13 @@
 The keyboard sends key positions; the host's keyboard layout turns them into
 characters. A host layout records, for one host keyboard layout, what each key
 types and which keys type each character. Macro text is typed through it
-(D-F16, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/adr/0016-macro-text-typed-through-host-layout.md)), and
+(D-F16, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/adr/0016-macro-text-typed-through-host-layout.md)), and
 clients read the same data to label keys and to tell which characters a macro
 can type. This file covers the catalogue, strokes, the fixture that carries
 the data, how it is derived, the C tables and how to change them. Settings
 scalar 27 selects a layout
 ([settings domain](profile-wire-v1/settings-domain.md#scalars)); typing through
-it is [macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/564dc3316b269a987fc84878f2c60eed73ef8006/docs/architecture/macro-playback.md#typing-through-the-host-layout)'s.
+it is [macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/17c1cf4488856d54241cc6a08621c6d6abd60aea/docs/architecture/macro-playback.md#typing-through-the-host-layout)'s.
 
 ## Catalogue
 

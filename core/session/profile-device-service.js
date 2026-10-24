@@ -48,10 +48,13 @@ const {EDIT_MODE, readActiveProfile, readEditMode, readEditProgress, readEditSta
 const WATCH_TIMEOUT_MS = 3000;
 const WATCH_MISSES = 3;
 const {snapshotLive} = require("./live-profile-session");
+const {STARTING, STARTING_CODE, STARTING_WORDS, hasStarted, stillStarting} = require("./keyboard-starting");
 const {LiveEditCoordinator, TransactionIds} = require("./live-edit-coordinator");
 
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
 const checkReady = requireReady;
+/** @param {number} ms */
+const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // The connected keyboard: scanning, connecting, and every read and save.
 //
@@ -290,6 +293,38 @@ class ProfileDeviceService {
                     : `Live compatibility check found ${compatibility.reasons.length} blocking issue${compatibility.reasons.length === 1 ? "" : "s"}.`
             );
         });
+    }
+
+    // Waits until the keyboard has finished starting (keyboard-starting.js):
+    // polls profile status until `deadline` on the service's clock,
+    // STARTING.WAIT_MS from now when omitted. A wait given a deadline is a
+    // read's retry, and first lets one poll interval pass. Resolves whether it
+    // started and whether the deadline passed; still starting then, with its
+    // slave half known, it fails KEYBOARD_STARTING.
+    /** @param {{deadline?: number}} [options] @returns {Promise<{started: boolean, deadline: number, late: boolean}>} */
+    async awaitStarted({deadline} = {}) {
+        if (!this.connection?.connected) this.refuse("Connect to a keyboard before reading it.");
+        const now = this.now || Date.now, sleep = this.sleep || defaultSleep;
+        const until = deadline ?? now() + STARTING.WAIT_MS;
+        let started = false;
+        await this.runOperation(PHASE.STARTING, async () => {
+            const connection = this.connectedConnection();
+            if (deadline !== undefined) await sleep(STARTING.POLL_MS);
+            for (;;) {
+                if (this.connection !== connection || !connection.connected) throw new Error("The keyboard disconnected while it was starting.");
+                const status = await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()});
+                this.status = status;
+                if (hasStarted(status)) {started = true; break;}
+                if (now() >= until) {
+                    if (stillStarting(status) && status.slaveKnown) throw Object.assign(new Error(STARTING_WORDS.timeout), {code: STARTING_CODE});
+                    this.addDiagnostic("The keyboard had not finished starting when the wait ended; reading it as it is.");
+                    break;
+                }
+                await sleep(STARTING.POLL_MS);
+            }
+            this.phase = PHASE.CONNECTED;
+        });
+        return {started, deadline: until, late: now() >= until};
     }
 
     // Reads the layout the keyboard is actually running and resolves each

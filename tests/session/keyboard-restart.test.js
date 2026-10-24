@@ -6,12 +6,15 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {openPanelLoop} = require("../../core/session/panel-loop");
-const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {BOOT, booting, fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
-const {RESTART_WORDS} = require("../../core/session/keyboard-reconnect");
+const {LOST_WORDS, RESTART_WORDS} = require("../../core/session/keyboard-reconnect");
 const {RESTART_LABEL} = require("../../core/session/keyboard-restart");
+const {PHASE} = require("../../core/model/vocabulary");
+const {STARTING, STARTING_WORDS} = require("../../core/session/keyboard-starting");
+const {PROFILE_ACTIVE_KIND} = require("../../core/protocol/profile-wire-v1");
 
 function fakeShell({recoveryFails = false} = {}) {
     const shell = {
@@ -26,18 +29,24 @@ function fakeShell({recoveryFails = false} = {}) {
 const model = shell => shell.posted.filter(message => message.type === "model").at(-1).model;
 const notices = shell => shell.posted.filter(message => message.notice).map(message => message.notice);
 
-/** @param {import("node:test").TestContext} t @param {{mode?: number, recoveryFails?: boolean, comesBack?: boolean}} [options] */
-async function open(t, {mode = EDIT_MODE.LIVE_REVIEW, recoveryFails = false, comesBack = true} = {}) {
-    const keyboard = liveKeyboard({document: document(), mode});
+/** @param {import("node:test").TestContext} t @param {{mode?: number, recoveryFails?: boolean, comesBack?: boolean, boot?: Parameters<ReturnType<typeof booting>["boot"]>[0], clock?: {now: number}, newId?: boolean, serial?: boolean}} [options] */
+async function open(t, {mode = EDIT_MODE.LIVE_REVIEW, recoveryFails = false, comesBack = true, boot, clock, newId = false, serial = true} = {}) {
+    const keyboard = booting(liveKeyboard({document: document(), mode}));
     const shell = fakeShell({recoveryFails});
     const adapter = fakeKeyboardAdapter({keyboard});
-    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 300, sleep: async () => {},
+    // The service's clock, when the test keeps one, moves only as it waits.
+    const time = clock ? {now: () => clock.now, sleep: async ms => {clock.now += ms;}} : {sleep: async () => {}};
+    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 300, ...time,
         reconnect: {sleep: () => new Promise(resolve => setTimeout(resolve, 5)), waitMs: comesBack ? 5000 : 50}});
     t.after(() => loop.close());
     // The keyboard drops off USB just after it answers, and comes back under
-    // the same name and serial number, unless the test says it does not.
-    const devices = adapter.devices;
+    // the same name and serial number, unless the test says it does not:
+    // node-hid lists it under a new path each time, a browser shows no serial.
+    if (!serial) adapter.devices = adapter.devices.map(({serialNumber, ...device}) => device);
+    const devices = newId ? adapter.devices.map(device => ({...device, id: `${device.id}-again`})) : adapter.devices;
     keyboard.restarting.onRestart = () => {
+        // Back on USB, it starts as the firmware does (D-F61), when the test says.
+        if (boot) keyboard.boot(boot);
         adapter.lastConnection().emitDisconnect(new Error("restarted"));
         adapter.devices = [];
         loop.serviceChanged();
@@ -48,7 +57,7 @@ async function open(t, {mode = EDIT_MODE.LIVE_REVIEW, recoveryFails = false, com
     const send = message => loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, ...message});
     /** @param {number} layoutIndex @param {string} keycode */
     const key = (layoutIndex, keycode) => send({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex, keycode}]});
-    return {keyboard, shell, loop, send, key, session: loop.session};
+    return {keyboard, shell, loop, send, key, adapter, session: loop.session};
 }
 
 // The keyboard of 2026-10-19: unsaved edits, then its storage stopped.
@@ -104,6 +113,80 @@ test("Restart keeps the unsaved edits, restarts both halves and puts them back u
     await send({type: "saveProfileDraft", confirmChecks: true});
     assert.equal(keyboard.working, null);
     assert.ok(keyboard.saved.equals(edited));
+});
+
+test("a keyboard still starting when it is back is waited for, then read, and the edits go back unsaved", async t => {
+    const {keyboard, shell, loop, send, session, edited} = await stoppedWithEdits(t, {boot: BOOT});
+    await send({type: "restartKeyboard"});
+    await loop.reconnected();
+    assert.ok(keyboard.working?.equals(edited), "the edits run on the keyboard again");
+    assert.ok(!keyboard.saved.equals(edited), "and are not saved");
+    const published = model(shell);
+    assert.equal(published.device.health.error, "", "no health error");
+    assert.equal(published.draft.live.unsaved, true);
+    assert.equal(session.draft.history.at(-1).label, RESTART_LABEL);
+    const said = notices(shell).at(-1);
+    assert.ok(said.startsWith(RESTART_WORDS.back()), said);
+    assert.match(said, /Your unsaved edits are back on the keyboard, not saved yet: review and save them\./);
+    assert.ok(shell.posted.some(message => message.type === "model" && message.model.load.state === "loading"
+        && message.model.load.phase === PHASE.STARTING), "the panel said it waited for the keyboard to finish starting");
+});
+
+test("a keyboard that does not finish starting says so and names the recovery copy; read later, it gets the edits back", async t => {
+    const clock = {now: 0};
+    const {keyboard, shell, loop, send, edited} = await stoppedWithEdits(t, {clock, boot: [{activeKind: PROFILE_ACTIVE_KIND.PENDING, stateFlags: 0xb2, reads: Infinity}]});
+    await send({type: "restartKeyboard"});
+    const since = clock.now;
+    await loop.reconnected();
+    assert.ok(clock.now - since >= STARTING.WAIT_MS, "it waited the bound");
+    const said = notices(shell).at(-1);
+    assert.ok(said.startsWith(STARTING_WORDS.timeout), said);
+    assert.equal(said.match(/recovery copy: \/recovery\/1\.json/g)?.length, 1, "the recovery copy, named once");
+    assert.equal(keyboard.working, null, "nothing was put back on a keyboard still starting");
+    // It finishes; reading it then puts the edits back.
+    keyboard.boot([]);
+    await send({type: "refresh"});
+    assert.ok(keyboard.working?.equals(edited));
+    assert.match(notices(shell).at(-1), /Your unsaved edits are back on the keyboard, not saved yet/);
+});
+
+for (const [label, options] of [["with its serial number", {}], ["without a serial number, as in a browser", {serial: false}]]) {
+    test(`a keyboard back under a new device id ${label} is the same keyboard: the edits go back to it, and save`, async t => {
+        const {keyboard, shell, loop, send, session, edited} = await stoppedWithEdits(t, {newId: true, boot: BOOT, ...options});
+        const before = loop.session.service.snapshot().selectedDeviceId;
+        await send({type: "restartKeyboard"});
+        await loop.reconnected();
+        assert.notEqual(loop.session.service.snapshot().selectedDeviceId, before, "listed under a new device id");
+        assert.ok(keyboard.working?.equals(edited), "the edits run on the restarted keyboard");
+        assert.equal(session.draft.live.session, keyboard.session, "the draft follows its new session");
+        const published = model(shell);
+        assert.equal(published.draft.matching, true);
+        assert.equal(published.draft.editable, true);
+        assert.match(notices(shell).at(-1), /Your unsaved edits are back on the keyboard, not saved yet/);
+        await send({type: "reviewProfileDraft"});
+        await send({type: "saveProfileDraft", confirmChecks: true});
+        assert.equal(keyboard.working, null);
+        assert.ok(keyboard.saved.equals(edited), "saved");
+    });
+}
+
+test("a restart that timed out, then replugged under a new device id, still gets its edits back once followed back", async t => {
+    const clock = {now: 0};
+    const {keyboard, shell, loop, send, adapter, edited} = await stoppedWithEdits(t, {clock, newId: true, boot: [{activeKind: PROFILE_ACTIVE_KIND.PENDING, stateFlags: 0xb2, reads: Infinity}]});
+    await send({type: "restartKeyboard"});
+    await loop.reconnected();
+    assert.ok(notices(shell).at(-1).startsWith(STARTING_WORDS.timeout));
+    // Unplugged and plugged back in: listed under yet another device id.
+    adapter.lastConnection().emitDisconnect(new Error("Unplugged."));
+    adapter.devices = adapter.devices.map(device => ({...device, id: `${device.id}-third`}));
+    keyboard.boot([]);
+    loop.serviceChanged();
+    await loop.reconnected();
+    assert.ok(keyboard.working?.equals(edited), "the edits run on the keyboard");
+    assert.equal(model(shell).draft.matching, true);
+    const said = notices(shell).at(-1);
+    assert.ok(said.startsWith(LOST_WORDS.back("disconnected")), said);
+    assert.match(said, /Your unsaved edits are back on the keyboard, not saved yet/);
 });
 
 test("in Live the put-back edits are left for the keyboard's own save", async t => {
