@@ -29,7 +29,7 @@ const {applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable
 const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY, compose} = require("../model/layer-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
-const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, setEditMode} = require("./live-edits");
+const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, retryRead, setEditMode} = require("./live-edits");
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {keyboardLabel} = require("./device-model");
@@ -47,10 +47,20 @@ const run = (shell, title, work) => shell.progress ? shell.progress(title, work)
 const savedNotice = (result, verb) => result?.slaveUnseen
     ? `Complete profile ${verb} both halves and active. The slave half confirmed its copy but is not connected now; plug the cable between the halves back in.`
     : `Complete profile ${verb} both halves and verified.`;
+// A notice says in words why a read failed. An answer from the keyboard that
+// did not decode says so; the decoder's own text (which page, how many bytes)
+// stays in the diagnostics, where the device service put it.
+const UNDECODED = new Set(["MALFORMED_RESPONSE", "NONCANONICAL_RESPONSE", "INCOMPATIBLE_RESPONSE", "CORRELATION_MISMATCH", "PAYLOAD_CORRUPT"]);
+/** @param {unknown} error */
+function failureWords(error) {
+    const {code, message} = /** @type {{code?: unknown, message?: unknown}} */ (error ?? {});
+    if (typeof code === "string" && UNDECODED.has(code)) return "the keyboard answered with something Ark could not decode (see the diagnostics)";
+    return typeof message === "string" ? message : String(error);
+}
 // The profile is saved whatever the read after it does, so a failed read is
 // said after the save rather than in place of it.
 /** @param {unknown} error */
-const rereadFailure = (error) => `Reading the keyboard again failed: ${(error instanceof Error ? error.message : String(error)).replace(/\.$/, "")}. `;
+const rereadFailure = (error) => `Reading the keyboard again failed: ${failureWords(error).replace(/\.$/, "")}. `;
 
 // A save that renamed the keyboard is followed by the keyboard reconnecting
 // under its new name. Its readback may be cut short by that: the keyboard is
@@ -122,7 +132,13 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
             session.notice = /** @type {Error} */ (error).message;
             return false;
         }
-        macroFailure = " Macros and global settings could not be read: " + /** @type {Error} */ (error).message;
+        macroFailure = " Macros and global settings could not be read: " + failureWords(error);
+        // A follow-back's read the keyboard moved under is the live watch's
+        // to read again (live-watch.js), within its bound.
+        if (session.reconnect && session.draft?.live) {
+            session.draft.needsRead = true;
+            retryRead(session, error);
+        }
     }
     if (!portable) {
         // A partly readable keyboard still gets its independent diagnostics.
@@ -135,7 +151,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     }
     const state = service.snapshot();
     if (state.error || state.committed?.state !== "read") {
-        session.notice = `The keyboard profile could not be read: ${state.error?.message || "no verified profile was returned"}.`;
+        session.notice = `The keyboard profile could not be read: ${state.error ? failureWords(state.error).replace(/\.$/, "") : "no verified profile was returned"}.`;
     } else {
         const description = state.committed.source === "compiled"
             ? "the keyboard's compiled defaults"

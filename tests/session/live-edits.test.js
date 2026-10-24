@@ -308,6 +308,120 @@ for (const mode of [EDIT_MODE.LIVE_REVIEW, EDIT_MODE.LIVE]) test(`a live rename 
 });
 const posted = shell => shell.posted.filter(message => message.notice).map(message => message.notice);
 
+// In Live a rename restarts USB about 1.5 s after the edit, before the
+// keyboard's own save 3 s after it, so the follow-back read runs while that
+// save lands: the saved profile moves on (and, to a shorter name, gets
+// shorter) under the read. Seen on the keyboard twice out of twice on
+// 2026-10-24: "Chunk 258 returned 1 bytes where 3 were expected", or "The
+// keyboard's profile changed while it was being read", and then a panel left
+// with unsaved edits until Read keyboard.
+/** @param {import("node:test").TestContext} t */
+async function renamedInLive(t) {
+    const {checkLive} = require("../../core/session/live-watch");
+    const {editKeyboardName} = require("../../core/model/keyboard-name");
+    const {fingerprint} = require("../../core/model/portable-profile");
+    const plain = document(), print = fingerprint(plain);
+    const named = editKeyboardName({document: plain, fingerprint: print}, {name: "Charybdis on the desk", expectedFingerprint: print});
+    const keyboard = liveKeyboard({document: named, mode: EDIT_MODE.LIVE});
+    const shell = fakeShell();
+    const adapter = fakeKeyboardAdapter({keyboard});
+    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 300, sleep: async () => {}, reconnect: {sleep: () => new Promise(resolve => setTimeout(resolve, 5)), waitMs: 5000}});
+    t.after(() => loop.close());
+    await loop.handleMessage({type: "refresh"});
+    keyboard.firstDeviceId = loop.session.draft.deviceId;
+    await loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, type: "renameKeyboard", name: "Desk"});
+    assert.ok(loop.session.reconnect, "Ark expects the restart the new name causes");
+    assert.ok(keyboard.working && keyboard.working.length < keyboard.saved.length, "the new name is shorter");
+    const comeBack = async () => {
+        adapter.lastConnection().emitDisconnect(new Error("USB restarted."));
+        adapter.devices = [{id: "fake-charybdis-2", product: "Desk", manufacturer: "Bastard Keyboards", serialNumber: "FAKE-1"}];
+        loop.serviceChanged();
+        await loop.reconnected();
+    };
+    const look = async () => {const changed = await checkLive(loop.session); if (changed) loop.publish(); return changed;};
+    return {keyboard, shell, loop, comeBack, look};
+}
+
+/** @param {any} published @param {any} keyboard @param {any} session */
+function inStep(published, keyboard, session) {
+    assert.equal(published.model.draft.matching, true, "the draft is the keyboard's");
+    assert.equal(published.model.draft.stale, false);
+    assert.equal(published.model.draft.live.unsaved, false, "nothing unsaved: the keyboard saved the name");
+    assert.equal(session.draft.dirty, false);
+    assert.equal(session.draft.live.savedGeneration, keyboard.generation);
+    const selected = session.service.snapshot().selectedDeviceId;
+    assert.equal(session.draft.deviceId, selected, "under its new device id");
+    assert.notEqual(selected, keyboard.firstDeviceId);
+}
+
+for (const during of [0x04, 0x21]) test(`a Live rename's follow-back read with the keyboard's own save landing during its ${during === 0x04 ? "saved profile" : "working copy"} is read again`, async t => {
+    const {keyboard, shell, loop, comeBack} = await renamedInLive(t);
+    const answer = keyboard.answer, pages = Math.ceil(keyboard.saved.length / 25);
+    let landed = false;
+    keyboard.answer = report => {
+        // Near the end of the saved profile, so what follows no longer fits it.
+        const page = report[4] | report[5] << 8, at = during === 0x04 ? pages - 1 : 3;
+        if (!landed && loop.session.reconnect?.dropped && report[0] === 0x08 && report[2] === during && page === at) {landed = true; keyboard.autoSave();}
+        return answer(report);
+    };
+    await comeBack();
+    assert.ok(landed, "the save landed during the read");
+    const published = model(shell);
+    inStep(published, keyboard, loop.session);
+    const said = posted(shell).at(-1);
+    assert.match(said, /back as “Desk”/);
+    assert.doesNotMatch(said, /could not be read|failed|Chunk/);
+});
+
+// A follow-back read the keyboard keeps moving under (three tries) is said to
+// have failed, and the live watch takes over: the same keyboard, by its edit
+// session, under its new device id, read again within the watch's bound.
+for (const settles of [true, false]) test(`after a failed follow-back read the live watch ${settles ? "follows the keyboard and reads it again" : "keeps its bounded retry"}`, async t => {
+    const {keyboard, shell, loop, comeBack, look} = await renamedInLive(t);
+    const answer = keyboard.answer;
+    let races = 0, racing = true;
+    // Each try of a live read reads what the keyboard runs, page 0 before
+    // and after its bytes.
+    const tries = () => keyboard.requests.filter(r => r[0] === 0x08 && r[2] === 0x21 && (r[4] | r[5] << 8) === 0).length / 2;
+    keyboard.answer = report => {
+        // Each try of the read moves under it once it has read the working
+        // copy, as the keyboard's own keys would.
+        if (racing && loop.session.reconnect?.dropped !== false && report[0] === 0x08 && report[2] === 0x06 && (report[4] | report[5] << 8) === 0) {
+            races++; keyboard.externalEdit(keyboard.working ?? keyboard.saved);
+        }
+        return answer(report);
+    };
+    await comeBack();
+    assert.ok(races >= 3);
+    assert.match(posted(shell).at(-1), /reading it again failed/, "the follow-back says its read failed");
+    assert.doesNotMatch(posted(shell).at(-1), /back as|Chunk|could not be read:/);
+    assert.equal(loop.session.draft.stale, true);
+    if (settles) {
+        racing = false;
+        assert.equal(keyboard.autoSave(), true, "the keyboard saves the name by itself");
+        assert.equal(await look(), true, "the watch takes over");
+        inStep(model(shell), keyboard, loop.session);
+        assert.match(posted(shell).at(-1), /read the keyboard again now that it is back/);
+        return;
+    }
+    // A keyboard that restarted meanwhile (or another one) is not followed:
+    // one look at its status ends the retry.
+    if (!settles) {
+        const retry = loop.session.liveReadRetry;
+        loop.session.draft.live.session ^= 1;
+        assert.equal(await look(), false);
+        assert.equal(loop.session.liveReadRetry, undefined, "left to the person");
+        loop.session.draft.live.session ^= 1;
+        loop.session.liveReadRetry = retry;
+    }
+    keyboard.requests.length = 0;
+    for (let poll = 0; poll < 6; poll++) await look();
+    // The follow-back's read was the first of three failed reads the draft
+    // gets: the watch reads twice more, three tries each.
+    assert.equal(tries(), 6, "two looks of three tries each, then Read keyboard is the person's");
+    assert.equal(loop.session.draft.stale, true);
+});
+
 test("a reconnect to the same running keyboard keeps the undo history", async t => {
     const {keyboard, session, key, send, loop} = await open(t);
     await key(0, 12, "KC_E");

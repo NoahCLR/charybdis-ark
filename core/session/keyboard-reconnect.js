@@ -152,13 +152,14 @@ function reconnectTarget(expected, devices) {
 
 /**
  * Waits for the renamed keyboard to drop off and come back, then reads it
- * with `read`. Ends at once if the expectation is replaced (the person chose
+ * with `read`, which resolves false when the keyboard is not ready to edit
+ * after it. Ends at once if the expectation is replaced (the person chose
  * or read a keyboard). Firmware may wait indefinitely for a safe boundary;
  * the bounded return wait starts only after the connection drops. `publish`
  * shows each change.
  * @param {Session} session
  * @param {Expected} expected
- * @param {{read: (deviceId: string) => Promise<unknown>, publish: () => void, sleep?: (ms: number) => Promise<void>, now?: () => number, waitMs?: number, pollMs?: number}} options
+ * @param {{read: (deviceId: string) => Promise<boolean | void>, publish: () => void, sleep?: (ms: number) => Promise<void>, now?: () => number, waitMs?: number, pollMs?: number}} options
  */
 async function awaitReconnect(session, expected, {read, publish, sleep = defaultSleep, now = Date.now, waitMs = RECONNECT.WAIT_MS, pollMs = RECONNECT.POLL_MS}) {
     const service = session.service;
@@ -196,8 +197,10 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
         if (session.reconnect !== expected) return;
         const target = reconnectTarget(expected, service.snapshot().devices || []);
         if (target && "device" in target) {
+            // A read that rejects, or says it is not ready (its complete
+            // profile could not be read), failed.
             let failed = false;
-            try {await read(target.device.id);} catch {failed = true;}
+            try {failed = await read(target.device.id) === false;} catch {failed = true;}
             const back = service.snapshot();
             // What the save said comes first, so its recovery copy is not lost.
             const outcome = failed || !back.connected || back.error ? words.failed : words.back(expected.name);

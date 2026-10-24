@@ -171,7 +171,7 @@ function followReconnect(session, shell, waiting) {
     const read = /** @param {string} deviceId */ async (deviceId) => {
         if (deviceId !== session.service.snapshot().selectedDeviceId) closeEditors(session, {resetForms: true});
         beginRead(session);
-        await connectAndRead(session, deviceId, shell);
+        return connectAndRead(session, deviceId, shell);
     };
     waiting.running = awaitReconnect(session, expected, {...waiting.timing, read, publish: () => publish(session, shell)})
         .catch(() => {endReconnect(session, expected); publish(session, shell);})
@@ -182,8 +182,9 @@ function followReconnect(session, shell, waiting) {
         });
 }
 
-// Connect, learn what the keyboard is, and read what it is running.
-/** @param {Session} session @param {string | undefined} selectedDeviceId @param {Shell} shell */
+// Connect, learn what the keyboard is, and read what it is running; true
+// when the keyboard is ready to edit after it.
+/** @param {Session} session @param {string | undefined} selectedDeviceId @param {Shell} shell @returns {Promise<boolean>} */
 async function connectAndRead(session, selectedDeviceId, shell) {
     /** @type {boolean | undefined} */
     let ready;
@@ -197,6 +198,7 @@ async function connectAndRead(session, selectedDeviceId, shell) {
         endRead(session, ready);
         publish(session, shell);
     }
+    return Boolean(ready);
 }
 
 /** @param {Session} session @param {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} message @param {Shell} shell */

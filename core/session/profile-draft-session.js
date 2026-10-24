@@ -208,8 +208,14 @@ class ProfileDraftSession {
     // is this keyboard, so the draft follows it there. True when it did.
     /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId */
     follow(snapshot, deviceId) {
-        if (!this.live || !deviceId || deviceId === this.deviceId || !snapshot || !("live" in snapshot) || !snapshot.live) return false;
-        if (/** @type {import("./types.js").LiveSnapshot} */ (snapshot).live.session !== this.live.session) return false;
+        if (!snapshot || !("live" in snapshot) || !snapshot.live) return false;
+        return this.followSession(/** @type {import("./types.js").LiveSnapshot} */ (snapshot).live.session, deviceId);
+    }
+    // The same, from the edit session the keyboard's status names (the live
+    // watch, after a follow-back read failed).
+    /** @param {number} session @param {string | null | undefined} deviceId */
+    followSession(session, deviceId) {
+        if (!this.live || !deviceId || deviceId === this.deviceId || session !== this.live.session) return false;
         this.deviceId = deviceId;
         return true;
     }

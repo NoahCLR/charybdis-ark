@@ -50,17 +50,63 @@ test("with nothing unsaved the saved profile is not downloaded again", async t =
     assert.ok(unsaved.live.saved.equals(read.live.saved));
 });
 
-test("a working copy that moves during the read is refused, never mixed", async t => {
+test("a working copy that moves during the read is read again, never mixed; one that keeps moving is refused", async t => {
     const {keyboard, snapshot} = await live(t);
     const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
     const answer = keyboard.answer;
-    let moved = false;
+    let moves = 1;
     keyboard.answer = report => {
         // Another client's edit lands once the bytes have been read.
-        if (!moved && report[0] === 0x08 && report[2] === 0x06) {moved = true; keyboard.externalEdit(Buffer.from(edited.profile, "base64"));}
+        if (moves > 0 && report[0] === 0x08 && report[2] === 0x06 && (report[4] | report[5] << 8) === 0) {moves--; keyboard.externalEdit(Buffer.from(edited.profile, "base64"));}
         return answer(report);
     };
-    await assert.rejects(snapshot(), {code: "PROFILE_CHANGED"});
+    const read = await snapshot();
+    assert.ok(read.live.working.equals(keyboard.working), "the second read is the edit, whole");
+    assert.equal(read.live.revision, keyboard.revision);
+    moves = Infinity;
+    keyboard.requests.length = 0;
+    await assert.rejects(snapshot(), error => error.code === "PROFILE_CHANGED" && /kept changing/.test(error.message));
+    // Each read ends with the whole edit status (its page 1 read once).
+    const reads = keyboard.requests.filter(r => r[0] === 0x08 && r[2] === 0x20 && (r[4] | r[5] << 8) === 1).length;
+    assert.equal(reads, 3, "three tries, then the words");
+});
+
+// The keyboard's own save (Live, 3 s after an edit) landing under a read:
+// the saved profile moves on beneath it, during its chunks or the working
+// copy's. The pair is read again and is the saved one.
+for (const during of [0x04, 0x21]) test(`an automatic save landing during the ${during === 0x04 ? "saved profile's" : "working copy's"} chunks is read again`, async t => {
+    const {keyboard, snapshot} = await live(t, {mode: EDIT_MODE.LIVE});
+    const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
+    keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
+    const answer = keyboard.answer;
+    let pages = 0;
+    keyboard.answer = report => {
+        if (report[0] === 0x08 && report[2] === during && (report[4] | report[5] << 8) > 0 && ++pages === 3) keyboard.autoSave();
+        return answer(report);
+    };
+    const read = await snapshot();
+    assert.ok(pages >= 3, "the save landed mid-read");
+    assert.equal(read.live.unsaved, false);
+    assert.equal(read.live.savedGeneration, keyboard.generation);
+    assert.ok(read.live.saved.equals(keyboard.saved));
+});
+
+test("a read waits while the keyboard reports a save running, then reads what it saved", async t => {
+    const keyboard = liveKeyboard({document: document(), mode: EDIT_MODE.LIVE});
+    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
+    keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
+    keyboard.startAutoSave();
+    let waits = 0;
+    const said = [];
+    const read = await snapshotLive(service.connection, service.requestIds, service.capabilities, {
+        onProgress: text => said.push(text),
+        sleep: async () => {if (++waits === 3) keyboard.autoSave();},
+    });
+    assert.equal(waits, 3);
+    assert.ok(said.some(text => /saving/i.test(text)), said.join(" | "));
+    assert.equal(read.live.unsaved, false);
+    assert.equal(read.live.savedGeneration, keyboard.generation);
 });
 
 test("a read waits while the keyboard is still taking an edit, then reads what it settled on", async t => {
@@ -75,4 +121,38 @@ test("a read waits while the keyboard is still taking an edit, then reads what i
     });
     assert.equal(waits, 3);
     assert.equal(read.live.unsaved, false);
+});
+
+test("a save that does not end is waited for a bounded time, then left to the person", async t => {
+    const keyboard = liveKeyboard({document: document(), mode: EDIT_MODE.LIVE});
+    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
+    keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
+    // A held key keeps the keyboard's own save from finishing.
+    keyboard.startAutoSave();
+    let waits = 0;
+    await assert.rejects(snapshotLive(service.connection, service.requestIds, service.capabilities, {sleep: async () => {waits++;}}),
+        error => error.code === "LIVE_SAVE_PENDING" && /still saving/.test(error.message));
+    assert.equal(waits, 600, "at least 30 s of polls 50 ms apart");
+});
+
+test("a saved profile that moves under every payload read is a move of the pair, read again", async t => {
+    const {keyboard, snapshot} = await live(t, {mode: EDIT_MODE.LIVE});
+    const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
+    keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
+    const answer = keyboard.answer;
+    let unsettled = 4;
+    keyboard.answer = report => {
+        // Page 0 of the saved profile names a new generation at each of the
+        // payload reader's four attempts, then settles.
+        const [response] = answer(report);
+        if (unsettled > 0 && report[0] === 0x08 && report[2] === 0x04 && (report[4] | report[5] << 8) === 0) {
+            const reads = keyboard.requests.filter(r => r[0] === 0x08 && r[2] === 0x04 && (r[4] | r[5] << 8) === 0).length;
+            if (reads % 2 === 0) {unsettled--; response.writeUInt32LE(response.readUInt32LE(7 + 6) + 1, 7 + 6);}
+        }
+        return [response];
+    };
+    const read = await snapshot();
+    assert.equal(unsettled, 0, "the first pair read ran out of payload attempts");
+    assert.equal(read.live.savedGeneration, keyboard.generation);
 });

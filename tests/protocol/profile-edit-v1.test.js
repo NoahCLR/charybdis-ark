@@ -148,6 +148,26 @@ test("the active profile is read whole, and a revision that moves during the rea
     await assert.rejects(readActiveProfile(moving, {nextRequestId: () => 1}), {code: "PROFILE_CHANGED"});
 });
 
+// A working copy that shortens under the read (an edit to a shorter name)
+// answers a short page, or "unknown page" past its new end: page 0 is read
+// again, and a moved one is the change, not a malformed answer.
+test("a page that no longer fits the active profile reads page 0 again before refusing", async () => {
+    for (const [moves, shorter, code] of [[true, 28, "PROFILE_CHANGED"], [true, 20, "PROFILE_CHANGED"], [false, 28, "MALFORMED_RESPONSE"], [false, 20, "DEVICE_REJECTED"]]) {
+        let bytes = Buffer.from(Array.from({length: 30}, (_, index) => index)), revision = 3, metadataReads = 0;
+        const meta = () => {const page = Buffer.alloc(25); page.set([1, 25]); page.writeUInt32LE(moves ? bytes.length : 30, 2); page.writeUInt32LE(7, 6); page.writeUInt32LE(revision, 10); return page;};
+        const keyboard = connection(request => {
+            const page = request.readUInt16LE(4);
+            if (page === 0) {metadataReads++; return ok(request, meta());}
+            const reply = (page - 1) * 25 >= bytes.length ? (() => {const refused = ok(request, Buffer.alloc(0)); refused[5] = 2; return refused;})()
+                : ok(request, bytes.subarray((page - 1) * 25, page * 25));
+            if (page === 1) {bytes = bytes.subarray(0, shorter); if (moves) revision++;}
+            return reply;
+        });
+        await assert.rejects(readActiveProfile(keyboard, {nextRequestId: () => 1}), {code}, `${shorter} bytes, page 0 moved: ${moves}`);
+        assert.equal(metadataReads, 2, "page 0 read again at the page that did not fit");
+    }
+});
+
 test("an unhandled SET is a definite refusal, not a timeout", async () => {
     const keyboard = connection(request => {const echo = Buffer.from(request); echo[0] = 0xff; return echo;});
     await assert.rejects(sendEditRequest(keyboard, buildEditAbortRequest(1)), {code: "UNHANDLED"});

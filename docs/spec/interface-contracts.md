@@ -576,6 +576,12 @@ Ark expects it (`core/session/keyboard-reconnect.js`;
 - After a live rename, a read naming the draft's edit session is the same
   keyboard, so the draft follows it with its history
   (`tests/session/live-edits.test.js`).
+- A read that is not ready after the keyboard is back is said as a failure,
+  never as "back". When a live keyboard moved under that read (in Live, its
+  own save after the rename), the live watch takes over: the keyboard whose
+  status names the draft's edit session is followed and read again, within
+  the watch's bound of three failed reads per draft
+  (`tests/session/live-edits.test.js`).
 
 ### Following a lost keyboard back
 
