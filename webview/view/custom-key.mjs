@@ -4,7 +4,7 @@
 // held, tapped when it is tapped. A behaviour on the key works on top of it,
 // and a behaviour step on another key that sends it sends the shortcut only.
 import {vocabulary} from "./vocabulary.mjs";
-import {customKeyPlacements} from "./reach.mjs";
+import {customKeyKeycodes, customKeyPlacements, reachGroups} from "./reach.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
 import {compactModifierMask} from "./keyvalues.mjs";
 
@@ -13,6 +13,19 @@ import {compactModifierMask} from "./keyvalues.mjs";
 
 /** @param {CustomKey | null | undefined} key */
 export const hasShortcut = (key) => Boolean(key?.shortcut && (key.shortcut.mods || key.shortcut.key));
+
+// A slot in use: named, or sending a shortcut, or with a behaviour. Any other
+// is an empty slot, drawn as one on the Custom keys screen, and is not a key a
+// layer could be missing.
+/** @param {CustomKey | null | undefined} key */
+export const customKeyInUse = (key) => Boolean(key && (key.name || key.hasBehavior || hasShortcut(key)));
+
+// Custom keys, grouped the ways a layer reaches them, as macros are: a key
+// carrying one, a transparent key letting a lower one, a behaviour branch
+// sending one (which sends its shortcut only, D-L63), or a combo sending one.
+/** @param {Model} model @param {import("../../contracts/panel.js").Layer[]} stack @param {number} at */
+export const customKeyReach = (model, stack, at) => reachGroups(model, stack, at, customKeyKeycodes,
+    (model?.customKeys || []).filter(customKeyInUse).map((key) => key.keycode));
 
 // The custom key a keycode names, if it is one.
 /** @param {Model} model @param {string | null | undefined} keycode */

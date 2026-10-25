@@ -107,7 +107,9 @@ works before the key is on any layer. Where the behaviour leaves a tap or hold
 empty, the key sends its shortcut. **Show on the Keys screen** opens its
 behaviour there, once the key is placed.
 
-**On layers** shows where the key is used; click a layer to see it there.
+**On layers** shows where the key is used; click a layer to see it there, on
+the Keys screen's **Custom keys** tab with the key's row picked. That tab
+lists every custom key a layer reaches, as the Macros tab does for macros.
 **Place on a key…** takes you to the board: pick a layer, then click the key
 to put it on.
 

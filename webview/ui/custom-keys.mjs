@@ -25,7 +25,7 @@ import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./frame.mjs";
 import {keyName} from "../view/keyvalues.mjs";
-import {customKeyDoes, hasShortcut, customKeyShortcutLine} from "../view/custom-key.mjs";
+import {customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourEditor} from "./keys/behaviour-editor.mjs";
@@ -68,7 +68,7 @@ export function screenCustomKeys() {
         if (!matches(row)) continue;
         const does = [hasShortcut(row) ? `sends ${row.shortcutLabel}` : "", row.hasBehavior ? "has a behaviour" : ""].filter(Boolean).join(" · ");
         const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
-        const cell = el(`<button class="mslot ${row.name || row.hasBehavior || hasShortcut(row) ? "filled" : ""}" data-custom-key="${esc(row.keycode)}"
+        const cell = el(`<button class="mslot ${customKeyInUse(row) ? "filled" : ""}" data-custom-key="${esc(row.keycode)}"
             aria-current="${row.keycode === key?.keycode}" data-tip="${esc(tip)}">
             <span class="n">K${esc(row.slot)}</span>${changed.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
             <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : "—"}</span></button>`);
@@ -196,8 +196,9 @@ function showOnLayer(keycode, at) {
     const placement = customKeyPlacements(getModel(), layers(), keycode).find((entry) => entry.at === at);
     const route = placement?.routes[0];
     if (!route) return;
-    Object.assign(state, {screen: "keys", tab: "key", layer: at, placement: null});
+    Object.assign(state, {screen: "keys", tab: "customKeys", layer: at, placement: null});
     if (route.keys.length) state.selected = route.keys[0];
+    state.reachRow.customKeys = `${route.group}:${keycode}`;
     state.reachGroups = setReachGroupOpen(state.reachGroups, route.group, true);
     render();
 }

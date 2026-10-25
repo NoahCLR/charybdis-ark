@@ -680,6 +680,7 @@ button.tier:hover { background: var(--surface-3); }
 .bench-tabs [data-tab="behaviours"] { width: 126px; }
 .bench-tabs [data-tab="combos"] { width: 108px; }
 .bench-tabs [data-tab="macros"] { width: 103px; }
+.bench-tabs [data-tab="customKeys"] { width: 136px; }
 .bench-tabs [data-tab="pointing"] { width: 152px; }
 .bench-tabs [data-tab] .c { text-align: left; }
 .bench-tabs button[role="tab"] > .draft-dot { position: absolute; top: 4px; right: 4px; margin: 0; }

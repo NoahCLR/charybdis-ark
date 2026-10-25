@@ -45,6 +45,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/keys/behaviours-tab.mjs", ["note"], "viewBehaviourNote() and comboNote(): escaped layer names and marked combo keys"],
     ["webview/ui/keys/combos-tab.mjs", ["reachedBy"], "keysReach() and reachText(): marked key names and escaped layer names"],
     ["webview/ui/keys/macros-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],
+    ["webview/ui/keys/custom-keys-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],
     ["webview/ui/keys/pointing-tab.mjs", ["reachedBy"], "keysReach() and branchReach(): marked key names and escaped layer names"],
     ["webview/ui/keys/key-tab.mjs", ["stackRows(model, layer, position)"], "the layer stack's rows, markup templates joined"],
     ["webview/ui/layerbar.mjs", ["tint"], "a style attribute holding layerSwatch()'s css() colour"],

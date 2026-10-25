@@ -7,7 +7,8 @@
 
 import {esc} from "../../lib/dom.mjs";
 import {actionLabel, keyMeaning, keyName} from "../../view/keyface.mjs";
-import {behaviourRouteKeys, macroKeycodes, macroReach, pointingReach, pointingSlotFor, reachInView, reachKeys, reachText} from "../../view/reach.mjs";
+import {behaviourRouteKeys, customKeyKeycodes, macroKeycodes, macroReach, pointingReach, pointingSlotFor, reachInView, reachKeys, reachText} from "../../view/reach.mjs";
+import {customKeyReach} from "../../view/custom-key.mjs";
 import {comboGroups, combosInView} from "../../view/combo-reach.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
 import {getModel, heldLayers, layerName, layers, state} from "../../store.mjs";
@@ -43,6 +44,8 @@ export function reachHighlight(model) {
     }
     if (state.tab === "macros") return reachKeys(stack, at, found(picked.startsWith("view:") ? {inView: macroView(model)} : macroReach(model, stack, at), picked),
         picked.startsWith("view:") ? heldLayers() : null);
+    if (state.tab === "customKeys") return reachKeys(stack, at, found(picked.startsWith("view:") ? {inView: customKeyView(model)} : customKeyReach(model, stack, at), picked),
+        picked.startsWith("view:") ? heldLayers() : null);
     if (state.tab === "pointing") return reachKeys(stack, at, found(picked.startsWith("view:") ? {inView: pointingView(model)} : pointingReach(model, stack, at), picked),
         picked.startsWith("view:") ? heldLayers() : null);
     return [];
@@ -55,6 +58,8 @@ export const storedCount = (reach) =>
     new Set([...reach.onKeys, ...reach.fromBranches, ...reach.fromCombos].map((entry) => entry.name)).size;
 /** @param {Model} model */
 export const macroView = (model) => reachInView(model, layers(), state.layer, heldLayers(), macroKeycodes);
+/** @param {Model} model */
+export const customKeyView = (model) => reachInView(model, layers(), state.layer, heldLayers(), customKeyKeycodes);
 /** @param {Model} model */
 export const pointingView = (model) => reachInView(model, layers(), state.layer, heldLayers(),
     (/** @type {string | undefined} */ keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; });
