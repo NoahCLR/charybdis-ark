@@ -24,6 +24,7 @@ import {pickKeycodeFor, swapKeys} from "./keys/key-edits.mjs";
 import {reachHighlight} from "./keys/reach.mjs";
 
 export {keysShortcut} from "./keys/shortcuts.mjs";
+export {matchBehavioursHeight} from "./keys/bench.mjs";
 export {previewFoot};
 
 export function screenKeys() {

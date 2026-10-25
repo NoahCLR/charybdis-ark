@@ -19,7 +19,7 @@ import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {SCREENS, screenDefinition, secondaryScreen} from "./view/screens.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
-import {keysShortcut, screenKeys} from "./ui/keys.mjs";
+import {keysShortcut, matchBehavioursHeight, screenKeys} from "./ui/keys.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
@@ -76,9 +76,10 @@ function render({keepScreen = false} = {}) {
     const theme = shellOf(model).theme;
     root.querySelector('[data-act="theme"]')?.addEventListener("click", () => post(setTheme(otherTheme(theme))));
     restoreKeysBenchHeight(root, benchHeight);
+    matchBehavioursHeight(root);
     restoreContentScroll(root, scroll);
-    revealSelectedContentRow(root);
     revealSelectedListRow(root);
+    revealSelectedContentRow(root);
     renderedScreen = state.screen;
 
     const picker = pickerOverlay();
@@ -224,8 +225,13 @@ addEventListener("keydown", (event) => {
     const proposal = getModel()?.liveProposal;
     if (proposal) post(controls.cancelLiveEdit(proposal.id));
 });
+// A resize lets the workbench find its height again at the new width, the
+// Behaviours tab's included, once per frame however many events come.
+let resizing = 0;
 addEventListener("resize", () => {
     /** @type {HTMLElement | null} */ (root.querySelector(".keys-pad .bench"))?.style.removeProperty("min-height");
+    cancelAnimationFrame(resizing);
+    resizing = requestAnimationFrame(() => matchBehavioursHeight(root));
 });
 
 // A dropped file must never navigate away from Ark and lose the draft,

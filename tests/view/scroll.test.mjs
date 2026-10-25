@@ -4,6 +4,8 @@ import test from "node:test";
 import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreKeysBenchHeight, scrollContentTo} from "../../webview/lib/scroll.mjs";
 
 const rootWith = (content) => ({querySelector: (selector) => selector === ".content" ? content : null});
+// A selector list matches when any of its selectors is the one asked about.
+const matches = (selector, one) => selector.split(",").map((part) => part.trim()).includes(one);
 
 test("rerendering a screen preserves its content scroll position", () => {
     const before = {scrollTop: 840, scrollLeft: 36};
@@ -57,7 +59,7 @@ test("a list that scrolls beside its editor keeps its place, under its own key",
 test("a list's picked row is brought into view below its heading, and left alone when visible", () => {
     const row = {getBoundingClientRect: () => ({top: 700, bottom: 760})};
     const list = {scrollTop: 0, getBoundingClientRect: () => ({top: 100, bottom: 660}),
-        querySelector: (selector) => selector === ".rowitem.on" ? row : selector === ".rowlist-h" ? {getBoundingClientRect: () => ({height: 34})} : null};
+        querySelector: (selector) => matches(selector, ".rowitem.on") ? row : matches(selector, ".rowlist-h") ? {getBoundingClientRect: () => ({height: 34})} : null};
     const root = {querySelector: (selector) => selector === "[data-scroll-list]" ? list : null};
     revealSelectedListRow(root);
     assert.equal(list.scrollTop, 100, "scrolled just far enough to show the row");
@@ -68,6 +70,22 @@ test("a list's picked row is brought into view below its heading, and left alone
     revealSelectedListRow(root);
     assert.equal(list.scrollTop, 76, "a visible row stays put");
     assert.doesNotThrow(() => revealSelectedListRow({querySelector: () => null}));
+});
+
+test("a reach table's moved pick comes out below its column header and its group's band", () => {
+    // The Keys tables stick their column header and the band of the group in
+    // view; only a pick that moved is marked for revealing.
+    const band = {getBoundingClientRect: () => ({height: 34})};
+    const row = {getBoundingClientRect: () => ({top: 120, bottom: 156}),
+        closest: (selector) => selector === "tbody" ? {querySelector: (inner) => inner === ".t-group" ? band : null} : null};
+    const list = {scrollTop: 300, getBoundingClientRect: () => ({top: 100, bottom: 600}),
+        querySelector: (selector) => matches(selector, "[data-reveal-selected]") ? row
+            : matches(selector, "thead") ? {getBoundingClientRect: () => ({height: 24})} : null};
+    revealSelectedListRow({querySelector: (selector) => selector === "[data-scroll-list]" ? list : null});
+    assert.equal(list.scrollTop, 262, "scrolled up past the header (24) and the band (34)");
+    row.getBoundingClientRect = () => ({top: 590.4, bottom: 626.4});
+    revealSelectedListRow({querySelector: (selector) => selector === "[data-scroll-list]" ? list : null});
+    assert.equal(list.scrollTop, 289, "a fraction short of the edge rounds out to a whole pixel");
 });
 
 test("navigating to another screen starts at the top", () => {
@@ -93,7 +111,7 @@ test("jumping from the combo builder places the board below the content edge", (
 
 test("a newly selected behaviour is revealed in the outer content scroller", () => {
     const selected = {getBoundingClientRect: () => ({top: 330, bottom: 380})};
-    const content = {scrollTop: 170, querySelector: () => selected,
+    const content = {scrollTop: 170, querySelector: (selector) => selector === "[data-reveal-selected]" ? selected : null,
         getBoundingClientRect: () => ({top: 100, bottom: 350})};
     revealSelectedContentRow(rootWith(content));
     assert.equal(content.scrollTop, 212);

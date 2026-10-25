@@ -3,10 +3,10 @@
 // back through the core's model and the webview deliberately redraws from that
 // model, but replacing `.content` must not make an ordinary click feel like
 // navigation. A slot bank (Macros, Custom keys) keeps its own scroll position
-// too, as does a list that scrolls beside its editor ([data-scroll-list], the
-// Lighting layers and pointing modes), each under its own key so one list's
-// place never carries into another's. Moving to another screen still starts
-// at its top.
+// too, as does a list that scrolls in a pane of its own ([data-scroll-list]:
+// the Lighting layers and pointing modes, each Keys reach table), each under
+// its own key so one list's place never carries into another's. Moving to
+// another screen still starts at its top.
 
 /** @typedef {{top: number, left: number}} ScrollOffset */
 /** @typedef {ScrollOffset & {bank?: ScrollOffset, list?: {key: string, top: number}}} ContentScroll */
@@ -41,17 +41,24 @@ export function restoreContentScroll(root, scroll) {
 
 // A list that scrolls beside its editor keeps its picked row in view, below
 // its sticky heading: after switching to it, or when the pick is made from
-// elsewhere. A row already in view stays where it is.
+// elsewhere. A row already in view stays where it is. A Keys reach table's
+// heading is its column header, and the band of the row's own group sticks
+// under it; there only a pick that moved is revealed ([data-reveal-selected]),
+// so unfolding a group further down never pulls the list back to the pick.
 /** @param {Element} root */
 export function revealSelectedListRow(root) {
     const list = root.querySelector("[data-scroll-list]");
-    const selected = list?.querySelector(".rowitem.on");
+    const selected = list?.querySelector(".rowitem.on, [data-reveal-selected]");
     if (!list || !selected) return;
     const bounds = list.getBoundingClientRect();
-    const top = bounds.top + (list.querySelector(".rowlist-h")?.getBoundingClientRect().height || 0);
+    const band = selected.closest?.("tbody")?.querySelector(".t-group");
+    const top = bounds.top + (list.querySelector(".rowlist-h, thead")?.getBoundingClientRect().height || 0)
+        + (band?.getBoundingClientRect().height || 0);
     const row = selected.getBoundingClientRect();
-    if (row.top < top) list.scrollTop -= top - row.top;
-    else if (row.bottom > bounds.bottom) list.scrollTop += row.bottom - bounds.bottom;
+    // Whole pixels, rounded out: a list scrolls by device pixels, and a row
+    // left a fraction short of the edge reads as cut off.
+    if (row.top < top) list.scrollTop -= Math.ceil(top - row.top);
+    else if (row.bottom > bounds.bottom) list.scrollTop += Math.ceil(row.bottom - bounds.bottom);
 }
 
 // The common Keys floor keeps ordinary tabs level. If one editor grows beyond
@@ -70,11 +77,11 @@ export function restoreKeysBenchHeight(root, height) {
 }
 
 // A behaviour selected from elsewhere may sit below the visible part of the
-// one content scroller. Reveal it there, without creating another scrollbar.
+// content scroller. Once its list has brought it into view, reveal it there.
 /** @param {Element} root @param {number} [margin] */
 export function revealSelectedContentRow(root, margin = 12) {
     const content = root.querySelector(".content");
-    const selected = content?.querySelector("[data-reveal-selected] .rowitem.on");
+    const selected = content?.querySelector("[data-reveal-selected]");
     if (!content || !selected) return;
     const bounds = content.getBoundingClientRect();
     const row = selected.getBoundingClientRect();

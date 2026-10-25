@@ -37,9 +37,20 @@ layers in view reach:
   "through". A behaviour on a key the row already names follows that key
   instead of naming it again (`tests/view/reach.test.mjs`,
   `browser-tests/marks.spec.js`).
-- The Keys tabs share one minimum height, and a taller editor carries its
-  height into the next render, so changing tabs keeps the scroll position
-  (`tests/view/scroll.test.mjs`).
+- Every Keys tab is as tall as the Behaviours tab, at every width: with
+  another tab open, the editor the Behaviours tab would show is laid out
+  behind it, the workbench's height read and the copy removed in the same
+  step, so the page never holds two editors (`matchBehavioursHeight`,
+  `browser-tests/keys-workbench.spec.js`). The tabs also share a minimum
+  height, and a taller editor carries its height into the next render, so
+  changing tabs keeps the scroll position (`tests/view/scroll.test.mjs`). A
+  list never sets that height: every Keys
+  tab that lists what a layer reaches draws one grouped table
+  (`reachTable`, `webview/ui/groups.mjs`), which scrolls in its own pane under
+  its column header and the band of the group in view, and keeps its place
+  per tab. A pick made elsewhere scrolls its row into the pane; unfolding a
+  group does not (`tests/view/scroll.test.mjs`,
+  `browser-tests/keys-workbench.spec.js`).
 - Reach groups come in one order, `GROUP_ORDER`, so headers stay put between
   tabs, and the view's groups lead (`tests/view/reach-groups.test.mjs`).
   **On this view** is the selected layer plus exactly the lower layers

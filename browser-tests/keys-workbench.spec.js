@@ -1,0 +1,134 @@
+// @ts-check
+"use strict";
+const {test, expect} = require("@playwright/test");
+const {openPreview} = require("./shell-page");
+
+// The Keys workbench lists what a layer reaches in one grouped table on every
+// tab, and a list never stretches it: the table scrolls in its own pane, under
+// its column header, beside the editor that sets the workbench's height.
+// While it scrolls, the band of the group in view sticks under that header,
+// and no row shows through either of them.
+
+const tab = (page, name) => page.locator(`.bench [data-tab="${name}"]`);
+const pane = (page) => page.locator(".bench-pane .reach-table");
+
+test("the behaviour list is a reach table that scrolls beside the editor", async ({page}) => {
+    await openPreview(page);
+    await tab(page, "behaviours").click();
+    await expect(page.locator(".bench-pane thead th")).toHaveText(["Behaviour", "Branches"]);
+    const sizes = await page.evaluate(() => {
+        const list = /** @type {HTMLElement} */ (document.querySelector(".bench-pane .reach-table"));
+        const editor = /** @type {HTMLElement} */ (document.querySelector(".beh-main"));
+        const bench = /** @type {HTMLElement} */ (document.querySelector(".keys-bench"));
+        const body = /** @type {HTMLElement} */ (document.querySelector(".bench-body"));
+        const padding = parseFloat(getComputedStyle(body).paddingTop) + parseFloat(getComputedStyle(body).paddingBottom);
+        const pane = /** @type {HTMLElement} */ (document.querySelector(".bench-pane"));
+        return {list: list.scrollHeight, shown: list.clientHeight, pane: pane.offsetHeight, editor: editor.offsetHeight, body: body.clientHeight - padding, bench: bench.offsetHeight};
+    });
+    expect(sizes.list, "the fixture lists more behaviours than fit").toBeGreaterThan(sizes.shown);
+    expect(sizes.pane, "the list's pane is as tall as the editor beside it").toBe(sizes.body);
+    expect(Math.abs(sizes.body - sizes.editor), "the editor, not the list, sets the height").toBeLessThan(2);
+
+    // Every tab keeps that height, and its table scrolls in the same pane.
+    for (const name of ["macros", "pointing", "combos"]) {
+        await tab(page, name).click();
+        await expect(pane(page)).toHaveAttribute("data-scroll-list", name);
+        expect(await page.locator(".keys-bench").evaluate((node) => /** @type {HTMLElement} */ (node).offsetHeight)).toBe(sizes.bench);
+    }
+});
+
+// A rule is a see-through line, so a stuck cell is checked by its pixels:
+// with every row painted red, nothing red may show from the top of the list
+// to the bottom of the stuck band, whatever lies under them.
+test("rows scrolling under the header and the group's band never show through", async ({page}) => {
+    await openPreview(page);
+    await tab(page, "behaviours").click();
+    await page.addStyleTag({content: ".bench-pane tr.beh-row > td { background: #ff0000 !important; transition: none !important; }"});
+    for (const scrolled of [0, 41, 100, 300]) {
+        const clip = await pane(page).evaluate((node, top) => {
+            node.scrollTop = top;
+            const list = node.getBoundingClientRect();
+            const band = /** @type {HTMLElement} */ (node.querySelector("td.t-group")).getBoundingClientRect();
+            return {x: list.left, y: list.top, width: list.width, height: band.bottom - list.top - 1};
+        }, scrolled);
+        const shot = await page.screenshot({clip});
+        const red = await page.evaluate(async (png) => {
+            const image = new Image();
+            image.src = `data:image/png;base64,${png}`;
+            await image.decode();
+            const canvas = document.createElement("canvas");
+            canvas.width = image.width;
+            canvas.height = image.height;
+            const context = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
+            context.drawImage(image, 0, 0);
+            const {data} = context.getImageData(0, 0, image.width, image.height);
+            let count = 0;
+            for (let at = 0; at < data.length; at += 4) if (data[at] > 150 && data[at + 1] < 90 && data[at + 2] < 90) count++;
+            return count;
+        }, shot.toString("base64"));
+        expect(red, `no row shows through the header or the band (scrolled ${scrolled})`).toBe(0);
+    }
+});
+
+// Each tab is opened first in a page of its own, so no height carried over
+// from another tab can stand in for the Behaviours tab's.
+test("every tab is as tall as the Behaviours tab, before it is ever opened", async ({context}) => {
+    /** @type {Record<string, number>} */
+    const heights = {};
+    for (const name of ["key", "combos", "macros", "pointing", "behaviours"]) {
+        const page = await context.newPage();
+        await openPreview(page);
+        await tab(page, name).click();
+        heights[name] = await page.locator(".keys-bench").evaluate((node) => /** @type {HTMLElement} */ (node).offsetHeight);
+        // The editor it was measured by is gone again: one editor at most.
+        await expect(page.locator(".bench-sizer")).toHaveCount(0);
+        await expect(page.locator(".bgrid")).toHaveCount(name === "behaviours" ? 1 : 0);
+        await page.close();
+    }
+    for (const name of ["key", "combos", "macros", "pointing"]) expect(heights[name], name).toBe(heights.behaviours);
+
+    // Narrowed, the editor wraps taller, and the open tab follows it.
+    const page = await context.newPage();
+    await openPreview(page);
+    await tab(page, "combos").click();
+    await page.setViewportSize({width: 1000, height: 900});
+    const height = () => page.locator(".keys-bench").evaluate((node) => /** @type {HTMLElement} */ (node).offsetHeight);
+    await expect.poll(height, "the narrow editor is taller than the wide one").toBeGreaterThan(heights.behaviours);
+    const narrowed = await height();
+    await tab(page, "behaviours").click();
+    expect(await height()).toBe(narrowed);
+});
+
+test("a behaviour row opens its behaviour, by click or from the keyboard", async ({page}) => {
+    await openPreview(page);
+    await tab(page, "behaviours").click();
+    await page.locator('.bench-pane tr[data-row="KC_2"][data-route="view"] td').nth(1).click();
+    await expect(page.locator('.bench-pane tr[data-row="KC_2"]')).toHaveAttribute("data-picked", "true");
+    await expect(page.locator(".beh-main .beh-title code")).toHaveText("KC_2");
+
+    await page.locator('.bench-pane tr[data-row="KC_3"][data-route="view"] .row-pick').focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".beh-main .beh-title code")).toHaveText("KC_3");
+    expect(await page.evaluate(() => window.__posted.filter((message) => message.type === "saveBehavior"))).toEqual([]);
+});
+
+test("a key picked on the board scrolls its row into the list, and unfolding a group keeps the list's place", async ({page}) => {
+    await openPreview(page);
+    await tab(page, "behaviours").click();
+    await page.locator('.board [aria-label^="KC_ENTER at"]').click();
+    const row = page.locator('.bench-pane tr[data-row="KC_ENTER"][data-picked]');
+    await expect(row).toHaveCount(1);
+    const inView = () => row.evaluate((node) => {
+        const list = /** @type {HTMLElement} */ (node.closest(".reach-table")).getBoundingClientRect();
+        const head = /** @type {HTMLElement} */ (node.closest("table")?.querySelector("thead")).getBoundingClientRect();
+        const box = node.getBoundingClientRect();
+        return box.top >= list.top + head.height && box.bottom <= list.bottom;
+    });
+    expect(await inView()).toBe(true);
+
+    await pane(page).evaluate((node) => {node.scrollTop = node.scrollHeight;});
+    const bottom = await pane(page).evaluate((node) => node.scrollTop);
+    await page.locator('.bench-pane [data-group="elsewhere"]').click();
+    await expect(page.locator('.bench-pane [data-group="elsewhere"]')).toHaveAttribute("aria-expanded", "true");
+    expect(await pane(page).evaluate((node) => node.scrollTop), "the list stays where it was, not back at the pick").toBe(bottom);
+});

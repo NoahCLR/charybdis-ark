@@ -31,9 +31,7 @@ export function tabCombos(body, right) {
     right.appendChild(toggle);
 
     const node = el(`<div class="tab-split wide">
-        <div>
-            <div id="comboTable"></div>
-        </div>
+        <div id="comboTable"></div>
         <div id="comboSide"></div>
     </div>`);
 

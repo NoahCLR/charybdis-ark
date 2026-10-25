@@ -626,6 +626,32 @@ button.tier:hover { background: var(--surface-3); }
 .keys-pad { grid-template-columns: minmax(0, 1fr); }
 .bench { overflow: hidden; }
 .keys-pad .bench { min-height: 580px; }
+/* The Keys workbench is as tall as its editor, or that shared floor: a list
+   never stretches it. Each reach table fills the body in a pane of its own
+   and scrolls there, under its column header and the band of the group in
+   view (ui/groups.mjs), beside the editor that sets the height. */
+.keys-bench { display: flex; flex-direction: column; }
+/* One cell for the open tab and, while it is measured, the behaviour editor
+   behind it (ui/keys/bench.mjs), so the workbench takes the Behaviours tab's
+   height whichever tab is open; panes and splits fill it, the Key tab's
+   sections stay their size. */
+.keys-bench > .bench-body { flex: 1; display: grid; grid-template: 1fr / minmax(0, 1fr); }
+.keys-bench > .bench-body > * { grid-area: 1 / 1; }
+.keys-bench > .bench-body > .tab-grid { align-self: start; }
+.bench-sizer { visibility: hidden; pointer-events: none; }
+.keys-bench .tab-split { align-items: stretch; }
+.keys-bench .tab-split.reach-split { grid-template-columns: 330px minmax(0, 1fr); }
+.bench-pane { position: relative; min-height: 0; }
+.bench-pane > .reach-table { position: absolute; inset: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* What sticks is painted solid, its rules included: a rule is a see-through
+   line, and the rows scrolling under a stuck cell would show through it. A
+   collapsed border belongs to the table and would stay behind when its cell
+   sticks, so each cell keeps its own (rows only rule their tops, so the lines
+   are the same). The band sticks under the header row, which is 24px: 16px
+   of line and 8px below it. */
+.bench-pane table.t { border-collapse: separate; border-spacing: 0; }
+.bench-pane table.t thead th { position: sticky; top: 0; z-index: 2; background: var(--surface); line-height: 16px; }
+.bench-pane table.t td.t-group { position: sticky; top: 24px; z-index: 1; background: var(--surface-2); }
 /* Like the layer tabs, the picked workbench tab joins the surface it opens.
    The strip scrolls when narrow; the stage switch stays outside it. */
 .bench-tabs { display: flex; align-items: flex-end; padding: 6px 10px 0; border-bottom: 1px solid var(--line); background: var(--surface-2); }
@@ -719,12 +745,6 @@ button.tier:hover { background: var(--surface-3); }
 .group-h[aria-expanded="true"] .chev { transform: rotate(90deg); }
 .group-h .ttl { flex: 1; min-width: 0; }
 .group-h .n { flex: none; font-family: var(--mono); font-size: 10px; letter-spacing: 0; }
-/* In the behaviour rail the list already carries that surface, so the header
-   is told apart by its rules rather than by its fill. */
-.rowlist .group-h { background: none; border-bottom: 1px solid var(--line); }
-.rowlist .group-h:hover { background: var(--surface-3); }
-.rowlist .group-h[aria-expanded="false"] { border-bottom: 0; }
-.rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
 .reach-table { padding: 2px 0; }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
@@ -810,9 +830,8 @@ button.tier:hover { background: var(--surface-3); }
 .key-participation > .sect-h { margin: 6px 0 2px; }
 .def-layers > summary { cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
 .def-layers > summary:hover { color: var(--text-2); }
-/* The Behaviours tab: an empty group, and the open behaviour's title, its
+/* The Behaviours tab: nothing to open, and the open behaviour's title, its
    keycode, the notes under them and its actions (ui/keys/behaviour-editor.mjs). */
-.rowgroup-empty { padding: 10px 12px; }
 .beh-empty { padding: 16px; }
 .beh-title { gap: 9px; }
 .beh-title h3 { font-size: 15px; }
@@ -882,7 +901,7 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* A place a jump landed on is marked for a moment, then fades. */
 .revealed, tr.revealed > td { background: color-mix(in srgb, var(--draft) 16%, transparent) !important; }
-.settings-group, .rowitem, [data-reach] > td { transition: background .6s ease; }
+.settings-group, .rowitem, [data-reach] > td, tr[data-row] > td { transition: background .6s ease; }
 
 /* The review: one item per thing that differs, with only the fields that do.
    Items made together share a block and one Discard. */
@@ -1029,6 +1048,14 @@ table.t.fixed td { overflow-wrap: anywhere; }
    rings those keys while it is picked. */
 [data-reach] { cursor: pointer; }
 table.t tr[data-reach]:hover > td { background: var(--surface-2); }
+/* A behaviour row picks itself the same way, and opens beside the table. */
+.beh-row { cursor: pointer; }
+table.t tr.beh-row:hover > td { background: var(--surface-2); }
+.beh-row .row-pick { text-align: left; }
+.beh-row.quiet .row-pick { color: var(--text-2); }
+.beh-row .sub { display: block; margin-top: 2px; font-size: 10.5px; color: var(--text-3); }
+.beh-branches { white-space: nowrap; font-size: 11px; color: var(--text-2); }
+.beh-branches .fbdot { margin-right: 3px; }
 table.t tr[data-picked] > td { background: var(--surface-3); }
 table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text); }
 .del { color: var(--text-3); text-decoration: line-through; }
