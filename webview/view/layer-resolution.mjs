@@ -34,7 +34,24 @@ export function activationSets(layers) {
  * the layers on besides layer 0 and this one.
  */
 export function resolvedPositions(/** @type {Layer[]} */ stack, /** @type {number} */ at, /** @type {number[]} */ held = []) {
-    const active = [0, at, ...held].reduce((mask, layer) => mask | (1 << layer), 0);
+    return answeredUnder(stack, at, [0, at, ...held]);
+}
+
+/**
+ * What each key answers with in the view the board shows: only the layers on
+ * in it. A layer shown alone is the view by itself, its transparent keys
+ * answering nothing; base joins once layers are previewed together, as the
+ * layer bar shows it on (layer-set.mjs). This is what **On this view** lists.
+ * The keyboard itself always has base on: what a transparent key does when
+ * pressed, or shows through to, is resolvedPositions.
+ */
+export function viewPositions(/** @type {Layer[]} */ stack, /** @type {number} */ at, /** @type {number[]} */ held = []) {
+    return answeredUnder(stack, at, held.length ? [0, at, ...held] : [at]);
+}
+
+/** @param {Layer[]} stack @param {number} at @param {number[]} on */
+function answeredUnder(stack, at, on) {
+    const active = on.reduce((mask, layer) => mask | (1 << layer), 0);
     const answeredKey = sourceKeys(stack, at);
     return (stack[at]?.positions || []).flatMap(position => {
         const answer = stack[at]?.answers?.[position.layoutIndex]?.find(candidate =>

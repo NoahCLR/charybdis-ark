@@ -151,7 +151,10 @@ test("the selected key lists the combos it is an input of, as the layers in view
     const ids = (answer) => answer.combos.map((combo) => combo.id);
     assert.deepEqual(ids(combosOnKey({combos}, stack, 0, [], 0)), [0, 1]);
     assert.deepEqual(ids(combosOnKey({combos}, stack, 1, [], 1)), [1], "the layer's own key");
-    assert.deepEqual(ids(combosOnKey({combos}, stack, 2, [], 1)), [0, 2], "on its own, a transparent key shows the default layer's");
+    const alone = combosOnKey({combos}, stack, 2, [], 1);
+    assert.equal(alone.position, null, "shown alone, a layer's transparent key shows nothing through: base is not on in that view");
+    assert.deepEqual(ids(alone), []);
+    assert.deepEqual(ids(combosOnKey({combos}, stack, 2, [0], 1)), [0, 2], "with base previewed on, the default layer's key");
     const previewed = combosOnKey({combos}, stack, 2, [1], 1);
     assert.equal(previewed.position.keycode, "KC_COMMA");
     assert.deepEqual(ids(previewed), [1], "with a layer previewed on, the highest one that is not transparent");
