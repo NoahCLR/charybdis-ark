@@ -1,7 +1,7 @@
 import test from "node:test";
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
-import {customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, shortcutKeyCode, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice} from "../../webview/view/custom-key.mjs";
+import {customKeyInUse, customKeyReach, customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, shortcutKeyCode, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice} from "../../webview/view/custom-key.mjs";
 
 const key = (slot, shortcut = {mods: 0, key: 0}, shortcutLabel = "", hasBehavior = false) =>
     ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior, shortcut, shortcutLabel});
@@ -141,4 +141,37 @@ test("a match with a behaviour is offered beside a new key where the behaviour w
     assert.deepEqual(choose([both(1, true), free(3)], true), {existing: "CUSTOM_KEY_1", withBehaviour: true, spare: "CUSTOM_KEY_3"}, "a key or combo output: use it with its behaviour, or make a new one");
     assert.deepEqual(choose([both(1, true), free(3)], false), {existing: "CUSTOM_KEY_1", withBehaviour: false, spare: undefined}, "a step sends only the shortcut: used as it is");
     assert.deepEqual(choose([free(3)], true), {existing: undefined, withBehaviour: false, spare: "CUSTOM_KEY_3"});
+});
+
+test("a custom key is in use once it is named, sends a shortcut or has a behaviour", () => {
+    const key = (fields) => ({slot: 0, keycode: "CUSTOM_KEY_0", name: "", hasBehavior: false, shortcut: {mods: 0, key: 0}, ...fields});
+    assert.equal(customKeyInUse(key({})), false, "an empty slot");
+    assert.equal(customKeyInUse(key({name: "Paste plain"})), true);
+    assert.equal(customKeyInUse(key({shortcut: {mods: 0x08, key: 0}})), true, "modifiers alone are a shortcut");
+    assert.equal(customKeyInUse(key({hasBehavior: true})), true);
+    assert.equal(customKeyInUse(undefined), false);
+});
+
+test("the Custom keys tab groups a layer's custom keys the ways a macro is reached, and leaves empty slots out", () => {
+    const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
+    const model = {
+        customKeys: [0, 1, 2, 3, 4].map((slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, name: slot < 4 ? `Key ${slot}` : "",
+            hasBehavior: false, shortcut: {mods: 0, key: 0}})),
+        qmkKeycodeAliases: {QK_USER_2: "CUSTOM_KEY_2"},
+        keyBehaviors: [{keycode: "KC_A", enabled: true, allowedLayers: 0xffff, steps: [{tapCount: 1, tap: {style: "TAP_SENDS", action: "CUSTOM_KEY_3"}}]}],
+        combos: [{id: 0, badge: "C1", inputs: ["KC_B", "KC_C"], output: "QK_USER_2"}],
+    };
+    const stack = withAnswers([
+        {index: 0, name: "Base", positions: [at(0, "QK_USER_0", "CUSTOM_KEY_0"), at(1, "KC_B"), at(2, "KC_C"), at(3, "KC_A")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "QK_USER_1", "CUSTOM_KEY_1"), at(2, "KC_NO"), at(3, "KC_NO")]},
+    ]);
+    const names = (entries) => entries.map((entry) => entry.name);
+    const base = customKeyReach(model, stack, 0);
+    assert.deepEqual(names(base.onKeys), ["CUSTOM_KEY_0"]);
+    assert.deepEqual(names(base.fromCombos), ["CUSTOM_KEY_2"], "a combo on Base's keys sends it");
+    assert.deepEqual(names(base.fromBranches), ["CUSTOM_KEY_3"], "a behaviour step on Base sends it");
+    assert.deepEqual(base.elsewhere, ["CUSTOM_KEY_1"], "unreachable from Base; the unnamed empty slot 4 is no key at all");
+    const numbers = customKeyReach(model, stack, 1);
+    assert.deepEqual(names(numbers.onKeys), ["CUSTOM_KEY_1"]);
+    assert.deepEqual(names(numbers.throughKeys), ["CUSTOM_KEY_0"], "a transparent key falls through to Base's");
 });

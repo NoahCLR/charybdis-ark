@@ -122,8 +122,10 @@ Under the board, the workbench works on the selected key. Its tabs are:
 - **Key**: what the key sends. See [Keys](keys.md).
 - **Behaviours**: its taps and holds. See [Behaviours](behaviours.md).
 - **Combos**: the combos on this layer. See [Combos](combos.md).
-- **Macros** and **Pointing modes**: the macros and pointing modes this layer
-  reaches, through keys, behaviours or combos. **Reached by** names a
+- **Macros**, **Custom keys** and **Pointing modes**: the macros, custom keys
+  and pointing modes this layer reaches, through keys, behaviours or combos.
+  A custom key's row shows its shortcut and its behaviour's branches; one a
+  behaviour sends sends only its shortcut. **Reached by** names a
   behaviour's key and then the branch that sends it, as the behaviour grid
   heads it: "from Right Option · 1× tap". When that key is already in the
   row, the branch follows it: "Dragscroll hold · 2× hold sends Dragscroll
@@ -131,9 +133,10 @@ Under the board, the workbench works on the selected key. Its tabs are:
 
 Each tab counts what it holds for this layer, and a dot marks a draft change.
 
-Behaviours, Combos, Macros and Pointing modes list what they hold in one kind
-of table: a header row per group (on this view, on this layer, through a
-transparent key and so on) that folds, and a row per thing. The table scrolls
-inside the workbench, so a long list never makes the workbench taller. Every
-tab is as tall as Behaviours, so switching tabs never moves what is under the
-workbench. Pick a key on the board and its row scrolls into view.
+Behaviours, Combos, Macros, Custom keys and Pointing modes list what they
+hold in one kind of table: a header row per group (on this view, on this
+layer, through a transparent key and so on) that folds, and a row per thing.
+The table scrolls inside the workbench, so a long list never makes the
+workbench taller. Every tab is as tall as Behaviours, so switching tabs never
+moves what is under the workbench. Pick a key on the board and its row
+scrolls into view.

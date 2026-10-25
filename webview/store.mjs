@@ -37,7 +37,7 @@ export const STATE_FIELDS = {
     resetBenchHeight: kept(false), // an explicit reach-section toggle lets the workbench shrink
     // The row picked in each tab. The board rings the keys that reach it, so
     // a row in a table can answer "where do I press for this".
-    reachRow: kept({macros: null, combos: null, pointing: null}),
+    reachRow: kept({macros: null, customKeys: null, combos: null, pointing: null}),
     cell: kept(null),
     // The behaviour whose grid `cell` is open in. The Keys screen and the
     // Custom keys screen each show one behaviour editor, and a cell opened in

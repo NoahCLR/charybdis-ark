@@ -30,7 +30,7 @@ test("the behaviour list is a reach table that scrolls beside the editor", async
     expect(Math.abs(sizes.body - sizes.editor), "the editor, not the list, sets the height").toBeLessThan(2);
 
     // Every tab keeps that height, and its table scrolls in the same pane.
-    for (const name of ["macros", "pointing", "combos"]) {
+    for (const name of ["macros", "customKeys", "pointing", "combos"]) {
         await tab(page, name).click();
         await expect(pane(page)).toHaveAttribute("data-scroll-list", name);
         expect(await page.locator(".keys-bench").evaluate((node) => /** @type {HTMLElement} */ (node).offsetHeight)).toBe(sizes.bench);
@@ -75,7 +75,7 @@ test("rows scrolling under the header and the group's band never show through", 
 test("every tab is as tall as the Behaviours tab, before it is ever opened", async ({context}) => {
     /** @type {Record<string, number>} */
     const heights = {};
-    for (const name of ["key", "combos", "macros", "pointing", "behaviours"]) {
+    for (const name of ["key", "combos", "macros", "customKeys", "pointing", "behaviours"]) {
         const page = await context.newPage();
         await openPreview(page);
         await tab(page, name).click();
@@ -85,7 +85,7 @@ test("every tab is as tall as the Behaviours tab, before it is ever opened", asy
         await expect(page.locator(".bgrid")).toHaveCount(name === "behaviours" ? 1 : 0);
         await page.close();
     }
-    for (const name of ["key", "combos", "macros", "pointing"]) expect(heights[name], name).toBe(heights.behaviours);
+    for (const name of ["key", "combos", "macros", "customKeys", "pointing"]) expect(heights[name], name).toBe(heights.behaviours);
 
     // Narrowed, the editor wraps taller, and the open tab follows it.
     const page = await context.newPage();
@@ -131,4 +131,30 @@ test("a key picked on the board scrolls its row into the list, and unfolding a g
     await page.locator('.bench-pane [data-group="elsewhere"]').click();
     await expect(page.locator('.bench-pane [data-group="elsewhere"]')).toHaveAttribute("aria-expanded", "true");
     expect(await pane(page).evaluate((node) => node.scrollTop), "the list stays where it was, not back at the pick").toBe(bottom);
+});
+
+// Custom keys have a screen of their own and are reached as macros are, so
+// they have a tab of their own too, between Macros and Pointing modes as the
+// rail orders those screens.
+test("the Custom keys tab lists the custom keys a layer reaches, and opens one on its screen", async ({page}) => {
+    await openPreview(page);
+    await expect(page.locator(".bench-tablist [data-tab] .tab-label")).toHaveText(["Key", "Behaviours", "Combos", "Macros", "Custom keys", "Pointing modes"]);
+    await tab(page, "customKeys").click();
+    await expect(page.locator(".bench-pane thead th")).toHaveText(["Key", "Shortcut", "Behaviour", "Reached by", ""]);
+    const row = page.locator('.bench-pane tr[data-reach="view:CUSTOM_KEY_0"]');
+    await expect(row).toContainText("CUSTOM_KEY_0");
+    await expect(row.locator("td").nth(2).locator(".fbdot")).not.toHaveCount(0);
+    // Picked, it rings the key carrying it, as a macro row does.
+    await row.locator("td").first().click();
+    await expect(row).toHaveAttribute("data-picked", "true");
+    await expect(page.locator(".board .kc-reach")).toHaveCount(1);
+    await row.locator("[data-editcustom]").click();
+    await expect(page.locator('[data-screen="customKeys"]')).toHaveAttribute("aria-current", "true");
+    await expect(page.locator('.mslot[data-custom-key="CUSTOM_KEY_0"]')).toHaveAttribute("aria-current", "true");
+
+    // And back: a layer under On layers opens the tab on the key's row.
+    await page.locator("[data-goto-layer]").first().click();
+    await expect(tab(page, "customKeys")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator('.bench-pane tr[data-reach="here:CUSTOM_KEY_0"]')).toHaveAttribute("data-picked", "true");
+    expect(await page.evaluate(() => window.__posted.filter((message) => message.type !== "ready")), "looking edits nothing").toEqual([]);
 });
