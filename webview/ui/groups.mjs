@@ -58,6 +58,9 @@ export const reachAttrs = (tab, group, name) => {
 // group. One table keeps the columns lined up across the groups being
 // compared, which is the point of showing them together. Each column is given
 // its width, so unfolding a group never re-sizes the ones already on screen.
+// The table scrolls inside its pane, under its column header and the band of
+// the group in view, so a long list never stretches the workbench; it keeps
+// its own place under the tab's key ([data-scroll-list], lib/scroll.mjs).
 /** @param {string} tab @param {{id: string, rows: string[], drafted?: boolean, detail?: string, empty?: string}[]} groups @param {string[][]} columns */
 export function reachTable(tab, groups, columns) {
     /** @param {{id: string, rows: string[], drafted?: boolean, detail?: string, empty?: string}} group */
@@ -67,11 +70,11 @@ export function reachTable(tab, groups, columns) {
             ? (group.rows.length ? group.rows.join("")
                 : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)
             : ""}</tbody>`;
-    const node = el(`<div class="reach-table"><table class="t fixed">
+    const node = el(`<div class="bench-pane"><div class="reach-table" data-scroll-list="${esc(tab)}"><table class="t fixed">
         <colgroup>${columns.map(([, width]) => `<col style="width:${esc(width)}">`).join("")}</colgroup>
         <thead><tr>${columns.map(([name]) => `<th>${esc(name)}</th>`).join("")}</tr></thead>
         ${inGroupOrder(groups).map(section).join("")}
-    </table></div>`);
+    </table></div></div>`);
     attachGroupToggles(node);
     return node;
 }

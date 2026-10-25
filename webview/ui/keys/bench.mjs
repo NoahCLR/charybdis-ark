@@ -9,6 +9,8 @@ import {mappedKeyCount} from "../../view/lighting.mjs";
 import {currentLayer, getModel, layers, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {keepInView} from "../layerbar.mjs";
+import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
+import {behaviourEditor} from "./behaviour-editor.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {tabBehaviours} from "./behaviours-tab.mjs";
 import {tabCombos} from "./combos-tab.mjs";
@@ -42,7 +44,7 @@ export function bench() {
     /** @type {Record<string, boolean>} */
     const drafted = {key: Boolean(marks.keys.get(currentLayer()?.index)?.has(state.selected)), behaviours: marks.behaviours.size > 0,
         combos: marks.combos.size > 0, macros: marks.macros.size > 0, pointing: marks.pointing.size > 0};
-    const node = el(`<div class="card bench">
+    const node = el(`<div class="card bench keys-bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist">
             ${TABS.map((tab) => `<button role="tab" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
                 <span class="tab-label">${tab.label}</span><span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}</div>
@@ -61,4 +63,25 @@ export function bench() {
     const tabs = /** @type {Record<string, (body: HTMLElement, right: HTMLElement) => void>} */ ({key: tabKey, behaviours: tabBehaviours, combos: tabCombos, macros: tabMacros, pointing: tabPointing});
     (tabs[state.tab] || tabKey)(body, right);
     return node;
+}
+
+// The Behaviours tab sets the workbench's height for every tab, so switching
+// tabs never moves what is under it. Once the screen is on the page, the
+// editor the Behaviours tab would show is laid out unseen behind the open
+// tab, in the same column (styles.css, .bench-sizer); the workbench's height
+// is read and the copy taken away again before anything else runs, so the
+// page never holds a second editor. The workbench keeps that height.
+/** @param {ParentNode} root */
+export function matchBehavioursHeight(root) {
+    const bench = /** @type {HTMLElement | null} */ (root.querySelector(".keys-bench"));
+    const body = bench?.querySelector(".bench-body");
+    if (!bench || !body || state.tab === "behaviours") return;
+    const behaviour = behaviourEditorRow(getModel(), state.behaviourRow || behaviourKey(selectedPosition()?.layoutIndex).keycode || "");
+    if (!behaviour) return;
+    const sizer = el(`<div class="tab-split reach-split bench-sizer" aria-hidden="true" inert><div></div><div></div></div>`);
+    /** @type {HTMLElement} */ (sizer.lastElementChild).appendChild(behaviourEditor(behaviour));
+    body.appendChild(sizer);
+    const height = bench.getBoundingClientRect().height;
+    sizer.remove();
+    bench.style.minHeight = `${height}px`;
 }

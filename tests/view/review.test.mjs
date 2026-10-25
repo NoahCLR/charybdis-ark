@@ -75,6 +75,8 @@ test("Show goes to where each kind of item is edited", () => {
     const combo = placeState({kind: "combo", index: 3});
     assert.equal(combo.pickCombo, 3, "a combo is asked for by id, since its group depends on the layer");
     assert.equal(combo.reveal, '[data-reach][data-picked="true"]');
+    assert.equal(placeState({kind: "behaviour", keycode: "KC_A"}).reveal, 'tr[data-row][data-picked="true"]',
+        "a behaviour is revealed at its picked row in the Behaviours table");
     const section = placeState({kind: "settings", section: "keyTiming"});
     assert.deepEqual(section.settingsOpen, ["keyTiming", "keyTiming:layers"], "a folded section opens, with its layer switches");
     assert.equal(section.reveal, '.settings-group[data-section="keyTiming"]');

@@ -148,7 +148,7 @@ export function placeState(place, layers = []) {
             return {screen: "keys", tab: "key", layer: layer < 0 ? place.layer : layer, selected: place.layoutIndex};
         }
         case "behaviour": return {screen: "keys", tab: "behaviours", behaviourRow: place.keycode, behaviourRowShown: null, cell: null,
-            reveal: ".rowitem.on"};
+            reveal: 'tr[data-row][data-picked="true"]'};
         // Which group lists a combo depends on the layer shown, so the combo is
         // asked for by id and the tab picks it where it finds it.
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};

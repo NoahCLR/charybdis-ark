@@ -11,8 +11,8 @@ import {behaviourGroups, behavioursInView} from "../../view/reach.mjs";
 import {currentLayer, getModel, heldLayers, layerName, layers, previewing, render, selectedPosition, state} from "../../store.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
-import {attachGroupToggles, groupHeader, groupOpen} from "../groups.mjs";
-import {inGroupOrder, setReachGroupOpen} from "../../view/reach-groups.mjs";
+import {reachTable} from "../groups.mjs";
+import {setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {actionMarked, comboInputsMarked, tierDot} from "../marks.mjs";
 import {behaviourEditor} from "./behaviour-editor.mjs";
 import {behaviourKey, behaviourRoute, selectBehaviourKey} from "./behaviour-selection.mjs";
@@ -64,11 +64,17 @@ export function tabBehaviours(body, right) {
 
     const route = behaviourRoute();
     const changed = draftMarks(model?.draft?.changes).behaviours;
+    // A row as every reach table draws one: the behaviour, then its branches
+    // as the grid's tier dots and a count. The name is a button so the list
+    // can be walked from the keyboard; a click anywhere on the row picks it.
     /** @param {string} group @param {import("../../../contracts/panel.js").BehaviorView} row @param {string} note */
-    const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${esc(group)}">
-        <span class="t">${actionMarked(model, row.keycode)}${actionLabel(model, row.keycode) === row.keycode ? ""
-            : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</span>
-        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${note}` : ""}</span></button>`;
+    const item = (group, row, note) => {
+        const picked = row.keycode === state.behaviourRow && (!route || route === group);
+        return `<tr class="beh-row${note ? " quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${esc(group)}"${picked ? ' data-picked="true"' : ""}${picked && selectionMoved ? " data-reveal-selected" : ""}>
+            <td><button class="row-pick">${actionMarked(model, row.keycode)}${actionLabel(model, row.keycode) === row.keycode ? ""
+                : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</button>${note ? `<span class="sub">${note}</span>` : ""}</td>
+            <td class="beh-branches">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length}</td></tr>`;
+    };
 
     // A selection made anywhere else — the board, the Key tab, a fresh
     // behaviour — can land in a closed group, so the group holding it opens
@@ -95,25 +101,15 @@ export function tabBehaviours(body, right) {
         state.behaviourRowShown = state.behaviourRow;
     }
 
-    /** @param {{id: string, rows: {row: import("../../../contracts/panel.js").BehaviorView, note: string}[], empty: string}} group */
-    const section = (group) => `<div class="rowgroup">
-        ${groupHeader("behaviours", group.id, group.rows.length, group.rows.some(({row}) => changed.has(row.keycode)))}
-        ${groupOpen("behaviours", group.id)
-            ? (group.rows.length ? `<div class="beh-rows"${selectionMoved ? " data-reveal-selected" : ""}>${group.rows.map((entry) => item(group.id, entry.row, entry.note)).join("")}</div>`
-                : `<p class="note rowgroup-empty">${esc(group.empty)}</p>`)
-            : ""}</div>`;
-
-    const node = el(`<div class="tab-split">
-        <aside class="rowlist behaviour-rail">
-            ${inGroupOrder(groups).map(section).join("")}
-        </aside>
-        <div class="beh-main"></div>
-    </div>`);
-    attachGroupToggles(node);
-    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-row]")).forEach((button) => button.addEventListener("click", () => {
-        state.behaviourRow = button.dataset.row || "";
-        state.behaviourRoute = {row: button.dataset.row || "", group: button.dataset.route || "view"};
-        state.behaviourRowShown = button.dataset.row || "";
+    const list = reachTable("behaviours", groups.map((group) => ({id: group.id, empty: group.empty,
+        rows: group.rows.map((entry) => item(group.id, entry.row, entry.note)),
+        drafted: group.rows.some(({row}) => changed.has(row.keycode))})), [["Behaviour", "70%"], ["Branches", "30%"]]);
+    const node = el(`<div class="tab-split reach-split"><div class="beh-main"></div></div>`);
+    node.prepend(list);
+    /** @type {NodeListOf<HTMLElement>} */ (list.querySelectorAll("tr[data-row]")).forEach((tr) => tr.addEventListener("click", () => {
+        state.behaviourRow = tr.dataset.row || "";
+        state.behaviourRoute = {row: tr.dataset.row || "", group: tr.dataset.route || "view"};
+        state.behaviourRowShown = tr.dataset.row || "";
         state.cell = null;
         render();
     }));
