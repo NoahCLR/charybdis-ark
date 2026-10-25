@@ -197,12 +197,17 @@ test("the view follows the exact previewed stack while the layer groups stay str
     };
     const macroNames = (held) => reachInView(model, stack, 2, held, macroKeycodes).map((entry) => entry.name);
     assert.deepEqual(behaviourGroups(model, stack, 2).here, [], "nothing is stored on Symbols");
-    assert.deepEqual(behavioursInView(model, stack, 2, []).map((entry) => entry.row.keycode), ["KC_B"]);
+    // Shown alone, Symbols is the whole view, and every key on it is
+    // transparent: base is not on until layers are previewed together.
+    assert.deepEqual(behavioursInView(model, stack, 2, []), [], "nothing on Symbols alone");
+    assert.deepEqual(combosInView(model, stack, 2, []), []);
+    assert.deepEqual(macroNames([]), []);
+    assert.deepEqual(behavioursInView(model, stack, 2, [0]).map((entry) => entry.row.keycode), ["KC_B"], "with base previewed on");
     assert.deepEqual(behavioursInView(model, stack, 2, [1]).map((entry) => entry.row.keycode), ["KC_C", "KC_B"]);
-    assert.deepEqual(combosInView(model, stack, 2, []).map((entry) => entry.combo.id), [1]);
+    assert.deepEqual(combosInView(model, stack, 2, [0]).map((entry) => entry.combo.id), [1]);
     assert.deepEqual(combosInView(model, stack, 2, [1]).map((entry) => entry.combo.id), [2],
         "a combo's inputs must coexist in this activation");
-    assert.deepEqual(macroNames([]), ["MACRO_1", "MACRO_0", "MACRO_2"]);
+    assert.deepEqual(macroNames([0]), ["MACRO_1", "MACRO_0", "MACRO_2"]);
     assert.deepEqual(macroNames([1]), ["MACRO_1", "MACRO_3"]);
     const modes = (held) => reachInView(model, stack, 2, held,
         (keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; });
@@ -565,18 +570,20 @@ test("generated behaviour lists use the declared owner's physical source rather 
         {index: 1, name: "Overlay", positions: [at(0, "KC_A"), at(1, "KC_TRANSPARENT")]},
         {index: 2, name: "Reference", positions: [at(0, "KC_A"), at(1, "KC_B")]},
     ]);
-    assert.equal(behavioursInView(model, stack, 1).length, 1, "B owns Base policy despite A coming from Overlay");
+    // Base previewed on under Overlay, so B answers from it in the view.
+    const view = () => behavioursInView(model, stack, 1, [0]);
+    assert.equal(view().length, 1, "B owns Base policy despite A coming from Overlay");
     combo.inputs.reverse();
-    assert.equal(behavioursInView(model, stack, 1).length, 0, "A becomes the declared owner, so B cannot lend its allowance");
+    assert.equal(view().length, 0, "A becomes the declared owner, so B cannot lend its allowance");
     combo.inputs.reverse();
     model.configDefaults = [{id: "comboReferences", fields: [{macro: "comboReference1", value: "Layer 2"}]}];
-    assert.equal(behavioursInView(model, stack, 1).length, 1, "reference remapping retains Base's physical origin");
+    assert.equal(view().length, 1, "reference remapping retains Base's physical origin");
     row.allowedLayers = 4;
-    assert.equal(behavioursInView(model, stack, 1).length, 0, "a reference-layer allowance cannot enable the output");
+    assert.equal(view().length, 0, "a reference-layer allowance cannot enable the output");
     row.allowedLayers = 1; row.enabled = false;
-    assert.equal(behavioursInView(model, stack, 1).length, 0);
+    assert.equal(view().length, 0);
     row.enabled = true; model.participation.behaviorsEnabled = false;
-    assert.equal(behavioursInView(model, stack, 1).length, 0);
+    assert.equal(view().length, 0);
 });
 
 test("a reach says where its keys come from, and a combo reached on this layer alone says so", () => {

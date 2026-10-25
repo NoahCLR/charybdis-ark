@@ -1,6 +1,6 @@
 // @ts-check
 import {actionLabel, behaviourFor, canonicalKeycode, keyMeaning, layerOfKeycode} from "./keyface.mjs";
-import {reachablePositions, resolvedPositions, downTheStack} from "./layer-resolution.mjs";
+import {reachablePositions, viewPositions, downTheStack} from "./layer-resolution.mjs";
 import {comboGroups, comboOutput, combosInView, comboInputOn} from "./combo-reach.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
@@ -22,7 +22,7 @@ function comboBehaviourFor(model, combo, keys, stack, at, held = []) {
     if (!row || row.enabled === false) return undefined;
     const owner = combo.inputs?.at(-1);
     const placements = keys.filter(({position}) => owner !== undefined && comboInputOn(owner, position));
-    const physical = placements.some(key => key.reference) ? resolvedPositions(stack, at, held) : [];
+    const physical = placements.some(key => key.reference) ? viewPositions(stack, at, held) : [];
     const permitted = placements.some(key => {
         const source = key.reference ? physical.find(entry => entry.position.layoutIndex === key.position.layoutIndex)?.layer : key.layer;
         return source && ((row.allowedLayers ?? 0xffff) & (2 ** source.index));
@@ -45,7 +45,8 @@ export const reachText = ({named = [], sources = [], matched = []}, {names = tru
  * The keys that name it, and — for anything a behaviour branch sends — the keys
  * carrying that behaviour, because those are the ones you actually reach it
  * through. For anything a combo sends, the keys you chord to fire it. A key answered from a layer below keeps its physical position, which
- * is what the board draws.
+ * is what the board draws. With `held`, a row On this view rings only the
+ * keys of the layers on in that view.
  */
 /** @param {Layer[]} stack @param {number} at @param {Partial<Pick<ReachEntry, "keys" | "behaviours" | "combos">> | null | undefined} entry @param {number[] | null} [held] */
 export function reachKeys(stack, at, entry, held = null) {
@@ -53,7 +54,7 @@ export function reachKeys(stack, at, entry, held = null) {
         .map((key) => key.position.layoutIndex));
     const behaviours = new Set((entry?.behaviours || []).map((row) => row.keycode));
     if (behaviours.size) {
-        for (const {position} of held === null ? reachablePositions(stack, at) : resolvedPositions(stack, at, held)) {
+        for (const {position} of held === null ? reachablePositions(stack, at) : viewPositions(stack, at, held)) {
             if (behaviours.has(keyMeaning(position))) indexes.add(position.layoutIndex);
         }
     }
@@ -70,7 +71,7 @@ export function behavioursInView(model, stack, at, held = []) {
         // The entry was inserted above whenever it was absent.
         return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(row.keycode));
     };
-    for (const key of resolvedPositions(stack, at, held)) {
+    for (const key of viewPositions(stack, at, held)) {
         const row = behaviourFor(model, keyMeaning(key.position));
         if (row) add(row).keys.push(key);
     }
@@ -109,7 +110,7 @@ export function reachInView(model, stack, at, held, namesOf) {
         // The entry was inserted above whenever it was absent.
         return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name));
     };
-    for (const key of resolvedPositions(stack, at, held)) {
+    for (const key of viewPositions(stack, at, held)) {
         for (const name of namesOf(keyMeaning(key.position))) add(name).keys.push(key);
         const row = behaviourFor(model, keyMeaning(key.position));
         if (row) branchActions(row, (action, cell) => {

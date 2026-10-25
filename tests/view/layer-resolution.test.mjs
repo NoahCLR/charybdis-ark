@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {withAnswers} from "../fixtures/layer-answers.mjs";
-import {resolvedPositions, reachablePositions, comboActivations, activations} from "../../webview/view/layer-resolution.mjs";
+import {resolvedPositions, reachablePositions, comboActivations, activations, viewPositions} from "../../webview/view/layer-resolution.mjs";
 import {pointingReach} from "../../webview/view/reach.mjs";
 
 test("a transparent key can be answered by any layer below that is held with this one", () => {
@@ -38,6 +38,23 @@ test("a transparent key can be answered by any layer below that is held with thi
         pdModes: [{id: 4, name: "Arrow", kind: 1, binding: {hold: "PD_SLOT_4", lock: "PD_SLOT_4_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}]};
     assert.deepEqual(pointingReach(model, stack, 2).fromBranchesBelow.map((entry) => entry.name), ["4"],
         "so the behaviour on Base is reached, and the mode its branch sends with it");
+});
+
+test("a view has only the layers on in it: base joins a preview, never a layer shown alone", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const stack = withAnswers([
+        {index: 0, name: "Base", positions: [at(0, "KC_A"), at(1, "KC_B")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_1"), at(1, "KC_TRANSPARENT")]},
+        {index: 2, name: "Symbols", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT")]},
+    ]);
+    const answers = (resolve, top, held) => resolve(stack, top, held).map((key) => `${key.position.keycode} from ${key.layer.name}`);
+    assert.deepEqual(answers(viewPositions, 1, []), ["KC_1 from Numbers"], "Numbers alone: its transparent key answers nothing");
+    assert.deepEqual(answers(viewPositions, 2, []), [], "Symbols alone is all transparent");
+    assert.deepEqual(answers(viewPositions, 0, []), ["KC_A from Base", "KC_B from Base"], "base shown alone is base");
+    assert.deepEqual(answers(viewPositions, 2, [0]), ["KC_A from Base", "KC_B from Base"], "base previewed on under Symbols");
+    assert.deepEqual(answers(viewPositions, 2, [1]), ["KC_1 from Numbers", "KC_B from Base"], "a preview has base on, as the layer bar shows");
+    // The keyboard always has base on: what a transparent key does when pressed.
+    assert.deepEqual(answers(resolvedPositions, 1, []), ["KC_1 from Numbers", "KC_B from Base"]);
 });
 
 test("resolution consumes published facts, including native transparency whose name is unknown", () => {

@@ -104,6 +104,11 @@ says which layers are on.
 ⌘-click a layer again to take it out, or click any tab to go back to one
 layer. The preview carries over to the Lighting screen.
 
+**On this view**, in the workbench's lists, holds what the layers on the board
+reach: the layer you picked alone, or every layer in the preview with the base
+under them. A transparent key on a layer shown alone answers nothing there;
+what it falls through to is listed under **Through a transparent key**.
+
 ### Default layers
 
 **Settings → Default layers** sets which layers are always on underneath

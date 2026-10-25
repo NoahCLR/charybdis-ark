@@ -44,9 +44,16 @@ layers in view reach:
   tabs, and the view's groups lead (`tests/view/reach-groups.test.mjs`).
   **On this view** is the selected layer plus exactly the lower layers
   previewed on: an activation, not a storage place, so it may overlap the
-  other groups. A combo is in the view only when that activation holds all its
-  inputs, matched on the Combo layer matching reference when one is set
-  (`tests/view/reach.test.mjs`, `tests/view/combo-reach.test.mjs`).
+  other groups. Base is on in it only once layers are previewed together, as
+  the layer bar shows it on; a layer shown alone is the view by itself, and
+  its transparent keys answer nothing there (what they fall through to is
+  under **Through a transparent key**). The view is `viewPositions`; what the
+  keyboard does, with base always on, stays `resolvedPositions`: the hover
+  card's fall-through, a selected transparent key opening the behaviour from
+  below, and picking a combo input on the board. A combo is in the view only
+  when that activation holds all its inputs, matched on the Combo layer
+  matching reference when one is set (`tests/view/layer-resolution.test.mjs`,
+  `tests/view/reach.test.mjs`, `tests/view/combo-reach.test.mjs`).
 - On the board, a transparent key answered from below wears that key's
   behaviour dots and the badges of the combos it fires in the view
   (`combosInPreview`); under Combo layer matching nothing from below adds a

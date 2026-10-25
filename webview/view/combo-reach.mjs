@@ -1,6 +1,6 @@
 // @ts-check
 import {behaviourFor, keyFace, keyMeaning} from "./keyface.mjs";
-import {comboActivations, downTheStack, resolvedPositions} from "./layer-resolution.mjs";
+import {comboActivations, downTheStack, resolvedPositions, viewPositions} from "./layer-resolution.mjs";
 /** @typedef {import("../../contracts/panel.js").ComboView} ComboView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("../../contracts/panel.js").Position} Position */
@@ -9,21 +9,24 @@ import {comboActivations, downTheStack, resolvedPositions} from "./layer-resolut
 /** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
 // The view is one actual activation: the selected layer plus the layers the
-// user has previewed under it. Keep it separate from the layer reach lists,
-// which deliberately include every *possible* activation of that layer.
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held */
-function comboAnswerEntries(model, stack, at, held) {
+// user has previewed under it, with base only in a preview (viewPositions).
+// Keep it separate from the layer reach lists, which deliberately include
+// every *possible* activation of that layer. Picking on the board asks the
+// keyboard instead: a transparent key picks what it falls through to, base
+// included (resolvedPositions).
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {typeof resolvedPositions} [resolve] */
+function comboAnswerEntries(model, stack, at, held, resolve = resolvedPositions) {
     const reference = comboReferenceLayer(model, at);
     const referenced = reference !== at && stack[reference];
     return referenced
         ? (referenced.positions || []).map((position) =>
             ({position, layer: referenced, fellThrough: false, whileHeld: false, reference: true}))
-        : resolvedPositions(stack, at, held);
+        : resolve(stack, at, held);
 }
 
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} [held] */
 export function combosInView(model, stack, at, held = []) {
-    const resolved = comboAnswerEntries(model, stack, at, held);
+    const resolved = comboAnswerEntries(model, stack, at, held, viewPositions);
     // comboKeysAmong returns positions from these exact entries, so every lookup exists.
     const answering = new Map(resolved.map((entry) => [entry.position, entry]));
     return (model?.combos || []).flatMap((combo) => {
@@ -306,11 +309,13 @@ export const comboInputShown = (model, stack, at, held, name) =>
 
 // The combos that take the key at this position as an input, in the view the
 // board shows: `at` on top with `held` previewed on under it, so a transparent
-// key asks about what shows through it, as picking it would (comboAnswers).
-// `position` is that key, or null where nothing answers.
+// key asks about what shows through it in that view. Shown alone, a layer's
+// transparent key shows nothing through (viewPositions). `position` is that
+// key, or null where nothing answers.
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {number} layoutIndex */
 export function combosOnKey(model, stack, at, held, layoutIndex) {
-    const position = comboAnswers(model, stack, at, held).get(layoutIndex) || null;
+    const position = comboAnswerEntries(model, stack, at, held, viewPositions)
+        .find((entry) => entry.position.layoutIndex === layoutIndex)?.position || null;
     return {position, combos: combosForKey(model, position)};
 }
 
