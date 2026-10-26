@@ -12,9 +12,10 @@ const {decodeMacroPayload} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {inspectMacroPlayback} = require("./macro-input");
 const {pointingMacros} = require("./pointing-taps");
+const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {actionName} = require("../schema/actions");
-const {VOCABULARY} = require("./vocabulary");
+const {VOCABULARY, slotName} = require("./vocabulary");
 
 // A behaviour step that sends a custom key sends only its shortcut (firmware
 // D-F26). The keyboard accepts a step naming a custom key without one, which
@@ -51,6 +52,20 @@ function profileFindings(decoded, destination = {}) {
             title: `${count} action${count === 1 ? "" : "s"} reach empty pointing slot ${Number(slot) + 1}`,
             detail: "Keys, behaviours or combo outputs still name this empty slot. The keyboard accepts them but does nothing when they run.",
             fix: "Configure the slot or replace the actions that reach it.", place: {kind: "pointing", slot: Number(slot)}});
+    }
+    // A layer the keyboard ignores in a link, the pointer layer or a default
+    // layer: stored and carried, since the pointing domain accepts it, and
+    // said here (the editor refuses to add one; settings or a reorder can).
+    for (const slot of decoded.pdModes || []) {
+        if (!slot.kind) continue;
+        const inert = inertLinkLayers(decoded.settings, linkNamed(slot));
+        for (let layer = 0; inert >>> layer; layer++) {
+            if (!(inert & (1 << layer))) continue;
+            findings.push({kind: "inertPointingLink", level: "warning", layers: [layer], identity: `${slot.id}:${layer}`,
+                title: `${slotName(slot)}'s link names a layer the keyboard ignores in it`,
+                detail: inertLinkReason(decoded.settings, layer),
+                fix: "Take the layer out of the mode's link.", place: {kind: "pointing", slot: slot.id}});
+        }
     }
     const host = hostSettings(decoded.settings.values, destination.detectedHostOs);
     const emptyMacros = new Set();

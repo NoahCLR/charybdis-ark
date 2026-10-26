@@ -16,7 +16,7 @@ const KC_A = 0x04, KC_B = 0x05, KC_ESC = 0x29, TRNS = 0x01, NO = 0x00;
 const MO = (n) => 0x5220 | n, TG = (n) => 0x5260 | n, TO = (n) => 0x5200 | n, TT = (n) => 0x52c0 | n, DF = (n) => 0x5240 | n;
 const LOCK_LAYER = (n) => 0x7ec0 + n;
 const code = (operand) => ({kind: 1, flags: 0, operand});
-function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}} = {}) {
+function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}, pdModes = []} = {}) {
     const layers = Array.from({length: 16}, (_, layer) => Array(60).fill(layer === 0 ? KC_A : (fill[layer] ?? TRNS)));
     for (const [at, value] of Object.entries(keys)) {
         const [layer, index] = at.split(":").map(Number);
@@ -30,7 +30,7 @@ function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}} =
     for (const [id, value] of Object.entries(settings)) if (id !== "references" && id !== "layers" && id !== "comboOutputBehaviors") values[id] = value;
     const records = Array.from({length: 16}, (_, layer) => ({reference: settings.references?.[layer] ?? layer, bypass: [], exclude: [], ...settings.layers?.[layer]}));
     return {layers, settings: {values, layers: records, comboOutputBehaviors: settings.comboOutputBehaviors, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")]},
-        behaviors: {rows}, combos: {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos}};
+        behaviors: {rows}, combos: {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos}, pdModes};
 }
 const traps = (value) => layerReach(value).filter((finding) => finding.level === LEVELS.TRAP);
 const kinds = (value) => layerReach(value).map((finding) => finding.kind);
@@ -269,7 +269,17 @@ test("the trackball wakes the pointer layer, which can carry the way out unless 
     const keys = {"0:0": TG(1), "1:0": KC_B, "4:3": TO(0)};
     assert.equal(traps(profile({keys})).length, 1, "auto-mouse is off");
     assert.deepEqual(traps(profile({keys, settings: {4: 1, 5: 4}})), []);
-    assert.equal(traps(profile({keys: {...keys, "0:0": TG(3), "3:0": KC_B}, settings: {4: 1, 5: 4, 8: 1, 9: 3}})).length, 1);
+    assert.equal(traps(profile({keys: {...keys, "0:0": TG(3), "3:0": KC_B}, settings: {4: 1, 5: 4, 8: 1, 9: 1 << 3}})).length, 1);
+});
+
+// Settings v9: auto-sniping follows a set of layers, and each of them that is
+// on keeps a separate pointer layer off (pointer_layer_policy_apply).
+test("every auto-sniping layer keeps the pointer layer off, and a switched-off set none", () => {
+    const keys = {"0:0": TG(1), "1:0": KC_B, "4:3": TO(0)}, mouse = {4: 1, 5: 4};
+    assert.deepEqual(traps(profile({keys, settings: {...mouse, 8: 1, 9: 1 << 3}})), [], "Numbers is no sniping layer");
+    assert.equal(traps(profile({keys, settings: {...mouse, 8: 1, 9: (1 << 1) | (1 << 3)}})).length, 1, "Numbers is one of two");
+    assert.deepEqual(traps(profile({keys, settings: {...mouse, 8: 0, 9: (1 << 1) | (1 << 3)}})), [], "the master switch off keeps the layers and strips nothing");
+    assert.deepEqual(traps(profile({keys, settings: {...mouse, 8: 1, 9: 0}})), [], "no layers");
 });
 
 test("a layer with keys that nothing reaches is a warning, an empty one is not", () => {
@@ -543,4 +553,81 @@ test("bypassed normal combo outputs retain their native layer escape", () => {
     assert.deepEqual(traps(p), []);
     combo.useOutputBehavior = true; p.settings.comboOutputBehaviors = false;
     assert.deepEqual(traps(p), []);
+});
+
+// Pointing links (firmware D-F62). PD_SLOT_n holds slot n's mode, and
+// PD_SLOT_n_LOCK toggles its lock; a mode its key runs turns on the layers its
+// link names for its key, and a layer that starts its mode keeps a separate
+// pointer layer off unless what ends the mode is on.
+const PD_SLOT = (n) => 0x7e80 + n, PD_SLOT_LOCK = (n) => 0x7ea0 + n;
+const linked = (extra = {}) => ({id: 1, kind: 1, name: "Volume", linkedLayers: 0, linkTurnsOn: 0, linkEnds: 0, ...extra});
+const mask = (layers) => layers.reduce((bits, layer) => bits | (1 << layer), 0);
+// The key turns layers on; the layers start the mode; the same layers both ways.
+const turnsOn = (layer, extra = {}) => linked({linkTurnsOn: 1 << layer, ...extra});
+const startedBy = (layers, extra = {}) => linked({linkedLayers: mask(layers), ...extra});
+const bothWays = (layers, extra = {}) => startedBy(layers, {linkTurnsOn: mask(layers), ...extra});
+
+test("a mode whose key turns layers on reaches them through its hold and lock keys", () => {
+    const keys = {"0:0": PD_SLOT(1), "5:3": KC_B};
+    assert.deepEqual(kinds(profile({keys})), ["unreachable"], "a mode key alone reaches nothing");
+    assert.deepEqual(kinds(profile({keys, pdModes: [turnsOn(5)]})), [], "the key turns Extra 1 on");
+    assert.deepEqual(kinds(profile({keys, pdModes: [bothWays([5])]})), [], "every linked layer");
+    assert.deepEqual(kinds(profile({keys: {...keys, "6:3": KC_A}, pdModes: [bothWays([5, 6])]})), [], "several, each reached");
+    assert.deepEqual(kinds(profile({keys: {...keys, "6:3": KC_A}, pdModes: [startedBy([5, 6], {linkTurnsOn: 1 << 6})]})), ["unreachable"], "only the ones its key turns on");
+    assert.deepEqual(kinds(profile({keys, pdModes: [startedBy([5])]})), ["unreachable"], "the layer turns the mode on, not the other way");
+    assert.deepEqual(kinds(profile({keys, pdModes: [turnsOn(5, {kind: 0})]})), ["unreachable"], "an empty slot runs nothing");
+    assert.deepEqual(kinds(profile({keys, pdModes: [turnsOn(5)], settings: {5: 5}})), ["unreachable"], "the keyboard never turns on the pointer layer for a link");
+    assert.deepEqual(kinds(profile({keys, pdModes: [turnsOn(5)], settings: {23: 1 | (1 << 5)}})).includes("unreachable"), false,
+        "a default layer is always on, so it is reached without the link");
+    assert.deepEqual(kinds(profile({keys: {"0:0": PD_SLOT_LOCK(1), "5:3": KC_B}, pdModes: [turnsOn(5)]})), [], "the lock key too");
+    // A behaviour branch held until release, or a combo output, that runs the
+    // mode reaches it as well.
+    const row = {target: code(KC_ESC), allowedLayers: 1, steps: [{tapIndex: 0, hold: {action: {kind: 4, flags: 0, operand: 1}, style: 1}}]};
+    assert.deepEqual(kinds(profile({keys: {"0:0": KC_ESC, "5:3": KC_B}, rows: [row], pdModes: [turnsOn(5)]})), []);
+    const combo = {inputs: [code(KC_A), code(KC_A)], output: {kind: 5, flags: 0, operand: 1}, allowedLayers: 0xffff};
+    assert.deepEqual(kinds(profile({keys: {"5:3": KC_B}, combos: [combo], pdModes: [turnsOn(5)]})).includes("unreachable"), false);
+});
+
+test("a locked mode keeps its layer on like a layer lock, and is a trap when the layer covers its lock key", () => {
+    const pdModes = [turnsOn(5)];
+    assert.deepEqual(traps(profile({keys: {"0:0": PD_SLOT_LOCK(1), "5:3": KC_B}, pdModes})), [], "the lock key still answers on Extra 1");
+    const [trap] = traps(profile({keys: {"0:0": PD_SLOT_LOCK(1), "5:0": KC_B}, pdModes}));
+    assert.deepEqual(trap.layers, [5]);
+    assert.deepEqual(trap.path, ["Tap PD_SLOT_1_LOCK on Base (which runs Volume, whose key turns layers on)"]);
+    assert.deepEqual(traps(profile({keys: {"0:0": PD_SLOT_LOCK(1), "5:0": KC_B, "5:1": TO(0)}, pdModes})), [], "with a way home on it");
+});
+
+test("a layer that starts its mode keeps the pointer layer off, so a way back only there does not count", () => {
+    const keys = {"0:0": TG(1), "1:0": KC_B, "4:3": TO(0)}, mouse = {4: 1, 5: 4};
+    assert.deepEqual(traps(profile({keys, settings: mouse})), [], "the trackball brings the pointer layer and its TO(0)");
+    assert.equal(traps(profile({keys, settings: mouse, pdModes: [startedBy([1])]})).length, 1, "Numbers starts Volume");
+    assert.equal(traps(profile({keys, settings: mouse, pdModes: [startedBy([3, 1])]})).length, 1, "one of several linked layers");
+    assert.equal(traps(profile({keys, settings: mouse, pdModes: [bothWays([1])]})).length, 1, "both ways");
+    assert.deepEqual(traps(profile({keys, settings: mouse, pdModes: [turnsOn(1)]})), [], "a key that only turns Numbers on leaves the pointer layer");
+    assert.deepEqual(traps(profile({keys, settings: {...mouse, 23: 1 | (1 << 1)}, pdModes: [startedBy([1])]})), [], "a default layer in a link does nothing");
+});
+
+test("a link a higher layer ends keeps the pointer layer off only while its layer is on top", () => {
+    // Numbers locks with no way home of its own, MO(2) on it holds Symbols, and
+    // the pointer layer's TO(0) is the way back.
+    const keys = {"0:0": TG(1), "1:0": KC_B, "1:1": MO(2), "4:3": TO(0)}, mouse = {4: 1, 5: 4};
+    assert.equal(traps(profile({keys, settings: mouse, pdModes: [startedBy([1])]})).length, 1, "Numbers starts Volume whatever is above it");
+    assert.deepEqual(traps(profile({keys, settings: mouse, pdModes: [startedBy([1], {linkEnds: 1})]})), [],
+        "holding Symbols over Numbers ends the mode, so the trackball brings the pointer layer back");
+    assert.equal(traps(profile({keys, settings: mouse, pdModes: [startedBy([1, 2], {linkEnds: 1})]})).length, 1,
+        "Symbols in the set starts the mode itself, on top");
+    assert.equal(traps(profile({keys: {"0:0": TG(1), "1:0": KC_B, "4:3": TO(0)}, settings: mouse, pdModes: [startedBy([1], {linkEnds: 1})]})).length, 1,
+        "with nothing above Numbers, its mode runs and keeps the pointer layer off");
+});
+
+test("a link any other layer ends keeps the pointer layer off only while no layer outside the link is on", () => {
+    // Symbols locks with no way home of its own, MO(1) on it holds Numbers,
+    // below it, and the pointer layer's TO(0) is the way back.
+    const keys = {"0:0": TG(2), "2:0": KC_B, "2:1": MO(1), "4:3": TO(0)}, mouse = {4: 1, 5: 4};
+    assert.equal(traps(profile({keys, settings: mouse, pdModes: [startedBy([2], {linkEnds: 1})]})).length, 1, "a lower layer does not end a link a higher layer ends");
+    assert.deepEqual(traps(profile({keys, settings: mouse, pdModes: [startedBy([2], {linkEnds: 2})]})), [], "a lower layer ends a link any other layer ends");
+    assert.equal(traps(profile({keys, settings: mouse, pdModes: [startedBy([2], {linkEnds: 2, linkTurnsOn: 1 << 1})]})).length, 1,
+        "the layer its key turns on is in the link, so it does not end it");
+    assert.equal(traps(profile({keys: {"0:0": TG(2), "2:0": KC_B, "4:3": TO(0)}, settings: mouse, pdModes: [startedBy([2], {linkEnds: 2})]})).length, 1,
+        "Base, always on, does not end it");
 });

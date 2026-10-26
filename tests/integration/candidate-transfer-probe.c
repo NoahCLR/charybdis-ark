@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     compatibility.allowed_domain_mask = NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS;
     compatibility.required_domain_mask = 0;
     compatibility.placement_positions = MATRIX_ROWS * MATRIX_COLS;
-    noah_profile_validator_v1_declaration_t declaration = {.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = 0, .domain_mask = domains, .byte_length = (uint32_t)length, .crc32 = crc, .digest = digest, .action_abi_digest = abi};
+    noah_profile_validator_v1_declaration_t declaration = {.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = NOAH_PROFILE_SCHEMA_MINOR, .domain_mask = domains, .byte_length = (uint32_t)length, .crc32 = crc, .digest = digest, .action_abi_digest = abi};
     noah_profile_reader_t reader = noah_profile_reader_from_memory(source, length);
     noah_profile_validator_v1_t validator;
     noah_profile_validator_v1_error_t error;
@@ -56,12 +56,12 @@ int main(int argc, char **argv) {
     assert(noah_active_profile_provider_init(&provider, &snapshot, safe, NULL, NULL, 0) == NOAH_ACTIVE_PROFILE_OK);
     memset(memory, 0xff, sizeof(memory));
     noah_profile_store_init(&store, (noah_profile_store_io_t){.read = read_memory, .write = write_memory},
-        (noah_profile_store_compatibility_t){.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = 0, .compiled_default_digest = digest, .action_abi_digest = abi});
+        (noah_profile_store_compatibility_t){.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = NOAH_PROFILE_SCHEMA_MINOR, .compiled_default_digest = digest, .action_abi_digest = abi});
     noah_profile_store_record_t selected;
     assert(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     noah_profile_candidate_store_backend_init(&backend, &store, &provider, &compatibility, digest, 0);
     noah_profile_candidate_backend_t callbacks = noah_profile_candidate_store_backend_interface(&backend);
-    noah_profile_candidate_compatibility_t candidate_compat = {.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = 0, .supported_domain_mask = domains, .max_payload_length = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE, .action_abi_digest = abi};
+    noah_profile_candidate_compatibility_t candidate_compat = {.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = NOAH_PROFILE_SCHEMA_MINOR, .supported_domain_mask = domains, .max_payload_length = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE, .action_abi_digest = abi};
     noah_profile_candidate_transaction_init(&transaction, &callbacks, &candidate_compat);
     puts("ready"); fflush(stdout);
     char line[128];

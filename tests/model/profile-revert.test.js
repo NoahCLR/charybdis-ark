@@ -8,7 +8,7 @@ const {settingsEditorView} = require("../../core/model/settings-editor");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81};
 const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
 
 // A draft with one edit of every kind the review describes.
@@ -33,8 +33,7 @@ function edited() {
     const slot = validateSnapshot(draft.document).pdModes[1];
     stage({type: "savePdMode", slot: 1, expectedBase: draft.identity(), config: {...slot, name: "Loudness", thresholdY: 90,
         directions: Object.fromEntries(Object.entries(slot.directions).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}])),
-        diagonals: Object.fromEntries(Object.entries(slot.diagonals || {}).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}])),
-        buttons: slot.buttons.map((button) => ({...button, tap: {...button.tap, keycode: String(button.tap.keycode)}}))}});
+        diagonals: Object.fromEntries(Object.entries(slot.diagonals || {}).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}]))}});
     return draft;
 }
 

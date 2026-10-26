@@ -117,7 +117,8 @@ export const sendsKind = (model, action) => namedAction(model, action)?.word || 
 
 // A mark as the core describes it: {kind: "tier", tier, branch?} · {kind:
 // "branch", count} · {kind: "layer", layer} · {kind: "pointing", slot} ·
-// {kind: "combo", badge?} · {kind: "stage", on}. Anything else draws nothing.
+// {kind: "combo", badge?} · {kind: "stage", on}. Anything else draws nothing;
+// a set of layers marks each name instead (valueMarked).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value */
 export function mark(model, value) {
     switch (value?.kind) {
@@ -160,6 +161,9 @@ function namedInline(model, keycode, text) {
 // keeps the layer's mark before the layer's name, or is "" for the caller.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} marker @param {string} text */
 export function valueMarked(model, marker, text) {
+    // A set of layers reads as its names, each after its layer's mark.
+    if (marker?.kind === "layers") return marker.layers.map((entry) => entry.name).join(", ") === String(text)
+        ? marker.layers.map((entry) => marked(model, {kind: "layer", layer: entry.layer}, entry.name)).join(", ") : "";
     const slot = marker?.kind === "pointing" ? model?.pdModes?.find((entry) => entry.id === marker.slot) : undefined;
     const keycodes = marker?.kind === "layer" ? Object.entries(model?.qmkKeyLayers || {}).flatMap(([keycode, layer]) => layer === marker.layer ? [keycode] : [])
         : slot ? slotKeycodeNames(slot) : [];

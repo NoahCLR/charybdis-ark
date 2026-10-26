@@ -1,10 +1,10 @@
 // @ts-check
 // Pointing modes: the device-owned slots, eight or 32 as the firmware has them.
 // Each one re-reads the trackball as scrolling or as directional keys while its
-// key is held or toggled.
+// key is held or toggled, or while one of its linked layers is on.
 //
-// The surface leads with what the mode is — name, movement, speed, actions —
-// and keeps thresholds, ratios and button overrides under Advanced, where they
+// The surface leads with what the mode is — name, movement, speed, actions,
+// its layer — and keeps thresholds and ratios under Advanced, where they
 // belong for the once-a-year visit.
 
 // Selector assertions refer to elements created by this module's authored markup.
@@ -48,7 +48,7 @@ export function screenPointing() {
     const list = el(`<nav class="pd-slots ${compact ? "many" : ""}" aria-label="Pointing slots"></nav>`);
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
     /** @param {import("./surface-types.js").PresentedSlot} slot */
-    const pick = (slot) => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; state.pdTaps = null; render(); };
+    const pick = (slot) => { state.pdSlot = slot.id; state.pdKind = null; state.pdTaps = null; render(); };
     for (const slot of slots) {
         if (compact && !slot.kind) continue;
         const bindings = !slot.kind ? bindingsForSlot(model, slot) : null;

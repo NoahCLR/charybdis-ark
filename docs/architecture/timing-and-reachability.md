@@ -90,8 +90,25 @@ active layer that is not transparent answers. A key moves the state by:
 - its row's branches (a hold branch holds a layer only when it presses and
   holds until release);
 - the combos its presses complete;
-- the trackball, which turns on the pointer layer unless the sniping layer
-  keeps it off.
+- a pointing mode's key, held or locked, for the layers its link has the
+  key turn on (firmware D-F62): the hold key holds each of them and the
+  lock key toggles each as a layer lock, as for a key, a behaviour branch or
+  a combo output that runs the mode. A key that turns on several layers is
+  walked as one effect per layer, so the walk may reach a state where only
+  some of them are on, which a person cannot;
+- the trackball, which turns on the pointer layer unless an auto-sniping
+  layer other than it, or a linked layer that starts its mode, keeps it off.
+  A link that a higher layer ends starts its mode, and so keeps the pointer
+  layer off, only while no layer above that linked layer is on; one that any
+  other layer ends, only while no layer outside both of the link's sets is
+  on. The pointer
+  layer, the default layers and Base never count as ending it.
+
+Only layers the keyboard runs in a link count: the pointer layer or a default
+layer in a link does nothing (`core/model/pointing-links.js`). Which source
+wins while another mode runs is not walked: a linked layer that starts its
+mode always counts as keeping the pointer layer off, even where a mode key
+held over it would let the pointer layer back.
 
 Holding is not limited by fingers, and a one-shot counts as a hold. So the
 walk finds every way out a person could, and never invents a trap.

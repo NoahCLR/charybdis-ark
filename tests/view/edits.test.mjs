@@ -17,7 +17,7 @@ import * as controls from "../../webview/view/controls.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../../webview/view/behavior-editor.mjs";
 import {shareHold} from "../../webview/view/share.mjs";
 import {durationMilliseconds, durationValue} from "../../webview/view/duration.mjs";
-import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, SHIPPED_SCROLL, dpiOptions, scrollStarter, modeDpi, newMode, readConfig, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
+import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, SHIPPED_SCROLL, dpiOptions, scrollStarter, modeDpi, newMode, readConfig, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
 const {SETTING} = require("../../core/schema/settings-domain-v1");
@@ -31,7 +31,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core"
 const {RGB_LOCALITIES} = require(path.join(here, "..", "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "..", "fixtures", "pd-profile"));
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90,
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81,
     featureFlags: require(path.join(here, "..", "..", "core", "protocol", "profile-wire-v1")).PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 
 test("the playback protection control stages a portable policy and Review/discard/undo preserve text", () => {
@@ -666,37 +666,47 @@ test("a pointing slot is posted whole, with its shortcuts as names", () => {
     assert.ok(after.directions.up.keycode > 0, "and the named shortcut became the keyboard's own value");
 });
 
-test("a mouse-button override is set up kind first, and reaches the keyboard once it is complete", () => {
+// The How it starts card's link: the layers that start the mode, the layers its key
+// turns on and what ends it, read into the slot's one record (linkRecord) and
+// accepted by the draft.
+test("a slot's link is set, changed and cleared through the posted record", () => {
     const draft = session();
-    const slot = decoded(draft).pdModes.find((candidate) => candidate.kind && candidate.buttons?.length);
-    const base = {kind: slot.kind, name: slot.name, dpi: String(slot.dpi)};
+    const base = (slot) => ({kind: slot.kind, name: slot.name, dpi: String(slot.dpi)});
     const post = (values) => {
-        const settled = settleButtons(slot, readConfig(slot, formOf({...base, ...values})));
-        stage(draft, edits.pdMode(slot.id, settled.config, draft.identity()));
-        return settled.pending;
+        const slot = decoded(draft).pdModes[1];
+        const config = readConfig(slot, formOf({...base(slot), ...values}));
+        stage(draft, edits.pdMode(1, config, draft.identity()));
+        return config;
     };
-    const stored = () => decoded(draft).pdModes[slot.id].buttons[0];
-    assert.equal(slot.buttons[0].kind, BUTTON.PASS_THROUGH, "the fixture's first button passes through");
+    const fields = (slot) => [slot.linkedLayers, slot.linkTurnsOn, slot.linkEnds];
+    const link = () => fields(decoded(draft).pdModes[1]);
+    assert.deepEqual(fields(post({linkedLayers: 1 << 3})), [1 << 3, 0, LINK_ENDS.NOTHING]);
+    assert.deepEqual(link(), [8, 0, 0]);
+    post({linkedLayers: 0b101000, linkTurnsOn: 0b1100000, linkEnds: LINK_ENDS.HIGHER_LAYER});
+    assert.deepEqual(link(), [0b101000, 0b1100000, 1], "the key's layers any mix, and a higher layer ends it");
+    post({linkedLayers: 0b101000, linkTurnsOn: 0b1100000, linkEnds: LINK_ENDS.OTHER_LAYER});
+    assert.deepEqual(link(), [0b101000, 0b1100000, 2]);
+    // Emptying the starting layers resets what ends the mode to Never.
+    assert.deepEqual(fields(post({linkedLayers: 0, linkTurnsOn: 0b1100000, linkEnds: LINK_ENDS.OTHER_LAYER})), [0, 0b1100000, 0]);
+    assert.deepEqual(link(), [0, 0b1100000, 0]);
+    // A form without the card's fields keeps the stored link.
+    assert.deepEqual(fields(readConfig(decoded(draft).pdModes[1], formOf(base(decoded(draft).pdModes[1])))), [0, 0b1100000, 0]);
+    assert.deepEqual(fields(post({linkedLayers: 0, linkTurnsOn: 0})), [0, 0, 0], "no link, every byte zero");
+    assert.deepEqual(link(), [0, 0, 0]);
+    assert.equal(draft.dirty, false);
+});
 
-    const pending = post({"button:0:kind": BUTTON.TAP, "button:0:tap": "", name: "Renamed"});
-    assert.equal(pending[0].kind, BUTTON.TAP, "a tap with no shortcut yet is held by the editor");
-    assert.equal(stored().kind, BUTTON.PASS_THROUGH, "and the keyboard keeps the stored override meanwhile");
-    assert.equal(decoded(draft).pdModes[slot.id].name, "Renamed", "while the rest of the record still lands");
-
-    assert.deepEqual(post({"button:0:kind": BUTTON.TAP, "button:0:tap": "KC_C"}), {});
-    assert.equal(stored().kind, BUTTON.TAP);
-    assert.ok(stored().tap.keycode > 0, "the shortcut arrives with its kind");
-
-    assert.deepEqual(post({"button:0:kind": BUTTON.HOLD_MODIFIERS, "button:0:modifiers": 0}), {0: {kind: BUTTON.HOLD_MODIFIERS, modifiers: 0, tap: {keycode: "0", modifierPolicy: 0, mask: 0}}},
-        "holding no modifiers is not storable yet");
-    post({"button:0:kind": BUTTON.HOLD_MODIFIERS, "button:0:modifiers": 2 | 128});
-    assert.equal(stored().kind, BUTTON.HOLD_MODIFIERS);
-    assert.equal(stored().modifiers, 2 | 128, "the switches reach the keyboard as its modifier mask");
-    assert.equal(stored().tap.keycode, 0, "and the earlier shortcut is dropped rather than refused");
-
-    post({"button:0:kind": BUTTON.PASS_THROUGH, "button:0:tap": "KC_C"});
-    assert.deepEqual(stored(), {kind: BUTTON.PASS_THROUGH, modifiers: 0, tap: {keycode: 0, modifierPolicy: 0, mask: 0}},
-        "pass through carries nothing it does not read");
+// Version 4 retired the mouse button overrides (firmware D-F22): a posted
+// record carries no button fields, and the draft refuses one that does.
+test("a pointing slot posts no button fields, and the draft takes none", () => {
+    const draft = session();
+    const slot = decoded(draft).pdModes[4];
+    const config = readConfig(slot, formOf({kind: slot.kind, name: "Renamed", dpi: String(slot.dpi)}));
+    assert.ok(!("buttons" in config));
+    stage(draft, edits.pdMode(4, config, draft.identity()));
+    assert.equal(decoded(draft).pdModes[4].name, "Renamed");
+    const withButtons = {...config, buttons: [{kind: 0}, {kind: 0}, {kind: 0}]};
+    assert.throws(() => stage(draft, edits.pdMode(4, withButtons, draft.identity())), /supported fields/);
 });
 
 test("a pointing mode picks its speed from the model's DPI list, and keeps a stored speed outside it", () => {
@@ -772,7 +782,7 @@ test("a directional mode posts how often it sends, and keeps it when the form do
     assert.equal(kept.directionOutput, 1, "switching axis keeps the choice");
     stage(draft, edits.pdMode(4, kept, draft.identity()));
     assert.equal(decoded(draft).pdModes[4].directionOutput, 1);
-    assert.equal(newMode({id: 7, buttons: [{}, {}, {}].map(() => ({kind: 0, modifiers: 0, tap: {keycode: 0, modifierPolicy: 0, mask: 0}}))}, KIND.DIRECTIONAL).directionOutput, 0,
+    assert.equal(newMode({id: 7}, KIND.DIRECTIONAL).directionOutput, 0,
         "a new mode sends every step");
 });
 
@@ -850,14 +860,12 @@ test("mouse buttons 3/4 stage with modifier policies, review, undo and complete 
     const config = readConfig(before, formOf({kind: KIND.DIRECTIONAL, name: before.name, dpi: before.dpi,
         axis: AXIS.EIGHT, "dir:left": "QK_MOUSE_BUTTON_3", "dir:right": "MS_BTN4",
         "dirPolicy:left": MODIFIER_POLICY.INHERIT, "dirPolicy:right": MODIFIER_POLICY.MASK, "dirMask:right": 2,
-        "diag:upLeft": "0x00d3", "diagPolicy:upLeft": MODIFIER_POLICY.EXACT,
-        "button:0:kind": BUTTON.TAP, "button:0:tap": "QK_MOUSE_BUTTON_1"}));
+        "diag:upLeft": "0x00d3", "diagPolicy:upLeft": MODIFIER_POLICY.EXACT}));
     stage(draft, edits.pdMode(4, config, draft.identity()));
     const after = decoded(draft).pdModes[4];
     assert.deepEqual(after.directions.left, {keycode: 0xd3, modifierPolicy: 0, mask: 0});
     assert.deepEqual(after.directions.right, {keycode: 0xd4, modifierPolicy: 1, mask: 2});
     assert.deepEqual(after.diagonals.upLeft, {keycode: 0xd3, modifierPolicy: 2, mask: 0});
-    assert.equal(after.buttons[0].tap.keycode, 0xd1, "an override may click its own physical button");
     const fields = draft.changes().find(change => change.unit === "pd:4").fields;
     assert.match(fields.find(field => field.label === "Left").after, /Mouse Button 3.*Inherit/);
     assert.match(fields.find(field => field.label === "Right").after, /Mouse Button 4.*Ignore/);
@@ -966,7 +974,7 @@ test("a new or switched-to scrolling mode scrolls like Dragscroll: its speed and
     // Without a scrolling mode to copy, the firmware's shipped Dragscroll.
     assert.deepEqual(scrollStarter([]), SHIPPED_SCROLL);
     assert.deepEqual([SHIPPED_SCROLL.dpi, SHIPPED_SCROLL.scroll.invert], [100, 2], "100 DPI, vertical reversed (pd_config.c)");
-    const directional = newMode({id: 7, buttons: []}, KIND.SCROLLING);
+    const directional = newMode({id: 7}, KIND.SCROLLING);
     assert.deepEqual([directional.dpi, directional.scroll.invert], [100, 2]);
     // A directional mode switched to scrolling takes the same speed and reversal.
     const arrow = decoded(draft).pdModes[4];
@@ -1286,13 +1294,12 @@ test("pointing macros stage inherit-only outputs and survive review, history and
     const config = readConfig(before, formOf({kind: 1, name: before.name, dpi: before.dpi, axis: AXIS.EIGHT,
         "dir:left": "MACRO_0", "dirPolicy:left": MODIFIER_POLICY.EXACT,
         "dir:right": "MACRO_127", "dirPolicy:right": MODIFIER_POLICY.MASK, "dirMask:right": 2,
-        "diag:upLeft": "MC_0", "button:0:kind": BUTTON.TAP, "button:0:tap": "0x7700"}));
+        "diag:upLeft": "MC_0"}));
     stage(draft, edits.pdMode(4, config, draft.identity()));
     const after = decoded(draft).pdModes[4];
     assert.deepEqual(after.directions.left, {keycode: 0x7700, modifierPolicy: 0, mask: 0});
     assert.deepEqual(after.directions.right, {keycode: 0x777f, modifierPolicy: 0, mask: 0});
     assert.equal(after.diagonals.upLeft.keycode, 0x7700);
-    assert.deepEqual(after.buttons[0].tap, after.directions.left);
     const fields = draft.changes().find(change => change.unit === "pd:4").fields;
     assert.match(fields.find(field => field.label === "Left").after, /Greeting.*Inherit/);
     assert.equal(draft.checks().filter(check => check.kind === "inertPointingMacro").length, 1);

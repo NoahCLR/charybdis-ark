@@ -25,7 +25,7 @@ test("settings in another version than current firmware's are refused, older or 
     const current = settings(), older = Buffer.concat([current.subarray(0, 404), current.subarray(660)]);
     older[0] = 7; older[6] = 0;
     await assert.rejects(readSettings(keyboard(older), ids()), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
-    const newer = Buffer.from(current); newer[0] = 9;
+    const newer = Buffer.from(current); newer[0] = 10;
     await assert.rejects(readSettings(keyboard(newer), ids()), {code: "FIRMWARE_UPDATE_REQUIRED"});
 });
 test("old firmware cannot silently produce a partial backup", async () => {

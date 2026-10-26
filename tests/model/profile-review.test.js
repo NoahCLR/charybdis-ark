@@ -168,6 +168,7 @@ test("a behaviour's allowed layers are named as every screen names them, never b
     assert.equal(field.after,[0,1,4,15].map(called).join(", "));
     assert.ok(field.after.split(", ").every(Boolean),"no layer is a blank name");
     assert.ok(!names[15],"the fixture leaves layer 15 unnamed"); assert.match(field.after,/Layer 15$/);
+    assert.deepEqual(field.afterMark,{kind:"layers",layers:[0,1,4,15].map(layer=>({layer,name:called(layer)}))},"each layer is marked");
 });
 test("a removed behaviour is marked removed and lists what it held, without its defaults", () => {
     const base=pdDocument(), before=snapshot(base), row=validateSnapshot(base).behaviors.rows[0];

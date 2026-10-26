@@ -24,7 +24,7 @@ for(const theme of ["dark","light"]) {
             const base=structuredClone(s.getModel());
             base.combos=[{id:0,inputs:['KC_LGUI','KC_RALT'],inputDisplays:['stale GUI','stale Alt'],output:'KC_A'}];
             base.pdModes[0].heldModifiers=132;
-            base.pdModes[0].buttons[0]={kind:3,modifiers:132,tap:{keycode:0,modifierPolicy:0,mask:0}};
+            base.pdModes[4].directions.up={keycode:82,modifierPolicy:1,mask:132};
             window.__hostBase=base;
             s.openComboBuilder(base.combos[0]);s.state.tab='combos';s.state.screen='keys';
         });
@@ -54,7 +54,7 @@ for(const theme of ["dark","light"]) {
         }
         await page.locator('.picker [data-act="use"]').click();
         expect(await page.evaluate(()=>window.__picked)).toBe('RGUI(KC_A)');
-        await page.evaluate(async()=>{const s=await import('/webview/store.mjs');s.state.screen='pointing';s.state.pdAdvanced=true;s.render();});
+        await page.evaluate(async()=>{const s=await import('/webview/store.mjs');s.state.screen='pointing';s.state.pdSlot=4;s.state.pdAdvanced=true;s.render();});
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
             await expect(page.getByRole('checkbox',{name:hostKeyLabel('Right GUI',host),exact:true}).first()).toHaveAttribute('aria-label',hostKeyLabel('Right GUI',host));

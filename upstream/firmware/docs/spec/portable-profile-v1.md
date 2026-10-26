@@ -51,7 +51,7 @@ left out:
    bytes are one profile; anything else means it changed during the read.
 
 The settings in a backup are the stored settings, never QMK's live copies
-(D-F32, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0032-live-edits-working-copy-and-save.md)). GET `0x07`
+(D-F32, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0032-live-edits-working-copy-and-save.md)). GET `0x07`
 reads the active settings domain alone, or the compiled defaults' when none is
 active ([settings domain](profile-wire-v1/settings-domain.md#settings-readback--get-0x07)).
 A keyboard adjustment (DPI or a lighting key) shows in QMK at once and reaches
@@ -102,7 +102,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`folded_keyboar
 ## Layers and their references
 
 The bank has sixteen layers, ids 0–15 (D-F14,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0014-bigger-profiles.md)); layer 0 is the base layer. A layer
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0014-bigger-profiles.md)); layer 0 is the base layer. A layer
 has no identity beyond its index, so the profile names layers by index
 throughout. `LT()` and `LM()` hold their layer in four bits, so every layer
 they can express is a bank layer; the five-bit layer actions (`MO()`, `TG()`,
@@ -118,11 +118,12 @@ together:
 | Keymap `0x60` | the layer's position in the domain; `LT`, `LM`, `MO`, `TG`, `TO`, `TT`, `OSL` and `LOCK_LAYER` keycodes |
 | Key behaviours `0x20` | layer actions as a row's target, tap or holds (action kinds 2 and 3, and kind-1 layer keycodes); each row's allowed-layers mask |
 | Combos `0x30` | layer actions as inputs or output; each row's allowed-layers mask |
-| Settings `0x40` | scalars 5 (auto-mouse pointer layer) and 9 (auto-sniping layer); scalars 23 (default layers), 29 and 30 (layer masks); the layer records, by position, and each record's combo reference layer; the layer names, by position |
+| Settings `0x40` | scalar 5 (auto-mouse pointer layer); scalars 9 (auto-sniping layers), 23 (default layers), 29 and 30 (layer masks); the layer records, by position, and each record's combo reference layer; the layer names, by position |
+| Pointing `0x50` | each slot's linked layers and the layers its key turns on (bytes 12..13 and 14..15 of its record, D-F62) |
 | Lighting `0x10` | each layer colour's layer id; each layer group row's selector (a layer, or `0xff` for all) |
 
-The pointing domain names no layer: a slot's pointer-layer byte is a policy,
-and layer keycodes are refused as pointing outputs
+In the pointing domain only a link names a layer: a slot's pointer-layer byte
+is a policy, and layer keycodes are refused as pointing outputs
 ([pointing domain](pd-mode-domain-v1.md)). The firmware checks every reference
 against the bank when it validates a profile; it cannot tell a moved layer
 from an edited one.
@@ -138,7 +139,7 @@ The keyboard validates the whole blob against the running firmware: schema,
 every domain version, the declared action-ABI digest, every ceiling and every
 action's placement. It becomes the next generation on both halves or nothing
 does. No part of a backup is translated (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0010-firmware-accepts-only-current-formats.md)): a blob in an
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0010-firmware-accepts-only-current-formats.md)): a blob in an
 earlier schema or domain version, or declared under another action-ABI digest,
 is refused.
 

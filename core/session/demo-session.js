@@ -45,7 +45,7 @@ const DEMO_DEVICE_ID = "demo";
 const DEMO_CAPABILITIES = Object.freeze({
     responseVersion: 3,
     protocol: Object.freeze({major: 2, minor: 0}),
-    schema: Object.freeze({major: 4, minor: 0}),
+    schema: Object.freeze({major: 4, minor: 1}),
     reportSize: 32,
     candidateChunkMax: 20,
     statusPageCount: 2,

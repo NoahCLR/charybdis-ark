@@ -127,13 +127,12 @@ test("eight directions draw and post every diagonal shortcut and modifier policy
     }
 });
 
-test("a direction's Ignore mask and mouse-button modifiers post each checkbox", async ({page}) => {
+test("a direction's Ignore mask posts each checkbox", async ({page}) => {
     await openControls(page, "pointing", {pdSlot: 4});
     await advanced(page);
     for (const [label, initial, expected] of [
         ["Up leaves out", 68, mask => ({directions: expect.objectContaining({up: expect.objectContaining({modifierPolicy: 1, mask})})})],
         ["Down leaves out", 68, mask => ({directions: expect.objectContaining({down: expect.objectContaining({modifierPolicy: 1, mask})})})],
-        ["Button 1 holds", 32, modifiers => ({buttons: expect.arrayContaining([expect.objectContaining({kind: 3, modifiers})])})],
     ]) {
         const group = editor(page).locator(".field").filter({has: page.locator(".pd-mods")}).filter({hasText: label});
         const controls = group.locator("[data-bit]");
@@ -150,24 +149,17 @@ test("a direction's Ignore mask and mouse-button modifiers post each checkbox", 
     }
 });
 
-test("button overrides wait for a complete shortcut or modifiers, then stage", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 0});
+// Version 4 retired the mouse button overrides (firmware D-F22): Advanced has
+// no table for them, and saving a mode posts no button fields.
+test("Advanced has no mouse button overrides, and a saved mode posts no button fields", async ({page}) => {
+    await openControls(page, "pointing", {pdSlot: 4});
     await advanced(page);
-    await field(page, "Button 1").selectOption("2");
-    await configPost(page, 0, {buttons: expect.arrayContaining([expect.objectContaining({kind: 0})])});
-    await clearPosts(page);
-    await change(field(page, "Button 1 shortcut"), "KC_A");
-    await configPost(page, 0, {buttons: expect.arrayContaining([expect.objectContaining({kind: 2, tap: expect.objectContaining({keycode: "KC_A"})})])});
-    await clearPosts(page);
-    await field(page, "Button 2").selectOption("3");
-    const modifiers = editor(page).locator(".field").filter({has: page.locator(".pd-mods")}).filter({hasText: "Button 2 holds"});
-    await expect(modifiers).toBeVisible();
-    await clearPosts(page);
-    await modifiers.locator('[data-bit="1"]').locator('..').click();
-    await configPost(page, 0, {buttons: expect.arrayContaining([expect.objectContaining({kind: 3, modifiers: 1})])});
-    await clearPosts(page);
-    await field(page, "Button 3").selectOption("1");
-    await configPost(page, 0, {buttons: expect.arrayContaining([expect.objectContaining({kind: 1})])});
+    await expect(editor(page).locator(".pd-buttons")).toHaveCount(0);
+    await expect(editor(page)).not.toContainText("Mouse button overrides");
+    await expect(editor(page).locator('[data-f^="pointing:4:button:"]')).toHaveCount(0);
+    await change(field(page, "Name"), "Arrow sentinel");
+    await configPost(page, 4, {name: "Arrow sentinel"});
+    expect((await posted(page))[0].config).not.toHaveProperty("buttons");
 });
 
 test("movement changes its form locally, and the first edit posts the new kind", async ({page}) => {
@@ -247,4 +239,110 @@ test("a pointing mode name counts bytes and flags one past the limit instead of 
     await name.fill("a".repeat(32));
     await expect(count).toHaveText("32 / 32 bytes");
     await expect(count).not.toHaveClass(/warn/);
+});
+
+// The How it starts card (firmware D-F62). The preview logs what is posted and never
+// applies it, so the slot the core would hand back is published by hand.
+async function publishSlot(page, id, link) {
+    await page.evaluate(async ({id, link}) => {
+        const {getModel} = await import("/webview/store.mjs");
+        const model = structuredClone(getModel());
+        Object.assign(model.pdModes.find(slot => slot.id === id), link);
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model,
+            acceptedEdit: {message: {type: "savePdMode"}, previousFingerprint: "before", fingerprint: "after"}}}));
+        window.__posted.length = 0;
+    }, {id, link});
+}
+
+test("the How it starts card posts the layers that start the mode, the layers its key turns on and what ends it", async ({page}) => {
+    await openControls(page, "pointing", {pdSlot: 1});
+    const card = editor(page).locator(".pd-starts");
+    // One card for how the mode starts: its keys, then the layers, then what ends it.
+    await expect(card.locator(".card-h h3")).toHaveText("How it starts");
+    await expect(card.locator(".card-h .note")).toHaveCount(0);
+    expect(await card.locator(".card-b > *").evaluateAll(nodes => nodes.map(node => node.className.split(" ")[0]))).toEqual(["note", "pd-lines", "layer-table"]);
+    await expect(card.locator('[data-act="place"]')).toBeVisible();
+    await expect(card.locator('[data-act="lighting"]')).toHaveCount(0);
+    await expect(editor(page).locator('.pd-identity [data-act="lighting"]')).toBeVisible();
+    const starts = n => page.locator(`[data-f="pointing:1:linkedLayers:${n}"]`);
+    const key = n => page.locator(`[data-f="pointing:1:linkTurnsOn:${n}"]`);
+    const sw = locator => page.locator("label.sw").filter({has: locator});
+    const rowOf = n => card.locator(".layer-table-row").filter({has: starts(n)});
+    const link = (fields) => ({linkedLayers: 0, linkTurnsOn: 0, linkEnds: 0, ...fields});
+    // One row per layer, in the tab order, with a switch in each of two columns.
+    const layers = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().layers.length);
+    await expect(card.locator(".layer-table-row:not(.layer-table-head)")).toHaveCount(layers);
+    await expect(card.locator(".layer-table-head")).toContainText("Starts this pointing mode");
+    await expect(card.locator(".layer-table-head")).toContainText("Turned on by this pointing mode's key");
+    // The default and pointer layers are dimmed rows that say why, both switches off limits.
+    await expect(rowOf(0)).toHaveClass(/unusable/);
+    await expect(rowOf(0)).toContainText("default layer, always on");
+    await expect(rowOf(4)).toContainText("pointer layer, follows the trackball");
+    for (const n of [0, 4]) { await expect(starts(n)).toBeDisabled(); await expect(key(n)).toBeDisabled(); }
+    await expect(card).not.toContainText("Not offered");
+    // A disabled switch looks disabled.
+    expect(await sw(starts(4)).locator(".track").evaluate(node => getComputedStyle(node).borderStyle)).toBe("dashed");
+    const ends = card.locator('[role="radiogroup"]');
+    await expect(ends).toHaveCount(0);
+
+    await sw(starts(3)).click();
+    await configPost(page, 1, link({linkedLayers: 1 << 3}));
+    await publishSlot(page, 1, link({linkedLayers: 1 << 3}));
+    await expect(ends).toHaveCount(1);
+    await expect(card.locator(".pd-link-ends")).toContainText("Ends when another layer turns on");
+    await expect(ends.locator('input[value="0"]')).toBeChecked();
+    await ends.locator("label").filter({hasText: "Any layer"}).click();
+    await configPost(page, 1, link({linkedLayers: 1 << 3, linkEnds: 2}));
+    await publishSlot(page, 1, {linkEnds: 2});
+    await sw(key(3)).click();
+    await configPost(page, 1, link({linkedLayers: 1 << 3, linkTurnsOn: 1 << 3, linkEnds: 2}));
+    // Navigation sits below the pointer layer, which this mode keeps: the
+    // core publishes that the pointer layer covers it, and the card says so.
+    await publishSlot(page, 1, {linkTurnsOn: 1 << 3, pointerCovers: 1 << 3});
+    await expect(card.locator(".callout.warn")).toContainText("Pointer, the pointer layer, sits above Navigation");
+    await sw(key(6)).click();
+    await configPost(page, 1, link({linkedLayers: 1 << 3, linkTurnsOn: (1 << 3) | (1 << 6), linkEnds: 2}));
+    await publishSlot(page, 1, {linkTurnsOn: (1 << 3) | (1 << 6)});
+    await expect(card.locator(".card-h .note")).toHaveText("also started by Navigation; its key turns on Navigation and Extra 2");
+    // Switching off the last starting layer resets what ends it to Never.
+    await sw(starts(3)).click();
+    await configPost(page, 1, link({linkTurnsOn: (1 << 3) | (1 << 6)}));
+    await publishSlot(page, 1, link({linkTurnsOn: (1 << 3) | (1 << 6)}));
+    await expect(ends).toHaveCount(0);
+    await sw(key(3)).click();
+    await configPost(page, 1, link({linkTurnsOn: 1 << 6}));
+});
+
+test("a layer that starts another mode cannot start this one and says so in its row, while its key switch stays usable", async ({page}) => {
+    await openControls(page, "pointing", {pdSlot: 2});
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.pdModeEditing.linkTargets[5], {linkedBy: 1, linkedByName: "Volume"});
+        store.setModel(model); store.render();
+    });
+    const starts = page.locator('[data-f="pointing:2:linkedLayers:5"]'), key = page.locator('[data-f="pointing:2:linkTurnsOn:5"]');
+    await expect(starts).toBeDisabled();
+    await expect(page.locator("label.sw").filter({has: starts})).toContainText("already starts Volume");
+    await expect(page.locator(".layer-table-row").filter({has: starts})).not.toHaveClass(/unusable/);
+    await expect(key).toBeEnabled();
+    await page.locator("label.sw").filter({has: key}).click();
+    await configPost(page, 2, {linkTurnsOn: 1 << 5});
+});
+
+test("Mouse: auto-sniping's layers post one switch each, beside its master switch", async ({page}) => {
+    await openControls(page, "mouse");
+    const fold = page.locator('[data-subfold="sniping:layers"]');
+    await expect(fold.locator(".fold-summary")).toHaveText("Only Navigation");
+    await fold.locator("summary").click();
+    await page.locator('label:has([data-f="setting:snipingOnLayer2"])').click();
+    await expectPost(page, {type: "updateConfigDefaults", sectionId: "sniping", expectedFingerprint: expect.any(String), fields: expect.arrayContaining([
+        {macro: "autoSniping", enabled: true}, {macro: "snipingOnLayer2", enabled: true}, {macro: "snipingOnLayer3", enabled: true}, {macro: "snipingOnLayer0", enabled: false},
+    ])});
+    await clearPosts(page);
+    await page.locator('label:has([data-f="setting:autoSniping"])').click();
+    await expectPost(page, {type: "updateConfigDefaults", sectionId: "sniping", expectedFingerprint: expect.any(String), fields: expect.arrayContaining([
+        {macro: "autoSniping", enabled: false}, {macro: "snipingOnLayer3", enabled: true},
+    ])});
 });

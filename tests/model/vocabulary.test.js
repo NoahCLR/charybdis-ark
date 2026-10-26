@@ -23,7 +23,8 @@ test("every stored enum value has a word", () => {
     assert.deepEqual(VOCABULARY.stages.filter((stage) => stage.bit).map((stage) => stage.bit).sort(), Object.values(rgb.RGB_STAGE_BITS).sort(), "stages");
     coversNumbers(VOCABULARY.pointing.kinds, pd.PD_KIND, "pointing kinds");
     coversNumbers(VOCABULARY.pointing.axes, pd.PD_AXIS, "axes");
-    coversNumbers(VOCABULARY.pointing.buttons, pd.PD_BUTTON, "button kinds");
+    coversNumbers(VOCABULARY.pointing.linkEnds, pd.PD_LINK_ENDS, "what ends a link's mode");
+    assert.deepEqual(Object.keys(VOCABULARY.pointing.linkInert).sort(), ["default", "pointer"], "each layer a link ignores, in the editor's row");
     coversNumbers(VOCABULARY.pointing.emptyDirection, pd.PD_EMPTY_DIRECTION, "empty direction");
     coversNumbers(VOCABULARY.pointing.directionOutput, pd.PD_DIRECTION_OUTPUT, "directional output");
     coversNumbers(VOCABULARY.pointing.scrollAxes, pd.PD_SCROLL_AXES, "scroll axes");

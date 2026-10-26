@@ -81,15 +81,19 @@ board, highest first, with the base at the bottom.
 - **Keys follow their layers**, on by default, renumbers every layer key
   (MO, LT, TG, TO, TT, OSL and the rest) so each still reaches the same layer
   after a move. Turned off, layer keys keep their numbers and reach whatever
-  layer now sits there. Names, colours and the pointer and sniping settings
-  move with their layer either way.
+  layer now sits there. A pointing mode's layers, those that start it and
+  those its key turns on, move as the layer keys do, so the keys that started
+  a mode still start it. Names, colours and the pointer and sniping settings
+  move with their layer either way. A move that would still put a pointing
+  mode's layer on the pointer layer or a default layer, or have one layer start
+  two modes, is refused and says why.
 
 Nothing changes until you press **Keep layers in draft**. **Discard** drops
 the moves, and so does closing the list any other way: Escape, or a click
 outside it.
 
 Make base swaps the two layers' roles: a key that reached the new base now
-reaches the old one. The new base's transparent keys become `KC_NO`, since
+reaches the old one, and so does a pointing mode's link. The new base's transparent keys become `KC_NO`, since
 there is nothing under the base for them to fall through to, and `KC_NO` on
 the old base becomes transparent. Review then checks what the move left
 behind, such as a layer nothing reaches any more.
@@ -112,7 +116,9 @@ what it falls through to is listed under **Through a transparent key**.
 ### Default layers
 
 **Settings → Default layers** sets which layers are always on underneath
-every other layer. Normally that is only the base. A key on the keyboard can
+every other layer. Normally that is only the base. A layer a pointing mode's
+link uses can't be a default layer
+([How it starts](pointing.md#how-it-starts)). A key on the keyboard can
 change this too, until the keyboard restarts.
 
 ## The workbench

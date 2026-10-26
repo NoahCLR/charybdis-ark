@@ -115,7 +115,7 @@ Each thing with a colour of its own has exactly one mark, drawn by
 | --- | --- |
 | A behaviour tier (tap, hold, long hold) | the dot the keyboard flashes when it resolves (`tierDot`) |
 | A tap count (2× and up) | its branch badge in its tap-branch colour (`branchBadge`) |
-| A layer | the board's icon in its layer colour (`kindIcon`) |
+| A layer | the board's icon in its layer colour (`kindIcon`); in a set of layers, before each layer's name (`valueMarked`) |
 | A pointing mode | the Pointing modes screen's icon in the light its slot paints (`kindIcon`, `slotLight`) |
 | A combo | its badge in the combo feedback colour (`comboBadge`) |
 | A lighting stage | its on/off dot |
@@ -184,7 +184,8 @@ below.
 | An Apply or Save cut short: the Apply verdicts (sent as `apply.failure.verdict`, which the bar draws), the sentence every such notice starts with, plain reasons for a lost connection, and the result a read shows after a Save cut short; no device path, code or developer word reaches a person | `core/session/interruption.js` | `tests/session/interruption.test.js`, `tests/session/portable-profile-session.test.js`, `tests/session/live-edits.test.js` |
 | Panel state fields declare their initial value and draft-replacement policy together | `webview/store.mjs`, `webview/view/state-fields.mjs` | `tests/view/state-fields.test.mjs` |
 | Lighting: one `webview/ui/lighting/` module per stage, posting the shared edit builders | `webview/ui/lighting.mjs` | `browser-tests/lighting-controls.spec.js` |
-| Pointing: the slot editor holds pending button and modifier choices until a complete record posts | `webview/ui/pointing.mjs`, `webview/ui/pointing/` | `browser-tests/pointing-controls.spec.js` |
+| Pointing: the slot editor holds a direction set to Ignore until its modifiers are chosen, and posts the complete record | `webview/ui/pointing.mjs`, `webview/ui/pointing/` | `browser-tests/pointing-controls.spec.js` |
+| Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key, and why not, published as `pdModeEditing.linkTargets`. The How it starts card (the mode's keys, then its layers, then what ends it; the slot's light sits in its identity card) draws the layers with the shared per-layer switches (`webview/ui/layer-switches.mjs`, whose grid Settings' layer groups use), as a table: a row per layer, a "Starts this pointing mode" and a "Turned on by this pointing mode's key" switch, each titled for the layer in its row. A default layer or the pointer layer is a dimmed row saying why in it, both switches disabled; a layer that starts another mode has its "Starts" switch disabled and says "already starts" that mode in the row, its key switch usable. A changed link naming one is refused when staged, and so is a settings change that makes a layer a link names the pointer layer or a default layer (`settingsLinkRefusal`, staged by `core/model/settings-editor.js`); a layer reorder renumbers a link as it renumbers layer keys (the base swap and Keys follow their layers included) and refuses, in words, a move that would still leave a link ignored or one layer starting two modes (`reorderLinkRefusal`, `core/model/portable-profile.js`); a stored layer the keyboard ignores (in an imported profile, say) stays switchable off, said beside it and as a Review warning. Review names each layer of a link, and of a behaviour's or combo's allowed layers, after its mark (a `layers` review mark). What ends the mode is a segmented radio group shown only beside starting layers; the posted record resets it to Never with the last of them. A copied mode keeps the layers its key turns on, not those that start it. Whether the pointer layer covers a layer the mode's key turns on is core's, published per slot as `pdModes[].pointerCovers` | `core/model/pointing-links.js`, `webview/view/pointing-link.mjs` | `tests/model/pointing-links.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `browser-tests/pointing-controls.spec.js` |
 | Device facts, the review sheet, the unsaved-demo dialog; the app keeps routing, rendering, focus and scroll, and window keys | `webview/ui/device.mjs`, `ui/review-overlay.mjs`, `ui/leave-demo.mjs` | (no test) |
 
 ## Key names and the picker
@@ -234,8 +235,7 @@ A name the catalog gives a key is what the key does wherever it is placed
 
 ## Pointing tap outputs
 
-Straight directions, diagonals and physical-button tap overrides share one tap
-vocabulary, owned by `core/schema/pd-mode-domain-v1.js`: keys, mouse buttons
+Straight directions and diagonals share one tap vocabulary, owned by `core/schema/pd-mode-domain-v1.js`: keys, mouse buttons
 1–8 (firmware D-F22) and macros (firmware D-F23), which take inherit
 policy and mask zero. Mouse movement, wheel, acceleration and
 modifier-wrapped mouse codes are refused, and backups keep click and macro
@@ -255,7 +255,7 @@ records exactly (`tests/schema/pd-mode-domain-v1.test.js`).
 
 A custom key's optional shortcut (firmware D-F26) is its own action (D-L63):
 a modifier mask and one key (none, a basic key or a mouse button); both zero
-is no shortcut. Ark reads and writes settings version 8 only (D-L64;
+is no shortcut. Ark reads and writes settings version 9 only (D-L64;
 `tests/schema/settings-domain-v1.test.js`).
 
 - The Custom keys screen edits it through `updateCustomKeyShortcut`, with key

@@ -31,9 +31,12 @@ function completeFixture() {
     const tap = () => ({keycode: 4, modifierPolicy: 1, mask: 1});
     for (const direction of Object.keys(modes[0].directions)) modes[0].directions[direction] = tap();
     for (const diagonal of Object.keys(modes[0].diagonals)) modes[0].diagonals[diagonal] = tap();
-    modes[0].buttons = [{kind: 2, modifiers: 0, tap: tap()}, {kind: 3, modifiers: 1, tap: {keycode: 0, modifierPolicy: 0, mask: 0}}, modes[0].buttons[2]];
+    // Linked, its key turning layers on and another layer ending it, so every
+    // link field can change.
+    Object.assign(modes[0], {linkedLayers: 1 << 6, linkTurnsOn: (1 << 6) | (1 << 9), linkEnds: 2});
     modes[1] = {...decoded.pdModes[0], id: 1};
-    modes[8] = structuredClone(modes[0]); modes[8].id = 8;
+    // A copy starts from another layer: a layer starts one mode.
+    modes[8] = {...structuredClone(modes[0]), id: 8, linkedLayers: 1 << 7, linkTurnsOn: 1 << 9, linkEnds: 1};
     for (const output of Object.values(modes[8].diagonals)) { output.modifierPolicy = 0; output.mask = 0; }
     value = rewrite(value, PROFILE_DOMAINS.find(row => row.key === "pdModes"), modes, decoded.codecOptions);
     const behaviors = structuredClone(decoded.behaviors);

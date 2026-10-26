@@ -131,7 +131,6 @@ export interface MacroOptions {
 }
 
 export interface PdTap {keycode: number; modifierPolicy: number; mask: number}
-export interface PdButton {kind: number; modifiers: number; tap: PdTap}
 export interface PdSlot {
     id: number;
     kind: number;
@@ -140,21 +139,25 @@ export interface PdSlot {
     dpi: number;
     heldModifiers: number;
     name: string;
+    /** The linked layers, bit n layer n: the layers that start the mode (firmware D-F62). */
+    linkedLayers: number;
+    /** The layers the mode's key turns on while it runs the mode, bit n layer n, any mix. */
+    linkTurnsOn: number;
+    /** PD_LINK_ENDS: what ends a mode its linked layers started, 0 nothing, 1 a higher layer, 2 any other layer. */
+    linkEnds: number;
     thresholdX: number;
     thresholdY: number;
     directions: Record<string, PdTap>;
-    buttons: PdButton[];
     scroll: Record<string, number>;
     diagonals: Record<string, PdTap>;
     emptyDirection: number;
     directionOutput: number;
 }
-export type PdSlotInput = Partial<Omit<PdSlot, 'buttons' | 'directions' | 'diagonals'>> & {
+export type PdSlotInput = Partial<Omit<PdSlot, 'directions' | 'diagonals'>> & {
     id: number;
     name: string;
     directions?: Record<string, Partial<PdTap>>;
     diagonals?: Record<string, Partial<PdTap>>;
-    buttons?: {kind?: number; modifiers?: number; tap?: Partial<PdTap>}[];
 };
 
 export interface Hsv {h: number; s: number; v: number}

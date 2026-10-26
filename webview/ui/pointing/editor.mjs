@@ -1,7 +1,7 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {NAME_TIP} from "../../view/names.mjs";
-import {KIND, dpiOptions, readConfig, scrollStarter, settleButtons, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
+import {KIND, dpiOptions, readConfig, scrollStarter, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
 import {post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {mark} from "../marks.mjs";
@@ -9,8 +9,9 @@ import {bindingName, words} from "./common.mjs";
 import {formControls} from "./form-controls.mjs";
 import {countNameBytes} from "../title-name.mjs";
 import {movement} from "./movement.mjs";
-import {slotReach} from "./reach.mjs";
+import {lightRow} from "./keys-and-light.mjs";
 import {advancedControls} from "./advanced.mjs";
+import {startCard} from "./link.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
 export function editor(model, slot, canEdit, slots) {
@@ -53,17 +54,17 @@ export function editor(model, slot, canEdit, slots) {
         {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(/** @type {HTMLSelectElement} */ (event.target).value)}; render(); }}));
     headBody.append(select("Pointer speed while active", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: "Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in Mouse → Pointer speed."}));
+    // Its light, beside the mark that shows it.
+    headBody.append(lightRow(model, slot));
     wrap.append(head);
 
     const controls = {form, disabled, field, select, shortcut, modifiers};
-    wrap.append(movement(model, slot, scrolling, controls), slotReach(model, slot, canEdit), advancedControls(model, slot, scrolling, controls));
+    wrap.append(movement(model, slot, scrolling, controls), startCard(model, slot, canEdit, controls), advancedControls(model, slot, scrolling, controls));
 
     stageCurrent = () => {
-        const buttons = settleButtons(slot, readConfig(slot, form));
-        const {config, pending} = settleTaps(slot, buttons.config);
-        const holding = Object.keys(buttons.pending).length > 0 || Object.keys(pending).length > 0;
-        const held = Boolean(state.pdButtons || state.pdTaps);
-        state.pdButtons = Object.keys(buttons.pending).length ? {slot: slot.id, rows: buttons.pending} : null;
+        const {config, pending} = settleTaps(slot, readConfig(slot, form));
+        const holding = Object.keys(pending).length > 0;
+        const held = Boolean(state.pdTaps);
         state.pdTaps = Object.keys(pending).length ? {slot: slot.id, rows: pending} : null;
         post(edits.pdMode(slot.id, config, model.profileIdentity));
         // A new kind draws its own field, even when nothing new was stored.
@@ -76,7 +77,6 @@ export function editor(model, slot, canEdit, slots) {
 
     /** @type {HTMLButtonElement} */ (head.querySelector('[data-act="clear"]')).addEventListener("click", () => {
         state.pdKind = null;
-        state.pdButtons = null;
         state.pdTaps = null;
         post(edits.clearPdMode(slot.id, model.profileIdentity));
     });

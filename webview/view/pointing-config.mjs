@@ -8,14 +8,17 @@
  * @typedef {import("../../contracts/edits.js").PdConfig} PdConfig
  * @typedef {import("../../contracts/edits.js").PdSlot} PdSlot
  * @typedef {import("../../contracts/edits.js").PdTap} PdTap
- * @typedef {import("../../contracts/edits.js").PdButton} PdButton
  * @typedef {import("../../contracts/edits.js").Scalar} Scalar
  */
 
 import {macroIndex} from "./keyvalues.mjs";
 
 export const KIND = {DIRECTIONAL: 1, SCROLLING: 2};
-export const BUTTON = {PASS_THROUGH: 0, CONSUME: 1, TAP: 2, HOLD_MODIFIERS: 3};
+// A slot's link (firmware D-F62): two layer masks, the layers that start the
+// mode and the layers its key turns on, and what ends a mode its layers
+// started: a higher layer, or any layer outside both sets. Every link field
+// zero is no link.
+export const LINK_ENDS = {NOTHING: 0, HIGHER_LAYER: 1, OTHER_LAYER: 2};
 // What a direction's shortcut does with modifiers held while it sends: they
 // apply, the chosen ones are left out, or the shortcut is sent exactly.
 export const MODIFIER_POLICY = {INHERIT: 0, MASK: 1, EXACT: 2};
@@ -131,11 +134,7 @@ export function readConfig(slot, form) {
         name: form.name(),
         dpi: number(form.dpi(), slot.dpi),
         pointerLayer: form.pointerLayer ? form.pointerLayer() : slot.pointerLayer,
-        buttons: (slot.buttons || []).map((button, index) => buttonRecord({
-            kind: form[`button:${index}:kind`]?.() ?? button.kind,
-            modifiers: form[`button:${index}:modifiers`]?.() ?? button.modifiers,
-            tap: {...button.tap, keycode: form[`button:${index}:tap`]?.() ?? button.tap?.keycode},
-        })),
+        ...linkRecord(slot, form),
     };
     if (kind === KIND.DIRECTIONAL) {
         const axis = form.axis ? form.axis() : slot.axis;
@@ -176,6 +175,17 @@ export function readConfig(slot, form) {
     return config;
 }
 
+// A slot's link as the keyboard stores it, from the How it starts card. What ends
+// the mode goes back to Never with the last layer that starts it, which it
+// needs.
+/** @param {PdSlot} slot @param {import("../../contracts/edits.js").PdForm} form @returns {Pick<PdConfig, "linkedLayers" | "linkTurnsOn" | "linkEnds">} */
+function linkRecord(slot, form) {
+    const layers = form.linkedLayers ? form.linkedLayers() : slot.linkedLayers;
+    const turnsOn = form.linkTurnsOn ? form.linkTurnsOn() : slot.linkTurnsOn;
+    const ends = layers ? (form.linkEnds ? form.linkEnds() : slot.linkEnds) : LINK_ENDS.NOTHING;
+    return {linkedLayers: layers, linkTurnsOn: turnsOn, linkEnds: ends};
+}
+
 // One direction's shortcut as the keyboard stores it: no shortcut stores
 // nothing at all, and a modifier mask goes only with "Ignore", which needs
 // one. Clearing a shortcut that left out modifiers therefore posts an empty
@@ -195,7 +205,7 @@ export const TAP_ROWS = [...DIRECTIONS.map(([name, label]) => ({key: `dir:${name
     ...DIAGONALS.map(([name, label]) => ({key: `diag:${name}`, group: /** @type {const} */ ("diagonals"), name, label}))];
 // "Ignore" is stored only with the modifiers it leaves out, and they are
 // chosen after it, so until then the direction posts as the slot stored it
-// and the editor holds the choice, as it does for button overrides.
+// and the editor holds the choice.
 /** @param {PdSlot} slot @param {PdConfig} config */
 export function settleTaps(slot, config) {
     /** @type {Record<string, PdTap>} */
@@ -230,43 +240,4 @@ export function thresholdDistance(counts, dpi) {
     if (!value || !speed) return null;
     const mm = value / speed * 25.4, text = mm < 10 ? mm.toFixed(1) : String(Math.round(mm));
     return {short: `≈ ${text} mm`, long: `Sensor counts: about ${text} mm of ball movement at ${speed} DPI.`};
-}
-
-// One mouse-button override as the keyboard stores it: a shortcut only when
-// it taps one, modifiers only when it holds them, and the rest zero, which
-// the keyboard requires. A shortcut left behind by an earlier kind is dropped
-// rather than refused.
-/** @param {{kind: number, modifiers?: Scalar, tap?: Partial<PdTap>}} button @returns {PdButton} */
-export function buttonRecord({kind, modifiers, tap}) {
-    return {
-        kind,
-        modifiers: kind === BUTTON.HOLD_MODIFIERS ? Number(modifiers) || 0 : 0,
-        tap: kind === BUTTON.TAP
-            ? tapRecord(tap || {})
-            : {keycode: "0", modifierPolicy: 0, mask: 0},
-    };
-}
-// Whether the keyboard can store the override yet: tapping a shortcut needs
-// the shortcut, holding modifiers needs at least one.
-/** @param {PdButton} button */
-export function buttonReady(button) {
-    if (button.kind === BUTTON.TAP) return String(button.tap?.keycode ?? "0") !== "0";
-    if (button.kind === BUTTON.HOLD_MODIFIERS) return Number(button.modifiers) !== 0;
-    return true;
-}
-// A record read from the form, split into what can be posted now and the
-// button overrides still being set up. The kind and its field are chosen one
-// after the other, and the keyboard refuses either alone, so an unfinished
-// override posts as the slot stored it and is held by the editor until it is
-// complete; the rest of the record still reaches the draft.
-/** @param {PdSlot} slot @param {PdConfig} config */
-export function settleButtons(slot, config) {
-    /** @type {Record<number, PdButton>} */
-    const pending = {};
-    const buttons = config.buttons.map((button, index) => {
-        if (buttonReady(button)) return button;
-        pending[index] = button;
-        return buttonRecord(slot.buttons[index]);
-    });
-    return {config: {...config, buttons}, pending};
 }

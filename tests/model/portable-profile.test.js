@@ -253,10 +253,10 @@ test("a keyboard storing a domain in another version than current firmware's is 
     v7[0] = 7; v7[6] = 0;
     const blob = decodeProfileBlob(source.profile);
     const live = encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x40 ? {...domain, version: 7, payload: v7} : domain)},
-        {domainVersions: {0x10: 4, 0x20: 2, 0x30: 3, 0x40: 7, 0x50: 3, 0x60: 1, 0x70: 1}});
+        {domainVersions: {0x10: 4, 0x20: 2, 0x30: 3, 0x40: 7, 0x50: 4, 0x60: 1, 0x70: 1}});
     const combos = {defaultTermMs: 50, holdTermMs: 200, rows: []};
     assert.throws(() => materializeProfile(live, live, combos, current), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
-    assert.throws(() => materializeProfile(source.candidate, source.candidate, combos, Buffer.from([9, ...current.subarray(1)])), /settings/i, "settings in another version are refused");
+    assert.throws(() => materializeProfile(source.candidate, source.candidate, combos, Buffer.from([10, ...current.subarray(1)])), /settings/i, "settings in another version are refused");
     assert.doesNotThrow(() => materializeProfile(source.candidate, source.candidate, combos, current));
 });
 

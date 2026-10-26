@@ -59,6 +59,15 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
             review: read(box(reviewItem(model, {unit: "x", title: "Right Option", status: "changed", fields: [
                 {label: "Hold", status: "changed", before: "Hold Navigation", after: "Zoom", beforeMark: {kind: "layer", layer: NAVIGATION}, afterMark: {kind: "pointing", slot: ZOOM}},
             ]}))),
+            // A set of layers, as a pointing link's: each name after its mark.
+            layerSet: (() => {
+                const node = box(reviewItem(model, {unit: "x", title: "Volume", status: "changed", fields: [
+                    {label: "Layers that start this pointing mode", status: "changed", before: "None", after: "Base, Navigation",
+                        afterMark: {kind: "layers", layers: [{layer: 0, name: "Base"}, {layer: NAVIGATION, name: "Navigation"}]}},
+                ]}));
+                return {icons: node.querySelectorAll(".ins .kind-icon.layer").length, names: [...node.querySelectorAll(".ins .mk")].map((entry) => entry.textContent),
+                    text: node.querySelector(".ins")?.textContent};
+            })(),
             // A colour value in the review keeps its swatch beside the value.
             colour: box(reviewItem(model, {unit: "x", title: "Navigation", status: "changed", titleMark: {kind: "layer", layer: NAVIGATION}, fields: [
                 {label: "Colour", status: "changed", before: "off", after: "HSV(85, 255, 255)", afterColour: {h: 85, s: 255, v: 255}},
@@ -71,6 +80,7 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
     expect(drawn.owners, "Lighting's LED groups name their owners by mark").toEqual(["layer", "pointing"]);
     expect(drawn.review).toEqual({icons: ["layer", "pointing"], swatches: 0});
     expect(drawn.colour).toBe(1);
+    expect(drawn.layerSet, "a set of layers marks each layer before its name").toEqual({icons: 2, names: ["Base", "Navigation"], text: "Base, Navigation"});
 });
 
 test("the hover card's title and the Combos table mark a layer by its icon", async ({page}) => {

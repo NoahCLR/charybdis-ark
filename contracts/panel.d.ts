@@ -42,6 +42,11 @@ export interface CatalogEntry {value: string; key: string; label: string; group:
 export interface MacroSlot {keycode: string; name: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
 /** A custom key's shortcut: a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI) and one key, 0 for none. */
 export interface CustomKeyShortcut {mods: number; key: number}
+/**
+ * A layer as a pointing slot's link target: `refusal` is why the keyboard would ignore a link to it, "" when it would not;
+ * `inert` names the kind of layer the keyboard ignores in a link, for the editor's row; `linkedBy` is the slot whose mode the layer starts.
+ */
+export interface PdLinkTarget {layer: number; refusal: string; inert: 'default' | 'pointer' | ''; linkedBy: number | null; linkedByName: string}
 /** `shortcutLabel` names the shortcut in the host's words ("Left Ctrl + Right Alt + K"), empty for none. */
 export interface CustomKey {slot: number; keycode: string; code: number; name: string; hasBehavior: boolean; shortcut: CustomKeyShortcut; shortcutLabel: string}
 export type PresentedField = SettingField & {value: string; enabled?: boolean; ms?: string; whole?: string};
@@ -104,8 +109,13 @@ export interface PublishedModel {
     vocabulary: Vocabulary & {pickerModifiers: {bit: number; value: string; label: string}[]};
     layers: Layer[];
     hostLayoutLegends: Record<string, string[]> | null;
-    pdModes: (PdSlot & {displayName: string; binding: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}})[];
-    pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; tapKeys: {plain: string[]; modified: string[]}};
+    /** `pointerCovers`: the layers the slot's key turns on that the pointer layer covers while the mode keeps it, bit n layer n (core/model/pointing-links.js). */
+    pdModes: (PdSlot & {displayName: string; binding: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}; pointerCovers: number})[];
+    pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; tapKeys: {plain: string[]; modified: string[]};
+        /** Every layer as a link target (core/model/pointing-links.js): why the keyboard would ignore it in a link ("" when it would not), and the slot whose link names it. */
+        linkTargets: PdLinkTarget[];
+        /** The pointer layer, which names what covers a slot's `pointerCovers`. */
+        pointerLayer: number | null};
     keyBehaviors: BehaviorView[];
     behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, KeyBehaviorDefaults>};
     profileIdentity: Partial<BaseIdentity> | null;

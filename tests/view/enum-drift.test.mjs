@@ -1,5 +1,5 @@
-// The webview keeps a few wire numbers of its own — pointing kinds, axes and
-// button kinds, modifier bits — because its pure modules need them at import
+// The webview keeps a few wire numbers of its own — pointing kinds, axes,
+// what ends a link's mode, modifier bits — because its pure modules need them at import
 // time and it may not import core/. They are the keyboard's numbers, so they
 // are pinned here to the schema that defines them: a change there fails here,
 // not on a keyboard.
@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {AXIS, BUTTON, KIND, MODIFIER_POLICY, SCROLL_AXES} from "../../webview/view/pointing-config.mjs";
+import {AXIS, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES} from "../../webview/view/pointing-config.mjs";
 import {modifierBits, modifierNames} from "../../webview/view/keyvalues.mjs";
 import {TIER_FIELDS} from "../../webview/view/edits.mjs";
 import {PD_MODE_IDS} from "../../webview/view/lighting.mjs";
@@ -24,7 +24,7 @@ test("the webview's pointing numbers are the schema's", () => {
     assert.deepEqual(AXIS, {VERTICAL: pd.PD_AXIS.VERTICAL, HORIZONTAL: pd.PD_AXIS.HORIZONTAL, DOMINANT: pd.PD_AXIS.DOMINANT, EIGHT: pd.PD_AXIS.EIGHT});
     assert.deepEqual(SCROLL_AXES, {...pd.PD_SCROLL_AXES});
     assert.deepEqual(MODIFIER_POLICY, {...pd.PD_MODIFIERS});
-    assert.deepEqual(BUTTON, {PASS_THROUGH: pd.PD_BUTTON.PASS_THROUGH, CONSUME: pd.PD_BUTTON.CONSUME, TAP: pd.PD_BUTTON.TAP, HOLD_MODIFIERS: pd.PD_BUTTON.HOLD_MODIFIERS});
+    assert.deepEqual(LINK_ENDS, {...pd.PD_LINK_ENDS});
 });
 
 test("the webview's name limit is the schema's", () => {

@@ -11,6 +11,7 @@ const {decodeComboDomain, encodeComboDomain, runningComboRows} = require("../sch
 const {keycodeAction, knownActionAbi, layerRef} = require("../schema/actions");
 const {comboPlacementProblem} = require("./profile-placement");
 const {pointingTaps} = require("./pointing-taps");
+const {linkRefusal} = require("./pointing-links");
 const {comboTableOf} = require("./portable-profile");
 const {editKeyBehaviors} = require("./key-behavior-edits");
 const {inDomain} = require("./draft-edits");
@@ -155,10 +156,21 @@ function editDeviceProfile(bytes, message, context = {}) {
             const source = integer(message.source, slots.length - 1, "Source slot");
             if (slots[id].kind || !slots[source].kind || id === source) throw invalid("Choose a configured source and an empty destination slot.");
             // A copy is named as one, and takes the source's colour row with
-            // it, as the PD domain spec says a duplicate does.
-            slots[id] = {...structuredClone(slots[source]), id, name: copyName(slots[source].name)};
+            // it, as the PD domain spec says a duplicate does. It keeps the
+            // layers its key turns on, which any number of keys may share, but
+            // not the layers that start the source: a layer starts one mode
+            // (firmware D-F62), and what ends the mode goes with them.
+            slots[id] = {...structuredClone(slots[source]), id, name: copyName(slots[source].name), linkedLayers: 0, linkEnds: 0};
             copyPdColour(profile, source, id, context);
-        } else slots[id] = {...structuredClone(message.config), id};
+        } else {
+            const stored = slots[id];
+            slots[id] = {...structuredClone(message.config), id};
+            // A link the keyboard would refuse or ignore is refused in words
+            // before the encoder's bare refusal (pointing-links.js).
+            const settings = decodeSettings(existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.SETTINGS, "Settings").payload);
+            const refusal = linkRefusal(settings, slots, slots[id], stored);
+            if (refusal) throw invalid(refusal);
+        }
         const keyValues = keycodeValues();
         /** @param {import("../../contracts/edits.js").PdTap | undefined} tap */
         const convertTap = tap => {
@@ -169,7 +181,6 @@ function editDeviceProfile(bytes, message, context = {}) {
         };
         Object.values(slots[id].directions || {}).forEach(convertTap);
         Object.values(slots[id].diagonals || {}).forEach(convertTap);
-        slots[id].buttons?.forEach(button => convertTap(button.tap));
         // Each shortcut is one the keyboard can send, said in words before the
         // encoder's bare refusal.
         for (const {label, tap} of pointingTaps(slots[id])) {

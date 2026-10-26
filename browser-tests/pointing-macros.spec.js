@@ -9,9 +9,9 @@ const {draftBinding} = require("../core/session/panel-session-state");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 
 for (const theme of ["dark", "light"]) {
-    test(`pointing macro picks stage directions, diagonals and buttons (${theme})`, async ({page}) => {
+    test(`pointing macro picks stage directions and diagonals (${theme})`, async ({page}) => {
         const value = document();
-        const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+        const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
         draft.stage({type: "updateMacro", keycode: "MACRO_0", payload: "777", name: "Greeting <&>", draftId: draft.id, draftRevision: draft.revision});
@@ -64,16 +64,6 @@ for (const theme of ["dark", "light"]) {
         await page.locator('[data-f="pointing:4:directionOutput"]').selectOption("1");
         await stagePosts();
         await expect(page.locator(".pd-cross")).not.toContainText("Busy triggers are dropped");
-        // Button 2 already taps a shortcut in the fixture. Choose a macro there.
-        await clearPosts(page);
-        await page.locator('label:has(input[data-f="pointing:4:button:1:tap"]) button').click();
-        const picker = page.getByRole("dialog", {name: "Pick a keycode"});
-        await picker.locator('[data-sec="macros"]').click();
-        await picker.locator('[data-pick="MACRO_0"]').click();
-        await picker.locator('[data-act="use"]').click();
-        const message = await stagePosts();
-        expect(message.config.buttons[1].tap).toEqual({keycode: "MACRO_0", modifierPolicy: 0, mask: 0});
-        expect(validateSnapshot(draft.document).pdModes[4].buttons[1].tap.keycode).toBe(0x7700);
-        await expect(page.locator(".pd-buttons")).toContainText("Inherit modifiers · the macro continues after its trigger");
+        expect(validateSnapshot(draft.document).pdModes[4].directions.left.keycode).toBe(0x7700);
     });
 }

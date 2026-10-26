@@ -12,6 +12,7 @@ const {hostLayouts} = require("../data/host-layouts");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
 const {layerName, VOCABULARY} = require("./vocabulary");
+const {settingsLinkRefusal} = require("./pointing-links");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @param {Partial<import("../../contracts/model.js").StoredSettingField>} [extra] @returns {import("../../contracts/model.js").StoredSettingField} */
@@ -79,9 +80,9 @@ const sections = [
         number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", undefined, {tooltip: "Trackball sensitivity for ordinary pointer movement. Higher DPI moves the cursor farther for the same ball movement.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
         number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", undefined, {tooltip: "Trackball sensitivity while sniping is active, including auto-sniping. Lower DPI gives finer cursor control.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
+    // Its layers, one switch each, are added with the layers' names below.
     {id: "sniping", label: "Auto-sniping", area: "Mouse", fields: [
-        toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while the selected layer is active."),
-        layer("snipingLayer", SETTING.AUTO_SNIPING_LAYER, "Auto-sniping layer", "Use sniping DPI while this layer is active and Auto-sniping is on."),
+        toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while any of its layers is on. Off keeps the layers chosen."),
     ]},
     {id: "autoMouse", label: "Auto-mouse", area: "Mouse", fields: [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
@@ -209,6 +210,10 @@ function settingsSections(snapshot, settings) {
     const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
     // Each section's one-per-layer switches are one setting to a person: the
     // interface draws them as one row of layers, worded by `layerGroup`.
+    // Auto-sniping follows a set of layers beside its master switch.
+    const sniping = /** @type {import("../../contracts/model.js").SettingsSection} */ (result.find(section => section.id === "sniping"));
+    sniping.layerGroup = {label: "Auto-sniping layers", hint: "Sniping speed while any of these layers is on. Each also keeps a separate pointer layer off, so its own keys stay under your hand while you mouse."};
+    sniping.fields.push(...everyLayer(i => ({...toggle(`snipingOnLayer${i}`, SETTING.AUTO_SNIPING_LAYERS, `On ${name(i)}`, "Use sniping speed while this layer is on."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}})));
     result.push({id: "startupLayers", area: "Settings", label: "Default layers", search: "startup layers always on default_layer_state",
         layerGroup: {label: "Default layers", hint: "Always on underneath every other layer. Normally only Base. QMK calls these default layers."}, fields:
         everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer a default layer: always on underneath every other layer. Keep at least one on; a higher default layer covers a lower one.", bitMask: 2 ** i, keyboardKeys: true, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
@@ -344,6 +349,10 @@ function editSettings(snapshot, message, capabilities) {
     if (section.id === "host") followHostOs(value.settings.values, before, snapshot.hostOs?.detected);
     if (!value.settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one default layer on.");
     if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
+    // The pointer layer and the default layers never move onto a layer a
+    // pointing mode's link names (firmware D-F62; pointing-links.js).
+    const linkRefusal = settingsLinkRefusal({values: before, names: value.settings.names}, value.settings, value.pdModes || []);
+    if (linkRefusal) throw fail(linkRefusal);
     // A timing displayed as default follows that default, including an older
     // profile's explicit value equal to it. Adopt inheritance only for changed
     // defaults; unrelated settings edits never rewrite behaviour rows.

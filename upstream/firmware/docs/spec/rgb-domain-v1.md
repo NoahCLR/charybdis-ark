@@ -16,7 +16,7 @@ lighting ceilings a build reports are on
 All integers are unsigned; multibyte integers are little-endian. A colour is
 three bytes, hue, saturation, value. Hue and saturation take `0..255`; value
 is at most the build's `RGB_MATRIX_MAXIMUM_BRIGHTNESS`, which GET `0x08`
-page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
+page 1 reports (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0038-keyboard-reports-its-brightness-limit.md);
 [editor metadata](profile-wire-v1/settings-domain.md#editor-metadata--get-0x08)).
 Black (`0, 0, 0`) is literal black, except in a group row
 ([below](#group-rows)) and in a layer colour, where saturation and value `0`
@@ -217,7 +217,14 @@ paints nothing, what is beneath shows.
 
 1. **Layer**: every layer that is on, the base layer always, lowest first, so
    a higher layer covers a lower one; a black layer colour paints nothing.
-   Then the layer rows.
+   Then the layer rows. While a layer of a running pointing mode's link is
+   on and the mode has a colour to paint (the pointing-mode stage is on), the
+   stage draws in two parts: the layers below the lowest such layer
+   and their rows, then the mode's colour and rows as stage 5 would paint
+   them, then that layer, the layers above and their rows (D-F62). The rows of the layers below no
+   longer cover those above in that case, and the stages after this one
+   (combo feedback beneath, the layer preview) paint over the mode. While the
+   auto-mouse fade replaces this stage, the mode paints in stage 5 instead.
 2. **Auto-mouse fade**, in place of the layer stage while the pointer layer
    is on and the fade has begun. It begins after the auto-mouse fade delay,
    blends from the layer stage toward its mode's end over the rest of the
@@ -230,7 +237,8 @@ paints nothing, what is beneath shows.
    rows as though it were on. It draws the layer stage's data, so it follows
    the layer bit.
 5. **Pointing mode**: the running slot's colour in its locality, then its
-   rows.
+   rows, unless stage 1 already painted it beneath a layer of its link
+   ([pointing domain](pd-mode-domain-v1.md#lighting-of-a-running-mode)).
 6. **Combo feedback, above**: every other active combo. A combo whose output
    holds a momentary layer paints in neither; the layer stage shows the hold.
 7. **Key feedback**, below.
@@ -283,9 +291,9 @@ Held by: `tests/host/run_active_profile_rgb_runtime_tests.sh` (`active_profile_r
 ## Compatibility
 
 The firmware reads only version 4 (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 3 and
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0010-firmware-accepts-only-current-formats.md)); version 3 and
 earlier are `INVALID_VERSION` and are not translated. The 32 pointing-colour
-rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
-the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0014-bigger-profiles.md)).
+rows are D-F09's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
+the sixteen layer colours D-F14's ([ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0014-bigger-profiles.md)).
 
 Held by: `tests/host/run_profile_rgb_v4_tests.sh` (`profile_rgb_v4_test.c`), `tests/fixtures/rgb_domain_v4.json` (`version-3`, `version-2`).

@@ -55,10 +55,16 @@ const namesIn = (value, macros, detected) => {
         keys: profileKeyNames({hostOs: host.effective, hostLayout: host.layout, macosIso: host.macosIso, actionsKnown: true, layers: value.settings.names, macros: macros?.macros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
             customKeys: value.settings.customKeyNames.map((name, slot) => ({slot, name}))})};
 };
-// The layers a behaviour or combo runs on, each named as everywhere else (an
-// unnamed layer is "Layer n", the base "Base"), compared by the stored mask.
-/** @param {number} mask @param {Names} names @returns {Field} */
-const allowedLayers = (mask, names) => ({text: names.layers.flatMap((_, i) => mask & 2 ** i ? [layerCalled(names.layers, i)] : []).join(", ") || "none", key: mask});
+// A set of layers, each named as everywhere else (an unnamed layer is "Layer
+// n", the base "Base") and marked with its colour, compared by the stored
+// mask: the layers a behaviour or combo runs on, and a pointing link's.
+/** @param {number} mask @param {Names} names @param {string} none @returns {Field} */
+const layerSet = (mask, names, none) => {
+    const layers = names.layers.flatMap((_, layer) => mask & 2 ** layer ? [{layer, name: layerCalled(names.layers, layer)}] : []);
+    return {text: layers.map(entry => entry.name).join(", ") || none, key: mask, ...(layers.length ? {mark: {kind: "layers", layers}} : {})};
+};
+/** @param {number} mask @param {Names} names */
+const allowedLayers = (mask, names) => layerSet(mask, names, "none");
 // The mark a stored keycode carries: the layer it acts on (model/key-names.js
 // keyLayer, as the screens mark it), or the pointing mode it runs.
 /** @param {number} code @returns {Mark | undefined} */
@@ -92,6 +98,12 @@ function pointingFields(slot, names) {
         : `${keyLabel(names.keys, output.keycode)} · ${output.modifierPolicy === 1 ? `${word(P.modifierPolicy, 1)} ${mods(output.mask)}` : word(P.modifierPolicy, output.modifierPolicy)}`;
     result.set("DPI", slot.dpi || "Normal pointer speed");
     result.set("Pointer layer", word(P.pointerLayer, slot.pointerLayer));
+    // The link: each set of layers by name with its marks, compared by what
+    // is stored; what ends it only beside layers that start it.
+    const L = P.linkLabels;
+    result.set(L.linkedLayers, layerSet(slot.linkedLayers, names, "None"));
+    result.set(L.linkTurnsOn, layerSet(slot.linkTurnsOn, names, "None"));
+    if (slot.linkedLayers) result.set(L.linkEnds, word(P.linkEnds, slot.linkEnds));
     if (slot.kind === 1) {
         result.set("Axes", word(P.axes, slot.axis));
         result.set("Horizontal movement per tap", slot.thresholdX);
@@ -108,8 +120,6 @@ function pointingFields(slot, names) {
         for (const [field, label] of P.scrollFields) result.set(label, slot.scroll[field]);
         result.set("Reverse scrolling", word(P.invert, slot.scroll.invert));
     }
-    slot.buttons.forEach((button, index) => result.set(`Button ${index + 1}`,
-        button.kind === 3 ? `Hold ${mods(button.modifiers)}` : button.kind === 2 ? tap(button.tap) : word(P.buttons, button.kind)));
     return result;
 }
 

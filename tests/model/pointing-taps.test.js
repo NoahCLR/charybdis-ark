@@ -4,12 +4,13 @@ const {pointingTaps, pointingTapKeys, pointingMacros} = require("../../core/mode
 const {isPdTapKey} = require("../../core/schema/pd-mode-domain-v1");
 const catalog = require("../../core/data/keycode-catalog");
 
-test("every shortcut place keeps its direction, diagonal or physical override", () => {
+test("every shortcut place keeps its direction or diagonal", () => {
     const stored = {directions: {left: {keycode: 4}}};
     const slot = {id: 7, kind: 1, name: "Clicks", directions: {left: {keycode: 0xd3}, right: {keycode: 4}},
-        diagonals: {upLeft: {keycode: 0xd4}}, buttons: [{tap: {keycode: 0xd1}}, {tap: {keycode: 0xd8}}]};
+        diagonals: {upLeft: {keycode: 0xd4}}};
     assert.deepEqual(pointingTaps(slot, stored)[0], {label: "Left", tap: slot.directions.left, stored: stored.directions.left});
-    assert.deepEqual(pointingTaps(slot).filter(place => place.tap).map(place => place.label), ["Left", "Right", "Up-left", "Button 1", "Button 2"]);
+    assert.deepEqual(pointingTaps(slot).filter(place => place.tap).map(place => place.label), ["Left", "Right", "Up-left"]);
+    assert.equal(pointingTaps(slot).length, 8, "four directions and four diagonals: mouse button overrides are retired (firmware D-F22)");
 });
 
 test("pointing picker names and aliases follow the tap allowlist", () => {
@@ -26,11 +27,10 @@ test("pointing picker names and aliases follow the tap allowlist", () => {
 });
 
 test("macro outputs keep their place, and are offered alone", () => {
-    const slot = {id: 4, name: "Macros", kind: 1, directions: {left: {keycode: 0x7700}}, diagonals: {upLeft: {keycode: 0x777f}}, buttons: [{tap: {keycode: 0x7701}}]};
+    const slot = {id: 4, name: "Macros", kind: 1, directions: {left: {keycode: 0x7700}}, diagonals: {upLeft: {keycode: 0x777f}}};
     assert.deepEqual(pointingMacros([slot]), [
         {slot: 4, name: "Macros", label: "Left", macro: 0},
         {slot: 4, name: "Macros", label: "Up-left", macro: 127},
-        {slot: 4, name: "Macros", label: "Button 1", macro: 1},
     ]);
     assert.deepEqual(pointingMacros([{...slot, kind: 0}]), []);
     for (const name of ["QK_MACRO_0", "MC_31", "MACRO_127"]) {

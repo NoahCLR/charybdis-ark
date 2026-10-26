@@ -67,7 +67,7 @@ test("every custom key has built-in behaviour defaults, placed or not", () => {
     const keys = [0, 5].map(slot => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior: false}));
     const model = buildDeviceModel({
         layout: layoutWith([0x7f00, 0x04].map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x6fd70b90},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x7fecec81},
         settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "170"}},
         customKeyView: {keys},
     });
@@ -82,7 +82,7 @@ test("device shortcut labels stay complete and semantic names require the advert
     const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7f02];
     const state = {
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x6fd70b90},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x7fecec81},
     };
     const model = buildDeviceModel(state);
     assert.deepEqual(model.layers[0].positions.map(key => key.display), ["GUI+C", "Shift+GUI+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
@@ -100,7 +100,7 @@ test("a position carries what its value means, not only what the keyboard calls 
     const model = buildDeviceModel({
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
-        capabilities: {actionAbiDigest: 0x6fd70b90},
+        capabilities: {actionAbiDigest: 0x7fecec81},
         macroView: {macros: [{keycode: "MACRO_0", name: "Sign-off"}]},
         customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7f00, name: "Right Thumb", hasBehavior: true}]},
     });
@@ -266,7 +266,7 @@ test("the Settings card gets the stored name, and the built-in one only while th
     const {document} = require("../fixtures/portable-profile");
     const {fingerprint, summary} = require("../../core/model/portable-profile");
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
+    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81};
     const binding = {editable: true, reason: ""}, device = {product: "Charybdis (4x6) Splinky"};
     assert.deepEqual(buildSnapshotModel(snapshot, caps, binding, {device, storedKeyboardName: ""}).keyboardName,
         {name: "", builtIn: "Charybdis (4x6) Splinky", identity: snapshot.fingerprint, perName: 32});
@@ -463,8 +463,8 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
         row({kind: 6, flags: 0, operand: 0}),   // MACRO_0
     ]}};
     const macroView = {macros: [{keycode: "MACRO_0", payload: ""}], hardcodedMacros: []};
-    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x6fd70b90}}).qmkKeyLabels;
-    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x6fd70b90}}).qmkKeyLabels;
+    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x7fecec81}}).qmkKeyLabels;
+    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x7fecec81}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
     assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
     assert.equal(labels["0x7EC2"], "Lock Layer 2", "a bare user slot reads by what it does to which layer");
@@ -485,7 +485,7 @@ test("effective host names reach keycaps, picker search and modifier controls wi
 
 test("pointing-only shortcuts enter the shared OS label table", () => {
     const model = buildDeviceModel({settingsView:{host:{effective:3}}, committed:{state:"read", domains:{pdModes:[
-        {id:0, kind:1, directions:{up:{keycode:0x0804}}, diagonals:{}, buttons:[{tap:{keycode:0x0805}}]}
+        {id:0, kind:1, directions:{up:{keycode:0x0804}}, diagonals:{upLeft:{keycode:0x0805}}}
     ]}}});
     assert.equal(model.qmkKeyLabels[resolve(0x0804).name], "Super+A");
     assert.equal(model.qmkKeyLabels[resolve(0x0805).name], "Super+B");

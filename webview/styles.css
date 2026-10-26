@@ -277,10 +277,18 @@ a.rail-build:hover { color: var(--text-2); }
 .btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.5; }
 
 .seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; }
-.seg button {
+.seg button, .seg label > span {
   height: 24px; padding: 0 11px; border-radius: 6px; font-size: 12px; color: var(--text-2);
 }
-.seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); font-weight: 520; box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.seg button[aria-pressed="true"], .seg input:checked + span { background: var(--surface-3); color: var(--text); font-weight: 520; box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+/* A segmented choice may be a radio group: each label's hidden radio beside
+   the words it shows, so the choice posts as any field's change does. */
+.seg label { position: relative; display: inline-flex; }
+.field > .seg { justify-self: start; }
+.seg label > span { display: inline-flex; align-items: center; cursor: pointer; white-space: nowrap; }
+.seg label input { position: absolute; opacity: 0; pointer-events: none; }
+.seg input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 1px; }
+.seg input:disabled + span { cursor: default; color: var(--text-disabled); }
 
 /* The hidden attribute wins over any component display rule. */
 [hidden] { display: none !important; }
@@ -330,6 +338,10 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .sw input:checked + .track { background: var(--inv-bg); border-color: transparent; }
 .sw input:checked + .track::after { transform: translateX(12px); background: var(--inv-text); }
 .sw .txt { font-size: 12.5px; }
+/* A switch that cannot be used looks it: a faint dashed track, greyed words. */
+.sw:has(input:disabled) { cursor: default; }
+.sw input:disabled + .track { opacity: .4; border-style: dashed; }
+.sw:has(input:disabled) .txt { color: var(--text-disabled); }
 /* Switches folded under a summary, in a row that wraps. */
 .sw-group { flex-wrap: wrap; margin-top: 10px; }
 
@@ -1342,6 +1354,10 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-editor .card-h .tag { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pd-empty-note { max-width: 64ch; }
 .pd-identity { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, .8fr); gap: 12px; }
+/* The slot's light spans the identity card, under its fields. */
+.pd-identity > .pd-light { grid-column: 1 / -1; }
+/* How it starts keeps its title whole beside a long summary. */
+.pd-starts > .card-h h3 { white-space: nowrap; }
 .pd-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .pd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .pd-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; align-items: start;
@@ -1392,12 +1408,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-taps > .h { font-size: 10.5px; color: var(--text-3); }
 .pd-taps .n { font-size: 12px; color: var(--text-2); }
 .pd-taps .mods { grid-column: 2 / -1; padding-bottom: 6px; }
-.pd-buttons { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: 8px 12px; align-items: center; }
-.pd-buttons > .h { font-size: 10.5px; color: var(--text-3); }
-.pd-buttons .n { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
-.pd-buttons .narrow { display: none; }
-/* A button that holds modifiers opens its switches under its own row. */
-.pd-buttons .mods { grid-column: 2 / -1; padding-bottom: 6px; }
 @container pd (max-width: 720px) {
   .pd-grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pd-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1408,14 +1418,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
   .pd-cross.pd-cross { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
   .pd-cross .arm.arm { grid-area: auto; }
   .pd-cross .hub { display: none; }
-  .pd-buttons { grid-template-columns: 28px minmax(0, 1fr); }
   .pd-taps { grid-template-columns: minmax(0, 1fr); }
   .pd-taps > .h { display: none; }
   .pd-taps .mods { grid-column: 1; }
-  .pd-buttons > .h { display: none; }
-  .pd-buttons .narrow { display: inline; }
-  .pd-buttons .blank { display: none; }
-  .pd-buttons > :not(.n) { grid-column: 2; }
 }
 @container content (max-width: 788px) { /* window 1020 */
   .pd-page { grid-template-columns: minmax(0, 1fr); }
@@ -1659,6 +1664,22 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .layer-grid .sw { min-width: 0; }
 .layer-grid .sw[hidden] { display: none; }
 .layer-grid .sw .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Switches per layer in columns (layer-switches.mjs): a row per layer, its
+   name then a column per switch; an unusable row is dimmed, its reason in it. */
+.layer-table { display: grid; }
+.layer-table-row { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-columns: minmax(0, 236px); grid-auto-flow: column;
+  align-items: center; gap: 4px 16px; min-height: 34px; padding: 4px 0; border-top: 1px solid var(--line); }
+.layer-table-head { min-height: 0; padding: 0 0 6px; border-top: none; align-items: end; font-size: 11px; color: var(--text-2); letter-spacing: .01em; }
+/* The reason wraps under the name rather than squeezing it. */
+.layer-table-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; min-width: 0; }
+.layer-table-name .txt { font-size: 12.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-table-why { font-size: 11px; color: var(--text-3); min-width: 0; }
+.layer-table-row .sw { min-width: 0; }
+.layer-table-row .sw .txt { font-size: 11.5px; line-height: 1.3; }
+.layer-table-row.unusable .layer-table-name .txt { color: var(--text-disabled); }
+.layer-table-row.unusable .layer-table-name .mk > :first-child { opacity: .45; }
+@container content (max-width: 788px) { .layer-table-row { grid-auto-columns: minmax(0, 190px); } }
+@container content (max-width: 528px) { .layer-table-row { grid-auto-columns: minmax(0, 132px); } }
 .btn .settings-help-mark { width: 14px; height: 14px; flex: none; fill: currentColor; stroke: none; }
 .swatch-pick { display: flex; gap: 10px; align-items: center; }
 .hue-ramp { flex: 1; height: 26px; border-radius: 6px; border: 1px solid var(--line); background: linear-gradient(90deg,#f33,#ff0,#3f3,#0ff,#33f,#f0f,#f33); position: relative; }

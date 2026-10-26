@@ -48,7 +48,6 @@ export interface KeyFeedback<C = Hsv> {
 export type FeedbackColourField = 'tapCommittedColor' | 'holdActiveColor' | 'longHoldActiveColor';
 export type FeedbackRow = FeedbackColourField | `branch:${number}`;
 export interface PdTap {keycode: Scalar; modifierPolicy: number; mask: number}
-export interface PdButton {kind: number; modifiers: number; tap: PdTap}
 export type Direction = 'left' | 'right' | 'up' | 'down';
 export type Diagonal = 'upLeft' | 'upRight' | 'downLeft' | 'downRight';
 export interface PdConfig {
@@ -57,8 +56,13 @@ export interface PdConfig {
     name: string;
     dpi: number;
     pointerLayer: number;
+    /** The linked layers (firmware D-F62), bit n layer n: the layers that start the mode. */
+    linkedLayers: number;
+    /** The layers the mode's key turns on while it runs the mode, bit n layer n, any mix. */
+    linkTurnsOn: number;
+    /** What ends a mode its linked layers started: 0 nothing, 1 a higher layer, 2 any other layer. Needs linked layers. */
+    linkEnds: number;
     axis?: number;
-    buttons: PdButton[];
     heldModifiers?: number;
     thresholdX?: number;
     thresholdY?: number;
@@ -131,6 +135,9 @@ export interface PdForm {
     name(): string;
     dpi(): Scalar;
     pointerLayer?: () => number;
+    linkedLayers?: () => number;
+    linkTurnsOn?: () => number;
+    linkEnds?: () => number;
     axis?: () => number;
     thresholdX?: () => Scalar;
     thresholdY?: () => Scalar;
@@ -139,9 +146,6 @@ export interface PdForm {
     scrollAxes?: () => number;
     heldModifiers?: () => number;
     invert?: () => number;
-    [key: `button:${number}:kind`]: (() => number) | undefined;
-    [key: `button:${number}:modifiers`]: (() => number) | undefined;
-    [key: `button:${number}:tap`]: (() => Scalar) | undefined;
     [key: `dir:${string}`]: (() => Scalar) | undefined;
     [key: `dirPolicy:${string}`]: (() => number) | undefined;
     [key: `dirMask:${string}`]: (() => number) | undefined;

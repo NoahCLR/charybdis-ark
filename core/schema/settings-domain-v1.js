@@ -4,7 +4,7 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {validHostSetting} = require("./host-settings");
 const {canonical} = require("./bytes");
-// Settings domain 0x40, version 8, the only one the keyboard stores (firmware
+// Settings domain 0x40, version 9, the only one the keyboard stores (firmware
 // D-F14, D-F26): 31 values, sixteen layer records, 128 custom-key shortcuts,
 // then 273 counted names — sixteen
 // layer names, 128 macro names, 128 custom-key names and the keyboard's
@@ -43,7 +43,9 @@ const LAYER_MASK = {...rule((v, layers) => v < 2 ** layers), layerReference: /**
 const STORED = /** @type {const} */ ([
     ["TAPPING_TERM", UINT16], ["TAP_HOLD_TERM", UINT16], ["LONG_HOLD_TERM", UINT16], ["MULTI_TAP_TERM", UINT16],
     ["AUTO_MOUSE_ENABLED", SWITCH], ["AUTO_MOUSE_LAYER", LAYER], ["AUTO_MOUSE_TIMEOUT", UINT16], ["AUTO_MOUSE_DEBOUNCE", range(0, 255)],
-    ["AUTO_SNIPING_ENABLED", SWITCH], ["AUTO_SNIPING_LAYER", LAYER],
+    // The master switch, then the layers auto-sniping follows: a layer mask,
+    // which may be empty, so turning auto-sniping off keeps its layers.
+    ["AUTO_SNIPING_ENABLED", SWITCH], ["AUTO_SNIPING_LAYERS", LAYER_MASK],
     // Retired per-mode DPI: mode tuning is in domain 0x50.
     ["DRAGSCROLL_DPI", RETIRED], ["VOLUME_DPI", RETIRED], ["BRIGHTNESS_DPI", RETIRED], ["ZOOM_DPI", RETIRED], ["ARROW_DPI", RETIRED],
     // A half-period: one on or off phase of the key feedback flash.
