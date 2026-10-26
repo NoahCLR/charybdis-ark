@@ -117,4 +117,10 @@ test("a reorder that would leave a link ignored, or one layer starting two modes
     const ignored = slots();
     ignored[1].linkedLayers |= 1 << 4;
     assert.equal(reorderLinkRefusal(value, value, ignored, ignored, same, false), "");
+    // Two of a link's layers landing on one (keys keeping their numbers, Make
+    // base) would merge them: refused, naming both.
+    const merge = (/** @type {number} */ mask) => (mask & (1 << 5) ? (mask & ~(1 << 5)) | (1 << 3) : mask);
+    const merged = slots().map((slot) => ({...slot, linkedLayers: merge(slot.linkedLayers), linkTurnsOn: merge(slot.linkTurnsOn)}));
+    assert.equal(reorderLinkRefusal(value, value, slots(), merged, merge, false),
+        "This move would put Navigation and Extra 1 of Brightness's link on one layer, Navigation. Turn on Keys follow their layers, or change the link first.");
 });

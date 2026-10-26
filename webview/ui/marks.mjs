@@ -103,6 +103,10 @@ export function sends(model, action, {inline = false} = {}) {
 // A name and the tags that qualify it, as `sends` draws them after the mark.
 /** @param {string} name @param {string[]} tags */
 const tagged = (name, tags) => `<span class="sends-name">${esc(name)}</span>${tags.map((tag) => `<span class="sends-tag">${esc(tag)}</span>`).join("")}`;
+// A layer by its mark and name, with the tags that qualify it, as `sends`
+// draws a layer action: a shortcut's layers, which no keycode names.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} layer @param {string} name @param {string[]} tags */
+export const layerTagged = (model, layer, name, tags) => `<span class="sends">${mark(model, {kind: "layer", layer})}${tagged(name, tags)}</span>`;
 // The same, inline and without a mark, for a list where every item is one kind
 // and a swatch beside it stands in for the mark (D-L31): "Zoom `HOLD`".
 /** @param {string} name @param {string[]} tags */

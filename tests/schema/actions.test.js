@@ -32,7 +32,7 @@ test("one action vocabulary is known, and a layer reference reads back", () => {
     assert.equal(layerRef(3), "Layer 3");
     assert.equal(layerOfRef("Layer 3"), 3);
     assert.equal(layerOfRef("Numbers"), undefined);
-    assert.equal(knownActionAbi(0x7fecec81), true, "the vocabulary with the keycode blocks and 32 pointing slots");
+    assert.equal(knownActionAbi(0xb4a15f12), true, "the vocabulary with the keycode blocks and 32 pointing slots");
     for (const retired of [0x837cf479, 0xf79c6151, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959]) assert.equal(knownActionAbi(retired), false, `0x${retired.toString(16)} is retired`);
     assert.equal(knownActionAbi(1), false);
 });
@@ -77,7 +77,7 @@ test("placement covers all sixteen layers and refuses a layer past the bank", ()
 test("the keyboard has the 32 pointing slots of the keycode blocks", () => {
     const {ACTION_ABI, KNOWN_ACTION_ABIS, PD_SLOT_COUNT} = require("../../core/schema/actions");
     assert.deepEqual(KNOWN_ACTION_ABIS, [ACTION_ABI]);
-    assert.equal(ACTION_ABI, 0x7fecec81);
+    assert.equal(ACTION_ABI, 0xb4a15f12);
     assert.equal(PD_SLOT_COUNT, 32);
     assert.equal(pdSlotOfCode(0x7e94), 20);
     assert.equal(pdSlotOfCode(0x7ebf), 31);

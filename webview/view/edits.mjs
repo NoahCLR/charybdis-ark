@@ -142,7 +142,7 @@ export function comboMessage(id, {output, inputs, termMs, followsDefault, holdTe
 // only now, with the combo in one draft step, so one undo takes both back and a
 // combo never kept leaves no key behind (D-L63). Once the output is something
 // else, the offered key is not made.
-/** @param {ReturnType<typeof comboMessage>} combo @param {{keycode: string, shortcut: {mods: number, key: number}, name: string} | null | undefined} made @param {string} [identity] */
+/** @param {ReturnType<typeof comboMessage>} combo @param {{keycode: string, shortcut: import("../../contracts/panel.js").CustomKeyShortcut, name: string} | null | undefined} made @param {string} [identity] */
 export const comboKept = (combo, made, identity) => made && combo.output === made.keycode
     ? customKeyForShortcut(made.keycode, made.shortcut, made.name, combo, identity) : combo;
 /** @param {number} id @returns {import("../../contracts/edits.js").EditOf<'deleteCombo'>} */
@@ -235,15 +235,18 @@ export const macroNameMessage = (keycode, name, identity) => ({type: "updateMacr
 export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateMacro", keycode, protection, expectedFingerprint: identity});
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKey'>} */
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
-// A custom key's shortcut: the eight-bit modifier mask the grid reads and one
-// key, 0 for none. Both zero clears it.
-/** @param {string} keycode @param {number} mods @param {number} key @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
-export const customKeyShortcutMessage = (keycode, mods, key, identity) => ({type: "updateCustomKeyShortcut", keycode, shortcut: {mods: Number(mods) || 0, key: Number(key) || 0}, expectedFingerprint: identity});
+// A custom key's shortcut: the eight-bit modifier mask the grid reads, one key,
+// 0 for none, the mask of layers it turns on and how it turns them on
+// (firmware D-F26; a kind means nothing without layers, so it is hold then).
+// All zero clears it.
+/** @param {string} keycode @param {{mods?: number, key?: number, layers?: number, layerKind?: number}} shortcut @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
+export const customKeyShortcutMessage = (keycode, {mods, key, layers, layerKind}, identity) => ({type: "updateCustomKeyShortcut", keycode,
+    shortcut: {mods: Number(mods) || 0, key: Number(key) || 0, layers: Number(layers) || 0, layerKind: Number(layers) ? Number(layerKind) || 0 : 0}, expectedFingerprint: identity});
 // A custom key made for a shortcut no keycode can hold: named, and put to use
 // by `then` (a layout key, a behaviour cell or a combo) in the same draft step
 // (D-L63).
-/** @param {string} keycode @param {{mods: number, key: number}} shortcut @param {string} name @param {import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']['then']} [then] @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
-export const customKeyForShortcut = (keycode, shortcut, name, then, identity) => ({...customKeyShortcutMessage(keycode, shortcut.mods, shortcut.key, identity),
+/** @param {string} keycode @param {{mods: number, key: number, layers?: number}} shortcut @param {string} name @param {import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']['then']} [then] @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
+export const customKeyForShortcut = (keycode, shortcut, name, then, identity) => ({...customKeyShortcutMessage(keycode, shortcut, identity),
     name: String(name ?? "").trim(), ...(then ? {then} : {})});
 // The keyboard's own name; empty gives it back its built-in name.
 /** @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'renameKeyboard'>} */

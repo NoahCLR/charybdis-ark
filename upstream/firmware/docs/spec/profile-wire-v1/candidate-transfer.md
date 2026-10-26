@@ -100,7 +100,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_mailbox_
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 5 | 1 | schema major, `4` |
-| 6 | 1 | schema minor, `1` |
+| 6 | 1 | schema minor, `2` |
 | 7 | 1 | requested-domain mask: bit *n* is the *n*th domain of the registry ([blob and digests](blob-and-digests.md)): RGB, key behaviours, combos, settings, pointing, keymap, macros |
 | 8 | 4 | blob length, `8`–`130048` |
 | 12 | 4 | CRC-32 of the exact blob |
@@ -111,7 +111,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_mailbox_
 The frame is malformed when the mask sets a bit outside the registry
 (offset `7`), the length is out of range (offset `8`), or any of bytes
 24–31 is nonzero. There is no flags byte and no store-format byte: Profile
-Wire 2.0 implies store format 6 ([D-F28](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+Wire 2.0 implies store format 6 ([D-F28](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 
 Processing a begin checks, in order, the schema version
 (`INCOMPATIBLE_SCHEMA`), the mask against the domains this build supports
@@ -157,7 +157,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_sequenti
 
 A client may build the candidate from ranges of the active profile (reuse)
 and stream the rest without reading status between chunks, so an Apply
-sends only what changed ([D-F18](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0018-differential-upload-builds-complete-candidate.md)).
+sends only what changed ([D-F18](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0018-differential-upload-builds-complete-candidate.md)).
 Both come with saves; a client may still send every byte as ordinary chunks.
 They only build the candidate: it is still complete, validated whole and
 saved as any other.
@@ -316,7 +316,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_begin_re
 ## Lease and cancellation
 
 Only the keyboard ends a candidate
-([D-F48](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0048-only-the-keyboard-ends-a-candidate.md)). Before the
+([D-F48](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0048-only-the-keyboard-ends-a-candidate.md)). Before the
 decision, every way a candidate ends releases it on this half and aborts
 the other half's prepared copy; after the decision nothing cancels it. What
 the client sees of each, on page 0:

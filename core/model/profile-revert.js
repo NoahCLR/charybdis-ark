@@ -15,6 +15,7 @@ const {settingsEditorView, fieldMask} = require("./settings-editor");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {domainCodec} = require("../schema/profile-domains");
 const {singleComboRemovalIndex} = require("./profile-review");
+const {settingsShortcutRefusal} = require("./shortcut-layers");
 
 /** @template T @param {T} value @returns {T} */
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -150,6 +151,14 @@ function revertUnits(before, after, units, capabilities) {
         } else throw fail("This change cannot be discarded on its own.");
     }
 
+    // A custom key's shortcut and the default layers share the settings
+    // domain: discarding one alone must not leave a shortcut on a layer that is
+    // always on, which the keyboard refuses (firmware D-F26).
+    if (open.has("settings")) {
+        const refusal = settingsShortcutRefusal(domain("settings").mine);
+        const what = [...units].some(unit => unit.startsWith("settings:")) ? "These settings" : "This change";
+        if (refusal) throw fail(`${what} cannot be discarded on ${what === "This change" ? "its" : "their"} own: ${refusal}`);
+    }
     if (open.has("combos")) {
         const combos = domain("combos");
         combos.mine.rows = combos.mine.rows.filter(Boolean);

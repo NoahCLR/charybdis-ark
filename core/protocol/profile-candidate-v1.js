@@ -43,7 +43,7 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     // it, so BEGIN no longer carries it; bytes 24–31 stay zero.
     STORE_FORMAT: 6,
     SCHEMA_MAJOR: 4,
-    SCHEMA_MINOR: 1,
+    SCHEMA_MINOR: 2,
     KNOWN_DOMAIN_MASK: PROFILE_DOMAIN_MASK,
 });
 

@@ -185,7 +185,8 @@ below.
 | Panel state fields declare their initial value and draft-replacement policy together | `webview/store.mjs`, `webview/view/state-fields.mjs` | `tests/view/state-fields.test.mjs` |
 | Lighting: one `webview/ui/lighting/` module per stage, posting the shared edit builders | `webview/ui/lighting.mjs` | `browser-tests/lighting-controls.spec.js` |
 | Pointing: the slot editor holds a direction set to Ignore until its modifiers are chosen, and posts the complete record | `webview/ui/pointing.mjs`, `webview/ui/pointing/` | `browser-tests/pointing-controls.spec.js` |
-| Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key, and why not, published as `pdModeEditing.linkTargets`. The How it starts card (the mode's keys, then its layers, then what ends it; the slot's light sits in its identity card) draws the layers with the shared per-layer switches (`webview/ui/layer-switches.mjs`, whose grid Settings' layer groups use), as a table: a row per layer, a "Starts this pointing mode" and a "Turned on by this pointing mode's key" switch, each titled for the layer in its row. A default layer or the pointer layer is a dimmed row saying why in it, both switches disabled; a layer that starts another mode has its "Starts" switch disabled and says "already starts" that mode in the row, its key switch usable. A changed link naming one is refused when staged, and so is a settings change that makes a layer a link names the pointer layer or a default layer (`settingsLinkRefusal`, staged by `core/model/settings-editor.js`); a layer reorder renumbers a link as it renumbers layer keys (the base swap and Keys follow their layers included) and refuses, in words, a move that would still leave a link ignored or one layer starting two modes (`reorderLinkRefusal`, `core/model/portable-profile.js`); a stored layer the keyboard ignores (in an imported profile, say) stays switchable off, said beside it and as a Review warning. Review names each layer of a link, and of a behaviour's or combo's allowed layers, after its mark (a `layers` review mark). What ends the mode is a segmented radio group shown only beside starting layers; the posted record resets it to Never with the last of them. A copied mode keeps the layers its key turns on, not those that start it. Whether the pointer layer covers a layer the mode's key turns on is core's, published per slot as `pdModes[].pointerCovers` | `core/model/pointing-links.js`, `webview/view/pointing-link.mjs` | `tests/model/pointing-links.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `browser-tests/pointing-controls.spec.js` |
+| Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key, and why not, published as `pdModeEditing.linkTargets`. The How it starts card (the mode's keys, then its layers, then what ends it; the slot's light sits in its identity card) draws the layers with the shared per-layer switches (`webview/ui/layer-switches.mjs`, whose grid Settings' layer groups use), as a table: a row per layer, a "Starts this pointing mode" and a "Turned on by this pointing mode's key" switch, each titled for the layer in its row. A default layer or the pointer layer is a dimmed row saying why in it, both switches disabled; a layer that starts another mode has its "Starts" switch disabled and says "already starts" that mode in the row, its key switch usable. A changed link naming one is refused when staged, and so is a settings change that makes a layer a link names the pointer layer or a default layer (`settingsLinkRefusal`, staged by `core/model/settings-editor.js`); a layer reorder renumbers a link as it renumbers layer keys (the base swap and Keys follow their layers included) and refuses, in words, a move that would still leave a link ignored, have one layer start two modes, or put two of a link's layers on one (`reorderLinkRefusal`, `core/model/portable-profile.js`); a stored layer the keyboard ignores (in an imported profile, say) stays switchable off, said beside it and as a Review warning. Review names each layer of a link, and of a behaviour's or combo's allowed layers, after its mark (a `layers` review mark). What ends the mode is a segmented radio group shown only beside starting layers; the posted record resets it to Never with the last of them. A copied mode keeps the layers its key turns on, not those that start it. Whether the pointer layer covers a layer the mode's key turns on is core's, published per slot as `pdModes[].pointerCovers` | `core/model/pointing-links.js`, `webview/view/pointing-link.mjs` | `tests/model/pointing-links.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `browser-tests/pointing-controls.spec.js` |
+| Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on, and why not (the base layer and the default layers are always on), published as `customKeyShortcutLayers`; staging a shortcut, a settings change and a layer reorder are each refused in words where the keyboard would refuse the profile, and a reorder that would merge two of a shortcut's layers is refused too (`reorderShortcutRefusal`). A refused reorder in Rename & Reorder is not kept: the panel stays as it was (`core/session/panel-session.js`, `applyLayerEdit`) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
 | Device facts, the review sheet, the unsaved-demo dialog; the app keeps routing, rendering, focus and scroll, and window keys | `webview/ui/device.mjs`, `ui/review-overlay.mjs`, `ui/leave-demo.mjs` | (no test) |
 
 ## Key names and the picker
@@ -254,13 +255,42 @@ records exactly (`tests/schema/pd-mode-domain-v1.test.js`).
 ## Custom key shortcuts
 
 A custom key's optional shortcut (firmware D-F26) is its own action (D-L63):
-a modifier mask and one key (none, a basic key or a mouse button); both zero
-is no shortcut. Ark reads and writes settings version 9 only (D-L64;
-`tests/schema/settings-domain-v1.test.js`).
+a modifier mask, one key (none, a basic key or a mouse button), a mask of the
+layers it turns on and how it turns them on, all alike, as one layer key does
+(`layerKind`: hold, lock, move to, tap-toggle or one-shot;
+`SHORTCUT_LAYER_KINDS`); all zero is no shortcut, any part alone is one, and a
+kind other than hold needs layers. Ark reads and writes settings version 10
+only (D-L64; `tests/schema/settings-domain-v1.test.js`).
 
 - The Custom keys screen edits it through `updateCustomKeyShortcut`, with key
   and modifiers in the keycode picker's `shortcut` mode, where modifiers may
-  mix sides (`tests/model/custom-key-editor.test.js`).
+  mix sides, and its layers in that mode's **Layers** section: the shared
+  per-layer switches (`webview/ui/layer-switches.mjs`) as a table, a row per
+  layer, any number on, under a **Turns them on as** choice of kind by its
+  layer key's verb (the vocabulary's `customKeys.layerKinds`), nothing to
+  choose until a layer is on; Clear goes back to Hold
+  (`tests/model/custom-key-editor.test.js`, `tests/view/custom-key.test.mjs`,
+  `browser-tests/custom-key-shortcut.spec.js`).
+- The base layer and the default layers are always on, so a shortcut cannot
+  name them. Core publishes the rule as `customKeyShortcutLayers`
+  (`core/model/shortcut-layers.js`): such a layer is a dimmed row saying why
+  in it, its switch disabled. Staging a shortcut that
+  names one is refused in words; so is a settings change that makes a layer a
+  shortcut names a default layer, and a layer reorder that would (the reorder
+  renumbers a shortcut's layers as it does layer keys;
+  `tests/model/shortcut-layers.test.js`).
+- Wherever a shortcut is named (the Custom keys list, key legends and tips,
+  hover, Review, the behaviour grid) its layers follow its modifiers and key
+  by name, lowest first, led by their kind's verb unless held: "Left Cmd +
+  Navigation + Extra", "Left Cmd + Lock Navigation + Extra" (`shortcutLabel`,
+  `core/model/key-names.js`). The hover card's Shortcut section tags each
+  layer with its kind and says what that does; the words that describe the
+  shortcut say what it does with its layers ("locks Navigation + Extra";
+  `webview/view/custom-key.mjs`, `tests/view/custom-key.test.mjs`).
+- A tap-toggle or one-shot shortcut makes its key dual-role, as `TT()` and
+  `OSL()` are: its tap / hold threshold follows the dual-role term
+  (`holdTermSetting`, `core/model/gesture-timing.js`;
+  `tests/model/gesture-timing.test.js`).
 - A field that needs a mixed-side set offers a custom key (`shortcutOffer`).
   One with exactly that shortcut and no behaviour is used. A layout key or
   combo output also runs the key's behaviour, so a match with one is offered
@@ -269,8 +299,9 @@ is no shortcut. Ark reads and writes settings version 9 only (D-L64;
   draft step as the edit that uses it; a combo output's key is made only when
   the combo is kept (`tests/view/custom-key.test.mjs`,
   `tests/view/edits.test.mjs`, `browser-tests/custom-key-shortcut.spec.js`).
-- Review shows it as the key's Shortcut field, discarded with the name, and
-  names it in the host OS's words (`tests/model/custom-key-editor.test.js`).
+- Review shows it as the key's Shortcut field, its layers included,
+  discarded with the name, and names it in the host OS's words
+  (`tests/model/custom-key-editor.test.js`, `tests/view/edits.test.mjs`).
 - A custom key with a shortcut taps and falls back to holding itself
   (`tests/model/built-in-behavior.test.js`). Bypassed, it sends its shortcut,
   or nothing without one, and Ark says so (`tests/view/custom-key.test.mjs`).

@@ -1,8 +1,11 @@
 // @ts-check
 // What a custom key does, in words, and its shortcut's key by value. A custom
-// key's shortcut (firmware D-F26) is its own action: held while the key is
-// held, tapped when it is tapped. A behaviour on the key works on top of it,
-// and a behaviour step on another key that sends it sends the shortcut only.
+// key's shortcut (firmware D-F26) is its own action: a key and modifiers, held
+// while the key is held, tapped when it is tapped, and layers, which it turns
+// on as one layer key does (its layer kind): held, locked, moved to,
+// tap-toggled or one-shot. A behaviour on the key works on top of it, and a
+// behaviour step on another key that sends it sends the shortcut only, layers
+// included.
 import {vocabulary} from "./vocabulary.mjs";
 import {customKeyKeycodes, customKeyPlacements, reachGroups} from "./reach.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
@@ -12,7 +15,48 @@ import {compactModifierMask} from "./keyvalues.mjs";
 /** @typedef {import("../../contracts/panel.js").CustomKey} CustomKey */
 
 /** @param {CustomKey | null | undefined} key */
-export const hasShortcut = (key) => Boolean(key?.shortcut && (key.shortcut.mods || key.shortcut.key));
+export const hasShortcut = (key) => Boolean(key?.shortcut && (key.shortcut.mods || key.shortcut.key || key.shortcut.layers));
+
+// How a shortcut turns its layers on (SHORTCUT_LAYER_KINDS): hold, lock, move
+// to, tap-toggle, one-shot; hold without layers.
+export const LAYER_KIND = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
+// QMK's TAPPING_TOGGLE: the tap of a tap-toggle key that locks its layers.
+const TAPPING_TOGGLE = 5;
+/** @param {CustomKey} key */
+export const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || LAYER_KIND.HOLD : LAYER_KIND.HOLD);
+/** @param {CustomKey} key */
+const layersAlone = (key) => Boolean(key.shortcut?.layers) && !key.shortcut.mods && !key.shortcut.key;
+/** @param {CustomKey} key */
+const layerNames = (key) => (key.shortcutLayerNames || []).join(" + ") || key.shortcutLabel;
+// What a shortcut of layers alone does with them, after "it".
+const LAYER_ACTS = [(/** @type {string} */ names) => `holds ${names} on`, (/** @type {string} */ names) => `locks ${names}`, (/** @type {string} */ names) => `moves to ${names}`,
+    (/** @type {string} */ names) => `tap-toggles ${names}`, (/** @type {string} */ names) => `turns ${names} on as a one-shot`];
+// What the shortcut does, after "it": sends its modifiers and key, its layers
+// named after them by their kind ("sends Left Cmd + Lock Navigation"), or, of
+// layers alone, what it does with them (firmware D-F26).
+/** @param {CustomKey} key */
+export const shortcutAct = (key) => (layersAlone(key) ? (LAYER_ACTS[layerKindOf(key)] || LAYER_ACTS[0])(layerNames(key)) : `sends ${key.shortcutLabel}`);
+// A tap-toggle or one-shot shortcut makes its key a momentary layer key, as
+// TT() and OSL() are: its layers are on from every press, behaviour or not.
+/** @param {CustomKey} key */
+const momentary = (key) => layerKindOf(key) === LAYER_KIND.TAP_TOGGLE || layerKindOf(key) === LAYER_KIND.ONESHOT;
+const FROM_EVERY_PRESS = "its layers are on from every press of the key";
+
+// When it does it, on the key itself with no behaviour: held and tapped as the
+// key is, and its layers as their kind turns them on.
+/** @param {CustomKey} key */
+function shortcutRuns(key) {
+    const keys = !layersAlone(key);
+    switch (layerKindOf(key)) {
+        case LAYER_KIND.LOCK: return `${keys ? "its keys held while the key is held; " : ""}pressing the key locks its layers on, or off again once all are on`;
+        case LAYER_KIND.MOVE: return `${keys ? "its keys held while the key is held; " : ""}pressing the key locks its layers alone, letting every other lock go`;
+        case LAYER_KIND.TAP_TOGGLE: return `held while the key is held; tapping it ${TAPPING_TOGGLE} times locks its layers`;
+        case LAYER_KIND.ONESHOT: return "held while the key is held; a tap turns its layers on for the next key press";
+        default: return "held while the key is held, tapped when it is tapped";
+    }
+}
+/** @param {string} text */
+const upper = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 // A slot in use: named, or sending a shortcut, or with a behaviour. Any other
 // is an empty slot, drawn as one on the Custom keys screen, and is not a key a
@@ -36,8 +80,8 @@ export const customKeyOf = (model, keycode) => /^CUSTOM_KEY_\d+$/.test(String(ke
 /** @param {CustomKey} key */
 export function customKeyDoes(key) {
     const sends = hasShortcut(key) ? key.shortcutLabel : "";
-    if (sends && key.hasBehavior) return `Its behaviour, on top of ${sends}: a tap or hold the behaviour leaves empty sends ${sends}.`;
-    if (sends) return `Sends ${sends}: held while the key is held, tapped when it is tapped. Set taps and holds in its grid to give it more.`;
+    if (sends && key.hasBehavior) return `Its behaviour, on top of ${sends}: a tap or hold the behaviour leaves empty ${shortcutAct(key)}${momentary(key) ? `, and ${FROM_EVERY_PRESS}` : ""}.`;
+    if (sends) return `${upper(shortcutAct(key))}: ${shortcutRuns(key)}. Set taps and holds in its grid to give it more.`;
     if (key.hasBehavior) return "Only what its behaviour says. Give it a shortcut to send one where the behaviour leaves a tap or hold empty.";
     return "Nothing yet. Give it a shortcut, or set taps and holds in its grid.";
 }
@@ -48,25 +92,82 @@ export function customKeyDoes(key) {
 /** @param {CustomKey} key */
 export function customKeyShortcutLine(key) {
     if (!hasShortcut(key)) return "No shortcut: it does only what its behaviour says.";
-    return key.hasBehavior ? `Sends ${key.shortcutLabel} where its behaviour leaves a tap or hold empty.`
-        : `Sends ${key.shortcutLabel}: held while the key is held, tapped when it is tapped.`;
+    return key.hasBehavior ? `${upper(shortcutAct(key))} where its behaviour leaves a tap or hold empty${momentary(key) ? `; ${FROM_EVERY_PRESS}` : ""}.`
+        : `${upper(shortcutAct(key))}: ${shortcutRuns(key)}.`;
 }
 
-// A custom key under its name in the hover card: what its shortcut does on
-// the key, or, with none, only that, since its behaviour shows below.
+// A custom key under its name in the hover card: with no shortcut, only that,
+// since its behaviour shows below. A shortcut has its own section instead.
 /** @param {CustomKey | null | undefined} key */
 export function customKeyHeadline(key) {
-    if (!key) return "";
-    if (hasShortcut(key)) return customKeyShortcutLine(key);
+    if (!key || hasShortcut(key)) return "";
     return key.hasBehavior ? "No shortcut" : "No shortcut and no behaviour yet: it sends nothing.";
 }
+
+// When a custom key's shortcut runs on it, for the hover card's Shortcut
+// section: held and tapped as the key is, or, under a behaviour, where the
+// behaviour leaves a tap or hold empty (firmware D-F26).
+/** @param {CustomKey} key */
+export const shortcutWhen = (key) => key.hasBehavior ? `Where its behaviour leaves a tap or hold empty${momentary(key) ? `; ${FROM_EVERY_PRESS}` : ""}`
+    : layersAlone(key) && (layerKindOf(key) === LAYER_KIND.LOCK || layerKindOf(key) === LAYER_KIND.MOVE) ? "When the key is pressed"
+    : "Held while the key is held, tapped when it is tapped";
+
+// Each layer's tag in the hover card, the kind's verb as its layer key reads
+// ("hold", "lock"), and what the layers do, under them.
+/** @param {Model} model @param {CustomKey} key */
+export function shortcutLayerTag(model, key) {
+    const kind = layerKindOf(key);
+    const verb = (vocabulary(model).customKeys.layerKinds || []).find(([value]) => value === kind)?.[1] || "Hold";
+    return verb.toLowerCase();
+}
+/** @param {CustomKey} key */
+export function shortcutLayerUnder(key) {
+    const many = (key.shortcut.layers & (key.shortcut.layers - 1)) !== 0;
+    const them = many ? "them" : "it", what = many ? "layers" : "layer";
+    switch (layerKindOf(key)) {
+        case LAYER_KIND.LOCK: return `${what} · locks ${them} on, or off when ${many ? "all are" : "it is"} on`;
+        case LAYER_KIND.MOVE: return `${what} · locks ${them} alone`;
+        case LAYER_KIND.TAP_TOGGLE: return key.hasBehavior ? `${what} · held from every press; ${TAPPING_TOGGLE} taps lock ${them} unless its behaviour has steps`
+            : `${what} · held while held; ${TAPPING_TOGGLE} taps lock ${them}`;
+        case LAYER_KIND.ONESHOT: return key.hasBehavior ? `${what} · held from every press; an empty tap turns ${them} on for the next key`
+            : `${what} · held while held; a tap turns ${them} on for the next key`;
+        default: return `${what} · on while the shortcut is held`;
+    }
+}
+
+// The layers a shortcut holds on, lowest first.
+/** @param {CustomKey} key */
+export const shortcutLayerList = (key) => Array.from({length: 16}, (_, layer) => layer).filter((layer) => (key.shortcut?.layers ?? 0) & (1 << layer));
 
 // Where only a custom key's shortcut runs (a behaviour step that sends the
 // key, or a combo output whose behaviour does not run), what it sends.
 /** @param {CustomKey | null | undefined} key */
 export function customKeyShortcutOnly(key) {
     if (!key) return "";
-    return hasShortcut(key) ? `sends its shortcut, ${key.shortcutLabel}` : "no shortcut, so it sends nothing";
+    if (!hasShortcut(key)) return "no shortcut, so it sends nothing";
+    if (!layersAlone(key)) return `sends its shortcut, ${key.shortcutLabel}`;
+    // Sent this way, a tap-toggle shortcut only holds: its taps are its key's.
+    switch (layerKindOf(key)) {
+        case LAYER_KIND.LOCK: return `locks its shortcut's layers, ${layerNames(key)}`;
+        case LAYER_KIND.MOVE: return `moves to its shortcut's layers, ${layerNames(key)}`;
+        case LAYER_KIND.ONESHOT: return `turns its shortcut's layers on as a one-shot, ${layerNames(key)}`;
+        default: return `holds its shortcut's layers on, ${layerNames(key)}`;
+    }
+}
+
+// What a custom key does as itself, its behaviour bypassed or off: its
+// shortcut, as when it is sent, except that a tap-toggle or one-shot key is
+// still TT() or OSL() of its layers (firmware D-F26): held from the press, its
+// own taps locking them or arming them.
+/** @param {CustomKey} key */
+function customKeyBypassed(key) {
+    const many = (key.shortcut.layers & (key.shortcut.layers - 1)) !== 0, them = many ? "them" : "it";
+    const sends = layersAlone(key) ? `holds its shortcut's layers on while held, ${layerNames(key)}` : `sends its shortcut, ${key.shortcutLabel}`;
+    switch (layerKindOf(key)) {
+        case LAYER_KIND.TAP_TOGGLE: return `${sends}; tapping it ${TAPPING_TOGGLE} times locks ${them}`;
+        case LAYER_KIND.ONESHOT: return `${sends}; a tap turns ${them} on for the next key`;
+        default: return customKeyShortcutOnly(key);
+    }
 }
 
 // A short note for a place that names the key: what it sends.
@@ -74,7 +175,7 @@ export function customKeyShortcutOnly(key) {
 export function customKeySendsNote(model, keycode) {
     const key = customKeyOf(model, keycode);
     if (!key) return "";
-    return hasShortcut(key) ? `Custom key · sends ${key.shortcutLabel}` : "Custom key · no shortcut: sends nothing of its own";
+    return hasShortcut(key) ? `Custom key · ${shortcutAct(key)}` : "Custom key · no shortcut: sends nothing of its own";
 }
 
 // What a placed custom key sends with its behaviour bypassed or off: its
@@ -82,7 +183,7 @@ export function customKeySendsNote(model, keycode) {
 /** @param {CustomKey | null | undefined} key */
 export function customKeyBypassText(key) {
     if (!key) return "";
-    return hasShortcut(key) ? `With its behaviour bypassed or off, this custom key sends its shortcut, ${key.shortcutLabel}.`
+    return hasShortcut(key) ? `With its behaviour bypassed or off, this custom key ${customKeyBypassed(key)}.`
         : "This custom key has no shortcut, so it sends nothing when its behaviour is bypassed or off. Give it a shortcut, or map a plain keycode on a gaming layer that needs direct output.";
 }
 
@@ -122,22 +223,67 @@ export function shortcutModifiers(model, name) {
 /** @param {Model} model @param {number} mask */
 export const shortcutPickMods = (model, mask) => (vocabulary(model).pickerModifiers || []).filter((entry) => mask & entry.bit).map((entry) => entry.value);
 
-// ...and the picker's choice is the mask and the key's value (0 for none).
-/** @param {Model} model @param {{mods?: string[], keys?: string[]}} pick @returns {import("../../contracts/edits.js").EditPayloads["updateCustomKeyShortcut"]["shortcut"]} */
-export function shortcutPick(model, {mods = [], keys = []}) {
+// ...and the picker's choice is the mask, the key's value (0 for none) and
+// the layers switched on in its Layers section.
+/** @param {Model} model @param {{mods?: string[], keys?: string[], layers?: number, layerKind?: number}} pick @returns {import("../../contracts/edits.js").EditPayloads["updateCustomKeyShortcut"]["shortcut"]} */
+export function shortcutPick(model, {mods = [], keys = [], layers = 0, layerKind = 0}) {
     const controls = vocabulary(model).pickerModifiers || [];
     const mask = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
     const held = keys[0] ? shortcutModifiers(model, keys[0]) : null;
-    if (held) return {mods: mask | held.mods, key: held.key ? shortcutKeyCode(model, held.key) ?? 0 : 0};
-    return {mods: mask, key: keys[0] ? shortcutKeyCode(model, keys[0]) ?? 0 : 0};
+    // A kind means nothing without layers: the shortcut holds then.
+    const kind = layers ? layerKind : 0;
+    if (held) return {mods: mask | held.mods, key: held.key ? shortcutKeyCode(model, held.key) ?? 0 : 0, layers, layerKind: kind};
+    return {mods: mask, key: keys[0] ? shortcutKeyCode(model, keys[0]) ?? 0 : 0, layers, layerKind: kind};
 }
 
-// The picker's choice in words, for its footer: "Left Ctrl + Right Alt + K".
-/** @param {Model} model @param {{mods: number, key: number}} shortcut */
+/** @param {Model} model @param {number} index */
+const layerWords = (model, index) => {
+    const layer = (model?.layers || []).find((entry) => entry.index === index);
+    return layer ? layer.displayName || layer.name : `Layer ${index}`;
+};
+
+// The picker's choice in words, for its footer: "Left Ctrl + Right Alt + K",
+// then its layers by name, lowest first, led by their kind's verb unless held,
+// as core names a shortcut ("Left Cmd + Lock Navigation + Extra").
+/** @param {Model} model @param {{mods: number, key: number, layers?: number, layerKind?: number}} shortcut */
 export function shortcutPickLabel(model, shortcut) {
     const mods = (vocabulary(model).modifiers || []).filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
     const entry = shortcut.key ? (model?.qmkKeycodes || []).find((row) => row.keycode === shortcut.key) : undefined;
-    return [...mods, entry ? entry.label || entry.value : ""].filter(Boolean).join(" + ");
+    const layers = (model?.layers || []).map((layer) => layer.index).filter((index) => (shortcut.layers ?? 0) & 2 ** index).sort((a, b) => a - b).map((index) => layerWords(model, index));
+    const verb = shortcut.layerKind ? (vocabulary(model).customKeys?.layerKinds || []).find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
+    if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;
+    return [...mods, entry ? entry.label || entry.value : "", ...layers].filter(Boolean).join(" + ");
+}
+
+// The kinds a shortcut's layers can be turned on as, in the picker: each
+// kind's verb, as its layer key reads ("Lock"), and what it does, for its tip.
+/** @param {Model} model @returns {{kind: number, label: string, tip: string, column: string}[]} */
+export function shortcutLayerKinds(model) {
+    /** @type {Record<number, {tip: string, column: string}>} */
+    const words = {
+        [LAYER_KIND.HOLD]: {tip: "As MO(): on while the shortcut is held, and only for a tap when it is tapped.", column: "Held on while the shortcut is"},
+        [LAYER_KIND.LOCK]: {tip: "As TG(): pressing it locks them all on, or all off again once all are locked.", column: "Locked by the shortcut"},
+        [LAYER_KIND.MOVE]: {tip: "As TO(): pressing it locks them alone, letting every other lock go.", column: "Locked alone by the shortcut"},
+        [LAYER_KIND.TAP_TOGGLE]: {tip: `As TT(): on from every press of the key; tapping it ${TAPPING_TOGGLE} times locks them, unless its behaviour has steps. Sent by another key's step, or by a combo that does not run the key's behaviour, they are only held; a combo that runs it acts as the key.`, column: "Held; locked by its taps"},
+        [LAYER_KIND.ONESHOT]: {tip: "As OSL(): on from every press of the key; a tap, or holding it alone and letting go, turns them on for the next key press, and a quick second tap cancels that.", column: "Held; one-shot when tapped"},
+    };
+    return (vocabulary(model).customKeys?.layerKinds || []).map(([kind, label]) => ({kind, label, ...(words[kind] || words[LAYER_KIND.HOLD])}));
+}
+
+// The layers a shortcut can turn on, one row each in the tab order, with why
+// one cannot (the base layer and the default layers are always on, firmware
+// D-F26): the core publishes the rule (model.customKeyShortcutLayers,
+// core/model/shortcut-layers.js).
+/** @param {Model} model @param {number} chosen */
+export function shortcutLayerRows(model, chosen) {
+    const targets = model?.customKeyShortcutLayers || [];
+    const words = vocabulary(model).customKeys.alwaysOn;
+    return (model?.layers || []).map((layer) => {
+        const target = targets.find((entry) => entry.layer === layer.index);
+        const on = Boolean(chosen & 2 ** layer.index), unusable = Boolean(target?.refusal);
+        return {layer: layer.index, name: layerWords(model, layer.index), on, unusable,
+            why: unusable && target?.alwaysOn && words ? words[target.alwaysOn] : "", tip: target?.refusal || ""};
+    });
 }
 
 // A key with modifiers from both sides, which no keycode can hold, still makes
@@ -158,9 +304,10 @@ export function shortcutOffer(model, {mods = [], keys = []}) {
 // make another. Where the key runs its own behaviour (a layout key, a combo
 // output) only one without a behaviour does just that; a behaviour step sends
 // a custom key's shortcut only, so any will do there.
-/** @param {Model} model @param {{mods: number, key: number}} shortcut @param {{runsBehaviour?: boolean}} [options] */
+/** @param {Model} model @param {{mods: number, key: number, layers?: number}} shortcut @param {{runsBehaviour?: boolean}} [options] */
 export const customKeyWithShortcut = (model, shortcut, {runsBehaviour = true} = {}) => (model?.customKeys || []).find((key) =>
-    hasShortcut(key) && key.shortcut.mods === shortcut.mods && key.shortcut.key === shortcut.key && !(runsBehaviour && key.hasBehavior));
+    hasShortcut(key) && key.shortcut.mods === shortcut.mods && key.shortcut.key === shortcut.key && (key.shortcut.layers ?? 0) === (shortcut.layers ?? 0)
+    && !(runsBehaviour && key.hasBehavior));
 
 // The custom key such an offer takes: the first that does nothing yet, with no
 // name, behaviour or shortcut and on no layer or combo.

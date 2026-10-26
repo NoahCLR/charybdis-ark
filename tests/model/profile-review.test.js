@@ -374,3 +374,23 @@ test("layout and Review labels follow the host layout on each side, including ma
         assert.equal(model.layers[0].positions[0].value, code);
     }
 });
+test("a shortcut kind that makes its key dual-role lists the threshold its behaviour now follows under the key", () => {
+    const settingsDomain = require("../../core/schema/settings-domain-v1");
+    const settings = (value, change) => withDomain(value,64,payload=>settingsDomain.decodeSettings(payload),value=>settingsDomain.encodeSettings(value),change);
+    const shortcut = layerKind => s => ({...s, customKeyShortcuts: s.customKeyShortcuts.map((row, slot) => slot === 5 ? {mods: 0, key: 0, layers: 1 << 3, layerKind} : row)});
+    const withRow = behaviours(pdDocument(), rows => {
+        const row = {...rows[0], target: {kind: 7, flags: 0, operand: 5}, tapHoldTerm: 0};
+        return [...rows, row].sort((a, b) => a.target.kind - b.target.kind || a.target.operand - b.target.operand);
+    });
+    const values = validateSnapshot(withRow).settings.values;
+    assert.notEqual(values[0], values[1], "the dual-role and behaviour terms differ here");
+    const before = snapshot(settings(withRow, shortcut(0))), after = snapshot(settings(withRow, shortcut(4)));
+    const items = profileReview(before, after);
+    assert.deepEqual(items.map(row => row.unit), ["customKey:5"]);
+    const follows = items[0].fields.find(field => field.label.endsWith(" · Tap / hold threshold"));
+    assert.deepEqual([follows?.before, follows?.after], [`default · ${values[1]} ms`, `default · ${values[0]} ms`]);
+    assert.match(items[0].note || "", /dual-role/);
+    // A kind change that keeps the key's threshold lists nothing more.
+    const lock = snapshot(settings(withRow, shortcut(1)));
+    assert.ok(!profileReview(before, lock)[0].fields.some(field => field.label.endsWith(" · Tap / hold threshold")));
+});

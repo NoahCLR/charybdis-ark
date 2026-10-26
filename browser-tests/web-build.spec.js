@@ -72,7 +72,7 @@ async function inputs() {
     const draft = {
         document: pdDocument(),
         deviceId: "web-build-charybdis",
-        capabilities: {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI, featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS,
+        capabilities: {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI, featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS,
             responseVersion: 2, reportSize: 32, brightnessMax: 255, maxProfilePayload: 65504, maxBehaviorRows: 128, maxPopulatedBehaviorSteps: 640,
             maxCombos: 128, maxComboInputs: 16, maxTapStepsPerBehavior: 5, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32, macroBytes: 10327},
         messages: [

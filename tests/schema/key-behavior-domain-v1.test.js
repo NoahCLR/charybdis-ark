@@ -137,7 +137,7 @@ test("domain envelope composes with the canonical whole-profile blob", () => {
     assert.equal(envelope.toString("hex"), golden.representativeEnvelopeHex);
     assert.equal(envelope[0], PROFILE_DOMAIN_IDS.KEY_BEHAVIORS);
     assert.deepEqual(decodeKeyBehaviorDomainEnvelope(envelope), decodeKeyBehaviorDomain(encodeKeyBehaviorDomain(representative())));
-    const blob = encodeProfileBlob({schema: {major: 4, minor: 1}, domains: [{
+    const blob = encodeProfileBlob({schema: {major: 4, minor: 2}, domains: [{
         id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS,
         version: 2,
         payload: encodeKeyBehaviorDomain(representative()),

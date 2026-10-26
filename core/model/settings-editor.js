@@ -13,6 +13,7 @@ const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
 const {layerName, VOCABULARY} = require("./vocabulary");
 const {settingsLinkRefusal} = require("./pointing-links");
+const {settingsShortcutRefusal} = require("./shortcut-layers");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @param {Partial<import("../../contracts/model.js").StoredSettingField>} [extra] @returns {import("../../contracts/model.js").StoredSettingField} */
@@ -353,13 +354,17 @@ function editSettings(snapshot, message, capabilities) {
     // pointing mode's link names (firmware D-F62; pointing-links.js).
     const linkRefusal = settingsLinkRefusal({values: before, names: value.settings.names}, value.settings, value.pdModes || []);
     if (linkRefusal) throw fail(linkRefusal);
+    // Nor onto a layer a custom key's shortcut turns on (firmware D-F26;
+    // shortcut-layers.js): the keyboard refuses that profile.
+    const shortcutRefusal = settingsShortcutRefusal(value.settings);
+    if (shortcutRefusal) throw fail(shortcutRefusal);
     // A timing displayed as default follows that default, including an older
     // profile's explicit value equal to it. Adopt inheritance only for changed
     // defaults; unrelated settings edits never rewrite behaviour rows.
     let behaviorsChanged = false;
     for (const row of value.behaviors.rows) {
-        const old = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, before);
-        const next = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, value.settings.values);
+        const old = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, before, value.settings.customKeyShortcuts);
+        const next = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, value.settings.values, value.settings.customKeyShortcuts);
         for (const [field, term] of /** @type {const} */ ([["tapHoldTerm", "hold"], ["longHoldTerm", "long"], ["multiTapTerm", "repeat"]])) {
             if (old[term] !== next[term] && row[field] !== 0 && row[field] === old[term]) {
                 row[field] = 0;

@@ -10,6 +10,15 @@ test("effective terms follow per-row overrides and the LT default", () => {
     assert.deepEqual(effectiveTimings({...row(0, 0), target: code(0x432f)}, [200,150,400,150]), {hold:200,long:400,repeat:150});
     assert.deepEqual(effectiveTimings(row(0,0), [200,150,400,150]), {hold:150,long:400,repeat:150});
 });
+test("a custom key whose shortcut taps-toggles or one-shots its layers waits the dual-role term, as TT() and OSL() do", () => {
+    const shortcuts = Array.from({length: 128}, () => ({mods: 0, key: 0, layers: 0, layerKind: 0}));
+    const custom = {target: {kind: 7, flags: 0, operand: 9}};
+    const terms = [200, 150, 400, 150];
+    /** @param {number} layerKind @param {number} [layers] */
+    const hold = (layerKind, layers = 1 << 3) => { shortcuts[9] = {mods: 0, key: 0, layers, layerKind}; return effectiveTimings(custom, terms, shortcuts).hold; };
+    assert.deepEqual([0, 1, 2, 3, 4].map((kind) => hold(kind)), [150, 150, 150, 200, 200]);
+    assert.equal(effectiveTimings(custom, terms).hold, 150, "no shortcuts given: the behaviour term");
+});
 test("release hold has an empty interval at equality and below, but not above", () => {
     for (const long of [99,100,101]) {
         const r = row(100,long);

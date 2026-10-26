@@ -4,8 +4,8 @@ const assert = require("node:assert/strict");
 const {timingAlone, changesNothing, inertBehaviorFindings} = require("../../core/model/inert-behaviors");
 
 const key = operand => ({kind: 1, flags: 0, operand});
-const shortcuts = Array.from({length: 128}, () => ({mods: 0, key: 0}));
-shortcuts[2] = {mods: 0x02, key: 0x06};
+const shortcuts = Array.from({length: 128}, () => ({mods: 0, key: 0, layers: 0, layerKind: 0}));
+shortcuts[2] = {mods: 0x02, key: 0x06, layers: 0, layerKind: 0};
 const row = (target, fields = {}) => ({target, steps: [], tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0,
     keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 0xffff, ...fields});
 
@@ -19,6 +19,7 @@ test("a timing alone does something only on a key the keyboard handles anyway, a
     // A custom key only with a shortcut.
     assert.equal(timingAlone({kind: 7, flags: 0, operand: 2}, shortcuts), true);
     assert.equal(timingAlone({kind: 7, flags: 0, operand: 3}, shortcuts), false);
+    assert.equal(timingAlone({kind: 7, flags: 0, operand: 4}, [...shortcuts.slice(0, 4), {mods: 0, key: 0, layers: 1 << 3, layerKind: 0}]), true, "layers alone are a shortcut (firmware D-F26)");
     // Keys the keyboard does not handle without a row: plain keys, macros, TO,
     // TG, LOCK_LAYER, pointing-mode toggles, DF and PDF, and layer keys past
     // the sixteen layers.

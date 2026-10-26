@@ -10,7 +10,7 @@ const {candidateMetadataForBlob, buildCandidateBeginRequest} = require("../../co
 const {buildSnapshotModel} = require("../../core/session/device-model");
 function fixture() {
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
+    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
     const draft = new ProfileDraftSession(snapshot, "board", caps);
     const stage = message => draft.stage({...message, draftRevision: draft.revision});
     return {draft, stage, caps};
@@ -81,10 +81,10 @@ test("keycode-picker modifier expressions are accepted as directional actions", 
     assert.equal(mode.directions.up.keycode, 0x081d);
     assert.equal(mode.directions.down.keycode, 0x081c);
 });
-test("logical Apply declares schema 4.1, all seven domains and storage format six", () => {
+test("logical Apply declares schema 4.2, all seven domains and storage format six", () => {
     const value = validateSnapshot(document());
     const metadata = candidateMetadataForBlob(value.profile, {actionAbiDigest: value.document.actionAbiDigest});
-    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.schemaMinor, 1); assert.equal(metadata.requestedDomains, 127); assert.equal(metadata.storeFormatVersion, 6);
+    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.schemaMinor, 2); assert.equal(metadata.requestedDomains, 127); assert.equal(metadata.storeFormatVersion, 6);
     const frame = buildCandidateBeginRequest(1, metadata);
     // Profile Wire 2 implies the store format: BEGIN carries a 32-bit length.
     assert.equal(frame.readUInt32LE(8), value.profile.length); assert.equal(frame.readUInt32LE(24), 0); assert.equal(frame.readUInt32LE(28), 0);

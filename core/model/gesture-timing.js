@@ -6,8 +6,9 @@
 // deliberately not collapsed into the same rule.
 const {KEY_BEHAVIOR_HOLD_STYLES: STYLE} = require("../schema/key-behavior-domain-v1");
 const {effectiveComboWindow} = require("../schema/combo-domain-v1");
-const {SETTING} = require("../schema/settings-domain-v1");
+const {SETTING, SHORTCUT_LAYER_KINDS} = require("../schema/settings-domain-v1");
 const {nativeCode, actionName} = require("../schema/actions");
+const {customKeyOfCode} = require("../data/user-keycodes");
 
 /**
  * @typedef {import("../schema/types.js").BehaviorStep} BehaviorStep
@@ -24,15 +25,24 @@ const DUAL_ROLE = /** @type {const} */ ([[0x2000, 0x3fff], [0x4000, 0x4fff], [0x
 // The setting a key's Tap / hold threshold follows when its row sets none, or
 // when it has no row. A dual-role key follows the dual-role term either way,
 // every other row the behaviour term (firmware D-F27 "Every dual-role key",
-// part of the Profile Wire base Ark requires, D-L64).
-/** @param {import("../schema/types.js").SemanticAction} target */
-function holdTermSetting(target) {
+// part of the Profile Wire base Ark requires, D-L64). A custom key whose
+// shortcut turns its layers on as TT() or OSL() does is one too (firmware
+// D-F26), so the profile's shortcuts, by slot, say which.
+/** @typedef {readonly ({layers?: number, layerKind?: number} | undefined)[]} KindedShortcuts */
+/** @param {import("../schema/types.js").SemanticAction} target @param {KindedShortcuts} [shortcuts] */
+function holdTermSetting(target, shortcuts) {
     const code = nativeCode(target);
+    const slot = code === undefined ? undefined : customKeyOfCode(code);
+    if (slot !== undefined) {
+        const shortcut = shortcuts?.[slot];
+        const dual = Boolean(shortcut?.layers) && (shortcut?.layerKind === SHORTCUT_LAYER_KINDS.TAP_TOGGLE || shortcut?.layerKind === SHORTCUT_LAYER_KINDS.ONESHOT);
+        return dual ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM;
+    }
     return DUAL_ROLE.some(([start, end]) => within(code, start, end)) ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM;
 }
-/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @returns {{hold: number | T, long: number | T, repeat: number | T}} */
-function effectiveTimings(row, values) {
-    return {hold: row.tapHoldTerm || values[holdTermSetting(row.target)],
+/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @param {KindedShortcuts} [shortcuts] @returns {{hold: number | T, long: number | T, repeat: number | T}} */
+function effectiveTimings(row, values, shortcuts) {
+    return {hold: row.tapHoldTerm || values[holdTermSetting(row.target, shortcuts)],
         long: row.longHoldTerm || values[SETTING.LONG_HOLD_TERM], repeat: row.multiTapTerm || values[SETTING.MULTI_TAP_TERM]};
 }
 /** @param {BehaviorStep} step @param {Timings} terms @returns {step is BehaviorStep & {hold: import("../schema/types.js").HoldBranch, longHold: import("../schema/types.js").HoldBranch}} */
@@ -48,7 +58,7 @@ function gestureTimingFindings(decoded) {
     /** @type {import("../../contracts/model.js").Finding[]} */
     const results = [];
     for (const row of decoded.behaviors?.rows || []) {
-        const keycode = actionName(row.target), terms = effectiveTimings(row, decoded.settings.values);
+        const keycode = actionName(row.target), terms = effectiveTimings(row, decoded.settings.values, decoded.settings.customKeyShortcuts);
         /** @param {string} id @param {string} title @param {string} detail @param {string} fix @param {import("../../contracts/model.js").FindingLevel} [level] */
         const add = (id, title, detail, fix, level = "warning") => results.push({kind: "gestureTiming", level, layers: [],
             identity: `${nativeCode(row.target)}:${id}`, title: `${keycode}: ${title}`, detail, fix, place: {kind: "behaviour", keycode}});

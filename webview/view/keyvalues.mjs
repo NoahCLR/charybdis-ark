@@ -71,7 +71,7 @@ export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ 
 // keycode can hold (two or more modifiers on each side) comes back as the
 // shortcut a custom key would take instead (D-L63).
 // Null when the selection has a key that is not a modifier, or nothing.
-/** @param {Model} model @param {{keys?: string[], mods?: string[]}} picker @returns {{keys: string[], mods: string[]} | {shortcut: {mods: number, key: number}} | null} */
+/** @param {Model} model @param {{keys?: string[], mods?: string[]}} picker @returns {{keys: string[], mods: string[]} | {shortcut: import("../../contracts/panel.js").CustomKeyShortcut} | null} */
 export function modifierPick(model, {keys = [], mods = []}) {
     const controls = vocabulary(model).pickerModifiers || [];
     const wrapped = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
@@ -91,7 +91,7 @@ export function modifierPick(model, {keys = [], mods = []}) {
         : oneSide(mask) ? mask & -mask
         : single(mask & 0x0f) ? mask & 0x0f
         : single(mask & 0xf0) ? mask & 0xf0 : 0;
-    if (!inner) return {shortcut: {mods: mask, key: 0}};
+    if (!inner) return {shortcut: {mods: mask, key: 0, layers: 0, layerKind: 0}};
     const name = (model?.qmkKeycodes || []).find((entry) => entry.keycode === 0xe0 + Math.log2(inner))?.value;
     if (!name) return null;
     return {keys: [name], mods: controls.filter((entry) => mask & ~inner & entry.bit).map((entry) => entry.value)};

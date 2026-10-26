@@ -159,8 +159,8 @@ const TIERS = /** @type {const} */ ([["tap", "tap"], ["hold", "hold"], ["longHol
 
 // A behaviour as fields: its timing, the anchor, then every tier the grid
 // shows, named as the grid names it (1× tap, 2× hold).
-/** @param {import("../schema/types.js").BehaviorRow | undefined} row @param {number[]} defaults @param {Names} names @returns {Fields} */
-function behaviourFields(row, defaults, names) {
+/** @param {import("../schema/types.js").BehaviorRow | undefined} row @param {number[]} defaults @param {Names} names @param {import("./gesture-timing.js").KindedShortcuts} [shortcuts] @returns {Fields} */
+function behaviourFields(row, defaults, names, shortcuts) {
     if (!row) return new Map();
     // Stored row edits stay here. Inherited effects appear under the settings
     // change that caused them, so discarding a default does not discard an
@@ -168,7 +168,7 @@ function behaviourFields(row, defaults, names) {
     // Each timing is marked with what it decides, as Settings marks its default.
     /** @param {number} value @param {number} fallback @param {Mark} labelMark @returns {Field} */
     const timing = (value, fallback, labelMark) => ({text: value ? `${value} ms` : `default · ${fallback} ms`, key: value, labelMark});
-    const inherited = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, defaults);
+    const inherited = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, defaults, shortcuts);
     /** @type {Fields} */
     const fields = new Map([
         ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
@@ -398,7 +398,7 @@ function profileReview(before, after, capabilities) {
     const targets = new Map([...a.behaviors.rows, ...b.behaviors.rows].map(row => [JSON.stringify(row.target), row.target]));
     for (const [id, target] of targets) {
         const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === id), next = b.behaviors.rows.find(row => JSON.stringify(row.target) === id);
-        item("Behaviours", `behavior:${id}`, action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA), behaviourFields(next, b.settings.values, namesB),
+        item("Behaviours", `behavior:${id}`, action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA, a.settings.customKeyShortcuts), behaviourFields(next, b.settings.values, namesB, b.settings.customKeyShortcuts),
             {kind: "behaviour", target}, [Boolean(old), Boolean(next)]);
     }
     const combosA = a.combos.rows, combosB = b.combos.rows;
@@ -465,12 +465,13 @@ function profileReview(before, after, capabilities) {
     keyNamesA.forEach((old, i) => {
         const next = keyNamesB[i];
         const shortcutA = a.settings.customKeyShortcuts[i], shortcutB = b.settings.customKeyShortcuts[i];
-        /** @param {{mods: number, key: number}} shortcut @param {Names} names @returns {Field} */
-        const shortcutField = (shortcut, names) => ({text: shortcutLabel(names.keys, shortcut) || "none", key: `${shortcut.mods}:${shortcut.key}`});
-        /** @param {string} name @param {{mods: number, key: number}} shortcut @param {Names} names @returns {Fields} */
+        // Its layers are part of the shortcut (firmware D-F26), named in it.
+        /** @param {{mods: number, key: number, layers: number, layerKind: number}} shortcut @param {Names} names @returns {Field} */
+        const shortcutField = (shortcut, names) => ({text: shortcutLabel(names.keys, shortcut) || "none", key: `${shortcut.mods}:${shortcut.key}:${shortcut.layers}:${shortcut.layerKind}`});
+        /** @param {string} name @param {{mods: number, key: number, layers: number, layerKind: number}} shortcut @param {Names} names @returns {Fields} */
         const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
-        /** @param {string} name @param {{mods: number, key: number}} shortcut */
-        const exists = (name, shortcut) => Boolean(name || shortcut.mods || shortcut.key);
+        /** @param {string} name @param {{mods: number, key: number, layers: number, layerKind: number}} shortcut */
+        const exists = (name, shortcut) => Boolean(name || shortcut.mods || shortcut.key || shortcut.layers);
         item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i},
             [exists(old, shortcutA), exists(next, shortcutB)]);
     });
@@ -520,7 +521,9 @@ function profileReview(before, after, capabilities) {
         for (const next of b.behaviors.rows) {
             const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(next.target));
             if (!old) continue;
-            const oldTimes = effectiveTimings(old, a.settings.values), nextTimes = effectiveTimings(next, b.settings.values);
+            // Both sides read the shortcuts as they are now, so a kind change
+            // that moves a key's threshold is the custom key's item (below).
+            const oldTimes = effectiveTimings(old, a.settings.values, b.settings.customKeyShortcuts), nextTimes = effectiveTimings(next, b.settings.values, b.settings.customKeyShortcuts);
             for (const [field, term, label] of /** @type {const} */ ([["multiTapTerm", "repeat", "Multi tap window"], ["tapHoldTerm", "hold", "Tap / hold threshold"], ["longHoldTerm", "long", "Long hold threshold"]])) {
                 // Normalized explicit matches already have a stored behaviour
                 // change above; include inherited-only effects here.
@@ -531,6 +534,20 @@ function profileReview(before, after, capabilities) {
             }
         }
         if (affected.size) timingChange.note = `${affected.size} behaviour${affected.size === 1 ? " follows" : "s follow"} the changed defaults; effective times are listed below.`;
+    }
+    // A shortcut whose layers become Tap-toggle or One-shot, or stop being
+    // either, makes its key dual-role or not (firmware D-F26): a behaviour on
+    // it that sets no Tap / hold threshold now follows the other default.
+    for (const change of items.filter(entry => entry.unit.startsWith("customKey:"))) {
+        const slot = Number(change.unit.slice("customKey:".length));
+        const shortcuts = a.settings.customKeyShortcuts.map((shortcut, i) => i === slot ? b.settings.customKeyShortcuts[i] : shortcut);
+        for (const next of b.behaviors.rows) {
+            if (next.tapHoldTerm !== 0) continue;
+            const was = effectiveTimings(next, b.settings.values, a.settings.customKeyShortcuts).hold, now = effectiveTimings(next, b.settings.values, shortcuts).hold;
+            if (was === now) continue;
+            change.fields.push({label: `${action(next.target, namesB)} · Tap / hold threshold`, status: "changed", before: `default · ${was} ms`, after: `default · ${now} ms`});
+            change.note = `Its behaviour now follows the ${now === b.settings.values[SETTING.TAPPING_TERM] ? "dual-role" : "tap / hold"} threshold, as its shortcut's layer kind makes the key ${now === b.settings.values[SETTING.TAPPING_TERM] ? "" : "no longer "}dual-role.`;
+        }
     }
     const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
     item("Settings", "settings:otherKeyOptions", "Other key options", new Map([["Stored bits", `0x${(a.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]),

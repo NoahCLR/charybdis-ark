@@ -29,6 +29,10 @@ Rest the pointer on a key and a card opens with everything it does:
 - its name and the keycode it stores
 - for a key that taps one thing and holds another, both, and the tap / hold
   threshold it uses
+- for a custom key, its shortcut: the keys it sends and the layers it turns
+  on, tagged with how (hold, lock, move to, tap-toggle or one-shot), and
+  whether it runs as the key does or where its behaviour leaves a tap or hold
+  empty
 - its behaviour, branch by branch, with the thresholds it runs on
 - the macro it plays, step by step, or the pointing mode it runs
 - the combos it is part of, what each sends and its other keys
@@ -83,17 +87,21 @@ board, highest first, with the base at the bottom.
   after a move. Turned off, layer keys keep their numbers and reach whatever
   layer now sits there. A pointing mode's layers, those that start it and
   those its key turns on, move as the layer keys do, so the keys that started
-  a mode still start it. Names, colours and the pointer and sniping settings
-  move with their layer either way. A move that would still put a pointing
-  mode's layer on the pointer layer or a default layer, or have one layer start
-  two modes, is refused and says why.
+  a mode still start it, and so do the layers a custom key's shortcut turns
+  on. Names, colours and the pointer and sniping settings move with their
+  layer either way. A move is refused, and says why, if it would put a
+  pointing mode's layer on the pointer layer or a default layer, have one
+  layer start two modes, have a shortcut turn on the base or a default layer,
+  or put two layers of one link or shortcut on the same layer (with layer keys
+  keeping their numbers, Make base can bring two of them together).
 
 Nothing changes until you press **Keep layers in draft**. **Discard** drops
 the moves, and so does closing the list any other way: Escape, or a click
 outside it.
 
 Make base swaps the two layers' roles: a key that reached the new base now
-reaches the old one, and so does a pointing mode's link. The new base's transparent keys become `KC_NO`, since
+reaches the old one, and so do a pointing mode's link and a custom key's
+shortcut. The new base's transparent keys become `KC_NO`, since
 there is nothing under the base for them to fall through to, and `KC_NO` on
 the old base becomes transparent. Review then checks what the move left
 behind, such as a layer nothing reaches any more.

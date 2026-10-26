@@ -372,10 +372,15 @@ function startLayerEdit(before, revision) {
 /** @param {LayerEdit} edit @param {readonly string[]} names */
 const rewriteLayers = (edit, names) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
 
-/** @param {LayerEdit} edit @param {readonly string[]} names */
-function keepNames(edit, names) {
-    rewriteLayers(edit, names);
-    edit.names = [...names];
+// Keeps a change to the edit only once the document rewritten with it is
+// valid, so a refused name, order or Keys follow is never kept: the edit stays
+// as it was, and every later message is checked against that.
+/** @param {LayerEdit} edit @param {Partial<Pick<LayerEdit, "names" | "order" | "keysFollow">>} next */
+function keep(edit, next) {
+    const candidate = {...edit, ...next};
+    rewriteLayers(candidate, candidate.names);
+    Object.assign(edit, next);
+    return edit;
 }
 
 // A move or a toggle posts every name the form holds, which is only taken
@@ -383,25 +388,27 @@ function keepNames(edit, names) {
 /** @param {LayerEdit} edit @param {unknown} names @returns {names is string[]} */
 const postsEveryName = (edit, names) => Array.isArray(names) && names.length === edit.names.length && names.every((name) => typeof name === "string");
 
-// Applies one message from the Rename & Reorder panel to its local state. A name
-// is checked by rewriting the document with it, so an invalid one is refused
-// before it is kept.
+// Applies one message from the Rename & Reorder panel to its local state. A
+// change is checked by rewriting the document with it (keep), so an invalid
+// name, or a move the document refuses, is refused before any of it is kept.
 /** @param {LayerEdit | null | undefined} edit @param {import("./types.js").LayerEditMessage} message */
 function applyLayerEdit(edit, message) {
     if (!edit) throw new Error("Read the layers again before editing them.");
+    /** @type {Partial<Pick<LayerEdit, "names" | "order" | "keysFollow">>} */
+    const next = {};
     if (message.keysFollow !== undefined) {
         if (typeof message.keysFollow !== "boolean") throw new Error("Read the layers again before editing them.");
-        edit.keysFollow = message.keysFollow;
+        next.keysFollow = message.keysFollow;
         if (message.type === "editPortableLayer" && message.id === undefined) {
-            // The form posts every name with the toggle, as with a move.
-            if (postsEveryName(edit, message.names)) keepNames(edit, message.names);
-            return edit;
+            // The form posts every name with the toggle, as with a move; the
+            // toggle is kept on its own first, so names it refuses leave it.
+            keep(edit, next);
+            return postsEveryName(edit, message.names) ? keep(edit, {names: [...message.names]}) : edit;
         }
     }
     if (message.type === "savePortableLayers" && message.names !== undefined) {
         if (!Array.isArray(message.names) || message.names.length !== edit.names.length) throw new Error("Read the layers again before naming them.");
-        keepNames(edit, message.names);
-        return edit;
+        return keep(edit, {...next, names: [...message.names]});
     }
     const id = message.id;
     if (typeof id !== "number" || !Number.isInteger(id) || id < 0 || id >= edit.order.length) throw new Error("Read the layers again before editing them.");
@@ -409,25 +416,26 @@ function applyLayerEdit(edit, message) {
         if (typeof message.name !== "string") throw new Error("Enter a layer name.");
         const names = [...edit.names];
         names[id] = message.name;
-        keepNames(edit, names);
-        return edit;
+        return keep(edit, {...next, names});
     }
     // The form posts every name with the move, because the rows are rebuilt
     // from this state afterwards: dropping them here would quietly undo
-    // whatever was typed before the move.
-    if (postsEveryName(edit, message.names)) keepNames(edit, message.names);
+    // whatever was typed before the move. They are kept first, so a refused
+    // name stops the move and a refused move keeps them.
+    if (Object.keys(next).length) keep(edit, next);
+    if (postsEveryName(edit, message.names)) keep(edit, {names: [...message.names]});
     // The bottom slot is the base. A layer reaches it only through Make base,
     // which swaps it with the layer there; a move or a drag stays above it.
-    const from = edit.order.indexOf(id);
+    const order = [...edit.order], from = order.indexOf(id);
     if (message.makeBase === true) {
         if (from < 1) throw new Error("That layer is already the base.");
-        [edit.order[0], edit.order[from]] = [edit.order[from], edit.order[0]];
-        return edit;
+        [order[0], order[from]] = [order[from], order[0]];
+        return keep(edit, {order});
     }
     const to = typeof message.to === "number" && Number.isInteger(message.to) ? message.to : typeof message.direction === "number" && Number.isInteger(message.direction) && [1, -1].includes(message.direction) ? from + message.direction : NaN;
-    if (from < 1 || !(to >= 1 && to < edit.order.length)) throw new Error("The base stays at the bottom; use Make base to put another layer there.");
-    edit.order.splice(to, 0, ...edit.order.splice(from, 1));
-    return edit;
+    if (from < 1 || !(to >= 1 && to < order.length)) throw new Error("The base stays at the bottom; use Make base to put another layer there.");
+    order.splice(to, 0, ...order.splice(from, 1));
+    return keep(edit, {order});
 }
 
 /** @param {LayerEdit} edit */

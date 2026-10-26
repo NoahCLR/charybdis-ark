@@ -13,11 +13,12 @@
 const {nativeCode, actionName} = require("../schema/actions");
 const {customKeyOfCode, PD_HOLD_BASE} = require("../data/user-keycodes");
 const {LAYERS} = require("../data/charybdis-layout");
+const {shortcutPresent} = require("../schema/settings-domain-v1");
 
 /**
  * @typedef {import("../schema/types.js").BehaviorRow} BehaviorRow
  * @typedef {import("../schema/types.js").SemanticAction} Action
- * @typedef {readonly {mods?: number, key?: number}[]} Shortcuts
+ * @typedef {readonly {mods?: number, key?: number, layers?: number}[]} Shortcuts
  */
 
 // The keys the keyboard handles with or without a row, as its key runtime
@@ -36,7 +37,7 @@ function timingAlone(target, shortcuts) {
     const code = nativeCode(target);
     if (code === undefined) return false;
     const slot = customKeyOfCode(code);
-    if (slot !== undefined) return Boolean(shortcuts?.[slot]?.mods || shortcuts?.[slot]?.key);
+    if (slot !== undefined) return shortcutPresent(shortcuts?.[slot]);
     if (/** @type {readonly number[]} */ (LAYER_IN_LOW_BITS).includes(code & ~0x1f)) return (code & 0x1f) < LAYERS;
     return ANY_LAYER.some(([start, end]) => code >= start && code <= end);
 }

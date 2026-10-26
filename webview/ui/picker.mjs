@@ -18,7 +18,8 @@ import {modifierPick, pickerModifierProblem} from "../view/keyvalues.mjs";
 import {comboOutputProblem, keyProblem} from "../view/keycode-expression.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
-import {customKeyChoice, offeredName, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutModifiers} from "../view/custom-key.mjs";
+import {customKeyChoice, offeredName, shortcutLayerKinds, shortcutLayerRows, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutModifiers} from "../view/custom-key.mjs";
+import {layerSwitchTable, switchedLayers} from "./layer-switches.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
 
 /** @param {Model} model */
@@ -27,7 +28,9 @@ const modifierControls = model => vocabulary(model).pickerModifiers || [];
 /** @param {import("./editor-types.js").PickerOptions} options */
 // `shortcut` picks a custom key's shortcut (firmware D-F26): the same board and
 // modifier row, but any of the eight modifiers mix, sides included, a key is
-// optional, and the choice goes to `onShortcut` as a mask and a key.
+// optional, its Layers section switches on any number of layers and how it
+// turns them on (hold, lock, move to, tap-toggle or one-shot, all alike), and
+// the choice goes to `onShortcut` as a mask, a key, a layer mask and a kind.
 // `onCustomKey` lets a keycode field take modifiers no keycode can hold — both
 // sides at once, or no key — through a custom key with that shortcut (D-L63):
 // one that already has it is picked as any key is, otherwise an unused one is
@@ -38,7 +41,7 @@ const modifierControls = model => vocabulary(model).pickerModifiers || [];
 export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false, comboOutput = false}) {
     const keys = allowedKeys ? seed.map(key => getModel()?.qmkKeycodeAliases?.[key] || key) : seed.slice();
     const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : [];
-    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
+    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), layers: shortcut?.layers || 0, layerKind: shortcut?.layers ? shortcut.layerKind || 0 : 0, maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
     render();
 }
 
@@ -59,7 +62,9 @@ const heldModifiers = (value) => state.picker?.shortcut ? shortcutModifiers(getM
 /** @param {string} value */
 const allowed = (value) => !state.picker?.allowedKeys || state.picker?.allowedKeys?.includes(value) || Boolean(heldModifiers(value));
 /** @param {Model} model */
+// A shortcut's Layers section holds its layer switches, not layer keycodes.
 const sections = (model) => pickerSections().filter(section => !state.picker?.allowedKeys || section.kind === "board"
+    || (section.kind === "layers" && Boolean(state.picker?.shortcut))
     || (section.kind === "macros" && (model?.macros || []).some(slot => allowed(slot.keycode)))
     || entriesForPickerSection(model?.qmkKeycodes || [], section).some(entry => allowed(entry.value)));
 
@@ -145,7 +150,19 @@ function sectionBody(model) {
         }).join("");
         return `<div class="pk-body"><div class="pkb"><svg viewBox="0 0 ${PICKER_BOARD.width} ${PICKER_BOARD.height}" xmlns="http://www.w3.org/2000/svg">${keys}</svg></div>
             ${model?.hostLayoutLegends ? `<p class="note pk-note">Shift above; ${modifierControls(model).find(({value}) => value === "A")?.label === "Option" ? "Option" : "AltGr"} on the right. ◌ marks a dead key: press it, then a letter.</p>` : ""}
-            <p class="note pk-note">${picker.shortcut ? "Click a key and the modifiers held with it, left and right mixed. Modifiers alone, or a key alone, are a shortcut too." : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.`}</p></div>`;
+            <p class="note pk-note">${picker.shortcut ? "Click a key and the modifiers held with it, left and right mixed; Layers adds the layers it turns on, and how. Modifiers alone, a key alone or layers alone are a shortcut too." : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.`}</p></div>`;
+    }
+    // A shortcut's layers are switches (shortcutLayerTable), placed once the
+    // sheet is built.
+    if (section.kind === "layers" && picker.shortcut) {
+        // How it turns them on, all alike, as one layer key does; nothing to
+        // choose until a layer is switched on.
+        const none = !picker.layers;
+        return `<div class="pk-body"><div class="field pk-layer-kind"><span>Turns them on as</span>
+            <div class="seg" role="radiogroup" aria-label="How the shortcut turns its layers on" data-tip="${none ? "Switch a layer on first." : ""}">
+                ${shortcutLayerKinds(model).map(({kind, label, tip}) => `<label data-tip="${esc(tip)}"><input type="radio" name="picker:shortcut-layer-kind" value="${esc(kind)}" data-f="picker:shortcut-layer-kind:${esc(kind)}" ${kind === (picker.layerKind || 0) ? "checked" : ""} ${none ? "disabled" : ""}><span>${esc(label)}</span></label>`).join("")}
+            </div></div><div data-shortcut-layers></div>
+        <p class="note pk-note">Each layer switched on is turned on as the choice above says, as that layer key would turn it on: held while the shortcut is, locked, locked alone, tap-toggled or one-shot. Held, it goes off when the shortcut lets go unless something else keeps it on, and a tap turns it on only for the tap. The base layer and the default layers are always on.</p></div>`;
     }
     if (section.kind === "layers") {
         // TG(n) is the same lock as LOCK_LAYER(n), so a key storing it lights
@@ -201,9 +218,27 @@ function sectionBody(model) {
         `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div></div>`;
 }
 
+// A shortcut's layers, one row per layer in the tab order: the base layer and
+// the default layers dimmed, saying why in the row (firmware D-F26).
+/** @param {Model} model @param {import("../state.js").PickerState} picker */
+function shortcutLayerTable(model, picker) {
+    const rows = shortcutLayerRows(model, picker.layers || 0);
+    const kinds = shortcutLayerKinds(model), kind = kinds.find((entry) => entry.kind === (picker.layerKind || 0)) || kinds[0];
+    const column = kind?.column || "Held on while the shortcut is";
+    return layerSwitchTable(model, "Layers", [column], rows.map((row) => ({
+        layer: row.layer, label: row.name, why: row.why, tip: row.tip, unusable: row.unusable,
+        switches: [{f: `picker:shortcut-layer:${row.layer}`, label: `${row.name}: ${column.toLowerCase()}`, checked: row.on, disabled: row.unusable,
+            tip: row.unusable ? row.tip : kind?.tip || ""}],
+    })));
+}
+
 export function pickerOverlay() {
     const picker = state.picker;
     if (!picker) return null;
+    // With no layer left, the kind they turn on as goes back to Hold, so it
+    // does not come back with the next layer switched on.
+    /** @param {number} mask */
+    const setLayers = (mask) => { picker.layers = mask; if (!mask) picker.layerKind = 0; };
     const model = getModel();
     const value = expression();
     // A key the draft would refuse never enables Use: the dialog must not
@@ -242,7 +277,9 @@ export function pickerOverlay() {
             ${picker.keys.length ? picker.keys.map((key, index) => `<button class="chip" data-remove="${esc(index)}">${esc(key)} ✕</button>`).join("")
                 : picker.mods.length ? modifierControls(model).filter(({value: wrap}) => picker.mods.includes(wrap)).map(({value: wrap, label}) =>
                     `<button class="chip" data-unmod="${esc(wrap)}">${esc(label)} ✕</button>`).join("")
-                : `<span class="note">nothing picked yet</span>`}
+                : picker.layers ? "" : `<span class="note">nothing picked yet</span>`}
+            ${picker.shortcut ? layers().filter((layer) => (picker.layers || 0) & 2 ** layer.index).sort((a, b) => a.index - b.index).map((layer) =>
+                `<button class="chip" data-unlayer="${esc(layer.index)}">${esc(layerName(layer))} ✕</button>`).join("") : ""}
             <code class="mono pk-value">${esc(storable || "—")}</code>
             <span class="right"><button class="btn ghost" data-act="clear">Clear</button>
                 <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>${picker.shortcut ? "Use shortcut" : "Use keycode"}</button></span>
@@ -275,7 +312,9 @@ export function pickerOverlay() {
         const layerTap = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-lt]"));
         if (layerTap) { picker.layerTap = picker.layerTap === layerTap.dataset.lt ? null : layerTap.dataset.lt || null; return render(); }
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clearlt"]'))) { picker.layerTap = null; return render(); }
-        if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clear"]'))) { picker.keys = []; picker.mods = []; picker.layerTap = null; return render(); }
+        if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clear"]'))) { picker.keys = []; picker.mods = []; picker.layers = 0; picker.layerKind = 0; picker.layerTap = null; return render(); }
+        const unlayer = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-unlayer]"));
+        if (unlayer) { setLayers((picker.layers || 0) & ~(2 ** Number(unlayer.dataset.unlayer))); return render(); }
         const remove = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-remove]"));
         if (remove) { picker.keys.splice(Number(remove.dataset.remove), 1); return render(); }
         const unmod = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-unmod]"));
@@ -320,6 +359,14 @@ export function pickerOverlay() {
             render();
         }
     });
+    const slot = /** @type {HTMLElement | null} */ (node.querySelector("[data-shortcut-layers]"));
+    if (slot) {
+        const table = shortcutLayerTable(model, picker);
+        slot.replaceWith(table);
+        table.addEventListener("change", () => { setLayers(switchedLayers(table, 0)); render(); });
+    }
+    const kinds = /** @type {HTMLElement | null} */ (node.querySelector(".pk-layer-kind"));
+    kinds?.addEventListener("change", (event) => { picker.layerKind = Number(/** @type {HTMLInputElement} */ (event.target).value) || 0; render(); });
     const search = /** @type {HTMLInputElement} */ (node.querySelector("#pickerSearch"));
     search.addEventListener("input", () => {
         picker.search = search.value;

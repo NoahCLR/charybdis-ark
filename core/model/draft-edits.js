@@ -15,6 +15,7 @@
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
 const {layerOfRef} = require("../schema/actions");
+const {shortcutPresent} = require("../schema/settings-domain-v1");
 
 /**
  * @typedef {import("../../contracts/edits.js").DraftEditType} DraftEditType
@@ -60,7 +61,7 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     updateMacro: {editor: "macro", label: "Edited a macro"},
     updateCustomKey: {editor: "customKey", label: "Renamed a custom key"},
     updateCustomKeyShortcut: {editor: "customKey", label: message => message.then || message.name !== undefined ? "Made a custom key for a shortcut"
-        : message.shortcut.mods || message.shortcut.key ? "Changed a custom key's shortcut" : "Cleared a custom key's shortcut"},
+        : shortcutPresent(message.shortcut) ? "Changed a custom key's shortcut" : "Cleared a custom key's shortcut"},
     renameKeyboard: {editor: "keyboardName", label: "Renamed the keyboard"},
     updatePlacementPolicy: {editor: "profile", domain: "placement", label: "Edited the draft"},
     savePdMode: {editor: "profile", domain: "pointing", label: "Edited a pointing mode"},

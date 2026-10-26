@@ -13,7 +13,7 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const schema2 = {maxProfilePayload: 130048, maxBehaviorRows: 64, maxPopulatedBehaviorSteps: 128, maxCombos: 32, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32};
-const customKeyCapabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81};
+const customKeyCapabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb4a15f12};
 const count = (usage, id) => usage.counts.find(entry => entry.id === id);
 
 // The fixture with no behaviours and no combos.
@@ -49,10 +49,12 @@ test("a custom key is in use once it has a name, a shortcut or a behaviour", () 
 
     const named = snapshot(editCustomKey(before, {keycode: "CUSTOM_KEY_100", name: "Zoom", expectedFingerprint: before.fingerprint}, customKeyCapabilities));
     assert.equal(count(profileUsage(named, schema2), "customKeys").used, count(behaved, "customKeys").used + 1, "a name");
-    const shortcut = snapshot(editCustomKey(named, {keycode: "CUSTOM_KEY_101", shortcut: {mods: 1, key: 0x1d}, expectedFingerprint: named.fingerprint}, customKeyCapabilities));
+    const shortcut = snapshot(editCustomKey(named, {keycode: "CUSTOM_KEY_101", shortcut: {mods: 1, key: 0x1d, layers: 0, layerKind: 0}, expectedFingerprint: named.fingerprint}, customKeyCapabilities));
     assert.equal(count(profileUsage(shortcut, schema2), "customKeys").used, count(behaved, "customKeys").used + 2, "a shortcut");
-    const both = snapshot(editCustomKey(shortcut, {keycode: "CUSTOM_KEY_100", shortcut: {mods: 2, key: 0x04}, expectedFingerprint: shortcut.fingerprint}, customKeyCapabilities));
+    const both = snapshot(editCustomKey(shortcut, {keycode: "CUSTOM_KEY_100", shortcut: {mods: 2, key: 0x04, layers: 0, layerKind: 0}, expectedFingerprint: shortcut.fingerprint}, customKeyCapabilities));
     assert.equal(count(profileUsage(both, schema2), "customKeys").used, count(behaved, "customKeys").used + 2, "a key is counted once");
+    const layered = snapshot(editCustomKey(both, {keycode: "CUSTOM_KEY_102", shortcut: {mods: 0, key: 0, layers: 1 << 3, layerKind: 0}, expectedFingerprint: both.fingerprint}, customKeyCapabilities));
+    assert.equal(count(profileUsage(layered, schema2), "customKeys").used, count(behaved, "customKeys").used + 3, "layers alone (firmware D-F26)");
 });
 
 test("macro slots in use are the ones with steps; the highest empty ones are unavailable when macro memory runs short", () => {

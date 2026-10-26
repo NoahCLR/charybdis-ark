@@ -16,8 +16,9 @@
 // each state every key resolves as the firmware does (the highest layer on that
 // is not transparent answers), and each key's own layer action, its behaviour
 // branches, the combos that match, a pointing mode's key turning on the layers
-// its link names, and the trackball waking the pointer layer move it to another
-// state.
+// its link names, a custom key's shortcut holding its layers, and the
+// trackball waking the pointer layer move it to another state. A key that
+// turns several layers on turns them on together and lets them go together.
 // From that it names:
 //
 // - traps: a set of locks you can get into and cannot get back to Base from;
@@ -37,16 +38,16 @@
 const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
 const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
-const {layerLockOfCode} = require("../data/user-keycodes");
+const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdBindingOfCode, PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
-const {SETTING} = require("../schema/settings-domain-v1");
+const {SETTING, SHORTCUT_LAYER_KINDS, alwaysOnLayers} = require("../schema/settings-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
 const {layerName, slotName} = require("./vocabulary");
 const {inertLinkLayers} = require("./pointing-links");
 const {PD_LINK_ENDS, PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
-const {analyzeLayerStates} = require("./layer-state-graph");
+const {analyzeLayerStates, maskOf: layersOf, lowest} = require("./layer-state-graph");
 const {compileLayerAnswers, answeringLayer} = require("./layer-resolution");
 
 /**
@@ -84,33 +85,65 @@ const layersIn = (mask) => Array.from({length: LAYERS}, (_, layer) => layer).fil
 const codeName = (code) => {
     const binding = pdBindingOfCode(code);
     if (binding) return binding.locked ? PD_SLOT_BINDINGS[binding.slot].lock : PD_SLOT_BINDINGS[binding.slot].hold;
+    const custom = customKeyOfCode(code);
+    if (custom !== undefined) return `CUSTOM_KEY_${custom}`;
     return layerLockOfCode(code) !== undefined ? `LOCK_LAYER(${layerLockOfCode(code)})`
         : keycodes.resolve(code)?.name || `0x${code.toString(16).toUpperCase().padStart(4, "0")}`;
 };
 
 // The pointing slots whose key turns layers on (firmware D-F62): a mode its
 // key runs, held or locked, turns on those layers for as long as it runs. So
-// the mode's hold key holds each layer, and its lock key toggles each as a
-// layer lock would, one more way onto each layer. A key that turns on several
-// layers is walked as one effect per layer, so the walk may find a state
-// where only some of them are on, which a person cannot reach. Which source
-// wins while another mode runs is not walked. Each slot maps to its layers
-// and its name.
-/** @typedef {Map<number, {layers: number[], name: string}>} ModeLinks */
-/** @param {number} slot @param {boolean} locked @param {ModeLinks | undefined} links @returns {LayerEffect[]} */
-function modeEffects(slot, locked, links) {
-    const link = links?.get(slot);
-    return link ? link.layers.map((layer) => ({kind: locked ? "lock" : "hold", layer, mode: link.name})) : [];
+// the mode's hold key holds them, and its lock key toggles them as a layer
+// lock would, one more way onto them: all of them at once, as one effect, so
+// the walk never reaches a state where only some are on. Which source wins
+// while another mode runs is not walked. Each slot maps to its layers and its
+// name; each custom key whose shortcut turns layers on (firmware D-F26) to
+// its layers and how it turns them on.
+/** @typedef {Map<number, {layers: number, name: string}>} ModeLinks */
+/** @typedef {{modes: ModeLinks, shortcuts: Map<number, {layers: number, layerKind: number}>}} LayerOwners */
+/** @param {number} slot @param {boolean} locked @param {LayerOwners | undefined} owners @returns {LayerEffect[]} */
+function modeEffects(slot, locked, owners) {
+    const link = owners?.modes.get(slot);
+    return link ? [{kind: locked ? "lock" : "hold", layer: lowest(link.layers), layers: link.layers, mode: link.name}] : [];
+}
+// A custom key's shortcut layers (firmware D-F26), all at once, as its layer
+// key turns one on: held while it is held (a tap holds nothing), locked,
+// locked alone (a move), or held as a one-shot is. A tap-toggle shortcut holds
+// them, and its own key's TAPPING_TOGGLE-th tap locks them, the key itself
+// or a combo that runs its behaviour; sent by a behaviour step or a combo
+// that sends only the shortcut (`own` false) it only holds, since those taps
+// are its key's. On its own key, a tap-toggle or one-shot shortcut is a momentary
+// layer key, as TT() and OSL() are: its layers are on from every press,
+// whatever the key's row (`fromPress`).
+/** @param {number} slot @param {LayerOwners | undefined} owners @param {boolean} own @returns {LayerEffect[]} */
+function shortcutEffects(slot, owners, own) {
+    const shortcut = owners?.shortcuts.get(slot);
+    if (!shortcut) return [];
+    const {layers, layerKind} = shortcut, at = {layer: lowest(layers), layers, shortcut: true};
+    switch (layerKind) {
+        case SHORTCUT_LAYER_KINDS.LOCK: return [{kind: "lock", ...at}];
+        case SHORTCUT_LAYER_KINDS.MOVE: return [{kind: "move", ...at}];
+        case SHORTCUT_LAYER_KINDS.ONESHOT: return [{kind: "hold", ...at, oneShot: true, ...(own ? {fromPress: true} : {})}];
+        case SHORTCUT_LAYER_KINDS.TAP_TOGGLE: return own ? [{kind: "hold", ...at, fromPress: true}, {kind: "lock", ...at, taps: TAPPING_TOGGLE}] : [{kind: "hold", ...at}];
+        default: return [{kind: "hold", ...at}];
+    }
 }
 
-// What a native keycode does to the layers, if anything. `unowned` is a layer
+// The shortcuts by slot, for the timing a custom key follows.
+/** @param {LayerOwners | undefined} owners */
+const shortcutsBySlot = (owners) => Array.from({length: 128}, (_, slot) => owners?.shortcuts.get(slot));
+
+// What a native keycode does to the layers, if anything: as the key pressed
+// (`own`), or sent by a behaviour step or a combo. `unowned` is a layer
 // keycode the keyboard leaves to QMK (DF, PDF, a layer past the bank).
-/** @param {number} code @param {ModeLinks} [links] @returns {LayerEffect[]} */
-function layerEffects(code, links) {
+/** @param {number} code @param {LayerOwners} [links] @param {boolean} [own] @returns {LayerEffect[]} */
+function layerEffects(code, links, own = true) {
     /** @param {number} layer @param {LayerEffect[]} effects @returns {LayerEffect[]} */
     const within = (layer, effects) => (layer < LAYERS ? effects : [{kind: "unowned", layer}]);
     const binding = pdBindingOfCode(code);
     if (binding) return modeEffects(binding.slot, binding.locked, links);
+    const custom = customKeyOfCode(code);
+    if (custom !== undefined) return shortcutEffects(custom, links, own);
     if (code >= 0x4000 && code <= 0x4fff) return within((code >> 8) & 15, [{kind: "hold", layer: (code >> 8) & 15}]);
     if (code >= 0x5000 && code <= 0x51ff) return within((code >> 5) & 15, [{kind: "hold", layer: (code >> 5) & 15}]);
     if (layerLockOfCode(code) !== undefined) return [{kind: "lock", layer: /** @type {number} */ (layerLockOfCode(code))}];
@@ -128,13 +161,14 @@ function layerEffects(code, links) {
 }
 
 // What a stored action does to the layers.
-/** @param {Action | undefined} action @param {ModeLinks} [links] @returns {LayerEffect[]} */
+/** @param {Action | undefined} action @param {LayerOwners} [links] @returns {LayerEffect[]} */
 function actionEffects(action, links) {
     if (!action) return [];
     if (action.kind === ACTION.LAYER_MOMENTARY) return action.operand < LAYERS ? [{kind: "hold", layer: action.operand}] : [];
     if (action.kind === ACTION.LAYER_LOCK) return action.operand < LAYERS ? [{kind: "lock", layer: action.operand}] : [];
     if (action.kind === ACTION.PD_MODE_MOMENTARY || action.kind === ACTION.PD_MODE_LOCK) return modeEffects(action.operand, action.kind === ACTION.PD_MODE_LOCK, links);
-    if (action.kind === ACTION.QMK_KEYCODE) return layerEffects(action.operand, links);
+    if (action.kind === ACTION.CUSTOM_KEY) return shortcutEffects(action.operand, links, false);
+    if (action.kind === ACTION.QMK_KEYCODE) return layerEffects(action.operand, links, false);
     return [];
 }
 
@@ -149,19 +183,37 @@ const holdPhrase = (index, name, longer) => `${index === 0 ? `Hold ${name}` : `T
 // action, less the parts its behaviour row replaces, and each branch of that
 // row. A row with steps replaces TT()'s own taps; one without is no row
 // (firmware D-F27). A hold branch that presses and holds until release holds
-// the layer; any other hold, like a tap, sends the action once.
-/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @param {ModeLinks} [links] @returns {(LayerEffect & {how: string, note?: string})[]} */
+// the layer; any other hold, like a tap, sends the action once. A custom key's
+// row sends its shortcut where it leaves a tier empty (firmware D-F26): tapped
+// from an empty first tap, held from the fallback hold, which belongs to the
+// first press alone and only while it authors neither a hold nor a long hold
+// (built-in-behavior.js). A shortcut that locks or moves does so from either,
+// and one that holds from the fallback hold.
+/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @param {LayerOwners} [links] @returns {(LayerEffect & {how: string, note?: string})[]} */
 function keyEffects(code, row, values, links) {
     /** @type {(LayerEffect & {how: string, note?: string})[]} */
     const effects = [];
     const first = row?.steps.find((step) => step.tapIndex === 0);
     /** @param {LayerEffect} effect */
-    const runs = (effect) => (effect.mode ? `which runs ${effect.mode}, whose key turns layers on` : "");
+    const runs = (effect) => (effect.mode ? `which runs ${effect.mode}, whose key turns layers on` : effect.shortcut ? "whose shortcut turns layers on" : "");
+    // The fallback hold: the first press's, while it authors no hold tier.
+    const fallbackHold = !first?.hold && !first?.longHold;
     for (const effect of layerEffects(code, links)) {
-        if (effect.taps && row?.steps.length) continue;
-        if (effect.kind === "hold" && !effect.oneShot ? first?.hold : first?.tap) continue;
-        const how = effect.taps ? `Tap ${codeName(code)} ${effect.taps} times` : effect.kind === "hold" && !effect.oneShot ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`;
-        effects.push({...effect, how, ...(effect.mode ? {note: runs(effect)} : {})});
+        let how;
+        if (effect.taps) {
+            if (row?.steps.length) continue;
+            how = `Tap ${codeName(code)} ${effect.taps} times`;
+        } else if (effect.fromPress) {
+            how = `Hold ${codeName(code)}`;
+        } else if (effect.shortcut) {
+            if (effect.kind !== "hold" && !first?.tap) how = `Tap ${codeName(code)}`;
+            else if (fallbackHold) how = holdPhrase(0, codeName(code), false);
+            else continue;
+        } else {
+            if (effect.kind === "hold" && !effect.oneShot ? first?.hold : first?.tap) continue;
+            how = effect.kind === "hold" && !effect.oneShot ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`;
+        }
+        effects.push({...effect, how, ...(effect.mode || effect.shortcut ? {note: runs(effect)} : {})});
     }
     for (const step of row?.steps || []) {
         /** @param {Action | undefined} action */
@@ -170,11 +222,13 @@ function keyEffects(code, row, values, links) {
             if (effect.kind !== "hold" || effect.oneShot) effects.push({...effect, how: tapPhrase(step.tapIndex, codeName(code)), note: sends(step.tap)});
         }
         for (const [part, longer] of /** @type {const} */ ([["hold", false], ["longHold", true]])) {
-            if (part === "hold" && values && row && releaseHoldUnreachable(step, effectiveTimings(row, values))) continue;
+            if (part === "hold" && values && row && releaseHoldUnreachable(step, effectiveTimings(row, values, shortcutsBySlot(links)))) continue;
             const hold = step[part];
             for (const effect of actionEffects(hold?.action, links)) {
                 const press = hold?.style === KEY_BEHAVIOR_HOLD_STYLES.PRESS_AND_HOLD_UNTIL_RELEASE;
-                if (effect.kind === "hold" && !press) continue;
+                // A hold that only sends its action once holds nothing, but a
+                // one-shot it sends is armed.
+                if (effect.kind === "hold" && !effect.oneShot && !press) continue;
                 effects.push({...effect, how: holdPhrase(step.tapIndex, codeName(code), longer), note: sends(hold?.action)});
             }
         }
@@ -226,7 +280,7 @@ function profileFacts(decoded) {
     // of the link's sets. The pointer layer and the default layers never end it, nor does
     // Base, which is always on here but not in the keyboard's layer state.
     /** @type {ModeLinks} */
-    const modeLinks = new Map();
+    const modes = new Map();
     let layerStarted = 0;
     /** @type {{layer: number, ends: number}[]} */
     const endedStarts = [];
@@ -236,7 +290,7 @@ function profileFacts(decoded) {
     for (const slot of decoded.pdModes || []) {
         if (!slot.kind) continue;
         const turnsOn = live(slot.linkTurnsOn);
-        if (turnsOn.length) modeLinks.set(slot.id, {layers: turnsOn, name: slotName(slot)});
+        if (turnsOn.length) modes.set(slot.id, {layers: turnsOn.reduce((layers, layer) => layers | bit(layer), 0) >>> 0, name: slotName(slot)});
         const link = (slot.linkedLayers | slot.linkTurnsOn) >>> 0;
         for (const layer of live(slot.linkedLayers)) {
             const ends = slot.linkEnds === PD_LINK_ENDS.HIGHER_LAYER ? (0xffff << (layer + 1)) & 0xffff & ~neverEnds
@@ -245,10 +299,17 @@ function profileFacts(decoded) {
             else layerStarted |= bit(layer);
         }
     }
+    // The custom keys whose shortcut turns layers on (firmware D-F26), and
+    // how; the layers always on never are among them.
+    /** @type {LayerOwners["shortcuts"]} */
+    const shortcuts = new Map();
+    (decoded.settings.customKeyShortcuts || []).forEach((shortcut, slot) => {if (shortcut.layers) shortcuts.set(slot, {layers: shortcut.layers & 0xffff, layerKind: shortcut.layerKind ?? SHORTCUT_LAYER_KINDS.HOLD});});
+    /** @type {LayerOwners} */
+    const modeLinks = {modes, shortcuts};
     const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
     return {names, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, modeLinks, layerStarted, endedStarts, values, behaviorUsed, comboPress, generatedLayers,
         // Base is always on, and so are the default layers the keyboard keeps.
-        always: (1 | (values[SETTING.DEFAULT_LAYERS] & 0xffff)) >>> 0,
+        always: alwaysOnLayers(values),
         /** @param {number} layer */
         comboLayer: (layer) => records?.[layer]?.reference ?? layer};
 }
@@ -431,10 +492,20 @@ const heldOf = (state) => state >>> 16;
 /** @param {number} state @param {WalkEffect} effect */
 function step(state, effect) {
     const locks = locksOf(state), held = heldOf(state);
+    const layers = layersOf(effect);
     switch (effect.kind) {
-        case "hold": return held & bit(effect.layer) ? state : stateOf(locks, held | bit(effect.layer));
-        case "lock": return effect.layer === 0 ? state : stateOf(locks ^ bit(effect.layer), held);
-        case "move": return stateOf(effect.layer === 0 ? 0 : bit(effect.layer), held);
+        case "hold": return (held & layers) === layers ? state : stateOf(locks, held | layers);
+        // A lock of several turns them all on, or all off once all are on,
+        // sharing each layer's lock with TG(), as a shortcut's Lock does
+        // (layer-state-graph.js; a pointing mode's lock key is walked alike).
+        case "lock": {
+            const set = layers & ~1;
+            if (!set) return state;
+            if (!(set & (set - 1))) return stateOf(locks ^ set, held);
+            return stateOf((locks & set) === set ? locks & ~set : locks | set, held);
+        }
+        // Locks the layers alone, every other lock let go; TO(0) lets them all go.
+        case "move": return stateOf(layers & ~1, held);
         default: return state;
     }
 }
@@ -443,6 +514,22 @@ function step(state, effect) {
 // each effect leads; `parent` the first way each state was reached.
 /** @param {Facts} facts @returns {import("./types.js").BoundedLayerWalk} */
 function boundedWalk(facts) {
+    // What one key holds is let go together, while any of it is still held
+    // (another hold that shared a layer may have let that one go), once a
+    // state reached can make that hold, as the symbolic walk does: walked
+    // again, with each release found, until no new one is.
+    /** @type {Set<number>} */
+    const holds = new Set();
+    for (;;) {
+        const walked = walkWith(facts, holds);
+        const made = [...walked.edges.values()].flat().map(({effect}) => effect).filter((effect) => effect.kind === "hold" && !holds.has(layersOf(effect)));
+        if (!walked.complete || !made.length) return walked;
+        for (const effect of made) holds.add(layersOf(effect));
+    }
+}
+
+/** @param {Facts} facts @param {ReadonlySet<number>} holds @returns {import("./types.js").BoundedLayerWalk} */
+function walkWith(facts, holds) {
     /** @type {Map<number, OfferedEffect[]>} */
     const cache = new Map();
     /** @type {import("./types.js").BoundedLayerWalk['edges']} */
@@ -460,7 +547,9 @@ function boundedWalk(facts) {
             if (effect.kind === "unowned") continue;
             out.push({to: step(state, effect), effect});
         }
-        for (const layer of layersIn(heldOf(state))) out.push({to: stateOf(locksOf(state), heldOf(state) & ~bit(layer)), effect: {kind: "release", layer}});
+        for (const layers of holds) {
+            if (heldOf(state) & layers) out.push({to: stateOf(locksOf(state), heldOf(state) & ~layers), effect: {kind: "release", layer: lowest(layers), layers}});
+        }
         edgeCount += out.length;
         if (edgeCount > MAX_WALK_EDGES) {complete = false; break;}
         edges.set(state, out);
@@ -540,7 +629,7 @@ function traps(facts, walked) {
         return {kind: "trap", level: LEVELS.TRAP, layers: layersIn(locks),
             title: `${listed(names)} can lock with no way back to ${layerName(facts.names, 0)}`,
             detail: `Once ${listed(names)} ${names.length === 1 ? "is" : "are"} locked, no key, behaviour or combo left on the board turns ${names.length === 1 ? "it" : "them"} off or moves back to ${layerName(facts.names, 0)}. Unplugging the keyboard clears it.`,
-            path: path.map((effect) => effect.kind === "release" ? `Release the hold on ${layerName(facts.names, effect.layer)}` : effect.how),
+            path: path.map((effect) => effect.kind === "release" ? `Release the hold on ${listed(namesOf(facts, layersOf(effect)))}` : effect.how),
             fix: `Put TO(0) or TG(${top}) on ${layerName(facts.names, top)}, where it answers, or take away the lock.`,
             place: placeOf(effect.from)};
     });
@@ -586,12 +675,12 @@ function findings(facts, walked) {
     /** @type {Map<number, OfferedEffect>} */
     const empty = new Map();
     for (const effect of walked.effects ?? [...walked.cache.values()].flat()) {
-        if (effect.kind === "unowned" || effect.from.trackball || effect.layer === 0 || hasKeys(effect.layer) || empty.has(effect.layer)) continue;
-        empty.set(effect.layer, effect);
+        if (effect.kind === "unowned" || effect.from.trackball) continue;
+        for (const layer of layersIn(layersOf(effect))) if (layer !== 0 && !hasKeys(layer) && !empty.has(layer)) empty.set(layer, effect);
     }
     for (const [layer, effect] of empty) {
         results.push({kind: "emptyTarget", level: LEVELS.NOTICE, layers: [layer],
-            title: `${effect.mode ? `${effect.mode}, a pointing mode,` : "A layer key"} reaches ${layerName(facts.names, layer)}, which has no keys of its own`,
+            title: `${effect.mode ? `${effect.mode}, a pointing mode,` : effect.shortcut ? "A custom key's shortcut" : "A layer key"} reaches ${layerName(facts.names, layer)}, which has no keys of its own`,
             detail: `${effect.how}: ${layerName(facts.names, layer)} holds only transparent keys and KC_NO, so it adds nothing to the board.`,
             fix: `Give ${layerName(facts.names, layer)} keys, or take the layer key away.`,
             place: placeOf(effect.from)});
@@ -616,7 +705,7 @@ function findings(facts, walked) {
     // only TO() means something there. Every key, branch and combo output is
     // counted, reachable or not.
     /** @param {LayerEffect[]} effects */
-    const idle = (effects) => effects.some((effect) => effect.kind !== "move" && effect.kind !== "unowned" && facts.always & bit(effect.layer));
+    const idle = (effects) => effects.some((effect) => effect.kind !== "move" && effect.kind !== "unowned" && (layersOf(effect) & ~facts.always) === 0);
     /** @type {{name: string, place: import("../../contracts/model.js").FindingPlace}[]} */
     const idlePlaces = [];
     facts.layers.forEach((codes, layer) => codes.forEach((code, position) => {

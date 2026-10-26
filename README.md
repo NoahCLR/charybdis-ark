@@ -21,6 +21,8 @@ halves. No C, no reflash, no firmware checkout.
   and delays, or record what you type. Macros type through your computer's
   keyboard layout.
 - **Custom keys.** Name your own keys, give each a shortcut and a behaviour.
+  A shortcut can turn layers on too, several at once, held, locked, moved
+  to, tap-toggled or one-shot, as a layer key would.
 - **The trackball.** Pointer speed, sniping on the layers you pick,
   auto-mouse, and 32 pointing modes that scroll or send arrows and shortcuts
   as the ball moves, each of which can run while its layers are on and turn

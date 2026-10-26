@@ -95,11 +95,36 @@ Pick one from the list (**Search by name** finds it by name or number). Its
 name is the editor's title: click it to rename, Enter to keep, Escape to put
 it back.
 
-**Shortcut** is what the key sends: one key and any modifiers, held while you
-hold the custom key and tapped when you tap it. **Pick…** opens the picker
-with only the keys a shortcut can send. Here left and right modifiers mix
-freely, so Left Ctrl + Right Option + K is fine. Modifiers alone, or a key
-alone, are a shortcut too. **Clear** removes it.
+**Shortcut** is what the key sends: one key, any modifiers and any layers.
+The key and modifiers are held while you hold the custom key and tapped when
+you tap it. **Pick…** opens the picker with only the keys a shortcut can send.
+Here left and right modifiers mix freely, so Left Ctrl + Right Option + K is
+fine. Its **Layers** section switches on the layers the shortcut turns on, as
+many as you like, and **Turns them on as** says how, all of them alike, as a
+layer key would:
+
+- **Hold**, as `MO()`: Left Cmd + Navigation + Extra holds Command and both
+  layers while you hold the key. They go off when you let go, unless a lock,
+  another key or a pointing mode's key keeps them on, and a tap turns them on
+  only for the tap.
+- **Lock**, as `TG()`: pressing the key locks them all on, or all off again
+  once all are locked.
+- **Move to**, as `TO()`: pressing the key locks them alone and lets every
+  other lock go.
+- **Tap-toggle**, as `TT()`: on while you hold the key; tapping the key five
+  times locks them, unless its behaviour has steps (any tap, hold or long
+  hold), which replace those taps as they do `TT()`'s.
+- **One-shot**, as `OSL()`: on while you hold the key; a tap, or holding it
+  alone and letting go, turns them on for your next key press, and a quick
+  second tap cancels that.
+
+Tap-toggle and one-shot keys are layer keys like `TT()` and `OSL()`: their
+layers are on from every press, even with a behaviour on the key, and they
+wait the dual-role tap / hold threshold. With the other kinds, a behaviour on
+the key sends the shortcut where it leaves a tap or a hold empty, so a lock or
+a move happens from either. The base layer and the default layers are always on, so
+their rows are dimmed and say so. Modifiers alone, a key alone or layers alone
+are a shortcut too. **Clear** removes it.
 
 **What it does** says whether the key sends its shortcut, its behaviour, both
 or nothing yet, and holds the same behaviour editor as the Keys screen. It
@@ -113,8 +138,12 @@ lists every custom key a layer reaches, as the Macros tab does for macros.
 **Place on a key…** takes you to the board: pick a layer, then click the key
 to put it on.
 
-A behaviour on another key can send a custom key too. It sends only that
-key's shortcut, never its behaviour.
+A behaviour on another key can send a custom key too, and so can a combo. It
+sends only that key's shortcut, layers included, never its behaviour. Sent
+that way, a tap-toggle shortcut only holds its layers: its taps belong to its
+own key. A combo set to run its output's behaviour is the exception: it acts
+as the custom key itself, so its taps can lock a tap-toggle shortcut's layers
+as the key's own do.
 
 ## Key swaps & typing
 
