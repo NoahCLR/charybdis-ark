@@ -44,14 +44,14 @@ export function screenMouse() {
     return main;
 }
 
-// Sniping is on while a sniping key is held or toggled, and while the
+// Sniping is on while a sniping key is held or toggled, and while an
 // auto-sniping layer is on; this says where those keys are, places one, and
 // says what sniping slows.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {boolean} canEdit */
 function snipingKeys(model, canEdit) {
     const node = el(`<div class="card-b sniping-keys">
         <div class="sect-h"><h4>Sniping keys</h4></div>
-        <p class="note">Sniping is on while one of these keys is held or toggled, and while the auto-sniping layer is on.</p></div>`);
+        <p class="note">Sniping is on while one of these keys is held or toggled, and while one of the auto-sniping layers is on.</p></div>`);
     for (const keycode of ["SNIPING", "SNP_TOG"]) {
         const words = actionLabel(model, keycode);
         const row = el(`<div class="row gap-10 sniping-key">

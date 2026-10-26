@@ -2,13 +2,16 @@
 "use strict";
 const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 
-// PD domain codec, version 3, the only one the keyboard stores (firmware
+// PD domain codec, version 4, the only one the keyboard stores (firmware
 // D-F14): a header naming its capacity (32 slots) and record count, then only
 // the slots that hold something (configured, or disabled with a name), each in
 // a 128-byte record, in ascending ID order. An omitted slot is disabled and
 // nameless. It decodes to one dense array, a record per slot. A record's name
-// follows the shared rule (profile-name.js): its length at byte 8, bytes 9..31
-// zero, its UTF-8 at bytes 96..127, zero after it.
+// follows the shared rule (profile-name.js): its length at byte 8, its UTF-8
+// at bytes 96..127, zero after it. Bytes 11..15 are the slot's link
+// (firmware D-F62): what ends a mode its layers started, the linked layers
+// that start it and the layers its key turns on (little-endian masks); bytes
+// 9..10 and 16..31 are zero.
 const {NAME_MAX_BYTES, validName, nameOfBytes} = require("./profile-name");
 const {canonical} = require("./bytes");
 const PD_DOMAIN = Object.freeze({ID: PROFILE_DOMAIN_IDS.PD_MODES, VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.PD_MODES], SLOTS: 32, HEADER_SIZE: 8, RECORD_SIZE: 128, NAME_OFFSET: 96, NAME_MAX_BYTES, MAX_SIZE: 8 + 32 * 128});
@@ -22,7 +25,12 @@ const PD_EMPTY_DIRECTION = Object.freeze({NEAREST: 0, BOTH: 1, NOTHING: 2});
 // movement (firmware D-F07).
 const PD_DIRECTION_OUTPUT = Object.freeze({REPEAT: 0, ONCE: 1});
 const PD_MODIFIERS = Object.freeze({INHERIT: 0, MASK: 1, EXACT: 2});
-const PD_BUTTON = Object.freeze({PASS_THROUGH: 0, CONSUME: 1, TAP: 2, HOLD_MODIFIERS: 3});
+// A link: its linked layers start the mode while any is on; its key turns on
+// its own set of layers, any mix; and a higher layer, or any layer outside
+// both sets, may end a mode its layers started. Every link byte zero is no
+// link. No layer starts two modes; the layers keys turn on may repeat.
+const PD_LINK_ENDS = Object.freeze({NOTHING: 0, HIGHER_LAYER: 1, OTHER_LAYER: 2});
+const PD_LINK_LAYERS = 16;
 const DIRECTIONS = ["left", "right", "up", "down"];
 // Eight directions keep their diagonals in bytes 70..85, which any other
 // directional record leaves zero. Byte 86 is what every directional mode does
@@ -85,24 +93,24 @@ function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
     /** @param {string} code @param {number} at @param {string} message @returns {never} */
     const reject = (code, at, message) => fail(code, offset + at, message);
     if (p[0] !== slot) reject("INVALID_ID", 0, `PD slots must appear exactly once in ID order 0–${slots - 1}.`);
-    if (p[7] || !zero(p.subarray(90, PD_DOMAIN.NAME_OFFSET))) reject("RESERVED", p[7] ? 7 : 90, "Reserved PD bytes must be zero.");
-    // Version 2's name field, bytes 9..31, is reserved since the name moved.
-    if (!zero(p.subarray(9, 32))) reject("RESERVED", 9, "Reserved PD bytes must be zero.");
+    // Reserved: byte 7, bytes 9..10 before the link, version 2's name field
+    // past the link (bytes 16..31,
+    // since the name moved), version 3's mouse button records (bytes 52..69)
+    // and the bytes before the name; each refused at its first byte.
+    const reserved = /** @type {const} */ ([[7, 8], [9, 11], [16, 32], [52, 70], [90, PD_DOMAIN.NAME_OFFSET]]).find(([from, to]) => !zero(p.subarray(from, to)));
+    if (reserved) reject("RESERVED", reserved[0], "Reserved PD bytes must be zero.");
     const name = readName(p, offset);
     if (p[1] > 2 || p[2] > 1 || p[3] > PD_AXIS.EIGHT) reject("INVALID_POLICY", 1, "Unknown engine, layer policy or axis policy.");
+    if (p[11] > PD_LINK_ENDS.OTHER_LAYER) reject("INVALID_POLICY", 11, "Unknown choice of what ends a mode its layers started.");
     if (p[1] === PD_KIND.DISABLED) {
-        if (!zero(p.subarray(2, 8)) || !zero(p.subarray(32, PD_DOMAIN.NAME_OFFSET))) reject("INVALID_PARAMETER", 2, "Disabled slots retain only their ID and name.");
+        if (!zero(p.subarray(2, 8)) || !zero(p.subarray(11, 16)) || !zero(p.subarray(32, PD_DOMAIN.NAME_OFFSET))) reject("INVALID_PARAMETER", 2, "Disabled slots retain only their ID and name.");
         return;
     }
     if (!name) reject("INVALID_NAME", 8, "Configured modes need a name.");
+    // What ends a mode its linked layers started needs linked layers.
+    if (p[11] !== PD_LINK_ENDS.NOTHING && !p.readUInt16LE(12)) reject("INVALID_PARAMETER", 11, "Only a mode its linked layers started can be ended by another layer, so it needs linked layers.");
     for (let at = 36; at < 52; at += 4) {
         if (!validTap(p.subarray(at, at + 4))) reject("INVALID_ACTION", at, "Unsupported directional tap or modifier policy.");
-    }
-    for (let at = 52; at < 70; at += 6) {
-        const kind = p[at], tap = p.subarray(at + 2, at + 6);
-        if (kind > 3 || (kind <= 1 && !zero(p.subarray(at + 1, at + 6))) ||
-            (kind === 2 && (p[at + 1] !== 0 || tap.readUInt16LE(0) === 0 || !validTap(tap))) ||
-            (kind === 3 && (p[at + 1] === 0 || !zero(tap)))) reject("INVALID_ACTION", at, "Invalid button override.");
     }
     const x = p.readUInt16LE(32), y = p.readUInt16LE(34);
     if (p[1] === PD_KIND.DIRECTIONAL && p[3] === PD_AXIS.EIGHT) {
@@ -138,9 +146,9 @@ function tapFromBytes(bytes, at) {
 function slotOfRecord(p, id, offset) {
     return {
         id, kind: p[1], pointerLayer: p[2], axis: p[3], dpi: p.readUInt16LE(4), heldModifiers: p[6], name: readName(p, offset),
+        linkedLayers: p.readUInt16LE(12), linkTurnsOn: p.readUInt16LE(14), linkEnds: p[11],
         thresholdX: p.readUInt16LE(32), thresholdY: p.readUInt16LE(34),
         directions: Object.fromEntries(DIRECTIONS.map(/** @returns {[string, import("./types.js").PdTap]} */ (name, i) => [name, tapFromBytes(p, 36 + i * 4)])),
-        buttons: Array.from({length: 3}, (_, i) => ({kind: p[52 + i * 6], modifiers: p[53 + i * 6], tap: tapFromBytes(p, 54 + i * 6)})),
         // Bytes 70..90 are scroll settings only in a scrolling mode.
         scroll: Object.fromEntries([...SCROLL_U16.map(/** @returns {[string, number]} */ (name, i) => [name, p[1] === PD_KIND.SCROLLING ? p.readUInt16LE(70 + i * 2) : 0]), ...SCROLL_U8.map(/** @returns {[string, number]} */ (name, i) => [name, p[1] === PD_KIND.SCROLLING ? p[84 + i] : 0])]),
         diagonals: Object.fromEntries(DIAGONALS.map(/** @returns {[string, import("./types.js").PdTap]} */ (name, i) => [name, p[1] === PD_KIND.DIRECTIONAL ? tapFromBytes(p, 70 + i * 4) : {keycode: 0, modifierPolicy: 0, mask: 0}])),
@@ -163,16 +171,16 @@ const storesRecord = slot => slot.kind !== PD_KIND.DISABLED || slot.name !== "";
 function decodePdDomain(bytes) {
     if (!Buffer.isBuffer(bytes)) fail("INVALID_ARGUMENT", 0, "PD domain must be a Buffer.");
     const {HEADER_SIZE, RECORD_SIZE, SLOTS, VERSION} = PD_DOMAIN;
-    if (bytes.length < HEADER_SIZE) fail("INVALID_LENGTH", 0, "PD domain v3 needs an 8-byte header.");
+    if (bytes.length < HEADER_SIZE) fail("INVALID_LENGTH", 0, "PD domain v4 needs an 8-byte header.");
     if (bytes[0] !== VERSION) fail("INVALID_HEADER", 0, `PD domain version ${bytes[0]} is not supported.`);
     const count = bytes[3];
-    if (bytes[1] !== SLOTS) fail("INVALID_HEADER", 1, `PD domain v3 must hold ${SLOTS} slots.`);
-    if (bytes[2] !== RECORD_SIZE) fail("INVALID_HEADER", 2, `PD domain v3 records must be ${RECORD_SIZE} bytes.`);
-    if (count > SLOTS) fail("INVALID_HEADER", 3, `PD domain v3 cannot hold more than ${SLOTS} records.`);
+    if (bytes[1] !== SLOTS) fail("INVALID_HEADER", 1, `PD domain v4 must hold ${SLOTS} slots.`);
+    if (bytes[2] !== RECORD_SIZE) fail("INVALID_HEADER", 2, `PD domain v4 records must be ${RECORD_SIZE} bytes.`);
+    if (count > SLOTS) fail("INVALID_HEADER", 3, `PD domain v4 cannot hold more than ${SLOTS} records.`);
     for (let at = 4; at < HEADER_SIZE; at++) if (bytes[at]) fail("RESERVED", at, "Reserved PD header bytes must be zero.");
-    if (bytes.length !== HEADER_SIZE + count * RECORD_SIZE) fail("INVALID_LENGTH", 0, `PD domain v3 with ${count} records must contain exactly ${HEADER_SIZE + count * RECORD_SIZE} bytes.`);
+    if (bytes.length !== HEADER_SIZE + count * RECORD_SIZE) fail("INVALID_LENGTH", 0, `PD domain v4 with ${count} records must contain exactly ${HEADER_SIZE + count * RECORD_SIZE} bytes.`);
     const slots = Array.from({length: SLOTS}, (_, id) => omittedSlot(id));
-    let prior = -1;
+    let prior = -1, starting = 0;
     for (let index = 0; index < count; index++) {
         const offset = HEADER_SIZE + index * RECORD_SIZE;
         const p = bytes.subarray(offset, offset + RECORD_SIZE), id = p[0];
@@ -180,6 +188,11 @@ function decodePdDomain(bytes) {
         validateRecord(p, id, offset, SLOTS);
         const slot = slotOfRecord(p, id, offset);
         if (!storesRecord(slot)) fail("NONCANONICAL", offset + 1, "A disabled slot without a name is stored by leaving its record out.");
+        // No layer starts two modes (firmware D-F62). The layers keys turn on
+        // may repeat: a key source beats a layer source, and a mode its
+        // layers started owns no layer, so links cannot chain or latch.
+        if (starting & slot.linkedLayers) fail("INVALID_PARAMETER", offset + 12, "Another pointing mode already starts from one of these layers.");
+        starting |= slot.linkedLayers;
         slots[id] = slot;
         prior = id;
     }
@@ -209,24 +222,17 @@ function writeTap(p, at, value = {}) {
 }
 /** @param {Buffer} p @param {import("./types.js").PdSlotInput} input @param {number} id */
 function writeRecord(p, input, id) {
-    const slot = object(input, ["id", "kind", "pointerLayer", "axis", "dpi", "heldModifiers", "name", "thresholdX", "thresholdY", "directions", "buttons", "scroll", "diagonals", "emptyDirection", "directionOutput"], "Slot");
+    const slot = object(input, ["id", "kind", "pointerLayer", "axis", "dpi", "heldModifiers", "name", "linkedLayers", "linkTurnsOn", "linkEnds", "thresholdX", "thresholdY", "directions", "scroll", "diagonals", "emptyDirection", "directionOutput"], "Slot");
     p[0] = integer(slot.id, 255);
-    for (const [at, name] of /** @type {[number, 'kind' | 'pointerLayer' | 'axis' | 'heldModifiers'][]} */ ([[1, "kind"], [2, "pointerLayer"], [3, "axis"], [6, "heldModifiers"]])) p[at] = integer(optional(slot[name], 0), 255);
-    for (const [at, name] of /** @type {[number, 'dpi' | 'thresholdX' | 'thresholdY'][]} */ ([[4, "dpi"], [32, "thresholdX"], [34, "thresholdY"]])) p.writeUInt16LE(integer(optional(slot[name], 0), 65535), at);
+    for (const [at, name] of /** @type {[number, 'kind' | 'pointerLayer' | 'axis' | 'heldModifiers' | 'linkEnds'][]} */ ([[1, "kind"], [2, "pointerLayer"], [3, "axis"], [6, "heldModifiers"], [11, "linkEnds"]])) p[at] = integer(optional(slot[name], 0), 255);
+    for (const [at, name] of /** @type {[number, 'dpi' | 'linkedLayers' | 'linkTurnsOn' | 'thresholdX' | 'thresholdY'][]} */ ([[4, "dpi"], [12, "linkedLayers"], [14, "linkTurnsOn"], [32, "thresholdX"], [34, "thresholdY"]])) p.writeUInt16LE(integer(optional(slot[name], 0), 65535), at);
     if (!validName(slot.name)) {
         fail("INVALID_NAME", PD_DOMAIN.HEADER_SIZE + id * PD_DOMAIN.RECORD_SIZE + 8, `Names must fit ${NAME_MAX_BYTES} UTF-8 bytes and contain no ASCII controls.`);
     }
     p[8] = p.write(slot.name, PD_DOMAIN.NAME_OFFSET, NAME_MAX_BYTES, "utf8");
     const directions = object(optional(slot.directions, /** @type {Record<string, Partial<import("./types.js").PdTap>>} */ ({})), DIRECTIONS, "Directions");
     DIRECTIONS.forEach((name, i) => writeTap(p, 36 + i * 4, directions[name]));
-    const buttons = optional(slot.buttons, [{}, {}, {}]);
-    if (!Array.isArray(buttons) || buttons.length !== 3) fail("INVALID_LENGTH", 0, "Exactly three button overrides are required.");
-    for (let i = 0; i < 3; i++) {
-        const button = object(buttons[i], ["kind", "modifiers", "tap"], "Button");
-        p[52 + i * 6] = integer(optional(button.kind, 0), 255);
-        p[53 + i * 6] = integer(optional(button.modifiers, 0), 255);
-        writeTap(p, 54 + i * 6, button.tap);
-    }
+    // Bytes 52..69, version 3's mouse button records, stay zero.
     const scroll = object(optional(slot.scroll, /** @type {Record<string, number>} */ ({})), [...SCROLL_U16, ...SCROLL_U8], "Scroll settings");
     const diagonals = object(optional(slot.diagonals, /** @type {Record<string, Partial<import("./types.js").PdTap>>} */ ({})), DIAGONALS, "Diagonals");
     if (slot.kind === PD_KIND.DIRECTIONAL) {
@@ -280,4 +286,4 @@ function validatePdRecord(bytes, id, offset = 0) {
     validateRecord(bytes, id, offset);
 }
 
-module.exports = {PD_DOMAIN, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, PD_CLICKS, isPdClick, PD_MACROS, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};
+module.exports = {PD_DOMAIN, PD_KIND, PD_LINK_ENDS, PD_LINK_LAYERS, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, DIAGONALS, PD_CLICKS, isPdClick, PD_MACROS, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};

@@ -14,6 +14,7 @@ const {SETTING, SETTING_FIELDS, decodeSettings} = require("../schema/settings-do
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
+const {reorderLinkRefusal} = require("./pointing-links");
 const {decodeMacroPayload} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {profileDepthOptions} = require("../schema/profile-depth");
@@ -227,8 +228,8 @@ const fingerprint = document => fingerprintOf(validateSnapshot(document));
 /** @param {{document: PortableDocument, decoded?: DecodedProfile}} snapshot */
 const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === snapshot.document ? snapshot.decoded : validateSnapshot(snapshot.document);
 // Moves each layer to its new place with everything it holds: its keys, name,
-// RGB colour and per-layer settings, and the settings that point at it (the
-// pointer and sniping layers). With keysFollow, the default, every layer key
+// RGB colour and per-layer settings, and what points at it (the pointer and
+// sniping layers). With keysFollow, the default, every layer key
 // (MO, LT, TG, TO, TT, OSL, DF, LM, LOCK_LAYER...) on a layer, in a behaviour
 // or on a combo is renumbered to reach the same layer; without it those keys
 // keep their numbers and reach whatever layer now sits there.
@@ -240,8 +241,14 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // new base now reaches the old base wherever it went, so the key that held
 // Numbers from Base holds Base from Numbers. Following would leave MO(0),
 // TG(0) and the like, which do nothing since the base is always on. The
-// startup layers are slots in the same way. The pointer and sniping layers and
-// the combo references name a layer by what it holds, so they follow it.
+// startup layers are slots in the same way. The pointer and sniping layers
+// and the combo references name a layer by what it holds, so they follow it.
+// A pointing slot's link is renumbered as layer keys are, base swap and
+// keysFollow included: the layers its key turns on are what a layer key turns
+// on, and the layers that start it are what such keys reach, so the keys that
+// started a mode still start it, and a link never lands on the base. A move
+// that would still leave a link ignored, or one layer starting two modes, is
+// refused in words (pointing-links.js reorderLinkRefusal).
 //
 // The swap is not keysFollow's to turn off: keys that kept their numbers would
 // reach whatever took the old base's slot once it moved on, so the key that
@@ -280,6 +287,7 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
         layers[remap[0]] = layers[remap[0]].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0000 ? 0x0001 : code);
     }
     const {rgb, behaviors, combos, settings, pdModes} = validated;
+    const settingsBefore = {values: settings.values.slice(), names: settings.names.slice()}, slotsBefore = structuredClone(pdModes);
     /** @param {WalkAction} a */
     const action = a => {if (!renumbers) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
@@ -317,6 +325,12 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     // The layers a behaviour or combo may act on are layers by what they hold.
     behaviors.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
     combos.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
+    // A pointing slot's link moves as the layer keys do.
+    /** @param {number} mask */
+    const reached = mask => remap.reduce((moved, _next, old) => (moved | ((mask >>> old) & 1) << reach(old)) >>> 0, 0);
+    pdModes.forEach(slot => {slot.linkedLayers = reached(slot.linkedLayers); slot.linkTurnsOn = reached(slot.linkTurnsOn);});
+    const linkRefusal = reorderLinkRefusal(settingsBefore, settings, slotsBefore, pdModes, reached, keysFollow);
+    if (linkRefusal) throw fail(linkRefusal);
     const changed = encodeProfileDomains({rgb, behaviors, combos, settings, pdModes, keymap: layers}, validated.codecOptions);
     // Reordering layers never rewrites macro streams or their allowed unused tail.
     result.profile = encodeProfileBlob({domains: decodeProfileBlob(validated.profile).domains.map(domain => changed.find(row => row.id === domain.id) || domain)}).toString("base64");

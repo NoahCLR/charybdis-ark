@@ -22,6 +22,7 @@ const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
 const {pointingTapKeys} = require("../model/pointing-taps");
+const {linkTargets, pointerCoveredLayers} = require("../model/pointing-links");
 const {decodedOf} = require("../model/portable-profile");
 const {baseLighting, settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
@@ -164,6 +165,8 @@ function configurationModel(content, capabilities, editing) {
         if (layer !== undefined) keyLayers[name] = layer;
     }
     const hostVocabulary = hostKeyVocabulary(names.hostOs);
+    // The settings a pointing slot's link is judged against, once read.
+    const linkSettings = content.domains.settings?.values ? content.domains.settings : null;
     return {
         // The words for every value the keyboard stores, so the interface
         // names things as the review does (model/vocabulary.js).
@@ -174,13 +177,20 @@ function configurationModel(content, capabilities, editing) {
         hostLayoutLegends: names.legends,
 
         // Each slot with the name a person reads for it, one rule for every
-        // surface (model/vocabulary.js slotName).
-        // and the keycodes that bind it (data/pd-bindings.js), so the interface
-        // names and finds a pointing-mode key without a registry of its own.
-        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id]})),
+        // surface (model/vocabulary.js slotName), the keycodes that bind it
+        // (data/pd-bindings.js), so the interface names and finds a
+        // pointing-mode key without a registry of its own, and the layers its
+        // key turns on that the pointer layer covers (model/pointing-links.js).
+        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id],
+            pointerCovers: linkSettings ? pointerCoveredLayers(linkSettings, slot) : 0})),
         pdModeEditing: {writable: editing.pointing,
             dpiChoices: dpiChoices({normalSpeed: true}),
-            // The keys a direction or button override may send, so the
+            // Which layers a slot's link may name, and why not
+            // (model/pointing-links.js), and the pointer layer, by which the
+            // interface names what covers a slot's pointerCovers.
+            linkTargets: linkSettings ? linkTargets(linkSettings, content.domains.pdModes || []) : [],
+            pointerLayer: linkSettings ? linkSettings.values[SETTING.AUTO_MOUSE_LAYER] : null,
+            // The keys a direction may send, so the
             // picker offers only those (model/pointing-taps.js).
             tapKeys: pointingTapKeys()},
         keyBehaviors: content.domains.keyBehaviors ? behaviorRowsForView(content.domains.keyBehaviors, behaviorFeatures(content), names) : [],
@@ -324,7 +334,7 @@ function profileKeycodes(content, capabilities) {
     }
     for (const row of content.comboRows) values.push(...row.inputs, row.output);
     for (const slot of content.domains.pdModes || []) {
-        const taps = [...Object.values(slot.directions || {}), ...Object.values(slot.diagonals || {}), ...(slot.buttons || []).map(button => button.tap)];
+        const taps = [...Object.values(slot.directions || {}), ...Object.values(slot.diagonals || {})];
         for (const tap of taps) if (tap) values.push(tap.keycode);
     }
     return values.filter(/** @returns {value is number} */ (value) => typeof value === "number" && Number.isInteger(value));

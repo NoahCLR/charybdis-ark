@@ -21,8 +21,10 @@ halves. No C, no reflash, no firmware checkout.
   and delays, or record what you type. Macros type through your computer's
   keyboard layout.
 - **Custom keys.** Name your own keys, give each a shortcut and a behaviour.
-- **The trackball.** Pointer speed, sniping, auto-mouse, and 32 pointing modes
-  that scroll or send arrows and shortcuts as the ball moves.
+- **The trackball.** Pointer speed, sniping on the layers you pick,
+  auto-mouse, and 32 pointing modes that scroll or send arrows and shortcuts
+  as the ball moves, each of which can run while its layers are on and turn
+  layers on with its key.
 - **Lighting.** The background effect, layer and pointing-mode colours, combo
   and key feedback, and the idle timeout. The board on screen lights up the
   way the keyboard will.

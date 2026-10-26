@@ -339,3 +339,21 @@ test("settings presentation owns combo timing words and explicit duration units"
         assert.equal(fields.find(field => field.macro === macro).unit, undefined, macro);
     }
 });
+
+// Settings v9: auto-sniping follows a set of layers beside its master switch,
+// drawn as one row of layer switches like the other per-layer settings.
+test("auto-sniping is its switch and one switch per layer, saved as one layer mask", () => {
+    const current = snapshot();
+    const section = settingsEditorView(current).sections.find(entry => entry.id === "sniping");
+    assert.equal(section.area, "Mouse");
+    assert.deepEqual(section.layerGroup, {label: "Auto-sniping layers", hint: section.layerGroup.hint});
+    assert.deepEqual(section.fields.map(field => field.macro), ["autoSniping", ...Array.from({length: 16}, (_, i) => `snipingOnLayer${i}`)]);
+    assert.deepEqual(section.fields.filter(field => field.enabled).map(field => field.macro), ["autoSniping", "snipingOnLayer3"], "Navigation alone, as the test profile has it");
+    assert.deepEqual(section.fields[4].governs, {kind: "layer", layer: 3});
+    assert.equal(section.fields[4].label, "On Navigation");
+    const values = updates => validateSnapshot(editSettings(current, message(current, "sniping", updates))).settings.values;
+    assert.equal(values({snipingOnLayer2: true, snipingOnLayer5: true})[9], (1 << 2) | (1 << 3) | (1 << 5), "several layers");
+    const off = values({autoSniping: false, snipingOnLayer2: true});
+    assert.deepEqual([off[8], off[9]], [0, (1 << 2) | (1 << 3)], "off keeps the layers chosen");
+    assert.equal(values({snipingOnLayer3: false})[9], 0, "no layer at all is a set the keyboard stores");
+});

@@ -41,7 +41,7 @@ test("a draft change resets forms, applies each field's rule to the state before
 
 // Every field of the panel's state, by what a draft change does to it. A new
 // field joins one of these lists, so its decision is made in review.
-const RESETS = ["retarget", "pdKind", "pdButtons", "pdTaps", "lastTake"];
+const RESETS = ["retarget", "pdKind", "pdTaps", "lastTake"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
@@ -74,7 +74,7 @@ test("a draft change resets the existing forms and preserves historically kept p
     };
     Object.assign(state, standing, {
         retarget: {from: "QK_USER_16", to: "KC_B", existing: "QK_USER_17"},
-        pdKind: {slot: 1, kind: 2}, pdButtons: {slot: 1, rows: {0: {}}}, pdTaps: {slot: 1, rows: {"dir:up": {}}},
+        pdKind: {slot: 1, kind: 2}, pdTaps: {slot: 1, rows: {"dir:up": {}}},
         lastTake: {slot: "MACRO_0", before: "abc"},
         macroForms: {MACRO_0: {draft: "unstaged", stepError: "bad"}},
     });

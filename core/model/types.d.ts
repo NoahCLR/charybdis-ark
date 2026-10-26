@@ -159,6 +159,8 @@ export interface LayerEffect {
     layer: number;
     taps?: number;
     oneShot?: boolean;
+    /** The pointing mode whose key turns the layer on, by its name (firmware D-F62). */
+    mode?: string;
 }
 export interface LayerEffectSource {layer?: number; layoutIndex?: number; code?: number; combo?: number; trackball?: boolean}
 export interface OfferedLayerEffect extends LayerEffect {how: string; note?: string; from: LayerEffectSource}

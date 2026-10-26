@@ -80,7 +80,11 @@ this stage paints nothing.
 ### Pointing modes
 
 Each pointing mode can light while it runs, over whatever the layer paints.
-Pick a mode, give it a colour, and choose where it paints:
+A mode linked to layers paints beneath the lowest of them that is on instead
+(a layer that starts it or one its key turns on),
+however the mode started: those layers' own colours show over it, and higher
+layers cover both (see [Pointing](pointing.md#how-it-starts)). Pick a mode,
+give it a colour, and choose where it paints:
 
 - **Both halves**, **Left half** or **Right half**: that area, whichever key
   started the mode.
@@ -91,7 +95,8 @@ Pick a mode, give it a colour, and choose where it paints:
   of the combo that did.
 
 A mode with no known trigger key paints every key under the last two.
-**Preview it active on the board** shows it.
+**Preview it active on the board** shows it as it paints with no linked
+layer on.
 
 ### Combo feedback
 

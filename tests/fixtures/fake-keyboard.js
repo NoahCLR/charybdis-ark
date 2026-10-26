@@ -22,7 +22,7 @@ const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 const {COMBO_READBACK_V1} = require("../../core/protocol/combo-readback-v1");
 const {FLASH_PAUSES_V1} = require("../../core/protocol/flash-pauses-v1");
 const {PROFILE_CANDIDATE_V1, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
-const {PROFILE_DOMAIN_IDS, crc32, decodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
+const {PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS, crc32, decodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {nativeCode} = require("../../core/schema/actions");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {rehash} = require("./device-combos");
@@ -40,28 +40,28 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:4,32:2,48:3,64:8,80:3,96:1,112:1";
+const CURRENT_DOMAINS = "16:4,32:2,48:3,64:9,80:4,96:1,112:1";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document. `settingsVersion` is the version its
-// settings readback reports: any but 8 is firmware Ark does not read.
+// settings readback reports: any but 9 is firmware Ark does not read.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, settingsVersion = 9, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 8, PD 3, keymap 1 and macros 1.");
+    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 9, PD 4, keymap 1 and macros 1.");
     const profile = held.candidate, digest = fnv1a32(profile), defaults = compiled || profile;
     const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
     const settings = settingsDomain.payload;
 
     const capabilities = [page(25, (p) => {
-        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, 3, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, 4, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
+        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, 3, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, PROFILE_BLOB_V1.SCHEMA_MAJOR, PROFILE_BLOB_V1.SCHEMA_MINOR, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
         p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {

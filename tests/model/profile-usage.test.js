@@ -13,7 +13,7 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const schema2 = {maxProfilePayload: 130048, maxBehaviorRows: 64, maxPopulatedBehaviorSteps: 128, maxCombos: 32, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32};
-const customKeyCapabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
+const customKeyCapabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81};
 const count = (usage, id) => usage.counts.find(entry => entry.id === id);
 
 // The fixture with no behaviours and no combos.

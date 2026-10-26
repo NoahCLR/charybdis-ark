@@ -15,8 +15,10 @@
 // of locked layers, and on top of it any layers held while keys are down. In
 // each state every key resolves as the firmware does (the highest layer on that
 // is not transparent answers), and each key's own layer action, its behaviour
-// branches, the combos that match, and the trackball waking the pointer layer
-// move it to another state. From that it names:
+// branches, the combos that match, a pointing mode's key turning on the layers
+// its link names, and the trackball waking the pointer layer move it to another
+// state.
+// From that it names:
 //
 // - traps: a set of locks you can get into and cannot get back to Base from;
 // - layers nothing reaches, layer keys that reach a layer with no keys of its
@@ -36,11 +38,14 @@ const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
 const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {layerLockOfCode} = require("../data/user-keycodes");
+const {pdBindingOfCode, PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
-const {layerName} = require("./vocabulary");
+const {layerName, slotName} = require("./vocabulary");
+const {inertLinkLayers} = require("./pointing-links");
+const {PD_LINK_ENDS, PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
 const {analyzeLayerStates} = require("./layer-state-graph");
 const {compileLayerAnswers, answeringLayer} = require("./layer-resolution");
 
@@ -76,15 +81,36 @@ const bit = (layer) => 1 << layer;
 const layersIn = (mask) => Array.from({length: LAYERS}, (_, layer) => layer).filter((layer) => mask & bit(layer));
 /** @param {number} code */
 // All semantic actions in a validated current-ABI profile have native keycodes.
-const codeName = (code) => (layerLockOfCode(code) !== undefined ? `LOCK_LAYER(${layerLockOfCode(code)})`
-    : keycodes.resolve(code)?.name || `0x${code.toString(16).toUpperCase().padStart(4, "0")}`);
+const codeName = (code) => {
+    const binding = pdBindingOfCode(code);
+    if (binding) return binding.locked ? PD_SLOT_BINDINGS[binding.slot].lock : PD_SLOT_BINDINGS[binding.slot].hold;
+    return layerLockOfCode(code) !== undefined ? `LOCK_LAYER(${layerLockOfCode(code)})`
+        : keycodes.resolve(code)?.name || `0x${code.toString(16).toUpperCase().padStart(4, "0")}`;
+};
+
+// The pointing slots whose key turns layers on (firmware D-F62): a mode its
+// key runs, held or locked, turns on those layers for as long as it runs. So
+// the mode's hold key holds each layer, and its lock key toggles each as a
+// layer lock would, one more way onto each layer. A key that turns on several
+// layers is walked as one effect per layer, so the walk may find a state
+// where only some of them are on, which a person cannot reach. Which source
+// wins while another mode runs is not walked. Each slot maps to its layers
+// and its name.
+/** @typedef {Map<number, {layers: number[], name: string}>} ModeLinks */
+/** @param {number} slot @param {boolean} locked @param {ModeLinks | undefined} links @returns {LayerEffect[]} */
+function modeEffects(slot, locked, links) {
+    const link = links?.get(slot);
+    return link ? link.layers.map((layer) => ({kind: locked ? "lock" : "hold", layer, mode: link.name})) : [];
+}
 
 // What a native keycode does to the layers, if anything. `unowned` is a layer
 // keycode the keyboard leaves to QMK (DF, PDF, a layer past the bank).
-/** @param {number} code @returns {LayerEffect[]} */
-function layerEffects(code) {
+/** @param {number} code @param {ModeLinks} [links] @returns {LayerEffect[]} */
+function layerEffects(code, links) {
     /** @param {number} layer @param {LayerEffect[]} effects @returns {LayerEffect[]} */
     const within = (layer, effects) => (layer < LAYERS ? effects : [{kind: "unowned", layer}]);
+    const binding = pdBindingOfCode(code);
+    if (binding) return modeEffects(binding.slot, binding.locked, links);
     if (code >= 0x4000 && code <= 0x4fff) return within((code >> 8) & 15, [{kind: "hold", layer: (code >> 8) & 15}]);
     if (code >= 0x5000 && code <= 0x51ff) return within((code >> 5) & 15, [{kind: "hold", layer: (code >> 5) & 15}]);
     if (layerLockOfCode(code) !== undefined) return [{kind: "lock", layer: /** @type {number} */ (layerLockOfCode(code))}];
@@ -102,12 +128,13 @@ function layerEffects(code) {
 }
 
 // What a stored action does to the layers.
-/** @param {Action | undefined} action @returns {LayerEffect[]} */
-function actionEffects(action) {
+/** @param {Action | undefined} action @param {ModeLinks} [links] @returns {LayerEffect[]} */
+function actionEffects(action, links) {
     if (!action) return [];
     if (action.kind === ACTION.LAYER_MOMENTARY) return action.operand < LAYERS ? [{kind: "hold", layer: action.operand}] : [];
     if (action.kind === ACTION.LAYER_LOCK) return action.operand < LAYERS ? [{kind: "lock", layer: action.operand}] : [];
-    if (action.kind === ACTION.QMK_KEYCODE) return layerEffects(action.operand);
+    if (action.kind === ACTION.PD_MODE_MOMENTARY || action.kind === ACTION.PD_MODE_LOCK) return modeEffects(action.operand, action.kind === ACTION.PD_MODE_LOCK, links);
+    if (action.kind === ACTION.QMK_KEYCODE) return layerEffects(action.operand, links);
     return [];
 }
 
@@ -123,26 +150,29 @@ const holdPhrase = (index, name, longer) => `${index === 0 ? `Hold ${name}` : `T
 // row. A row with steps replaces TT()'s own taps; one without is no row
 // (firmware D-F27). A hold branch that presses and holds until release holds
 // the layer; any other hold, like a tap, sends the action once.
-/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @returns {(LayerEffect & {how: string, note?: string})[]} */
-function keyEffects(code, row, values) {
+/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @param {ModeLinks} [links] @returns {(LayerEffect & {how: string, note?: string})[]} */
+function keyEffects(code, row, values, links) {
     /** @type {(LayerEffect & {how: string, note?: string})[]} */
     const effects = [];
     const first = row?.steps.find((step) => step.tapIndex === 0);
-    for (const effect of layerEffects(code)) {
+    /** @param {LayerEffect} effect */
+    const runs = (effect) => (effect.mode ? `which runs ${effect.mode}, whose key turns layers on` : "");
+    for (const effect of layerEffects(code, links)) {
         if (effect.taps && row?.steps.length) continue;
         if (effect.kind === "hold" && !effect.oneShot ? first?.hold : first?.tap) continue;
-        effects.push({...effect, how: effect.taps ? `Tap ${codeName(code)} ${effect.taps} times` : effect.kind === "hold" && !effect.oneShot ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`});
+        const how = effect.taps ? `Tap ${codeName(code)} ${effect.taps} times` : effect.kind === "hold" && !effect.oneShot ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`;
+        effects.push({...effect, how, ...(effect.mode ? {note: runs(effect)} : {})});
     }
     for (const step of row?.steps || []) {
         /** @param {Action | undefined} action */
         const sends = (action) => `its behaviour sends ${actionName(/** @type {Action} */ (action))}`;
-        for (const effect of actionEffects(step.tap)) {
+        for (const effect of actionEffects(step.tap, links)) {
             if (effect.kind !== "hold" || effect.oneShot) effects.push({...effect, how: tapPhrase(step.tapIndex, codeName(code)), note: sends(step.tap)});
         }
         for (const [part, longer] of /** @type {const} */ ([["hold", false], ["longHold", true]])) {
             if (part === "hold" && values && row && releaseHoldUnreachable(step, effectiveTimings(row, values))) continue;
             const hold = step[part];
-            for (const effect of actionEffects(hold?.action)) {
+            for (const effect of actionEffects(hold?.action, links)) {
                 const press = hold?.style === KEY_BEHAVIOR_HOLD_STYLES.PRESS_AND_HOLD_UNTIL_RELEASE;
                 if (effect.kind === "hold" && !press) continue;
                 effects.push({...effect, how: holdPhrase(step.tapIndex, codeName(code), longer), note: sends(hold?.action)});
@@ -183,9 +213,40 @@ function profileFacts(decoded) {
     /** @param {BehaviorRow | undefined} row @param {{useOutputBehavior: boolean}} combo */
     const generatedLayers = (row, combo) => combo.useOutputBehavior && row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && row.enabled !== false ? (row.allowedLayers ?? 0xffff) : 0;
     const pointer = values[SETTING.AUTO_MOUSE_ENABLED] ? values[SETTING.AUTO_MOUSE_LAYER] : undefined;
-    const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? values[SETTING.AUTO_SNIPING_LAYER] : undefined;
+    // The auto-sniping layers, none with its master switch off. Any of them
+    // that is on keeps a separate pointer layer off (pointer_layer_policy_apply).
+    const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? (values[SETTING.AUTO_SNIPING_LAYERS] & 0xffff) >>> 0 : 0;
+    // Pointing links the keyboard runs (firmware D-F62; the pointer layer or
+    // a default layer in a link does nothing): the slots whose key turns
+    // layers on, and the linked layers that start a mode, each of which keeps
+    // a separate pointer layer off while it starts it, as a sniping layer
+    // does. A link that a higher layer, or any other layer, ends starts its
+    // mode from a linked layer only while none of those is on
+    // (pointing_mode_link_ended): a layer above it, or any layer outside both
+    // of the link's sets. The pointer layer and the default layers never end it, nor does
+    // Base, which is always on here but not in the keyboard's layer state.
+    /** @type {ModeLinks} */
+    const modeLinks = new Map();
+    let layerStarted = 0;
+    /** @type {{layer: number, ends: number}[]} */
+    const endedStarts = [];
+    const neverEnds = (bit(values[SETTING.AUTO_MOUSE_LAYER]) | values[SETTING.DEFAULT_LAYERS] | 1) >>> 0;
+    /** @param {number} mask */
+    const live = (mask) => layersIn(mask & ((1 << PD_LINK_LAYERS) - 1) & ~inertLinkLayers(decoded.settings, mask));
+    for (const slot of decoded.pdModes || []) {
+        if (!slot.kind) continue;
+        const turnsOn = live(slot.linkTurnsOn);
+        if (turnsOn.length) modeLinks.set(slot.id, {layers: turnsOn, name: slotName(slot)});
+        const link = (slot.linkedLayers | slot.linkTurnsOn) >>> 0;
+        for (const layer of live(slot.linkedLayers)) {
+            const ends = slot.linkEnds === PD_LINK_ENDS.HIGHER_LAYER ? (0xffff << (layer + 1)) & 0xffff & ~neverEnds
+                : slot.linkEnds === PD_LINK_ENDS.OTHER_LAYER ? 0xffff & ~link & ~neverEnds : 0;
+            if (ends) endedStarts.push({layer, ends: ends >>> 0});
+            else layerStarted |= bit(layer);
+        }
+    }
     const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
-    return {names, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, values, behaviorUsed, comboPress, generatedLayers,
+    return {names, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, modeLinks, layerStarted, endedStarts, values, behaviorUsed, comboPress, generatedLayers,
         // Base is always on, and so are the default layers the keyboard keeps.
         always: (1 | (values[SETTING.DEFAULT_LAYERS] & 0xffff)) >>> 0,
         /** @param {number} layer */
@@ -223,6 +284,17 @@ function comboCodes(facts, active) {
 
 /** @param {number} mask */
 const highest = (mask) => 31 - Math.clz32(mask);
+// The layers that keep the pointer layer off while any is on: every sniping
+// layer but the pointer layer itself, and every linked layer that starts its
+// mode (which never is the pointer layer) unless another layer can end the
+// mode, which keeps it off only while none of those is on
+// (facts.endedStarts). Which source wins while a mode's key runs another mode
+// is not walked.
+/** @param {Facts} facts */
+const pointerStrip = (facts) => {
+    const strip = facts.sniping | facts.layerStarted;
+    return facts.pointer === undefined ? strip : (strip & ~bit(facts.pointer)) >>> 0;
+};
 
 // Everything that changes the layers from one state, each with where it came
 // from so a path can be told.
@@ -235,7 +307,7 @@ function offers(facts, active, cache) {
         const at = resolve(facts, active, position);
         if (!at || at.code === NOTHING) return;
         const row = facts.rows.get(at.code);
-        for (const effect of keyEffects(at.code, facts.behaviorUsed(row, at.layer, position) ? row : undefined, facts.values)) {
+        for (const effect of keyEffects(at.code, facts.behaviorUsed(row, at.layer, position) ? row : undefined, facts.values, facts.modeLinks)) {
             found.push({...effect, from: {layer: at.layer, layoutIndex: position, code: at.code},
                 how: `${effect.how} on ${layerName(facts.names, at.layer)}${effect.note ? ` (${effect.note})` : ""}`});
         }
@@ -251,8 +323,8 @@ function offers(facts, active, cache) {
             const row = facts.rows.get(outputCode), allowed = facts.generatedLayers(row, combo);
             const origins = (present.get(combo.inputs.at(-1)) || []).filter(layer => combo.allowedLayers & bit(layer));
             const effects = [
-                ...(origins.some(layer => allowed & bit(layer)) ? keyEffects(outputCode, row, facts.values) : []),
-                ...(origins.some(layer => !(allowed & bit(layer))) ? actionEffects(combo.output) : []),
+                ...(origins.some(layer => allowed & bit(layer)) ? keyEffects(outputCode, row, facts.values, facts.modeLinks) : []),
+                ...(origins.some(layer => !(allowed & bit(layer))) ? actionEffects(combo.output, facts.modeLinks) : []),
             ];
             for (const effect of effects) {
                 if (effect.kind === "unowned") continue;
@@ -260,10 +332,11 @@ function offers(facts, active, cache) {
             }
         }
     }
-    // Moving the trackball wakes the pointer layer, unless the sniping layer
-    // is on and keeps it off (pointer_layer_policy_apply).
-    const stripped = facts.sniping !== undefined && facts.pointer !== facts.sniping && (active & bit(facts.sniping));
-    if (facts.pointer !== undefined && facts.pointer < LAYERS && !stripped) {
+    // Moving the trackball wakes the pointer layer, unless a sniping layer or
+    // a layer that starts its mode is on and keeps it off
+    // (pointer_layer_policy_apply).
+    const endedStrips = facts.endedStarts.some(({layer, ends}) => (active & bit(layer)) && !(active & ends));
+    if (facts.pointer !== undefined && facts.pointer < LAYERS && !(active & pointerStrip(facts)) && !endedStrips) {
         found.push({kind: "hold", layer: facts.pointer, from: {trackball: true}, how: `Move the trackball, which turns on ${layerName(facts.names, facts.pointer)}`});
     }
     cache.set(active, found);
@@ -291,7 +364,7 @@ function compactWalk(facts) {
             const when = {on: bit(layer), off: covered}; covered |= bit(layer);
             const source = {position, layer, code, when}; sources.push(source);
             const row = facts.rows.get(code);
-            for (const effect of keyEffects(code, facts.behaviorUsed(row, layer, position) ? row : undefined, facts.values)) {
+            for (const effect of keyEffects(code, facts.behaviorUsed(row, layer, position) ? row : undefined, facts.values, facts.modeLinks)) {
                 transitions.push({...effect, when, from: {layer, layoutIndex: position, code},
                     how: `${effect.how} on ${layerName(facts.names, layer)}${effect.note ? ` (${effect.note})` : ""}`});
             }
@@ -331,14 +404,14 @@ function compactWalk(facts) {
         // Bind each to its own source-resolution/participation conditions;
         // absence of an eligible owner is not the condition for a bypassed one.
         const variants = allowed ? [
-            {when: {all: [when, presence(owner, combo.allowedLayers & allowed)]}, effects: keyEffects(outputCode, row, facts.values)},
-            {when: {all: [when, presence(owner, combo.allowedLayers & ~allowed)]}, effects: actionEffects(combo.output)},
-        ] : [{when, effects: actionEffects(combo.output)}];
+            {when: {all: [when, presence(owner, combo.allowedLayers & allowed)]}, effects: keyEffects(outputCode, row, facts.values, facts.modeLinks)},
+            {when: {all: [when, presence(owner, combo.allowedLayers & ~allowed)]}, effects: actionEffects(combo.output, facts.modeLinks)},
+        ] : [{when, effects: actionEffects(combo.output, facts.modeLinks)}];
         for (const variant of variants) for (const effect of variant.effects) transitions.push({...effect, when: variant.when,
             from: {combo: combo.index}, how: `Press combo ${combo.index} (${combo.inputs.map(codeName).join(" + ")}), which sends ${actionName(combo.output)}`});
     }
     if (facts.pointer !== undefined && facts.pointer < LAYERS) transitions.push({kind: "hold", layer: facts.pointer,
-        when: {off: facts.sniping !== undefined && facts.pointer !== facts.sniping ? bit(facts.sniping) : 0},
+        when: {all: [{off: pointerStrip(facts)}, ...facts.endedStarts.map(({layer, ends}) => ({not: {on: bit(layer), off: ends}}))]},
         from: {trackball: true}, how: `Move the trackball, which turns on ${layerName(facts.names, facts.pointer)}`});
     const result = analyzeLayerStates({always: facts.always, transitions, queries, trapLimit: MAX_TRAPS});
     if (!result.complete && !result.reachabilityComplete) return result;
@@ -504,7 +577,7 @@ function findings(facts, walked) {
         if (!reachabilityComplete || reached & bit(layer) || !hasKeys(layer)) continue;
         results.push({kind: "unreachable", level: LEVELS.WARNING, layers: [layer],
             title: `Nothing reaches ${layerName(facts.names, layer)}`,
-            detail: `${layerName(facts.names, layer)} has keys, but no key, behaviour, combo or the trackball turns it on, so none of them can be used.`,
+            detail: `${layerName(facts.names, layer)} has keys, but no key, behaviour, combo, pointing mode or the trackball turns it on, so none of them can be used.`,
             fix: `Put a layer key for ${layerName(facts.names, layer)} (MO(${layer}), TG(${layer}), TO(${layer})…) on a layer you can reach.`,
             place: keyPlace(layer)});
     }
@@ -518,7 +591,7 @@ function findings(facts, walked) {
     }
     for (const [layer, effect] of empty) {
         results.push({kind: "emptyTarget", level: LEVELS.NOTICE, layers: [layer],
-            title: `A layer key reaches ${layerName(facts.names, layer)}, which has no keys of its own`,
+            title: `${effect.mode ? `${effect.mode}, a pointing mode,` : "A layer key"} reaches ${layerName(facts.names, layer)}, which has no keys of its own`,
             detail: `${effect.how}: ${layerName(facts.names, layer)} holds only transparent keys and KC_NO, so it adds nothing to the board.`,
             fix: `Give ${layerName(facts.names, layer)} keys, or take the layer key away.`,
             place: placeOf(effect.from)});

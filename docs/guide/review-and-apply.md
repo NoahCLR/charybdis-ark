@@ -127,8 +127,9 @@ reorder is one change and a key edited afterwards is another.
 
 ## Checks
 
-Before anything is kept, Review checks what the layers let you reach. Each
-check says whether your draft made it, the keyboard already has it, or the
+Before anything is kept, Review checks what the layers let you reach,
+through keys, behaviours, combos, the trackball and pointing modes linked to
+layers. Each check says whether your draft made it, the keyboard already has it, or the
 draft fixes it.
 
 - A **Trap** is a layer that can lock on with no way back to the base layer.

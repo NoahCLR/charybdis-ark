@@ -111,7 +111,9 @@ export interface Vocabulary {
         invert: WordList<number>;
         scrollAxes: WordList<number>;
         pointerLayer: WordList<number>;
-        buttons: WordList<number>;
+        linkLabels: {starts: string; keyTurnsOn: string; startsOther: string; linkedLayers: string; linkTurnsOn: string; linkEnds: string};
+        linkInert: {default: string; pointer: string};
+        linkEnds: WordList<number>;
         emptyDirection: WordList<number>;
         directionOutput: WordList<number>;
         modifierPolicy: WordList<number>;
@@ -199,6 +201,8 @@ export type ReviewSummary = Pick<ReviewChange, 'unit' | 'title' | 'status'> & {p
 
 export type ReviewMark =
     | {kind: 'layer'; layer: number}
+    /** A set of layers, each named as the value names it, in order. */
+    | {kind: 'layers'; layers: {layer: number; name: string}[]}
     | {kind: 'pointing'; slot: number}
     | {kind: 'tier'; tier: string; branch?: number}
     | {kind: 'branch'; count: number}

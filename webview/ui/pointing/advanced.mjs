@@ -1,6 +1,6 @@
 // @ts-check
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
-import {AXIS, BUTTON, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, thresholdDistance} from "../../view/pointing-config.mjs";
+import {AXIS, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, thresholdDistance} from "../../view/pointing-config.mjs";
 import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
 import {word} from "../../view/vocabulary.mjs";
 import {state} from "../../store.mjs";
@@ -8,10 +8,10 @@ import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} 
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} scrolling @param {FormControls} controls */
-export function advancedControls(model, slot, scrolling, {form, disabled, field, select, shortcut, modifiers}) {
+export function advancedControls(model, slot, scrolling, {form, disabled, field, select, modifiers}) {
     // ── advanced ──────────────────────────────────────────────────────────
     const advanced = /** @type {HTMLDetailsElement} */ (el(`<details class="card pd-advanced" ${state.pdAdvanced ? "open" : ""}><summary class="card-h">
-        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">thresholds, ratios, mouse buttons</span></summary>
+        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">thresholds, ratios, held modifiers</span></summary>
         <div class="card-b stack"></div></details>`));
     const advancedBody = /** @type {HTMLElement} */ (advanced.querySelector(".card-b"));
     /** @param {string} title */
@@ -103,39 +103,6 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         }
         section("Scroll tuning").append(tuning);
     }
-
-    const buttons = section("Mouse button overrides");
-    buttons.append(el(`<p class="note">A tap override can click mouse buttons 1–8, including its own number, without running the clicked button's behaviour or overrides. A button already held stays held, with no extra click.</p>`));
-    if ((slot.buttons || []).length) {
-        // An override still being set up is drawn as chosen, not as stored.
-        const unfinished = state.pdButtons?.slot === slot.id ? state.pdButtons.rows : {};
-        const table = el(`<div class="pd-buttons"><span class="h">Button</span><span class="h">While this mode runs</span>
-            <span class="h">Shortcut</span><span class="h">Held modifiers</span></div>`);
-        (slot.buttons || []).forEach((stored, index) => {
-            const button = unfinished[index] || stored;
-            const kindSelect = select(`Button ${index + 1}`, words(model).buttons, button.kind, `button:${index}:kind`);
-            /** @type {HTMLElement} */ (kindSelect.querySelector("span")).classList.add("sr");
-            const tapping = button.kind === BUTTON.TAP, holding = button.kind === BUTTON.HOLD_MODIFIERS;
-            const tap = tapping
-                ? shortcut(`Button ${index + 1} shortcut`, button.tap?.keycode, `button:${index}:tap`,
-                    typeof button.tap?.keycode === "string" ? {name: button.tap.keycode === "0" ? "" : button.tap.keycode} : {})
-                : el(`<span class="note blank">—</span>`);
-            tap.querySelector?.("span")?.classList.add("sr");
-            const macro = tapping ? pointingMacro(model, button.tap?.keycode) : null;
-            const held = macro ? `${word(words(model).modifierPolicy, MODIFIER_POLICY.INHERIT)} · the macro continues after its trigger` : holding ? modifierNames(model, button.modifiers).join(", ") || "choose at least one below" : "—";
-            table.append(el(`<span class="n">${esc(index + 1)}</span>`), kindSelect, tap,
-                el(`<span class="note"><span class="narrow">Held modifiers: </span>${esc(held)}</span>`));
-            if (holding) {
-                const mods = modifiers(`Button ${index + 1} holds`, button.modifiers ?? 0, `button:${index}:modifiers`);
-                mods.classList.add("mods");
-                table.append(mods);
-            }
-        });
-        buttons.append(table);
-    } else {
-        buttons.append(el(`<p class="note">This slot stores no button overrides.</p>`));
-    }
-
 
     // Open stays open from slot to slot, so two modes' tuning can be compared.
     advanced.addEventListener("toggle", () => {

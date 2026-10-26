@@ -15,7 +15,7 @@ for (const theme of ["dark", "light"]) {
         // Publish a real draft with named custom keys and a retained retired code.
         const value = pdDocument();
         editLayers(value, layers => layers[0][0] = 0x7e54);
-        const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+        const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         for (const [slot, name] of ["Right Thumb", "Left Thumb", "Click Spam"].entries())
             draft.stage({type: "updateCustomKey", keycode: `CUSTOM_KEY_${slot}`, name, draftId: draft.id, draftRevision: draft.revision});

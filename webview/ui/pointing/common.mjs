@@ -1,7 +1,7 @@
 // @ts-check
 import {vocabulary, word} from "../../view/vocabulary.mjs";
 
-// The words for movement, axes, buttons and scroll fields come with the
+// The words for movement, axes, links and scroll fields come with the
 // model (model.vocabulary.pointing), so this editor and the review agree.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model */
 export const words = (model) => vocabulary(model).pointing;

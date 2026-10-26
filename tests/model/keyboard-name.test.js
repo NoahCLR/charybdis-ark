@@ -8,7 +8,7 @@ const {storedKeyboardName, keyboardNameView, editKeyboardName} = require("../../
 const {profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81};
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 
 test("a profile stores no keyboard name until one is given, and the view says what stands in", () => {

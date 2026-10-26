@@ -26,7 +26,7 @@ const {
 
 function representativeBlob(payloadSize = 41) {
     return encodeProfileBlob({
-        schema: {major: 4, minor: 0},
+        schema: {major: 4, minor: 1},
         domains: [{
             id: PROFILE_DOMAIN_IDS.RGB,
             version: 4,

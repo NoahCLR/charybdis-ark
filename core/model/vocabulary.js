@@ -240,7 +240,18 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // Which axes a scrolling mode scrolls.
         scrollAxes: [[0, "Both axes"], [1, "Horizontal only"], [2, "Vertical only"]],
         pointerLayer: [[0, "Keep the pointer layer active"], [1, "Return to the typing layer"]],
-        buttons: [[0, "Pass through"], [1, "Consume"], [2, "Tap a shortcut"], [3, "Hold modifiers"]],
+        // A slot's link (firmware D-F62): the layers that start its mode, the
+        // layers its key turns on while it runs the mode, and what ends a mode
+        // its layers started: a layer above the highest of them that is on, or
+        // any layer outside both sets, neither the pointer layer nor a default
+        // layer. The editor's two columns of switches, and Review's fields.
+        // Each column title describes the layer in its row; "already starts"
+        // names the other mode a layer starts.
+        linkLabels: {starts: "Starts this pointing mode", keyTurnsOn: "Turned on by this pointing mode's key", startsOther: "already starts",
+            linkedLayers: "Layers that start this pointing mode", linkTurnsOn: "Layers turned on by this pointing mode's key", linkEnds: "Ends when another layer turns on"},
+        linkEnds: [[0, "Never"], [1, "A higher layer"], [2, "Any layer"]],
+        // Why a layer cannot be in a link, said in its row.
+        linkInert: {default: "default layer, always on", pointer: "pointer layer, follows the trackball"},
         // What moving toward a direction with no shortcut does. "Both" sends
         // the two compass neighbours, 45 degrees either side, the one the
         // movement leans toward first: a diagonal's straight directions, a

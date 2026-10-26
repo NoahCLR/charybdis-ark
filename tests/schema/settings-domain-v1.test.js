@@ -4,11 +4,12 @@ const assert = require("node:assert/strict");
 const {SETTINGS, SHORTCUT_KEYS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, validSetting, validShortcutKey, defaultLayerRecord, encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
 
 // Compiled defaults as the firmware sets them (profile-wire-v1/settings-domain.md):
-// scalar 27 retired at zero, behaviours on, every layer in both masks, every
-// layer referring combos to itself with nothing bypassed or excluded.
-const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff],
+// scalar 27 retired at zero, auto-sniping on Navigation (layer 3) alone,
+// behaviours on, every layer in both masks, every layer referring combos to
+// itself with nothing bypassed or excluded.
+const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,1 << 3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff],
     names: Array.from({length: 16}, (_, id) => id < 8 ? `Layer ${id}` : ""), layers: Array.from({length: 16}, (_, layer) => defaultLayerRecord(layer)),
-    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0})), keyboardName: "", formatVersion: 8});
+    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0})), keyboardName: "", formatVersion: 9});
 const thirtyTwo = (seed, fill) => `${seed}`.padEnd(32, fill);
 const full = () => ({...defaults(), names: Array.from({length: 16}, (_, i) => thirtyTwo(`L${i}`, "-")),
     macroNames: Array.from({length: 128}, (_, i) => thirtyTwo(i, "~")), customKeyNames: Array.from({length: 128}, (_, i) => thirtyTwo(`Key ${i}`, "!")),
@@ -18,8 +19,8 @@ const withShortcut = (slot, shortcut) => { const value = defaults(); value.custo
 const withValue = (id, v) => { const value = defaults(); value.values[id] = v; return value; };
 const withLayer = (layer, record) => { const value = defaults(); value.layers[layer] = {...value.layers[layer], ...record}; return value; };
 
-test("the layout constants are the firmware's version 8 domain", () => {
-    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, SETTINGS.CUSTOM_KEY_SHORTCUTS], [8, 31, 16, 128, 128, 128]);
+test("the layout constants are the firmware's version 9 domain", () => {
+    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, SETTINGS.CUSTOM_KEY_SHORTCUTS], [9, 31, 16, 128, 128, 128]);
     // 128 two-byte shortcuts at 404, then 273 counted names: 16 layers, 128
     // macros, 128 custom keys and the keyboard (profile-wire-v1/settings-domain.md).
     assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SHORTCUTS_OFFSET, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 132, 404, 660, 933, 9669]);
@@ -34,7 +35,7 @@ test("the stored field table determines scalar geometry and layer-reference rewr
     assert.equal(SETTINGS.SHORTCUTS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET + SETTINGS.LAYERS * SETTINGS.LAYER_RECORD_SIZE);
     assert.equal(SETTINGS.FIXED_SIZE, SETTINGS.SHORTCUTS_OFFSET + SETTINGS.CUSTOM_KEY_SHORTCUTS * SETTINGS.SHORTCUT_SIZE);
     assert.deepEqual(SETTING_FIELDS.filter(field => field.layerReference).map(field => [field.name, field.layerReference, field.layerReorder]), [
-        ["AUTO_MOUSE_LAYER", "layer", "storage"], ["AUTO_SNIPING_LAYER", "layer", "storage"],
+        ["AUTO_MOUSE_LAYER", "layer", "storage"], ["AUTO_SNIPING_LAYERS", "mask", "storage"],
         ["DEFAULT_LAYERS", "mask", "reach"], ["LAYER_BEHAVIORS", "mask", "storage"], ["LAYER_COMBOS", "mask", "storage"],
     ]);
     assert.ok(Object.isFrozen(SETTING_FIELDS));
@@ -46,7 +47,8 @@ test("the stored field table determines scalar geometry and layer-reference rewr
 const EDGES = {
     TAPPING_TERM: [[0, 65535], [65536]], TAP_HOLD_TERM: [[0, 65535], [65536]], LONG_HOLD_TERM: [[0, 65535], [65536]], MULTI_TAP_TERM: [[0, 65535], [65536]],
     AUTO_MOUSE_ENABLED: [[0, 1], [2]], AUTO_MOUSE_LAYER: [[0, 15], [16]], AUTO_MOUSE_TIMEOUT: [[0, 65535], [65536]], AUTO_MOUSE_DEBOUNCE: [[0, 255], [256]],
-    AUTO_SNIPING_ENABLED: [[0, 1], [2]], AUTO_SNIPING_LAYER: [[0, 15], [16]],
+    // A layer mask that may be empty: turning auto-sniping off keeps its layers.
+    AUTO_SNIPING_ENABLED: [[0, 1], [2]], AUTO_SNIPING_LAYERS: [[0, 1 << 3, 0xffff], [0x10000]],
     DRAGSCROLL_DPI: [[0], [1, 400]], VOLUME_DPI: [[0], [1]], BRIGHTNESS_DPI: [[0], [1]], ZOOM_DPI: [[0], [1]], ARROW_DPI: [[0], [1]],
     FEEDBACK_PERIOD: [[1, 65535], [0, 65536]], AUTO_MOUSE_DEAD_TIME: [[0, 65535], [65536]], RGB_TIMEOUT: [[0, 86400000], [86400001]],
     DEFAULT_DPI: [[400, 600, 3400], [200, 500, 3600]], SNIPING_DPI: [[100, 200, 400], [0, 150, 500]],
@@ -70,20 +72,20 @@ test("every stored value is named once, in ID order, and accepts only what the f
         for (const v of [...refused, -1, 1.5, 2 ** 32]) assert.equal(validSetting(id, v), false, `${name} refuses ${v}`);
     }
     // Layers and layer masks follow the bank they are judged in.
-    for (const name of ["AUTO_MOUSE_LAYER", "AUTO_SNIPING_LAYER"]) assert.ok(validSetting(SETTING[name], 7, 8) && !validSetting(SETTING[name], 8, 8));
-    for (const name of ["DEFAULT_LAYERS", "LAYER_BEHAVIORS", "LAYER_COMBOS"]) assert.ok(validSetting(SETTING[name], 0xff, 8) && !validSetting(SETTING[name], 0x100, 8));
+    assert.ok(validSetting(SETTING.AUTO_MOUSE_LAYER, 7, 8) && !validSetting(SETTING.AUTO_MOUSE_LAYER, 8, 8));
+    for (const name of ["AUTO_SNIPING_LAYERS", "DEFAULT_LAYERS", "LAYER_BEHAVIORS", "LAYER_COMBOS"]) assert.ok(validSetting(SETTING[name], 0xff, 8) && !validSetting(SETTING[name], 0x100, 8));
     // A plain range carries its bounds for an editor.
     assert.deepEqual([SETTING_FIELD.AUTO_MOUSE_DEBOUNCE.max, SETTING_FIELD.RGB_TIMEOUT.max, SETTING_FIELD.FEEDBACK_PERIOD.min], [255, 86400000, 1]);
     assert.deepEqual([SETTING_FIELD.DEFAULT_DPI.min, SETTING_FIELD.DEFAULT_DPI.max, SETTING_FIELD.DEFAULT_DPI.step], [400, 3400, 200]);
 });
 
-test("settings v8 round-trip Unicode names, layer records, zero settings and every name", () => {
+test("settings v9 round-trip Unicode names, layer records, zero settings and every name", () => {
     const value = defaults(); value.names[1] = "Édition ⌘"; value.names[15] = "Top"; value.macroNames[3] = "Sign-off"; value.macroNames[127] = "Last macro";
     value.customKeyNames[127] = "Last key"; value.keyboardName = "Noah’s Charybdis";
     value.layers[2] = {reference: 0, bypass: [0, 7, 8, 59], exclude: [12, 33]};
     value.layers[15] = {reference: 14, bypass: [], exclude: [59]};
     const bytes = encodeSettings(value);
-    assert.deepEqual([...bytes.subarray(0, 8)], [8, 16, 31, 128, 128, 0, 128, 0]);
+    assert.deepEqual([...bytes.subarray(0, 8)], [9, 16, 31, 128, 128, 0, 128, 0]);
     const nameBytes = [...value.names, ...value.macroNames, ...value.customKeyNames, value.keyboardName].reduce((sum, name) => sum + Buffer.byteLength(name), 0);
     assert.equal(bytes.length, SETTINGS.MIN_SIZE + nameBytes);
     const layer2 = SETTINGS.LAYER_RECORDS_OFFSET + 2 * SETTINGS.LAYER_RECORD_SIZE;
@@ -112,17 +114,18 @@ test("settings reject invalid durations, the retired pointing DPI and the retire
 
 test("the behaviour master switch and the per-layer masks hold sixteen layers", () => {
     assert.ok(validSetting(28, 0) && validSetting(28, 1) && !validSetting(28, 2));
-    for (const id of [29, 30]) {
+    // The behaviour and combo layers, and auto-sniping's (scalar 9).
+    for (const id of [29, 30, 9]) {
         for (const ok of [0, 1, 0x8000, 0xffff]) assert.deepEqual(decodeSettings(encodeSettings(withValue(id, ok))).values[id], ok, `${id}=${ok}`);
         for (const bad of [0x10000, 0x80000000, -1, 1.5]) assert.throws(() => encodeSettings(withValue(id, bad)), /Invalid keyboard settings/, `${id}=${bad}`);
     }
     assert.throws(() => encodeSettings(withValue(28, 2)), /Invalid keyboard settings/);
     assert.equal(decodeSettings(encodeSettings(withValue(28, 0))).values[28], 0);
     assert.ok(validSetting(23, 0x8000) && !validSetting(23, 0x10000) && !validSetting(23, 0));
-    for (const id of [5, 9]) {
-        assert.equal(decodeSettings(encodeSettings(withValue(id, 15))).values[id], 15);
-        assert.throws(() => encodeSettings(withValue(id, 16)), /Invalid keyboard settings/);
-    }
+    assert.equal(decodeSettings(encodeSettings(withValue(5, 15))).values[5], 15);
+    assert.throws(() => encodeSettings(withValue(5, 16)), /Invalid keyboard settings/);
+    // Auto-sniping on no layer is kept, as with its switch off.
+    assert.equal(decodeSettings(encodeSettings(withValue(9, 0))).values[9], 0);
     const mask = Buffer.from(encodeSettings(defaults())); mask.writeUInt32LE(0x1ffff, SETTINGS.SCALARS_OFFSET + 30 * 4);
     assert.throws(() => decodeSettings(mask), /Invalid keyboard settings/);
 });
@@ -206,12 +209,12 @@ test("decoded names must be well-formed, counted and within 32 bytes", () => {
     assert.throws(() => decodeSettings(six), /Unsupported settings format/);
 });
 
-test("only version 8 is read or written: the retired versions and reserved bytes are refused", () => {
-    for (const formatVersion of [7, 6, 5, 4, 9]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
+test("only version 9 is read or written: the retired versions and reserved bytes are refused", () => {
+    for (const formatVersion of [8, 7, 6, 5, 4, 10]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
     const bytes = encodeSettings(defaults());
-    for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 16, 31, 128, 128], [7, 16, 31, 128, 128], [9, 16, 31, 128, 128],
-        [8, 8, 31, 128, 128], [8, 16, 28, 128, 128], [8, 16, 31, 64, 128], [8, 16, 31, 128, 64],
-        [8, 16, 31, 128, 128, 2], [8, 16, 31, 128, 128, 0, 0], [8, 16, 31, 128, 128, 0, 64], [8, 16, 31, 128, 128, 0, 128, 1]]) {
+    for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 16, 31, 128, 128], [7, 16, 31, 128, 128], [8, 16, 31, 128, 128], [10, 16, 31, 128, 128],
+        [9, 8, 31, 128, 128], [9, 16, 28, 128, 128], [9, 16, 31, 64, 128], [9, 16, 31, 128, 64],
+        [9, 16, 31, 128, 128, 2], [9, 16, 31, 128, 128, 0, 0], [9, 16, 31, 128, 128, 0, 64], [9, 16, 31, 128, 128, 0, 128, 1]]) {
         const relabelled = Buffer.from(bytes); relabelled.set(header);
         assert.throws(() => decodeSettings(relabelled), /Unsupported settings format/, header.join());
     }

@@ -77,7 +77,6 @@ export const STATE_FIELDS = {
     layersAsked: kept(false), // its stack is requested once per opening
     pdSlot: kept(0),
     pdKind: resets(null),      // movement selection while the rebuilt form catches up: {slot, kind}
-    pdButtons: resets(null),   // {slot, rows: {index: override}}: button overrides whose kind is chosen but not yet its shortcut or modifiers
     pdTaps: resets(null),      // {slot, rows: {"dir:up": tap}}: direction shortcuts set to ignore modifiers before any is chosen
     pdAdvanced: kept(false),  // Advanced open on the pointing editor, whichever slot is shown
     applyDismissed: kept(0),  // the failed Apply (by id) the person closed, so it stays closed

@@ -18,7 +18,7 @@ Every multi-byte integer is little-endian. Every reserved byte and every
 reserved flag bit is zero, in requests and in replies; a request with a
 nonzero reserved byte is refused as malformed. Every profile length and
 offset is 32 bits wide, on the wire and in storage (D-F28,
-[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0028-new-base-32-bit-profile-lengths.md)). The firmware's
+[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0028-new-base-32-bit-profile-lengths.md)). The firmware's
 encoders write one canonical representation; its decoders refuse wrong
 ordering, padding and unused data.
 
@@ -41,14 +41,14 @@ Held by: no test (an index).
 ## Version identity
 
 A keyboard identifies itself by its capability page alone (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0031-via-is-not-supported.md)); there is no separate
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0031-via-is-not-supported.md)); there is no separate
 protocol-version or firmware-version read. Capability page 0
 ([hid-channel.md](hid-channel.md#capability-pages--get-0x01)) carries:
 
 | Identity | Value in this firmware | Where |
 | --- | --- | --- |
 | Profile Wire version | major `2`, minor `0` | page 0 bytes 2–3 |
-| Profile schema version | major `4`, minor `0` | page 0 bytes 4–5, and blob header bytes 4–5 |
+| Profile schema version | major `4`, minor `1` (D-F62: pointing v4, settings v9) | page 0 bytes 4–5, and blob header bytes 4–5 |
 | Capability layout | `3`, three pages | page 0 bytes 0–1 |
 | Firmware version | `NOAH_FIRMWARE_VERSION`, never zero | page 0 bytes 17–20 |
 | Action-ABI digest | see [blob-and-digests.md](blob-and-digests.md#action-abi-digest) | page 0 bytes 13–16 |
@@ -60,7 +60,7 @@ firmware's history; a later capability raises the minor version (D-F28). The
 store format, `6`, is implied by the Profile Wire version and never travels.
 The firmware accepts only the formats it writes: a blob, candidate or saved
 profile in another schema or store format is refused, never translated
-(D-F10, [`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/929bf5a592527147be0556bc0746b8740682dbe3/docs/adr/0010-firmware-accepts-only-current-formats.md)).
+(D-F10, [`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0010-firmware-accepts-only-current-formats.md)).
 
 Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, `qmk_profile_channel_test.c`), `tests/fixtures/profile_wire_v1_reads.fixture`.
 
@@ -84,7 +84,7 @@ client can tell which vectors this firmware answers to.
 | `combo_domain_v3.fixture`, `combo_output_behaviors_v1.fixture` | Combo domain `0x30` version 3 payloads | `run_active_profile_combo_runtime_tests.sh` |
 | `combo_readback_v3.fixture` | Native combo readback (GET `0x06`) pages | `run_combo_readback_tests.sh` |
 | `rgb_domain_v1.fixture`, `rgb_domain_v4.json` | Lighting domain `0x10` vectors | `run_profile_rgb_v1_tests.sh`, `run_profile_rgb_v4_tests.sh`, `run_active_profile_rgb_runtime_tests.sh`, `run_rgb_layer_render_tests.sh` |
-| `pd_mode_domain_v3.json` | Pointing domain `0x50` version 3 vectors | `run_profile_pd_v1_tests.sh`, `run_pd_profile_integration_tests.sh`, `run_profile_compiled_defaults_v1_tests.sh` |
+| `pd_mode_domain_v4.json` | Pointing domain `0x50` version 4 vectors | `run_profile_pd_v1_tests.sh`, `run_pd_profile_integration_tests.sh`, `run_profile_compiled_defaults_v1_tests.sh` |
 | `pd_mode_domain_v1.json` | A test-only snapshot of the compiled pointing modes | `run_pointing_mode_handlers_tests.sh` |
 | `folded_keyboard_profile.json` | Noah's profile in logical form, which the compiled defaults must reproduce | `run_profile_compiled_defaults_v1_tests.sh` |
 | `host_layouts_v1.json` | The host layout catalogue | `tools/host_layouts/build.py`, `run_host_layout_tests.sh` |

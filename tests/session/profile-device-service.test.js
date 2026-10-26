@@ -133,7 +133,7 @@ function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
     const featureFlags = (PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.POINTING
         | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0)) >>> 0;
-    capabilityIdentity.set([options.capabilityLayout ?? 3, 3, 2, 0, options.schemaMajor || 4, 0, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.set([options.capabilityLayout ?? 3, 3, 2, 0, options.schemaMajor || 4, options.schemaMajor ? 0 : 1, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
@@ -350,7 +350,7 @@ test("compatibility reports a schema blocker, and the diagnostic says what was c
     const scanned = await service.enumerate();
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.compatibility.compatible, false);
-    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.0/);
+    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.1/);
     assert.match(connected.diagnostics.join("\n"), /found \d+ blocking issue/);
 });
 
@@ -458,7 +458,7 @@ test("the layout read counts only keys the app cannot name", () => {
     const {unnamedKeyCount} = require("../../core/session/profile-device-service");
     const keycodes = require("../../core/data/keycode-catalog");
     const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
-    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x6fd70b90}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x7fecec81}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
     for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");
 });
 

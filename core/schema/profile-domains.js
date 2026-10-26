@@ -22,12 +22,12 @@ const PROFILE_DOMAINS = Object.freeze([
         encode: value => require("./combo-domain-v1").encodeComboDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["combos"]} */
         decode: (bytes, _options = {}) => require("./combo-domain-v1").decodeComboDomain(bytes)}),
-    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 8, wireBit: 1 << 3, area: "settings", document: "profile",
+    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 9, wireBit: 1 << 3, area: "settings", document: "profile",
         /** @param {import("./types.js").SettingsDomain} value @returns {Buffer} */
         encode: value => require("./settings-domain-v1").encodeSettings(value),
         /** @param {Buffer} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["settings"]} */
         decode: (bytes, _options = {}) => require("./settings-domain-v1").decodeSettings(bytes)}),
-    Object.freeze({name: "PD_MODES", id: 0x50, key: "pdModes", readKey: "pdModes", version: 3, wireBit: 1 << 4, area: "pointing", document: "profile",
+    Object.freeze({name: "PD_MODES", id: 0x50, key: "pdModes", readKey: "pdModes", version: 4, wireBit: 1 << 4, area: "pointing", document: "profile",
         /** @param {import("./types.js").PdSlot[]} value @returns {Buffer} */
         encode: value => require("./pd-mode-domain-v1").encodePdDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["pdModes"]} */

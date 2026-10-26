@@ -8,9 +8,9 @@ const {judge, markdown} = require("../../scripts/check-agreement");
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
 // Capability pages as firmware's contract probe states them (Profile Wire 2.0,
-// schema 4, action-ABI digest 0x6fd70b90, sixteen layers, all seven domains, a
+// schema 4.1, action-ABI digest 0x7fecec81, sixteen layers, all seven domains, a
 // split build that saves and has pointing).
-const PAGES = ["03030200040020140207000000900bd76f00000100c0a24491", "10108005801010203a0880807f202040000000000000000000", "800200d00000e0cf0000e0cf00005788000000000000000000"];
+const PAGES = ["0303020004012014020700000081ecec7f00000100c0a24491", "10108005801010203a0880807f202040000000000000000000", "800200d00000e0cf0000e0cf00005788000000000000000000"];
 const sha = text => createHash("sha256").update(text).digest("hex");
 
 function setup() {
@@ -60,7 +60,7 @@ test("each contract check can fail on its own", () => {
         const domains = Buffer.from(PAGES[1], "hex"); domains[12] = 0x0f;
         assert.deepEqual(failing({capabilityPages: [PAGES[0], domains.toString("hex"), PAGES[2]]}), ["firmware supports every profile domain Ark registers"]);
         // A schema or Profile Wire version that is not exactly Ark's, minor included.
-        const schema = Buffer.from(PAGES[0], "hex"); schema[5] = 1;
+        const schema = Buffer.from(PAGES[0], "hex"); schema[5] = 0;
         assert.deepEqual(failing({capabilityPages: [schema.toString("hex"), PAGES[1], PAGES[2]]}), ["profile schema is the one Ark reads"]);
         const protocol = Buffer.from(PAGES[0], "hex"); protocol[3] = 1;
         assert.deepEqual(failing({capabilityPages: [protocol.toString("hex"), PAGES[1], PAGES[2]]}), ["Profile Wire version is the one Ark requires"]);

@@ -8,7 +8,7 @@ const {PD_KIND, isPdTapKey, pdTapProblem, isPdMacro, PD_MACROS} = require("../sc
 const catalog = require("../data/keycode-catalog");
 
 /** @typedef {{keycode?: unknown, modifierPolicy?: unknown, mask?: unknown}} TapLike */
-/** @typedef {{directions?: Record<string, TapLike | undefined>, diagonals?: Record<string, TapLike | undefined>, buttons?: ({tap?: TapLike} | undefined)[]}} SlotLike */
+/** @typedef {{directions?: Record<string, TapLike | undefined>, diagonals?: Record<string, TapLike | undefined>}} SlotLike */
 
 /** @type {readonly (readonly ["directions" | "diagonals", string, string])[]} */
 const PLACES = Object.freeze([
@@ -21,9 +21,7 @@ const PLACES = Object.freeze([
 /** @param {SlotLike} slot @param {SlotLike} [stored] */
 function pointingTaps(slot, stored) {
     /** @type {{label: string, tap: TapLike | undefined, stored: TapLike | undefined}[]} */
-    const taps = PLACES.map(([group, name, label]) => ({label, tap: slot[group]?.[name], stored: stored?.[group]?.[name]}));
-    (slot.buttons || []).forEach((button, index) => taps.push({label: `Button ${index + 1}`, tap: button?.tap, stored: stored?.buttons?.[index]?.tap}));
-    return taps;
+    return PLACES.map(([group, name, label]) => ({label, tap: slot[group]?.[name], stored: stored?.[group]?.[name]}));
 }
 
 // Each configured slot's macro outputs, with their stored slot identity.

@@ -7,9 +7,10 @@ const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profil
 // The firmware's eight-slot record fixture as the 32 slots the keyboard has:
 // slot 6 disabled but named, so it keeps a record, and the rest empty. The
 // first seven slots are the first seven records, at the offsets the frozen
-// eight-slot envelope had them.
+// eight-slot envelope had them, less Arrow's mouse button overrides, which
+// version 4 retired (firmware D-F22).
 const slots = () => {
-    const value = [...structuredClone(fixture.slots), ...Array.from({length: 24}, (_, index) => ({id: index + 8, kind: 0, name: ""}))];
+    const value = [...structuredClone(fixture.slots).map(({buttons: _retired, ...slot}) => slot), ...Array.from({length: 24}, (_, index) => ({id: index + 8, kind: 0, name: ""}))];
     value[6] = {id: 6, kind: 0, name: "Spare"};
     return value;
 };
@@ -34,15 +35,16 @@ test("native PD, layer-lock and custom-key identities sit in their fixed blocks"
 test("the fixture's slots encode as its records and preserve the full preset policies", () => {
     const encoded = encodePdDomain(slots()), frozen = Buffer.from(fixture.hex, "hex");
     assert.equal(encoded.length, 8 + 7 * 128, "six configured slots and one named one");
-    // Each record is the frozen one, its name moved to the counted field.
+    // Each record is the frozen one, its name moved to the counted field and
+    // its button records (52..69) cleared.
     for (let slot = 0; slot < 6; slot++) {
-        const now = encoded.subarray(8 + slot * 128, 8 + (slot + 1) * 128), before = frozen.subarray(8 + slot * 96, 8 + (slot + 1) * 96);
+        const now = encoded.subarray(8 + slot * 128, 8 + (slot + 1) * 128), before = Buffer.from(frozen.subarray(8 + slot * 96, 8 + (slot + 1) * 96)).fill(0, 52, 70);
         assert.deepEqual([now.subarray(0, 8), now.subarray(32, 96)], [before.subarray(0, 8), before.subarray(32, 96)], `slot ${slot}`);
     }
     const decoded = decodePdDomain(encoded);
     assert.deepEqual(encodePdDomain(decoded), encoded);
     assert.equal(decoded[4].directions.up.mask, 0x44);
-    assert.equal(decoded[4].buttons[0].modifiers, 0x20);
+    assert.ok(frozen.subarray(8 + 4 * 96 + 52, 8 + 4 * 96 + 70).some(Boolean), "the fixture's Arrow had overrides");
     assert.equal(decoded[5].heldModifiers, 8);
     assert.equal(decoded[7].kind, 0);
     assert.deepEqual(decoded[6], {...decodePdDomain(encodePdDomain(slots().map(slot => slot.id === 6 ? {id: 6, kind: 0, name: ""} : slot)))[6], name: "Spare"});
@@ -65,8 +67,9 @@ test("PD decoder rejects malformed framing, hidden disabled state and noncanonic
     reject(() => decodePdDomain(bytes().subarray(0, -1)), "INVALID_LENGTH");
     reject(() => decodePdDomain(Buffer.concat([bytes(), Buffer.from([0])])), "INVALID_LENGTH");
     for (const [offset, value, code] of [[0, 1, "INVALID_HEADER"], [1, 8, "INVALID_HEADER"], [8, 1, "INVALID_ID"],
-        [15, 1, "RESERVED"], [98, 1, "RESERVED"], [17, 1, "RESERVED"], [8 + 6 * 128 + 4, 100, "INVALID_PARAMETER"],
-        [8 + 96, 0xc0, "INVALID_NAME"], [8 + 127, 1, "INVALID_NAME"], [16, 33, "INVALID_NAME"], [9, 3, "INVALID_POLICY"]]) {
+        [15, 1, "RESERVED"], [98, 1, "RESERVED"], [24, 1, "RESERVED"], [17, 1, "RESERVED"], [8 + 6 * 128 + 4, 100, "INVALID_PARAMETER"],
+        [8 + 96, 0xc0, "INVALID_NAME"], [8 + 127, 1, "INVALID_NAME"], [16, 33, "INVALID_NAME"], [9, 3, "INVALID_POLICY"],
+        [8 + 4 * 128 + 52, 3, "RESERVED"], [8 + 6 * 128 + 14, 1, "INVALID_PARAMETER"], [8 + 6 * 128 + 12, 1, "INVALID_PARAMETER"]]) {
         const b = bytes(); b[offset] = value;
         reject(() => decodePdDomain(b), code);
     }
@@ -90,17 +93,15 @@ test("directional output vocabulary accepts macros and excludes controls, mouse 
 
 // Firmware D-F22: a tap may click a plain mouse button 1–8, and the record is
 // unchanged.
-test("mouse buttons 1–8 click from a direction, a diagonal and a button override under every modifier policy", () => {
+test("mouse buttons 1–8 click from a direction and a diagonal under every modifier policy", () => {
     const value = slots();
     Object.assign(value[4], {axis: 3, thresholdX: 40, thresholdY: 40,
         directions: {up: {keycode: 0xd3}, down: {keycode: 0xd4, modifierPolicy: 1, mask: 2}, left: {keycode: 0xd1, modifierPolicy: 2}, right: {keycode: 0xd8}},
-        diagonals: {upLeft: {keycode: 0xd2}, upRight: {keycode: 0xd5, modifierPolicy: 2}, downLeft: {keycode: 0}, downRight: {keycode: 0xd7, modifierPolicy: 1, mask: 0x10}},
-        buttons: [{kind: 2, tap: {keycode: 0xd1}}, {kind: 2, tap: {keycode: 0xd4, modifierPolicy: 2}}, {kind: 2, tap: {keycode: 0xd6, modifierPolicy: 1, mask: 1}}]});
+        diagonals: {upLeft: {keycode: 0xd2}, upRight: {keycode: 0xd5, modifierPolicy: 2}, downLeft: {keycode: 0}, downRight: {keycode: 0xd7, modifierPolicy: 1, mask: 0x10}}});
     const decoded = decodePdDomain(encodePdDomain(value));
     assert.deepEqual(decoded[4].directions.up, {keycode: 0xd3, modifierPolicy: 0, mask: 0});
     assert.deepEqual(decoded[4].directions.down, {keycode: 0xd4, modifierPolicy: 1, mask: 2});
     assert.deepEqual(decoded[4].diagonals.downRight, {keycode: 0xd7, modifierPolicy: 1, mask: 0x10});
-    assert.deepEqual(decoded[4].buttons[1].tap, {keycode: 0xd4, modifierPolicy: 2, mask: 0});
     assert.deepEqual(encodePdDomain(decoded), encodePdDomain(value), "round trip");
     // The policies are unchanged: masking needs a mask, the others refuse one.
     for (const tap of [{keycode: 0xd3, modifierPolicy: 1}, {keycode: 0xd3, modifierPolicy: 2, mask: 1}, {keycode: 0xd3, modifierPolicy: 3},
@@ -165,13 +166,14 @@ test("a scrolling mode stores which axes it scrolls in byte 3", () => {
     reject(() => encodePdDomain(value), "INVALID_PARAMETER");
 });
 
-test("button override validation requires balanced, explicit output kinds", () => {
-    for (const button of [{kind: 4}, {kind: 0, modifiers: 8}, {kind: 1, tap: {keycode: 4}},
-        {kind: 2}, {kind: 2, modifiers: 8, tap: {keycode: 4}}, {kind: 3}, {kind: 3, modifiers: 8, tap: {keycode: 4}}]) {
-        const value = slots(); value[4].buttons[0] = button;
-        reject(() => encodePdDomain(value), "INVALID_ACTION");
+test("version 3's mouse button records are reserved zero in every slot", () => {
+    for (let at = 52; at < 70; at++) {
+        const b = bytes(); b[8 + 4 * 128 + at] = 1;
+        assert.throws(() => decodePdDomain(b), error => error.code === "RESERVED" && error.offset === 8 + 4 * 128 + 52, `byte ${at}`);
     }
-    const value = slots(); value[4].buttons = new Array(3);
+    // A slot has no button field to write them from.
+    assert.equal(decodePdDomain(bytes())[4].buttons, undefined);
+    const value = slots(); value[4].buttons = [{}, {}, {}];
     reject(() => encodePdDomain(value), "INVALID_ARGUMENT");
 });
 
@@ -182,11 +184,11 @@ test("encoder rejects unknown fields and numeric coercion rather than silently d
     }
 });
 
-test("a profile carries the PD domain only as version 3, and the retired payloads are refused", () => {
+test("a profile carries the PD domain only as version 4, and the retired payloads are refused", () => {
     const payload = bytes();
-    assert.deepEqual(decodeProfileBlob(encodeProfileBlob({domains: [{id: PD_DOMAIN.ID, version: 3, payload}]})).domains[0].payload, payload);
-    for (const version of [1, 2]) reject(() => encodeProfileBlob({domains: [{id: PD_DOMAIN.ID, version, payload}]}), "UNKNOWN_DOMAIN_VERSION");
-    const envelope = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 4, 0, 1, 1, 0x50, 1, 8, 3, 0, 0]);
+    assert.deepEqual(decodeProfileBlob(encodeProfileBlob({domains: [{id: PD_DOMAIN.ID, version: 4, payload}]})).domains[0].payload, payload);
+    for (const version of [1, 2, 3]) reject(() => encodeProfileBlob({domains: [{id: PD_DOMAIN.ID, version, payload}]}), "UNKNOWN_DOMAIN_VERSION");
+    const envelope = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 4, 1, 1, 1, 0x50, 1, 8, 3, 0, 0]);
     reject(() => decodeProfileBlob(Buffer.concat([envelope, Buffer.from(fixture.hex, "hex")])), "UNKNOWN_DOMAIN_VERSION");
     assert.throws(() => decodePdDomain(Buffer.from(fixture.hex, "hex")), error => error.code === "INVALID_HEADER" && error.offset === 0);
 });
@@ -196,10 +198,10 @@ test("macro records round trip every tap place, inherit only", () => {
         assert.ok(isPdMacro(keycode));
         const modes = slots();
         modes[7] = {id: 7, kind: 1, name: "Macros", axis: 3, thresholdX: 40, thresholdY: 40,
-            directions: {left: {keycode}}, diagonals: {upLeft: {keycode}}, buttons: [{kind: 2, tap: {keycode}}, {kind: 0}, {kind: 0}]};
+            directions: {left: {keycode}}, diagonals: {upLeft: {keycode}}};
         const bytes = encodePdDomain(modes);
         assert.deepEqual(encodePdDomain(decodePdDomain(bytes)), bytes);
-        for (const at of [36, 70, 54]) for (const [policy, mask] of [[1, 2], [2, 0], [0, 2]]) {
+        for (const at of [36, 70]) for (const [policy, mask] of [[1, 2], [2, 0], [0, 2]]) {
             const bad = Buffer.from(bytes); bad[8 + 7 * 128 + at + 2] = policy; bad[8 + 7 * 128 + at + 3] = mask;
             reject(() => decodePdDomain(bad), "INVALID_ACTION");
         }

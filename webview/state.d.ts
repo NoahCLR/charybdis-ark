@@ -1,4 +1,4 @@
-import type {BranchStyle, Combo, PdButton, PdTap, Scalar} from '../contracts/edits.js';
+import type {BranchStyle, Combo, PdTap, Scalar} from '../contracts/edits.js';
 import type {PanelCommand, PanelResponse} from '../contracts/messages.js';
 import type {MacroStep} from './view/types.js';
 import type {ScreenId} from './view/screens.mjs';
@@ -25,7 +25,7 @@ export interface PanelState {
         madeKey: {keycode: string; shortcut: {mods: number; key: number}; name: string} | null};
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
     stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pdSlot: number; pdKind: {slot: number; kind: number} | null;
-    pdButtons: {slot: number; rows: Record<number, PdButton>} | null; pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
+    pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
     pdAdvanced: boolean; applyDismissed: number; pdPreview: boolean; feedbackRow: string | undefined;
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
     macroClipboard: MacroStep[] | null;

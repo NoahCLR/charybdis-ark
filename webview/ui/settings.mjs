@@ -17,6 +17,7 @@ import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 import {githubMark} from "../view/shell-panel.mjs";
 import {durationControl} from "./duration.mjs";
+import {layerSwitchGrid} from "./layer-switches.mjs";
 import {elsewhereWords, fieldParts, foldedSummary, isLayerSwitch, layerSwitchSummary, matchesElsewhere, matchesQuery, noMatchWords, settingsCards, startsFolded} from "../view/settings-layout.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
@@ -288,28 +289,20 @@ const layerCell = (model, field, layer) => layer
     ? marked(model, {kind: "layer", layer: layer.index}, layerName(layer))
     : marked(model, field.governs, field.label);
 
-// One switch per layer, each named by its layer and shown in its colour, in
-// the order the layer tabs read. Each keeps its own field identity, so the
-// section still saves whole and a search still finds a single layer.
+// A section's one-per-layer switches as one row of layers (layer-switches.mjs).
+// Each keeps its own field identity, so the section still saves whole.
 /** @param {{label: string, hint: string}} group @param {Field[]} fields @param {Field[]} shown @param {boolean} canEdit @param {() => void} submit */
 function layerGroupRow(group, fields, shown, canEdit, submit) {
-    const model = getModel();
     const row = el(`<div class="setrow layer-switches" data-tip="${esc(group.hint)}" ${fields.some((field) => shown.includes(field)) ? "" : "hidden"}>
         <div><div class="nm">${esc(group.label)}${keyboardKeysMark(fields[0])}</div><div class="hint">${esc(group.hint)}</div></div>
-        <div class="layer-grid" role="group" aria-label="${esc(group.label)}"></div>
     </div>`);
-    const grid = /** @type {HTMLElement} */ (row.querySelector(".layer-grid"));
-    for (const field of fields) {
-        const at = field.governs?.kind === "layer" ? field.governs.layer : -1;
-        const layer = layers().find((entry) => entry.index === at);
-        const editable = canEdit && !field.readOnly;
-        const tip = [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" ");
-        const node = el(`<label class="sw" data-tip="${esc(tip)}" ${shown.includes(field) ? "" : "hidden"}>
-            <input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
-            <span class="track"></span><span class="txt">${layerCell(model, field, layer)}</span></label>`);
-        /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
-        grid.appendChild(node);
-    }
+    const grid = layerSwitchGrid(getModel(), group.label, fields.map((field) => ({
+        layer: field.governs?.kind === "layer" ? field.governs.layer : -1, label: field.label, macro: field.macro, f: `setting:${field.macro}`,
+        checked: Boolean(field.enabled), disabled: !canEdit || Boolean(field.readOnly), hidden: !shown.includes(field),
+        tip: [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" "),
+    })));
+    /** @type {NodeListOf<HTMLInputElement>} */ (grid.querySelectorAll("input")).forEach((input) => input.addEventListener("change", submit));
+    row.appendChild(grid);
     return row;
 }
 

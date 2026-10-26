@@ -59,7 +59,7 @@ test("every registered edit names its editor, its words and, on the profile, its
 function draft() {
     const doc = pdDocument();
     const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
-    return new ProfileDraftSession(snapshot, "test-device", {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90});
+    return new ProfileDraftSession(snapshot, "test-device", {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81});
 }
 
 test("every registered edit reaches its editor, and anything else is refused as unsupported", () => {

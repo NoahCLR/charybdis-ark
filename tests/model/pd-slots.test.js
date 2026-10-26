@@ -31,7 +31,7 @@ test("layer ordering keeps the profile in the formats the keyboard stores", () =
     const result = validateSnapshot(reorderLayers(wide, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]), CAPABILITIES_32);
     assert.equal(result.pdModes.length, 32);
     assert.equal(result.rgb.formatVersion, 4);
-    assert.equal(domainOf(result.document, 0x50).version, 3);
+    assert.equal(domainOf(result.document, 0x50).version, 4);
 });
 
 test("the profile meter counts a sparse PD domain by its stored bytes, and its slots by the ones in use", () => {

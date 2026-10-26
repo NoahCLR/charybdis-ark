@@ -286,13 +286,40 @@ _Avoid_: protected playback, input protection
 
 **Pointing mode**:
 A role the trackball takes instead of moving the pointer, either scrolling or
-directional, while its key is held or locked; one runs at a time.
+directional, while its key is held or locked or one of its linked layers is
+on; one runs at a time.
 _Avoid_: pd mode, PD-mode, pointer mode, trackball mode
 
 **Pointing slot**:
 One of 32 fixed, numbered places that holds a pointing mode or is empty; keys
 reach the slot, so a slot keeps its keys when its mode changes.
 _Avoid_: PD slot, pointing-mode slot, mode slot
+
+**Link** (of a pointing slot):
+Its linked layers, the layers its key turns on, and what ends it (D-F62). No
+layer starts two modes; any number of keys may turn one on.
+_Avoid_: binding, layer binding
+
+**Linked layers**:
+The set of layers that start a pointing slot's mode while any of them is on.
+_Avoid_: mode layers, pointing layers, trigger layers
+
+**Turns on** (of a link):
+The set of layers a mode's key turns on while it runs the mode: any layers,
+its own linked layers among them or not, and layers another mode starts from.
+_Avoid_: direction (retired), chosen layer (retired), brings, brought layer
+
+**Ends on** (of a link):
+What ends a mode its linked layers started, until that layer goes off:
+nothing, a higher layer (one above the highest linked layer that is on), or
+any other layer (one outside both of the link's sets). The pointer layer and a default layer
+never end it.
+_Avoid_: top only (retired), exclusive, yield
+
+**Source** (of a pointing mode):
+What runs a mode: its key, held or locked, or its linked layers. A key source
+beats a layer source.
+_Avoid_: trigger, origin, owner (for this)
 
 **Movement**:
 Whether a pointing mode turns ball motion into scrolling or into directional
@@ -302,6 +329,11 @@ _Avoid_: engine, engine family, kind
 **Pointer layer**:
 The layer meant for trackball work, turned on by moving the ball.
 _Avoid_: mouse layer, auto-mouse layer, pointing layer
+
+**Auto-sniping layers**:
+The layers whose being on turns sniping on by itself, behind one master
+switch; one of them is an auto-sniping layer.
+_Avoid_: sniping layer, the auto-sniping layer (for the set)
 
 **Auto-mouse**:
 Turning the pointer layer on when the ball moves and off again after a quiet
