@@ -91,11 +91,25 @@ active layer that is not transparent answers. A key moves the state by:
   holds until release);
 - the combos its presses complete;
 - a pointing mode's key, held or locked, for the layers its link has the
-  key turn on (firmware D-F62): the hold key holds each of them and the
-  lock key toggles each as a layer lock, as for a key, a behaviour branch or
-  a combo output that runs the mode. A key that turns on several layers is
-  walked as one effect per layer, so the walk may reach a state where only
-  some of them are on, which a person cannot;
+  key turn on (firmware D-F62): the hold key holds them and the lock key
+  toggles them as a layer lock, as for a key, a behaviour branch or a combo
+  output that runs the mode;
+- a custom key's shortcut (firmware D-F26), which turns its layers on as its
+  kind's layer key does: held as `MO()`, locked as a lock of several, moved
+  to as `TO()` of several, held with a fifth-tap lock as `TT()`, or held as a
+  one-shot as `OSL()`. That is the key itself, a behaviour hold that presses
+  and holds it, or a combo output that sends it. On its own key with its own
+  row, the row sends the shortcut where it leaves a tier empty: tapped from an
+  empty first tap, held from the fallback hold, which only the first press has
+  and only while it authors neither a hold nor a long hold, so a lock or a
+  move happens from either and a held shortcut only from that hold; a tap-toggle or one-shot shortcut's layers are on from every
+  press, whatever the row, and a row with steps drops the tap-toggle's
+  fifth-tap lock. A tap that sends it does what tapping that layer key does: a
+  held or tap-toggle shortcut turns its layers on only for the tap, so it
+  moves no state, while a lock, a move or a one-shot does; sent by a step, or
+  by a combo that does not run the key's behaviour, a tap-toggle shortcut
+  only holds, since its taps are its key's, while a combo that runs it acts as
+  the key itself;
 - the trackball, which turns on the pointer layer unless an auto-sniping
   layer other than it, or a linked layer that starts its mode, keeps it off.
   A link that a higher layer ends starts its mode, and so keeps the pointer
@@ -110,8 +124,25 @@ wins while another mode runs is not walked: a linked layer that starts its
 mode always counts as keeping the pointer layer off, even where a mode key
 held over it would let the pointer layer back.
 
-Holding is not limited by fingers, and a one-shot counts as a hold. So the
-walk finds every way out a person could, and never invents a trap.
+A key that turns several layers on is one effect on all of them: they go on
+together, and a hold of them is released together, so the walk never reaches
+a state where only some of one key's layers are on. A lock of several turns them all on, or all off once all of them are
+on. A shortcut's Lock shares each layer's lock with `TG()` (firmware layer
+ownership), so this is exact: turning them all off releases a layer a `TG()`
+locked too, as the keyboard does. A pointing mode's lock key is walked the
+same way, though the keyboard's mode owns its layers apart from the locks, so
+there the walk may let go of a layer a `TG()` still keeps on. A move to several
+locks them alone and lets every other lock go; `TO(0)`'s is the base alone,
+which lets them all go. A hold's release joins
+the walk once a state reached can make that hold. Layers are not tracked by
+the key that holds or locks them, though: where two holds share a layer (a
+shortcut holding Navigation and Extra, and an `MO()` of Navigation), letting
+either go drops the shared layer, and the other's release still lets go of
+what is left of it; a lock of one layer of a set toggles that layer alone.
+Only there can the walk reach a state a person cannot, and so name a trap no
+person could fall into. Holding is not limited by fingers, and a
+one-shot counts as a hold. So the walk finds every way out a person could,
+and elsewhere never invents a trap.
 
 `compactWalk` compiles keys and combos into conditions on active layers.
 `analyzeLayerStates` (`layer-state-graph.js`) explores them as shared Boolean

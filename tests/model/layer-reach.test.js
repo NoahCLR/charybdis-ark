@@ -16,7 +16,7 @@ const KC_A = 0x04, KC_B = 0x05, KC_ESC = 0x29, TRNS = 0x01, NO = 0x00;
 const MO = (n) => 0x5220 | n, TG = (n) => 0x5260 | n, TO = (n) => 0x5200 | n, TT = (n) => 0x52c0 | n, DF = (n) => 0x5240 | n;
 const LOCK_LAYER = (n) => 0x7ec0 + n;
 const code = (operand) => ({kind: 1, flags: 0, operand});
-function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}, pdModes = []} = {}) {
+function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}, pdModes = [], shortcuts = {}} = {}) {
     const layers = Array.from({length: 16}, (_, layer) => Array(60).fill(layer === 0 ? KC_A : (fill[layer] ?? TRNS)));
     for (const [at, value] of Object.entries(keys)) {
         const [layer, index] = at.split(":").map(Number);
@@ -29,7 +29,9 @@ function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}, p
     values[23] = 1; values[20] = 1; values[28] = 1; values[29] = 0xffff; values[30] = 0xffff;
     for (const [id, value] of Object.entries(settings)) if (id !== "references" && id !== "layers" && id !== "comboOutputBehaviors") values[id] = value;
     const records = Array.from({length: 16}, (_, layer) => ({reference: settings.references?.[layer] ?? layer, bypass: [], exclude: [], ...settings.layers?.[layer]}));
-    return {layers, settings: {values, layers: records, comboOutputBehaviors: settings.comboOutputBehaviors, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")]},
+    // Each custom key's shortcut (firmware D-F26), none unless `shortcuts` gives one by slot.
+    const customKeyShortcuts = Array.from({length: 128}, (_, slot) => ({mods: 0, key: 0, layers: 0, layerKind: 0, ...shortcuts[slot]}));
+    return {layers, settings: {values, layers: records, comboOutputBehaviors: settings.comboOutputBehaviors, customKeyShortcuts, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")]},
         behaviors: {rows}, combos: {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos}, pdModes};
 }
 const traps = (value) => layerReach(value).filter((finding) => finding.level === LEVELS.TRAP);
@@ -630,4 +632,124 @@ test("a link any other layer ends keeps the pointer layer off only while no laye
         "the layer its key turns on is in the link, so it does not end it");
     assert.equal(traps(profile({keys: {"0:0": TG(2), "2:0": KC_B, "4:3": TO(0)}, settings: mouse, pdModes: [startedBy([2], {linkEnds: 2})]})).length, 1,
         "Base, always on, does not end it");
+});
+
+// A key that turns several layers on at once turns them all on, and its
+// release lets them all go (firmware D-F26, D-F62): the walk never reaches a
+// state where only some of them are on. Here Extra 2 (6) covers Extra 1's (5)
+// B with KC_NO, so the combo of A on Base and B needs Extra 1 on without
+// Extra 2, which no key gives, until an MO(5) does.
+const CUSTOM_KEY = (n) => 0x7f00 + n;
+for (const [name, key, extra] of [
+    ["a custom key whose shortcut turns on", CUSTOM_KEY(9), {shortcuts: {9: {layers: (1 << 5) | (1 << 6)}}}],
+    ["a pointing mode whose key turns on", PD_SLOT(1), {pdModes: [linked({linkTurnsOn: (1 << 5) | (1 << 6)})]}],
+]) {
+    test(`${name} several layers reaches them only together`, () => {
+        const combo = {inputs: [code(KC_A), code(KC_B)], output: code(KC_ESC), allowedLayers: 0xffff};
+        const keys = {"0:3": key, "5:1": KC_B, "6:1": NO, "6:2": KC_ESC, "5:2": KC_ESC};
+        assert.deepEqual(kinds(profile({keys, combos: [combo], ...extra})), ["unreachableCombo"], "never Extra 1 alone");
+        assert.deepEqual(kinds(profile({keys: {...keys, "0:4": MO(5)}, combos: [combo], ...extra})), [], "an MO(5) gives Extra 1 alone");
+        assert.deepEqual(kinds(profile({keys: {"0:3": key, "5:1": KC_B, "6:2": KC_ESC}, ...extra})), [], "both layers are reached");
+    });
+}
+
+test("a custom key's shortcut holds its layers like MO(), from the key, its empty hold tier, a hold step or a combo", () => {
+    const shortcuts = {9: {layers: 1 << 5}};
+    const keys = {"5:3": KC_B};
+    assert.deepEqual(kinds(profile({keys: {...keys, "0:0": CUSTOM_KEY(9)}})), ["unreachable"], "no shortcut, no layer");
+    assert.deepEqual(kinds(profile({keys: {...keys, "0:0": CUSTOM_KEY(9)}, shortcuts})), [], "the key holds Extra 1");
+    const custom = {kind: 7, flags: 0, operand: 9};
+    const tapOnly = {target: custom, allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: code(KC_ESC)}]};
+    assert.deepEqual(kinds(profile({keys: {...keys, "0:0": CUSTOM_KEY(9)}, rows: [tapOnly], shortcuts})), [], "an empty hold tier sends the shortcut");
+    const held = {...tapOnly, steps: [{tapIndex: 0, tap: code(KC_ESC), hold: {action: code(KC_B), style: 1}}]};
+    assert.deepEqual(kinds(profile({keys: {...keys, "0:0": CUSTOM_KEY(9)}, rows: [held], shortcuts})), ["unreachable"], "a hold of its own replaces it");
+    const step = {target: code(KC_ESC), allowedLayers: 0xffff, steps: [{tapIndex: 0, hold: {action: custom, style: 1}}]};
+    assert.deepEqual(kinds(profile({keys: {...keys, "0:0": KC_ESC}, rows: [step], shortcuts})), [], "another key's hold step");
+    const tapped = {...step, steps: [{tapIndex: 0, tap: custom}]};
+    assert.deepEqual(kinds(profile({keys: {...keys, "0:0": KC_ESC}, rows: [tapped], shortcuts})), ["unreachable"], "a tap turns them on only for the tap");
+    const combo = {inputs: [code(KC_A), code(KC_A)], output: custom, allowedLayers: 0xffff};
+    assert.deepEqual(kinds(profile({keys, combos: [combo], shortcuts})), [], "a combo whose output it is");
+});
+
+// A shortcut turns its layers on as its layer key does (firmware D-F26):
+// hold (0), lock (1), move to (2), tap-toggle (3), one-shot (4).
+const HOLD = 0, LOCK = 1, MOVE = 2, TAP_TOGGLE = 3, ONESHOT = 4;
+
+test("a custom key's lock, move and tap-toggle shortcuts can lock their layers, as TG(), TO() and TT() do", () => {
+    // The key's own place on Extra 1 is covered by B, so a lock of it has no
+    // way home; a hold or a one-shot lets go.
+    const keys = {"0:0": CUSTOM_KEY(9), "5:0": KC_B};
+    /** @param {number} layerKind */
+    const trapped = (layerKind) => traps(profile({keys, shortcuts: {9: {layers: 1 << 5, layerKind}}})).length;
+    assert.deepEqual([HOLD, LOCK, MOVE, TAP_TOGGLE, ONESHOT].map(trapped), [0, 1, 1, 1, 0]);
+    // A row with steps replaces the tap-toggle's own taps, as it does TT()'s.
+    const row = {target: {kind: 7, flags: 0, operand: 9}, allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: code(KC_ESC)}]};
+    assert.equal(traps(profile({keys, rows: [row], shortcuts: {9: {layers: 1 << 5, layerKind: TAP_TOGGLE}}})).length, 0);
+});
+
+test("a custom key's move shortcut locks its layers alone, letting the others go", () => {
+    // Numbers locks, its own TG(1) covered by B. On it, the custom key turns
+    // Extra 1 (5) on, where TG(5) lets Extra 1 go: moved, that is the way
+    // home; locked beside Numbers, it is not.
+    const keys = {"0:0": TG(1), "1:0": KC_B, "1:1": CUSTOM_KEY(9), "5:2": TG(5)};
+    assert.equal(traps(profile({keys, shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}})).length, 1, "locked beside Numbers");
+    assert.deepEqual(traps(profile({keys, shortcuts: {9: {layers: 1 << 5, layerKind: MOVE}}})), [], "moved: Numbers let go");
+});
+
+test("sent by a step or a combo, a shortcut's layers do what its kind does there", () => {
+    // Another key's tap step sends the custom key: a held or tap-toggle
+    // shortcut turns Extra 1 on only for the tap, a lock, a move or a one-shot
+    // reaches it.
+    const keys = {"0:0": KC_ESC, "5:3": KC_B};
+    const custom = {kind: 7, flags: 0, operand: 9};
+    const tapped = {target: code(KC_ESC), allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: custom}]};
+    /** @param {number} layerKind @param {object} extra */
+    const reached = (layerKind, extra) => !kinds(profile({keys, ...extra, shortcuts: {9: {layers: 1 << 5, layerKind}}})).includes("unreachable");
+    assert.deepEqual([HOLD, LOCK, MOVE, TAP_TOGGLE, ONESHOT].map((kind) => reached(kind, {rows: [tapped]})), [false, true, true, false, true], "a tap step");
+    // Held by a step that presses and holds, every kind reaches it.
+    const held = {...tapped, steps: [{tapIndex: 0, hold: {action: custom, style: 1}}]};
+    assert.deepEqual([HOLD, LOCK, MOVE, TAP_TOGGLE, ONESHOT].map((kind) => reached(kind, {rows: [held]})), [true, true, true, true, true], "a hold step");
+    // A combo whose output it is holds, locks or moves.
+    const combo = {inputs: [code(KC_A), code(KC_A)], output: custom, allowedLayers: 0xffff};
+    assert.deepEqual([HOLD, LOCK, MOVE, TAP_TOGGLE, ONESHOT].map((kind) => reached(kind, {keys: {"5:3": KC_B}, combos: [combo]})), [true, true, true, true, true], "a combo");
+    // Sent, a tap-toggle shortcut never locks: its taps are its own key's.
+    const lockFree = {"0:0": KC_ESC, "5:0": KC_B};
+    assert.deepEqual(traps(profile({keys: lockFree, rows: [held], shortcuts: {9: {layers: 1 << 5, layerKind: TAP_TOGGLE}}})), []);
+});
+
+test("a custom key with its own row sends its shortcut where the row leaves a tier empty, and a tap-toggle or one-shot holds from every press", () => {
+    const custom = {kind: 7, flags: 0, operand: 9};
+    const tapOnly = {target: custom, allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: code(KC_ESC)}]};
+    const both = {target: custom, allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: code(KC_ESC), hold: {action: code(KC_A), style: 1}}]};
+    // A lock whose row authors the tap still locks, from the empty hold tier:
+    // Extra 1 covers the key with B, so it is a trap.
+    const covered = {"0:0": CUSTOM_KEY(9), "5:0": KC_B};
+    const lockTrap = traps(profile({keys: covered, rows: [tapOnly], shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}}));
+    assert.equal(lockTrap.length, 1, "locked from the empty hold tier");
+    assert.match(JSON.stringify(lockTrap), /Hold CUSTOM_KEY_9/, "named by the hold that makes it");
+    assert.equal(traps(profile({keys: covered, rows: [tapOnly], shortcuts: {9: {layers: 1 << 5, layerKind: MOVE}}})).length, 1, "moved from it too");
+    // Both tiers authored at the first count: no way left but a later one.
+    assert.deepEqual(traps(profile({keys: covered, rows: [both], shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}})), [], "both tiers its own");
+    // The fallback hold belongs to the first press alone (firmware
+    // handled_key_resolution_uses_fallback_hold_behavior): a later count's
+    // empty hold holds nothing.
+    const later = {...both, steps: [...both.steps, {tapIndex: 1, tap: code(KC_ESC)}]};
+    assert.deepEqual(traps(profile({keys: covered, rows: [later], shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}})), [], "a later count's empty hold is no hold");
+    // A first press with a long hold but no hold has no fallback hold either.
+    const longOnly = {target: custom, allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: code(KC_ESC), longHold: {action: code(KC_A), style: 1}}]};
+    assert.deepEqual(traps(profile({keys: covered, rows: [longOnly], shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}})), [], "a long hold, no hold: no lock");
+    // A held shortcut is held from the empty hold tier, and from nowhere when
+    // the first press has a long hold: then its layer is unreachable.
+    const holdKeys = {"0:0": CUSTOM_KEY(9), "5:3": KC_B};
+    /** @param {object} row */
+    const holdReached = (row) => !kinds(profile({keys: holdKeys, rows: [row], shortcuts: {9: {layers: 1 << 5, layerKind: HOLD}}})).includes("unreachable");
+    assert.deepEqual([tapOnly, longOnly, later].map(holdReached), [true, false, false], "Hold: an empty first hold, a long hold, both tiers authored");
+    // A tap-toggle or one-shot key holds its layers from every press, its
+    // row's tiers authored or not; a held one does not.
+    const keys = {"0:0": CUSTOM_KEY(9), "5:3": KC_B};
+    /** @param {number} layerKind */
+    const reached = (layerKind) => !kinds(profile({keys, rows: [both], shortcuts: {9: {layers: 1 << 5, layerKind}}})).includes("unreachable");
+    assert.deepEqual([HOLD, TAP_TOGGLE, ONESHOT].map(reached), [false, true, true]);
+    // A row with steps replaces the tap-toggle's own taps: no lock, no trap.
+    assert.deepEqual(traps(profile({keys: covered, rows: [both], shortcuts: {9: {layers: 1 << 5, layerKind: TAP_TOGGLE}}})), []);
 });

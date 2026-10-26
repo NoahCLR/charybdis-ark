@@ -11,7 +11,14 @@
 // (a basic keycode, alone or with modifiers) taps itself; LT() taps its key,
 // MT() taps its key and OSM() arms its one-shot. A custom key with a shortcut
 // (firmware D-F26) is a plain key whose own action is that shortcut: it taps
-// it, and holds it as a fallback.
+// it, and holds it as a fallback. One whose shortcut's layers are Tap-toggle
+// or One-shot is a momentary layer key instead, as TT() and OSL() are: it
+// holds its shortcut from every press (`fromPress`, no fallback), and its own
+// tap is left only what it does to the layers: One-shot's arms them, and
+// Tap-toggle's does nothing until its TAPPING_TOGGLE-th tap, which a row with
+// steps replaces, so it has no tap of its own. (Under an authored first-press
+// hold the keyboard does tap a Tap-toggle shortcut's keys from an empty tap;
+// the grid, one built-in tap per row, leaves that cell empty.)
 //
 // The built-in hold belongs to the first press. LT() holds its layer and MT()
 // and OSM() their modifiers, whatever else the row authors. A plain key's hold
@@ -37,20 +44,23 @@
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
+const {SHORTCUT_LAYER_KINDS, shortcutPresent} = require("../schema/settings-domain-v1");
 
 /** @param {number} code @param {number} start @param {number} end */
 const within = (code, start, end) => code >= start && code <= end;
 /** @param {number} code */
 const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
 
-/** @typedef {{customKeyShortcuts?: readonly {mods: number, key: number}[]}} BuiltInFeatures */
+/** @typedef {{customKeyShortcuts?: readonly {mods: number, key: number, layers: number, layerKind: number}[]}} BuiltInFeatures */
 /** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean}} */
 function builtInActions(target, {customKeyShortcuts = []} = {}) {
     const slot = target?.kind === ACTION.CUSTOM_KEY ? target.operand : target?.kind === ACTION.QMK_KEYCODE ? customKeyOfCode(target.operand) : undefined;
     if (slot !== undefined) {
         const shortcut = customKeyShortcuts[slot];
-        if (!shortcut || !(shortcut.mods || shortcut.key)) return {releaseTaps: true};
+        if (!shortcutPresent(shortcut)) return {releaseTaps: true};
         const own = {kind: ACTION.CUSTOM_KEY, operand: slot};
+        if (shortcut.layers && shortcut.layerKind === SHORTCUT_LAYER_KINDS.ONESHOT) return {tap: own, hold: own, fromPress: true};
+        if (shortcut.layers && shortcut.layerKind === SHORTCUT_LAYER_KINDS.TAP_TOGGLE) return {hold: own, fromPress: true};
         return {tap: own, hold: own, fallback: true, releaseTaps: true};
     }
     if (target?.kind === ACTION.MACRO) return {releaseTaps: true};

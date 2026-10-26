@@ -48,7 +48,7 @@ test("a behaviour step that sends a custom key without a shortcut is flagged, an
         {tapIndex: 0, tap: customKey(3), hold: {style: 0, repeatHz: 0, action: customKey(5)}},
         {tapIndex: 1, longHold: {style: 0, repeatHz: 0, action: customKey(3)}},
     ]}];
-    decoded.settings.customKeyShortcuts[5] = {mods: 0, key: 0xd1};
+    decoded.settings.customKeyShortcuts[5] = {mods: 0, key: 0xd1, layers: 0, layerKind: 0};
     decoded.settings.customKeyNames[3] = "";
     const flagged = profileFindings(decoded, {}).filter(row => row.kind === "shortcutlessCustomKeyStep");
     assert.deepEqual(flagged.map(row => [row.level, row.title]), [
@@ -59,6 +59,8 @@ test("a behaviour step that sends a custom key without a shortcut is flagged, an
     assert.equal(profileFindings(decoded, {}).find(row => row.kind === "shortcutlessCustomKeyStep")?.title,
         "KC_A: press 1 tap sends custom key “Hyper”, which has no shortcut", "the custom key by its name");
     assert.deepEqual(flagged[0].place, {kind: "behaviour", keycode: "KC_A"});
-    decoded.settings.customKeyShortcuts[3] = {mods: 0x0f, key: 0};
+    decoded.settings.customKeyShortcuts[3] = {mods: 0x0f, key: 0, layers: 0, layerKind: 0};
     assert.ok(!profileFindings(decoded, {}).some(row => row.kind === "shortcutlessCustomKeyStep"), "modifiers alone are a shortcut");
+    decoded.settings.customKeyShortcuts[3] = {mods: 0, key: 0, layers: 1 << 3, layerKind: 0};
+    assert.ok(!profileFindings(decoded, {}).some(row => row.kind === "shortcutlessCustomKeyStep"), "so are layers alone (firmware D-F26)");
 });

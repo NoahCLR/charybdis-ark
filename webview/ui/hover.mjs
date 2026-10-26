@@ -6,14 +6,14 @@
 import {el, esc} from "../lib/dom.mjs";
 import {actionNaming, behaviourFor, canonicalKeycode, dualRole, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
 import {comboBehaviours, comboInputIsKey, combosAt, combosShownAt} from "../view/combo-reach.mjs";
-import {customKeyHeadline, customKeyOf, customKeyShortcutOnly} from "../view/custom-key.mjs";
+import {customKeyHeadline, customKeyOf, customKeyShortcutOnly, hasShortcut, shortcutLayerList, shortcutLayerTag, shortcutLayerUnder, shortcutWhen} from "../view/custom-key.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
 import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds, styleDetail} from "../view/behavior-editor.mjs";
 import {behaviourRuns} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, macroSteps, marked, sends, sendsKind, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, layerTagged, macroSteps, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {styleWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {KIND} from "../view/pointing-config.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
@@ -172,6 +172,7 @@ function reachSections(model, layer, position, index,
         ? behaviourRuns(model, layer?.index ?? 0, /** @type {{row: number, column: number}} */ (/** @type {unknown} */ (position)), behaviour)
         : {runs: Boolean(behaviour), reasons: []};
     const runs = use.runs;
+    if (custom && hasShortcut(custom)) sections.push(shortcutSection(model, custom));
     if (role) {
         // A row that does not run is ignored, its own threshold with it: the
         // key waits its default, the dual-role threshold.
@@ -250,6 +251,22 @@ function reachSections(model, layer, position, index,
         }).join("")}</div>`);
     }
     return sections;
+}
+
+// A custom key's shortcut as the behaviour rows draw what they send: its
+// keys, then each layer it turns on, by mark and name, tagged with how it
+// turns them on (firmware D-F26).
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").CustomKey} custom */
+function shortcutSection(model, custom) {
+    const keys = custom.shortcutKeys || [];
+    const layers = shortcutLayerList(custom);
+    const rows = [];
+    if (keys.length) rows.push(`<div class="hc-act"><span class="hc-stage">Sends</span>
+        <span class="hc-keys">${keys.map((part) => `<span class="hc-key">${esc(part)}</span>`).join('<span class="hc-life">+</span>')}</span></div>`);
+    if (layers.length) rows.push(`<div class="hc-act"><span class="hc-stage">Layers</span>
+        <span class="hc-layers">${layers.map((at) => layerTagged(model, at, layerName(model?.layers?.[at]) || `Layer ${at}`, [shortcutLayerTag(model, custom)])).join("")}
+        ${under(shortcutLayerUnder(custom))}</span></div>`);
+    return `<div class="hc-sect"><div class="hc-h">Shortcut</div><div class="hc-sub">${esc(shortcutWhen(custom))}</div>${rows.join("")}</div>`;
 }
 
 // The custom key a keycode is, under any of its names or the bare hex a

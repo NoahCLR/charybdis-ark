@@ -8,6 +8,7 @@ const {gestureTimingFindings} = require("./gesture-timing");
 const {inertBehaviorFindings} = require("./inert-behaviors");
 const {layerReach, compareFindings} = require("./layer-reach");
 const {baseLighting} = require("./settings-editor");
+const {shortcutPresent} = require("../schema/settings-domain-v1");
 const {decodeMacroPayload} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {inspectMacroPlayback} = require("./macro-input");
@@ -30,7 +31,7 @@ function shortcutlessCustomKeySteps(decoded) {
         for (const step of row.steps) for (const [tier, action] of /** @type {const} */ ([["tap", step.tap], ["hold", step.hold?.action], ["long", step.longHold?.action]])) {
             if (action?.kind !== ACTION.CUSTOM_KEY) continue;
             const shortcut = shortcuts[action.operand];
-            if (shortcut && (shortcut.mods || shortcut.key)) continue;
+            if (shortcutPresent(shortcut)) continue;
             // The custom key as the Custom keys screen calls it.
             const name = names[action.operand] ? `custom key “${names[action.operand]}”` : `custom key ${action.operand}`;
             findings.push({kind: "shortcutlessCustomKeyStep", level: "warning", layers: [], identity: `${keycode}:${step.tapIndex}:${tier}:${action.operand}`,

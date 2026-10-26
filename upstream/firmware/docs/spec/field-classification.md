@@ -25,7 +25,7 @@ Profile data cannot introduce a capability the build lacks: a profile may
 switch off a lighting stage the build compiled, never switch on one it did not
 ([lighting](rgb-domain-v1.md)). A ceiling bounds live values and cannot be
 raised live. The compiled defaults hold every authored profile-data value
-(D-F12, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0012-one-complete-compiled-profile.md)); a profile that
+(D-F12, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0012-one-complete-compiled-profile.md)); a profile that
 omits a domain runs the compiled defaults' domain.
 
 Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, `folded_keyboard_profile_test.py`), `tests/fixtures/compiled_profile_pd_v2.fixture`, `tests/fixtures/folded_keyboard_profile.json`.
@@ -37,16 +37,16 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 | `keymaps[][][]` | profile data | keymap `0x60`, every layer of the bank |
 | `layer_names[]` | profile data | settings `0x40`, layer names 0–15 |
 | `CUSTOM_KEYS`: each row's name | profile data | settings `0x40`, custom-key names |
-| `CUSTOM_KEYS`: a `SHORTCUT` row's modifiers and key | profile data | settings `0x40`, custom-key shortcuts (D-F26, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0026-custom-key-carries-a-shortcut.md)) |
+| `CUSTOM_KEYS`: a `SHORTCUT` row's modifiers, key, layers and layer kind | profile data | settings `0x40`, custom-key shortcuts (D-F26, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0026-custom-key-carries-a-shortcut.md)) |
 | `MACROS`: each row's payload | profile data | macros `0x70`; generated in the bank encoding as `authored_macro_bank.h` |
-| `MACROS`: each row's name | profile data | settings `0x40`, macro names (D-F43, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0043-macros-have-names-user-macros-retired.md)) |
+| `MACROS`: each row's name | profile data | settings `0x40`, macro names (D-F43, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0043-macros-have-names-user-macros-retired.md)) |
 | `COMBOS`: each row's inputs and output | profile data | combos `0x30`, a row |
 | `COMBOS`: `COMBO_WINDOW`'s window; a `COMBO` row follows the default window | profile data | combos `0x30`, the row's window (`0` follows the default) |
 | `key_behaviors[]`: `.keycode` | profile data | key behaviours `0x20`, the row's target |
 | `key_behaviors[]`: `.tap_hold_term`, `.longer_hold_term`, `.multi_tap_term` | profile data | the row's thresholds (`0` follows the settings) |
 | `key_behaviors[]`: `.keeps_auto_mouse_anchored` | profile data | the row's flag bit 0 |
 | `key_behaviors[]`: `tap_counts[]` tap, hold and long hold, their hold style and repeat rate | profile data | the row's steps |
-| The 128 custom-key slots, the 128 macro slots, the userspace keycode blocks | ceiling | the action-ABI digest ([blob and digests](profile-wire-v1/blob-and-digests.md#action-abi-digest)); D-F51, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md) |
+| The 128 custom-key slots, the 128 macro slots, the userspace keycode blocks | ceiling | the action-ABI digest ([blob and digests](profile-wire-v1/blob-and-digests.md#action-abi-digest)); D-F51, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md) |
 | `LAYER_*`, `MACRO_n`, `CUSTOM_KEY_n` names in C | source-only | the profile stores numbers |
 
 The compiled defaults enable every authored behaviour and combo on every
@@ -93,7 +93,7 @@ Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_valida
 
 | Authored | Class | Where it lives |
 | --- | --- | --- |
-| `NOAH_LAYER_BANK_COUNT` (16) | ceiling | the layer bank (D-F14, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0014-bigger-profiles.md)); part of the action-ABI digest |
+| `NOAH_LAYER_BANK_COUNT` (16) | ceiling | the layer bank (D-F14, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0014-bigger-profiles.md)); part of the action-ABI digest |
 | `TAPPING_TERM` | profile data | settings scalar 0; the combo domain's hold threshold default |
 | `COMBO_TERM` | profile data | the combo domain's default window |
 | `CUSTOM_TAP_HOLD_TERM`, `CUSTOM_LONGER_HOLD_TERM`, `CUSTOM_MULTI_TAP_TERM` | profile data | settings scalars 1–3 |
@@ -107,14 +107,14 @@ Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_valida
 | `AUTO_MOUSE_DEFAULT_LAYER`, `AUTO_MOUSE_TIME` | profile data | settings scalars 5 and 6 |
 | `AUTO_MOUSE_DELAY`, `AUTO_MOUSE_THRESHOLD` | profile data | settings scalars 25 and 26; the keymap redefines both to read them |
 | `RGB_MATRIX_DEFAULT_MODE`, `_HUE`, `_SAT`, `_VAL`, `_SPD` | profile data | settings scalars 21 and 22 |
-| `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | ceiling | QMK clamps brightness to it; GET `0x08` page 1 reports it (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0038-keyboard-reports-its-brightness-limit.md)) |
+| `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | ceiling | QMK clamps brightness to it; GET `0x08` page 1 reports it (D-F38, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0038-keyboard-reports-its-brightness-limit.md)) |
 | `RGB_MATRIX_LED_FLUSH_LIMIT` | ceiling | the shortest interval between LED updates, and the auto-mouse fade's step |
 | `NOAH_RGB_IDLE_TIMEOUT_MS` | profile data | settings scalar 17; QMK's `RGB_MATRIX_TIMEOUT` is `0` in builds that save |
 | `RGB_POINTING_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`, `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE` | capability | the lighting stages the build compiles |
 | `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` | profile data | settings scalar 15 |
 | `AUTOMOUSE_RGB_DEAD_TIME` | profile data | settings scalar 16 |
 | `NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`, `NOAH_DEFAULT_UNICODE_PLAYBACK`, `NOAH_DEFAULT_MACOS_ISO` | profile data | settings scalar 27 |
-| `NOAH_KEYBOARD_NAME` | profile data | settings `0x40`, the keyboard name (D-F25, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0025-keyboard-name-is-usb-product-string.md)) |
+| `NOAH_KEYBOARD_NAME` | profile data | settings `0x40`, the keyboard name (D-F25, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0025-keyboard-name-is-usb-product-string.md)) |
 
 Settings no authored macro sets take the fixed compiled defaults the
 [settings domain](profile-wire-v1/settings-domain.md#scalars) lists: QMK's
@@ -129,11 +129,11 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 | --- | --- | --- |
 | `noah_pd_defaults[]`: each slot's name, movement, pointer-layer policy, axis, DPI, held modifiers, thresholds, directional outputs, link, scroll tuning | profile data | pointing `0x50`; a disabled slot without a name is not stored |
 | `NOAH_DRAGSCROLL_*` in `users/noah/config.h`, the thresholds in `pointing_mode_defaults.h` | profile data | the scrolling and directional slots' fields, through `noah_pd_defaults[]` |
-| The 32 pointing slots | ceiling | part of the action-ABI digest (D-F09, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md)) |
+| The 32 pointing slots | ceiling | part of the action-ABI digest (D-F09, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md)) |
 | The scrolling and directional movement code, its per-scan output limits | capability | |
 
 Keys reach a slot by its number, so a slot keeps its keys when its mode
-changes (D-F50, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/2a24114edc1f076ff7161e5308c86530a7020c85/docs/adr/0050-pointing-keycodes-name-slots.md)).
+changes (D-F50, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0050-pointing-keycodes-name-slots.md)).
 
 Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled pointing domain equals the `presets` vector), `tests/fixtures/pd_mode_domain_v4.json`.
 

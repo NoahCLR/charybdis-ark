@@ -60,11 +60,11 @@ released with it (D-L44, D-L50).
 | What | Current | Where |
 | --- | --- | --- |
 | Profile Wire | 2.0, exactly | `PROFILE_WIRE_V1` in `protocol/profile-wire-v1.js` |
-| Profile schema | 4.1, exactly | `PROFILE_BLOB_V1` in `schema/profile-blob-v1.js` |
-| Domain versions | RGB 4, key behaviours 2, combos 3, settings 9, PD 4, keymap 1, macros 1 | `schema/profile-domains.js` |
+| Profile schema | 4.2, exactly | `PROFILE_BLOB_V1` in `schema/profile-blob-v1.js` |
+| Domain versions | RGB 4, key behaviours 2, combos 3, settings 10, PD 4, keymap 1, macros 1 | `schema/profile-domains.js` |
 | Store format | 6 (implied by Profile Wire 2, not on the wire) | `PROFILE_CANDIDATE_V1` in `protocol/profile-candidate-v1.js` |
 | Profile size | 130,048 bytes; lengths and offsets 32 bits | `PROFILE_CANDIDATE_V1`, `PROFILE_BLOB_V1` |
-| Action vocabulary | `0x7fecec81` | `ACTION_ABI` in `schema/actions.js` |
+| Action vocabulary | `0xb4a15f12` | `ACTION_ABI` in `schema/actions.js` |
 | Feature word | split, saves, pointing (bits 0–2) | `PROFILE_WIRE_FEATURES` in `protocol/profile-wire-v1.js` |
 | Backup | version 5; 196,608-byte file limit | `DOCUMENT_VERSION`, `FILE_MAX_BYTES` in `model/portable-profile.js` |
 

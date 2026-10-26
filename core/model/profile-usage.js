@@ -18,6 +18,7 @@
 const {decodedOf} = require("./portable-profile");
 const {profileMacroBudget} = require("./macro-editor");
 const {PROFILE_ACTION_KINDS: ACTION, PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
+const {shortcutPresent} = require("../schema/settings-domain-v1");
 
 /** @param {number | undefined} value @returns {value is number} */
 const positive = value => typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -56,7 +57,7 @@ function profileUsage(snapshot, capabilities) {
     // the Custom keys screen marks its tile; a pointing slot once it has a mode.
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     const customKeys = settings.customKeyNames.filter((name, slot) =>
-        name || settings.customKeyShortcuts[slot].mods || settings.customKeyShortcuts[slot].key || behaved.has(slot)).length;
+        name || shortcutPresent(settings.customKeyShortcuts[slot]) || behaved.has(slot)).length;
     // A macro slot is in use once it has steps; the rest are free unless the
     // macro memory has no room left for them.
     const macros = profileMacroBudget(decoded, capabilities);

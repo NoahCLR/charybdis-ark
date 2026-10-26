@@ -17,7 +17,7 @@ const keycodeLegacy = require("../data/keycode-legacy");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings, holdTermSetting} = require("../model/gesture-timing");
 const {timingAlone} = require("../model/inert-behaviors");
-const {compactKeyLabels, hostKeyVocabulary, keyLabel, keyLayer, profileKeyNames, shortcutLabel} = require("../model/key-names");
+const {compactKeyLabels, hostKeyVocabulary, keyLabel, keyLayer, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
@@ -143,14 +143,15 @@ function configurationModel(content, capabilities, editing) {
         const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
         if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
     }
-    // So is each custom key, under its name, its tip naming the shortcut it
-    // sends.
-    const customKeys = (content.customKeyView?.keys || []).map(key => ({...key, shortcutLabel: shortcutLabel(names, key.shortcut)}));
+    // So is each custom key, under its name, its tip saying what its shortcut
+    // does.
+    const customKeys = (content.customKeyView?.keys || []).map(key => ({...key, shortcutLabel: shortcutLabel(names, key.shortcut), shortcutKeys: shortcutKeys(names, key.shortcut), shortcutLayerNames: shortcutLayerNames(names, key.shortcut)}));
     for (const {name, native, code, label} of names.custom) {
         const entry = catalog.entries.find(entry => entry.keycode === code);
-        const sends = customKeys.find(key => key.code === code)?.shortcutLabel;
+        const shortcut = customKeys.find(key => key.code === code)?.shortcut;
+        const does = shortcutAct(names, shortcut);
         const presentation = {value: name, key: name, label, group: "Custom keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase(),
-            tip: sends ? `${label} · sends ${sends}` : `${label} · no shortcut`};
+            tip: does ? `${label} · ${does}` : `${label} · no shortcut`};
         if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
     }
     // Every keycode the profile holds is in the table by its name here, so the
@@ -232,6 +233,8 @@ function configurationModel(content, capabilities, editing) {
         customKeys,
         customKeyNameSpace: content.customKeyView?.names || null,
         customKeyShortcutKeys: content.customKeyView?.shortcutKeys ? [...content.customKeyView.shortcutKeys] : [],
+        // Every layer with why a shortcut cannot turn it on (shortcut-layers.js).
+        customKeyShortcutLayers: content.customKeyView?.shortcutLayers ? content.customKeyView.shortcutLayers.map(target => ({...target})) : [],
         customKeyEditing: {identity: content.customKeyView?.identity || "", writable: editing.customKeys},
         // The keyboard's own name, edited on Settings with the other settings.
         keyboardName: content.keyboardNameView || null,
@@ -360,10 +363,10 @@ function behaviorDefaults(content, capabilities, aliases, names) {
     return Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
         const target = keycodeAction(code);
         const name = keycodeCatalog.resolve(code).name;
-        const timing = effectiveTimings({target}, values);
+        const timing = effectiveTimings({target}, values, features.customKeyShortcuts);
         // Where each default comes from, named for the editor's placeholders.
         // A key follows the same one with or without a row (firmware D-F27).
-        const source = holdTermSetting(target) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
+        const source = holdTermSetting(target, features.customKeyShortcuts) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
         return [aliases[name] || name, {builtIn: builtInForView(target, features, names),
             timing: {tapHoldTerm: timing.hold, longHoldTerm: timing.long, multiTapTerm: timing.repeat},
             timingSources: {tapHoldTerm: source, longHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},

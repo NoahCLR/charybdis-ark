@@ -4,7 +4,7 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {validHostSetting} = require("./host-settings");
 const {canonical} = require("./bytes");
-// Settings domain 0x40, version 9, the only one the keyboard stores (firmware
+// Settings domain 0x40, version 10, the only one the keyboard stores (firmware
 // D-F14, D-F26): 31 values, sixteen layer records, 128 custom-key shortcuts,
 // then 273 counted names — sixteen
 // layer names, 128 macro names, 128 custom-key names and the keyboard's
@@ -18,10 +18,16 @@ const {canonical} = require("./bytes");
 // (participation-policy.md). Decoded, each bitmap is the sorted list of its
 // set positions (row × columns + column).
 //
-// A custom-key shortcut is two bytes, custom key 0 first: the modifier mask in
-// HID report order (bit 0 Left Ctrl … bit 7 Right GUI, any combination), then
-// the key: none, a basic key or a mouse button (SHORTCUT_KEYS). Both zero is no
-// shortcut; modifiers alone and a key alone are both shortcuts.
+// A custom-key shortcut is five bytes, custom key 0 first: the modifier mask in
+// HID report order (bit 0 Left Ctrl … bit 7 Right GUI, any combination), the
+// key: none, a basic key or a mouse button (SHORTCUT_KEYS), the layers it
+// turns on, a 16-bit mask, little-endian, then how it turns them on, as the
+// layer keys do (SHORTCUT_LAYER_KINDS): hold, lock, move to, tap-toggle or
+// one-shot, all its layers alike. All zero is no shortcut; any part alone is a
+// shortcut, and a kind other than hold needs layers. The base layer and the
+// default layers are always on, so a shortcut never names them; the domain
+// states the default layers itself, so both directions are refused here, as
+// the firmware does.
 const {NAME_MAX_BYTES, validName, nameOfBytes, encodeName} = require("./profile-name");
 
 /** @param {string} message */
@@ -74,7 +80,7 @@ const STORED = /** @type {const} */ ([
 const SCALARS_OFFSET = 8, PLACEMENT_BYTES = 8, LAYER_RECORD_SIZE = 1 + 2 * PLACEMENT_BYTES;
 const LAYER_RECORDS_OFFSET = SCALARS_OFFSET + STORED.length * 4;
 const MACRO_NAMES = 128, CUSTOM_KEY_NAMES = 128, KEYBOARD_NAMES = 1, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES + KEYBOARD_NAMES;
-const CUSTOM_KEY_SHORTCUTS = 128, SHORTCUT_SIZE = 2;
+const CUSTOM_KEY_SHORTCUTS = 128, SHORTCUT_SIZE = 5;
 const SHORTCUTS_OFFSET = LAYER_RECORDS_OFFSET + LAYERS * LAYER_RECORD_SIZE;
 const FIXED_SIZE = SHORTCUTS_OFFSET + CUSTOM_KEY_SHORTCUTS * SHORTCUT_SIZE;
 const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS], COUNT: STORED.length, LAYERS, MACRO_NAMES, CUSTOM_KEY_NAMES, CUSTOM_KEY_SHORTCUTS,
@@ -83,13 +89,30 @@ const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_
 // The keys a shortcut may hold (firmware D-F26): none, the basic keyboard
 // usages KC_A..KC_EXSEL, or mouse buttons 1-8. Modifiers belong in the mask.
 const SHORTCUT_KEYS = Object.freeze({BASIC_MIN: 0x04, BASIC_MAX: 0xa4, MOUSE_MIN: 0xd1, MOUSE_MAX: 0xd8});
+// How a shortcut turns its layers on (firmware D-F26), as MO(), TG(), TO(),
+// TT() and OSL() turn one on: held while the key is; a lock of them all, or
+// off again when all are locked; locked alone, every other lock released;
+// held, its own tapping-toggle-th tap locking them; held, a tap turning them
+// on for the next key press.
+const SHORTCUT_LAYER_KINDS = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
+/** @param {unknown} kind @param {number} layers */
+const validLayerKind = (kind, layers) => Number.isInteger(kind) && /** @type {number} */ (kind) >= SHORTCUT_LAYER_KINDS.HOLD && /** @type {number} */ (kind) <= SHORTCUT_LAYER_KINDS.ONESHOT && (layers !== 0 || kind === SHORTCUT_LAYER_KINDS.HOLD);
 /** @param {unknown} key */
 const validShortcutKey = key => Number.isInteger(key) && (key === 0 || (/** @type {number} */ (key) >= SHORTCUT_KEYS.BASIC_MIN && /** @type {number} */ (key) <= SHORTCUT_KEYS.BASIC_MAX)
     || (/** @type {number} */ (key) >= SHORTCUT_KEYS.MOUSE_MIN && /** @type {number} */ (key) <= SHORTCUT_KEYS.MOUSE_MAX));
 /** @param {unknown} shortcut @returns {shortcut is import("./types.js").CustomKeyShortcut} */
 const validShortcut = shortcut => typeof shortcut === "object" && shortcut !== null
     && Number.isInteger(/** @type {any} */ (shortcut).mods) && /** @type {any} */ (shortcut).mods >= 0 && /** @type {any} */ (shortcut).mods <= 0xff
-    && validShortcutKey(/** @type {any} */ (shortcut).key);
+    && validShortcutKey(/** @type {any} */ (shortcut).key)
+    && Number.isInteger(/** @type {any} */ (shortcut).layers) && /** @type {any} */ (shortcut).layers >= 0 && /** @type {any} */ (shortcut).layers <= 0xffff && !(/** @type {any} */ (shortcut).layers & 1)
+    && validLayerKind(/** @type {any} */ (shortcut).layerKind, /** @type {any} */ (shortcut).layers);
+// Whether a custom key has a shortcut: any part of it, layers alone included.
+/** @param {{mods?: number, key?: number, layers?: number} | null | undefined} shortcut */
+const shortcutPresent = shortcut => Boolean(shortcut && (shortcut.mods || shortcut.key || shortcut.layers));
+// The layers always on, which no shortcut may name: the base layer and the
+// default layers (scalar 23).
+/** @param {readonly number[]} values */
+const alwaysOnLayers = values => ((values[SETTING.DEFAULT_LAYERS] | 1) & 0xffff) >>> 0;
 const MATRIX_POSITIONS = MATRIX_KEYS;
 const SETTINGS_HEADER_FLAGS = Object.freeze({OFFSET: 5, COMBO_OUTPUT_BYPASS: 1, KNOWN: 1});
 const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, SETTINGS.CUSTOM_KEY_SHORTCUTS, 0]);
@@ -145,7 +168,9 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     if (!Array.isArray(value.customKeyNames) || value.customKeyNames.length !== SETTINGS.CUSTOM_KEY_NAMES) throw fail("Missing custom key names.");
     if (typeof value.keyboardName !== "string") throw fail("Missing keyboard name.");
     if (!Array.isArray(value.customKeyShortcuts) || value.customKeyShortcuts.length !== SETTINGS.CUSTOM_KEY_SHORTCUTS) throw fail("Missing custom key shortcuts.");
-    if (!value.customKeyShortcuts.every(validShortcut)) throw fail("A custom key shortcut holds modifiers and one plain key or mouse button.");
+    if (!value.customKeyShortcuts.every(validShortcut)) throw fail("A custom key shortcut holds modifiers, one plain key or mouse button, and layers other than the base, turned on as one layer key does.");
+    const named = value.customKeyShortcuts.findIndex(shortcut => shortcut.layers & alwaysOnLayers(value.values));
+    if (named >= 0) throw fail(`Custom key ${named}'s shortcut turns on a default layer, which is always on.`);
     const fixed = Buffer.alloc(SETTINGS.FIXED_SIZE);
     HEADER.copy(fixed);
     if (value.comboOutputBehaviors !== undefined && typeof value.comboOutputBehaviors !== "boolean") throw fail("Combo output behaviour permission must be on or off.");
@@ -158,9 +183,12 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
         bitmapOfPositions(record.bypass, positions).copy(fixed, at + 1);
         bitmapOfPositions(record.exclude, positions).copy(fixed, at + 1 + SETTINGS.PLACEMENT_BYTES);
     });
-    value.customKeyShortcuts.forEach(({mods, key}, slot) => {
-        fixed[SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE] = mods;
-        fixed[SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE + 1] = key;
+    value.customKeyShortcuts.forEach(({mods, key, layers, layerKind}, slot) => {
+        const at = SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE;
+        fixed[at] = mods;
+        fixed[at + 1] = key;
+        fixed.writeUInt16LE(layers, at + 2);
+        fixed[at + 4] = layerKind;
     });
     /** @param {string} name @param {string} what */
     const record = (name, what) => {
@@ -181,7 +209,11 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const customKeyShortcuts = Array.from({length: SETTINGS.CUSTOM_KEY_SHORTCUTS}, (_, slot) => {
         const at = SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE;
         if (!validShortcutKey(bytes[at + 1])) throw fail("A custom key shortcut names a key it cannot hold.");
-        return {mods: bytes[at], key: bytes[at + 1]};
+        const layers = bytes.readUInt16LE(at + 2);
+        if (layers & alwaysOnLayers(values)) throw fail(`Custom key ${slot}'s shortcut turns on a layer that is always on.`);
+        const layerKind = bytes[at + 4];
+        if (!validLayerKind(layerKind, layers)) throw fail(`Custom key ${slot}'s shortcut turns its layers on in no way the keyboard knows.`);
+        return {mods: bytes[at], key: bytes[at + 1], layers, layerKind};
     });
     let offset = SETTINGS.FIXED_SIZE;
     const nameRecord = () => {
@@ -201,4 +233,4 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, customKeyShortcuts, keyboardName, formatVersion: SETTINGS.VERSION};
     return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
 }
-module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SHORTCUT_KEYS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, validShortcut, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, validShortcut, shortcutPresent, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};

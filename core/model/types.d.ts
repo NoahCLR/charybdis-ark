@@ -110,7 +110,7 @@ export type LayerCondition = boolean | {
     any?: LayerCondition[];
     not?: LayerCondition;
 };
-export interface LayerTransition {kind: string; layer: number; when: LayerCondition}
+export interface LayerTransition {kind: string; layer: number; layers?: number; when: LayerCondition}
 export interface LayerAnalysisLimits {nodes?: number; work?: number}
 export interface LayerAnalysisInput<T extends LayerTransition> {
     always?: number;
@@ -125,7 +125,7 @@ export interface LayerReachProof<T extends LayerTransition> {
     effects: T[];
     witnesses: Set<number>;
 }
-export type LayerPathEffect<T extends LayerTransition> = T | {kind: 'release'; layer: number; when: true; from?: undefined; how?: undefined};
+export type LayerPathEffect<T extends LayerTransition> = T | {kind: 'release'; layer: number; layers?: number; when: true; from?: undefined; how?: undefined};
 export type LayerAnalysisResult<T extends LayerTransition> =
     | (LayerReachProof<T> & {
         complete: true;
@@ -156,15 +156,22 @@ export type LayerAnalysisResult<T extends LayerTransition> =
 
 export interface LayerEffect {
     kind: 'hold' | 'lock' | 'move' | 'unowned';
+    /** The layer it acts on, or the lowest of `layers`. */
     layer: number;
+    /** Every layer it acts on at once, for a key that turns several on (firmware D-F26, D-F62); `layer` alone without it. */
+    layers?: number;
     taps?: number;
     oneShot?: boolean;
-    /** The pointing mode whose key turns the layer on, by its name (firmware D-F62). */
+    /** The pointing mode whose key turns the layers on, by its name (firmware D-F62). */
     mode?: string;
+    /** A custom key's shortcut turns the layers on (firmware D-F26). */
+    shortcut?: boolean;
+    /** On from every press of its own key, whatever the key's row: a tap-toggle or one-shot shortcut, as TT() and OSL() are. */
+    fromPress?: boolean;
 }
 export interface LayerEffectSource {layer?: number; layoutIndex?: number; code?: number; combo?: number; trackball?: boolean}
 export interface OfferedLayerEffect extends LayerEffect {how: string; note?: string; from: LayerEffectSource}
-export type WalkLayerEffect = OfferedLayerEffect | {kind: 'release'; layer: number; from?: undefined; how?: undefined};
+export type WalkLayerEffect = OfferedLayerEffect | {kind: 'release'; layer: number; layers?: number; from?: undefined; how?: undefined};
 export interface BoundedLayerWalk {
     complete: boolean;
     cache: Map<number, OfferedLayerEffect[]>;

@@ -9,7 +9,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {scrollContentTo} from "../../lib/scroll.mjs";
 import {actionLabel, canonicalKeycode, visibleKeycode} from "../../view/keyface.mjs";
-import {customKeyOf, customKeySendsNote, hasShortcut, shortcutPickLabel} from "../../view/custom-key.mjs";
+import {customKeyOf, customKeySendsNote, customKeyShortcutOnly, hasShortcut, shortcutPickLabel} from "../../view/custom-key.mjs";
 import {comboInputShown} from "../../view/combo-reach.mjs";
 import {closeComboBuilder, getModel, heldLayers, layerName, layers, post, render, state} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
@@ -196,5 +196,5 @@ function bypassedOutput(model, output, made) {
     if (made) return `This custom key sends its shortcut, ${shortcutPickLabel(model, made.shortcut)}.`;
     const key = customKeyOf(model, canonicalKeycode(model, output));
     if (!key) return "A custom key sends its shortcut, or nothing if it has none.";
-    return hasShortcut(key) ? `This custom key sends its shortcut, ${key.shortcutLabel}.` : "This custom key has no shortcut, so it sends nothing.";
+    return hasShortcut(key) ? `This custom key ${customKeyShortcutOnly(key)}.` : "This custom key has no shortcut, so it sends nothing.";
 }

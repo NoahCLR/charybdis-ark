@@ -110,8 +110,8 @@ function editor(model, portable, busy) {
                 <label class="sw"><input type="checkbox" id="layerKeysFollow" data-f="layers:keys-follow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Keys follow their layers</span></label>
                 <span class="note">${follow
-                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer, and pointing modes' layers move with them. Make base swaps the two roles: a key that reached the new base reaches the old one."
-                    : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Pointing modes' layers keep their numbers too. Names, colours and the pointer and sniping settings still move with their layer, and Make base still swaps the keys that reach the two layers."}</span>
+                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer, and pointing modes' layers and custom keys' shortcut layers move with them. Make base swaps the two roles: a key that reached the new base reaches the old one."
+                    : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Pointing modes' layers and custom keys' shortcut layers keep their numbers too, and a move that would land one on a default layer, or two of one link's or shortcut's layers on one, is refused. Names, colours and the pointer and sniping settings still move with their layer, and Make base still swaps the keys that reach the two layers."}</span>
             </div>
             <div class="row">
                 <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>

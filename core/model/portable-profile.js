@@ -15,6 +15,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/c
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
 const {reorderLinkRefusal} = require("./pointing-links");
+const {reorderShortcutRefusal} = require("./shortcut-layers");
 const {decodeMacroPayload} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {profileDepthOptions} = require("../schema/profile-depth");
@@ -248,7 +249,10 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // on, and the layers that start it are what such keys reach, so the keys that
 // started a mode still start it, and a link never lands on the base. A move
 // that would still leave a link ignored, or one layer starting two modes, is
-// refused in words (pointing-links.js reorderLinkRefusal).
+// refused in words (pointing-links.js reorderLinkRefusal). A custom key's
+// shortcut layers are what a layer key turns on, so they are renumbered the
+// same way; one that would land on a default layer is refused in words too
+// (shortcut-layers.js reorderShortcutRefusal).
 //
 // The swap is not keysFollow's to turn off: keys that kept their numbers would
 // reach whatever took the old base's slot once it moved on, so the key that
@@ -331,6 +335,11 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     pdModes.forEach(slot => {slot.linkedLayers = reached(slot.linkedLayers); slot.linkTurnsOn = reached(slot.linkTurnsOn);});
     const linkRefusal = reorderLinkRefusal(settingsBefore, settings, slotsBefore, pdModes, reached, keysFollow);
     if (linkRefusal) throw fail(linkRefusal);
+    // So do a custom key's shortcut layers (firmware D-F26).
+    const shortcutsBefore = {...settings, names: settingsBefore.names, customKeyShortcuts: settings.customKeyShortcuts};
+    settings.customKeyShortcuts = settings.customKeyShortcuts.map(shortcut => ({...shortcut, layers: reached(shortcut.layers)}));
+    const shortcutRefusal = reorderShortcutRefusal(shortcutsBefore, settings, reached, keysFollow);
+    if (shortcutRefusal) throw fail(shortcutRefusal);
     const changed = encodeProfileDomains({rgb, behaviors, combos, settings, pdModes, keymap: layers}, validated.codecOptions);
     // Reordering layers never rewrites macro streams or their allowed unused tail.
     result.profile = encodeProfileBlob({domains: decodeProfileBlob(validated.profile).domains.map(domain => changed.find(row => row.id === domain.id) || domain)}).toString("base64");

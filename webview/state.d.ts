@@ -14,7 +14,7 @@ export interface MacroForm {
     moveNotice?: string;
     selectionAnchor?: string | null; selectedSteps?: string[]; stepHistory?: MacroHistory;
 }
-export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void; onShortcut?: (shortcut: {mods: number; key: number}) => void; onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'; layoutKey?: boolean; comboOutput?: boolean}
+export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void; layers?: number; layerKind?: number; onShortcut?: (shortcut: import('../contracts/panel.js').CustomKeyShortcut) => void; onCustomKey?: (keycode: string, shortcut: import('../contracts/panel.js').CustomKeyShortcut, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'; layoutKey?: boolean; comboOutput?: boolean}
 export interface PanelState {
     screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;
@@ -22,7 +22,7 @@ export interface PanelState {
     cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; flashPausesAsked: number | string | null; keyDetailsOpen: boolean; stackOpen: boolean;
     cellHow: {cell: string; keycode: string; style?: BranchStyle; repeatHz?: Scalar} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null;
-        madeKey: {keycode: string; shortcut: {mods: number; key: number}; name: string} | null};
+        madeKey: {keycode: string; shortcut: import('../contracts/panel.js').CustomKeyShortcut; name: string} | null};
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
     stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pdSlot: number; pdKind: {slot: number; kind: number} | null;
     pdTaps: {slot: number; rows: Record<string, PdTap>} | null;

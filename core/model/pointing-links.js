@@ -103,12 +103,21 @@ function settingsLinkRefusal(before, after, slots) {
 // Why a layer reorder cannot be made, in words; "" when it can. A reorder
 // renumbers a link as it renumbers layer keys (portable-profile.js), so the
 // keys that started a mode still start it. With keys keeping their numbers,
-// though, a move could still give two modes one starting layer, or put a
-// link's layer on the pointer layer or a default layer. `moved` renumbers a
-// mask from before the move to after it.
+// though, a move could still give two modes one starting layer, put a link's
+// layer on the pointer layer or a default layer, or put two of its layers on
+// one (Make base: the old base's slot and the new base's both reach it), which
+// would merge them. `moved` renumbers a mask from before the move to after it.
 /** @param {LinkSettings} before @param {LinkSettings} after @param {readonly LinkSlot[]} was @param {readonly LinkSlot[]} now @param {(mask: number) => number} moved @param {boolean} keysFollow */
 function reorderLinkRefusal(before, after, was, now, moved, keysFollow) {
     const instead = keysFollow ? "Change the link first." : "Turn on Keys follow their layers, or change the link first.";
+    for (const slot of was) {
+        if (!slot.kind) continue;
+        for (const mask of [slot.linkedLayers ?? 0, slot.linkTurnsOn ?? 0]) {
+            const layers = layersOf(mask), landed = layers.map(layer => layersOf(moved(1 << layer))[0]);
+            const at = landed.findIndex((target, i) => landed.indexOf(target) !== i);
+            if (at >= 0) return `This move would put ${layerName(before.names, layers[landed.indexOf(landed[at])])} and ${layerName(before.names, layers[at])} of ${slotName(slot)}'s link on one layer, ${layerName(after.names, landed[at])}. ${instead}`;
+        }
+    }
     for (const slot of now) {
         if (!slot.kind) continue;
         for (const layer of layersOf(slot.linkedLayers ?? 0)) {

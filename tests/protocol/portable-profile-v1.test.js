@@ -21,11 +21,11 @@ test("settings in another version than current firmware's are refused, older or 
         const metadata = Buffer.alloc(12); metadata.set([1,25]); metadata.writeUInt16LE(bytes.length, 2); metadata.writeUInt32LE(crc32(bytes),4); metadata.writeUInt32LE(fnv1a32(bytes),8);
         return {request: async request => {const page = request[4]; return response(request, page ? bytes.subarray((page-1)*25, page*25) : metadata);}};
     };
-    // Settings v7: the current form without its 256-byte shortcut table.
-    const current = settings(), older = Buffer.concat([current.subarray(0, 404), current.subarray(660)]);
+    // Settings v7: the current form without its 512-byte shortcut table.
+    const current = settings(), older = Buffer.concat([current.subarray(0, 404), current.subarray(916)]);
     older[0] = 7; older[6] = 0;
     await assert.rejects(readSettings(keyboard(older), ids()), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
-    const newer = Buffer.from(current); newer[0] = 10;
+    const newer = Buffer.from(current); newer[0] = 11;
     await assert.rejects(readSettings(keyboard(newer), ids()), {code: "FIRMWARE_UPDATE_REQUIRED"});
 });
 test("old firmware cannot silently produce a partial backup", async () => {

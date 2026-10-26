@@ -3,7 +3,9 @@
 
 // Layer-state sets share identical Boolean decisions instead of materializing
 // their Cartesian product. Locks and holds remain separate, interleaved bits:
-// clearing a lock must not release a held layer. Conditions describe active
+// clearing a lock must not release a held layer. A transition may act on
+// several layers at once (`layers`, a mask): they turn on together, and what
+// one hold turned on is released together. Conditions describe active
 // layers ({on, off}, {all}, {any}, {not}); callers own keyboard semantics.
 // The result contains proved reachability, traps and concrete paths, never the
 // decision graph. A budget failure is explicit and carries no absence claims.
@@ -141,6 +143,13 @@ const activeOf = (state, always) => {
 };
 /** @param {number} mask */
 const countBits = mask => {let count = 0; for (; mask; mask &= mask - 1) count++; return count;};
+// Every layer an effect acts on, as a mask: one, or a key's several at once.
+/** @param {{layer: number, layers?: number}} effect */
+const maskOf = effect => (effect.layers ?? (1 << effect.layer)) >>> 0;
+/** @param {number} mask */
+const lowest = mask => 31 - Math.clz32(mask & -mask);
+/** @param {number} mask @param {number} offset */
+const bitsOf = (mask, offset) => {let bits = 0; for (let n = 0; n < LAYERS; n++) if (mask & (1 << n)) bits |= 1 << (2 * n + offset); return bits >>> 0;};
 
 /**
  * @template {import("./types.js").LayerTransition} T
@@ -148,7 +157,7 @@ const countBits = mask => {let count = 0; for (; mask; mask &= mask - 1) count++
  * @returns {import("./types.js").LayerAnalysisResult<T>}
  */
 function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 4, limits}) {
-    /** @typedef {{kind: string, layer: number, guard: number, sources: {guard: number, effect: T}[]}} Operation */
+    /** @typedef {{kind: string, layer: number, layers: number, guard: number, sources: {guard: number, effect: T}[]}} Operation */
     const sets = new StateSets(limits);
     /** @type {Map<string, Operation>} */
     const operations = new Map();
@@ -169,7 +178,7 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
         for (const child of value.all || value.any || []) scope(child);
         if (value.not !== undefined) scope(value.not);
     }
-    transitions.forEach(effect => {affectedLayers |= 1 << effect.layer; scope(effect.when);}); queries.forEach(scope);
+    transitions.forEach(effect => {affectedLayers |= maskOf(effect); scope(effect.when);}); queries.forEach(scope);
     try {
         /** @type {WeakMap<object, number>} */
         let conditions = new WeakMap();
@@ -193,35 +202,65 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
             }
             conditions.set(value, root); return root;
         }
+        // A lock of the base does nothing; a move locks its layers alone (the
+        // base never), so TO(0)'s is the base alone: it lets every lock go.
+        /** @param {T} effect */
+        const layersFor = effect => effect.kind === "lock" ? maskOf(effect) & ~1 : maskOf(effect);
+        /** @type {Set<number>} */
+        const held = new Set();
         for (const effect of transitions) {
-            if (!["hold", "lock", "move"].includes(effect.kind) || (effect.kind === "lock" && effect.layer === 0)) continue;
-            const guard = condition(effect.when), key = `${effect.kind}:${effect.layer}`;
+            if (!["hold", "lock", "move"].includes(effect.kind) || !layersFor(effect)) continue;
+            const layers = layersFor(effect), guard = condition(effect.when), key = `${effect.kind}:${layers}`;
             compiled.push({guard, effect}); if (!guard) continue;
-            affectedLayers |= 1 << effect.layer;
-            const op = operations.get(key) || {kind: effect.kind, layer: effect.layer, guard: 0, sources: []};
+            affectedLayers |= layers;
+            if (effect.kind === "hold") held.add(layers);
+            const op = operations.get(key) || {kind: effect.kind, layer: lowest(layers), layers, guard: 0, sources: []};
             op.guard = sets.or(op.guard, guard); op.sources.push({guard, effect}); operations.set(key, op);
         }
-        for (let layer = 0; layer < LAYERS; layer++) operations.set(`release:${layer}`, {
-            kind: "release", layer, guard: sets.literal(2 * layer + 1), sources: []});
+        // What a hold turned on is let go together, while any of it is still
+        // held: another hold that shared a layer may have let that one go. A
+        // release joins the walk once its hold has been made from a state
+        // reached, so a hold no person can make lets nothing go.
+        /** @type {Map<number, Operation>} */
+        const releases = new Map();
+        for (const layers of held) releases.set(layers, {
+            kind: "release", layer: lowest(layers), layers, guard: sets.not(sets.cube(bitsOf(layers, 1), 0)), sources: []});
         queries.forEach(query => queryRoots.push(condition(query)));
         // Compilation is finished; collection can now recycle intermediate
         // condition nodes that are not referenced by an operation or query.
         conditions = new WeakMap();
         const ops = [...operations.values()], zero = sets.cube(0xffffffff), heldZero = sets.cube(HOLD_BITS);
-        const permanent = [zero, heldZero, ...compiled.map(c => c.guard), ...queryRoots, ...ops.map(op => op.guard)];
+        const permanent = [zero, heldZero, ...compiled.map(c => c.guard), ...queryRoots, ...ops.map(op => op.guard), ...[...releases.values()].map(op => op.guard)];
+        /** @param {number} root @param {number} bits */
+        const flips = (root, bits) => {for (let v = 0; v < 32; v++) if (bits & (1 << v)) root = sets.flip(root, v); return root;};
+        // A lock of several layers turns them all on, or all off once all are
+        // on, sharing each layer's lock with TG() as a shortcut's Lock does
+        // (timing-and-reachability.md). One layer's lock is that layer's
+        // toggle.
+        /** @param {Operation} op */
+        const allLocked = op => sets.cube(bitsOf(op.layers, 0), bitsOf(op.layers, 0));
         /** @param {number} root @param {Operation} op */
         const forward = (root, op) => {
-            const v = 2 * op.layer + (op.kind === "lock" ? 0 : 1);
-            if (op.kind === "lock") return sets.flip(root, v);
-            if (op.kind === "move") return sets.and(sets.forget(root, LOCK_BITS), sets.cube(LOCK_BITS, op.layer ? 1 << (2 * op.layer) : 0));
-            return sets.and(sets.forget(root, 1 << v), sets.literal(v, op.kind === "hold"));
+            if (op.kind === "lock" && countBits(op.layers) === 1) return flips(root, bitsOf(op.layers, 0));
+            if (op.kind === "lock") {
+                const bits = bitsOf(op.layers, 0), all = allLocked(op);
+                return sets.or(sets.and(sets.forget(sets.and(root, all), bits), sets.cube(bits, 0)),
+                    sets.and(sets.forget(sets.and(root, sets.not(all)), bits), all));
+            }
+            if (op.kind === "move") return sets.and(sets.forget(root, LOCK_BITS), sets.cube(LOCK_BITS, bitsOf(op.layers & ~1, 0)));
+            const bits = bitsOf(op.layers, 1);
+            return sets.and(sets.forget(root, bits), sets.cube(bits, op.kind === "hold" ? bits : 0));
         };
         /** @param {number} root @param {Operation} op */
         const backward = (root, op) => {
-            const v = 2 * op.layer + (op.kind === "lock" ? 0 : 1);
-            if (op.kind === "lock") return sets.flip(root, v);
-            if (op.kind === "move") return sets.restrict(root, LOCK_BITS, op.layer ? 1 << (2 * op.layer) : 0);
-            return sets.restrict(root, 1 << v, op.kind === "hold" ? 1 << v : 0);
+            if (op.kind === "lock" && countBits(op.layers) === 1) return flips(root, bitsOf(op.layers, 0));
+            if (op.kind === "lock") {
+                const bits = bitsOf(op.layers, 0), all = allLocked(op);
+                return sets.or(sets.and(all, sets.restrict(root, bits, 0)), sets.and(sets.not(all), sets.restrict(root, bits, bits)));
+            }
+            if (op.kind === "move") return sets.restrict(root, LOCK_BITS, bitsOf(op.layers & ~1, 0));
+            const bits = bitsOf(op.layers, 1);
+            return sets.restrict(root, bits, op.kind === "hold" ? bits : 0);
         };
         let reachable = zero;
         waves.push(reachable);
@@ -229,8 +268,10 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
             sets.collect([...permanent, ...waves]);
             let next = reachable;
             for (const op of ops) next = sets.or(next, forward(sets.and(reachable, op.guard), op));
-            if (next === reachable) break;
-            reachable = next; waves.push(reachable);
+            const made = ops.filter(op => op.kind === "hold" && releases.has(op.layers) && sets.and(reachable, op.guard));
+            for (const op of made) {ops.push(/** @type {Operation} */ (releases.get(op.layers))); releases.delete(op.layers);}
+            if (next === reachable && !made.length) break;
+            if (next !== reachable) {reachable = next; waves.push(reachable);}
         }
         let reachedLayers = always;
         for (let n = 0; n < LAYERS; n++) if (sets.and(reachable, condition({on: 1 << n}))) reachedLayers |= 1 << n;
@@ -246,9 +287,9 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
         proved = {reachabilityComplete: true, reachedLayers, queries: queryResults, effects, witnesses};
         // A permanent escape or universally available toggles prove every
         // state safe without a backwards search through all combinations.
-        const reset = ops.some(op => op.kind === "move" && op.layer === 0 && op.guard === 1);
-        const lockTargets = ops.filter(op => op.kind === "lock" || (op.kind === "move" && op.layer));
-        const reversible = lockTargets.every(op => operations.get(`lock:${op.layer}`)?.guard === 1);
+        const reset = ops.some(op => op.kind === "move" && !(op.layers & ~1) && op.guard === 1);
+        const lockTargets = ops.filter(op => op.kind === "lock" || (op.kind === "move" && op.layers & ~1));
+        const reversible = lockTargets.every(op => [...Array(LAYERS).keys()].filter(n => op.layers & ~1 & (1 << n)).every(n => operations.get(`lock:${1 << n}`)?.guard === 1));
         if (reset || reversible) return {complete: true, reachedLayers, queries: queryResults, effects, witnesses, traps: [], trapCount: 0};
 
         phase = "escapes";
@@ -318,7 +359,7 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
         }
         /** @param {Operation} op @param {number} source @returns {import("./types.js").LayerPathEffect<T>} */
         function effectFor(op, source) {
-            return op.sources.find(({guard}) => sets.has(guard, source))?.effect || {kind: "release", layer: op.layer, when: true};
+            return op.sources.find(({guard}) => sets.has(guard, source))?.effect || {kind: "release", layer: op.layer, layers: op.layers, when: true};
         }
         /** @param {number} state */
         function pathTo(state) {
@@ -354,4 +395,4 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
     }
 }
 
-module.exports = {analyzeLayerStates};
+module.exports = {analyzeLayerStates, maskOf, lowest};

@@ -104,6 +104,10 @@ export interface SettingField<Name extends string = string> extends SettingRule 
 export interface CustomKeyShortcut {
     mods: number;
     key: number;
+    /** The layers it turns on (firmware D-F26), never the base or a default layer. */
+    layers: number;
+    /** How it turns them on, as a layer key does (SHORTCUT_LAYER_KINDS): 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers. */
+    layerKind: number;
 }
 
 export interface SettingsDomain {
@@ -114,7 +118,7 @@ export interface SettingsDomain {
     layers: LayerRecord[];
     macroNames: string[];
     customKeyNames: string[];
-    /** Each custom key's shortcut, custom key 0 first; `{mods: 0, key: 0}` is none. */
+    /** Each custom key's shortcut, custom key 0 first; `{mods: 0, key: 0, layers: 0, layerKind: 0}` is none. */
     customKeyShortcuts: CustomKeyShortcut[];
     /** The keyboard's own name, its USB product string; empty for the firmware's built-in name. */
     keyboardName: string;

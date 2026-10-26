@@ -614,3 +614,26 @@ test("clean drafts also use latest detection, including loss of a known host", (
         assert.equal(draft.history.length,1);
     }
 });
+test("undoing and redoing a reorder brings a custom key's shortcut layers back exactly", () => {
+    const {settings, compiled} = require("../fixtures/portable-profile");
+    const policy = settings();
+    policy.customKeyShortcuts[0] = {mods: 0x08, key: 0, layers: (1 << 3) | (1 << 5), layerKind: 2};
+    policy.customKeyShortcuts[1] = {mods: 0, key: 0, layers: 0xfffe, layerKind: 1};
+    const value = compiled({policy});
+    const snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}, options: options()};
+    const draft = new ProfileDraftSession(snapshot, "board", {compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest});
+    const shortcuts = () => validateSnapshot(draft.document).settings.customKeyShortcuts.slice(0, 2);
+    const start = shortcuts();
+    layers(draft, [0, 3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    const moved = shortcuts();
+    assert.equal(moved[0].layers, (1 << 1) | (1 << 5), "Navigation moved to slot 1, and the shortcut with it");
+    assert.deepEqual(units(draft), ["layerOrder"], "the shortcut is not a change of its own");
+    layers(draft, [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    draft.undo(draft.revision);
+    assert.deepEqual(shortcuts(), moved);
+    draft.undo(draft.revision);
+    assert.deepEqual(shortcuts(), start);
+    assert.equal(draft.current.fingerprint, snapshot.fingerprint);
+    draft.redo(draft.revision);
+    assert.deepEqual(shortcuts(), moved);
+});

@@ -55,7 +55,7 @@ function read(path) {
     // until a profile has its own: mixed sides with a key, modifiers alone, a
     // mouse button alone, and none for every other key.
     const shortcuts = authored.customKeyShortcuts;
-    assert.deepEqual([shortcuts[1], shortcuts[63], shortcuts[127]], [{mods: 0x41, key: 0x0e}, {mods: 0x0f, key: 0}, {mods: 0, key: 0xd1}]);
+    assert.deepEqual([shortcuts[1], shortcuts[63], shortcuts[127]], [{mods: 0x41, key: 0x0e, layers: 0, layerKind: 0}, {mods: 0x0f, key: 0, layers: 0, layerKind: 0}, {mods: 0, key: 0xd1, layers: 0, layerKind: 0}]);
     assert.equal(shortcuts.filter(({mods, key}) => mods || key).length, 3);
     assert.equal((await read(process.argv[3])).keyboardName, "");
     console.log("app reads the firmware's streamed settings and its macro and layer names");

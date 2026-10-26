@@ -22,6 +22,7 @@ const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {layerName, slotName} = require("./vocabulary");
 const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
+const {LAYERS} = require("../data/charybdis-layout");
 
 // What a layer key does to its layer, in the picker's words. TG is a lock on
 // this firmware (firmware D-F46).
@@ -269,14 +270,45 @@ function keyLabel(names, value) {
     return carriesModifiers(resolved) ? hostKeyLabel(resolved.label, names?.hostOs) : resolved.label;
 }
 // A custom key's shortcut (firmware D-F26) as it reads: its modifiers in the
-// host's words, left before right, then its key, joined by " + ". Empty for
-// no shortcut.
-/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {{mods: number, key: number} | null | undefined} shortcut */
+// host's words, left before right, then its key, then the layers it turns on
+// by name, lowest first, joined by " + ": "Left Command + Navigation + Extra".
+// Held layers read by name alone; any other kind leads with its layer key's
+// verb: "Left Command + Lock Navigation + Extra". Empty for no shortcut.
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {{mods: number, key: number, layers?: number, layerKind?: number} | null | undefined} shortcut */
 function shortcutLabel(names, shortcut) {
     if (!shortcut) return "";
+    const parts = shortcutKeys(names, shortcut);
+    const layers = shortcutLayerNames(names, shortcut);
+    const verb = shortcut.layerKind ? VOCABULARY.customKeys.layerKinds.find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
+    if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;
+    return [...parts, ...layers].join(" + ");
+}
+// The layers a shortcut turns on, by name, lowest first.
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {{layers?: number} | null | undefined} shortcut @returns {string[]} */
+function shortcutLayerNames(names, shortcut) {
+    const layers = [];
+    for (let layer = 0; layer < LAYERS; layer++) if ((shortcut?.layers ?? 0) & (1 << layer)) layers.push(layerName(names?.layers, layer));
+    return layers;
+}
+// What a shortcut does, after its key's name in a tip: sends its modifiers and
+// key, its layers named after them by their kind, or, of layers alone, what
+// it does with them ("holds Navigation on", "locks Navigation + Extra"), as
+// the Custom keys screen says it (webview/view/custom-key.mjs, shortcutAct).
+const LAYER_ACTS = ["holds %s on", "locks %s", "moves to %s", "tap-toggles %s", "turns %s on as a one-shot"];
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {{mods: number, key: number, layers?: number, layerKind?: number} | null | undefined} shortcut */
+function shortcutAct(names, shortcut) {
+    if (!shortcut || !(shortcut.mods || shortcut.key || shortcut.layers)) return "";
+    if (shortcut.mods || shortcut.key) return `sends ${shortcutLabel(names, shortcut)}`;
+    return (LAYER_ACTS[shortcut.layerKind ?? 0] || LAYER_ACTS[0]).replace("%s", shortcutLayerNames(names, shortcut).join(" + "));
+}
+// What a shortcut sends, one part each: its modifiers in the host's words,
+// left before right, then its key. Empty for a shortcut of layers alone.
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {{mods: number, key: number} | null | undefined} shortcut @returns {string[]} */
+function shortcutKeys(names, shortcut) {
+    if (!shortcut) return [];
     const parts = hostKeyVocabulary(names?.hostOs).modifiers.filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
     if (shortcut.key) parts.push(keyLabel(names, shortcut.key));
-    return parts.join(" + ");
+    return parts;
 }
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {number} value */
 function keyLabelWithName(names, value) {
@@ -285,4 +317,4 @@ function keyLabelWithName(names, value) {
     return label === name ? label : `${label} (${name})`;
 }
 
-module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, layerKeyLabel, profileKeyNames, semanticLabel, shortcutLabel};
+module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, layerKeyLabel, profileKeyNames, semanticLabel, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames};

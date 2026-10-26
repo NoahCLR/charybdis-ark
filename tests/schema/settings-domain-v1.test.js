@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {SETTINGS, SHORTCUT_KEYS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, validSetting, validShortcutKey, defaultLayerRecord, encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
+const {SETTINGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, validSetting, validShortcutKey, defaultLayerRecord, encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
 
 // Compiled defaults as the firmware sets them (profile-wire-v1/settings-domain.md):
 // scalar 27 retired at zero, auto-sniping on Navigation (layer 3) alone,
@@ -9,21 +9,21 @@ const {SETTINGS, SHORTCUT_KEYS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_P
 // itself with nothing bypassed or excluded.
 const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,1 << 3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff],
     names: Array.from({length: 16}, (_, id) => id < 8 ? `Layer ${id}` : ""), layers: Array.from({length: 16}, (_, layer) => defaultLayerRecord(layer)),
-    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0})), keyboardName: "", formatVersion: 9});
+    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0, layers: 0, layerKind: 0})), keyboardName: "", formatVersion: 10});
 const thirtyTwo = (seed, fill) => `${seed}`.padEnd(32, fill);
 const full = () => ({...defaults(), names: Array.from({length: 16}, (_, i) => thirtyTwo(`L${i}`, "-")),
     macroNames: Array.from({length: 128}, (_, i) => thirtyTwo(i, "~")), customKeyNames: Array.from({length: 128}, (_, i) => thirtyTwo(`Key ${i}`, "!")),
-    customKeyShortcuts: Array.from({length: 128}, (_, i) => ({mods: 255 - i, key: [0, 0x04, 0xa4, 0xd1, 0xd8][i % 5]})),
+    customKeyShortcuts: Array.from({length: 128}, (_, i) => ({mods: 255 - i, key: [0, 0x04, 0xa4, 0xd1, 0xd8][i % 5], layers: (i * 0x0203) & 0xfffe, layerKind: (i * 0x0203) & 0xfffe ? i % 5 : 0})),
     keyboardName: thirtyTwo("Charybdis", "*")});
 const withShortcut = (slot, shortcut) => { const value = defaults(); value.customKeyShortcuts[slot] = shortcut; return value; };
 const withValue = (id, v) => { const value = defaults(); value.values[id] = v; return value; };
 const withLayer = (layer, record) => { const value = defaults(); value.layers[layer] = {...value.layers[layer], ...record}; return value; };
 
-test("the layout constants are the firmware's version 9 domain", () => {
-    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, SETTINGS.CUSTOM_KEY_SHORTCUTS], [9, 31, 16, 128, 128, 128]);
-    // 128 two-byte shortcuts at 404, then 273 counted names: 16 layers, 128
+test("the layout constants are the firmware's version 10 domain", () => {
+    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, SETTINGS.CUSTOM_KEY_SHORTCUTS], [10, 31, 16, 128, 128, 128]);
+    // 128 five-byte shortcuts at 404, then 273 counted names: 16 layers, 128
     // macros, 128 custom keys and the keyboard (profile-wire-v1/settings-domain.md).
-    assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SHORTCUTS_OFFSET, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 132, 404, 660, 933, 9669]);
+    assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SHORTCUTS_OFFSET, SETTINGS.SHORTCUT_SIZE, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 132, 404, 5, 1044, 1317, 10053]);
     assert.deepEqual([SETTING.UNICODE_HOST_MODE, SETTING.BEHAVIORS_ENABLED, SETTING.LAYER_BEHAVIORS, SETTING.LAYER_COMBOS], [27, 28, 29, 30]);
     assert.equal(MATRIX_POSITIONS, 60);
     assert.deepEqual(defaultLayerRecord(9), {reference: 9, bypass: [], exclude: []});
@@ -79,13 +79,13 @@ test("every stored value is named once, in ID order, and accepts only what the f
     assert.deepEqual([SETTING_FIELD.DEFAULT_DPI.min, SETTING_FIELD.DEFAULT_DPI.max, SETTING_FIELD.DEFAULT_DPI.step], [400, 3400, 200]);
 });
 
-test("settings v9 round-trip Unicode names, layer records, zero settings and every name", () => {
+test("settings v10 round-trip Unicode names, layer records, zero settings and every name", () => {
     const value = defaults(); value.names[1] = "Édition ⌘"; value.names[15] = "Top"; value.macroNames[3] = "Sign-off"; value.macroNames[127] = "Last macro";
     value.customKeyNames[127] = "Last key"; value.keyboardName = "Noah’s Charybdis";
     value.layers[2] = {reference: 0, bypass: [0, 7, 8, 59], exclude: [12, 33]};
     value.layers[15] = {reference: 14, bypass: [], exclude: [59]};
     const bytes = encodeSettings(value);
-    assert.deepEqual([...bytes.subarray(0, 8)], [9, 16, 31, 128, 128, 0, 128, 0]);
+    assert.deepEqual([...bytes.subarray(0, 8)], [10, 16, 31, 128, 128, 0, 128, 0]);
     const nameBytes = [...value.names, ...value.macroNames, ...value.customKeyNames, value.keyboardName].reduce((sum, name) => sum + Buffer.byteLength(name), 0);
     assert.equal(bytes.length, SETTINGS.MIN_SIZE + nameBytes);
     const layer2 = SETTINGS.LAYER_RECORDS_OFFSET + 2 * SETTINGS.LAYER_RECORD_SIZE;
@@ -209,12 +209,12 @@ test("decoded names must be well-formed, counted and within 32 bytes", () => {
     assert.throws(() => decodeSettings(six), /Unsupported settings format/);
 });
 
-test("only version 9 is read or written: the retired versions and reserved bytes are refused", () => {
-    for (const formatVersion of [8, 7, 6, 5, 4, 10]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
+test("only version 10 is read or written: the retired versions and reserved bytes are refused", () => {
+    for (const formatVersion of [9, 8, 7, 6, 5, 4, 11]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
     const bytes = encodeSettings(defaults());
-    for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 16, 31, 128, 128], [7, 16, 31, 128, 128], [8, 16, 31, 128, 128], [10, 16, 31, 128, 128],
-        [9, 8, 31, 128, 128], [9, 16, 28, 128, 128], [9, 16, 31, 64, 128], [9, 16, 31, 128, 64],
-        [9, 16, 31, 128, 128, 2], [9, 16, 31, 128, 128, 0, 0], [9, 16, 31, 128, 128, 0, 64], [9, 16, 31, 128, 128, 0, 128, 1]]) {
+    for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 16, 31, 128, 128], [7, 16, 31, 128, 128], [8, 16, 31, 128, 128], [9, 16, 31, 128, 128], [11, 16, 31, 128, 128],
+        [10, 8, 31, 128, 128], [10, 16, 28, 128, 128], [10, 16, 31, 64, 128], [10, 16, 31, 128, 64],
+        [10, 16, 31, 128, 128, 2], [10, 16, 31, 128, 128, 0, 0], [10, 16, 31, 128, 128, 0, 64], [10, 16, 31, 128, 128, 0, 128, 1]]) {
         const relabelled = Buffer.from(bytes); relabelled.set(header);
         assert.throws(() => decodeSettings(relabelled), /Unsupported settings format/, header.join());
     }
@@ -248,22 +248,71 @@ test("a custom-key shortcut is a modifier mask and one key the firmware accepts"
     for (const key of accepted) assert.ok(validShortcutKey(key), `accepts 0x${key.toString(16)}`);
     for (const key of refused) assert.equal(validShortcutKey(key), false, `refuses ${key}`);
     // Mixed sides, modifiers alone and a key alone are all shortcuts.
-    for (const shortcut of [{mods: 0x41, key: 0x0e}, {mods: 0x0f, key: 0}, {mods: 0, key: 0xd1}, {mods: 0xff, key: 0xa4}]) {
+    for (const shortcut of [{mods: 0x41, key: 0x0e, layers: 0, layerKind: 0}, {mods: 0x0f, key: 0, layers: 0, layerKind: 0}, {mods: 0, key: 0xd1, layers: 0, layerKind: 0}, {mods: 0xff, key: 0xa4, layers: 0, layerKind: 0}]) {
         const bytes = encodeSettings(withShortcut(5, shortcut));
-        const at = SETTINGS.SHORTCUTS_OFFSET + 5 * 2;
-        assert.deepEqual([...bytes.subarray(at, at + 2)], [shortcut.mods, shortcut.key]);
+        const at = SETTINGS.SHORTCUTS_OFFSET + 5 * 5;
+        assert.deepEqual([...bytes.subarray(at, at + 5)], [shortcut.mods, shortcut.key, 0, 0, 0]);
         assert.deepEqual(decodeSettings(bytes).customKeyShortcuts[5], shortcut);
     }
-    for (const shortcut of [{mods: 256, key: 0}, {mods: -1, key: 0}, {mods: 0, key: 0xe0}, {mods: 1, key: 0xa5}, {mods: 1}, null, 4]) {
+    for (const shortcut of [{mods: 256, key: 0, layers: 0, layerKind: 0}, {mods: -1, key: 0, layers: 0, layerKind: 0}, {mods: 0, key: 0xe0, layers: 0, layerKind: 0}, {mods: 1, key: 0xa5, layers: 0, layerKind: 0}, {mods: 1, layers: 0}, {mods: 1, key: 0}, null, 4]) {
         assert.throws(() => encodeSettings(withShortcut(5, shortcut)), /shortcut/, JSON.stringify(shortcut));
     }
     assert.throws(() => encodeSettings({...defaults(), customKeyShortcuts: defaults().customKeyShortcuts.slice(1)}), /custom key shortcuts/);
     assert.throws(() => encodeSettings({...defaults(), customKeyShortcuts: undefined}), /custom key shortcuts/);
     const bytes = encodeSettings(defaults());
     for (const key of [0x01, 0xa5, 0xe0, 0xd9]) {
-        const stored = Buffer.from(bytes); stored[SETTINGS.SHORTCUTS_OFFSET + 127 * 2 + 1] = key;
+        const stored = Buffer.from(bytes); stored[SETTINGS.SHORTCUTS_OFFSET + 127 * 5 + 1] = key;
         assert.throws(() => decodeSettings(stored), /cannot hold/, `0x${key.toString(16)}`);
     }
-    const any = Buffer.from(bytes); any[SETTINGS.SHORTCUTS_OFFSET + 127 * 2] = 0xff;
-    assert.deepEqual(decodeSettings(any).customKeyShortcuts[127], {mods: 0xff, key: 0}, "any modifier mask");
+    const any = Buffer.from(bytes); any[SETTINGS.SHORTCUTS_OFFSET + 127 * 5] = 0xff;
+    assert.deepEqual(decodeSettings(any).customKeyShortcuts[127], {mods: 0xff, key: 0, layers: 0, layerKind: 0}, "any modifier mask");
+});
+
+test("a shortcut's layers are a 16-bit mask that never names the base layer or a default layer", () => {
+    // Firmware D-F26, settings v10: bytes 2..3 of the record, little-endian.
+    const shortcut = {mods: 0x08, key: 0, layers: 0x8206, layerKind: 0};
+    const bytes = encodeSettings(withShortcut(9, shortcut));
+    const at = SETTINGS.SHORTCUTS_OFFSET + 9 * 5;
+    assert.deepEqual([...bytes.subarray(at, at + 5)], [0x08, 0, 0x06, 0x82, 0]);
+    assert.deepEqual(decodeSettings(bytes).customKeyShortcuts[9], shortcut);
+    // Layers alone are a shortcut.
+    assert.deepEqual(decodeSettings(encodeSettings(withShortcut(9, {mods: 0, key: 0, layers: 0xfffe, layerKind: 0}))).customKeyShortcuts[9], {mods: 0, key: 0, layers: 0xfffe, layerKind: 0});
+    for (const layers of [1, 0x10000, -2, 1.5, undefined]) {
+        assert.throws(() => encodeSettings(withShortcut(9, {mods: 0, key: 0, layers})), /shortcut/, String(layers));
+    }
+    // A default layer is always on too: refused in the shortcut, and so is a
+    // set of default layers that takes in a layer a shortcut names.
+    const defaultTwo = withShortcut(9, {mods: 0, key: 0, layers: 0x0004, layerKind: 0});
+    defaultTwo.values[SETTING.DEFAULT_LAYERS] = 0b101;
+    assert.throws(() => encodeSettings(defaultTwo), /Custom key 9.*always on/);
+    const stored = Buffer.from(bytes);
+    stored[SETTINGS.SHORTCUTS_OFFSET + 9 * 5 + 2] |= 1;
+    assert.throws(() => decodeSettings(stored), /always on/);
+    stored[SETTINGS.SHORTCUTS_OFFSET + 9 * 5 + 2] = 0x06;
+    stored.writeUInt32LE(0b11, SETTINGS.SCALARS_OFFSET + SETTING.DEFAULT_LAYERS * 4);
+    assert.throws(() => decodeSettings(stored), /always on/);
+});
+
+test("a shortcut turns its layers on as one layer key does, all alike, and only when it has layers", () => {
+    // Firmware D-F26, settings v10: byte 4 of the record.
+    assert.deepEqual(SHORTCUT_LAYER_KINDS, {HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
+    for (const layerKind of Object.values(SHORTCUT_LAYER_KINDS)) {
+        const shortcut = {mods: 0x02, key: 0x04, layers: 0x0028, layerKind};
+        const bytes = encodeSettings(withShortcut(12, shortcut));
+        const at = SETTINGS.SHORTCUTS_OFFSET + 12 * 5;
+        assert.deepEqual([...bytes.subarray(at, at + 5)], [0x02, 0x04, 0x28, 0, layerKind]);
+        assert.deepEqual(decodeSettings(bytes).customKeyShortcuts[12], shortcut);
+    }
+    // Past one-shot, not a whole number, missing, or a kind with no layers to
+    // turn on: refused both ways.
+    for (const shortcut of [{mods: 0, key: 0, layers: 0x0008, layerKind: 5}, {mods: 0, key: 0, layers: 0x0008, layerKind: 1.5}, {mods: 0, key: 0, layers: 0x0008},
+        {mods: 0x01, key: 0, layers: 0, layerKind: SHORTCUT_LAYER_KINDS.LOCK}]) {
+        assert.throws(() => encodeSettings(withShortcut(12, shortcut)), /shortcut/, JSON.stringify(shortcut));
+    }
+    const bytes = encodeSettings(withShortcut(12, {mods: 0x01, key: 0, layers: 0x0008, layerKind: 0}));
+    const at = SETTINGS.SHORTCUTS_OFFSET + 12 * 5;
+    const past = Buffer.from(bytes); past[at + 4] = 5;
+    assert.throws(() => decodeSettings(past), /Custom key 12.*no way/);
+    const bare = Buffer.from(bytes); bare.writeUInt16LE(0, at + 2); bare[at + 4] = SHORTCUT_LAYER_KINDS.ONESHOT;
+    assert.throws(() => decodeSettings(bare), /Custom key 12.*no way/);
 });

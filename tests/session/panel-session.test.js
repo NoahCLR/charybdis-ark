@@ -6,7 +6,7 @@ const {applyLayerEdit, buildPanelModel: projectPanelModel, observeService, disca
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb4a15f12, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -364,6 +364,30 @@ test("the model shows the draft's surfaces but the keyboard's own header", () =>
     assert.equal(model.layers[1].displayName, draft.current.summary.names[1]);
     assert.equal(model.portable.available, true);
     assert.equal(model.portable.layers, null, "the layer editor is closed until Rename & Reorder opens it");
+});
+
+test("a refused move or Make base is not kept, so the layers can still be edited after it", () => {
+    // Keys stay where they are; Numbers is a default layer, and a shortcut
+    // turns Navigation on. Making Numbers the base and dragging the old Base
+    // up would leave the shortcut naming a default layer.
+    const {settings, compiled} = require("../fixtures/portable-profile");
+    const {SETTING} = require("../../core/schema/settings-domain-v1");
+    const policy = settings();
+    policy.values[SETTING.DEFAULT_LAYERS] = 1 | (1 << 1);
+    policy.customKeyShortcuts[0] = {mods: 0x08, key: 0, layers: 1 << 3, layerKind: 0};
+    const doc = compiled({policy});
+    const edit = startLayerEdit({document: doc, fingerprint: fingerprint(doc), summary: summary(doc)}, 1);
+    applyLayerEdit(edit, {type: "editPortableLayer", keysFollow: false, names: edit.names});
+    applyLayerEdit(edit, {type: "editPortableLayer", id: 1, makeBase: true, names: edit.names});
+    const order = [...edit.order], names = [...edit.names];
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 0, to: 3, names: edit.names}), /shortcut/);
+    assert.deepEqual(edit.order, order, "the refused move is not kept");
+    assert.deepEqual(edit.names, names);
+    // Later edits work: a rename, and a move the shortcut allows.
+    applyLayerEdit(edit, {type: "editPortableLayer", id: 5, name: "Extra one"});
+    assert.equal(edit.names[5], "Extra one");
+    applyLayerEdit(edit, {type: "editPortableLayer", id: 4, to: 5, names: edit.names});
+    assert.ok(validateSnapshot(layerEditDocument(edit)));
 });
 
 test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carries names with a move", () => {

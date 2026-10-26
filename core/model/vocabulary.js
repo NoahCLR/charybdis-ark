@@ -233,6 +233,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         {id: "key", label: "Key feedback", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
     ],
 
+    // A custom key's shortcut (firmware D-F26): why a layer cannot be one it
+    // turns on, said in the layer's row of the shortcut picker, and how it
+    // turns its layers on (SHORTCUT_LAYER_KINDS), in the words its layer key
+    // reads by ("Lock Navigation").
+    customKeys: {alwaysOn: {base: "base layer, always on", default: "default layer, always on"},
+        layerKinds: [[0, "Hold"], [1, "Lock"], [2, "Move to"], [3, "Tap-toggle"], [4, "One-shot"]]},
     pointing: {
         kinds: [[0, "Empty"], [1, "Directional keys / shortcuts"], [2, "Scrolling"]],
         axes: [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]],

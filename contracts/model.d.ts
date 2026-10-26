@@ -105,6 +105,7 @@ export interface Vocabulary {
     feedbackOwners: WordList<string>;
     ledTables: WordList<string>;
     stages: readonly {id: string; label: string; bit?: number}[];
+    customKeys: {alwaysOn: {base: string; default: string}; layerKinds: WordList<number>};
     pointing: {
         kinds: WordList<number>;
         axes: WordList<number>;

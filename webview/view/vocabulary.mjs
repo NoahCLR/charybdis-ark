@@ -10,7 +10,7 @@
 
 /** @type {import("../../contracts/model.js").Vocabulary} */
 const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), editModes: {}, halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
-    feedbackOwners: [], ledTables: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], linkLabels: {starts: "", keyTurnsOn: "", startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
+    feedbackOwners: [], ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []}, pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], linkLabels: {starts: "", keyTurnsOn: "", startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
 /** @param {VocabularyModel | null | undefined} model */

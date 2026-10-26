@@ -25,6 +25,8 @@ function completeFixture() {
     const settings = structuredClone(decoded.settings);
     settings.layers[0].bypass = [matrixPosition(0)];
     settings.layers[0].exclude = [matrixPosition(1)];
+    // A shortcut with layers, so how it turns them on can change too.
+    settings.customKeyShortcuts[3] = {mods: 0, key: 0, layers: 1 << 3, layerKind: 0};
     value = rewrite(value, PROFILE_DOMAINS.find(row => row.key === "settings"), settings, decoded.codecOptions);
     const modes = structuredClone(decoded.pdModes);
     modes[0] = {...structuredClone(modes[4]), id: 0, axis: 3, name: "Eight-way", emptyDirection: 1, directionOutput: 1};

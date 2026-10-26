@@ -59,7 +59,7 @@ test("every registered edit names its editor, its words and, on the profile, its
 function draft() {
     const doc = pdDocument();
     const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
-    return new ProfileDraftSession(snapshot, "test-device", {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x7fecec81});
+    return new ProfileDraftSession(snapshot, "test-device", {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb4a15f12});
 }
 
 test("every registered edit reaches its editor, and anything else is refused as unsupported", () => {
@@ -92,8 +92,9 @@ test("each edit is recorded in its own words", () => {
     assert.equal(draftEditLabel({type: "retargetBehavior", keycode: "KC_A", target: "KC_B"}, document), "Moved a behaviour");
     assert.equal(draftEditLabel({type: "updateRgbStages", stageEnableMask: 0}, document), "Edited lighting");
     assert.equal(draftEditLabel({type: "updateCustomKey", keycode: "CUSTOM_KEY_0", name: "Thumb"}, document), "Renamed a custom key");
-    assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 1, key: 0}}, document), "Changed a custom key's shortcut");
-    assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 0, key: 0}}, document), "Cleared a custom key's shortcut");
+    assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 1, key: 0, layers: 0, layerKind: 0}}, document), "Changed a custom key's shortcut");
+    assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 0, key: 0, layers: 0, layerKind: 0}}, document), "Cleared a custom key's shortcut");
+    assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 0, key: 0, layers: 8, layerKind: 0}}, document), "Changed a custom key's shortcut", "layers alone");
     assert.equal(draftEditLabel({type: "renameKeyboard", name: "Board"}, document), "Renamed the keyboard");
 
     session.stage({type: "updateLayoutKeys", draftRevision: session.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_A"}]});

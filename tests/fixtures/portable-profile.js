@@ -1,8 +1,8 @@
 // @ts-check
 "use strict";
 // Current firmware's profile as Ark's tests build it: the firmware's frozen
-// populated profile (populated_profile_v4.fixture: schema 4.1, RGB 4, key
-// behaviours 2, combos 3, settings 9, sparse PD 4, slots 0-5 configured,
+// populated profile (populated_profile_v4.fixture: schema 4.2, RGB 4, key
+// behaviours 2, combos 3, settings 10, sparse PD 4, slots 0-5 configured,
 // keymap 1 and macros 1), materialized the way a keyboard read does, with
 // these settings and a combo table standing in for the live readbacks, and
 // the given layers and empty macros in place of the fixture's. It is a format
@@ -21,10 +21,10 @@ const {LAYER_LOCK_BASE} = require("../../core/data/user-keycodes");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
 
 const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/populated_profile_v4.fixture");
-const CURRENT_CAPABILITIES = Object.freeze({protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 1}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI,
+const CURRENT_CAPABILITIES = Object.freeze({protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI,
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
 
-// Settings v9: values 10..14 are the retired pointing DPI and 27 the retired
+// Settings v10: values 10..14 are the retired pointing DPI and 27 the retired
 // combo references, all zero; auto-sniping follows Navigation (layer 3)
 // alone; behaviours and combos are on everywhere; every
 // layer refers combos to itself; every macro and custom key name is empty,
@@ -35,7 +35,7 @@ function settings() {
     const values = [200, 150, 400, 150, 1, 4, 1200, 25, 1, 1 << 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff];
     const layers = Array.from({length: 16}, (_, layer) => ({...defaultLayerRecord(layer), reference: layer}));
     return {values, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")], layers,
-        macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0})), keyboardName: "", formatVersion: 9};
+        macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0, layers: 0, layerKind: 0})), keyboardName: "", formatVersion: 10};
 }
 const profileBytes = () => {
     const match = fs.readFileSync(FIXTURE, "utf8").match(/^profile\.hex=(.+)$/m);

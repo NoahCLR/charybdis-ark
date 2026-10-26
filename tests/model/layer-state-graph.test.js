@@ -104,8 +104,13 @@ test("an independent bank beside a real trap reports the trapping layer once", (
 });
 
 test("an unfinished escape proof preserves completed reachability checks", () => {
-    const result = analyzeLayerStates({always: 1, transitions: [{kind: "lock", layer: 1, when: {off: 2}}],
-        queries: [{on: 2}, {on: 4}], limits: {work: 2000}});
+    // The first budget that finishes reachability but not the escape proof,
+    // found rather than written in, so a cheaper or dearer pass keeps the test.
+    const input = {always: 1, transitions: [{kind: "lock", layer: 1, when: {off: 2}}], queries: [{on: 2}, {on: 4}]};
+    let work = 1;
+    while (work < 1e6 && analyzeLayerStates({...input, limits: {work}}).phase !== "escapes") work = Math.ceil(work * 1.05) + 1;
+    assert.ok(work < 1e6, "some budget finishes reachability and not the escape proof");
+    const result = analyzeLayerStates({...input, limits: {work}});
     assert.equal(result.complete, false);
     assert.equal(result.phase, "escapes");
     assert.equal(result.reachabilityComplete, true);
@@ -119,4 +124,68 @@ test("budget failure identifies the involved layers and makes no absence claims"
     assert.equal(result.complete, false);
     assert.equal(result.affectedLayers, 6);
     assert.equal(result.traps, undefined);
+});
+
+test("a transition on several layers turns them on together, and its hold is released together", () => {
+    // Layers 1 and 2 are only ever held together (firmware D-F26, D-F62), so
+    // layer 1 alone is never reached; a layer of its own is released alone.
+    const together = analyzeLayerStates({always: 1, transitions: [{kind: "hold", layer: 1, layers: 0b110, when: true}], queries: [{on: 2, off: 4}, {on: 6}]});
+    assert.equal(together.complete, true);
+    assert.equal(together.reachedLayers, 0b111);
+    assert.deepEqual(together.queries, [false, true]);
+    const apart = analyzeLayerStates({always: 1, transitions: [{kind: "hold", layer: 1, layers: 0b110, when: true}, {kind: "hold", layer: 1, when: true}], queries: [{on: 2, off: 4}]});
+    assert.deepEqual(apart.queries, [true], "a hold of layer 1 alone reaches it alone");
+    // A lock of several toggles them all.
+    const locked = analyzeLayerStates({always: 1, transitions: [{kind: "lock", layer: 1, layers: 0b110, when: true}], queries: [{on: 2, off: 4}, {on: 6}]});
+    assert.deepEqual(locked.queries, [false, true]);
+});
+
+test("a lock made after a shared layer was let go is reached with nothing held, so its trap is found", () => {
+    // A key holds layers 1 and 2; MO(2) holds 2 alone. Holding both, then
+    // letting MO(2) go, leaves layer 1 on (where two holds share a layer the
+    // walk lets either drop it), and a lock of 3 made only there has no way
+    // back (layer 3 covers its own lock key). The key's release still lets layer 1 go, so that lock is reached
+    // with nothing held, and named as a trap.
+    // Layer 3 covers every key, its own lock key included.
+    const transitions = [{kind: "hold", layer: 1, layers: 0b110, when: {off: 0b1000}}, {kind: "hold", layer: 2, when: {off: 0b1000}},
+        {kind: "lock", layer: 3, when: {on: 0b10, off: 0b1100}}];
+    const result = analyzeLayerStates({always: 1, transitions, queries: []});
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.traps.map(trap => trap.locks), [0b1000]);
+});
+
+test("a lock of several layers turns them all on, never off one another lock holds on", () => {
+    // A pointing mode's lock key turns on layers 1 and 2 (firmware D-F62). A
+    // lock of layer 1 alone, usable only while 2 is off, then the mode's lock:
+    // both are on, so layer 2 is never on alone; the mode's lock again turns
+    // both off.
+    const transitions = [{kind: "lock", layer: 1, layers: 0b110, when: true}, {kind: "lock", layer: 1, when: {off: 0b100}}];
+    const result = analyzeLayerStates({always: 1, transitions, queries: [{on: 0b100, off: 0b10}, {on: 0b110}]});
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.queries, [false, true]);
+});
+
+test("a hold's release is offered only once that hold can be made", () => {
+    // A key holds layers 1 and 2; MO(2) exists only on layer 3, which nothing
+    // turns on, so its release never lets layer 2 go alone.
+    const transitions = [{kind: "hold", layer: 1, layers: 0b110, when: true}, {kind: "hold", layer: 2, when: {on: 0b1000}}];
+    const result = analyzeLayerStates({always: 1, transitions, queries: [{on: 0b10, off: 0b100}]});
+    assert.deepEqual(result.queries, [false]);
+});
+
+test("a move to several layers locks them alone and lets every other lock go", () => {
+    // A custom key's shortcut moves to layers 2 and 3 (firmware D-F26, TO()
+    // of a set). Layer 1 locks while 3 is off, the move is offered on layer 1
+    // only, and layer 2's own lock toggles it while 3 is on: layer 1 is never
+    // on beside them once moved, and locking 2 off leaves 3 alone.
+    const transitions = [{kind: "lock", layer: 1, when: {off: 0b1000}}, {kind: "move", layer: 2, layers: 0b1100, when: {on: 0b10}}, {kind: "lock", layer: 2, when: {on: 0b1000}}];
+    const result = analyzeLayerStates({always: 1, transitions, queries: [{on: 0b1100, off: 0b10}, {on: 0b1110}, {on: 0b1000, off: 0b100}]});
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.queries, [true, false, true]);
+    // Layer 3 alone has no way home: the trap is found.
+    assert.equal(result.trapCount > 0, true);
+    // A move to the base alone (TO(0)) offered everywhere lets every lock go,
+    // which proves every state safe.
+    const home = analyzeLayerStates({always: 1, transitions: [...transitions, {kind: "move", layer: 0, when: true}], queries: []});
+    assert.deepEqual([home.complete, home.trapCount], [true, 0]);
 });
