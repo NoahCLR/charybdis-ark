@@ -32,7 +32,7 @@ export interface PanelState {
     recording: {slot: string; before: string} | null; lastTake: {slot: string; before: string; after: string} | null;
     recordDelays: boolean; recordPreserveHoldTiming: boolean; recordDelayThreshold: number; recordDelayRound: number;
     ledPicks: number[]; trackball: boolean; rowColour: {h: string; s: string; v: string}; ledRow: {target: string; owner: string; source: string};
-    settingsSearch: string; overlay: string | null;
+    overlay: string | null;
     settingsDurationUnits: Record<string, 'seconds' | 'minutes'>;
     leaveDemo: {ask: {title: string; detail: string; confirm: string}; message: PanelCommand} | null;
     modeAsk: {mode: number; question: 'saveOrRevert' | 'sendOrDiscard'} | null;

@@ -1,7 +1,7 @@
 // @ts-check
 // Backups: the whole keyboard as one file.
 //
-// Layer names and priority are edited beside the board, in Keys → Layers, where
+// Layer names and priority are edited beside the board, in Keymap → Layers, where
 // what a layer holds is visible while it is named.
 //
 // A complete profile is layers, behaviours, combos, custom keys, macros,

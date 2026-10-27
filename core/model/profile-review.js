@@ -456,7 +456,7 @@ function profileReview(before, after, capabilities) {
             // The effect belongs to Host, so discarding it restores Host and
             // preserves independently edited macro text and names.
             item("Macros", "settings:host", `Macro ${index}${macro.name ? ` · ${macro.name}` : ""} · Your computer settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
-            /** @type {Change} */ (items.at(-1)).note = "Playback changes because of Settings → Your computer. Discard it together with that change.";
+            /** @type {Change} */ (items.at(-1)).note = "Playback changes because of Host → Your computer. Discard it together with that change.";
         });
     }
     // A custom key is its name and shortcut here; what its behaviour adds is

@@ -95,7 +95,7 @@ for (const destination of ["screen", "slot", "editor"]) {
         await page.locator('[data-act="record"]').click();
         await page.keyboard.press("a");
         expect((await take(page)).payload).toBe("{KC_A}");
-        if (destination === "screen") await page.locator('[data-screen="settings"]').click();
+        if (destination === "screen") await page.locator('[data-screen="host"]').click();
         if (destination === "slot") await page.locator('[data-slot="MACRO_18"]').click();
         if (destination === "editor") await page.locator('[data-raw-toggle]').click();
         await expect.poll(() => take(page).then(value => value.recording)).toBeNull();
@@ -104,7 +104,7 @@ for (const destination of ["screen", "slot", "editor"]) {
         await expect.poll(() => updates(page)).toEqual([
             expect.objectContaining({keycode: "MACRO_17", payload: "{KC_A}"}),
         ]);
-        if (destination === "screen") await expect(page.locator('#settingsSearch')).toBeVisible();
+        if (destination === "screen") await expect(page.locator('[data-section="host"]')).toBeVisible();
         if (destination === "slot") await expect(page.locator('[data-macro-editor="MACRO_18"]')).toBeVisible();
         if (destination === "editor") await expect(page.locator('[data-raw]')).toHaveAttribute("open");
     });
@@ -153,7 +153,7 @@ for (const ending of ['stop', 'escape', 'screen', 'slot', 'editor']) {
         });
         if (ending === 'stop') await page.locator('[data-act="record"]').click();
         if (ending === 'escape') await page.keyboard.press('Escape');
-        if (ending === 'screen') await page.locator('[data-screen="settings"]').click();
+        if (ending === 'screen') await page.locator('[data-screen="host"]').click();
         if (ending === 'slot') await page.locator('[data-slot="MACRO_18"]').click();
         if (ending === 'editor') await page.locator('[data-raw-toggle]').click();
         await page.evaluate(() => {Date.now = window.__realRecordingNow;});

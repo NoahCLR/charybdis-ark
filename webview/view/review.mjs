@@ -8,6 +8,8 @@
 // sits under its own area, groups become blocks with one Discard, and every
 // item knows how to go to its editor.
 
+import {screenOfSection} from "./settings-layout.mjs";
+
 // The order areas are read in, as the rail lists the screens they live on.
 export const AREAS = ["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
 /** @param {string} area */
@@ -156,16 +158,16 @@ export function placeState(place, layers = []) {
         case "customKey": return {screen: "customKeys", customKey: `CUSTOM_KEY_${place.index}`};
         case "pointing": return {screen: "pointing", pointingSlot: place.slot, pdKind: null, pdTaps: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
-        // A section is edited on the screen its area names: a lighting stage
+        // A section is edited on the screen that draws it: a lighting stage
         // for a Lighting one, the top of Lighting for one above every stage,
-        // Mouse, or Settings.
+        // or the Settings screen that holds it. Default layers has no editor.
         case "settings": {
             if (place.stage) return {screen: "lighting", stage: place.stage};
             if (place.area === "Lighting") return {screen: "lighting", reveal: place.section ? `.settings-group[data-section="${place.section}"]` : null};
-            const screen = place.area === "Mouse" ? "mouse" : "settings";
-            return place.section
-                ? {screen, settingsSearch: "", settingsOpen: [place.section, `${place.section}:layers`], reveal: `.settings-group[data-section="${place.section}"]`}
-                : {screen, settingsSearch: ""};
+            // The keyboard's name is the Keyboard screen's title.
+            if (place.section === "keyboard") return {screen: "device"};
+            const screen = screenOfSection(place.section);
+            return screen ? {screen, reveal: `.settings-group[data-section="${place.section}"]`} : null;
         }
         case "layers": return {screen: "keys", layersOpen: true};
         default: return null;

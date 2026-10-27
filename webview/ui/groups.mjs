@@ -1,5 +1,5 @@
 // @ts-check
-// The grouped lists the Keys tabs share: a counted header per group, shared
+// The grouped lists the Keymap tabs share: a counted header per group, shared
 // independent open state, and rows that pick themselves. A group folds with the
 // same chevron as everything else that folds, turned down while open.
 // Titles and order come from view/reach-groups.mjs.

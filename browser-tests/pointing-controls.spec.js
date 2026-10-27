@@ -199,7 +199,7 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
 test("pointing navigation reaches placement and lighting without an edit", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
     await editor(page).locator('[data-act="place"]').click();
-    await expect(page.locator('.main h1')).toHaveText("Keys");
+    await expect(page.locator('.main h1')).toHaveText("Keymap");
     expect(await posted(page)).toEqual([]);
     await page.locator('[data-screen="pointing"]').click();
     await editor(page).locator('[data-act="lighting"]').click();
@@ -331,11 +331,8 @@ test("a layer that starts another mode cannot start this one and says so in its 
     await configPost(page, 2, {linkTurnsOn: 1 << 5});
 });
 
-test("Mouse: auto-sniping's layers post one switch each, beside its master switch", async ({page}) => {
-    await openControls(page, "mouse");
-    const fold = page.locator('[data-subfold="sniping:layers"]');
-    await expect(fold.locator(".fold-summary")).toHaveText("Only Navigation");
-    await fold.locator("summary").click();
+test("Pointer settings: auto-sniping's layers post one switch each, beside its master switch", async ({page}) => {
+    await openControls(page, "pointer");
     await page.locator('label:has([data-f="setting:snipingOnLayer2"])').click();
     await expectPost(page, {type: "updateConfigDefaults", sectionId: "sniping", expectedFingerprint: expect.any(String), fields: expect.arrayContaining([
         {macro: "autoSniping", enabled: true}, {macro: "snipingOnLayer2", enabled: true}, {macro: "snipingOnLayer3", enabled: true}, {macro: "snipingOnLayer0", enabled: false},

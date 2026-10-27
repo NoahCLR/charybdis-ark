@@ -1,12 +1,13 @@
 # Pointing
 
-Two screens set up the trackball. **Mouse** is how it moves the pointer.
-**Pointing modes** make it do something else while a key is held or locked,
-or while a layer is on: scroll, or send arrows and shortcuts as it moves.
+Two screens set up the trackball. **Pointer settings**, under Settings in
+the rail, is how it moves the pointer. **Pointing modes**, under Configure,
+make it do something else while a key is held or locked, or while a layer is
+on: scroll, or send arrows and shortcuts as it moves.
 
-Hover any label on Mouse for what it does.
+Hover any label on Pointer settings for what it does.
 
-## Mouse
+## Pointer settings
 
 **Pointer speed**
 
@@ -19,8 +20,7 @@ The DPI keys on the keyboard change these too, and Ark shows the new value.
 
 - **Auto-sniping** uses the sniping speed while any of the **Auto-sniping
   layers** is on. Each layer has its own switch, as the other per-layer
-  settings do; folded, the row says which are on ("Only Navigation"). Turning
-  **Auto-sniping** off keeps the layers you chose.
+  settings do. Turning **Auto-sniping** off keeps the layers you chose.
 - While one of those layers is on, moving the ball doesn't turn on a separate
   pointer layer, so the layer's own keys stay under your hand.
 - **Sniping keys** shows where the **Sniping (hold)** and **Sniping toggle**
@@ -64,7 +64,7 @@ it.
   accented letter takes two.
 - **Movement**: **Directional keys / shortcuts** or **Scrolling**.
 - **Pointer speed while active**: the mode's own DPI, or **Normal pointer
-  speed** to keep the Mouse setting.
+  speed** to keep the one set in Pointer settings.
 - **Light**: its colour and where it paints, with **Edit in Lighting**.
 - **Duplicate** copies the mode into the first empty slot. **Clear slot**
   empties it.

@@ -67,10 +67,9 @@ export function editor(model, slot, canEdit) {
     card.addEventListener("pointerdown", event => {
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="discard"], [data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
-    // Your computer starts folded in Settings; this link is for it, so it opens.
+    // Your computer, on Host.
     /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => {
-        Object.assign(state, {screen: "settings", settingsSearch: "", reveal: '.settings-group[data-section="host"]',
-            settingsOpen: [...(state.settingsOpen || []).filter((id) => id !== "host"), "host"]});
+        Object.assign(state, {screen: "host", reveal: '.settings-group[data-section="host"]'});
         render();
     });
     /** @type {HTMLSelectElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLSelectElement} */ (event.target).value), model.macroEditing.identity)));
@@ -143,7 +142,7 @@ function nameField(model, slot, canEdit) {
 
 // The layers that set this macro off themselves — a key carrying it, a
 // behaviour mapped there whose branch plays it, or a combo on its keys — each
-// in its layer colour and naming how. A click opens that layer in Keys with
+// in its layer colour and naming how. A click opens that layer in Keymap with
 // this macro picked in its Macros tab, on the row for the first of those
 // routes, so the board rings its keys and the table marks the row.
 
@@ -179,8 +178,8 @@ function showOnLayer(keycode, at) {
 function unicodeSetup(model, slot) {
     const {mode, os, layout, layoutFits, layoutName} = model?.macroUnicode || {mode: 0};
     const typed = layoutFits === false
-        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Your computer, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
-        : `Text types through the ${layoutName} layout chosen in Settings → Your computer, accented letters included; keep that layout active on the computer.`;
+        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Host → Your computer, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
+        : `Text types through the ${layoutName} layout chosen in Host → Your computer, accented letters included; keep that layout active on the computer.`;
     const entry = mode
         ? ["", "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source.",
             "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",

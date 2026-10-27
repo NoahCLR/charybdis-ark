@@ -92,11 +92,11 @@ test("dropping respects every Import gate and cancels a read when the surface ch
     expect(await page.evaluate(() => window.__posted)).toEqual([]);
 });
 for (const theme of ["dark", "light"]) {
-    test(`Mouse edit posts its complete section (${theme})`, async ({page}) => {
+    test(`a pointer setting posts its complete section (${theme})`, async ({page}) => {
         const errors = [];
         page.on("pageerror", error => errors.push(error.message));
         await openPreview(page, theme);
-        await page.locator('[data-screen="mouse"]').click();
+        await page.locator('[data-screen="pointer"]').click();
         const field = page.locator('select[data-macro="normalDpi"]');
         await expect(field).toHaveCount(1);
         await expect(field).toBeEnabled();
@@ -380,7 +380,7 @@ test("the demo's controls post their messages", async ({page}) => {
     // controls post without asking.
     await page.goto("/preview/index.html?shell=demo");
     await expect(page.locator(".rail-product")).toHaveText("Demo");
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     await clear();
     await page.locator('select[data-macro="normalDpi"]').selectOption("1400");
     await expect.poll(posted).toEqual([expect.objectContaining({type: "updateConfigDefaults", sectionId: "normalPointerSpeed",

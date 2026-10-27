@@ -21,9 +21,9 @@ function storedKeyboardName(snapshot) {
     try {return decodedOf(snapshot).settings.keyboardName;} catch {return undefined;}
 }
 
-// What the Settings screen's Keyboard card shows. `builtIn` is the firmware's
-// built-in name when the shell knows it: the USB product of a keyboard that
-// enumerated with no stored name.
+// What the Keyboard screen's title shows. `builtIn` is the firmware's built-in
+// name when the shell knows it: the USB product of a keyboard that enumerated
+// with no stored name.
 /** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {string} [builtIn] */
 function keyboardNameView(snapshot, builtIn = "") {
     const name = storedKeyboardName(snapshot);

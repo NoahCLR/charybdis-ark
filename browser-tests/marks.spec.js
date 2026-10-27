@@ -103,7 +103,7 @@ test("the layer bar keeps its swatches, Settings' per-layer switches mark their 
     const bar = await page.locator(".layer-tabs").first().evaluate(marksIn);
     expect(bar.icons).toEqual([]);
     expect(bar.swatches).toBeGreaterThan(1);
-    await openControls(page, "settings");
+    await openControls(page, "behaviours");
     const switches = await page.locator('label.sw:has([data-f^="setting:behaviorsOnLayer"])').evaluateAll((labels) => labels.map((label) => ({
         icons: label.querySelectorAll(".kind-icon").length, swatches: label.querySelectorAll(".swatch").length})));
     expect(switches.length).toBeGreaterThan(1);

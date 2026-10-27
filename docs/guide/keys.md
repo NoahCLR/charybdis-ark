@@ -34,7 +34,7 @@ the Key tab says so. A keycode you set here goes on the top layer and wins.
 
 **Pick…**, or double-clicking a key, opens the keycode picker. It starts with
 a board labelled for your computer's keyboard layout (set in
-[Settings → Your computer](macros.md#your-computer)), with Shift above each
+[Settings → Host](macros.md#your-computer)), with Shift above each
 legend and Option or AltGr on the right. Below it are sections by task:
 **Symbols**, **Navigation**, **Numpad**, **Layers**, **Pointing modes**,
 **Macros**, **Mouse**, **Media**, **Lighting**, **Magic** and **Custom keys**,
@@ -139,13 +139,13 @@ their rows are dimmed and say so. Modifiers alone, a key alone or layers alone
 are a shortcut too. **Clear** removes it.
 
 **What it does** says whether the key sends its shortcut, its behaviour, both
-or nothing yet, and holds the same behaviour editor as the Keys screen. It
+or nothing yet, and holds the same behaviour editor as the Keymap screen. It
 works before the key is on any layer. Where the behaviour leaves a tap or hold
-empty, the key sends its shortcut. **Show on the Keys screen** opens its
+empty, the key sends its shortcut. **Show on the Keymap screen** opens its
 behaviour there, once the key is placed.
 
 **On layers** shows where the key is used; click a layer to see it there, on
-the Keys screen's **Custom keys** tab with the key's row picked. That tab
+the Keymap screen's **Custom keys** tab with the key's row picked. That tab
 lists every custom key a layer reaches, as the Macros tab does for macros.
 **Place on a key…** takes you to the board: pick a layer, then click the key
 to put it on.
@@ -159,8 +159,8 @@ as the key's own do.
 
 ## Key swaps & typing
 
-**Settings → Key swaps & typing** holds keyboard-wide options that apply on
-every layer:
+**Key swaps & typing**, on **Settings → Host** below Your computer, holds
+keyboard-wide options that apply on every layer:
 
 - **Modifiers**: swap left Ctrl and Caps Lock, use Caps Lock as left Ctrl,
   swap Option and Command on either side, disable the Command keys, swap Ctrl

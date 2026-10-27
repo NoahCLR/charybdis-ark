@@ -118,8 +118,9 @@ from the bar.
 
 **Checks** come first: what the draft lets the keyboard do, and what must be
 fixed first. Then the changes, grouped by the area they are edited in:
-Keys, Layers, Behaviours, Combos, Custom keys, Macros, Mouse, Pointing modes,
-Lighting, Settings and so on. Each change shows the fields that differ, with
+Keys, Layers, Behaviours, Combos, Custom keys, Macros, Mouse (what Pointer
+settings edits), Pointing modes, Lighting, Settings (the other Settings
+screens) and so on. Each change shows the fields that differ, with
 the keyboard's value and the draft's side by side.
 
 - **Show** closes Review and opens the change where it is edited.

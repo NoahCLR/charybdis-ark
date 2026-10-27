@@ -13,14 +13,6 @@ async function openPreview(page, theme = "dark", search = "") {
     await page.waitForFunction((expected) => document.documentElement.dataset.theme === expected, theme);
 }
 
-// Opens a folded Settings card or fold by its title, as a person would; one
-// already open is left open.
-/** @param {import("@playwright/test").Page} page @param {string} id a data-section or data-subfold */
-async function openFold(page, id) {
-    const fold = page.locator(`details[data-section="${id}"], details[data-subfold="${id}"]`).first();
-    if (!(await fold.evaluate((node) => /** @type {HTMLDetailsElement} */ (node).open))) await fold.locator(":scope > summary").click();
-}
-
 // The rail's keyboard menu, opened from its button as a person would; one
 // already open is left open.
 /** @param {import("@playwright/test").Page} page */
@@ -45,4 +37,4 @@ async function currentEditMode(page) {
     return Number(value);
 }
 
-module.exports = {chooseEditMode, currentEditMode, keyboardMenu, openFold, openPreview};
+module.exports = {chooseEditMode, currentEditMode, keyboardMenu, openPreview};

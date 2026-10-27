@@ -59,7 +59,7 @@ async function expectBuildLink(line, mark) {
     }
 }
 
-const ready = (page) => expect(page.locator('[data-screen="mouse"]')).toBeEnabled({timeout: 20000});
+const ready = (page) => expect(page.locator('[data-screen="pointer"]')).toBeEnabled({timeout: 20000});
 
 for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "demo" : "keyboard"} import review, use it, and undo`, async ({page, context, baseURL}) => {
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
@@ -145,7 +145,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     expect(await page.evaluate(() => window.__fakeHid)).toEqual({requested: 1, refusedWithoutClick: 0, opened: 1});
 
     // Stage an edit.
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     const field = page.locator('select[data-macro="normalDpi"]');
     await expect(field).toBeEnabled();
     const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
@@ -269,8 +269,8 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await expect(page.locator(".rail-keyboard")).not.toContainText(/Connected|halves|Recovery/);
     await expect(page.locator(".rail-keyboard > .dot")).toHaveAttribute("data-tip", /^Nothing is connected\. The demo/);
 
-    // Mouse: a pointer speed.
-    await page.locator('[data-screen="mouse"]').click();
+    // Pointer settings: a pointer speed.
+    await page.locator('[data-screen="pointer"]').click();
     const dpi = page.locator('select[data-macro="normalDpi"]');
     await expect(dpi).toBeEnabled();
     await dpi.selectOption(await dpi.evaluate((select) => [...select.options].find((option) => !option.selected).value));
@@ -541,7 +541,7 @@ test("the web shell reads, edits and Applies one profile generation without VIA"
     const errors = await open(page);
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     const dpi = page.locator('select[data-macro="normalDpi"]');
     const next = await dpi.evaluate(select => [...select.options].find(option => !option.selected).value);
     await dpi.selectOption(next);
@@ -576,7 +576,7 @@ test("in Live + review an edit reaches the keyboard at once, and review and Save
     await ready(page);
     expect(await currentEditMode(page)).toBe(2);
 
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     const field = page.locator('select[data-macro="normalDpi"]');
     await expect(field).toBeEnabled();
     const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
@@ -601,7 +601,7 @@ test("in Live + review an edit reaches the keyboard at once, and review and Save
     await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(1);
 
     // A key changed again, then Revert puts back what is saved.
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     const again = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
     await field.selectOption(again);
     await expect(page.locator(".commit.live")).toBeVisible();
@@ -627,7 +627,7 @@ test("in Live the keyboard saves an edit by itself and the page says so, without
     await expect(page.locator(".rail-message")).toContainText("Now in Live edit:", {timeout: 20000});
     expect(keyboard.mode).toBe(1);
 
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     const field = page.locator('select[data-macro="normalDpi"]');
     await expect(field).toBeEnabled();
     const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
@@ -649,7 +649,7 @@ test("in Live the keyboard saves an edit by itself and the page says so, without
     expect(dialogs).toEqual([]);
     await ready(page);
     expect(await currentEditMode(page)).toBe(1);
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     await expect(page.locator('select[data-macro="normalDpi"]')).toHaveValue(third);
     await expect(page.locator(".commit.live")).toHaveCount(0);
     expect(errors).toEqual([]);
@@ -674,10 +674,10 @@ test("in Live a held-open menu pauses the looks, and answers held back never dro
     // A select's menu opens: no look goes out while it may be open. A real
     // press moves focus to the select, so the control focused before (a
     // screen button clicked earlier) loses it just after the press.
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     const menu = page.locator('select[data-macro="normalDpi"]');
     await expect(menu).toBeEnabled();
-    await page.locator('[data-screen="mouse"]').focus();
+    await page.locator('[data-screen="pointer"]').focus();
     await menu.dispatchEvent("pointerdown");
     await menu.focus();
     await page.evaluate(() => window.__fakeHidHold(true));

@@ -37,9 +37,9 @@ function retargetBehaviour(from, to, conflict) {
     state.retarget = null;
     const row = conflict === "swap" || conflict === "overwrite"
         ? behaviourListeningTo(model, to)?.keycode || canonicalKeycode(model, to) : canonicalKeycode(model, to);
-    // The editor that moved it follows it to its new key: the Keys screen's
+    // The editor that moved it follows it to its new key: the Keymap screen's
     // open row, or on Custom keys the key now holding it if that is one. Moved
-    // from Custom keys to any other key, it opens on the Keys screen, where
+    // from Custom keys to any other key, it opens on the Keymap screen, where
     // that key's behaviours are, rather than leaving an empty editor here.
     const toCustomKey = (model?.customKeys || []).some((key) => key.keycode === row);
     if (state.screen === "customKeys" && !toCustomKey) Object.assign(state, {screen: "keys", tab: "behaviours", behaviourRoute: null});

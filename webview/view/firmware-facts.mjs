@@ -1,12 +1,9 @@
 // @ts-check
 // What this firmware was built with, as the Keyboard screen states it beside
-// the memory those numbers bound, and as a Settings search finds it there.
+// the memory those numbers bound.
 // Pure: it reads the published model and returns words.
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
-
-// Its other names, so a search for the card itself finds every fact.
-export const FIRMWARE_FACTS_SEARCH = {label: "Built into this firmware", tooltip: "firmware build compiled"};
 
 const BUILD = "Needs a firmware build to change.";
 

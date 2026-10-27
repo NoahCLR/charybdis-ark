@@ -32,20 +32,20 @@ export const STATE_FIELDS = {
     behaviourRow: kept(null),
     behaviourRowShown: kept(null),
     behaviourRoute: kept(null), // {row, group}: the group the picked behaviour was picked in, so the board rings that route only
-    // A route has one open state across the Keys tabs that show it.
+    // A route has one open state across the Keymap tabs that show it.
     reachGroups: kept(initialReachGroups()),
     resetBenchHeight: kept(false), // an explicit reach-section toggle lets the workbench shrink
     // The row picked in each tab. The board rings the keys that reach it, so
     // a row in a table can answer "where do I press for this".
     reachRow: kept({macros: null, customKeys: null, combos: null, pointing: null}),
     cell: kept(null),
-    // The behaviour whose grid `cell` is open in. The Keys screen and the
+    // The behaviour whose grid `cell` is open in. The Keymap screen and the
     // Custom keys screen each show one behaviour editor, and a cell opened in
     // one behaviour never opens in another's grid or takes its shortcuts.
     cellRow: kept(null),
     reveal: kept(null),        // a selector the next render scrolls into view and marks, then forgets
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
-    settingsOpen: kept([]),    // settings sections opened by hand or by a Show, so a render keeps them open
+    settingsOpen: kept([]),    // the Keyboard screen's folds opened by hand, so a render keeps them open
     flashPausesAsked: kept(null), // the connection whose flash pauses an open Diagnostics last asked for
     keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
     stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
@@ -109,7 +109,6 @@ export const STATE_FIELDS = {
     trackball: kept(false),
     rowColour: kept({h: "0", s: "0", v: "0"}),
     ledRow: kept({target: "layer", owner: "", source: ""}),
-    settingsSearch: kept(""),
     overlay: kept(null),
     leaveDemo: kept(null),     // {ask, message}: leaving the demo (or replacing its file) waiting on its question
     modeAsk: kept(null),       // {mode, question}: a switch of edit mode waiting on Save/Revert or Send/Discard

@@ -33,7 +33,7 @@ test("the custom key bank scrolls on its own and keeps its place, so the editor 
     await expectPosition();
     await expect(name).toBeInViewport();
 
-    await page.locator('[data-screen="settings"]').click();
+    await page.locator('[data-screen="behaviours"]').click();
     await page.locator('[data-screen="customKeys"]').click();
     await expect.poll(() => bank.evaluate(node => node.scrollTop)).toBe(0);
 });

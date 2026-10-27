@@ -6,7 +6,7 @@ const {openControls, clearPosts, posted} = require("./control-preview");
 // Letters typed or pasted into a number field never appear in it, so the
 // field never shows text the edit would refuse.
 test("a whole-number setting shows and posts only the digits typed into it", async ({page}) => {
-    await openControls(page, "settings");
+    await openControls(page, "behaviours");
     const field = page.locator('.setrow input[inputmode="numeric"]:not([disabled])').first();
     await field.fill("");
     await field.pressSequentially("1a2b");

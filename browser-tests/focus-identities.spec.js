@@ -14,8 +14,7 @@ async function identityProblems(page) {
 const surfaces = [
     ["keys", {tab: "key"}], ["keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI", cell: "1-hold", cellRow: "KC_LEFT_GUI"}],
     ["keys", {tab: "combos"}], ["keys", {layersOpen: true}],
-    ["settings", {settingsOpen: ["keyBehavior", "comboSettings", "autoMouse", "mouse"]}],
-    ["mouse", {}], ["customKeys", {}], ["macros", {macroSlot: "MACRO_17"}],
+    ["behaviours", {}], ["combos", {}], ["pointer", {}], ["host", {}], ["customKeys", {}], ["macros", {macroSlot: "MACRO_17"}],
     ...["base", "layers", "auto", "pd", "combo", "key", "groups"].map(stage =>
         ["lighting", {stage, layer: 1, pointingSlot: 0, feedbackRow: "holdActiveColor"}]),
     ...[0, 4, 8].map(pointingSlot => ["pointing", {pointingSlot, pdAdvanced: true}]),
@@ -90,19 +89,6 @@ test("Pointing name preserves focus and caret across an accepted edit", async ({
     expect(await previous.evaluate(node => node.isConnected)).toBe(false);
     await expect(input).toBeFocused();
     expect(await input.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([2, 5]);
-});
-
-test("Settings search uses shared focus restoration and retains the editing caret", async ({page}) => {
-    await openControls(page, "settings");
-    const search = page.locator("#settingsSearch");
-    await search.fill("timing");
-    await search.evaluate(node => node.setSelectionRange(2, 4));
-    const old = await search.elementHandle();
-    await page.keyboard.insertText("X");
-    expect(await old.evaluate(node => node.isConnected)).toBe(false);
-    await expect(search).toBeFocused();
-    await expect(search).toHaveValue("tiXng");
-    expect(await search.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([3, 3]);
 });
 
 test("picker search has a unique identity beside its underlying editor", async ({page}) => {
