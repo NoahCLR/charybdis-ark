@@ -7,7 +7,7 @@ const {document} = require("../fixtures/portable-profile");
 
 test("whole-profile checks report inert actions and destination blockers", () => {
     const decoded = validateSnapshot(document());
-    decoded.danglingPdBindings = {7: 2};
+    decoded.danglingPointingKeys = {7: 2};
     // Text the US layout cannot type, with Unicode playback off.
     decoded.macroSlots[0] = Buffer.from("é");
     const checks = profileFindings(decoded, {brightnessMax: 100, effects: [{id: 2}]});
@@ -22,7 +22,7 @@ test("whole-profile checks report inert actions and destination blockers", () =>
 test("whole-profile findings retain new and fixed status beside the keyboard", () => {
     const keyboard = validateSnapshot(document());
     const draft = validateSnapshot(document());
-    draft.danglingPdBindings = {7: 1};
+    draft.danglingPointingKeys = {7: 1};
     const checks = draftProfileChecks(keyboard, draft, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], {});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.status, "new");
 });

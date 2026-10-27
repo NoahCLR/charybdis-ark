@@ -7,7 +7,8 @@ const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression} = require("../schema/compiled-profile-v1");
-const {PD_SLOT_COUNT, actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
+const {actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
+const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
 const {behaviorPlacementProblem} = require("./profile-placement");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
@@ -36,7 +37,7 @@ function integer(value, max, label, optional = false) {
 /** @param {Buffer} payload @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editKeyBehaviors(payload, message, capabilities = {}) {
     if (!((capabilities.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS)) throw invalid("This firmware does not support saving key behaviours.");
-    const maxPdModes = PD_SLOT_COUNT;
+    const maxPdModes = POINTING_SLOT_COUNT;
     /** @type {{rows: Row[]}} */
     const {rows} = decodeKeyBehaviorDomain(payload, profileDepthOptions(capabilities).behaviors);
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest ?? 0);

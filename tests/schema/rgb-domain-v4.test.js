@@ -4,7 +4,7 @@
 // Ark's own further cases built from the compiled profile's lighting.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {RGB_DOMAIN_V1, RGB_PD_MODE_IDS, decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
+const {RGB_DOMAIN_V1, RGB_POINTING_MODE_IDS, decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
@@ -39,8 +39,8 @@ const reject = (fn, code) => assert.throws(fn, error => error.code === code, `ex
 const v4 = () => validateSnapshot(document()).rgb;
 
 test("format 4 colours 16 layers and 32 pointing slots and round-trips", () => {
-    assert.equal(RGB_DOMAIN_V1.PD_SLOTS, 32);
-    assert.equal(RGB_PD_MODE_IDS.PD_MODE_SLOT_31, 31);
+    assert.equal(RGB_DOMAIN_V1.POINTING_SLOTS, 32);
+    assert.equal(RGB_POINTING_MODE_IDS.POINTING_MODE_31, 31);
     const encoded = encodeRgbDomainV1(v4());
     assert.equal(encoded[0], 4);
     assert.equal(encoded[5], 16, "header byte 5 counts the layer colours");

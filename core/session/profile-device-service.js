@@ -18,7 +18,7 @@ const {baseLighting} = require("../model/settings-editor");
 const {profilePlacementProblem} = require("../model/profile-placement");
 const {knownActionAbi} = require("../schema/actions");
 const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
-const {pdBindingOfCode} = require("../data/pd-bindings");
+const {pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {layerName} = require("../model/vocabulary");
 const {readSettings, readSettingsLimits} = require("../protocol/portable-profile-v1");
 const {deviceLabels, editorViews} = require("./device-model");
@@ -1458,7 +1458,7 @@ function unnamedKeyCount(layers, capabilities) {
     const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest ?? 0);
     /** @param {import("./types.js").LayoutKey} key */
     const named = ({keycode, resolved}) => resolved.known
-        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdBindingOfCode(keycode) !== undefined);
+        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdModeKeyOfCode(keycode) !== undefined);
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 

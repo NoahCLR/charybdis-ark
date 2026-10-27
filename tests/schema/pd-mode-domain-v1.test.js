@@ -21,8 +21,8 @@ test("native PD, layer-lock and custom-key identities sit in their fixed blocks"
     const {resolveNativeQmkExpression} = require("../../core/schema/compiled-profile-v1");
     const model = {layers: Array.from({length: 16}, (_, id) => ({id}))};
     for (let id = 0; id < 16; id++) {
-        assert.equal(resolveNativeQmkExpression(`PD_SLOT_${id}`, model), 0x7e80 + id);
-        assert.equal(resolveNativeQmkExpression(`PD_SLOT_${id}_LOCK`, model), 0x7ea0 + id);
+        assert.equal(resolveNativeQmkExpression(`PD_MODE_${id}`, model), 0x7e80 + id);
+        assert.equal(resolveNativeQmkExpression(`PD_MODE_${id}_LOCK`, model), 0x7ea0 + id);
         assert.equal(resolveNativeQmkExpression(`LOCK_LAYER(${id})`, model), 0x7ec0 + id);
     }
     assert.equal(resolveNativeQmkExpression("LOCK_LAYER(16)", model), undefined, "only sixteen layers have a lock");

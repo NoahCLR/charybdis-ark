@@ -7,7 +7,7 @@ const {validateSnapshot, fingerprint} = require("../../core/model/portable-profi
 const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
 const {STARTING} = require("../../core/session/keyboard-starting");
 const {PHASE} = require("../../core/model/vocabulary");
-const {backup32, document32} = require("../fixtures/pd-slots-32");
+const {backup32, document32} = require("../fixtures/pointing-slots-32");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 const pdProfile = require("../fixtures/pd-profile");
 

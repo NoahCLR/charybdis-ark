@@ -32,7 +32,7 @@ test("a duration keeps one decimal point and no letters", async ({page}) => {
 });
 
 test("a pointing tuning field drops pasted letters", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 0});
+    await openControls(page, "pointing", {pointingSlot: 0});
     const field = page.locator('.pd-editor input[inputmode="numeric"]:not([disabled])').first();
     await field.fill("");
     await page.keyboard.insertText("4x0");

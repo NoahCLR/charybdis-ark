@@ -75,7 +75,7 @@ export const STATE_FIELDS = {
     stage: kept("layers"),
     layersOpen: kept(false),  // the layer-stack panel on the layer row
     layersAsked: kept(false), // its stack is requested once per opening
-    pdSlot: kept(0),
+    pointingSlot: kept(0),
     pdKind: resets(null),      // movement selection while the rebuilt form catches up: {slot, kind}
     pdTaps: resets(null),      // {slot, rows: {"dir:up": tap}}: direction shortcuts set to ignore modifiers before any is chosen
     pdAdvanced: kept(false),  // Advanced open on the pointing editor, whichever slot is shown

@@ -175,7 +175,7 @@ test("keys: a key change posts", async ({page}) => {
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys"})]);
 });
 test("lighting: a layer colour posts", async ({page}) => {
-    await openLive(page, "lighting", {stage: "layers", layer: 1, pdSlot: 0, feedbackRow: "holdActiveColor"});
+    await openLive(page, "lighting", {stage: "layers", layer: 1, pointingSlot: 0, feedbackRow: "holdActiveColor"});
     await change(page.locator('#benchBody [data-channel="0"]'), 71);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateLayerColor", h: 71})]);
 });
@@ -190,7 +190,7 @@ test("combos: the default window posts", async ({page}) => {
     await expectPost(page, {type: "updateComboDefaultWindow", defaultTermMs: "77"});
 });
 test("pointing: a scrolling field posts its record", async ({page}) => {
-    await openLive(page, "pointing", {pdSlot: 0});
+    await openLive(page, "pointing", {pointingSlot: 0});
     await change(page.locator('[data-f="pointing:0:scroll:divisorH"]'), 71);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "savePdMode"})]);
 });

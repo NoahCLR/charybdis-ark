@@ -30,7 +30,7 @@ function model(overrides = {}) {
                 {layer: "Layer 3", layerId: 3, color: colour(180, 255, 200), mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"},
                 {layer: "Layer 4", layerId: 4, color: colour(0, 0, 158), mode: "ALL_KEYS"},
             ],
-            pdModeColors: [{pointingMode: "PD_MODE_DRAGSCROLL", color: colour(21, 255, 200), locality: "RGB_RIGHT_HALF"}],
+            pdModeColors: [{pointingMode: "POINTING_MODE_DRAGSCROLL", color: colour(21, 255, 200), locality: "RGB_RIGHT_HALF"}],
             comboFeedback: {color: colour(0, 0, 0), locality: "RGB_KEYS_ONLY"},
             keyBehaviorFeedback: {
                 tapCommittedColor: colour(0, 0, 158), holdActiveColor: colour(18, 255, 200),
@@ -156,7 +156,7 @@ test("a pointing mode is an overlay on its locality, never on the key that binds
     assert.deepEqual(row.color, colour(21, 255, 200));
     const preview = {color: row.color, locality: row.locality, triggerIndex: 0};
 
-    const bindingKey = keyLight(m, {index: 3}, position(0, "PD_SLOT_0"));
+    const bindingKey = keyLight(m, {index: 3}, position(0, "PD_MODE_0"));
     assert.notDeepEqual(bindingKey.colour, row.color, "binding a mode does not colour its key");
 
     const right = keyLight(m, {index: 3}, position(7, "KC_TRANSPARENT"), {pdActive: preview});
@@ -165,7 +165,7 @@ test("a pointing mode is an overlay on its locality, never on the key that binds
 
     const left = keyLight(m, {index: 3}, position(0, "KC_TRANSPARENT"), {pdActive: preview});
     assert.equal(left.source, "base", "the left half is outside this locality");
-    const leftMapped = keyLight(m, {index: 3}, position(0, "PD_SLOT_0"), {pdActive: preview});
+    const leftMapped = keyLight(m, {index: 3}, position(0, "PD_MODE_0"), {pdActive: preview});
     assert.equal(leftMapped.source, "layer", "and there the layer still owns its own keys");
 
     const stageOff = model({rgb: {...model().rgb, stages: [{id: "pd", label: "Pointing modes", enabled: false}]}});
@@ -231,13 +231,13 @@ test("LED group rows paint their LEDs, inheriting their stage colour when stored
             {owner: "RGB_LAYER_GROUP_ALL", color: colour(40, 255, 120), ledIndices: [56]},
             {owner: "Layer 5", color: colour(10, 255, 255), ledIndices: [6]},
         ],
-        pdModeLedGroups: [{owner: "RGB_PD_MODE_GROUP_ALL", color: colour(0, 0, 0), ledIndices: [6]}],
+        pdModeLedGroups: [{owner: "RGB_POINTING_MODE_GROUP_ALL", color: colour(0, 0, 0), ledIndices: [6]}],
     });
     const layer = {index: 3};
     assert.deepEqual(keyLight(m, layer, position(14, "KC_TRANSPARENT")).colour, colour(180, 255, 200), "inherits the layer colour on an unmapped key");
     assert.deepEqual(trackballLight(m, layer).colour, colour(40, 255, 120), "a group can reach the trackball");
     assert.deepEqual(keyLight(m, layer, position(13, "KC_UP")).colour, colour(180, 255, 200), "a row for an inactive layer does not paint");
-    const pdActive = {mode: "PD_MODE_DRAGSCROLL", color: colour(21, 255, 200), locality: "RGB_RIGHT_HALF"};
+    const pdActive = {mode: "POINTING_MODE_DRAGSCROLL", color: colour(21, 255, 200), locality: "RGB_RIGHT_HALF"};
     assert.deepEqual(keyLight(m, layer, position(13, "KC_UP"), {pdActive}).colour, colour(21, 255, 200),
         "a pointing group row paints the mode colour on the left half too");
 });
@@ -277,14 +277,14 @@ test("a base-effect LED class the effect skips stays unlit; an animated effect i
 
 test("a trackball mode previews from its first placed key, and black paints dark", async () => {
     const {pdTrigger} = await import("../../webview/view/lighting.mjs");
-    const pd = {pdModes: [{id: 0, kind: 2, binding: {slot: 0, hold: "PD_SLOT_0", lock: "PD_LOCK_0"}}]};
-    const base = {index: 0, positions: [position(0, "KC_A"), {layoutIndex: 40, keycode: "QK_USER_16", semantic: "PD_SLOT_0"}]};
+    const pd = {pdModes: [{id: 0, kind: 2, keys: {slot: 0, hold: "PD_MODE_0", lock: "PD_LOCK_0"}}]};
+    const base = {index: 0, positions: [position(0, "KC_A"), {layoutIndex: 40, keycode: "QK_USER_16", semantic: "PD_MODE_0"}]};
     const other = {index: 3, positions: [{layoutIndex: 5, keycode: "QK_USER_17", semantic: "PD_LOCK_0"}]};
     const m = {...model(), ...pd, layers: [base, other]};
     assert.deepEqual(pdTrigger(m, base, 0), {layoutIndex: 40, layer: 0});
     assert.deepEqual(pdTrigger(m, other, 0), {layoutIndex: 5, layer: 3}, "the viewed layer's key first");
     assert.equal(pdTrigger(m, base, 1), null);
-    const black = {mode: "PD_MODE_DRAGSCROLL", color: colour(0, 0, 0), locality: "RGB_RIGHT_HALF"};
+    const black = {mode: "POINTING_MODE_DRAGSCROLL", color: colour(0, 0, 0), locality: "RGB_RIGHT_HALF"};
     const light = keyLight(model(), {index: 0, positions: []}, position(11, "KC_A"), {pdActive: black});
     assert.equal(light.source, "pointing");
     assert.ok(isOff(light.colour), "the right half goes dark");

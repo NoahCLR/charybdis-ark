@@ -44,7 +44,7 @@ export interface DecodedProfile {
     combos: ReturnType<typeof import('../schema/combo-domain-v1.js').decodeComboDomain>;
     pdModes: ReturnType<typeof import('../schema/pd-mode-domain-v1.js').decodePdDomain>;
     codecOptions: ReturnType<typeof import('../schema/profile-depth.js').profileDepthOptions>;
-    danglingPdBindings: Record<string, number>;
+    danglingPointingKeys: Record<string, number>;
 }
 export interface ProfileSummary {layers: number; behaviors: number; combos: number; macros: number; names: string[]}
 export interface SnapshotFacts {

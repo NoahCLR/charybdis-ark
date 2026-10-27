@@ -154,7 +154,7 @@ export function placeState(place, layers = []) {
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};
         case "macro": return {screen: "macros", macroSlot: `MACRO_${place.index}`};
         case "customKey": return {screen: "customKeys", customKey: `CUSTOM_KEY_${place.index}`};
-        case "pointing": return {screen: "pointing", pdSlot: place.slot, pdKind: null, pdTaps: null};
+        case "pointing": return {screen: "pointing", pointingSlot: place.slot, pdKind: null, pdTaps: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
         // A section is edited on the screen its area names: a lighting stage
         // for a Lighting one, the top of Lighting for one above every stage,

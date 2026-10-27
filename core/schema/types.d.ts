@@ -137,7 +137,7 @@ export interface MacroOptions {
 }
 
 export interface PdTap {keycode: number; modifierPolicy: number; mask: number}
-export interface PdSlot {
+export interface PointingSlot {
     id: number;
     kind: number;
     pointerLayer: number;
@@ -159,7 +159,7 @@ export interface PdSlot {
     emptyDirection: number;
     directionOutput: number;
 }
-export type PdSlotInput = Partial<Omit<PdSlot, 'directions' | 'diagonals'>> & {
+export type PointingSlotInput = Partial<Omit<PointingSlot, 'directions' | 'diagonals'>> & {
     id: number;
     name: string;
     directions?: Record<string, Partial<PdTap>>;

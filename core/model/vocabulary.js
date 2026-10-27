@@ -228,7 +228,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         {id: "base", label: "Background effect"},
         {id: "layers", label: "Layer colours", bit: RGB_STAGE_BITS.LAYER},
         {id: "auto", label: "Auto-mouse fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
-        {id: "pd", label: "Pointing modes", bit: RGB_STAGE_BITS.PD_MODE},
+        {id: "pd", label: "Pointing modes", bit: RGB_STAGE_BITS.POINTING_MODE},
         {id: "combo", label: "Combo feedback", bit: RGB_STAGE_BITS.COMBO},
         {id: "key", label: "Key feedback", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
     ],

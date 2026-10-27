@@ -92,7 +92,7 @@ function readName(p, offset) {
 function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
     /** @param {string} code @param {number} at @param {string} message @returns {never} */
     const reject = (code, at, message) => fail(code, offset + at, message);
-    if (p[0] !== slot) reject("INVALID_ID", 0, `PD slots must appear exactly once in ID order 0–${slots - 1}.`);
+    if (p[0] !== slot) reject("INVALID_ID", 0, `Pointing slots must appear exactly once in ID order 0–${slots - 1}.`);
     // Reserved: byte 7, bytes 9..10 before the link, version 2's name field
     // past the link (bytes 16..31,
     // since the name moved), version 3's mouse button records (bytes 52..69)
@@ -142,7 +142,7 @@ function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
 function tapFromBytes(bytes, at) {
     return {keycode: bytes.readUInt16LE(at), modifierPolicy: bytes[at + 2], mask: bytes[at + 3]};
 }
-/** @param {Buffer} p @param {number} id @param {number} offset @returns {import("./types.js").PdSlot} */
+/** @param {Buffer} p @param {number} id @param {number} offset @returns {import("./types.js").PointingSlot} */
 function slotOfRecord(p, id, offset) {
     return {
         id, kind: p[1], pointerLayer: p[2], axis: p[3], dpi: p.readUInt16LE(4), heldModifiers: p[6], name: readName(p, offset),
@@ -220,7 +220,7 @@ function writeTap(p, at, value = {}) {
     p[at + 2] = integer(optional(value.modifierPolicy, 0), 255);
     p[at + 3] = integer(optional(value.mask, 0), 255);
 }
-/** @param {Buffer} p @param {import("./types.js").PdSlotInput} input @param {number} id */
+/** @param {Buffer} p @param {import("./types.js").PointingSlotInput} input @param {number} id */
 function writeRecord(p, input, id) {
     const slot = object(input, ["id", "kind", "pointerLayer", "axis", "dpi", "heldModifiers", "name", "linkedLayers", "linkTurnsOn", "linkEnds", "thresholdX", "thresholdY", "directions", "scroll", "diagonals", "emptyDirection", "directionOutput"], "Slot");
     p[0] = integer(slot.id, 255);
@@ -248,21 +248,21 @@ function writeRecord(p, input, id) {
 // The 32 slots, with only the records the sparse format needs. The bytes
 // are checked by decoding them, so the decoder's own canonical check writes
 // with writePdDomain rather than encoding again.
-/** @param {import("./types.js").PdSlotInput[]} slots */
+/** @param {import("./types.js").PointingSlotInput[]} slots */
 function encodePdDomain(slots) {
     const bytes = writePdDomain(slots);
     decodePdDomain(bytes);
     return bytes;
 }
-/** @param {import("./types.js").PdSlotInput[]} slots */
+/** @param {import("./types.js").PointingSlotInput[]} slots */
 function writePdDomain(slots) {
-    if (!Array.isArray(slots) || slots.length !== PD_DOMAIN.SLOTS) fail("INVALID_LENGTH", 0, `Exactly ${PD_DOMAIN.SLOTS} PD slots are required.`);
+    if (!Array.isArray(slots) || slots.length !== PD_DOMAIN.SLOTS) fail("INVALID_LENGTH", 0, `Exactly ${PD_DOMAIN.SLOTS} pointing slots are required.`);
     const {RECORD_SIZE, SLOTS, VERSION} = PD_DOMAIN;
     const records = [];
     for (let id = 0; id < SLOTS; id++) {
         const slot = slots[id];
         if (!slot || typeof slot !== "object" || Array.isArray(slot)) fail("INVALID_ARGUMENT", 0, "Slot must be an object with supported fields.");
-        if (slot.id !== id) fail("INVALID_ID", 0, `PD slots must appear exactly once in ID order 0–${SLOTS - 1}.`);
+        if (slot.id !== id) fail("INVALID_ID", 0, `Pointing slots must appear exactly once in ID order 0–${SLOTS - 1}.`);
         if (!storesRecord({kind: slot.kind ?? 0, name: slot.name})) continue;
         const p = Buffer.alloc(RECORD_SIZE);
         writeRecord(p, slot, id);
@@ -274,7 +274,7 @@ function writePdDomain(slots) {
 // One 128-byte record, and its rules, alone. The firmware's frozen record
 // corpus is wrapped in the retired eight-slot envelope; the cross-language
 // runner checks its records with these, and no profile carries that envelope.
-/** @param {import("./types.js").PdSlotInput} slot @param {number} [id] */
+/** @param {import("./types.js").PointingSlotInput} slot @param {number} [id] */
 function encodePdRecord(slot, id = slot?.id) {
     const p = Buffer.alloc(PD_DOMAIN.RECORD_SIZE);
     writeRecord(p, slot, id);

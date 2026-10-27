@@ -16,8 +16,8 @@ profile slots, record layout and marker values are
 
 A save writes one thing: the complete profile, every domain the keymap and
 macros included, as one generation in one profile slot on each half
-([D-F40](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0040-apply-publishes-one-atomic-generation.md),
-[D-F31](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0031-via-is-not-supported.md)). Nothing outside the profile is
+([D-F40](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0040-apply-publishes-one-atomic-generation.md),
+[D-F31](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0031-via-is-not-supported.md)). Nothing outside the profile is
 part of a save: the edit mode, stored apart from every profile, and the
 runtime toggles are neither written nor rolled back by one, and the settings
 QMK holds are pushed into QMK from the profile, never saved from it
@@ -120,8 +120,8 @@ returns.
 
 Both halves always prepare and validate the complete candidate; reusing
 ranges skips sending bytes, never a durable step
-([D-F18](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0018-differential-upload-builds-complete-candidate.md),
-[D-F19](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0019-the-copy-reuses-what-the-other-half-has.md)).
+([D-F18](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0018-differential-upload-builds-complete-candidate.md),
+[D-F19](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0019-the-copy-reuses-what-the-other-half-has.md)).
 
 A keyboard without a slave half goes from validated straight to committing,
 writes steps 4–7 and activates.
@@ -212,7 +212,7 @@ Held by: `tests/host/run_profile_owner_tests.sh` (`test_lost_link_after_decision
 ## Cancellation
 
 Only the keyboard ends a candidate
-([D-F48](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0048-only-the-keyboard-ends-a-candidate.md)). Before the
+([D-F48](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0048-only-the-keyboard-ends-a-candidate.md)). Before the
 decision every cause takes one path; after it nothing cancels, whatever the
 client saw, and an abort answers `INVALID_STATE`.
 
@@ -233,7 +233,7 @@ The path:
    saved profile left as it was, once the slave half acknowledges the
    `ABORT`, or answers it with a storage error (it rejected the copy itself),
    or after 15 s (`NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS`) without
-   either ([D-F41](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0041-cancelled-save-ends-in-bounded-time.md)).
+   either ([D-F41](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0041-cancelled-save-ends-in-bounded-time.md)).
 3. Released unacknowledged, the `ABORT` becomes peer cleanup: neither half
    holds a marker for the copy, so durable authority is unchanged on both;
    profile status flag 8 stays set, the `ABORT` is retried about once a

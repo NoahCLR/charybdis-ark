@@ -32,6 +32,9 @@ function fixtures() {
             return [line.slice(0, separator), line.slice(separator + 1)];
         }));
     const actionKinds = Object.keys(PROFILE_ACTION_KINDS);
+    // The shared fixture keeps the action kinds' former pointing names.
+    /** @type {Record<string, string>} */
+    const fixtureKind = {POINTING_MODE_MOMENTARY: "PD_MODE_MOMENTARY", POINTING_MODE_LOCK: "PD_MODE_LOCK"};
     return {
         empty: {
             hex: values.get("blob.empty.hex"),
@@ -49,8 +52,8 @@ function fixtures() {
         },
         actions: actionKinds.map((kind) => ({
             kind,
-            operand: Number.parseInt(values.get(`action.${kind}.operand`), 10),
-            hex: values.get(`action.${kind}.hex`),
+            operand: Number.parseInt(values.get(`action.${fixtureKind[kind] || kind}.operand`), 10),
+            hex: values.get(`action.${fixtureKind[kind] || kind}.hex`),
         })),
     };
 }

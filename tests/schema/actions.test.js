@@ -1,15 +1,15 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {actionName, nativeCode, keycodeAction, pdSlotOfCode, layerRef, layerOfRef, knownActionAbi} = require("../../core/schema/actions");
+const {actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef, knownActionAbi} = require("../../core/schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../../core/schema/profile-blob-v1");
 
 test("an action has one name and one native keycode", () => {
     assert.equal(actionName({kind: ACTION.QMK_KEYCODE, operand: 0x04}), "KC_A");
     assert.equal(actionName({kind: ACTION.LAYER_MOMENTARY, operand: 2}), "MO(2)");
-    assert.equal(actionName({kind: ACTION.PD_MODE_MOMENTARY, operand: 0}), "PD_SLOT_0");
-    assert.equal(actionName({kind: ACTION.PD_MODE_LOCK, operand: 7}), "PD_SLOT_7_LOCK");
+    assert.equal(actionName({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}), "PD_MODE_0");
+    assert.equal(actionName({kind: ACTION.POINTING_MODE_LOCK, operand: 7}), "PD_MODE_7_LOCK");
     assert.equal(nativeCode({kind: ACTION.QMK_KEYCODE, operand: 0x04}), 0x04);
-    assert.equal(nativeCode({kind: ACTION.PD_MODE_LOCK, operand: 0}), 0x7ea0);
+    assert.equal(nativeCode({kind: ACTION.POINTING_MODE_LOCK, operand: 0}), 0x7ea0);
     assert.equal(actionName({kind: ACTION.CUSTOM_KEY, operand: 127}), "CUSTOM_KEY_127");
     // Custom keys sit at 0x7f00 + n since firmware D-F14; layer locks cover sixteen layers.
     assert.equal(nativeCode({kind: ACTION.CUSTOM_KEY, operand: 3}), 0x7f03);
@@ -18,14 +18,14 @@ test("an action has one name and one native keycode", () => {
     assert.equal(nativeCode({kind: ACTION.LAYER_LOCK, operand: 15}), 0x7ecf);
     assert.equal(actionName({kind: ACTION.LAYER_MOMENTARY, operand: 15}), "MO(15)");
     assert.deepEqual(keycodeAction(0x29), {kind: ACTION.QMK_KEYCODE, operand: 0x29});
-    assert.equal(pdSlotOfCode(0x7e87), 7);
-    assert.equal(pdSlotOfCode(0x7ea7), 7);
-    assert.equal(pdSlotOfCode(0x0004), undefined);
+    assert.equal(pointingSlotOfCode(0x7e87), 7);
+    assert.equal(pointingSlotOfCode(0x7ea7), 7);
+    assert.equal(pointingSlotOfCode(0x0004), undefined);
     // The keycode blocks hold 32 slots; how many a keyboard has is its
     // current vocabulary defines 32 slots, and its decode limits enforce it.
-    assert.equal(actionName({kind: ACTION.PD_MODE_LOCK, operand: 31}), "PD_SLOT_31_LOCK");
-    assert.equal(nativeCode({kind: ACTION.PD_MODE_MOMENTARY, operand: 31}), 0x7e9f);
-    assert.throws(() => actionName({kind: ACTION.PD_MODE_MOMENTARY, operand: 32}), /pointing slot/);
+    assert.equal(actionName({kind: ACTION.POINTING_MODE_LOCK, operand: 31}), "PD_MODE_31_LOCK");
+    assert.equal(nativeCode({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 31}), 0x7e9f);
+    assert.throws(() => actionName({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 32}), /pointing slot/);
 });
 
 test("one action vocabulary is known, and a layer reference reads back", () => {
@@ -75,11 +75,12 @@ test("placement covers all sixteen layers and refuses a layer past the bank", ()
 });
 
 test("the keyboard has the 32 pointing slots of the keycode blocks", () => {
-    const {ACTION_ABI, KNOWN_ACTION_ABIS, PD_SLOT_COUNT} = require("../../core/schema/actions");
+    const {ACTION_ABI, KNOWN_ACTION_ABIS} = require("../../core/schema/actions");
+    const {POINTING_SLOT_COUNT} = require("../../core/data/pd-mode-keys");
     assert.deepEqual(KNOWN_ACTION_ABIS, [ACTION_ABI]);
     assert.equal(ACTION_ABI, 0x67df11b3);
-    assert.equal(PD_SLOT_COUNT, 32);
-    assert.equal(pdSlotOfCode(0x7e94), 20);
-    assert.equal(pdSlotOfCode(0x7ebf), 31);
-    assert.equal(pdSlotOfCode(0x7ec0), undefined, "the layer-lock block");
+    assert.equal(POINTING_SLOT_COUNT, 32);
+    assert.equal(pointingSlotOfCode(0x7e94), 20);
+    assert.equal(pointingSlotOfCode(0x7ebf), 31);
+    assert.equal(pointingSlotOfCode(0x7ec0), undefined, "the layer-lock block");
 });

@@ -14,7 +14,7 @@
 // a screen shows one, keeps the number.
 
 const {VOCABULARY} = require("./vocabulary");
-const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
+const {PD_MODE_KEYS, pdModeKeyOfName} = require("../data/pd-mode-keys");
 const {CUSTOM_KEY_SLOTS, customKeyCode, layerLockOfCode} = require("../data/user-keycodes");
 const keycodes = require("../data/keycode-catalog");
 const {actionName} = require("../schema/actions");
@@ -31,9 +31,16 @@ const {shortcutPresent, shortcutSends} = require("../schema/settings-domain-v1")
 const LAYER_VERBS = {MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"};
 const LAYER_KEY = /^(MO|TG|TT|OSL|TO|DF|PDF|LOCK_LAYER)\((\d+)\)$/;
 
-// LOCK_LAYER(2) → "Lock layer 2".
+// A pointing key by its slot: "Dragscroll · hold", "Slot 6 · lock (empty)",
+// or "Slot 0 · hold" where the keyboard reported no slots.
+/** @param {{id: number, kind: number, name: string} | undefined} slot @param {number} id @param {boolean} locked */
+const pointingKeyLabel = (slot, id, locked) => `${slotName(slot, id)} · ${locked ? "lock" : "hold"}${slot && !slot.kind ? " (empty)" : ""}`;
+
+// LOCK_LAYER(2) → "Lock layer 2", PD_MODE_0 → "Slot 0 · hold".
 /** @param {string} semantic */
 function semanticLabel(semantic) {
+    const pointing = pdModeKeyOfName(semantic);
+    if (pointing) return pointingKeyLabel(undefined, pointing.slot, pointing.locked);
     const [, name, args] = /^([A-Z][A-Z0-9_]*)(?:\((.*)\))?$/.exec(semantic) || [, semantic, undefined];
     const words = name.replace(/_/g, " ").toLowerCase();
     return words.charAt(0).toUpperCase() + words.slice(1) + (args === undefined ? "" : ` ${args.replace(/\s+/g, "")}`);
@@ -43,7 +50,7 @@ function semanticLabel(semantic) {
  * What one profile renames, over the catalogue.
  *
  *   labels    keycode name → label, under the stored name and the profile's own
- *   aliases   stored name → the profile's name for it (QK_USER_16 → PD_SLOT_0)
+ *   aliases   stored name → the profile's name for it (QK_USER_16 → PD_MODE_0)
  *   pointing  every pointing-mode keycode, {name, native, code, label}
  *   custom    every custom key, {name, native, code, label}
  *   keyLayers keycode name → the layer it acts on, for every layer key named
@@ -98,7 +105,7 @@ function hostLayoutNames(layoutId, macosIso) {
 }
 
 /**
- * @param {{hostOs?: number, hostLayout?: number, macosIso?: boolean, layers?: string[], macros?: {keycode: string, name?: string}[], customKeys?: {slot: number, name?: string}[], behaviors?: Pick<import("../schema/types.js").BehaviorRow, 'target'>[], pdModes?: Pick<import("../schema/types.js").PdSlot, 'id' | 'name' | 'kind'>[], actionsKnown?: boolean}} [options]
+ * @param {{hostOs?: number, hostLayout?: number, macosIso?: boolean, layers?: string[], macros?: {keycode: string, name?: string}[], customKeys?: {slot: number, name?: string}[], behaviors?: Pick<import("../schema/types.js").BehaviorRow, 'target'>[], pdModes?: Pick<import("../schema/types.js").PointingSlot, 'id' | 'name' | 'kind'>[], actionsKnown?: boolean}} [options]
  * @returns {import("../../contracts/model.js").ProfileKeyNames}
  */
 function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, macosIso = false, layers, macros = [], customKeys = [], behaviors = [], pdModes = [], actionsKnown = false} = {}) {
@@ -175,9 +182,9 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     // still empty, and stays put when a slot is cleared. It does nothing until
     // the slot is configured, which the label says.
     for (const slot of pdModes) for (const locked of [false, true]) {
-        const binding = PD_SLOT_BINDINGS[slot.id];
-        const name = locked ? binding.lock : binding.hold, code = locked ? binding.lockCode : binding.holdCode;
-        const label = `${slotName(slot)} · ${locked ? "lock" : "hold"}${slot.kind ? "" : " (empty)"}`;
+        const keys = PD_MODE_KEYS[slot.id];
+        const name = locked ? keys.lock : keys.hold, code = locked ? keys.lockCode : keys.holdCode;
+        const label = pointingKeyLabel(slot, slot.id, locked);
         const native = keycodes.resolve(code).name;
         aliases[native] = name;
         labels[native] = label;

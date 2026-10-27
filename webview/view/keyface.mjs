@@ -80,7 +80,7 @@ const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 
 // A position carries two names: the one the keyboard stores (`QK_USER_16`, or
 // bare hex for a value the shipped vocabulary never named) and the one the rest
-// of the profile uses (`PD_SLOT_0`, `MACRO_0`, `LEFT_THUMB`). Behaviour
+// of the profile uses (`PD_MODE_0`, `MACRO_0`, `LEFT_THUMB`). Behaviour
 // rows, macro slots and pointing slots are all keyed by the second, so every
 // lookup from a key to what it reaches goes through this.
 export const keyMeaning = (/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position) => position?.semantic || position?.keycode || "";
@@ -217,12 +217,12 @@ export function behaviourGridLayout(behaviour, advertisedMaximum = 5, all = fals
 
 /** @param {string | undefined} action */
 const pointingSlotOf = (action) => {
-    const match = /^PD_SLOT_(\d+)(?:_LOCK)?$/.exec(String(action ?? ""));
+    const match = /^PD_MODE_(\d+)(?:_LOCK)?$/.exec(String(action ?? ""));
     return match ? Number(match[1]) : null;
 };
 // A pointing-mode key holds its mode from the press unless a later tap count
 // holds another mode: then it waits for Tap / hold, so the two modes never
-// overlap (key_behavior_lookup.c, key_behavior_step_references_foreign_pd_mode).
+// overlap (key_behavior_lookup.c, key_behavior_step_references_foreign_pointing_mode).
 /** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").InheritedBranch} hold */
 function builtInHoldNow(behaviour, hold) {
     const own = pointingSlotOf(hold.action);

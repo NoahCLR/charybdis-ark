@@ -39,7 +39,7 @@ const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
 const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
-const {pdBindingOfCode, PD_SLOT_BINDINGS} = require("../data/pd-bindings");
+const {pdModeKeyOfCode, PD_MODE_KEYS} = require("../data/pd-mode-keys");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {SETTING, SHORTCUT_LAYER_KINDS, alwaysOnLayers} = require("../schema/settings-domain-v1");
@@ -83,8 +83,8 @@ const layersIn = (mask) => Array.from({length: LAYERS}, (_, layer) => layer).fil
 /** @param {number} code */
 // All semantic actions in a validated current-ABI profile have native keycodes.
 const codeName = (code) => {
-    const binding = pdBindingOfCode(code);
-    if (binding) return binding.locked ? PD_SLOT_BINDINGS[binding.slot].lock : PD_SLOT_BINDINGS[binding.slot].hold;
+    const key = pdModeKeyOfCode(code);
+    if (key) return key.locked ? PD_MODE_KEYS[key.slot].lock : PD_MODE_KEYS[key.slot].hold;
     const custom = customKeyOfCode(code);
     if (custom !== undefined) return `CUSTOM_KEY_${custom}`;
     return layerLockOfCode(code) !== undefined ? `LOCK_LAYER(${layerLockOfCode(code)})`
@@ -140,8 +140,8 @@ const shortcutsBySlot = (owners) => Array.from({length: 128}, (_, slot) => owner
 function layerEffects(code, links, own = true) {
     /** @param {number} layer @param {LayerEffect[]} effects @returns {LayerEffect[]} */
     const within = (layer, effects) => (layer < LAYERS ? effects : [{kind: "unowned", layer}]);
-    const binding = pdBindingOfCode(code);
-    if (binding) return modeEffects(binding.slot, binding.locked, links);
+    const key = pdModeKeyOfCode(code);
+    if (key) return modeEffects(key.slot, key.locked, links);
     const custom = customKeyOfCode(code);
     if (custom !== undefined) return shortcutEffects(custom, links, own);
     if (code >= 0x4000 && code <= 0x4fff) return within((code >> 8) & 15, [{kind: "hold", layer: (code >> 8) & 15}]);
@@ -166,7 +166,7 @@ function actionEffects(action, links) {
     if (!action) return [];
     if (action.kind === ACTION.LAYER_MOMENTARY) return action.operand < LAYERS ? [{kind: "hold", layer: action.operand}] : [];
     if (action.kind === ACTION.LAYER_LOCK) return action.operand < LAYERS ? [{kind: "lock", layer: action.operand}] : [];
-    if (action.kind === ACTION.PD_MODE_MOMENTARY || action.kind === ACTION.PD_MODE_LOCK) return modeEffects(action.operand, action.kind === ACTION.PD_MODE_LOCK, links);
+    if (action.kind === ACTION.POINTING_MODE_MOMENTARY || action.kind === ACTION.POINTING_MODE_LOCK) return modeEffects(action.operand, action.kind === ACTION.POINTING_MODE_LOCK, links);
     if (action.kind === ACTION.CUSTOM_KEY) return shortcutEffects(action.operand, links, false);
     if (action.kind === ACTION.QMK_KEYCODE) return layerEffects(action.operand, links, false);
     return [];
@@ -246,7 +246,7 @@ function keyEffects(code, row, values, links) {
 // mode from a linked layer only while none of those is on (linkStarts,
 // pointing-links.js). The custom keys whose shortcut turns layers on, and how.
 // What the links and shortcuts read of a profile: its settings and its modes.
-/** @typedef {{settings: Pick<import("../schema/types.js").SettingsDomain, "values" | "names" | "customKeyShortcuts">, pdModes?: import("../schema/types.js").PdSlot[]}} LinkProfile */
+/** @typedef {{settings: Pick<import("../schema/types.js").SettingsDomain, "values" | "names" | "customKeyShortcuts">, pdModes?: import("../schema/types.js").PointingSlot[]}} LinkProfile */
 /** @param {LinkProfile} decoded */
 function linkFacts(decoded) {
     /** @type {ModeLinks} */

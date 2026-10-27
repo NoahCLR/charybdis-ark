@@ -515,7 +515,7 @@ function withLinkStarts(model, stack, on, entries) {
 export function pointingSlotFor(model, keycode) {
     const slots = model?.pdModes || [];
     const alias = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
-    const named = slots.find((slot) => slot.binding && [slot.binding.hold, slot.binding.lock].includes(String(alias || "")));
+    const named = slots.find((slot) => slot.keys && [slot.keys.hold, slot.keys.lock].includes(String(alias || "")));
     if (named) return named;
     const value = typeof keycode === "number" ? keycode : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
     return Number.isInteger(value) ? slots.find((slot) => slotKeycodes(slot).includes(value)) : undefined;
@@ -593,21 +593,21 @@ export function namedAction(model, action) {
     return null;
 }
 
-// The two values a slot answers to: hold and lock, as the core's binding
-// registry gives them. Matching on the numbers rather than on names matters
+// The two values a slot answers to: hold and lock, as the core's key table
+// (data/pd-mode-keys.js) gives them. Matching on the numbers rather than on names matters
 // for an empty slot, whose record carries no name for the model to resolve —
 // the keycode exists on the keyboard either way.
 /** @param {PointingSlot} slot */
-export const slotKeycodes = (slot) => slot.binding ? [slot.binding.holdCode, slot.binding.lockCode] : [];
+export const slotKeycodes = (slot) => slot.keys ? [slot.keys.holdCode, slot.keys.lockCode] : [];
 // The same two keycodes by the names the model knows them by: hold, then lock.
 /** @param {PointingSlot} slot */
-export const slotKeycodeNames = (slot) => slot.binding ? [slot.binding.hold, slot.binding.lock] : [];
+export const slotKeycodeNames = (slot) => slot.keys ? [slot.keys.hold, slot.keys.lock] : [];
 
 // What still reaches a pointing slot. The keyboard keeps its mode keycodes
 // whatever a slot holds, so a key bound to an empty slot is inert rather than
 // invalid — and the interface has to say which keys those are.
 /** @param {ViewModel} model @param {PointingSlot | null | undefined} slot */
-export function bindingsForSlot(model, slot) {
+export function whatReachesSlot(model, slot) {
     if (!slot) return {keys: [], behaviours: [], combos: [], layers: []};
     const values = new Set(slotKeycodes(slot));
     const names = new Set(slotKeycodeNames(slot));
@@ -632,4 +632,4 @@ export function bindingsForSlot(model, slot) {
 
 // The keycode name that holds a slot's mode.
 /** @param {PointingSlot} slot */
-export const bindingKeycode = (slot) => slot.binding?.hold || "";
+export const holdKeyName = (slot) => slot.keys?.hold || "";

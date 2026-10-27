@@ -10,14 +10,14 @@ import {createRequire} from "node:module";
 import {AXIS, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES} from "../../webview/view/pointing-config.mjs";
 import {modifierBits, modifierNames} from "../../webview/view/keyvalues.mjs";
 import {TIER_FIELDS} from "../../webview/view/edits.mjs";
-import {PD_MODE_IDS} from "../../webview/view/lighting.mjs";
+import {POINTING_MODE_IDS} from "../../webview/view/lighting.mjs";
 import {NAME_MAX_BYTES} from "../../webview/view/names.mjs";
 
 const require = createRequire(import.meta.url);
 const pd = require("../../core/schema/pd-mode-domain-v1");
 const {VOCABULARY} = require("../../core/model/vocabulary");
-const {RGB_PD_MODE_IDS} = require("../../core/schema/rgb-domain-v1");
-const {PD_SLOT_CAPACITY} = require("../../core/data/pd-bindings");
+const {RGB_POINTING_MODE_IDS} = require("../../core/schema/rgb-domain-v1");
+const {POINTING_SLOT_COUNT} = require("../../core/data/pd-mode-keys");
 
 test("the webview's pointing numbers are the schema's", () => {
     assert.deepEqual(KIND, {DIRECTIONAL: pd.PD_KIND.DIRECTIONAL, SCROLLING: pd.PD_KIND.SCROLLING});
@@ -42,9 +42,9 @@ test("the webview's tiers are the vocabulary's", () => {
 });
 
 test("the webview names every pointing slot's lighting row as the RGB schema does", () => {
-    assert.equal(PD_MODE_IDS.length, PD_SLOT_CAPACITY);
-    assert.deepEqual(PD_MODE_IDS.map((name) => RGB_PD_MODE_IDS[name]), PD_MODE_IDS.map((_, id) => id));
-    assert.equal(Object.keys(RGB_PD_MODE_IDS).length, PD_SLOT_CAPACITY);
+    assert.equal(POINTING_MODE_IDS.length, POINTING_SLOT_COUNT);
+    assert.deepEqual(POINTING_MODE_IDS.map((name) => RGB_POINTING_MODE_IDS[name]), POINTING_MODE_IDS.map((_, id) => id));
+    assert.equal(Object.keys(RGB_POINTING_MODE_IDS).length, POINTING_SLOT_COUNT);
 });
 
 test("pointing macro identities follow the schema's complete native range", async () => {

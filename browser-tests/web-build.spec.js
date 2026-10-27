@@ -53,11 +53,11 @@ async function inputs() {
     ];
 
     const {document: pdDocument} = require("../tests/fixtures/pd-profile");
-    const {document32} = require("../tests/fixtures/pd-slots-32");
+    const {document32} = require("../tests/fixtures/pointing-slots-32");
     const portableFixture = require("../tests/fixtures/portable-profile");
     const documents = [
         {name: "pd-profile", document: pdDocument()},
-        {name: "pd-slots-32", document: document32()},
+        {name: "pointing-slots-32", document: document32()},
         {name: "portable-profile", document: portableFixture.document()},
         {name: "retired portable version", document: {...portableFixture.document(), version: 1}, rejects: "INVALID_PORTABLE_PROFILE"},
     ];

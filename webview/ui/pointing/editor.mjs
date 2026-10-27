@@ -5,7 +5,8 @@ import {KIND, dpiOptions, readConfig, scrollStarter, settleTaps, startingRecord}
 import {post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {mark} from "../marks.mjs";
-import {bindingName, words} from "./common.mjs";
+import {words} from "./common.mjs";
+import {holdKeyName} from "../../view/reach.mjs";
 import {formControls} from "./form-controls.mjs";
 import {countNameBytes} from "../title-name.mjs";
 import {movement} from "./movement.mjs";
@@ -31,7 +32,7 @@ export function editor(model, slot, canEdit, slots) {
     const head = el(`<div class="card">
         <div class="card-h">
             <span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>
-            <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${esc(slot.id)} · ${esc(bindingName(slot))}</span>
+            <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${esc(slot.id)} · ${esc(holdKeyName(slot))}</span>
             <span class="right">
                 ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${esc(disabled)}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
@@ -83,7 +84,7 @@ export function editor(model, slot, canEdit, slots) {
     /** @type {HTMLButtonElement | null} */ (head.querySelector('[data-act="duplicate"]'))?.addEventListener("click", () => {
         const target = slots.find((candidate) => !candidate.kind);
         if (!target) return;
-        state.pdSlot = target.id;
+        state.pointingSlot = target.id;
         post(edits.duplicatePdMode(target.id, slot.id, model.profileIdentity));
     });
     return wrap;

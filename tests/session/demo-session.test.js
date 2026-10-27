@@ -8,7 +8,7 @@ const assert = require("node:assert/strict");
 const {openPanelLoop} = require("../../core/session/panel-loop");
 const {fingerprint} = require("../../core/model/portable-profile");
 const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
-const {document32: pdDocument} = require("../fixtures/pd-slots-32");
+const {document32: pdDocument} = require("../fixtures/pointing-slots-32");
 const {ACTION_ABI} = require("../../core/schema/actions");
 const {
     DEMO_CAPABILITIES, DEMO_DEVICE_ID, DEMO_LIMITS, DEMO_OPTIONS, demoProfile, demoRefusal, demoSnapshot, demoState, panelState,

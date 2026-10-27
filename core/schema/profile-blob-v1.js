@@ -34,8 +34,8 @@ const PROFILE_ACTION_KINDS = Object.freeze({
     QMK_KEYCODE: 1,
     LAYER_MOMENTARY: 2,
     LAYER_LOCK: 3,
-    PD_MODE_MOMENTARY: 4,
-    PD_MODE_LOCK: 5,
+    POINTING_MODE_MOMENTARY: 4,
+    POINTING_MODE_LOCK: 5,
     MACRO: 6,
     // Kind 7 named the retired user macros under earlier action vocabularies,
     // when MACRO_n was their name, not a macro slot's.
@@ -263,9 +263,9 @@ function normalizeSemanticAction(action, options = {}) {
         case PROFILE_ACTION_KINDS.LAYER_LOCK:
             assertOperandSlot(kind, operand, limits.maxLogicalLayers, "logical layer");
             break;
-        case PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY:
-        case PROFILE_ACTION_KINDS.PD_MODE_LOCK:
-            assertOperandSlot(kind, operand, limits.maxPdModes, "PD mode");
+        case PROFILE_ACTION_KINDS.POINTING_MODE_MOMENTARY:
+        case PROFILE_ACTION_KINDS.POINTING_MODE_LOCK:
+            assertOperandSlot(kind, operand, limits.maxPdModes, "pointing slot");
             break;
         case PROFILE_ACTION_KINDS.MACRO:
             assertOperandSlot(kind, operand, limits.maxMacroSlots, "macro slot");

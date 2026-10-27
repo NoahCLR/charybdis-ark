@@ -143,7 +143,7 @@ test("a layer or pointing-mode action is named with its tag, a layer-tap by its 
         const slot = model.pdModes.find((entry) => entry.id === ZOOM);
         const drawn = {
             hold: actionMarked(model, `MO(${NAVIGATION})`),
-            pointing: actionMarked(model, slot.binding.lock),
+            pointing: actionMarked(model, slot.keys.lock),
             layerTap: keyNameMarked(model, "/ / Navigation", `LT(${NAVIGATION},KC_SLASH)`),
             // A name the core did not give keeps the words, with the layer marked.
             other: keyNameMarked(model, "Navigation", `MO(${NAVIGATION})`),
@@ -152,8 +152,8 @@ test("a layer or pointing-mode action is named with its tag, a layer-tap by its 
                 {label: "Tap", status: "changed", before: "/ / Navigation", after: "Lock Navigation", beforeMark: {kind: "layer", layer: NAVIGATION}, afterMark: {kind: "layer", layer: NAVIGATION}},
             ]}),
             // A behaviour is titled by its key, named as that key is everywhere.
-            reviewTitle: reviewItem(model, {unit: "y", title: actionLabel(model, slot.binding.hold), status: "removed",
-                place: {kind: "behaviour", keycode: slot.binding.hold}, fields: []}),
+            reviewTitle: reviewItem(model, {unit: "y", title: actionLabel(model, slot.keys.hold), status: "removed",
+                place: {kind: "behaviour", keycode: slot.keys.hold}, fields: []}),
         };
         for (const [name, html] of Object.entries(drawn)) document.body.insertAdjacentHTML("beforeend", `<div data-drawn="${name}">${html}</div>`);
     }, {NAVIGATION, ZOOM});
@@ -206,7 +206,7 @@ test("the hover card's title, the Combos table and the Key and Pointing modes ta
     // Every row of the Pointing modes tab names its slot by its icon, then the
     // name and each keycode after its hold or lock tag.
     await page.locator('[data-tab="pointing"]').click();
-    const row = page.locator(".reach-table tbody tr:has(code:text-is('PD_SLOT_4_LOCK'))").first();
+    const row = page.locator(".reach-table tbody tr:has(code:text-is('PD_MODE_4_LOCK'))").first();
     await expect(row).toBeVisible();
     expect(await row.locator("td").first().evaluate(namedIn)).toMatchObject({named: [{icon: "", name: "Arrow", tags: ["lock"]}], icons: 1});
     await expect(page.locator(".reach-table .pd-swatch")).toHaveCount(0);
@@ -216,12 +216,12 @@ test("the hover card's title, the Combos table and the Key and Pointing modes ta
     // Dragscroll's own key locks it on a double tap held, so that cell follows
     // the key rather than naming the key a second time.
     const reached = (keycode) => page.locator(`.reach-table tbody tr:has(td:first-child code:text-is('${keycode}'))`).first().locator("td").nth(5);
-    const arrow = await reached("PD_SLOT_4_LOCK").evaluate(namedIn);
+    const arrow = await reached("PD_MODE_4_LOCK").evaluate(namedIn);
     expect(arrow.text).toMatch(/^from Right Option KC_RIGHT_ALT · 1× ?tap$/);
-    const dragscroll = reached("PD_SLOT_0_LOCK");
+    const dragscroll = reached("PD_MODE_0_LOCK");
     await expect(dragscroll.locator(".bn")).toHaveText(["2×"]);
     await expect(dragscroll.locator(".fbdot")).toHaveCount(1);
     expect(await dragscroll.evaluate(namedIn)).toMatchObject({named: [{icon: "pointing", name: "Dragscroll", tags: ["hold"]}, {icon: "pointing", name: "Dragscroll", tags: ["lock"]}]});
-    expect((await dragscroll.evaluate(namedIn)).text).toMatch(/· 2× ?hold sends Dragscroll ?lock ?PD_SLOT_0_LOCK$/);
+    expect((await dragscroll.evaluate(namedIn)).text).toMatch(/· 2× ?hold sends Dragscroll ?lock ?PD_MODE_0_LOCK$/);
     expect((await dragscroll.evaluate(namedIn)).text).not.toContain("from");
 });

@@ -13,7 +13,7 @@ const {builtInActions} = require("./built-in-behavior");
 const {changesNothing} = require("./inert-behaviors");
 const {
     RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
-    RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_TAP_COMMIT_MODES,
+    RGB_LOCALITIES, RGB_POINTING_MODE_IDS, RGB_TAP_COMMIT_MODES,
 } = require("../schema/rgb-domain-v1");
 
 /** @template {Record<string, number>} T @param {T} values @param {number} value @returns {keyof T & string} */
@@ -132,9 +132,9 @@ function rgbForView(domain) {
         layerLedGroups: groupRows(domain.layerGroupRows, "layer", (row) => row.selector === all ? "RGB_LAYER_GROUP_ALL" : layerName(row.selector)),
         automouseFade: {mode: enumName(RGB_AUTOMOUSE_MODES, domain.automouseFade.mode), end_color: colorForView(domain.automouseFade.endColor)},
         pdModeColors: domain.pdModeColors.map((row) => ({
-            pointingMode: enumName(RGB_PD_MODE_IDS, row.pdModeId), color: colorForView(row.color), locality: enumName(RGB_LOCALITIES, row.locality),
+            pointingMode: enumName(RGB_POINTING_MODE_IDS, row.pdModeId), color: colorForView(row.color), locality: enumName(RGB_LOCALITIES, row.locality),
         })),
-        pdModeLedGroups: groupRows(domain.pdModeGroupRows, "pdMode", (row) => row.selector === all ? "RGB_PD_MODE_GROUP_ALL" : enumName(RGB_PD_MODE_IDS, row.selector)),
+        pdModeLedGroups: groupRows(domain.pdModeGroupRows, "pdMode", (row) => row.selector === all ? "RGB_POINTING_MODE_GROUP_ALL" : enumName(RGB_POINTING_MODE_IDS, row.selector)),
         comboFeedback: {color: colorForView(domain.comboFeedback.color), locality: enumName(RGB_LOCALITIES, domain.comboFeedback.locality)},
         comboFeedbackLedGroups: groupRows(domain.comboGroupRows, "combo"),
         keyBehaviorFeedback: {

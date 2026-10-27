@@ -34,8 +34,8 @@ test("a transparent key can be answered by any layer below that is held with thi
     assert.deepEqual(reachable.filter((entry) => entry.position.layoutIndex === 1)
         .map((entry) => [entry.position.keycode, entry.whileHeld]),
         [["KC_NO", true], ["KC_RIGHT_ALT", false]]);
-    const model = {keyBehaviors: [{keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, hold: {action: "PD_SLOT_4"}}]}],
-        pdModes: [{id: 4, name: "Arrow", kind: 1, binding: {hold: "PD_SLOT_4", lock: "PD_SLOT_4_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}]};
+    const model = {keyBehaviors: [{keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, hold: {action: "PD_MODE_4"}}]}],
+        pdModes: [{id: 4, name: "Arrow", kind: 1, keys: {hold: "PD_MODE_4", lock: "PD_MODE_4_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}]};
     assert.deepEqual(pointingReach(model, stack, 2).fromBranchesBelow.map((entry) => entry.name), ["4"],
         "so the behaviour on Base is reached, and the mode its branch sends with it");
 });

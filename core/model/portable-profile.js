@@ -7,7 +7,7 @@
  * @typedef {import("./types.js").ProfileDestination} ProfileDestination
  * @typedef {{kind: number, operand: number}} WalkAction
  */
-const {keycodeAction, knownActionAbi, pdSlotOfCode} = require("../schema/actions");
+const {keycodeAction, knownActionAbi, pointingSlotOfCode} = require("../schema/actions");
 const {decodeProfileBlob, decodeStoredProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
 const {ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {SETTING, SETTING_FIELDS, decodeSettings} = require("../schema/settings-domain-v1");
@@ -160,7 +160,7 @@ function validateSnapshot(value, capabilities) {
     // layout leaves to Unicode entry.
     if (settings.values[SETTING.UNICODE_HOST_MODE] & 0x100) for (const macro of macros) validateMacro(macro, {textEntry: true, layout: hostSettings(settings.values).layout});
     if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`RGB does not cover all ${LAYERS} layers.`);
-    // A binding for an empty slot is allowed, because the keyboard allows it:
+    // A key for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
     // activate a slot whose record is empty rather than misbehaving
     // (`noah_active_profile_pd_for_mask` returns nothing, and both activate and lock
@@ -168,14 +168,14 @@ function validateSnapshot(value, capabilities) {
     // nothing until its slot is configured again. They are counted here so the
     // interface can say so before anyone wonders why a key went quiet.
     /** @type {Map<number, number>} */
-    const danglingPdBindings = new Map();
+    const danglingPointingKeys = new Map();
     /** @param {number | undefined} id */
     const checkPd = id => {
         if (id === undefined || pdModes[id]?.kind) return;
-        danglingPdBindings.set(id, (danglingPdBindings.get(id) || 0) + 1);
+        danglingPointingKeys.set(id, (danglingPointingKeys.get(id) || 0) + 1);
     };
     /** @param {number} code */
-    const checkNativePd = code => checkPd(pdSlotOfCode(code));
+    const checkNativePd = code => checkPd(pointingSlotOfCode(code));
     layers.flat().forEach(checkNativePd);
     /** @param {WalkAction} action */
     const checkAction = action => {
@@ -193,7 +193,7 @@ function validateSnapshot(value, capabilities) {
     // This same complete blob is both the portable profile and the candidate.
     const candidateBytes = profile;
     if (capabilities?.maxProfilePayload !== undefined && candidateBytes.length > capabilities.maxProfilePayload) throw fail(`The profile needs ${candidateBytes.length} bytes with its keymap and macros; this keyboard holds ${capabilities.maxProfilePayload}.`);
-    return {document: /** @type {PortableDocument} */ (candidate), profile, candidate: candidateBytes, layers, macroSlots: macros, settings, rgb, behaviors, combos, pdModes, codecOptions, danglingPdBindings: Object.fromEntries(danglingPdBindings)};
+    return {document: /** @type {PortableDocument} */ (candidate), profile, candidate: candidateBytes, layers, macroSlots: macros, settings, rgb, behaviors, combos, pdModes, codecOptions, danglingPointingKeys: Object.fromEntries(danglingPointingKeys)};
 }
 
 // A profile with a renamed macro or custom key. Every name fits the settings

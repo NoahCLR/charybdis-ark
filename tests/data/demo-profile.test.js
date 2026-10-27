@@ -38,7 +38,7 @@ test("the demo profile decodes under the current schema, for current firmware, u
     assert.equal(decoded.pdModes.length, 32);
     assert.ok(decoded.profile.length <= DEMO_CAPABILITIES.maxProfilePayload);
     assert.ok(decoded.macroSlots.reduce((total, bytes) => total + bytes.length + 1, 0) <= DEMO_CAPABILITIES.macroBytes);
-    assert.deepEqual(decoded.danglingPdBindings, {}, "no key reaches an empty pointing slot");
+    assert.deepEqual(decoded.danglingPointingKeys, {}, "no key reaches an empty pointing slot");
     assert.equal(summary(document).names.length, 16);
 });
 

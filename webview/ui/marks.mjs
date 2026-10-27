@@ -114,7 +114,7 @@ export const layerTagged = (model, layer, name, tags, {inline = false} = {}) =>
 /** @param {string} name @param {string[]} tags */
 export const namedWithTags = (name, tags) => `<span class="sends inline">${tagged(name, tags)}</span>`;
 // A pointing slot by name, then each keycode that reaches it after its hold or
-// lock tag: "Dragscroll `HOLD` PD_SLOT_0 `LOCK` PD_SLOT_0_LOCK". A tag with no
+// lock tag: "Dragscroll `HOLD` PD_MODE_0 `LOCK` PD_MODE_0_LOCK". A tag with no
 // keycode (null) stands alone: a mode its link starts, "Arrow `STARTED`".
 /** @param {string} name @param {[string, string | null][]} keycodes */
 export const slotNamedWithKeycodes = (name, keycodes) => `<span class="sends inline"><span class="sends-name">${esc(name)}</span>${keycodes

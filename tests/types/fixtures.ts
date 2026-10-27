@@ -3,7 +3,7 @@ import type {DeviceAdapter, RequestConnection} from '../../core/transport/types.
 import type {SettingsDomain} from '../../core/schema/types.js';
 import {fakeKeyboard, fakeKeyboardAdapter} from '../fixtures/fake-keyboard.js';
 import {compiled, document, settings} from '../fixtures/portable-profile.js';
-import {document32} from '../fixtures/pd-slots-32.js';
+import {document32} from '../fixtures/pointing-slots-32.js';
 import {hostMacros} from '../fixtures/host-macros.js';
 import {options} from '../fixtures/keyboard-options.js';
 import {payloadDevice} from '../fixtures/profile-payload.js';

@@ -24,7 +24,7 @@ export function firmwareFacts(model) {
     add("Tap counts", firmware?.tapCounts ?? model?.behaviorEditing?.maxTapStepsPerBehavior, "per behaviour", "How many taps a behaviour can tell apart; more quick taps each send the first tap.");
     add("Macros", firmware?.macros ?? (model?.macros?.length || null), "macros", "Macro slots in the shared profile storage.");
     add("Custom keys", firmware?.customKeys, "custom keys", "Custom key slots.");
-    add("Pointing modes", model?.pdModes?.length || null, "modes", "Pointing mode slots.");
+    add("Pointing modes", model?.pdModes?.length || null, "modes", "Pointing slots.");
     add("Combos", firmware?.combos, "combos", "The most combos the profile can hold.");
     add("LEDs", firmware?.leds, "LEDs", "Lights on both halves together.");
     const brightness = model?.rgb?.maximumBrightness;

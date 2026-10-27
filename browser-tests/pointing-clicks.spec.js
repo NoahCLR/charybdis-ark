@@ -22,7 +22,7 @@ for (const theme of ["dark", "light"]) {
                 store.setModel({...store.getModel(), ...patch}); store.render();
             }, patch);
         };
-        await openControls(page, "pointing", {pdSlot: 4}, theme);
+        await openControls(page, "pointing", {pointingSlot: 4}, theme);
         await publish();
         for (const [direction, button] of [["left", 3], ["right", 4]]) {
             await clearPosts(page);

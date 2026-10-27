@@ -10,7 +10,7 @@
 // ask here rather than each doing it their own way.
 
 const keycodes = require("../data/keycode-catalog");
-const {PD_SLOT_BINDINGS, PD_SLOT_CAPACITY, pdBindingOfCode} = require("../data/pd-bindings");
+const {PD_MODE_KEYS, pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 
@@ -28,9 +28,6 @@ const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 /** @param {number} value */
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
 
-// The keyboard's pointing slots: all 32 of the keycode blocks.
-const PD_SLOT_COUNT = PD_SLOT_CAPACITY;
-
 // An action's name, the one every edit message and row lookup uses.
 /** @param {import("./types.js").SemanticAction} action */
 function actionName(action) {
@@ -41,11 +38,11 @@ function actionName(action) {
         case ACTION.LAYER_LOCK: return `LOCK_LAYER(${action.operand})`;
         case ACTION.MACRO: return `MACRO_${action.operand}`;
         case ACTION.CUSTOM_KEY: return `CUSTOM_KEY_${action.operand}`;
-        case ACTION.PD_MODE_MOMENTARY:
-        case ACTION.PD_MODE_LOCK: {
-            const binding = PD_SLOT_BINDINGS[action.operand];
-            if (!binding) throw new Error(`Unsupported pointing slot ${action.operand}.`);
-            return action.kind === ACTION.PD_MODE_LOCK ? binding.lock : binding.hold;
+        case ACTION.POINTING_MODE_MOMENTARY:
+        case ACTION.POINTING_MODE_LOCK: {
+            const keys = PD_MODE_KEYS[action.operand];
+            if (!keys) throw new Error(`Unsupported pointing slot ${action.operand}.`);
+            return action.kind === ACTION.POINTING_MODE_LOCK ? keys.lock : keys.hold;
         }
         default: throw new Error(`Unsupported device action kind ${action.kind}.`);
     }
@@ -60,7 +57,7 @@ const keycodeAction = operand => ({kind: ACTION.QMK_KEYCODE, operand});
 
 // The pointing slot a native keycode binds, if it is a pointing-mode key.
 /** @param {number} code */
-const pdSlotOfCode = code => pdBindingOfCode(code)?.slot;
+const pointingSlotOfCode = code => pdModeKeyOfCode(code)?.slot;
 
 // A layer as edit messages and group rows name it, and back.
 /** @param {number} index @returns {import("../../contracts/edits.js").LayerReference} */
@@ -123,4 +120,4 @@ function placementProblem(action, placement, {layerCount = 16} = {}) {
     }
 }
 
-module.exports = {PLACEMENT, placementProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, PD_SLOT_COUNT, actionName, nativeCode, keycodeAction, pdSlotOfCode, layerRef, layerOfRef};
+module.exports = {PLACEMENT, placementProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef};

@@ -30,7 +30,7 @@ export interface ReadDomains {
     rgb?: import('../schema/types.js').RgbProfile;
     keyBehaviors?: {rows: import('../schema/types.js').BehaviorRow[]};
     settings?: import('../schema/types.js').SettingsDomain;
-    pdModes?: import('../schema/types.js').PdSlot[];
+    pdModes?: import('../schema/types.js').PointingSlot[];
     combos?: ReturnType<typeof import('../schema/combo-domain-v1.js').decodeComboDomain>;
 }
 export interface CommittedRead {

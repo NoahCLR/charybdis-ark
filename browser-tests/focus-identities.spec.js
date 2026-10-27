@@ -17,8 +17,8 @@ const surfaces = [
     ["settings", {settingsOpen: ["keyBehavior", "comboSettings", "autoMouse", "mouse"]}],
     ["mouse", {}], ["customKeys", {}], ["macros", {macroSlot: "MACRO_17"}],
     ...["base", "layers", "auto", "pd", "combo", "key", "groups"].map(stage =>
-        ["lighting", {stage, layer: 1, pdSlot: 0, feedbackRow: "holdActiveColor"}]),
-    ...[0, 4, 8].map(pdSlot => ["pointing", {pdSlot, pdAdvanced: true}]),
+        ["lighting", {stage, layer: 1, pointingSlot: 0, feedbackRow: "holdActiveColor"}]),
+    ...[0, 4, 8].map(pointingSlot => ["pointing", {pointingSlot, pdAdvanced: true}]),
 ];
 
 for (const [screen, state] of surfaces) {
@@ -34,7 +34,7 @@ for (const [screen, state] of surfaces) {
         if (screen === "macros") await page.locator("[data-raw-toggle]").click();
         // Visit the complete forms, including collapsed settings, modifier
         // masks, diagonals and tuning controls that are absent by default.
-        if (screen === "pointing" && state.pdSlot === 4) {
+        if (screen === "pointing" && state.pointingSlot === 4) {
             await page.evaluate(async () => {
                 const store = await import("/webview/store.mjs");
                 const model = structuredClone(store.getModel()); model.pdModes[4].axis = 3;
@@ -81,7 +81,7 @@ for (const [screen, state] of surfaces) {
 }
 
 test("Pointing name preserves focus and caret across an accepted edit", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 0});
+    await openControls(page, "pointing", {pointingSlot: 0});
     const input = page.locator(".pd-identity label").filter({has: page.getByText("Name", {exact: true})}).locator("input");
     await input.focus();
     await input.evaluate(node => node.setSelectionRange(2, 5));
@@ -106,7 +106,7 @@ test("Settings search uses shared focus restoration and retains the editing care
 });
 
 test("picker search has a unique identity beside its underlying editor", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     await page.locator(".pd-cross .arm.up [data-pick]").click();
     expect(await identityProblems(page)).toEqual([]);
     const search = page.locator("#pickerSearch");

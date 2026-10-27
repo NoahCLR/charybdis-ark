@@ -4,7 +4,7 @@ import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode
 import keyNames from "../../core/model/key-names.js";
 
 test("visible macro keycodes use the MACRO_n name for both QMK's named and unnamed values", () => {
-    const model = {qmkKeycodeAliases: {QK_MACRO_9: "MACRO_9", "0x773F": "MACRO_63", QK_USER_16: "PD_SLOT_0"}};
+    const model = {qmkKeycodeAliases: {QK_MACRO_9: "MACRO_9", "0x773F": "MACRO_63", QK_USER_16: "PD_MODE_0"}};
     assert.equal(visibleKeycode(model, "QK_MACRO_9"), "MACRO_9");
     assert.equal(visibleKeycode(model, "0x773F"), "MACRO_63");
     assert.equal(visibleKeycode(model, "QK_USER_16"), "QK_USER_16", "other stored identities keep their existing display");
@@ -12,9 +12,9 @@ test("visible macro keycodes use the MACRO_n name for both QMK's named and unnam
 });
 
 test("a bare value the keyboard names reads by that name, and a named keycode keeps its own", () => {
-    const model = {qmkKeycodeAliases: {"0x7F01": "CUSTOM_KEY_1", "0x7E85": "PD_SLOT_5", QK_USER_16: "PD_SLOT_0"}};
+    const model = {qmkKeycodeAliases: {"0x7F01": "CUSTOM_KEY_1", "0x7E85": "PD_MODE_5", QK_USER_16: "PD_MODE_0"}};
     assert.equal(visibleKeycode(model, "0x7F01"), "CUSTOM_KEY_1");
-    assert.equal(visibleKeycode(model, "0x7E85"), "PD_SLOT_5");
+    assert.equal(visibleKeycode(model, "0x7E85"), "PD_MODE_5");
     assert.equal(visibleKeycode(model, "QK_USER_16"), "QK_USER_16");
     assert.equal(visibleKeycode(model, "0x7F09"), "0x7F09", "a value nothing names stays a value");
 });
@@ -71,13 +71,13 @@ test("a key for an empty pointing slot says so on its second line", () => {
 test("a picked key finds the behaviour it would collide with, whatever its spelling", () => {
     const model = {
         qmkKeycodeAliases: {KC_ENT: "KC_ENTER", KC_ENTER: "KC_ENTER", KC_SLSH: "KC_SLASH", KC_SLASH: "KC_SLASH"},
-        keyBehaviors: [{keycode: "KC_ENTER"}, {keycode: "LT(3,KC_SLASH)"}, {keycode: "PD_SLOT_0"}],
+        keyBehaviors: [{keycode: "KC_ENTER"}, {keycode: "LT(3,KC_SLASH)"}, {keycode: "PD_MODE_0"}],
     };
     assert.equal(canonicalKeycode(model, "KC_ENT"), "KC_ENTER");
     assert.equal(canonicalKeycode(model, "LT(3, KC_SLSH)"), "LT(3,KC_SLASH)");
     assert.equal(behaviourListeningTo(model, "KC_ENT").keycode, "KC_ENTER");
     assert.equal(behaviourListeningTo(model, "LT(3, KC_SLSH)").keycode, "LT(3,KC_SLASH)");
-    assert.equal(behaviourListeningTo(model, "PD_SLOT_0").keycode, "PD_SLOT_0");
+    assert.equal(behaviourListeningTo(model, "PD_MODE_0").keycode, "PD_MODE_0");
     assert.equal(behaviourListeningTo(model, "KC_A"), undefined);
 });
 
@@ -251,13 +251,13 @@ test("the grid shows the tap counts in use and the next, or every one, and says 
 });
 
 test("a pointing-mode key holds its mode from the press, unless a later tap count holds another mode", () => {
-    const hold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_SLOT_0", fromPress: true};
-    const behaviour = {keycode: "PD_SLOT_0", builtIn: {hold}, steps: []};
+    const hold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_MODE_0", fromPress: true};
+    const behaviour = {keycode: "PD_MODE_0", builtIn: {hold}, steps: []};
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
-    const same = {...behaviour, steps: [{tapCount: 1, hold: {action: "PD_SLOT_0_LOCK"}}]};
+    const same = {...behaviour, steps: [{tapCount: 1, hold: {action: "PD_MODE_0_LOCK"}}]};
     assert.equal(inheritedBranch(same, {tapCount: 0}, "hold").fromPress, true, "its own mode does not defer it");
-    const other = {...behaviour, steps: [{tapCount: 1, longHold: {action: "PD_SLOT_3"}}]};
+    const other = {...behaviour, steps: [{tapCount: 1, longHold: {action: "PD_MODE_3"}}]};
     assert.deepEqual(inheritedBranch(other, {tapCount: 0}, "hold"), {...hold, fromPress: false}, "another mode waits for Tap / hold");
     const layer = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(2)", fromPress: true};
-    assert.equal(inheritedBranch({keycode: "MO(2)", builtIn: {hold: layer}, steps: [{tapCount: 1, hold: {action: "PD_SLOT_3"}}]}, {tapCount: 0}, "hold"), layer);
+    assert.equal(inheritedBranch({keycode: "MO(2)", builtIn: {hold: layer}, steps: [{tapCount: 1, hold: {action: "PD_MODE_3"}}]}, {tapCount: 0}, "hold"), layer);
 });

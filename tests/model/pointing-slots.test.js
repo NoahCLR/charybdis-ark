@@ -7,7 +7,7 @@ const assert = require("node:assert/strict");
 const {validateSnapshot, reorderLayers} = require("../../core/model/portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
-const {CAPABILITIES_32, document32} = require("../fixtures/pd-slots-32");
+const {CAPABILITIES_32, document32} = require("../fixtures/pointing-slots-32");
 
 const domainOf = (doc, id) => decodeProfileBlob(Buffer.from(doc.profile, "base64")).domains.find(domain => domain.id === id);
 
@@ -19,11 +19,11 @@ test("a profile's actions reach every one of the 32 slots", () => {
     behaviors.rows[0].steps[0] = {tapIndex: 0, tap: {kind: 5, operand: 12}};
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors, options);
     const reaching = {...wide, profile: encodeProfileBlob(blob).toString("base64")};
-    editLayers(reaching, layers => layers[0][0] = 0x7e9f); // PD_SLOT_31, an empty slot: allowed, and counted as inert
+    editLayers(reaching, layers => layers[0][0] = 0x7e9f); // PD_MODE_31, an empty slot: allowed, and counted as inert
     const value = validateSnapshot(reaching, CAPABILITIES_32);
     assert.deepEqual(value.behaviors.rows[0].steps[0].tap, {kind: 5, flags: 0, operand: 12});
-    assert.equal(value.danglingPdBindings[31], 1);
-    assert.equal(value.danglingPdBindings[12], undefined, "slot 12 is configured");
+    assert.equal(value.danglingPointingKeys[31], 1);
+    assert.equal(value.danglingPointingKeys[12], undefined, "slot 12 is configured");
 });
 
 test("layer ordering keeps the profile in the formats the keyboard stores", () => {

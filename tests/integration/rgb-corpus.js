@@ -31,7 +31,7 @@ if (process.argv[4]) {
     model.keyFeedback.tapBranchColors = Array.from({length: options.tapBranchColorCount}, (_, h) => ({h, s: 255, v: 10}));
     golden = encodeRgbDomainV1(model, options);
 }
-// The probe's limits: four single bytes, then the PD slot mask as 32 bits.
+// The probe's limits: four single bytes, then the pointing slot mask as 32 bits.
 const config = Buffer.alloc(8);
 config.set([options.compiledStageMask, options.logicalLayerCount, options.maximumBrightness, options.tapBranchColorCount]);
 config.writeUInt32LE(options.supportedPdModeIds.reduce((mask, id) => (mask | (1 << id)) >>> 0, 0), 4);

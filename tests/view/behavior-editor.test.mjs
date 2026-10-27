@@ -44,7 +44,7 @@ test("transparent and disabled key aliases never open a behaviour editor", () =>
         assert.equal(canHaveBehaviour({}, key), false, key);
         assert.equal(behaviourEditorRow({}, key), undefined, key);
     }
-    for (const key of ["KC_A", "LT(3,KC_F)", "CUSTOM_KEY_0", "PD_SLOT_0"]) assert.equal(canHaveBehaviour({}, key), true, key);
+    for (const key of ["KC_A", "LT(3,KC_F)", "CUSTOM_KEY_0", "PD_MODE_0"]) assert.equal(canHaveBehaviour({}, key), true, key);
 });
 
 test("a transparent key in a layer preview opens the key answered from below", () => {
