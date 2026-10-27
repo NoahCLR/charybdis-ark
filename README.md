@@ -36,12 +36,13 @@ halves. No C, no reflash, no firmware checkout.
 
 ## Nothing is permanent until you say so
 
-Pick how edits reach the keyboard, under **Edits** beside its name. In
-**Live + review**, the default, every edit runs on the keyboard straight away
-so you can try it, and nothing is kept until you review it and **Save**.
-Unplug it and it goes back to what was saved. **Live** works like VIA: the keyboard saves by itself a few seconds
-after you stop. **Apply** keeps your edits in Ark until you review and apply
-them.
+Pick how edits reach the keyboard, under **Edits** beside its name.
+**Live edit** works like VIA: every edit runs on the keyboard straight away,
+and the keyboard saves by itself a few seconds after you stop. In
+**Live preview + save**, the default, every edit runs on the keyboard straight
+away so you can try it, and nothing is kept until you review it and **Save**.
+Unplug it and it goes back to what was saved. **Review and save** keeps your
+edits in Ark until you review and save them.
 
 Whichever you pick, every edit goes into one draft with undo, redo and a full
 history. **Review** lists every change and checks what your layers let you

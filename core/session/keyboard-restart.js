@@ -27,6 +27,7 @@
  * @typedef {NonNullable<Session["draft"]>} Draft
  */
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
+const {EDIT_MODE_WORDS} = require("../model/vocabulary");
 const {IDENTITY} = require("../model/layer-order");
 const {snapshotOf} = require("./live-profile-session");
 const {expectRestart, followKeyboard} = require("./keyboard-reconnect");
@@ -146,7 +147,7 @@ async function putBack(session, restart, read) {
         return `It stopped saving again at once, so the fault is in its flash or its firmware, and restarting again will not help.${restart.kept ? ` Your unsaved edits were not put back.${inRecovery(restart.recovery)}` : ""}${slave}`.trim();
     }
     if (!restart.kept) return slave.trim();
-    if (!draft?.live) return `Your unsaved edits were not put back: the keyboard now takes edits by Apply.${inRecovery(restart.recovery)}${slave}`;
+    if (!draft?.live) return `Your unsaved edits were not put back: the keyboard is now in ${EDIT_MODE_WORDS[EDIT_MODE.APPLY].label}.${inRecovery(restart.recovery)}${slave}`;
     // Only to the keyboard just read, at the session it runs now.
     const readSession = read && "live" in read ? /** @type {import("./types.js").LiveSnapshot} */ (read).live?.session : undefined;
     if (draft.deviceId !== session.service.snapshot().selectedDeviceId || readSession === undefined || draft.live.session !== readSession) {

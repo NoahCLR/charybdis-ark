@@ -4,25 +4,26 @@ import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, 
 import * as controls from "../../webview/view/controls.mjs";
 
 const vocabulary = {editModes: {
-    0: {id: "apply", label: "Apply", detail: "a"}, 1: {id: "live", label: "Live", detail: "b"}, 2: {id: "liveReview", label: "Live + review", detail: "c"},
+    0: {id: "apply", label: "Review and save", detail: "a"}, 1: {id: "live", label: "Live edit", detail: "b"}, 2: {id: "liveReview", label: "Live preview + save", detail: "c"},
 }};
 /** @param {object} draft @param {number} mode */
-const model = (draft, mode = LIVE_REVIEW, offered = [APPLY, LIVE, LIVE_REVIEW]) => /** @type {any} */ ({vocabulary, editMode: {mode, conflict: false, offered}, draft});
+const model = (draft, mode = LIVE_REVIEW, offered = [LIVE, LIVE_REVIEW, APPLY]) => /** @type {any} */ ({vocabulary, editMode: {mode, conflict: false, offered}, draft});
 
-test("the switch offers all three modes, and shows a mode it does not offer only when a keyboard reports it", () => {
-    assert.deepEqual(editModeChoices(model({}))?.choices.map(choice => [choice.label, choice.offered]), [["Apply", true], ["Live", true], ["Live + review", true]]);
-    assert.deepEqual(editModeChoices(model({}, LIVE, [APPLY, LIVE_REVIEW]))?.choices.map(choice => [choice.label, choice.offered]), [["Apply", true], ["Live + review", true], ["Live", false]]);
-    assert.equal(editModeChoices({...model({}), editMode: {mode: LIVE, conflict: false, offered: [APPLY, LIVE, LIVE_REVIEW], notStored: true}})?.notStored, true, "a mode the keyboard has not stored yet is flagged");
+test("the switch offers all three modes in the order core offers them, and shows a mode it does not offer only when a keyboard reports it", () => {
+    assert.deepEqual(editModeChoices(model({}))?.choices.map(choice => [choice.value, choice.label, choice.offered]),
+        [[LIVE, "Live edit", true], [LIVE_REVIEW, "Live preview + save", true], [APPLY, "Review and save", true]]);
+    assert.deepEqual(editModeChoices(model({}, LIVE, [LIVE_REVIEW, APPLY]))?.choices.map(choice => [choice.label, choice.offered]), [["Live preview + save", true], ["Review and save", true], ["Live edit", false]]);
+    assert.equal(editModeChoices({...model({}), editMode: {mode: LIVE, conflict: false, offered: [LIVE, LIVE_REVIEW, APPLY], notStored: true}})?.notStored, true, "a mode the keyboard has not stored yet is flagged");
     assert.equal(editModeChoices({}), null);
 });
 
-test("leaving Live asks nothing (the keyboard saves first); entering it asks as Live + review does", () => {
+test("leaving Live edit asks nothing (the keyboard saves first); entering it asks as Live preview + save does", () => {
     assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}, LIVE), APPLY), null);
     assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}, LIVE), LIVE_REVIEW), null);
     assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}, LIVE_REVIEW), LIVE), "saveOrRevert");
     assert.equal(switchQuestion(model({live: null, dirty: true}, APPLY), LIVE), "sendOrDiscard");
-    assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}, APPLY), LIVE), "saveOrRevert", "an Apply keyboard still running unsaved edits settles them first");
-    assert.match(questionWords("saveOrRevert", 1, {mode: LIVE, from: LIVE_REVIEW}).detail, /In Live the keyboard saves edits by itself/);
+    assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}, APPLY), LIVE), "saveOrRevert", "a Review and save keyboard still running unsaved edits settles them first");
+    assert.match(questionWords("saveOrRevert", 1, {mode: LIVE, from: LIVE_REVIEW}).detail, /In Live edit the keyboard saves edits by itself/);
     assert.match(questionWords("sendOrDiscard", 2, {mode: LIVE}).detail, /saves it by itself a moment later/);
     assert.match(questionWords("sendOrDiscard", 2, {mode: LIVE_REVIEW}).detail, /runs unsaved until you save it/);
 });
@@ -151,8 +152,8 @@ test("unsaved edits ask Save or Revert whichever way the mode goes, and for sett
     const conflicted = {...model({live: {unsaved: false}}), editMode: {mode: LIVE_REVIEW, conflict: true, offered: [APPLY, LIVE_REVIEW]}};
     assert.equal(switchQuestion(conflicted, LIVE_REVIEW), null, "settling with nothing unsaved switches at once");
     assert.equal(switchQuestion({...conflicted, draft: {live: {unsaved: true}}}, LIVE_REVIEW), "saveOrRevert");
-    assert.match(questionWords("saveOrRevert", 1, {mode: APPLY, from: LIVE_REVIEW}).detail, /In Apply/);
-    assert.match(questionWords("saveOrRevert", 1, {mode: LIVE_REVIEW, from: LIVE, label: "Live + review"}).detail, /switches to Live \+ review only with nothing unsaved/);
+    assert.match(questionWords("saveOrRevert", 1, {mode: APPLY, from: LIVE_REVIEW}).detail, /In Review and save, edits wait in Ark until you save them/);
+    assert.match(questionWords("saveOrRevert", 1, {mode: LIVE_REVIEW, from: LIVE, label: "Live preview + save"}).detail, /switches to Live preview \+ save only with nothing unsaved/);
     assert.match(questionWords("saveOrRevert", 1, {mode: LIVE_REVIEW, from: LIVE_REVIEW}).detail, /settles halves/);
 });
 
@@ -170,27 +171,28 @@ test("the question lists the checks Save or Send confirms", () => {
 });
 
 // Jumping in the history, renaming and importing reach the keyboard at once
-// in the live modes (D-L65, firmware D-F25); in Apply they wait for Apply.
+// in the live modes (D-L65, firmware D-F25); in Review and save they wait
+// for a save.
 test("history, rename and import words follow the edit mode", async () => {
     const {historyFooter, renameNote, importNote, importCallout} = await import("../../webview/view/edit-mode.mjs");
     const apply = /** @type {any} */ ({live: null});
     const live = /** @type {any} */ ({live: {mode: LIVE}});
     const review = /** @type {any} */ ({live: {mode: LIVE_REVIEW}});
 
-    assert.equal(historyFooter(apply), "Going to a step changes only the draft. The keyboard is not touched until you apply.");
-    assert.equal(renameNote(apply), "Your computer and Chrome show this name after Apply; the keyboard reconnects for a moment to take it.");
-    assert.equal(importNote(apply), "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and apply it.");
-    assert.equal(importCallout(apply), "Nothing is written to the keyboard until you review and apply; the review shows every change field by field.");
-    assert.equal(historyFooter(null), historyFooter(apply), "no draft reads as Apply");
+    assert.equal(historyFooter(apply), "Going to a step changes only the draft. The keyboard is not touched until you save.");
+    assert.equal(renameNote(apply), "Your computer and Chrome show this name once you save; the keyboard reconnects for a moment to take it.");
+    assert.equal(importNote(apply), "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and save it.");
+    assert.equal(importCallout(apply), "Nothing is written to the keyboard until you review and save; the review shows every change field by field.");
+    assert.equal(historyFooter(null), historyFooter(apply), "no draft reads as Review and save");
 
     for (const draft of [live, review]) {
-        const mode = draft === live ? "Live" : "Live + review";
-        assert.doesNotMatch(historyFooter(draft), /not touched|until you apply/, mode);
+        const mode = draft === live ? "Live edit" : "Live preview + save";
+        assert.doesNotMatch(historyFooter(draft), /not touched|until you save/, mode);
         assert.match(historyFooter(draft), /sends it to the keyboard at once/, mode);
-        assert.doesNotMatch(renameNote(draft), /after Apply/, mode);
+        assert.doesNotMatch(renameNote(draft), /once you save/, mode);
         assert.match(renameNote(draft), /reconnects for a moment to take it right after the edit/, mode);
         for (const words of [importNote(draft), importCallout(draft)]) {
-            assert.doesNotMatch(words, /until you review and apply/, mode);
+            assert.doesNotMatch(words, /until you review and save/, mode);
             assert.match(words, /Use as draft sends it to the keyboard at once as unsaved edits/, mode);
             assert.match(words, /Revert or unplugging/, mode);
         }

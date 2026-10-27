@@ -60,8 +60,8 @@ Held by: `tests/host/run_qmk_profile_split_transport_tests.sh` (`qmk_profile_spl
   an n-byte chunk, never under 32 (a shorter chunk is zero-padded). A payload
   reuse is 44 bytes. The largest frame is 128 bytes, so a chunk carries at
   most 106 bytes, pushed as a request or pulled as a reply (D-F28,
-  [0028](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0028-new-base-32-bit-profile-lengths.md); D-F19,
-  [0019](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0019-the-copy-reuses-what-the-other-half-has.md)).
+  [0028](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0028-new-base-32-bit-profile-lengths.md); D-F19,
+  [0019](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0019-the-copy-reuses-what-the-other-half-has.md)).
 - The last byte is a CRC8, polynomial `0x07`, initial value 0, over every
   byte before it. Multi-byte values are little-endian. Every offset and length
   is 32 bits. Every reserved or unused byte is zero, and a frame with a
@@ -87,7 +87,7 @@ Held by: `tests/host/run_profile_split_foundation_tests.sh` (`profile_split_foun
 | `ACK` | `6` | transfer | accepted progress (`OK`) or `BUSY` |
 | `ERROR` | `7` | transfer | a terminal or retryable error |
 | `PAYLOAD_REQUEST` | `8` | transfer, no chunk | pull bytes of the other half's saved profile |
-| retired | `9` | none | refused like an unknown kind (D-F31, [0031](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0031-via-is-not-supported.md)) |
+| retired | `9` | none | refused like an unknown kind (D-F31, [0031](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0031-via-is-not-supported.md)) |
 | `PREPARE_DURABLE` | `10` | descriptor | validate the received copy and make only its prepared marker durable |
 | retired | `11` | none | refused like an unknown kind (D-F31) |
 | `PAYLOAD_REUSE` | `12` | reuse | fill a range of the copy from the receiver's own active profile |
@@ -236,7 +236,7 @@ run: its save waits for a quiet keyboard before the next erase, or the scan's
 flash time is spent ([device-resident-profile.md](device-resident-profile.md)).
 That is not a stall: the receiver's own timers stand still meanwhile, and the
 sender counts each storage-paused reply as progress toward the save's
-deadlines (D-F32, [0032](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0032-live-edits-working-copy-and-save.md)).
+deadlines (D-F32, [0032](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0032-live-edits-working-copy-and-save.md)).
 Profile Wire candidate status page 1 reports reasons 8 and 9 as 5
 ([candidate-transfer.md](profile-wire-v1/candidate-transfer.md)).
 
@@ -417,7 +417,7 @@ uses, holding its storage admission as `PEER`.
 - The receive lease: a copy still being received is aborted, and its
   admission released, 3 s (`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`) after the
   last request for that copy, whatever else crosses the link (D-F44,
-  [0044](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0044-stale-copy-cannot-hold-off-later-copies.md)). The
+  [0044](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0044-stale-copy-cannot-hold-off-later-copies.md)). The
   lease never ends a copy being validated, prepared, committed or of unknown
   durability.
 - `ABORT` ends a copy still receiving, validating or prepared and answers
@@ -508,7 +508,7 @@ Recovery:
   a second in idle slots, reported as *peer cleanup pending*
   ([hid-channel.md](profile-wire-v1/hid-channel.md)), and no new prepared
   push or transfer starts until it is acknowledged (D-F41,
-  [0041](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0041-cancelled-save-ends-in-bounded-time.md)). A push whose
+  [0041](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0041-cancelled-save-ends-in-bounded-time.md)). A push whose
   commit is authorized cannot be cancelled.
 
 Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push_*`, `test_authorized_commit_survives_one_replayed_reply`, `test_store_completion_polling_requires_the_matching_full_copy`, `test_maximum_candidate_resolves_within_owner_no_progress_window`, `test_prepared_abort_is_bounded_when_other_half_goes_silent`, `test_prepared_abort_is_bounded_when_other_half_stays_busy`, `test_receiver_durable_prepare_survives_sender_pause`), `tests/host/run_profile_owner_tests.sh` (`test_other_half_store_write_failure_retries_then_fails_fast`, `test_host_abort_ends_when_other_half_never_acknowledges`).
@@ -517,7 +517,7 @@ Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push
 
 A prepared copy is ended only by its push: `PREPARE_COMMIT` commits it and
 `ABORT` releases it; the receive lease never times it (D-F34,
-[0034](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). A push lives
+[0034](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). A push lives
 in its sender's RAM, so a sender that restarts forgets it without ending it.
 Flag bit 5 of a `METADATA` request closes that gap.
 

@@ -160,7 +160,7 @@ test("after Apply, Put back makes what the keyboard held before it the draft, on
     const session = sessionWithDraft(), draft = session.draft, h = shell();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     draft.review(draft.revision);
-    await assert.rejects(draftControl(session, {type: "putBackProfile", draftRevision: draft.revision}, h), /no copy from before an Apply/);
+    await assert.rejects(draftControl(session, {type: "putBackProfile", draftRevision: draft.revision}, h), /no copy from before a save/);
     await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
     assert.ok(session.beforeApply, "the copy saved before Apply is kept for Put back");
     assert.deepEqual(session.beforeApply.document, h.saved[0]);
@@ -172,7 +172,7 @@ test("after Apply, Put back makes what the keyboard held before it the draft, on
     assert.equal(fingerprint(session.draft.document), fingerprint(before));
     const view = session.draft.view(session.service.snapshot());
     assert.equal(view.dirty, true);
-    assert.equal(view.undoLabel, "Put back what the keyboard had before Apply");
+    assert.equal(view.undoLabel, "Put back what the keyboard had before the save");
 });
 
 test("an Apply that renames the keyboard expects it to reconnect, and a readback its restart cuts short is no failure", async () => {
@@ -185,9 +185,9 @@ test("an Apply that renames the keyboard expects it to reconnect, and a readback
         session.draft.review(session.draft.revision);
         await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
         assert.deepEqual(session.reconnect, {deviceId: "kb", serialNumber: "", name, otherDevices: [], startedAt: session.reconnect.startedAt, dropped: false,
-            saved: "Complete profile applied to both halves and verified. Recovery copy: /recovery/1.json"});
+            saved: "Complete profile saved to both halves and verified. Recovery copy: /recovery/1.json"});
         assert.deepEqual(expecting, [true]);
-        assert.equal(session.notice, `Complete profile applied to both halves and verified. Recovery copy: /recovery/1.json ${RECONNECT_WORDS.waiting}`,
+        assert.equal(session.notice, `Complete profile saved to both halves and verified. Recovery copy: /recovery/1.json ${RECONNECT_WORDS.waiting}`,
             interrupted ? "the keyboard is read again once it is back, so the cut-short read is not reported" : "");
     }
     // A save that leaves the name alone expects nothing.
@@ -224,7 +224,7 @@ test("a failed post-Apply read clears its progress stage and is said after the s
     await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
     assert.equal(session.postApplyReadStep, undefined);
     assert.equal(session.applyRunning, false);
-    assert.match(session.notice, /^Complete profile applied to both halves and verified\. Reading the keyboard again failed: readback interrupted\. Recovery copy: \/recovery\/1\.json$/);
+    assert.match(session.notice, /^Complete profile saved to both halves and verified\. Reading the keyboard again failed: readback interrupted\. Recovery copy: \/recovery\/1\.json$/);
 });
 
 test("a destination blocker refuses Apply before recovery or HID", async () => {

@@ -95,13 +95,13 @@ function profileFindings(decoded, destination = {}) {
     if (max !== undefined && Number.isInteger(max) && lighting.brightness > max) {
         findings.push({kind: "brightnessBlocker", level: "blocker", layers: [], identity: String(lighting.brightness),
             title: `Background effect brightness exceeds this keyboard's limit of ${max}`,
-            detail: `This profile stores brightness ${lighting.brightness}; the keyboard accepts at most ${max}. Apply will refuse the profile.`,
+            detail: `This profile stores brightness ${lighting.brightness}; the keyboard accepts at most ${max}, so it refuses the profile.`,
             fix: `Set the background effect brightness to ${max} or lower.`, place: {kind: "settings", area: "Lighting", section: "rgbAppearance", stage: "base"}});
     }
     if (Array.isArray(destination.effects) && !destination.effects.some(effect => effect.id === lighting.effect)) {
         findings.push({kind: "effectBlocker", level: "blocker", layers: [], identity: String(lighting.effect),
             title: `Background effect ${lighting.effect} is unavailable on this keyboard`,
-            detail: "The connected firmware does not advertise this effect. Apply will refuse the profile.",
+            detail: "The connected firmware does not advertise this effect, so the keyboard refuses the profile.",
             fix: "Choose a background effect this keyboard reports.", place: {kind: "settings", area: "Lighting", section: "rgbAppearance", stage: "base"}});
     }
     return findings;

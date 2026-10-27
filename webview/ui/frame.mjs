@@ -53,7 +53,7 @@ export function rail() {
     const busyWords = health.busy ? `${phaseWords(model, health.phase)?.label || "Working"}. ` : "";
     const halves = halvesWords(model, health.halves);
     const keyboardDot = demo.active
-        ? {tone: "demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard."}
+        ? {tone: "demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only saving needs a keyboard."}
         : reconnecting ? {tone: "", tip: reconnecting.restart ? "The keyboard is restarting. It comes back by itself in a moment, and Ark reads it again." : reconnecting.lost ? "Ark lost the keyboard and is connecting it again." : "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
         : !device.connected ? {tone: "err", tip: "No keyboard is connected."}
         : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
@@ -228,14 +228,14 @@ export function commitBar() {
     if (draft.busy && apply?.state === "applying") {
         const index = apply.steps.findIndex((step) => step.state === "active");
         return el(`<div class="commit applying ap">
-            <div class="ap-head"><strong>Applying to the keyboard</strong>
+            <div class="ap-head"><strong>Saving to the keyboard</strong>
                 <span class="muted">step ${index + 1} of ${apply.steps.length}</span></div>
             ${applySteps(apply)}
             <div class="note">The keyboard keeps running its saved profile until both halves confirm.</div></div>`);
     }
     if (draft.busy && apply?.state === "done") {
         return el(`<div class="commit applying readback" role="status" aria-live="polite">
-            ${spinner()}<strong>Applied — reading back the keyboard</strong>
+            ${spinner()}<strong>Saved — reading back the keyboard</strong>
             <span class="readback-detail">${esc(postApplyReadText(model.postApplyRead))}</span>
             <span class="readback-note">Editing resumes when this read finishes.</span></div>`);
     }
@@ -244,7 +244,7 @@ export function commitBar() {
     // verdict, in the words the notice starts with too.
     if (!draft.busy && apply?.state === "failed" && state.applyDismissed !== apply.id) {
         const node = el(`<div class="commit ap failed">
-            <div class="ap-head"><i class="dot err"></i><strong>Apply stopped at: ${esc(apply.failure?.label)}</strong></div>
+            <div class="ap-head"><i class="dot err"></i><strong>Save stopped at: ${esc(apply.failure?.label)}</strong></div>
             <p class="ap-reason">${esc(apply.failure?.reason)}</p>
             <p class="ap-saved">${esc(apply.failure?.verdict)}</p>
             ${applySteps(apply)}
@@ -325,7 +325,7 @@ export function commitBar() {
         <button class="btn ghost tiny" data-act="discard"
             data-tip="${demo ? "Put every change back to the demo setup." : "Put every change back to what the keyboard holds."} Undo (${shortcut("Z")}) brings them back.">Discard all</button>
         <button class="btn primary" data-act="review"
-            data-tip="${demo ? "See every change and what the checks find. Apply needs a keyboard; Export saves the setup." : "See every change, then write the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and apply"}</button></div>`);
+            data-tip="${demo ? "See every change and what the checks find. Saving needs a keyboard; Export keeps the setup as a file." : "See every change, then write the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and save"}</button></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="review"]')).addEventListener("click", openReview);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
     return node;

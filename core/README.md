@@ -16,7 +16,7 @@ build requests and decode answers; `schema/` decodes the stored bytes.
 `session/profile-device-service.js` owns the connection and publishes what it
 holds as `snapshot()`. Its complete read, `readKeyboardProfile`, takes one
 verified snapshot: `snapshotProfile` (`session/portable-profile-session.js`)
-for a keyboard in Apply, `snapshotLive` (`session/live-profile-session.js`) for
+for a keyboard in Review and save, `snapshotLive` (`session/live-profile-session.js`) for
 one in a live edit mode or still running unsaved live edits; that read also
 keeps the working copy's exact bytes, which live edits splice against.
 
@@ -29,7 +29,7 @@ rewrites one domain. Review (`model/profile-review.js`) and the checks
 the keyboard. `buildPanelModel` projects the draft through
 `session/device-model.js` into the model the panel draws.
 
-**Applying.** In Apply mode, `session/panel-controls.js` hands the reviewed
+**Applying.** In Review and save, `session/panel-controls.js` hands the reviewed
 document to the service's `restorePortableProfile`, which runs
 `restoreProfile` (`session/portable-profile-session.js`): recovery copy first,
 then one candidate through `session/candidate-upload-coordinator.js` and

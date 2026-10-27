@@ -5,7 +5,7 @@ conservative analysis behind them
 ([D-L36](../adr/0036-review-checks-reach-and-save-blockers.md),
 [D-L48](../adr/0048-timing-advice-follows-firmware-capability.md),
 [D-L49](../adr/0049-timing-findings-constrain-reachability-conservatively.md);
-for the person, the [guide](../guide/review-and-apply.md#timing-checks)). Firmware owns timing
+for the person, the [guide](../guide/review-and-save.md#timing-checks)). Firmware owns timing
 and [participation](../../upstream/firmware/docs/spec/participation-policy.md).
 Ark owns the analysis, its limits and how inherited behaviour is shown.
 
@@ -26,10 +26,10 @@ Ark owns the analysis, its limits and how inherited behaviour is shown.
 
 Core enforces each level, not only the interface:
 
-- **Blocker.** Apply, and Save in Live + review, refuse it before a recovery
+- **Blocker.** Apply, and Save in Live preview + save, refuse it before a recovery
   copy or HID write. A live edit that adds one is not sent, nor is a draft
   holding one sent live.
-- **Trap or warning.** Apply, and Save in Live + review, need `confirmChecks`
+- **Trap or warning.** Apply, and Save in Live preview + save, need `confirmChecks`
   for the reviewed revision, whether the draft made it or the keyboard had
   it. A live edit that adds one waits as a proposal (`checksAdded`).
 - **Notice.** It only informs.

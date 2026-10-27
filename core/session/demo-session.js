@@ -97,11 +97,11 @@ const DEMO_OPTIONS = Object.freeze({
 });
 
 
-// What core says in the demo: the device it is not, and why Apply is not here.
+// What core says in the demo: the device it is not, and why Save is not here.
 const DEMO_WORDS = Object.freeze({
     label: "Demo",
     bundled: "the demo setup",
-    applyNeedsKeyboard: "Apply needs a keyboard. Export this setup, then import it on your keyboard to review and apply it there.",
+    applyNeedsKeyboard: "Saving needs a keyboard. Export this setup, then import it on your keyboard to review and save it there.",
 });
 
 /** @param {string} text @param {string} [code] */
@@ -127,7 +127,7 @@ const demoProfile = () => JSON.parse(JSON.stringify(DEMO_PROFILE));
 function demoRefusal(session, state) {
     if (state.connected) return "A keyboard is connected. Disconnect it to explore the demo instead.";
     if (state.busy || session.readBusy) return "Ark is working with a keyboard. Wait for it to finish.";
-    if (session.draft?.dirty && !session.demo) return "Your draft has changes for a keyboard. Reconnect it to apply them, or discard them, before exploring the demo.";
+    if (session.draft?.dirty && !session.demo) return "Your draft has changes for a keyboard. Reconnect it to save them, or discard them, before exploring the demo.";
     return "";
 }
 
@@ -284,7 +284,7 @@ function demoHeader(session, busy) {
         label: DEMO_WORDS.label,
         summary: `No keyboard · ${session.demo.name}`,
         savedProfile: "",
-        subtitle: "Nothing here was read from a keyboard, and nothing can be applied to one.",
+        subtitle: "Nothing here was read from a keyboard, and nothing can be saved to one.",
         flashPauses: DEMO_FLASH_PAUSES,
         health: {profile: "demo", converged: false, halves: /** @type {import("../../contracts/model.js").HalvesId} */ ("unread"), recoveryPending: false, earlierFormat: false, restartNeeded: false, busy: Boolean(busy), phase: PHASE.DEMO, error: ""},
     };
@@ -294,7 +294,7 @@ function demoHeader(session, busy) {
 function demoDiagnostics(session) {
     return [
         `No keyboard is connected. The demo opened ${session.demo.name} as current firmware would hold it: sixteen layers, 32 pointing slots, 128 macros and 128 custom keys.`,
-        "Edits, checks and the review work as they would on a keyboard. Apply needs one: export the setup, then import it on your keyboard.",
+        "Edits, checks and the review work as they would on a keyboard. Saving needs one: export the setup, then import it on your keyboard.",
     ];
 }
 

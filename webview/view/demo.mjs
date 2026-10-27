@@ -23,8 +23,8 @@ export const DEMO_WORDS = Object.freeze({
     status: "Demo · no keyboard",
     banner: "No keyboard is connected. Change anything: edits stay in this window, and Export saves them as a profile file for your keyboard.",
     explore: "Explore a demo",
-    exploreTip: "Open Ark on a demo setup, with no keyboard. Every screen works and every edit shows in the review; only Apply needs a keyboard.",
-    exportNote: "Save the demo setup, with your edits, as a complete profile file. On your keyboard, Import it to review and apply it.",
+    exploreTip: "Open Ark on a demo setup, with no keyboard. Every screen works and every edit shows in the review; only saving needs a keyboard.",
+    exportNote: "Save the demo setup, with your edits, as a complete profile file. On your keyboard, Import it to review and save it.",
     draftTip: "Edits waiting in this window, over the demo setup. Nothing here is on a keyboard.",
     // Where a check the draft did not make comes from: the demo setup.
     existingChecks: "Already in the demo setup",

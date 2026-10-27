@@ -4,7 +4,8 @@ The words for the app: how a person reads the keyboard, edits it in a draft,
 reviews and keeps changes, and backs them up. The keyboard's own words (profile,
 half, generation, working copy, edit mode, Save, Apply, behaviour, pointing
 mode and the rest) are in the [firmware's glossary](upstream/firmware/GLOSSARY.md),
-which Ark imports at a pinned commit.
+which Ark imports at a pinned commit. A person sees the keyboard's Apply and
+its Save both as **Save** (D-L72).
 
 ## Reading the keyboard
 
@@ -20,7 +21,7 @@ _Avoid_: capture, dump, cache
 
 **Demo**:
 Ark running on a complete example profile with no keyboard connected; every
-screen works and only Apply needs a keyboard.
+screen works and only saving needs a keyboard.
 _Avoid_: offline mode, sample keyboard, fixture (in the interface)
 
 **Read-only**:
@@ -65,15 +66,15 @@ reviewed against the keyboard before it can be kept.
 _Avoid_: conflict (alone), outdated draft, drifted draft
 
 **Send live**:
-Turning an Apply-mode draft into unsaved edits on the keyboard when switching
-to a live edit mode.
+Turning a draft made in Review and save into unsaved edits on the keyboard
+when switching to a live edit mode.
 _Avoid_: push, upload, apply live
 
 ## Review
 
 **Review**:
 The list of every change in the draft against the keyboard, with the checks,
-that Apply and Save go through.
+that every save goes through.
 _Avoid_: diff view, summary, changes dialog
 
 **Check**:
@@ -86,11 +87,11 @@ A layer that can be locked on with no way back to the base layer.
 _Avoid_: dead end, stuck layer, layer lock-in
 
 **Blocker**:
-A check that keeps Apply disabled until it is fixed.
+A check that keeps Save disabled until it is fixed.
 _Avoid_: error (for this), fatal
 
 **Warning**:
-A check that Apply or Save asks about before writing ("Apply anyway").
+A check that Save asks about before writing ("Save anyway").
 _Avoid_: caution, soft error
 
 **Notice**:
@@ -104,8 +105,13 @@ _Avoid_: coverage, navigability, escape analysis
 
 ## Keeping changes
 
+**Save** (on screen):
+Making the draft's edits permanent on the keyboard: the
+keyboard's Apply in Review and save, its Save in the live modes (D-L72).
+_Avoid_: Apply (on screen), commit, write, push
+
 **Recovery copy**:
-A backup Ark saves automatically before an Apply, a Save or a restart, of what
+A backup Ark saves automatically before a save or a restart, of what
 that operation could lose, and of the unsaved edits when a Save is cut short.
 _Avoid_: recovery file, Before Apply copy, safety backup, snapshot
 
@@ -148,7 +154,7 @@ _Avoid_: sidebar, nav, menu
 
 **Bar**:
 The floating bar at the foot of the window, the only way changes leave it:
-Review, Apply, Save, Revert and their progress.
+Review, Save, Revert and their progress.
 _Avoid_: footer, save bar, toolbar, status bar
 
 **Board**:

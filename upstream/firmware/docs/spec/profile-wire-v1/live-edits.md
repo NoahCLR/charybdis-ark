@@ -2,10 +2,10 @@
 
 How a client changes the working copy over Profile Wire so an edit runs on
 both halves at once without a save, then saves it, reverts it, or has the
-keyboard save it in Live; the edit mode stored beside the profile; keyboard
+keyboard save it in Live edit; the edit mode stored beside the profile; keyboard
 adjustments; and how a stopped keyboard says so and is restarted
-([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0032-live-edits-working-copy-and-save.md),
-[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
+([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0032-live-edits-working-copy-and-save.md),
+[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
 Raw HID framing and read envelope are in [the HID channel](hid-channel.md);
 every result code is in [errors](errors.md); Save writes through
 [candidate transfer](candidate-transfer.md). How the slave half follows the
@@ -138,7 +138,7 @@ answered `INVALID_ARGUMENT` and reaches nothing.
 | `0x24` abort | nothing |
 | `0x25` save | 5–8 session, 9–12 revision |
 | `0x26` revert | 5–8 session, 9–12 revision |
-| `0x27` edit mode | 5 mode: `0` Apply, `1` Live, `2` Live + review |
+| `0x27` edit mode | 5 mode: `0` Review and save, `1` Live edit, `2` Live preview + save |
 | `0x28` restart | 5–8 the confirmation `52 45 53 54` ("REST") |
 
 Splices and data arrive in order. A repeated splice or data report whose
@@ -235,7 +235,7 @@ validate, `6` waiting for the commit. When the checksums, length and domains
 equal the saved profile's, it compares the bytes (`7`); the same bytes are
 not written again: the keyboard runs its saved profile at the next safe
 boundary (`8`) with nothing unsaved and the same revision, and the slave
-half follows as after a Revert. Live's own save does the same. Phase `5` is
+half follows as after a Revert. Live edit's own save does the same. Phase `5` is
 never reported.
 
 When a save lands the saved profile holds the working copy's bytes: nothing
@@ -244,7 +244,7 @@ was; its result (`VALIDATION_REJECTED`, or `PUBLICATION_FAILED` with the
 candidate's error id) and transaction are on page 1, and a working copy
 replaced before the save began writing ends it `ABORTED`. A save waits for
 a quiet keyboard before each flash erase
-([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
+([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
 wait counts toward no timeout on either half.
 
 An Apply still works and replaces the working copy: unsaved edits are gone
@@ -433,8 +433,9 @@ Held by: `tests/host/run_qmk_profile_edit_channel_tests.sh` (`test_gets`).
 
 ## Edit mode
 
-The edit mode says how a client's edits reach the keyboard: `0` Apply, `1`
-Live, `2` Live + review. A keyboard never set is in Live + review. It is
+The edit mode says how a client's edits reach the keyboard: `0` Review and
+save, `1` Live edit, `2` Live preview + save. A keyboard never set is in Live
+preview + save. It is
 stored outside every profile, in QMK's EEPROM user datablock on each half,
 never in a profile or a backup, as two 16-byte records:
 
@@ -466,7 +467,7 @@ Held by: `tests/host/run_profile_working_sync_tests.sh` (`test_edit_mode_follows
 
 ## Automatic saves
 
-In Live the master half saves the working copy itself after 3 s without a
+In Live edit the master half saves the working copy itself after 3 s without a
 published revision and without a held key, the matrix also quiet for 50 ms,
 whether or not a client is connected. Every held-key scan and every published
 revision restarts the interval. It starts only when the keyboard step is
@@ -477,9 +478,9 @@ only an explicit Save, a new edit or a new adjustment tries again. Unplugging
 before it completes loses the unsaved edits; a save already running has the
 ordinary old-or-new outcome.
 
-Live + review never saves automatically. Apply saves automatically only a
-working copy made of keyboard adjustments alone; a published client edit
-rules that copy out until Save, Revert or an Apply. No client keepalive or
+Live preview + save never saves automatically. Review and save saves
+automatically only a working copy made of keyboard adjustments alone; a
+published client edit rules that copy out until Save, Revert or an Apply. No client keepalive or
 disconnect message affects this.
 
 Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_auto_save_test.inc`: `test_auto_save_modes_and_adjustments`, `test_ineligible_auto_saves_skip_admission_work`, `test_auto_save_hour_bound`, `test_auto_save_power_cuts`, `test_a_failed_automatic_save_is_reported_and_not_repeated`).

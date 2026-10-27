@@ -403,7 +403,7 @@ test("going from Apply to Live + review with a draft asks to send it live or dis
     // The notice says both things, whole: the send publishes the model on
     // its way, which takes the mode's notice before the draft's is added.
     const said = shell.posted.filter(message => message.type === "model" && message.notice).map(message => message.notice);
-    assert.ok(said.some(text => /^Edits now reach the keyboard by Live \+ review: .* Your draft is running on the keyboard, unsaved\.$/.test(text)), said.join(" | "));
+    assert.ok(said.some(text => /^Now in Live preview \+ save: .* Your draft is running on the keyboard, unsaved\.$/.test(text)), said.join(" | "));
     assert.ok(said.every(text => !/undefined/.test(text)), said.join(" | "));
 });
 

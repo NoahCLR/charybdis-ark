@@ -87,7 +87,7 @@ export function screenProfile() {
 const FIRMWARE_LINE = "A backup restores onto the same firmware release; check the release notes before updating firmware.";
 
 // What every recovery copy is, before where the shell keeps it.
-const RECOVERY_NOTE = "Before every Apply, Save and restart, and before leaving Live or restoring a backup, Ark keeps a copy of what that could lose,";
+const RECOVERY_NOTE = "Before every save and restart, and before leaving Live edit or restoring a backup, Ark keeps a copy of what that could lose,";
 
 // Not built yet, and said so rather than half-built: Ark reads the
 // firmware’s complete defaults, but has no whole-defaults draft control yet.
