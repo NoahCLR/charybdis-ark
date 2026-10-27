@@ -40,8 +40,10 @@ export interface BehaviorView extends Omit<Behavior, 'steps'> {
 export interface ComboView extends Combo {inputPositions?: number[]; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
 export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string}
 export interface MacroSlot {keycode: string; name: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
-/** A custom key's shortcut (firmware D-F26): a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI), one key (0 for none), a mask of the layers it turns on, and how it turns them on (`layerKind`: 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers). */
-export interface CustomKeyShortcut {mods: number; key: number; layers: number; layerKind: number}
+/** A custom key's shortcut (firmware D-F26): a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI), its keys in press order (at most six, each once, at most one media and one system key), a mask of the layers it turns on, and how it turns them on (`layerKind`: 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers). */
+export interface CustomKeyShortcut {mods: number; keys: number[]; layers: number; layerKind: number}
+/** A cap on a shortcut's keys: at most `most` of the keys in `keycodes` (every key when null), or, with `each`, each of them at most `most` times; `refusal` says why when broken. */
+export interface ShortcutKeyCap {keycodes: readonly number[] | null; each: boolean; most: number; refusal: string}
 /** A layer as a shortcut's layer: why a shortcut cannot turn it on ('' when it can), and which kind of always-on layer that makes it. */
 export interface ShortcutLayerTarget {layer: number; refusal: string; alwaysOn: 'base' | 'default' | ''}
 /**
@@ -54,9 +56,9 @@ export interface PdLinkTarget {layer: number; refusal: string; inert: 'default' 
 /** `shortcutLabel` names the shortcut in the host's words ("Left Ctrl + Right Alt + K"), empty for none. */
 export interface CustomKey {
     slot: number; keycode: string; code: number; name: string; hasBehavior: boolean; shortcut: CustomKeyShortcut;
-    /** The whole shortcut in words: modifiers, key, then layers, joined by " + ", the layers led by their kind's verb unless held ("Lock Navigation"). */
+    /** The whole shortcut in words: modifiers, keys, then layers, joined by " + ", the layers led by their kind's verb unless held ("Lock Navigation"). */
     shortcutLabel: string;
-    /** What it sends, one part each: modifiers in the host's words, then its key; empty for layers alone. */
+    /** What it sends, one part each: modifiers in the host's words, then each key in press order; empty for layers alone. */
     shortcutKeys: string[];
     /** The layers it turns on, by name, lowest first; empty for none. */
     shortcutLayerNames: string[];
@@ -151,6 +153,8 @@ export interface PublishedModel {
     customKeyNameSpace: {perName: number} | null;
     /** The keys a custom key's shortcut may hold, by catalogue name and alias. */
     customKeyShortcutKeys: string[];
+    /** The caps on a shortcut's keys, in the order the codec checks them, each with the codec's words when broken, and the limits in words (core/schema/settings-domain-v1.js, SHORTCUT_KEY_LIMITS). */
+    customKeyShortcutKeyLimits: {caps: ShortcutKeyCap[]; words: string};
     /** Every layer with why a custom key's shortcut cannot turn it on (core/model/shortcut-layers.js). */
     customKeyShortcutLayers: ShortcutLayerTarget[];
     customKeyEditing: {identity: string; writable: boolean};

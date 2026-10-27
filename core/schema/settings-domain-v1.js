@@ -4,7 +4,7 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {validHostSetting} = require("./host-settings");
 const {canonical} = require("./bytes");
-// Settings domain 0x40, version 10, the only one the keyboard stores (firmware
+// Settings domain 0x40, version 11, the only one the keyboard stores (firmware
 // D-F14, D-F26): 31 values, sixteen layer records, 128 custom-key shortcuts,
 // then 273 counted names — sixteen
 // layer names, 128 macro names, 128 custom-key names and the keyboard's
@@ -18,9 +18,10 @@ const {canonical} = require("./bytes");
 // (participation-policy.md). Decoded, each bitmap is the sorted list of its
 // set positions (row × columns + column).
 //
-// A custom-key shortcut is five bytes, custom key 0 first: the modifier mask in
-// HID report order (bit 0 Left Ctrl … bit 7 Right GUI, any combination), the
-// key: none, a basic key or a mouse button (SHORTCUT_KEYS), the layers it
+// A custom-key shortcut is ten bytes, custom key 0 first: the modifier mask in
+// HID report order (bit 0 Left Ctrl … bit 7 Right GUI, any combination), six
+// key bytes, the keys it holds together in the order they are pressed, zero
+// after the last (SHORTCUT_KEYS; decoded, the list of its keys), the layers it
 // turns on, a 16-bit mask, little-endian, then how it turns them on, as the
 // layer keys do (SHORTCUT_LAYER_KINDS): hold, lock, move to, tap-toggle or
 // one-shot, all its layers alike. All zero is no shortcut; any part alone is a
@@ -80,15 +81,93 @@ const STORED = /** @type {const} */ ([
 const SCALARS_OFFSET = 8, PLACEMENT_BYTES = 8, LAYER_RECORD_SIZE = 1 + 2 * PLACEMENT_BYTES;
 const LAYER_RECORDS_OFFSET = SCALARS_OFFSET + STORED.length * 4;
 const MACRO_NAMES = 128, CUSTOM_KEY_NAMES = 128, KEYBOARD_NAMES = 1, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES + KEYBOARD_NAMES;
-const CUSTOM_KEY_SHORTCUTS = 128, SHORTCUT_SIZE = 5;
+const CUSTOM_KEY_SHORTCUTS = 128, SHORTCUT_KEY_COUNT = 6, SHORTCUT_SIZE = 4 + SHORTCUT_KEY_COUNT;
 const SHORTCUTS_OFFSET = LAYER_RECORDS_OFFSET + LAYERS * LAYER_RECORD_SIZE;
 const FIXED_SIZE = SHORTCUTS_OFFSET + CUSTOM_KEY_SHORTCUTS * SHORTCUT_SIZE;
 const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS], COUNT: STORED.length, LAYERS, MACRO_NAMES, CUSTOM_KEY_NAMES, CUSTOM_KEY_SHORTCUTS,
-    LAYER_RECORD_SIZE, PLACEMENT_BYTES, PLACEMENT_MAX_POSITIONS: PLACEMENT_BYTES * 8, NAME_MAX_BYTES, SHORTCUT_SIZE,
+    LAYER_RECORD_SIZE, PLACEMENT_BYTES, PLACEMENT_MAX_POSITIONS: PLACEMENT_BYTES * 8, NAME_MAX_BYTES, SHORTCUT_SIZE, SHORTCUT_KEY_COUNT,
     SCALARS_OFFSET, LAYER_RECORDS_OFFSET, SHORTCUTS_OFFSET, FIXED_SIZE, MIN_SIZE: FIXED_SIZE + NAME_COUNT, MAX_SIZE: FIXED_SIZE + NAME_COUNT * (NAME_MAX_BYTES + 1)});
-// The keys a shortcut may hold (firmware D-F26): none, the basic keyboard
-// usages KC_A..KC_EXSEL, or mouse buttons 1-8. Modifiers belong in the mask.
-const SHORTCUT_KEYS = Object.freeze({BASIC_MIN: 0x04, BASIC_MAX: 0xa4, MOUSE_MIN: 0xd1, MOUSE_MAX: 0xd8});
+// The keys a shortcut may hold (firmware D-F26): QMK's basic keycodes for a
+// usage the computer sees. Keyboard keys KC_A..KC_EXSEL, the system keys
+// (power, sleep, wake), the consumer (media) keys, and the mouse keys that
+// move, click and scroll; modifiers belong in the mask, and mouse-key
+// acceleration changes no report. At most SHORTCUT_KEY_COUNT, the 6-key
+// report's limit on every build, each once, and at most one system key and one
+// media key, since those reports carry one usage each.
+const SHORTCUT_KEYS = Object.freeze({BASIC_MIN: 0x04, BASIC_MAX: 0xa4, SYSTEM_MIN: 0xa5, SYSTEM_MAX: 0xa7, CONSUMER_MIN: 0xa8, CONSUMER_MAX: 0xc2, MOUSE_MIN: 0xcd, MOUSE_MAX: 0xdc});
+/** @param {number} key */
+const systemKey = key => key >= SHORTCUT_KEYS.SYSTEM_MIN && key <= SHORTCUT_KEYS.SYSTEM_MAX;
+/** @param {number} key */
+const consumerKey = key => key >= SHORTCUT_KEYS.CONSUMER_MIN && key <= SHORTCUT_KEYS.CONSUMER_MAX;
+// A key a shortcut may hold; 0 (none) is not one.
+/** @param {unknown} key */
+const validShortcutKey = key => Number.isInteger(key) && ((/** @type {number} */ (key) >= SHORTCUT_KEYS.BASIC_MIN && /** @type {number} */ (key) <= SHORTCUT_KEYS.CONSUMER_MAX)
+    || (/** @type {number} */ (key) >= SHORTCUT_KEYS.MOUSE_MIN && /** @type {number} */ (key) <= SHORTCUT_KEYS.MOUSE_MAX));
+// The bytes that are not keys a shortcut holds but have words of their own
+// when refused: no key, transparent, mouse-key acceleration and the modifier
+// keys, which are the mask's.
+const NOT_SHORTCUT_KEYS = Object.freeze({NONE: 0x00, TRANSPARENT: 0x01, ACCELERATION_MIN: 0xdd, ACCELERATION_MAX: 0xdf, MODIFIER_MIN: 0xe0, MODIFIER_MAX: 0xe7});
+// Why a shortcut cannot be stored, in words: the codec's refusals, and the
+// picker's (each cap's, published in customKeyShortcutKeyLimits), one home.
+const SHORTCUT_KEY_REFUSALS = Object.freeze({
+    list: "A shortcut names its keys as a list, in the order they are pressed.",
+    single: "A shortcut names its keys as a list, in the order they are pressed, not as a single key.",
+    none: "A shortcut holds no empty key (KC_NO): leave it out.",
+    transparent: "A shortcut holds no transparent key (KC_TRNS): it is the key's own action, with no layer below it to fall through to.",
+    acceleration: "A shortcut holds no mouse-key acceleration key: acceleration changes nothing the computer sees.",
+    modifier: "A shortcut holds keyboard keys, media and system keys and mouse keys, not modifier keys, which are its modifiers.",
+    kind: "A shortcut holds keyboard keys, media and system keys and mouse keys, and no other keycode.",
+    count: `A shortcut holds at most ${SHORTCUT_KEY_COUNT} keys at once.`,
+    twice: "A shortcut holds each key once.",
+    media: "A shortcut holds at most one media key: the computer reads one at a time.",
+    system: "A shortcut holds at most one system key (power, sleep or wake): the computer reads one at a time.",
+    shape: `A custom key shortcut holds modifiers, up to ${SHORTCUT_KEY_COUNT} keys, and layers other than the base, turned on as one layer key does.`,
+});
+/** @param {number} min @param {number} max */
+const keycodesIn = (min, max) => Object.freeze(Array.from({length: max - min + 1}, (_, at) => min + at));
+// The caps on the keys a shortcut holds, checked in this order: at most
+// `most` of the keys in `keycodes` (every key when null), or, with `each`,
+// each of them at most `most` times. Published to the picker as they are
+// (customKeyShortcutKeyLimits), so it refuses what the codec refuses, in the
+// same words, with no rule of its own.
+/** @type {readonly import("../../contracts/panel.js").ShortcutKeyCap[]} */
+const SHORTCUT_KEY_CAPS = Object.freeze([
+    Object.freeze({keycodes: null, each: false, most: SHORTCUT_KEY_COUNT, refusal: SHORTCUT_KEY_REFUSALS.count}),
+    Object.freeze({keycodes: null, each: true, most: 1, refusal: SHORTCUT_KEY_REFUSALS.twice}),
+    Object.freeze({keycodes: keycodesIn(SHORTCUT_KEYS.CONSUMER_MIN, SHORTCUT_KEYS.CONSUMER_MAX), each: false, most: 1, refusal: SHORTCUT_KEY_REFUSALS.media}),
+    Object.freeze({keycodes: keycodesIn(SHORTCUT_KEYS.SYSTEM_MIN, SHORTCUT_KEYS.SYSTEM_MAX), each: false, most: 1, refusal: SHORTCUT_KEY_REFUSALS.system}),
+]);
+// The limits the picker reads: the caps, and the limits in words for its
+// notes and tips.
+const SHORTCUT_KEY_LIMITS = Object.freeze({caps: SHORTCUT_KEY_CAPS,
+    words: `up to ${SHORTCUT_KEY_COUNT} keys held together, at most one media key and one system key`});
+// The first cap these keys break, or undefined.
+/** @param {readonly import("../../contracts/panel.js").ShortcutKeyCap[]} caps @param {readonly number[]} keys */
+const brokenCap = (caps, keys) => caps.find(cap => {
+    const held = cap.keycodes ? keys.filter(key => /** @type {readonly number[]} */ (cap.keycodes).includes(key)) : keys;
+    const most = cap.each ? Math.max(0, ...held.map(key => held.filter(other => other === key).length)) : held.length;
+    return most > cap.most;
+});
+// Why a shortcut cannot hold this byte, which is not a key it may hold.
+/** @param {unknown} key */
+function keyRefusal(key) {
+    if (key === NOT_SHORTCUT_KEYS.NONE) return SHORTCUT_KEY_REFUSALS.none;
+    if (key === NOT_SHORTCUT_KEYS.TRANSPARENT) return SHORTCUT_KEY_REFUSALS.transparent;
+    if (!Number.isInteger(key)) return SHORTCUT_KEY_REFUSALS.kind;
+    const code = /** @type {number} */ (key);
+    if (code >= NOT_SHORTCUT_KEYS.ACCELERATION_MIN && code <= NOT_SHORTCUT_KEYS.ACCELERATION_MAX) return SHORTCUT_KEY_REFUSALS.acceleration;
+    if (code >= NOT_SHORTCUT_KEYS.MODIFIER_MIN && code <= NOT_SHORTCUT_KEYS.MODIFIER_MAX) return SHORTCUT_KEY_REFUSALS.modifier;
+    return SHORTCUT_KEY_REFUSALS.kind;
+}
+// Why a shortcut cannot hold these keys, or "" when it can: one list, in the
+// order they are pressed.
+/** @param {unknown} keys */
+function shortcutKeysRefusal(keys) {
+    if (!Array.isArray(keys)) return SHORTCUT_KEY_REFUSALS.list;
+    const wrong = keys.findIndex(key => !validShortcutKey(key));
+    if (wrong >= 0) return keyRefusal(keys[wrong]);
+    return brokenCap(SHORTCUT_KEY_CAPS, keys)?.refusal ?? "";
+}
 // How a shortcut turns its layers on (firmware D-F26), as MO(), TG(), TO(),
 // TT() and OSL() turn one on: held while the key is; a lock of them all, or
 // off again when all are locked; locked alone, every other lock released;
@@ -97,18 +176,31 @@ const SHORTCUT_KEYS = Object.freeze({BASIC_MIN: 0x04, BASIC_MAX: 0xa4, MOUSE_MIN
 const SHORTCUT_LAYER_KINDS = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
 /** @param {unknown} kind @param {number} layers */
 const validLayerKind = (kind, layers) => Number.isInteger(kind) && /** @type {number} */ (kind) >= SHORTCUT_LAYER_KINDS.HOLD && /** @type {number} */ (kind) <= SHORTCUT_LAYER_KINDS.ONESHOT && (layers !== 0 || kind === SHORTCUT_LAYER_KINDS.HOLD);
-/** @param {unknown} key */
-const validShortcutKey = key => Number.isInteger(key) && (key === 0 || (/** @type {number} */ (key) >= SHORTCUT_KEYS.BASIC_MIN && /** @type {number} */ (key) <= SHORTCUT_KEYS.BASIC_MAX)
-    || (/** @type {number} */ (key) >= SHORTCUT_KEYS.MOUSE_MIN && /** @type {number} */ (key) <= SHORTCUT_KEYS.MOUSE_MAX));
 /** @param {unknown} shortcut @returns {shortcut is import("./types.js").CustomKeyShortcut} */
 const validShortcut = shortcut => typeof shortcut === "object" && shortcut !== null
     && Number.isInteger(/** @type {any} */ (shortcut).mods) && /** @type {any} */ (shortcut).mods >= 0 && /** @type {any} */ (shortcut).mods <= 0xff
-    && validShortcutKey(/** @type {any} */ (shortcut).key)
+    && !shortcutKeysRefusal(/** @type {any} */ (shortcut).keys)
     && Number.isInteger(/** @type {any} */ (shortcut).layers) && /** @type {any} */ (shortcut).layers >= 0 && /** @type {any} */ (shortcut).layers <= 0xffff && !(/** @type {any} */ (shortcut).layers & 1)
     && validLayerKind(/** @type {any} */ (shortcut).layerKind, /** @type {any} */ (shortcut).layers);
-// Whether a custom key has a shortcut: any part of it, layers alone included.
-/** @param {{mods?: number, key?: number, layers?: number} | null | undefined} shortcut */
-const shortcutPresent = shortcut => Boolean(shortcut && (shortcut.mods || shortcut.key || shortcut.layers));
+// Why a shortcut is not one the keyboard stores, in words, or "" when it is:
+// its keys' refusal when they are what is wrong, else the shape it has.
+/** @param {unknown} shortcut */
+function shortcutStoreRefusal(shortcut) {
+    if (validShortcut(shortcut)) return "";
+    if (typeof shortcut !== "object" || shortcut === null) return SHORTCUT_KEY_REFUSALS.shape;
+    if (!("keys" in shortcut) && "key" in shortcut) return SHORTCUT_KEY_REFUSALS.single;
+    return shortcutKeysRefusal(/** @type {{keys?: unknown}} */ (shortcut).keys) || SHORTCUT_KEY_REFUSALS.shape;
+}
+// Whether a shortcut sends anything to the computer, modifiers or keys, and
+// whether a custom key has one at all: any part of it, layers alone included.
+/** @param {{mods?: number, keys?: readonly number[]} | null | undefined} shortcut */
+const shortcutSends = shortcut => Boolean(shortcut && (shortcut.mods || shortcut.keys?.length));
+/** @param {{mods?: number, keys?: readonly number[], layers?: number} | null | undefined} shortcut */
+const shortcutPresent = shortcut => Boolean(shortcut && (shortcutSends(shortcut) || shortcut.layers));
+// One string for a shortcut's every part, equal for equal shortcuts: for
+// comparing two, and for Review's field identity.
+/** @param {import("./types.js").CustomKeyShortcut} shortcut */
+const shortcutIdentity = shortcut => `${shortcut.mods}:${shortcut.keys.join(",")}:${shortcut.layers}:${shortcut.layerKind}`;
 // The layers always on, which no shortcut may name: the base layer and the
 // default layers (scalar 23).
 /** @param {readonly number[]} values */
@@ -168,7 +260,8 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     if (!Array.isArray(value.customKeyNames) || value.customKeyNames.length !== SETTINGS.CUSTOM_KEY_NAMES) throw fail("Missing custom key names.");
     if (typeof value.keyboardName !== "string") throw fail("Missing keyboard name.");
     if (!Array.isArray(value.customKeyShortcuts) || value.customKeyShortcuts.length !== SETTINGS.CUSTOM_KEY_SHORTCUTS) throw fail("Missing custom key shortcuts.");
-    if (!value.customKeyShortcuts.every(validShortcut)) throw fail("A custom key shortcut holds modifiers, one plain key or mouse button, and layers other than the base, turned on as one layer key does.");
+    const refused = value.customKeyShortcuts.find(shortcut => !validShortcut(shortcut));
+    if (refused !== undefined) throw fail(shortcutStoreRefusal(refused));
     const named = value.customKeyShortcuts.findIndex(shortcut => shortcut.layers & alwaysOnLayers(value.values));
     if (named >= 0) throw fail(`Custom key ${named}'s shortcut turns on a default layer, which is always on.`);
     const fixed = Buffer.alloc(SETTINGS.FIXED_SIZE);
@@ -183,12 +276,12 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
         bitmapOfPositions(record.bypass, positions).copy(fixed, at + 1);
         bitmapOfPositions(record.exclude, positions).copy(fixed, at + 1 + SETTINGS.PLACEMENT_BYTES);
     });
-    value.customKeyShortcuts.forEach(({mods, key, layers, layerKind}, slot) => {
+    value.customKeyShortcuts.forEach(({mods, keys, layers, layerKind}, slot) => {
         const at = SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE;
         fixed[at] = mods;
-        fixed[at + 1] = key;
-        fixed.writeUInt16LE(layers, at + 2);
-        fixed[at + 4] = layerKind;
+        keys.forEach((key, index) => { fixed[at + 1 + index] = key; });
+        fixed.writeUInt16LE(layers, at + 1 + SHORTCUT_KEY_COUNT);
+        fixed[at + 3 + SHORTCUT_KEY_COUNT] = layerKind;
     });
     /** @param {string} name @param {string} what */
     const record = (name, what) => {
@@ -208,12 +301,17 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     });
     const customKeyShortcuts = Array.from({length: SETTINGS.CUSTOM_KEY_SHORTCUTS}, (_, slot) => {
         const at = SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE;
-        if (!validShortcutKey(bytes[at + 1])) throw fail("A custom key shortcut names a key it cannot hold.");
-        const layers = bytes.readUInt16LE(at + 2);
+        const record = [...bytes.subarray(at + 1, at + 1 + SHORTCUT_KEY_COUNT)];
+        const count = record.indexOf(0) < 0 ? SHORTCUT_KEY_COUNT : record.indexOf(0);
+        const keys = record.slice(0, count);
+        if (record.slice(count).some(Boolean)) throw fail(`Custom key ${slot}'s shortcut has a key after its last.`);
+        const refusal = shortcutKeysRefusal(keys);
+        if (refusal) throw fail(`Custom key ${slot}'s shortcut: ${refusal}`);
+        const layers = bytes.readUInt16LE(at + 1 + SHORTCUT_KEY_COUNT);
         if (layers & alwaysOnLayers(values)) throw fail(`Custom key ${slot}'s shortcut turns on a layer that is always on.`);
-        const layerKind = bytes[at + 4];
+        const layerKind = bytes[at + 3 + SHORTCUT_KEY_COUNT];
         if (!validLayerKind(layerKind, layers)) throw fail(`Custom key ${slot}'s shortcut turns its layers on in no way the keyboard knows.`);
-        return {mods: bytes[at], key: bytes[at + 1], layers, layerKind};
+        return {mods: bytes[at], keys, layers, layerKind};
     });
     let offset = SETTINGS.FIXED_SIZE;
     const nameRecord = () => {
@@ -233,4 +331,4 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, customKeyShortcuts, keyboardName, formatVersion: SETTINGS.VERSION};
     return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
 }
-module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, validShortcut, shortcutPresent, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, shortcutKeysRefusal, shortcutStoreRefusal, SHORTCUT_KEY_REFUSALS, SHORTCUT_KEY_CAPS, SHORTCUT_KEY_LIMITS, validShortcut, shortcutSends, shortcutPresent, shortcutIdentity, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};

@@ -23,7 +23,7 @@ The pointing domain is required in every profile the keyboard validates
 (`MISSING_DOMAIN` otherwise, [errors](profile-wire-v1/errors.md#validation-results)).
 A profile stores a slot's colour only in the lighting domain, one row per slot
 whether or not the slot is stored here (D-F09,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0009-thirty-two-pointing-slots-stored-sparsely.md)).
 
 Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registry_test.c`), `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the required domain mask).
 
@@ -31,9 +31,9 @@ Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registr
 
 Each userspace keycode family owns one fixed block in QMK's user range,
 reserved beyond what is supported, so adding slots or layers renumbers nothing
-(D-F51, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)). A slot
+(D-F51, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)). A slot
 keycode names its slot; the mode comes from the active profile (D-F50,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0050-pointing-keycodes-name-slots.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0050-pointing-keycodes-name-slots.md)).
 
 | Block | Keycodes | Supported |
 | --- | --- | --- |
@@ -180,7 +180,7 @@ byte 12. The layers keys turn on are not exclusive: two keys may turn on one
 layer, and a key may turn on a layer another slot links. A key source beats a
 layer source and a mode its layers started owns no layer, so links still
 cannot start each other in a chain or keep themselves on (D-F62,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0062-pointing-slots-link-to-layers.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0062-pointing-slots-link-to-layers.md)).
 
 Integer bounds are otherwise the fields' widths. Validation reads the header
 in one step, then each record in steps of at most 20 bytes, and holds no more
@@ -213,8 +213,8 @@ A tap's keycode is one of:
 | Keycodes | What |
 | --- | --- |
 | `0x0004..0x00c2` | keyboard `0x04..0xa4`, system `0xa5..0xa7`, consumer `0xa8..0xc2` |
-| `0x00d1..0x00d8` | mouse buttons 1–8, a click (D-F22, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0022-pointing-modes-click-mouse-buttons.md)) |
-| `0x7700..0x777f` | macro slots 0–127, a macro start, policy 0 and mask 0 only (D-F23, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0023-pointing-outputs-start-macros.md)) |
+| `0x00d1..0x00d8` | mouse buttons 1–8, a click (D-F22, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0022-pointing-modes-click-mouse-buttons.md)) |
+| `0x7700..0x777f` | macro slots 0–127, a macro start, policy 0 and mask 0 only (D-F23, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0023-pointing-outputs-start-macros.md)) |
 | high byte `0x01..0x1f` with a low-nibble modifier bit, low byte `0x04..0xa4` | a modified keyboard key |
 
 Everything else is refused: standalone modifiers, mouse movement, wheel and
@@ -230,7 +230,7 @@ Mouse buttons 1–3 run as they would without a mode, in every mode: their own
 behaviour, its tap, hold and repeat. Version 3's per-mode button overrides
 (pass through, consume, tap, hold modifiers) are retired; a mode gets its own
 keys from a layer its [link](#linked-layers) turns on instead (D-F62). A mode still
-clicks buttons from its movement ([D-F22](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0022-pointing-modes-click-mouse-buttons.md),
+clicks buttons from its movement ([D-F22](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0022-pointing-modes-click-mouse-buttons.md),
 [outputs](#outputs)).
 
 Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_mouse_buttons_run_their_behaviour_in_every_mode`).
@@ -285,7 +285,7 @@ Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_an_emp
 ## Linked layers
 
 A slot that holds a mode may have a link (D-F62,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0062-pointing-slots-link-to-layers.md)): its **linked layers**,
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0062-pointing-slots-link-to-layers.md)): its **linked layers**,
 a set of layers that start the mode; the layers the mode's key **turns on**
 while it runs the mode, a second set, any layers; and what **ends** a mode its
 linked layers started.
@@ -370,8 +370,8 @@ Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, 
 ## Directional movement
 
 One engine runs every directional mode (D-F45,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0045-one-directional-engine.md); D-F42,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0042-directional-modes-read-eight-directions.md)). The axis says
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0045-one-directional-engine.md); D-F42,
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0042-directional-modes-read-eight-directions.md)). The axis says
 which directions exist: vertical up and down, horizontal left and right,
 dominant axis the four straight ones, eight directions all eight. A
 directional mode never moves the pointer.
@@ -399,7 +399,7 @@ acts as `0`); `2` its motion is consumed and sends nothing, each step still
 counting as one output against the per-report limit.
 
 Byte 87, how often a direction sends: `0` once per threshold step; `1` once
-per movement (D-F07, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0007-directional-mode-can-send-once-per-movement.md)).
+per movement (D-F07, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0007-directional-mode-can-send-once-per-movement.md)).
 A movement starts with the first motion after the mode starts or after
 150 ms without motion. Its first step that sends anything spends it; from then
 on only a direction more than 90° from the one that sent may send, a whole
@@ -427,7 +427,7 @@ saturates at ±2^24 counts.
 - Still for longer than the axis timeout releases the axis; longer than the
   expiry drops the banks too.
 - Byte 3 limits which axes scroll (D-F08,
-  [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0008-scrolling-mode-can-scroll-one-axis.md)). A gesture held
+  [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0008-scrolling-mode-can-scroll-one-axis.md)). A gesture held
   on an axis the mode does not scroll runs as above but sends nothing, so its
   motion neither scrolls later nor leaks into the other axis.
 - Held modifiers are owned for as long as the mode runs. Keys typed meanwhile
@@ -486,7 +486,7 @@ Held by: `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integrati
 ## Compatibility
 
 The firmware reads only version 4 (D-F10,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0010-firmware-accepts-only-current-formats.md)): another
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0010-firmware-accepts-only-current-formats.md)): another
 envelope version is `UNKNOWN_DOMAIN_VERSION`, and a version-3 payload's
 header is `INVALID_HEADER` at 0. Nothing is translated. A saved profile in an
 older format or action vocabulary is not used; the

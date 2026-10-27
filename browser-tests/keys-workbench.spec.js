@@ -177,7 +177,7 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
         // place, and CUSTOM_KEY_0 (on Base already) locking Navigation.
         Object.assign(model.layers[0].positions[46], {keycode: "MO(3)", semantic: "MO(3)", display: "Navigation", editLabel: "Hold Navigation", value: 0x5223});
         Object.assign(model.customKeys.find((key) => key.keycode === "CUSTOM_KEY_0"),
-            {shortcut: {mods: 0, key: 0, layers: 1 << 3, layerKind: 1}, shortcutLabel: "Lock Navigation", shortcutKeys: [], shortcutLayerNames: ["Navigation"]});
+            {shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind: 1}, shortcutLabel: "Lock Navigation", shortcutKeys: [], shortcutLayerNames: ["Navigation"]});
         model.qmkKeyTurnsOn = {...model.qmkKeyTurnsOn, "MO(3)": 1 << 3, "CUSTOM_KEY_0": 1 << 3};
         model.draft.revision++;
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));

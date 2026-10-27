@@ -1,7 +1,8 @@
 // @ts-check
-// What a custom key does, in words, and its shortcut's key by value. A custom
-// key's shortcut (firmware D-F26) is its own action: a key and modifiers, held
-// while the key is held, tapped when it is tapped, and layers, which it turns
+// What a custom key does, in words, and its shortcut's keys by value. A custom
+// key's shortcut (firmware D-F26) is its own action: up to six keys and
+// modifiers held together, held while the key is held, tapped when it is
+// tapped, and layers, which it turns
 // on as one layer key does (its layer kind): held, locked, moved to,
 // tap-toggled or one-shot. A behaviour on the key works on top of it, and a
 // behaviour step on another key that sends it sends the shortcut only, layers
@@ -14,8 +15,19 @@ import {compactModifierMask} from "./keyvalues.mjs";
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {import("../../contracts/panel.js").CustomKey} CustomKey */
 
+// A shortcut, or the parts of one a caller has (a missing part is none).
+/** @typedef {{mods?: number, keys?: readonly number[], layers?: number, layerKind?: number}} ShortcutParts */
+
+// Whether a shortcut sends anything to the computer, modifiers or keys; with
+// layers, any part at all is a shortcut.
+/** @param {ShortcutParts | null | undefined} shortcut */
+const sendsKeys = (shortcut) => Boolean(shortcut && (shortcut.mods || shortcut.keys?.length));
 /** @param {CustomKey | null | undefined} key */
-export const hasShortcut = (key) => Boolean(key?.shortcut && (key.shortcut.mods || key.shortcut.key || key.shortcut.layers));
+export const hasShortcut = (key) => Boolean(key?.shortcut && (sendsKeys(key.shortcut) || key.shortcut.layers));
+// Whether two shortcuts are the same: every part, a missing one as none.
+/** @param {ShortcutParts} a @param {ShortcutParts} b */
+export const sameShortcut = (a, b) => (a.mods ?? 0) === (b.mods ?? 0) && (a.keys ?? []).join() === (b.keys ?? []).join()
+    && (a.layers ?? 0) === (b.layers ?? 0) && (a.layerKind ?? 0) === (b.layerKind ?? 0);
 
 // How a shortcut turns its layers on (SHORTCUT_LAYER_KINDS): hold, lock, move
 // to, tap-toggle, one-shot; hold without layers.
@@ -25,13 +37,13 @@ const TAPPING_TOGGLE = 5;
 /** @param {CustomKey} key */
 export const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || LAYER_KIND.HOLD : LAYER_KIND.HOLD);
 /** @param {CustomKey} key */
-const layersAlone = (key) => Boolean(key.shortcut?.layers) && !key.shortcut.mods && !key.shortcut.key;
+const layersAlone = (key) => Boolean(key.shortcut?.layers) && !sendsKeys(key.shortcut);
 /** @param {CustomKey} key */
 const layerNames = (key) => (key.shortcutLayerNames || []).join(" + ") || key.shortcutLabel;
 // What a shortcut of layers alone does with them, after "it".
 const LAYER_ACTS = [(/** @type {string} */ names) => `holds ${names} on`, (/** @type {string} */ names) => `locks ${names}`, (/** @type {string} */ names) => `moves to ${names}`,
     (/** @type {string} */ names) => `tap-toggles ${names}`, (/** @type {string} */ names) => `turns ${names} on as a one-shot`];
-// What the shortcut does, after "it": sends its modifiers and key, its layers
+// What the shortcut does, after "it": sends its modifiers and keys, its layers
 // named after them by their kind ("sends Left Cmd + Lock Navigation"), or, of
 // layers alone, what it does with them (firmware D-F26).
 /** @param {CustomKey} key */
@@ -57,6 +69,11 @@ function shortcutRuns(key) {
 }
 /** @param {string} text */
 const upper = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+// A shortcut's limits in words, as core says them (model.
+// customKeyShortcutKeyLimits): "up to 6 keys held together, at most one media
+// key and one system key"; `start` begins a sentence with them.
+/** @param {Model} model @param {boolean} [start] */
+export const shortcutLimitWords = (model, start = false) => (start ? upper : String)(model?.customKeyShortcutKeyLimits?.words || "");
 
 // A slot in use: named, or sending a shortcut, or with a behaviour. Any other
 // is an empty slot, drawn as one on the Custom keys screen, and is not a key a
@@ -223,17 +240,88 @@ export function shortcutModifiers(model, name) {
 /** @param {Model} model @param {number} mask */
 export const shortcutPickMods = (model, mask) => (vocabulary(model).pickerModifiers || []).filter((entry) => mask & entry.bit).map((entry) => entry.value);
 
-// ...and the picker's choice is the mask, the key's value (0 for none) and
-// the layers switched on in its Layers section.
+// ...and the picker's choice is the mask, the keys' values in the order they
+// were picked, and the layers switched on in its Layers section. A symbol
+// picked is its key with its modifiers in the mask.
 /** @param {Model} model @param {{mods?: string[], keys?: string[], layers?: number, layerKind?: number}} pick @returns {import("../../contracts/edits.js").EditPayloads["updateCustomKeyShortcut"]["shortcut"]} */
 export function shortcutPick(model, {mods = [], keys = [], layers = 0, layerKind = 0}) {
     const controls = vocabulary(model).pickerModifiers || [];
-    const mask = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
-    const held = keys[0] ? shortcutModifiers(model, keys[0]) : null;
+    let mask = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
+    /** @type {number[]} */
+    const codes = [];
+    for (const name of keys) {
+        const held = shortcutModifiers(model, name);
+        if (held) mask |= held.mods;
+        const code = held ? (held.key ? shortcutKeyCode(model, held.key) : null) : shortcutKeyCode(model, name);
+        if (code !== null) codes.push(code);
+    }
     // A kind means nothing without layers: the shortcut holds then.
-    const kind = layers ? layerKind : 0;
-    if (held) return {mods: mask | held.mods, key: held.key ? shortcutKeyCode(model, held.key) ?? 0 : 0, layers, layerKind: kind};
-    return {mods: mask, key: keys[0] ? shortcutKeyCode(model, keys[0]) ?? 0 : 0, layers, layerKind: kind};
+    return {mods: mask, keys: codes, layers, layerKind: layers ? layerKind : 0};
+}
+
+// Why the picker's keys cannot be a shortcut, before Use posts them: the
+// first of core's caps they break, in core's words (model.
+// customKeyShortcutKeyLimits, SHORTCUT_KEY_CAPS), read as the codec reads
+// them; "" when they can.
+/** @param {Model} model @param {{mods?: string[], keys?: string[], layers?: number, layerKind?: number}} pick */
+export function shortcutPickProblem(model, pick) {
+    const {keys} = shortcutPick(model, pick);
+    const broken = (model?.customKeyShortcutKeyLimits?.caps || []).find((cap) => {
+        const held = cap.keycodes ? keys.filter((key) => /** @type {readonly number[]} */ (cap.keycodes).includes(key)) : keys;
+        const most = cap.each ? Math.max(0, ...held.map((key) => held.filter((other) => other === key).length)) : held.length;
+        return most > cap.most;
+    });
+    return broken?.refusal || "";
+}
+
+// The shortcut picker's keys and modifiers as the person builds them: the
+// keys in press order, the modifier row lit (`mods`), the modifiers they
+// turned on themselves (`own`), and the modifiers each key picked as a symbol
+// brought (`symbols`, by its key: `!` is 1 with Shift).
+/** @typedef {{keys: string[], mods: string[], own?: string[], symbols?: Record<string, string[]>}} ShortcutPicking */
+/** @param {ShortcutPicking} picking */
+const picking = ({keys, mods, own = [], symbols = {}}) => ({keys: [...keys], mods: [...mods], own: [...own], symbols: {...symbols}});
+
+// A modifier turned on or off with its button, or with its modifier key.
+/** @param {ShortcutPicking} pick @param {string} mod @returns {Required<ShortcutPicking>} */
+export function shortcutPickModifier(pick, mod) {
+    const next = picking(pick);
+    const on = next.mods.includes(mod);
+    next.mods = on ? next.mods.filter((value) => value !== mod) : [...next.mods, mod];
+    next.own = on ? next.own.filter((value) => value !== mod) : [...new Set([...next.own, mod])];
+    return next;
+}
+
+// A key taken out: with it go the modifiers it brought as a symbol, unless
+// another key picked as a symbol still needs one or the person turned it on.
+/** @param {ShortcutPicking} pick @param {string} key @returns {Required<ShortcutPicking>} */
+export function shortcutPickDrop(pick, key) {
+    const next = picking(pick);
+    const brought = next.symbols[key] || [];
+    delete next.symbols[key];
+    const needed = new Set([...next.own, ...Object.values(next.symbols).flat()]);
+    next.keys = next.keys.filter((value) => value !== key);
+    next.mods = next.mods.filter((mod) => !brought.includes(mod) || needed.has(mod));
+    return next;
+}
+
+// A click on a key in the shortcut picker. A modifier key toggles its
+// modifier. A symbol joins the keys with its modifiers lit, and a second
+// click takes it out; any other key joins the keys in press order, or is
+// taken out.
+/** @param {Model} model @param {ShortcutPicking} pick @param {string} name @returns {Required<ShortcutPicking>} */
+export function shortcutPickKey(model, pick, name) {
+    const held = shortcutModifiers(model, name);
+    if (!held) return pick.keys.includes(name) ? shortcutPickDrop(pick, name) : {...picking(pick), keys: [...pick.keys, name]};
+    const mods = shortcutPickMods(model, held.mods);
+    const on = mods.every((mod) => pick.mods.includes(mod));
+    if (!held.key) return mods.filter((mod) => pick.mods.includes(mod) === on).reduce((next, mod) => shortcutPickModifier(next, mod), picking(pick));
+    if (on && pick.keys.includes(held.key)) return shortcutPickDrop(pick, held.key);
+    const next = picking(pick);
+    next.mods = [...new Set([...next.mods, ...mods])];
+    if (!next.keys.includes(held.key)) next.keys.push(held.key);
+    next.symbols[held.key] = mods;
+    return next;
 }
 
 /** @param {Model} model @param {number} index */
@@ -243,16 +331,16 @@ const layerWords = (model, index) => {
 };
 
 // The picker's choice in words, for its footer: "Left Ctrl + Right Alt + K",
-// then its layers by name, lowest first, led by their kind's verb unless held,
+// its keys in order ("Left Shift + A + S + Play"), then its layers by name, lowest first, led by their kind's verb unless held,
 // as core names a shortcut ("Left Cmd + Lock Navigation + Extra").
-/** @param {Model} model @param {{mods: number, key: number, layers?: number, layerKind?: number}} shortcut */
+/** @param {Model} model @param {{mods: number, keys: readonly number[], layers?: number, layerKind?: number}} shortcut */
 export function shortcutPickLabel(model, shortcut) {
     const mods = (vocabulary(model).modifiers || []).filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
-    const entry = shortcut.key ? (model?.qmkKeycodes || []).find((row) => row.keycode === shortcut.key) : undefined;
+    const keys = shortcut.keys.map((code) => (model?.qmkKeycodes || []).find((row) => row.keycode === code)).map((entry) => entry ? entry.label || entry.value : "");
     const layers = (model?.layers || []).map((layer) => layer.index).filter((index) => (shortcut.layers ?? 0) & 2 ** index).sort((a, b) => a - b).map((index) => layerWords(model, index));
     const verb = shortcut.layerKind ? (vocabulary(model).customKeys?.layerKinds || []).find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
     if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;
-    return [...mods, entry ? entry.label || entry.value : "", ...layers].filter(Boolean).join(" + ");
+    return [...mods, ...keys, ...layers].filter(Boolean).join(" + ");
 }
 
 // The kinds a shortcut's layers can be turned on as, in the picker: each
@@ -296,7 +384,7 @@ export function shortcutLayerRows(model, chosen) {
 export function shortcutOffer(model, {mods = [], keys = []}) {
     if (!mods.length || !keys.length || !(model?.customKeyShortcutKeys || []).length) return null;
     const shortcut = shortcutPick(model, {mods, keys});
-    if (!shortcut.key) return null;
+    if (!shortcut.keys.length) return null;
     return (shortcut.mods & 0x0f) && (shortcut.mods & 0xf0) ? shortcut : null;
 }
 
@@ -304,10 +392,9 @@ export function shortcutOffer(model, {mods = [], keys = []}) {
 // make another. Where the key runs its own behaviour (a layout key, a combo
 // output) only one without a behaviour does just that; a behaviour step sends
 // a custom key's shortcut only, so any will do there.
-/** @param {Model} model @param {{mods: number, key: number, layers?: number}} shortcut @param {{runsBehaviour?: boolean}} [options] */
+/** @param {Model} model @param {ShortcutParts} shortcut @param {{runsBehaviour?: boolean}} [options] */
 export const customKeyWithShortcut = (model, shortcut, {runsBehaviour = true} = {}) => (model?.customKeys || []).find((key) =>
-    hasShortcut(key) && key.shortcut.mods === shortcut.mods && key.shortcut.key === shortcut.key && (key.shortcut.layers ?? 0) === (shortcut.layers ?? 0)
-    && !(runsBehaviour && key.hasBehavior));
+    hasShortcut(key) && sameShortcut(key.shortcut, shortcut) && !(runsBehaviour && key.hasBehavior));
 
 // The custom key such an offer takes: the first that does nothing yet, with no
 // name, behaviour or shortcut and on no layer or combo.
@@ -322,7 +409,7 @@ export const unusedCustomKey = (model, stack) => (model?.customKeys || []).find(
 // a behaviour step sends only the shortcut and never chains another
 // behaviour, so there any match is used as it is. With no match, an unused
 // key is made it.
-/** @param {Model} model @param {{mods: number, key: number}} shortcut @param {import("../../contracts/panel.js").Layer[]} stack @param {{runsBehaviour?: boolean}} [options] */
+/** @param {Model} model @param {{mods: number, keys: readonly number[]}} shortcut @param {import("../../contracts/panel.js").Layer[]} stack @param {{runsBehaviour?: boolean}} [options] */
 export function customKeyChoice(model, shortcut, stack, {runsBehaviour = true} = {}) {
     const plain = customKeyWithShortcut(model, shortcut, {runsBehaviour});
     // A step sends only the shortcut, so a match's behaviour never runs there.
@@ -333,7 +420,7 @@ export function customKeyChoice(model, shortcut, stack, {runsBehaviour = true} =
 
 // The name it gets: the shortcut in words if that fits a name, else written
 // short ("LCtrl+LShift+RCtrl+RShift"), else none.
-/** @param {Model} model @param {{mods: number, key: number}} shortcut */
+/** @param {Model} model @param {{mods: number, keys: readonly number[]}} shortcut */
 export function offeredName(model, shortcut) {
     const label = shortcutPickLabel(model, shortcut);
     if (nameBytes(label) <= NAME_MAX_BYTES) return label;

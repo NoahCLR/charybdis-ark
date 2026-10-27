@@ -2,9 +2,9 @@
 
 Domain `0x60`, version 1, holds the keymap: the native QMK keycode at every
 matrix position of every layer (D-F30,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). It is the
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). It is the
 only copy of the keymap the firmware keeps; VIA is not supported (D-F31,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0031-via-is-not-supported.md)). The domain id, envelope and
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0031-via-is-not-supported.md)). The domain id, envelope and
 byte order are [blob and digests](blob-and-digests.md)'s; how domains make a
 profile is [the device-resident profile](../device-resident-profile.md)'s.
 Refusal codes are named in [errors](errors.md).

@@ -8,7 +8,7 @@ const {settingsEditorView} = require("../../core/model/settings-editor");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb4a15f12};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
 const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
 
 // A draft with one edit of every kind the review describes.
@@ -103,7 +103,7 @@ test("discarding a default-layer change alone that would put a shortcut on an al
     const keyboard = snapshotOf(editSettings(plain, {type: "updateConfigDefaults", sectionId: "startupLayers", expectedFingerprint: plain.fingerprint, fields: fields(plain, {startupLayer3: true})}, capabilities));
     // The draft makes it an ordinary layer, then a custom key turns it on.
     const freed = snapshotOf(editSettings(keyboard, {type: "updateConfigDefaults", sectionId: "startupLayers", expectedFingerprint: keyboard.fingerprint, fields: fields(keyboard, {startupLayer3: false})}, capabilities));
-    const draft = snapshotOf(editCustomKey(freed, {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0, key: 0, layers: 1 << 3, layerKind: 0}, expectedFingerprint: freed.fingerprint}, capabilities));
+    const draft = snapshotOf(editCustomKey(freed, {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind: 0}, expectedFingerprint: freed.fingerprint}, capabilities));
     const units = profileReview(keyboard, draft).map((row) => row.unit);
     const startup = units.find((unit) => unit.startsWith("settings:") && unit.includes("startupLayers"));
     assert.ok(startup, units.join());

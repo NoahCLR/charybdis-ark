@@ -56,7 +56,7 @@ test("the 128 macros populate the model, including empty slots and their names",
     let current = snapshot(pdDocument());
     current = snapshot(editMacro(current, {keycode: "MACRO_127", payload: "{KC_LGUI,KC_N}", name: "New note", expectedFingerprint: current.fingerprint}));
     const view = macroEditorView(current);
-    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0xb4a15f12}});
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x67df11b3}});
     assert.equal(model.macros.length, 128);
     assert.equal(model.macros[0].empty, true);
     assert.equal(model.macros[127].name, "New note");
@@ -75,12 +75,12 @@ test("the 128 macros populate the model, including empty slots and their names",
 
 test("naming a macro changes its name and nothing else", () => {
     const source = pdDocument(), current = snapshot(source);
-    assert.equal(settingsDomain(source).version, 10);
+    assert.equal(settingsDomain(source).version, 11);
     const named = editMacro(current, {keycode: "MACRO_3", name: "  Zoom mute ", expectedFingerprint: current.fingerprint});
     assert.deepEqual(profileMacros(named), profileMacros(source), "a rename leaves every macro's steps alone");
     const domain = settingsDomain(named);
-    assert.equal(domain.version, 10);
-    assert.equal(domain.payload[0], 10, "the payload repeats the envelope's version");
+    assert.equal(domain.version, 11);
+    assert.equal(domain.payload[0], 11, "the payload repeats the envelope's version");
     const settings = validateSnapshot(named).settings, before = validateSnapshot(source).settings;
     assert.equal(settings.macroNames[3], "Zoom mute", "names are trimmed");
     assert.deepEqual(settings.values, before.values);
@@ -167,7 +167,7 @@ test("the model reports the bank and each macro's room; a macro past the free me
     assert.equal(view.macroBank.slots, 128);
     assert.equal(view.macroBank.reserveTaps, 10);
     assert.equal(view.macroBank.available, 128);
-    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0xb4a15f12}});
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x67df11b3}});
     assert.deepEqual(model.macroBank, view.macroBank);
     // The keyboard streams a macro in windows, so only the free memory bounds it.
     assert.doesNotThrow(() => editMacro(current, {keycode: "MACRO_2", payload: "{KC_A}".repeat(171), expectedFingerprint: current.fingerprint}));

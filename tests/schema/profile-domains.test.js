@@ -15,7 +15,7 @@ test("one canonical registry pins every current domain's identity, version, wire
         {name: "RGB", id: 16, key: "rgb", readKey: "rgb", version: 4, wireBit: 1, area: "lighting"},
         {name: "KEY_BEHAVIORS", id: 32, key: "behaviors", readKey: "keyBehaviors", version: 2, wireBit: 2, area: "behaviours"},
         {name: "COMBOS", id: 48, key: "combos", readKey: "combos", version: 3, wireBit: 4, area: "combos"},
-        {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 10, wireBit: 8, area: "settings"},
+        {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 11, wireBit: 8, area: "settings"},
         {name: "PD_MODES", id: 80, key: "pdModes", readKey: "pdModes", version: 4, wireBit: 16, area: "pointing"},
         {name: "KEYMAP", id: 96, key: "keymap", readKey: undefined, version: 1, wireBit: 32, area: "keys"},
         {name: "MACROS", id: 112, key: "macros", readKey: undefined, version: 1, wireBit: 64, area: "macros"},

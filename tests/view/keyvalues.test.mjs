@@ -120,8 +120,8 @@ test("modifiers alone, or with a modifier key, fold into one set stored as the s
     assert.deepEqual(modifierPick(picking, {mods: ["C", "S", "RALT"], keys: []}), {keys: ["KC_RIGHT_ALT"], mods: ["C", "S"]});
     assert.deepEqual(modifierPick(picking, {mods: ["A", "RCTL", "RSFT"], keys: []}), {keys: ["KC_LEFT_ALT"], mods: ["RCTL", "RSFT"]});
     // Two or more on each side: no keycode holds it, so a custom key would.
-    assert.deepEqual(modifierPick(picking, {mods: ["C", "S", "RCTL", "RSFT"], keys: []}), {shortcut: {mods: 0x33, key: 0, layers: 0, layerKind: 0}});
-    assert.deepEqual(modifierPick(picking, {mods: ["S", "RCTL", "RSFT"], keys: ["KC_LCTL"]}), {shortcut: {mods: 0x33, key: 0, layers: 0, layerKind: 0}});
+    assert.deepEqual(modifierPick(picking, {mods: ["C", "S", "RCTL", "RSFT"], keys: []}), {shortcut: {mods: 0x33, keys: [], layers: 0, layerKind: 0}});
+    assert.deepEqual(modifierPick(picking, {mods: ["S", "RCTL", "RSFT"], keys: ["KC_LCTL"]}), {shortcut: {mods: 0x33, keys: [], layers: 0, layerKind: 0}});
     // A key that is not a modifier, or nothing at all, is left as picked.
     assert.equal(modifierPick(picking, {mods: ["G"], keys: ["KC_C"]}), null);
     assert.equal(modifierPick(picking, {mods: [], keys: []}), null);

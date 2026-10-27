@@ -28,8 +28,8 @@ test("a shortcut naming a layer that is always on is refused in words", () => {
 });
 
 test("a settings change or a layer reorder that makes a shortcut's layer a default layer is refused, naming the key", () => {
-    const value = {...settings(), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0, layers: 0, layerKind: 0}))};
-    value.customKeyShortcuts[7] = {mods: 0x08, key: 0, layers: 1 << 3, layerKind: 0};
+    const value = {...settings(), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, keys: [], layers: 0, layerKind: 0}))};
+    value.customKeyShortcuts[7] = {mods: 0x08, keys: [], layers: 1 << 3, layerKind: 0};
     value.customKeyNames[7] = "Cmd + Nav";
     assert.equal(settingsShortcutRefusal(value), "");
     value.values[23] = 1 | (1 << 3);

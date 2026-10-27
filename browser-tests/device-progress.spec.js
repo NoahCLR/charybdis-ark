@@ -25,7 +25,7 @@ for (const {screen, source, initial} of [
             }}, {adapter: {listDevices: async () => [], connect: async () => {throw Error("fixture must not connect");}}});
             const service = loop.session.service;
             service.connectionPublicId = "fixture"; service.connectionToken = 1;
-            service.capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, reportSize: 32, statusPageCount: 2, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb4a15f12, featureFlags};
+            service.capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, reportSize: 32, statusPageCount: 2, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags};
             if (!initial) service.portable = {document: doc};
             const bytes = core.portable.validateSnapshot(doc).candidate, metadata = core.Buffer.alloc(25);
             // Payload metadata layout 2 (Profile Wire 2): a 32-bit length.

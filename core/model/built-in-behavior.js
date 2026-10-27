@@ -51,7 +51,7 @@ const within = (code, start, end) => code >= start && code <= end;
 /** @param {number} code */
 const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
 
-/** @typedef {{customKeyShortcuts?: readonly {mods: number, key: number, layers: number, layerKind: number}[]}} BuiltInFeatures */
+/** @typedef {{customKeyShortcuts?: readonly import("../schema/types.js").CustomKeyShortcut[]}} BuiltInFeatures */
 /** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean}} */
 function builtInActions(target, {customKeyShortcuts = []} = {}) {
     const slot = target?.kind === ACTION.CUSTOM_KEY ? target.operand : target?.kind === ACTION.QMK_KEYCODE ? customKeyOfCode(target.operand) : undefined;

@@ -100,10 +100,12 @@ export interface LayerRecord {reference: number; bypass: number[]; exclude: numb
 // also carries its bounds.
 export interface SettingRule {valid(v: number, layers: number): boolean; min?: number; max?: number; step?: number; layerReference?: 'layer' | 'mask'; layerReorder?: 'storage' | 'reach'}
 export interface SettingField<Name extends string = string> extends SettingRule {id: number; name: Name}
-/** A custom key's own action (firmware D-F26): a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI) and one key, 0 for none. */
+/** A custom key's own action (firmware D-F26): a HID report modifier mask, the keys it holds together and the layers it turns on; all empty is no shortcut. */
 export interface CustomKeyShortcut {
+    /** The modifiers held with its keys, in HID report order: bit 0 Left Ctrl … bit 7 Right GUI, any combination. */
     mods: number;
-    key: number;
+    /** The keys it holds together, in the order they are pressed: at most six, each once, at most one media and one system key (firmware D-F26). */
+    keys: number[];
     /** The layers it turns on (firmware D-F26), never the base or a default layer. */
     layers: number;
     /** How it turns them on, as a layer key does (SHORTCUT_LAYER_KINDS): 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers. */
@@ -118,7 +120,7 @@ export interface SettingsDomain {
     layers: LayerRecord[];
     macroNames: string[];
     customKeyNames: string[];
-    /** Each custom key's shortcut, custom key 0 first; `{mods: 0, key: 0, layers: 0, layerKind: 0}` is none. */
+    /** Each custom key's shortcut, custom key 0 first; `{mods: 0, keys: [], layers: 0, layerKind: 0}` is none. */
     customKeyShortcuts: CustomKeyShortcut[];
     /** The keyboard's own name, its USB product string; empty for the firmware's built-in name. */
     keyboardName: string;

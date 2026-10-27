@@ -31,20 +31,20 @@ test("custom keys and macros keep their tap when released before a long hold, an
 });
 
 test("a custom key with a shortcut taps it and holds it as a fallback, like a plain key", () => {
-    const customKeyShortcuts = Array.from({length: 128}, () => ({mods: 0, key: 0, layers: 0, layerKind: 0}));
-    customKeyShortcuts[2] = {mods: 0x41, key: 0x0e, layers: 0, layerKind: 0};
-    customKeyShortcuts[127] = {mods: 0x0f, key: 0, layers: 0, layerKind: 0};
+    const customKeyShortcuts = Array.from({length: 128}, () => ({mods: 0, keys: [], layers: 0, layerKind: 0}));
+    customKeyShortcuts[2] = {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0};
+    customKeyShortcuts[127] = {mods: 0x0f, keys: [], layers: 0, layerKind: 0};
     const own = operand => ({kind: ACTION.CUSTOM_KEY, operand});
     for (const [target, slot] of [[own(2), 2], [key(0x7f02), 2], [own(127), 127], [key(0x7f7f), 127]]) {
         assert.deepEqual(builtInActions(target, {customKeyShortcuts}), {tap: own(slot), hold: own(slot), fallback: true, releaseTaps: true});
     }
     assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {releaseTaps: true}, "one without a shortcut claims nothing");
-    customKeyShortcuts[3] = {mods: 0, key: 0, layers: 1 << 3, layerKind: 0};
+    customKeyShortcuts[3] = {mods: 0, keys: [], layers: 1 << 3, layerKind: 0};
     assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {tap: own(3), hold: own(3), fallback: true, releaseTaps: true}, "layers alone are a shortcut (firmware D-F26)");
     // Lock and Move to are plain keys too: their shortcut acts at the press,
     // held or tapped.
     for (const layerKind of [1, 2]) {
-        customKeyShortcuts[3] = {mods: 0, key: 0, layers: 1 << 3, layerKind};
+        customKeyShortcuts[3] = {mods: 0, keys: [], layers: 1 << 3, layerKind};
         assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {tap: own(3), hold: own(3), fallback: true, releaseTaps: true});
     }
     // Tap-toggle and One-shot make it a momentary layer key, as TT() and
@@ -52,9 +52,9 @@ test("a custom key with a shortcut taps it and holds it as a fallback, like a pl
     // notwithstanding (no fallback). One-shot's own tap arms its layers;
     // Tap-toggle's does nothing until its fifth, which a row with steps
     // replaces, so it has no tap of its own.
-    customKeyShortcuts[3] = {mods: 0x02, key: 0, layers: 1 << 3, layerKind: 4};
+    customKeyShortcuts[3] = {mods: 0x02, keys: [], layers: 1 << 3, layerKind: 4};
     assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {tap: own(3), hold: own(3), fromPress: true});
-    customKeyShortcuts[3] = {mods: 0, key: 0, layers: 1 << 3, layerKind: 3};
+    customKeyShortcuts[3] = {mods: 0, keys: [], layers: 1 << 3, layerKind: 3};
     assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {hold: own(3), fromPress: true});
 });
 

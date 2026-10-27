@@ -235,17 +235,18 @@ export const macroNameMessage = (keycode, name, identity) => ({type: "updateMacr
 export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateMacro", keycode, protection, expectedFingerprint: identity});
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKey'>} */
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
-// A custom key's shortcut: the eight-bit modifier mask the grid reads, one key,
-// 0 for none, the mask of layers it turns on and how it turns them on
+// A custom key's shortcut: the eight-bit modifier mask the grid reads, its keys
+// in the order they are pressed (none for none), the mask of layers it turns
+// on and how it turns them on
 // (firmware D-F26; a kind means nothing without layers, so it is hold then).
 // All zero clears it.
-/** @param {string} keycode @param {{mods?: number, key?: number, layers?: number, layerKind?: number}} shortcut @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
-export const customKeyShortcutMessage = (keycode, {mods, key, layers, layerKind}, identity) => ({type: "updateCustomKeyShortcut", keycode,
-    shortcut: {mods: Number(mods) || 0, key: Number(key) || 0, layers: Number(layers) || 0, layerKind: Number(layers) ? Number(layerKind) || 0 : 0}, expectedFingerprint: identity});
+/** @param {string} keycode @param {{mods?: number, keys?: readonly number[], layers?: number, layerKind?: number}} shortcut @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
+export const customKeyShortcutMessage = (keycode, {mods, keys, layers, layerKind}, identity) => ({type: "updateCustomKeyShortcut", keycode,
+    shortcut: {mods: Number(mods) || 0, keys: (keys || []).map(Number), layers: Number(layers) || 0, layerKind: Number(layers) ? Number(layerKind) || 0 : 0}, expectedFingerprint: identity});
 // A custom key made for a shortcut no keycode can hold: named, and put to use
 // by `then` (a layout key, a behaviour cell or a combo) in the same draft step
 // (D-L63).
-/** @param {string} keycode @param {{mods: number, key: number, layers?: number}} shortcut @param {string} name @param {import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']['then']} [then] @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
+/** @param {string} keycode @param {{mods: number, keys: readonly number[], layers?: number}} shortcut @param {string} name @param {import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']['then']} [then] @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
 export const customKeyForShortcut = (keycode, shortcut, name, then, identity) => ({...customKeyShortcutMessage(keycode, shortcut, identity),
     name: String(name ?? "").trim(), ...(then ? {then} : {})});
 // The keyboard's own name; empty gives it back its built-in name.

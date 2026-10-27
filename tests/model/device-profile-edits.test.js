@@ -42,7 +42,7 @@ const {fixturePages, retiredPages} = require("../fixtures/device-combos");
 const {assertEffectiveCombos} = require("../../core/model/device-profile-edits");
 const readOf = pages => ({state: "read", ...decodeComboPages(pages[0], pages.slice(1))});
 const pages = fixturePages();
-const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0xb4a15f12}, combos: readOf(pages)};
+const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0x67df11b3}, combos: readOf(pages)};
 const comboTable = bytes => {const domain = decodeProfileBlob(bytes).domains.find(row => row.id === 0x30); return decodeComboDomain(domain.payload);};
 const comboRows = bytes => comboTable(bytes).rows;
 test("adding, editing and deleting combos preserves every untouched profile domain and combo", () => {
