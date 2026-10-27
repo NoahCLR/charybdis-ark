@@ -134,7 +134,7 @@ _Avoid_: restore (alone), load, upload
 
 **Screen**:
 One of Ark's top-level views chosen from the rail: Keys, Lighting, Macros,
-Custom keys, Mouse, Pointing modes, Settings, Backups and Keyboard.
+Custom keys, Pointing modes, Mouse, Settings, Backups and Keyboard.
 _Avoid_: page, tab, area (for this), surface, panel
 
 **Area**:

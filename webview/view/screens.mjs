@@ -39,15 +39,15 @@ export const SCREENS = Object.freeze({
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.5 8h5M8 5.5v5"/></svg>',
         available: configureReady, render: renderers => renderers.screenCustomKeys(),
     }),
-    mouse: screen({
-        label: "Mouse", group: "Configure", title: "Keyboard", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
-        available: configureReady, render: renderers => renderers.screenMouse(),
-    }),
     pointing: screen({
         label: "Pointing modes", group: "Configure", title: "Keyboard", keepOnPublish: true,
         icon: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg>',
         available: configureReady, render: renderers => renderers.screenPointing(),
+    }),
+    mouse: screen({
+        label: "Mouse", group: "Configure", title: "Keyboard", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
+        available: configureReady, render: renderers => renderers.screenMouse(),
     }),
     settings: screen({
         label: "Settings", group: "Configure", title: "Keyboard", keepOnPublish: true,

@@ -4,7 +4,7 @@ import {SCREENS, configureReady, isScreenId, screenAvailable, screenDefinition, 
 
 test("the registry owns every rail screen and renderer in the existing order", () => {
     assert.deepEqual(screenGroups().map(({group, items}) => [group, items.map(({id}) => id)]), [
-        ["Configure", ["keys", "lighting", "macros", "customKeys", "mouse", "pointing", "settings"]],
+        ["Configure", ["keys", "lighting", "macros", "customKeys", "pointing", "mouse", "settings"]],
         ["Keyboard", ["profile", "device"]],
     ]);
     const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "CustomKeys", "Mouse", "Pointing", "Settings", "Profile", "Device"]
