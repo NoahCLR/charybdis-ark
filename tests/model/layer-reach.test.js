@@ -30,7 +30,7 @@ function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}, p
     for (const [id, value] of Object.entries(settings)) if (id !== "references" && id !== "layers" && id !== "comboOutputBehaviors") values[id] = value;
     const records = Array.from({length: 16}, (_, layer) => ({reference: settings.references?.[layer] ?? layer, bypass: [], exclude: [], ...settings.layers?.[layer]}));
     // Each custom key's shortcut (firmware D-F26), none unless `shortcuts` gives one by slot.
-    const customKeyShortcuts = Array.from({length: 128}, (_, slot) => ({mods: 0, key: 0, layers: 0, layerKind: 0, ...shortcuts[slot]}));
+    const customKeyShortcuts = Array.from({length: 128}, (_, slot) => ({mods: 0, keys: [], layers: 0, layerKind: 0, ...shortcuts[slot]}));
     return {layers, settings: {values, layers: records, comboOutputBehaviors: settings.comboOutputBehaviors, customKeyShortcuts, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")]},
         behaviors: {rows}, combos: {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos}, pdModes};
 }
@@ -759,7 +759,7 @@ test("the layers a keycode turns on, as the keyboard runs it", () => {
     // key's shortcut layers; DF and PDF only make a layer the default, which
     // the keyboard leaves to QMK, so they turn none on.
     const decoded = {settings: settings(), pdModes: [{id: 5, kind: 1, name: "Zoom", linkedLayers: 0, linkTurnsOn: (1 << 3) | (1 << 4), linkEnds: 0}]};
-    decoded.settings.customKeyShortcuts = Array.from({length: 128}, (_, slot) => (slot === 2 ? {mods: 0, key: 0, layers: (1 << 3) | (1 << 6), layerKind: 1} : {mods: 0, key: 0, layers: 0, layerKind: 0}));
+    decoded.settings.customKeyShortcuts = Array.from({length: 128}, (_, slot) => (slot === 2 ? {mods: 0, keys: [], layers: (1 << 3) | (1 << 6), layerKind: 1} : {mods: 0, keys: [], layers: 0, layerKind: 0}));
     const turnsOn = keycodeLayersOn(decoded);
     const {PD_SLOT_BINDINGS} = require("../../core/data/pd-bindings");
     const {customKeyCode} = require("../../core/data/user-keycodes");

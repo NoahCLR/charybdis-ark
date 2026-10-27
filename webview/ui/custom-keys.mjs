@@ -25,7 +25,7 @@ import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./frame.mjs";
 import {keyName} from "../view/keyvalues.mjs";
-import {customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine, shortcutAct} from "../view/custom-key.mjs";
+import {customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine, sameShortcut, shortcutAct, shortcutLimitWords} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourEditor} from "./keys/behaviour-editor.mjs";
@@ -154,22 +154,22 @@ function behaviourCard(model, key) {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function shortcutField(model, key, canEdit) {
     const identity = model?.customKeyEditing?.identity;
-    const name = keyName(model, key.shortcut.key);
+    const names = key.shortcut.keys.map((code) => keyName(model, code)).filter(Boolean);
     const node = el(`<div class="field"><span>Shortcut</span>
             <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
-                data-tip="One key, any modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would. Pick… opens the keycode picker with its modifier row and its Layers section.">
+                data-tip="${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}, any` : "Any"} modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would. Pick… opens the keycode picker with its modifier row and its Layers section.">
             <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>
             <button class="btn ghost" data-act="clear-shortcut" ${canEdit && hasShortcut(key) ? "" : "disabled"}
                 data-tip="No shortcut: the key does only what its behaviour says.">Clear</button></div>
             <span class="note">${esc(customKeyShortcutLine(key))}</span></div>`);
     /** @param {import("../../contracts/panel.js").CustomKeyShortcut} shortcut */
     const save = (shortcut) => post(edits.customKeyShortcutMessage(key.keycode, shortcut, identity));
-    /** @type {HTMLElement} */ (node.querySelector('[data-act="clear-shortcut"]')).addEventListener("click", () => save({mods: 0, key: 0, layers: 0, layerKind: 0}));
+    /** @type {HTMLElement} */ (node.querySelector('[data-act="clear-shortcut"]')).addEventListener("click", () => save({mods: 0, keys: [], layers: 0, layerKind: 0}));
     /** @type {HTMLElement} */ (node.querySelector('[data-act="pick-shortcut"]')).addEventListener("click", () => openPicker({
         title: "Shortcut", context: key.name || `Custom key ${key.slot}`,
-        seed: name ? [name] : [], allowedKeys: model?.customKeyShortcutKeys || [], shortcut: {mods: key.shortcut.mods, layers: key.shortcut.layers, layerKind: key.shortcut.layerKind},
+        seed: names, allowedKeys: model?.customKeyShortcutKeys || [], shortcut: {mods: key.shortcut.mods, layers: key.shortcut.layers, layerKind: key.shortcut.layerKind},
         onShortcut: (shortcut) => {
-            if (shortcut.mods !== key.shortcut.mods || shortcut.key !== key.shortcut.key || shortcut.layers !== key.shortcut.layers || shortcut.layerKind !== key.shortcut.layerKind) save(shortcut);
+            if (!sameShortcut(shortcut, key.shortcut)) save(shortcut);
         },
     }));
     return node;

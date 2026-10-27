@@ -40,16 +40,16 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:4,32:2,48:3,64:10,80:4,96:1,112:1";
+const CURRENT_DOMAINS = "16:4,32:2,48:3,64:11,80:4,96:1,112:1";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document. `settingsVersion` is the version its
-// settings readback reports: any but 10 is firmware Ark does not read.
+// settings readback reports: any but 11 is firmware Ark does not read.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, settingsVersion = 10, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, settingsVersion = 11, compiledOnly = false, slaveKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */

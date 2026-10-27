@@ -13,7 +13,7 @@ value ids are listed in
 - Both halves run the split serial link at a fixed 460,800 baud
   (`SERIAL_USART_SPEED`, set in `users/noah/lib/compat/qmk_split_transport.mk`).
   There is no speed selector: `NOAH_SPLIT_BAUD` fails the build (D-F52,
-  [0052](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0052-split-activity-coalescing-and-fixed-baud.md)).
+  [0052](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0052-split-activity-coalescing-and-fixed-baud.md)).
 - `SERIAL_USART_TIMEOUT` is 5 ms, for each wait on the serial FIFO.
 - Every split data frame carries the fork's frame CRC8 by default
   (`SPLIT_TRANSPORT_CRC`); `NOAH_SPLIT_CRC=no` builds without it. The build
@@ -77,8 +77,14 @@ build's packed C struct, sent whole.
 | `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC` | key feedback owner map and tap branch map |
 
 - A packet is sent when it changed, when forced, and as a heartbeat: every
-  250 ms while it carries active state, every 1,000 ms otherwise. A locked
-  pointing mode sends no fade progress.
+  250 ms while it carries active state, every 1,000 ms otherwise. A pass
+  sends at most one heartbeat; one due behind another's goes out on a
+  following pass, and each packet's heartbeat counts from its own last send.
+  Changed and forced packets never wait.
+- Fade progress is active state only while the pointer layer is on, where
+  both halves draw it. With the layer off the packet carries the finished
+  fade, whatever the auto-mouse timer reads; with auto-mouse off, or a
+  locked pointing mode, it carries no fade progress.
 - A send pass stops at its first failed RPC. Until the retry delay passes
   (50 ms, doubling to 1,000 ms) no packet is built; the next pass is a
   recovery probe that sends the latest state. A role change clears the
@@ -212,7 +218,7 @@ arming and just after, and summarises the windows wholly between them, stage
 times included. It also estimates the poll rate with measured split time
 removed, a comparison between builds rather than a prediction. Install its
 dependencies with `npm ci --prefix tools`. Capture with the procedure in
-[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/measurements/pointing-cadence/README.md),
+[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/measurements/pointing-cadence/README.md),
 which also keeps the recorded sets.
 
 Held by: `tests/host/run_split_activity_tests.sh` (`split_diagnostics_tool_test.cjs`).

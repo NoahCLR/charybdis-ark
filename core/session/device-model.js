@@ -30,7 +30,7 @@ const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
 const {keyboardNameView} = require("../model/keyboard-name");
 const {runningComboRows} = require("../schema/combo-domain-v1");
-const {SETTING} = require("../schema/settings-domain-v1");
+const {SETTING, SHORTCUT_KEY_LIMITS} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {compileLayerAnswers} = require("../model/layer-resolution");
 
@@ -248,6 +248,8 @@ function configurationModel(content, capabilities, editing) {
         customKeys,
         customKeyNameSpace: content.customKeyView?.names || null,
         customKeyShortcutKeys: content.customKeyView?.shortcutKeys ? [...content.customKeyView.shortcutKeys] : [],
+        // The limits are the codec's whether or not a profile is open.
+        customKeyShortcutKeyLimits: /** @type {import("../../contracts/panel.js").PublishedModel["customKeyShortcutKeyLimits"]} */ (structuredClone(content.customKeyView?.shortcutKeyLimits ?? SHORTCUT_KEY_LIMITS)),
         // Every layer with why a shortcut cannot turn it on (shortcut-layers.js).
         customKeyShortcutLayers: content.customKeyView?.shortcutLayers ? content.customKeyView.shortcutLayers.map(target => ({...target})) : [],
         customKeyEditing: {identity: content.customKeyView?.identity || "", writable: editing.customKeys},

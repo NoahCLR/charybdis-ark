@@ -18,7 +18,7 @@ Every multi-byte integer is little-endian. Every reserved byte and every
 reserved flag bit is zero, in requests and in replies; a request with a
 nonzero reserved byte is refused as malformed. Every profile length and
 offset is 32 bits wide, on the wire and in storage (D-F28,
-[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0028-new-base-32-bit-profile-lengths.md)). The firmware's
+[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0028-new-base-32-bit-profile-lengths.md)). The firmware's
 encoders write one canonical representation; its decoders refuse wrong
 ordering, padding and unused data.
 
@@ -41,14 +41,14 @@ Held by: no test (an index).
 ## Version identity
 
 A keyboard identifies itself by its capability page alone (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0031-via-is-not-supported.md)); there is no separate
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0031-via-is-not-supported.md)); there is no separate
 protocol-version or firmware-version read. Capability page 0
 ([hid-channel.md](hid-channel.md#capability-pages--get-0x01)) carries:
 
 | Identity | Value in this firmware | Where |
 | --- | --- | --- |
 | Profile Wire version | major `2`, minor `0` | page 0 bytes 2–3 |
-| Profile schema version | major `4`, minor `2` (D-F62: pointing v4; D-F26: settings v10) | page 0 bytes 4–5, and blob header bytes 4–5 |
+| Profile schema version | major `4`, minor `3` (D-F62: pointing v4; D-F26: settings v11) | page 0 bytes 4–5, and blob header bytes 4–5 |
 | Capability layout | `3`, three pages | page 0 bytes 0–1 |
 | Firmware version | `NOAH_FIRMWARE_VERSION`, never zero | page 0 bytes 17–20 |
 | Action-ABI digest | see [blob-and-digests.md](blob-and-digests.md#action-abi-digest) | page 0 bytes 13–16 |
@@ -60,7 +60,7 @@ firmware's history; a later capability raises the minor version (D-F28). The
 store format, `6`, is implied by the Profile Wire version and never travels.
 The firmware accepts only the formats it writes: a blob, candidate or saved
 profile in another schema or store format is refused, never translated
-(D-F10, [`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0010-firmware-accepts-only-current-formats.md)).
+(D-F10, [`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0010-firmware-accepts-only-current-formats.md)).
 
 Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, `qmk_profile_channel_test.c`), `tests/fixtures/profile_wire_v1_reads.fixture`.
 

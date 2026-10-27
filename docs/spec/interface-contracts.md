@@ -173,6 +173,7 @@ below.
 | Screens: IDs, labels, rail groups, availability, rendering and redraw; `PanelState.screen` takes its IDs from here; an unknown ID shows an unavailable screen | `webview/view/screens.mjs` | `tests/view/screens.test.mjs`, `browser-tests/screens-registry.spec.js` |
 | Words, sent as `model.vocabulary`; stages are found by id, never by label | `core/model/vocabulary.js` | `tests/model/vocabulary.test.js`, `tests/view/enum-drift.test.mjs` |
 | Actions, native keycodes, decode limits, layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
+| Custom-key shortcut keys (firmware D-F26): which keys a shortcut holds (`customKeyShortcutKeys`, by catalogue name) and the caps on them, as data the codec itself checks: at most six, each once, at most one media and one system key, each cap with its keycodes and the codec's words when broken, and the limits in words, published as `customKeyShortcutKeyLimits` (`SHORTCUT_KEY_LIMITS`). The picker reads the caps against the keycodes it would post and says the first one broken (`shortcutPickProblem`), with no limit, category or name matching of its own; every other refusal (a byte that is no such key, an old single-key message) is the codec's words too (`shortcutStoreRefusal`, `SHORTCUT_KEY_REFUSALS`) | `core/schema/settings-domain-v1.js` (`SHORTCUT_KEY_CAPS`, `shortcutKeysRefusal`), `core/model/custom-key-editor.js` | `tests/schema/settings-domain-v1.test.js`, `tests/model/custom-key-editor.test.js`, `tests/view/custom-key.test.mjs`, `browser-tests/custom-key-shortcut.spec.js` |
 | Decoding once: a snapshot's `decoded` form is taken with `decodedOf` (`core/model/portable-profile.js`), which decodes afresh only when the document changed; draft history entries are frozen and decoded once each | `core/model/portable-profile.js`, `core/session/profile-draft-session.js` | `tests/session/profile-draft-session.test.js` |
 | Pure edits and presentation; the model imports no session or protocol module | `core/model/device-profile-edits.js`, `key-behavior-edits.js`, `device-profile-view.js` | `tests/model/device-profile-edits.test.js`, `tests/layering.test.js` |
 | Layer answers: which stack slots answer each position under which active layers, for reach and the published model alike; the interface never resolves transparency again | `core/model/layer-resolution.js` | `tests/model/layer-resolution.test.js`, `tests/view/layer-resolution.test.mjs` |
@@ -255,16 +256,23 @@ records exactly (`tests/schema/pd-mode-domain-v1.test.js`).
 ## Custom key shortcuts
 
 A custom key's optional shortcut (firmware D-F26) is its own action (D-L63):
-a modifier mask, one key (none, a basic key or a mouse button), a mask of the
-layers it turns on and how it turns them on, all alike, as one layer key does
-(`layerKind`: hold, lock, move to, tap-toggle or one-shot;
-`SHORTCUT_LAYER_KINDS`); all zero is no shortcut, any part alone is one, and a
-kind other than hold needs layers. Ark reads and writes settings version 10
-only (D-L64; `tests/schema/settings-domain-v1.test.js`).
+a modifier mask, its `keys` in press order (up to six keyboard, media,
+system and mouse keys, each once, at most one media key and one system key;
+`SHORTCUT_KEYS`, `shortcutKeysRefusal`), a mask of the layers it turns on and
+how it turns them on, all alike, as one layer key does (`layerKind`: hold,
+lock, move to, tap-toggle or one-shot; `SHORTCUT_LAYER_KINDS`); no modifiers,
+no keys and no layers is no shortcut, any part alone is one, and a kind other
+than hold needs layers. Ark reads and writes settings version 11 only (D-L64;
+`tests/schema/settings-domain-v1.test.js`).
 
-- The Custom keys screen edits it through `updateCustomKeyShortcut`, with key
+- The Custom keys screen edits it through `updateCustomKeyShortcut`, with keys
   and modifiers in the keycode picker's `shortcut` mode, where modifiers may
-  mix sides, and its layers in that mode's **Layers** section: the shared
+  mix sides and each click adds a key in press order or takes it out; a
+  symbol is its key with its modifiers, held for the whole shortcut, and
+  taking it out leaves a modifier another symbol still needs or the person
+  turned on (`shortcutPickKey`, `shortcutPickDrop`); the caps are published
+  as `customKeyShortcutKeyLimits` and the first one broken is said in its
+  words (`shortcutPickProblem`), with Use off, before anything posts, and its layers in that mode's **Layers** section: the shared
   per-layer switches (`webview/ui/layer-switches.mjs`) as a table, a row per
   layer, any number on, under a **Turns them on as** choice of kind by its
   layer key's verb (the vocabulary's `customKeys.layerKinds`), nothing to
@@ -280,7 +288,7 @@ only (D-L64; `tests/schema/settings-domain-v1.test.js`).
   renumbers a shortcut's layers as it does layer keys;
   `tests/model/shortcut-layers.test.js`).
 - Wherever a shortcut is named (the Custom keys list, key legends and tips,
-  hover, Review, the behaviour grid) its layers follow its modifiers and key
+  hover, Review, the behaviour grid) its layers follow its modifiers and keys
   by name, lowest first, led by their kind's verb unless held: "Left Cmd +
   Navigation + Extra", "Left Cmd + Lock Navigation + Extra" (`shortcutLabel`,
   `core/model/key-names.js`). The hover card's Shortcut section tags each

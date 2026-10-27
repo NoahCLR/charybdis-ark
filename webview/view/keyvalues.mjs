@@ -91,7 +91,7 @@ export function modifierPick(model, {keys = [], mods = []}) {
         : oneSide(mask) ? mask & -mask
         : single(mask & 0x0f) ? mask & 0x0f
         : single(mask & 0xf0) ? mask & 0xf0 : 0;
-    if (!inner) return {shortcut: {mods: mask, key: 0, layers: 0, layerKind: 0}};
+    if (!inner) return {shortcut: {mods: mask, keys: [], layers: 0, layerKind: 0}};
     const name = (model?.qmkKeycodes || []).find((entry) => entry.keycode === 0xe0 + Math.log2(inner))?.value;
     if (!name) return null;
     return {keys: [name], mods: controls.filter((entry) => mask & ~inner & entry.bit).map((entry) => entry.value)};

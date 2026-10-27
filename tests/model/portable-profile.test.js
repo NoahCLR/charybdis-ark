@@ -249,14 +249,14 @@ test("current backups preserve retired user assignments without reinterpreting t
 test("a keyboard storing a domain in another version than current firmware's is not read", () => {
     const source = validateSnapshot(document());
     const current = encodeSettings(settings());
-    const v7 = Buffer.concat([current.subarray(0, 404), current.subarray(916)]);
+    const v7 = Buffer.concat([current.subarray(0, 404), current.subarray(1684)]);
     v7[0] = 7; v7[6] = 0;
     const blob = decodeProfileBlob(source.profile);
     const live = encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x40 ? {...domain, version: 7, payload: v7} : domain)},
         {domainVersions: {0x10: 4, 0x20: 2, 0x30: 3, 0x40: 7, 0x50: 4, 0x60: 1, 0x70: 1}});
     const combos = {defaultTermMs: 50, holdTermMs: 200, rows: []};
     assert.throws(() => materializeProfile(live, live, combos, current), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
-    assert.throws(() => materializeProfile(source.candidate, source.candidate, combos, Buffer.from([11, ...current.subarray(1)])), /settings/i, "settings in another version are refused");
+    assert.throws(() => materializeProfile(source.candidate, source.candidate, combos, Buffer.from([12, ...current.subarray(1)])), /settings/i, "settings in another version are refused");
     assert.doesNotThrow(() => materializeProfile(source.candidate, source.candidate, combos, current));
 });
 
@@ -307,16 +307,16 @@ test("a custom key's shortcut layers follow their layers through a reorder, Make
     const build = (change) => {
         const policy = settings();
         policy.values[SETTING.DEFAULT_LAYERS] = 1;
-        policy.customKeyShortcuts[0] = {mods: 0x08, key: 0, layers: (1 << 3) | (1 << 5), layerKind: 2}; // Move to Navigation + Extra 1
-        policy.customKeyShortcuts[1] = {mods: 0, key: 0, layers: 1 << 1, layerKind: 1};                   // Lock Numbers
-        policy.customKeyShortcuts[2] = {mods: 0, key: 0, layers: 0xfffe, layerKind: 3};                    // Tap-toggle all fifteen
+        policy.customKeyShortcuts[0] = {mods: 0x08, keys: [], layers: (1 << 3) | (1 << 5), layerKind: 2}; // Move to Navigation + Extra 1
+        policy.customKeyShortcuts[1] = {mods: 0, keys: [], layers: 1 << 1, layerKind: 1};                   // Lock Numbers
+        policy.customKeyShortcuts[2] = {mods: 0, keys: [], layers: 0xfffe, layerKind: 3};                    // Tap-toggle all fifteen
         change?.(policy);
         return compiled({policy});
     };
     const shortcuts = (doc) => validateSnapshot(doc).settings.customKeyShortcuts.slice(0, 3);
     // Keys following, a move renumbers them by content and keeps each kind.
     const moved = shortcuts(reorderLayers(build(), [0, 3, 1, 2, ...rest]));
-    assert.deepEqual(moved, [{mods: 0x08, key: 0, layers: (1 << 1) | (1 << 5), layerKind: 2}, {mods: 0, key: 0, layers: 1 << 2, layerKind: 1}, {mods: 0, key: 0, layers: 0xfffe, layerKind: 3}]);
+    assert.deepEqual(moved, [{mods: 0x08, keys: [], layers: (1 << 1) | (1 << 5), layerKind: 2}, {mods: 0, keys: [], layers: 1 << 2, layerKind: 1}, {mods: 0, keys: [], layers: 0xfffe, layerKind: 3}]);
     // Make base trades roles: one naming the new base names the old base in
     // its new slot, as MO() of it does.
     const based = shortcuts(reorderLayers(build(), [1, 0, 2, 3, ...rest]));
@@ -327,9 +327,9 @@ test("a custom key's shortcut layers follow their layers through a reorder, Make
     assert.deepEqual(shortcuts(reorderLayers(build(), [0, 2, 1, 3, ...rest], undefined, {keysFollow: false})), shortcuts(build()));
     // Make base with keys keeping their numbers: a shortcut that would land on
     // a default layer is refused, as is one whose layers would merge.
-    const numbersDefault = build((policy) => {policy.values[SETTING.DEFAULT_LAYERS] = 1 | (1 << 1); policy.customKeyShortcuts[1] = {mods: 0, key: 0, layers: 0, layerKind: 0}; policy.customKeyShortcuts[2] = {mods: 0, key: 0, layers: 0, layerKind: 0};});
+    const numbersDefault = build((policy) => {policy.values[SETTING.DEFAULT_LAYERS] = 1 | (1 << 1); policy.customKeyShortcuts[1] = {mods: 0, keys: [], layers: 0, layerKind: 0}; policy.customKeyShortcuts[2] = {mods: 0, keys: [], layers: 0, layerKind: 0};});
     assert.throws(() => reorderLayers(numbersDefault, [1, 2, 3, 0, ...rest], undefined, {keysFollow: false}), /Custom key 0's shortcut turn on .*, which would be a default layer, always on\. Turn on Keys follow their layers/);
-    const merging = build((policy) => {policy.customKeyShortcuts[0] = {mods: 0, key: 0, layers: (1 << 1) | (1 << 3), layerKind: 0}; policy.customKeyShortcuts[1] = {mods: 0, key: 0, layers: 0, layerKind: 0}; policy.customKeyShortcuts[2] = {mods: 0, key: 0, layers: 0, layerKind: 0};});
+    const merging = build((policy) => {policy.customKeyShortcuts[0] = {mods: 0, keys: [], layers: (1 << 1) | (1 << 3), layerKind: 0}; policy.customKeyShortcuts[1] = {mods: 0, keys: [], layers: 0, layerKind: 0}; policy.customKeyShortcuts[2] = {mods: 0, keys: [], layers: 0, layerKind: 0};});
     assert.throws(() => reorderLayers(merging, [1, 2, 3, 0, ...rest], undefined, {keysFollow: false}), /Custom key 0's shortcut turn on Numbers and Navigation as one layer/);
     // Keys following, neither can happen.
     assert.doesNotThrow(() => reorderLayers(merging, [1, 2, 3, 0, ...rest]));

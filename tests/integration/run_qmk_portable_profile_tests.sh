@@ -51,12 +51,12 @@ function read(path) {
     assert.deepEqual(authored.customKeyNames.filter(Boolean), ["Right Thumb", "Last"]);
     // The keyboard's own name follows, empty for the built-in one.
     assert.equal(authored.keyboardName, "");
-    // Settings v8 (firmware D-F26): each custom key's shortcut, the keymap's
+    // Settings v11 (firmware D-F26): each custom key's shortcut, the keymap's
     // until a profile has its own: mixed sides with a key, modifiers alone, a
     // mouse button alone, and none for every other key.
     const shortcuts = authored.customKeyShortcuts;
-    assert.deepEqual([shortcuts[1], shortcuts[63], shortcuts[127]], [{mods: 0x41, key: 0x0e, layers: 0, layerKind: 0}, {mods: 0x0f, key: 0, layers: 0, layerKind: 0}, {mods: 0, key: 0xd1, layers: 0, layerKind: 0}]);
-    assert.equal(shortcuts.filter(({mods, key}) => mods || key).length, 3);
+    assert.deepEqual([shortcuts[1], shortcuts[63], shortcuts[127]], [{mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}, {mods: 0x0f, keys: [], layers: 0, layerKind: 0}, {mods: 0, keys: [0xd1], layers: 0, layerKind: 0}]);
+    assert.equal(shortcuts.filter(({mods, keys}) => mods || keys.length).length, 3);
     assert.equal((await read(process.argv[3])).keyboardName, "");
     console.log("app reads the firmware's streamed settings and its macro and layer names");
 })().catch(error => {console.error(error); process.exitCode = 1;});

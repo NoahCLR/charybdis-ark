@@ -10,7 +10,7 @@ const {candidateMetadataForBlob, buildCandidateBeginRequest} = require("../../co
 const {buildSnapshotModel} = require("../../core/session/device-model");
 function fixture() {
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 2}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
+    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
     const draft = new ProfileDraftSession(snapshot, "board", caps);
     const stage = message => draft.stage({...message, draftRevision: draft.revision});
     return {draft, stage, caps};
@@ -81,10 +81,10 @@ test("keycode-picker modifier expressions are accepted as directional actions", 
     assert.equal(mode.directions.up.keycode, 0x081d);
     assert.equal(mode.directions.down.keycode, 0x081c);
 });
-test("logical Apply declares schema 4.2, all seven domains and storage format six", () => {
+test("logical Apply declares schema 4.3, all seven domains and storage format six", () => {
     const value = validateSnapshot(document());
     const metadata = candidateMetadataForBlob(value.profile, {actionAbiDigest: value.document.actionAbiDigest});
-    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.schemaMinor, 2); assert.equal(metadata.requestedDomains, 127); assert.equal(metadata.storeFormatVersion, 6);
+    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.schemaMinor, 3); assert.equal(metadata.requestedDomains, 127); assert.equal(metadata.storeFormatVersion, 6);
     const frame = buildCandidateBeginRequest(1, metadata);
     // Profile Wire 2 implies the store format: BEGIN carries a 32-bit length.
     assert.equal(frame.readUInt32LE(8), value.profile.length); assert.equal(frame.readUInt32LE(24), 0); assert.equal(frame.readUInt32LE(28), 0);
@@ -269,7 +269,7 @@ test("the model publishes the layers that start each mode and what each keycode 
         directions: {left: {keycode: "KC_LEFT"}, right: {keycode: "KC_RIGHT"}}}});
     stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}, {layoutIndex: 1, keycode: "MO(3)"},
         {layoutIndex: 2, keycode: "LT(3,KC_B)"}, {layoutIndex: 3, keycode: "CUSTOM_KEY_2"}, {layoutIndex: 4, keycode: "KC_A"}]});
-    stage({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", shortcut: {mods: 0, key: 0, layers: (1 << 3) | (1 << 6), layerKind: 1}});
+    stage({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", shortcut: {mods: 0, keys: [], layers: (1 << 3) | (1 << 6), layerKind: 1}});
     const state = {capabilities: caps, phase: "idle", committed: {state: "unavailable"}, combos: {state: "unavailable"}};
     const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""}, state);
     const [start] = model.pdModes[7].linkStarts;

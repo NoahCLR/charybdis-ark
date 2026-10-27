@@ -191,7 +191,7 @@ export function comboBuilder(canEdit, holdTerm) {
 
 // What a bypassed output sends, when it is a custom key: its shortcut, or
 // nothing without one (firmware D-F26).
-/** @param {Model} model @param {string} output @param {{shortcut: {mods: number, key: number}} | null} made */
+/** @param {Model} model @param {string} output @param {{shortcut: {mods: number, keys: readonly number[]}} | null} made */
 function bypassedOutput(model, output, made) {
     if (made) return `This custom key sends its shortcut, ${shortcutPickLabel(model, made.shortcut)}.`;
     const key = customKeyOf(model, canonicalKeycode(model, output));

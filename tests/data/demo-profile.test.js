@@ -32,7 +32,7 @@ test("the demo profile decodes under the current schema, for current firmware, u
     assert.equal(decoded.document, document, "nothing about it needed upgrading");
     assert.equal(document.version, 5);
     assert.equal(document.keyboard, "charybdis-4x6");
-    assert.equal(document.actionAbiDigest, ACTION_ABI, "the 32-slot action vocabulary, 0xb4a15f12");
+    assert.equal(document.actionAbiDigest, ACTION_ABI, "the 32-slot action vocabulary, 0x67df11b3");
     assert.equal(profileLayers(document).length, 16);
     assert.equal(profileMacros(document).length, 128);
     assert.equal(decoded.pdModes.length, 32);

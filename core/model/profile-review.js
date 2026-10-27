@@ -5,7 +5,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis
 const {layerOfRef, nativeCode, pdSlotOfCode} = require("../schema/actions");
 const {hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, profileKeyNames, shortcutLabel} = require("./key-names");
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
-const {SETTING} = require("../schema/settings-domain-v1");
+const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings-domain-v1");
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
@@ -466,12 +466,12 @@ function profileReview(before, after, capabilities) {
         const next = keyNamesB[i];
         const shortcutA = a.settings.customKeyShortcuts[i], shortcutB = b.settings.customKeyShortcuts[i];
         // Its layers are part of the shortcut (firmware D-F26), named in it.
-        /** @param {{mods: number, key: number, layers: number, layerKind: number}} shortcut @param {Names} names @returns {Field} */
-        const shortcutField = (shortcut, names) => ({text: shortcutLabel(names.keys, shortcut) || "none", key: `${shortcut.mods}:${shortcut.key}:${shortcut.layers}:${shortcut.layerKind}`});
-        /** @param {string} name @param {{mods: number, key: number, layers: number, layerKind: number}} shortcut @param {Names} names @returns {Fields} */
+        /** @param {import("../schema/types.js").CustomKeyShortcut} shortcut @param {Names} names @returns {Field} */
+        const shortcutField = (shortcut, names) => ({text: shortcutLabel(names.keys, shortcut) || "none", key: shortcutIdentity(shortcut)});
+        /** @param {string} name @param {import("../schema/types.js").CustomKeyShortcut} shortcut @param {Names} names @returns {Fields} */
         const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
-        /** @param {string} name @param {{mods: number, key: number, layers: number, layerKind: number}} shortcut */
-        const exists = (name, shortcut) => Boolean(name || shortcut.mods || shortcut.key || shortcut.layers);
+        /** @param {string} name @param {import("../schema/types.js").CustomKeyShortcut} shortcut */
+        const exists = (name, shortcut) => Boolean(name || shortcutPresent(shortcut));
         item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i},
             [exists(old, shortcutA), exists(next, shortcutB)]);
     });

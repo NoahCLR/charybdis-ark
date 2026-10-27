@@ -617,8 +617,8 @@ test("clean drafts also use latest detection, including loss of a known host", (
 test("undoing and redoing a reorder brings a custom key's shortcut layers back exactly", () => {
     const {settings, compiled} = require("../fixtures/portable-profile");
     const policy = settings();
-    policy.customKeyShortcuts[0] = {mods: 0x08, key: 0, layers: (1 << 3) | (1 << 5), layerKind: 2};
-    policy.customKeyShortcuts[1] = {mods: 0, key: 0, layers: 0xfffe, layerKind: 1};
+    policy.customKeyShortcuts[0] = {mods: 0x08, keys: [], layers: (1 << 3) | (1 << 5), layerKind: 2};
+    policy.customKeyShortcuts[1] = {mods: 0, keys: [], layers: 0xfffe, layerKind: 1};
     const value = compiled({policy});
     const snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}, options: options()};
     const draft = new ProfileDraftSession(snapshot, "board", {compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest});

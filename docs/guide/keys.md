@@ -95,11 +95,23 @@ Pick one from the list (**Search by name** finds it by name or number). Its
 name is the editor's title: click it to rename, Enter to keep, Escape to put
 it back.
 
-**Shortcut** is what the key sends: one key, any modifiers and any layers.
-The key and modifiers are held while you hold the custom key and tapped when
-you tap it. **Pick…** opens the picker with only the keys a shortcut can send.
-Here left and right modifiers mix freely, so Left Ctrl + Right Option + K is
-fine. Its **Layers** section switches on the layers the shortcut turns on, as
+**Shortcut** is what the key sends: up to six keys held together, any
+modifiers and any layers. The keys and modifiers are held while you hold the
+custom key and tapped when you tap it: the modifiers go down first, then the
+keys in the order you picked them, and they come back up the other way round.
+**Pick…** opens the picker with only the keys a shortcut can send: keyboard
+keys, media and system keys (play/pause, volume, sleep) and mouse keys
+(buttons, the wheel, cursor movement). Click each key you want, in order;
+click one again to take it out. A symbol such as `!` is its key with Shift,
+and a shortcut has one set of modifiers, so that Shift is held for the whole
+shortcut: `!` then `a` sends Shift + 1 + A, which types "!A". Taking a symbol
+out takes its Shift with it, unless another symbol still needs it or you
+turned Shift on yourself. A shortcut holds at most six keys, one media
+key and one system key, since the computer reads one of each at a time: the
+picker says so under the keys and keeps **Use shortcut** off until the choice
+fits. A media key in a shortcut plays wherever the shortcut is sent: behind a
+behaviour, from a bypassed key or as a combo's output. Here left and right
+modifiers mix freely, so Left Ctrl + Right Option + K is fine. Its **Layers** section switches on the layers the shortcut turns on, as
 many as you like, and **Turns them on as** says how, all of them alike, as a
 layer key would:
 

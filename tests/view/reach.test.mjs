@@ -627,7 +627,7 @@ test("a custom key's layers are the ones where a key carries it or a combo sends
 test("a custom key is placed wherever it is sent, unnamed and with nothing but a shortcut, or by a behaviour step", () => {
     const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
     const model = {
-        customKeys: [0, 1].map((slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, name: "", hasBehavior: false, shortcut: {mods: slot ? 0 : 0x41, key: slot ? 0 : 0x0e}})),
+        customKeys: [0, 1].map((slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, name: "", hasBehavior: false, shortcut: {mods: slot ? 0 : 0x41, keys: [slot ? 0 : 0x0e]}})),
         qmkKeycodeAliases: {},
         keyBehaviors: [{keycode: "KC_A", enabled: true, allowedLayers: 0xffff, steps: [{tapCount: 1, tap: {style: "TAP_SENDS", action: "CUSTOM_KEY_1"}}]}],
         combos: [],

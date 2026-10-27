@@ -3,7 +3,7 @@
 const {test, expect} = require("@playwright/test");
 const {openControls, posted, clearPosts} = require("./control-preview");
 
-const shortcut = (mods, key, layers = 0, layerKind = 0) => expect.objectContaining({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_1", shortcut: {mods, key, layers, layerKind}});
+const shortcut = (mods, keys, layers = 0, layerKind = 0) => expect.objectContaining({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_1", shortcut: {mods, keys, layers, layerKind}});
 
 // The Shortcut field is set in the keycode picker, with the modifier row the
 // Keys screen uses: here left and right mix, and modifiers alone or a key
@@ -23,14 +23,14 @@ for (const theme of ["dark"]) {
         await expect(page.locator(".picker .pk-problem")).toHaveCount(0);
         await expect(page.locator(".picker .pk-value")).toHaveText(/^Left Ctrl \+ Right (Alt|Option) \+ K$/);
         await page.locator('.picker [data-act="use"]').click();
-        await expect.poll(() => posted(page)).toEqual([shortcut(0x41, 0x0e)]);
+        await expect.poll(() => posted(page)).toEqual([shortcut(0x41, [0x0e])]);
 
         // Modifiers alone are a shortcut too.
         await clearPosts(page);
         await page.locator('[data-act="pick-shortcut"]').click();
         for (const mod of ["C", "S", "A", "G"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
         await page.locator('.picker [data-act="use"]').click();
-        await expect.poll(() => posted(page)).toEqual([shortcut(0x0f, 0)]);
+        await expect.poll(() => posted(page)).toEqual([shortcut(0x0f, [])]);
 
         // Publish a model in which the key has the mixed-side shortcut, as the
         // core would after staging: the field shows it, the picker opens with
@@ -38,7 +38,7 @@ for (const theme of ["dark"]) {
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             const model = structuredClone(store.getModel());
-            Object.assign(model.customKeys[1], {shortcut: {mods: 0x41, key: 0x0e, layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + Right Alt + K"});
+            Object.assign(model.customKeys[1], {shortcut: {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + Right Alt + K"});
             store.setModel(model); store.render();
             window.__posted.length = 0;
         });
@@ -49,9 +49,48 @@ for (const theme of ["dark"]) {
         await page.locator('.picker [data-act="cancel"]').first().click();
         expect(await posted(page)).toEqual([]);
         await page.locator('[data-act="clear-shortcut"]').click();
-        await expect.poll(() => posted(page)).toEqual([shortcut(0, 0)]);
+        await expect.poll(() => posted(page)).toEqual([shortcut(0, [])]);
     });
 }
+
+// A shortcut holds up to six keys together (firmware D-F26), media and system
+// keys among them: each click adds a key in press order, and the picker says
+// in words why it cannot hold a seventh, a second media key or a second
+// system key, with Use off, so nothing the keyboard would refuse posts.
+test("a custom key's shortcut picks several keys in order, a media key among them, and refuses what it cannot hold", async ({page}) => {
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"});
+    /** @param {string} name */
+    const pick = async (name) => { await page.locator("#pickerSearch").fill(name); await page.locator(`.picker [data-pick="${name}"]`).first().click(); };
+    await page.locator('[data-act="pick-shortcut"]').click();
+    await expect(page.locator(".picker .sheet-h .note")).toContainText("up to 6 keys held together, at most one media key and one system key");
+    await page.locator('.picker [data-mod="S"]').click();
+    for (const name of ["KC_A", "KC_S", "KC_MEDIA_PLAY_PAUSE"]) await pick(name);
+    await expect(page.locator(".picker .sheet-f [data-remove]")).toHaveCount(3);
+    await expect(page.locator(".picker .pk-problem")).toHaveCount(0);
+    await expect(page.locator(".picker .pk-value")).toHaveText(/^Left Shift \+ A \+ S \+ .*Play.*$/);
+    await page.locator(".picker").first().screenshot({path: test.info().outputPath("chord-picker.png")});
+    await page.locator('.picker [data-act="use"]').click();
+    await expect.poll(() => posted(page)).toEqual([shortcut(0x02, [0x04, 0x16, 0xae])]);
+
+    for (const [keys, words] of [
+        [["KC_A", "KC_S", "KC_D", "KC_F", "KC_G", "KC_H", "KC_J"], /at most 6 keys/],
+        [["KC_MEDIA_PLAY_PAUSE", "KC_AUDIO_VOL_UP"], /one media key/],
+        [["KC_SYSTEM_POWER", "KC_A", "KC_SYSTEM_SLEEP"], /one system key/],
+    ]) {
+        await clearPosts(page);
+        await page.locator('[data-act="pick-shortcut"]').click();
+        for (const name of keys) await pick(name);
+        await expect(page.locator(".picker .pk-problem")).toHaveText(words);
+        await expect(page.locator('.picker [data-act="use"]')).toBeDisabled();
+        await page.locator(".picker").first().screenshot({path: test.info().outputPath(`chord-refused-${keys.length}.png`)});
+        // Taking the last key out again lifts the refusal.
+        await page.locator(".picker .sheet-f [data-remove]").last().click();
+        await expect(page.locator(".picker .pk-problem")).toHaveCount(0);
+        await expect(page.locator('.picker [data-act="use"]')).toBeEnabled();
+        await page.locator('.picker [data-act="cancel"]').first().click();
+        expect(await posted(page)).toEqual([]);
+    }
+});
 
 // A shortcut can hold layers too (firmware D-F26): the picker's Layers
 // section is a switch per layer, any number on; the base layer and the
@@ -69,14 +108,14 @@ test("a custom key's shortcut picks several layers, with the always-on ones dimm
     await expect(page.locator(".picker .pk-value")).toHaveText(/^Left (Command|GUI|Win|Super) \+ Navigation \+ Extra 1$/);
     await expect(page.locator('.picker [data-unlayer="5"]')).toHaveCount(1);
     await page.locator('.picker [data-act="use"]').click();
-    await expect.poll(() => posted(page)).toEqual([shortcut(0x08, 0, (1 << 3) | (1 << 5))]);
+    await expect.poll(() => posted(page)).toEqual([shortcut(0x08, [], (1 << 3) | (1 << 5))]);
 
     // Layers alone, with one taken off again by its chip.
     await clearPosts(page);
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        Object.assign(model.customKeys[1], {shortcut: {mods: 0, key: 0, layers: 0b101000, layerKind: 0}, shortcutLabel: "Navigation + Extra 1"});
+        Object.assign(model.customKeys[1], {shortcut: {mods: 0, keys: [], layers: 0b101000, layerKind: 0}, shortcutLabel: "Navigation + Extra 1"});
         store.setModel(model); store.render();
         window.__posted.length = 0;
     });
@@ -85,7 +124,7 @@ test("a custom key's shortcut picks several layers, with the always-on ones dimm
     await expect(page.locator('.picker [data-f="picker:shortcut-layer:3"]')).toBeChecked();
     await page.locator('.picker [data-unlayer="3"]').click();
     await page.locator('.picker [data-act="use"]').click();
-    await expect.poll(() => posted(page)).toEqual([shortcut(0, 0, 1 << 5)]);
+    await expect.poll(() => posted(page)).toEqual([shortcut(0, [], 1 << 5)]);
 });
 
 // How a shortcut turns its layers on is chosen beside them, as one layer key
@@ -108,7 +147,7 @@ test("a shortcut's layers can be locked, moved to, tap-toggled or one-shot, and 
         await expect(page.locator(".picker .pk-value")).toHaveText(`${verb} Navigation + Extra 1`);
         await expect(page.locator(".picker .layer-table-head")).not.toContainText("Held on while the shortcut is");
         await page.locator('.picker [data-act="use"]').click();
-        await expect.poll(() => posted(page)).toEqual([shortcut(0, 0, (1 << 3) | (1 << 5), value)]);
+        await expect.poll(() => posted(page)).toEqual([shortcut(0, [], (1 << 3) | (1 << 5), value)]);
     }
 
     // Opened on a shortcut that locks, the choice shows Lock; Clear goes back
@@ -116,7 +155,7 @@ test("a shortcut's layers can be locked, moved to, tap-toggled or one-shot, and 
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        Object.assign(model.customKeys[1], {shortcut: {mods: 0x08, key: 0, layers: 0b1000, layerKind: 1}, shortcutLabel: "Left GUI + Lock Navigation"});
+        Object.assign(model.customKeys[1], {shortcut: {mods: 0x08, keys: [], layers: 0b1000, layerKind: 1}, shortcutLabel: "Left GUI + Lock Navigation"});
         store.setModel(model); store.render();
     });
     await page.locator('[data-act="pick-shortcut"]').click();
@@ -143,8 +182,11 @@ test("a shortcut's layers can be locked, moved to, tap-toggled or one-shot, and 
 test("the picker refuses a key a shortcut cannot hold", async ({page}) => {
     await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"});
     await page.locator('[data-act="pick-shortcut"]').click();
-    await page.locator("#pickerSearch").fill("KC_AUDIO_MUTE");
-    await expect(page.locator('.picker [data-pick="KC_AUDIO_MUTE"]')).toHaveCount(0);
+    // Mouse-key acceleration changes no report; transparent is no key.
+    for (const name of ["QK_MOUSE_ACCELERATION_0", "KC_TRANSPARENT"]) {
+        await page.locator("#pickerSearch").fill(name);
+        await expect(page.locator(`.picker [data-pick="${name}"]`)).toHaveCount(0);
+    }
     await page.locator('.picker [data-act="cancel"]').first().click();
     expect(await posted(page)).toEqual([]);
 });
@@ -188,14 +230,20 @@ test("the shortcut picker offers the modifier keys and shifted symbols, as modif
     await expect(page.locator('.picker [data-mod="S"]')).toHaveClass(/\bon\b/);
     await expect(page.locator('.picker [data-pick="KC_EXLM"]')).toHaveClass(/\bon\b/);
     await expect(page.locator(".picker .pk-value")).toHaveText("Left Shift + 1");
+    // A second click takes the symbol out again, its key and its modifier.
+    await page.locator('.picker [data-pick="KC_EXLM"]').click();
+    await expect(page.locator('.picker [data-mod="S"]')).not.toHaveClass(/\bon\b/);
+    await expect(page.locator('.picker [data-pick="KC_EXLM"]')).not.toHaveClass(/\bon\b/);
+    await page.locator('.picker [data-pick="KC_EXLM"]').click();
+    await expect(page.locator(".picker .pk-value")).toHaveText("Left Shift + 1");
     await clearPosts(page);
     await page.locator('.picker [data-act="use"]').click();
-    await expect.poll(() => posted(page)).toEqual([shortcut(0x02, 0x1e)]);
+    await expect.poll(() => posted(page)).toEqual([shortcut(0x02, [0x1e])]);
 
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        Object.assign(model.customKeys[1], {shortcut: {mods: 0x02, key: 0x1e, layers: 0, layerKind: 0}, shortcutLabel: "Left Shift + 1"});
+        Object.assign(model.customKeys[1], {shortcut: {mods: 0x02, keys: [0x1e], layers: 0, layerKind: 0}, shortcutLabel: "Left Shift + 1"});
         store.setModel(model); store.render();
     });
     await page.locator('[data-act="pick-shortcut"]').click();
@@ -205,6 +253,53 @@ test("the shortcut picker offers the modifier keys and shifted symbols, as modif
     await page.locator('.picker [data-mod="S"]').click();
     await expect(page.locator('.picker [data-pick="KC_EXLM"]')).not.toHaveClass(/\bon\b/);
     await expect(page.locator(".picker .pk-value")).toHaveText("1");
+});
+
+// A symbol's modifiers are held for the whole shortcut, so taking one symbol
+// out leaves a modifier another symbol still needs, or one the person turned
+// on themselves: ! then @ is Shift + 1 + 2, and without ! it is Shift + 2.
+test("taking a symbol out keeps the Shift another symbol or the person holds", async ({page}) => {
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"});
+    const open = async () => {
+        await clearPosts(page);
+        await page.locator('[data-act="pick-shortcut"]').click();
+        await page.locator('.picker [data-act="clear"]').click();
+        await page.locator('.picker [data-sec="symbols"]').click();
+    };
+    await open();
+    await page.locator('.picker [data-pick="KC_EXLM"]').click();
+    await page.locator('.picker [data-pick="KC_AT"]').click();
+    await expect(page.locator(".picker .pk-value")).toHaveText("Left Shift + 1 + 2");
+    await page.locator('.picker [data-pick="KC_EXLM"]').click();
+    await expect(page.locator(".picker .pk-value")).toHaveText("Left Shift + 2");
+    await expect(page.locator('.picker [data-mod="S"]')).toHaveClass(/\bon\b/);
+    await expect(page.locator('.picker [data-pick="KC_AT"]')).toHaveClass(/\bon\b/);
+    await expect(page.locator('.picker [data-pick="KC_EXLM"]')).not.toHaveClass(/\bon\b/);
+    await page.locator(".picker").first().screenshot({path: test.info().outputPath("chord-symbol-toggle.png")});
+    await page.locator('.picker [data-act="use"]').click();
+    await expect.poll(() => posted(page)).toEqual([shortcut(0x02, [0x1f])]);
+
+    // Its chip takes it out the same way.
+    await open();
+    await page.locator('.picker [data-pick="KC_EXLM"]').click();
+    await page.locator('.picker [data-pick="KC_AT"]').click();
+    await page.locator(".picker .sheet-f [data-remove]").first().click();
+    await expect(page.locator(".picker .pk-value")).toHaveText("Left Shift + 2");
+    // The last symbol out takes its Shift with it.
+    await page.locator('.picker [data-pick="KC_AT"]').click();
+    await expect(page.locator('.picker [data-mod="S"]')).not.toHaveClass(/\bon\b/);
+    await page.locator('.picker [data-act="cancel"]').first().click();
+    expect(await posted(page)).toEqual([]);
+
+    // A Shift turned on with its button is the person's, and stays.
+    await open();
+    await page.locator('.picker [data-mod="S"]').click();
+    await page.locator('.picker [data-pick="KC_EXLM"]').click();
+    await page.locator('.picker [data-pick="KC_EXLM"]').click();
+    await expect(page.locator('.picker [data-mod="S"]')).toHaveClass(/\bon\b/);
+    await expect(page.locator(".picker .pk-value")).toHaveText("Left Shift");
+    await page.locator('.picker [data-act="use"]').click();
+    await expect.poll(() => posted(page)).toEqual([shortcut(0x02, [])]);
 });
 
 // A layout key's picker offers an unused custom key for modifiers no keycode
@@ -237,7 +332,7 @@ test("the Keys screen's picker offers a custom key for Ctrl and Shift on both si
     await offer.click();
     await expect(page.locator(".picker")).toHaveCount(0);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`,
-        shortcut: {mods: 0x33, key: 0, layers: 0, layerKind: 0}, name: "LCtrl+LShift+RCtrl+RShift",
+        shortcut: {mods: 0x33, keys: [], layers: 0, layerKind: 0}, name: "LCtrl+LShift+RCtrl+RShift",
         then: {type: "updateLayoutKeys", layer, changes: [{layoutIndex: 27, keycode: `CUSTOM_KEY_${slot}`}]}})]);
 
     // One side and a key is an ordinary keycode: no offer.
@@ -255,7 +350,7 @@ test("the picker uses a custom key that already holds the shortcut", async ({pag
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: false, shortcut: {mods: 0x33, key: 0, layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
+        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: false, shortcut: {mods: 0x33, keys: [], layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
         store.setModel(model); store.render();
     });
     await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
@@ -282,7 +377,7 @@ test("a behaviour cell's picker makes a custom key for mixed-side modifiers, and
     const slot = Number((await offer.textContent()).match(/\d+/)[0]);
     await clearPosts(page);
     await offer.click();
-    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x33, key: 0, layers: 0, layerKind: 0},
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x33, keys: [], layers: 0, layerKind: 0},
         then: expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({keycode: "CUSTOM_KEY_5",
             steps: [expect.objectContaining({tapCount: 0, hold: expect.objectContaining({action: `CUSTOM_KEY_${slot}`})})]})})})]);
 });
@@ -316,7 +411,7 @@ test("a combo output's picker fills the output with a custom key made only when 
     const slot = await takeOffer();
     await inputs();
     await page.locator('.combo-builder [data-act="keep"]').click();
-    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x66, key: 0, layers: 0, layerKind: 0},
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x66, keys: [], layers: 0, layerKind: 0},
         then: expect.objectContaining({type: "addCombo", output: `CUSTOM_KEY_${slot}`, inputs: ["KC_A", "KC_B"]})})]);
 
     // Picking another output after the offer makes no key.
@@ -338,7 +433,7 @@ test("a matching custom key with a behaviour is offered beside a new one on a la
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: true, shortcut: {mods: 0x33, key: 0, layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
+        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: true, shortcut: {mods: 0x33, keys: [], layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
         store.setModel(model); store.render();
     });
     const open = async () => {
@@ -360,7 +455,7 @@ test("a matching custom key with a behaviour is offered beside a new one on a la
     expect(slot).not.toBe(3);
     await clearPosts(page);
     await make.click();
-    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x33, key: 0, layers: 0, layerKind: 0}})]);
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x33, keys: [], layers: 0, layerKind: 0}})]);
 });
 
 // In a behaviour cell the step sends only the shortcut, never the matching
@@ -370,7 +465,7 @@ test("a behaviour cell uses a matching custom key even when it has a behaviour",
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: true, shortcut: {mods: 0x33, key: 0, layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
+        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: true, shortcut: {mods: 0x33, keys: [], layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
         store.setModel(model); store.render();
     });
     await page.locator('.custom-key-behaviour [data-cell="0-hold"]').click();
@@ -437,7 +532,7 @@ test("the hover card draws a shortcut's keys and layers as the behaviour rows do
     const section = page.locator(".hovercard .hc-sect").filter({has: page.locator(".hc-h", {hasText: "Shortcut"})});
     const hover = async () => { await page.mouse.move(0, 0); await page.locator(`.board [data-key="${AT}"]`).first().hover(); await expect(section).toBeVisible(); };
 
-    await place({mods: 0x08, key: 0x2c, layers: 0b101000, layerKind: 0}, "Left GUI + Space + Navigation + Extra 1", ["Left GUI", "Space"]);
+    await place({mods: 0x08, keys: [0x2c], layers: 0b101000, layerKind: 0}, "Left GUI + Space + Navigation + Extra 1", ["Left GUI", "Space"]);
     await hover();
     await expect(page.locator(".hovercard .hc-head .hc-sub"), "the header leaves the shortcut to its section").toHaveCount(0);
     await expect(section.locator(".hc-sub").first()).toHaveText("Held while the key is held, tapped when it is tapped");
@@ -447,14 +542,22 @@ test("the hover card draws a shortcut's keys and layers as the behaviour rows do
     expect(await section.locator(".hc-layers .kind-icon.layer").count(), "each layer by its mark").toBe(2);
     await page.locator(".hovercard").first().screenshot({path: test.info().outputPath("shortcut-hover.png")});
 
+    // Several keys: a chip per key, in the order they are pressed, a media key
+    // among them, beside its layers.
+    await place({mods: 0x02, keys: [0x04, 0x16, 0x07, 0xae], layers: 0b1000, layerKind: 1}, "Left Shift + A + S + D + Play/Pause + Lock Navigation", ["Left Shift", "A", "S", "D", "Play/Pause"]);
+    await hover();
+    await expect(section.locator(".hc-key")).toHaveText(["Left Shift", "A", "S", "D", "Play/Pause"]);
+    await expect(section.locator(".hc-layers .sends-tag")).toHaveText(["lock"]);
+    await page.locator(".hovercard").first().screenshot({path: test.info().outputPath("chord-hover.png")});
+
     // Layers alone: no Sends row.
-    await place({mods: 0, key: 0, layers: 0b1000, layerKind: 0}, "Navigation", []);
+    await place({mods: 0, keys: [], layers: 0b1000, layerKind: 0}, "Navigation", []);
     await hover();
     await expect(section.locator(".hc-key")).toHaveCount(0);
     await expect(section.locator(".hc-stage")).toHaveText(["Layers"]);
 
     // A lock tags its layers as locked, and says what that does.
-    await place({mods: 0, key: 0, layers: 0b101000, layerKind: 1}, "Lock Navigation + Extra 1", []);
+    await place({mods: 0, keys: [], layers: 0b101000, layerKind: 1}, "Lock Navigation + Extra 1", []);
     await hover();
     await expect(section.locator(".hc-sub").first()).toHaveText("When the key is pressed");
     await expect(section.locator(".hc-layers .sends-tag")).toHaveText(["lock", "lock"]);

@@ -22,11 +22,11 @@ Apply reaches both halves is the
 A half runs one active profile: its working copy when it has unsaved edits,
 otherwise its saved profile, otherwise its compiled defaults. A client writes
 the profile only through Profile Wire; VIA is not built (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0031-via-is-not-supported.md)).
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0031-via-is-not-supported.md)).
 
 At boot a half runs the saved profile [boot selection](#boot-selection)
 chooses; a working copy never survives a replug or a restart (D-F32,
-[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0032-live-edits-working-copy-and-save.md);
+[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0032-live-edits-working-copy-and-save.md);
 [live edits](profile-wire-v1/live-edits.md#the-working-copy)). The halves then
 compare their saved generations ([split protocol](profile-split-v1.md#authority)).
 
@@ -66,7 +66,7 @@ Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_test.c`, `test_
 A profile is up to seven domains, one per [domain registry](profile-wire-v1/blob-and-digests.md#domain-registry)
 row: lighting, key behaviours, combos, settings, pointing slots, the keymap
 and the macros (D-F30,
-[`0030`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). The
+[`0030`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0030-keymap-and-macros-belong-to-the-profile.md)). The
 keymap and macro domains are the only copy of the layout and the macros the
 firmware keeps.
 
@@ -94,9 +94,9 @@ Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_t
 ## Current-format admission
 
 The firmware accepts only the formats it writes (D-F10,
-[`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0010-firmware-accepts-only-current-formats.md)): Profile
+[`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0010-firmware-accepts-only-current-formats.md)): Profile
 Wire 2.0, profile schema 4.2, each domain at its registry version, and store
-format 6 (D-F28, [`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+format 6 (D-F28, [`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 Nothing in another format is translated:
 
 - a candidate or backup in another schema or domain version is refused
@@ -113,7 +113,7 @@ and the layer count ([action-ABI digest](profile-wire-v1/blob-and-digests.md#act
 and the compiled-default digest every byte of the compiled defaults, so after
 a reflash that changes either, the saved profile is not used and the half
 runs its compiled defaults until a client restores one (D-F12,
-[`0012`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0012-one-complete-compiled-profile.md)). The slots survive a
+[`0012`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0012-one-complete-compiled-profile.md)). The slots survive a
 UF2 update, which writes only the firmware image.
 
 Every candidate a client sends, and every live edit, is held to where its
@@ -131,7 +131,7 @@ order, behind an eight-byte blob header. A domain's length is exactly what
 its encoder emits; an encoder that emits nothing leaves its domain out of
 that build's compiled defaults. Each registry row names the module whose
 encoder writes it, so a row without one does not compile (D-F13,
-[`0013`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0013-registry-row-names-its-domain-module.md)). The authored
+[`0013`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0013-registry-row-names-its-domain-module.md)). The authored
 macros are already in the macro bank encoding (`authored_macro_bank.h`), so
 writing the compiled defaults compiles no macro.
 
@@ -167,7 +167,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 
 Each half keeps its saved profile in two profile slots, A and B, in a fixed
 256 KiB region of its own flash, outside QMK's emulated EEPROM (D-F29,
-[`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0029-profile-slots-in-their-own-flash-region.md)). A slot is
+[`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0029-profile-slots-in-their-own-flash-region.md)). A slot is
 read in place through XIP; no RAM copy of a slot exists. The build assumes
 2 MiB of flash.
 
@@ -418,7 +418,7 @@ Held by: `tests/host/run_qmk_durable_io_tests.sh` (`qmk_durable_io_test.c`, `tes
 
 ## Ceilings and the maximum profile
 
-Every ceiling holds at once (D-F14, [`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/197d670539f5a692fdaed209870220a927e4bdd4/docs/adr/0014-bigger-profiles.md)):
+Every ceiling holds at once (D-F14, [`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0014-bigger-profiles.md)):
 
 | Surface | Ceiling |
 | --- | ---: |
@@ -436,14 +436,14 @@ Every ceiling holds at once (D-F14, [`0014`](https://github.com/NoahCLR/charybdi
 
 `tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table
-at its ceiling and every name at 32 bytes, in 75,185 bytes:
+at its ceiling and every name at 32 bytes, in 75,825 bytes:
 
 | Domain | Bytes |
 | --- | ---: |
 | Lighting `0x10` | 591 |
 | Key behaviours `0x20` | 13,828 |
 | Combos `0x30` | 9,736 |
-| Settings `0x40` | 10,053 |
+| Settings `0x40` | 10,693 |
 | Pointing `0x50` | 4,104 |
 | Keymap `0x60` | 1,920 |
 | Macros `0x70` | 34,903 |

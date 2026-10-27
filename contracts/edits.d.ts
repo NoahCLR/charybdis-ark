@@ -104,8 +104,9 @@ export interface EditPayloads {
     validateMacro: {keycode: string; payload: string; requestId: number};
     updateCustomKey: {keycode: string; name: string; expectedFingerprint?: string};
     /**
-     * A custom key's shortcut (firmware D-F26): a HID report modifier mask, one key, its layers and the layer kind they act as
-     * (0 Hold, 1 Lock, 2 Move to, 3 Tap-toggle, 4 One-shot; 0 without layers), `{mods: 0, key: 0, layers: 0, layerKind: 0}` to clear it.
+     * A custom key's shortcut (firmware D-F26): a HID report modifier mask, up to six keys held together in the order they are pressed
+     * (each once, at most one media and one system key), its layers and the layer kind they act as
+     * (0 Hold, 1 Lock, 2 Move to, 3 Tap-toggle, 4 One-shot; 0 without layers), `{mods: 0, keys: [], layers: 0, layerKind: 0}` to clear it.
      * `name` names the key in the same step. `then` is a layout or profile edit staged on top in the same draft step
      * (a layout key, a behaviour cell, a combo kept with it as its output): what the keycode picker offers for
      * modifiers no keycode can hold (D-L63).

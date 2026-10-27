@@ -3,8 +3,8 @@
 const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 
 // The 128 custom keys. A key has an identity (CUSTOM_KEY_n, keycode
-// 0x7f00 + n), a name and a shortcut: modifiers from either side, one key and
-// any layers it holds on, the base and the default layers aside (firmware
+// 0x7f00 + n), a name and a shortcut: modifiers from either side, up to six
+// keys held together and any layers it holds on, the base and the default layers aside (firmware
 // D-F26; shortcut-layers.js). The shortcut is the key's own action, the way an ordinary
 // key's keycode is: held while the key is held, tapped when it is tapped, and
 // what its behaviour row falls back to. A behaviour row, edited like any other,
@@ -13,7 +13,7 @@ const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains")
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {SETTINGS, validName, validShortcut, validShortcutKey, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, SHORTCUT_KEY_LIMITS, validName, validShortcutKey, shortcutStoreRefusal, shortcutIdentity, encodeSettings} = require("../schema/settings-domain-v1");
 const {shortcutLayerTargets, shortcutRefusal} = require("./shortcut-layers");
 const keycodes = require("../data/keycode-catalog");
 const {knownActionAbi} = require("../schema/actions");
@@ -34,18 +34,18 @@ function customKeyEditorView(snapshot, capabilities) {
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     return {identity: snapshot.fingerprint,
         keys: names.map((name, slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: customKeyCode(slot), name, hasBehavior: behaved.has(slot),
-            shortcut: {...settings.customKeyShortcuts[slot]}})),
+            shortcut: {...settings.customKeyShortcuts[slot], keys: [...settings.customKeyShortcuts[slot].keys]}})),
         // Each name may be 32 bytes of text; the profile as a whole has a ceiling.
         names: {perName: SETTINGS.NAME_MAX_BYTES},
-        // The keys a shortcut may hold, by catalogue name, for the picker, and
-        // every layer with why a shortcut cannot turn it on.
-        shortcutKeys: SHORTCUT_KEY_NAMES, shortcutLayers: shortcutLayerTargets(settings)};
+        // The keys a shortcut may hold, by catalogue name, for the picker, the
+        // caps on them, and every layer with why a shortcut cannot turn it on.
+        shortcutKeys: SHORTCUT_KEY_NAMES, shortcutKeyLimits: SHORTCUT_KEY_LIMITS, shortcutLayers: shortcutLayerTargets(settings)};
 }
 
-// Every key a shortcut may hold, by its catalogue name: the basic keys and
-// mouse buttons 1-8 the firmware accepts (validShortcutKey), not none.
+// Every key a shortcut may hold, by its catalogue name: the keyboard, media,
+// system and mouse keys the firmware accepts (validShortcutKey).
 const SHORTCUT_KEY_NAMES = Object.freeze(keycodes.entries()
-    .filter(entry => entry.value !== 0 && validShortcutKey(entry.value))
+    .filter(entry => validShortcutKey(entry.value))
     .flatMap(entry => [entry.name, ...entry.aliases]));
 
 // A custom key's name, or its shortcut. Both live in the profile's settings
@@ -67,7 +67,11 @@ function editCustomKey(snapshot, message, capabilities) {
     const layers = /** @type {{layers?: unknown} | undefined} */ (shortcut)?.layers;
     const refusal = Number.isInteger(layers) ? shortcutRefusal(value.settings, {layers: /** @type {number} */ (layers)}) : "";
     if (refusal) throw fail(refusal, "CUSTOM_KEY_SHORTCUT_INVALID");
-    if ((!renaming || shortcut !== undefined) && !validShortcut(shortcut)) throw fail("A custom key shortcut holds modifiers, one plain key or mouse button, and layers other than the base, turned on as one layer key does.", "CUSTOM_KEY_SHORTCUT_INVALID");
+    // So is any other shortcut it cannot store: its keys' refusal (too many,
+    // twice, a second media or system key, a byte that is no such key), or
+    // the shape it has.
+    const storeRefusal = !renaming || shortcut !== undefined ? shortcutStoreRefusal(shortcut) : "";
+    if (storeRefusal) throw fail(storeRefusal, "CUSTOM_KEY_SHORTCUT_INVALID");
     const settings = structuredClone(value.settings);
     if (renaming) {
         const name = /** @type {string} */ (message.name).trim();
@@ -75,12 +79,11 @@ function editCustomKey(snapshot, message, capabilities) {
         settings.customKeyNames[slot] = name;
     }
     if (shortcut !== undefined) {
-        const {mods, key, layers, layerKind} = /** @type {import("../schema/types.js").CustomKeyShortcut} */ (shortcut);
-        settings.customKeyShortcuts[slot] = {mods, key, layers, layerKind};
+        const {mods, keys, layers, layerKind} = /** @type {import("../schema/types.js").CustomKeyShortcut} */ (shortcut);
+        settings.customKeyShortcuts[slot] = {mods, keys: [...keys], layers, layerKind};
     }
     const was = value.settings.customKeyShortcuts[slot], now = settings.customKeyShortcuts[slot];
-    if (settings.customKeyNames[slot] === value.settings.customKeyNames[slot]
-        && now.mods === was.mods && now.key === was.key && now.layers === was.layers && now.layerKind === was.layerKind) return value.document;
+    if (settings.customKeyNames[slot] === value.settings.customKeyNames[slot] && shortcutIdentity(now) === shortcutIdentity(was)) return value.document;
     /** @type {import("./types.js").PortableDocument} */
     const document = JSON.parse(JSON.stringify(value.document));
     document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
