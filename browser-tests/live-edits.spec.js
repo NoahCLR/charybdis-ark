@@ -87,7 +87,7 @@ test("review compares what is saved with what runs, and Save posts the keyboard'
         window.__posted.length = 0;
     });
     const save = sheet.locator('[data-act="apply"]');
-    await expect(save).toHaveText("Save on keyboard");
+    await expect(save).toHaveText("Save to keyboard");
     await save.click();
     const confirm = page.locator('[data-act="apply-anyway"]');
     if (await confirm.count()) {
@@ -388,4 +388,45 @@ test("an Apply draft's keyboard that stopped saving says so, for either half, an
     });
     await expect(page.locator(".commit.stopped")).toHaveCount(0);
     await expect(page.locator('.commit [data-act="review"]')).toHaveText("Review and save");
+});
+
+/** @param {import("@playwright/test").Page} page @param {boolean} restartNeeded */
+async function setRestartNeeded(page, restartNeeded) {
+    await page.evaluate(async restartNeeded => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.device.health.restartNeeded = restartNeeded;
+        store.setModel(model); store.render();
+        window.__posted.length = 0;
+    }, restartNeeded);
+}
+
+// A slave half that never confirmed a cancelled save leaves the keyboard
+// refusing saves until it restarts: the bar says so with Restart, in every
+// edit mode, where only the keyboard dot's hover words used to.
+for (const [mode, shell] of [["Review and save", ""], ["Live edit", "live-auto"], ["Live preview + save", "live"]]) {
+    test(`a keyboard that needs a restart says so in the bar in ${mode}, and Restart posts`, async ({page}) => {
+        await page.goto(`/preview/index.html${shell ? `?shell=${shell}` : ""}`);
+        await expect(page.locator(".commit.restart-needed")).toHaveCount(0);
+        await setRestartNeeded(page, true);
+        const bar = page.locator(".commit.restart-needed");
+        await expect(bar).toContainText("Restart the keyboard");
+        await expect(bar).toContainText("The slave half did not confirm a cancelled save");
+        await expect(bar.locator('[data-act="review"], [data-act="save-again"], [data-act="revert"]')).toHaveCount(0);
+        await bar.locator('[data-act="restart"]').click();
+        await expectPost(page, {type: "restartKeyboard"});
+        // The dot keeps its words.
+        await expect(page.locator(".rail-keyboard .dot.err")).toHaveCount(1);
+        await setRestartNeeded(page, false);
+        await expect(page.locator(".commit.restart-needed")).toHaveCount(0);
+    });
+}
+
+test("a keyboard that stopped saving and needs a restart shows one bar, the stopped one", async ({page}) => {
+    await page.goto("/preview/index.html?shell=apply-stopped");
+    await setRestartNeeded(page, true);
+    await expect(page.locator(".commit")).toHaveCount(1);
+    await expect(page.locator(".commit.stopped")).toContainText("The keyboard stopped saving");
+    await expect(page.locator(".commit.stopped")).toContainText("1 change in your draft");
+    await expect(page.locator(".commit.restart-needed")).toHaveCount(0);
 });

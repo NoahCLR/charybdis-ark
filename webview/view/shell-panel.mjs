@@ -50,9 +50,11 @@ export function savedWhen(savedAt) {
     return Number.isNaN(date.getTime()) ? String(savedAt ?? "") : date.toLocaleString("en-GB", {day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"});
 }
 
-// What made a recovery copy, as its title says it.
+// What made a recovery copy, as its title says it. Both keyboard saves read
+// as Save (D-L72), so the title tells them apart by what was saved: a whole
+// draft (the keyboard's Apply) or the live modes' unsaved edits.
 /** @type {Readonly<Record<import("../../contracts/model.js").RecoveryCause, string>>} */
-const MADE_BY = Object.freeze({apply: "Before Save", restore: "Before restoring a backup", save: "Before Save", restart: "Before Restart", "leave-live": "Before leaving Live edit"});
+const MADE_BY = Object.freeze({apply: "Before saving a draft", restore: "Before restoring a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"});
 
 // A recovery copy named by what made it, the keyboard it came from and when.
 // A copy stored before those were recorded is named only by when, rather

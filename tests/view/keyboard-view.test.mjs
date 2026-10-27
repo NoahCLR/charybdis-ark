@@ -42,7 +42,7 @@ test("a slave half that missed a cancelled save reads the same on the rail and t
     assert.ok(tip.includes([RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" ")), "the rail says what the Keyboard screen's callout says");
     assert.match(RESTART_NEEDED.detail, /^The slave half did not confirm a cancelled save/);
     assert.match(RESTART_NEEDED.steps[0], /^Unplug the USB cable from the master half \(not the cable between the halves\)/,
-        "Ark's Restart is only for a stopped keyboard (D-L67): the unplug steps stay");
+        "the unplug steps stay, for where the bar's Restart is not offered");
     assert.doesNotMatch([RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" "), /\b(left|right|other) half\b/i, "the halves are named by role");
 });
 

@@ -48,7 +48,7 @@ Every edit takes effect on both halves as you make it, so you can try it as
 you type. The bar counts the **unsaved changes** the keyboard runs. The bar has two buttons:
 
 - **Review and save** opens Review, which compares what the keyboard has
-  **Saved** with what is **Running now**. **Save on keyboard** keeps a
+  **Saved** with what is **Running now**. **Save to keyboard** keeps a
   recovery copy of what was saved, then writes the running profile as the
   saved one on both halves.
 - **Revert** puts back the saved profile without writing anything. Undo sends
@@ -254,3 +254,12 @@ says the keyboard stopped saving.
 Unplugging the keyboard works too, but loses the unsaved edits. Ark never
 restarts the keyboard on its own. If the keyboard stops saving again straight
 away, the fault is in its flash or firmware and another restart won't help.
+
+### When the keyboard needs a restart
+
+If a save was cancelled and the slave half never confirmed it, the keyboard
+refuses new saves until it restarts. Nothing was lost. The bar says **Restart
+the keyboard**, in every edit mode, with the same **Restart** as above; the
+keyboard's dot in the rail turns red and says it on hover too. If the keyboard
+has also stopped saving, the bar says only that. Unplugging the master half's
+USB cable works too, but loses unsaved edits.

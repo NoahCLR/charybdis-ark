@@ -372,7 +372,9 @@ keyboard. `putBackAfterRestart` then looks at the edit status at once, since
 the read says nothing of it, so a keyboard that stopped again is told apart.
 Apply of a draft whose keyboard said it stopped is refused as stopped before
 any recovery copy or write. Ark offers
-Restart only when the keyboard says it stopped, in any edit mode.
+Restart only when the keyboard says it stopped, or that its slave half never
+confirmed a cancelled save (`health.restartNeeded`), in any edit mode, as one
+bar (`restartOffer`).
 
 ## Backups
 

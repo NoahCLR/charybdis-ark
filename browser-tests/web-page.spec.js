@@ -181,7 +181,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     await page.locator('[data-screen="profile"]').click();
     const copies = page.locator(".card.recoveries .recovery-row");
     await expect(copies).toHaveCount(1);
-    await expect(copies.first().locator(".recovery-name")).toHaveText(/^Before Save · .+ · \d{1,2} \w{3} \d{4}, \d\d:\d\d$/);
+    await expect(copies.first().locator(".recovery-name")).toHaveText(/^Before saving a draft · .+ · \d{1,2} \w{3} \d{4}, \d\d:\d\d$/);
     await expect(copies.first().locator(".recovery-name")).toHaveAttribute("title", /^recovery-.+\.charybdis\.json$/);
     const [recovery] = await Promise.all([page.waitForEvent("download"), copies.first().locator("[data-recovery]").click()]);
     expect(recovery.suggestedFilename()).toMatch(/^recovery-.+\.charybdis\.json$/);
@@ -588,7 +588,7 @@ test("in Live + review an edit reaches the keyboard at once, and review and Save
     await page.locator('.commit.live [data-act="review"]').click();
     await expect(page.locator(".sheet")).toContainText("Running now");
     const save = page.locator('.sheet [data-act="apply"]');
-    await expect(save).toHaveText("Save on keyboard");
+    await expect(save).toHaveText("Save to keyboard");
     await expect(save).toBeEnabled();
     await save.click();
     const anyway = page.locator('[data-act="apply-anyway"]');

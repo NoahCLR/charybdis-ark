@@ -52,7 +52,8 @@ write anything if it can't save one. A restart with unsaved edits keeps a
 copy of those edits the same way.
 
 Each copy is named by what made it, the keyboard it came from and when, for
-example "Before Save · Noah's Charybdis · 23 Oct 2026, 14:02". Copies kept by
+example "Before saving live edits · Noah's Charybdis · 23 Oct 2026, 14:02". A
+copy from before a save in Review and save is "Before saving a draft". Copies kept by
 an older Ark don't record those, and are named "Recovery copy" and when.
 
 The copies are kept in the browser and listed under **Recovery copies**,
