@@ -9,7 +9,7 @@ test("every registered screen opens from the rail with its own title and keeps t
         const {SCREENS} = await import("/webview/view/screens.mjs");
         return Object.entries(SCREENS).map(([id, definition]) => ({id, label: definition.label}));
     });
-    await expect(page.locator(".rail-group")).toHaveText(["Configure", "Keyboard"]);
+    await expect(page.locator(".rail-group")).toHaveText(["Configure", "Settings", "Keyboard"]);
     await expect(page.locator(".rail [data-screen]")).toHaveCount(screens.length);
     for (const {id, label} of screens) {
         const button = page.locator(`.rail [data-screen="${id}"]`);

@@ -236,7 +236,7 @@ const THEN = '<span class="step-chip-then" aria-hidden="true">→</span>';
 
 // A macro's steps as chips, each a small editor tile: its mark, then the
 // short name the tile shows (typed text in quotes), joined by the editor's
-// arrows. The full name is the chip's tip in Keys → Macros; the hover card
+// arrows. The full name is the chip's tip in Keymap → Macros; the hover card
 // cannot be hovered, so it reads the short names alone.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} payload */
 export function macroSteps(model, payload) {

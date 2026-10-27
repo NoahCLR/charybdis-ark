@@ -5,7 +5,7 @@ keyboard holds up to 128 combos, each with up to 16 keys.
 
 ## The combos on a layer
 
-**Keys → Combos** lists the combos for the layer you picked, grouped by how
+**Keymap → Combos** lists the combos for the layer you picked, grouped by how
 they are reached: on the selected key, on this layer, through a transparent
 key, and the ones this layer can't reach. Each row shows its badge (C0, C1…),
 its keys, what it sends, its **Window**, any conditions, and **Reached by**:
@@ -52,6 +52,8 @@ builder says which.
 
 ## Settings → Combos
 
+**Settings → Combos** in the rail shows two cards, both open. **Combos**:
+
 - **Enabled**: every combo on or off. A key on the keyboard can change it
   too.
 - **Default combo window**: for every combo without its own. New combos start
@@ -62,18 +64,19 @@ builder says which.
   plain output.
 - **On these layers**: a key joins combos only when the layer it comes from is
   on here.
-- **Layer matching**: which layer's keys each layer's combos are matched
-  against. Pick the layer itself to keep its combos independent.
+
+**Combo layer matching**: which layer's keys each layer's combos are matched
+against. Pick the layer itself to keep its combos independent.
 
 ## Where combos run
 
 Like behaviours, a combo fires only where every switch allows it: **Enabled**
-and **On these layers** in Settings, the combo's own **Use this combo** and
+and **On these layers** on the Combos settings screen, the combo's own **Use this combo** and
 **Layers it runs on**, and **Join combos** on each of its keys in the Key tab.
 Every key in the combo must be allowed to take part.
 
-Whether the output's behaviour runs depends on the behaviours switch in
-Settings, **Combo outputs use behaviours**, the combo's **Use output
+Whether the output's behaviour runs depends on the behaviours switch on the
+Behaviours settings screen, **Combo outputs use behaviours**, the combo's **Use output
 behaviour**, and the behaviour's own switches. The output takes the layer of
 the combo's last listed key.
 

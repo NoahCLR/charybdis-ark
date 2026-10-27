@@ -28,7 +28,7 @@ test("Host changes review affected text macros while leaving key steps and ident
     assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
     for (const row of effects) {
         assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
-        assert.match(row.note, /because of Settings → Your computer\. Discard it together with that change\./);
+        assert.match(row.note, /because of Host → Your computer\. Discard it together with that change\./);
         const typing = row.fields.find(field => field.label === "Text entry");
         assert.match(typing.before, /layout keys: "é"/);
         assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
@@ -265,7 +265,7 @@ test("a settings section is listed under the screen it is edited on", () => {
     const timing=items.find(entry=>entry.unit==="settings:keyTiming"), mouse=items.find(entry=>entry.unit==="settings:autoMouse");
     assert.equal(timing.area,"Settings");
     assert.deepEqual(timing.place,{kind:"settings",section:"keyTiming",area:"Settings"});
-    assert.equal(mouse.area,"Mouse","auto-mouse is edited on the Mouse screen");
+    assert.equal(mouse.area,"Mouse","auto-mouse is listed under Mouse");
     assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Mouse"});
 });
 test("clearing a pointing mode is a change to the slot, not to every behaviour that reaches it", () => {

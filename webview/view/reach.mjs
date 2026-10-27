@@ -228,7 +228,7 @@ export const macroKeycodes = (keycode) =>
  * The layers a macro is set off from, in stack order: every layer that holds a
  * way to it itself — a key naming it, a behaviour mapped there whose branch
  * sends it, or a combo firing from its keys that sends it, directly or through
- * a behaviour. Each route carries the group the Keys tab lists it under, so a
+ * a behaviour. Each route carries the group the Keymap tab lists it under, so a
  * screen can open that layer on the same row, and the keys the board rings.
  * What a layer only reaches under a transparent key is the lower layer's route,
  * listed for that layer, not repeated for every layer above it. `at` is the

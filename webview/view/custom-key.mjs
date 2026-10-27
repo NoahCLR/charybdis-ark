@@ -219,7 +219,7 @@ export function shortcutKeyCode(model, expression) {
 // the mask (Left Shift is Left Shift, with no key), and a key with its own
 // modifiers, as QMK's shifted symbols are (KC_EXLM is S(KC_1)), is those
 // modifiers and its key, when the shortcut may hold that key. So the shortcut
-// picker offers every modifier and symbol the Keys screen's picker does, and
+// picker offers every modifier and symbol the Keymap screen's picker does, and
 // `!` is Left Shift + 1. Null for any other key.
 /** @param {Model} model @param {string} name @returns {{key: string, mods: number} | null} */
 export function shortcutModifiers(model, name) {

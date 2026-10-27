@@ -7,7 +7,7 @@
 // shortcut, which is the key's own action (firmware D-F26), and its behaviour,
 // which works on top. The selected key shows two cards: the key itself (its
 // name as the card's title, as a macro's is, then its shortcut and where it is
-// placed; each field is one entry in `keyFields`) and what it does, which is the Keys screen's behaviour editor for
+// placed; each field is one entry in `keyFields`) and what it does, which is the Keymap screen's behaviour editor for
 // that key, placed or not. A key with no stored behaviour shows the unstored
 // grid with its built-in defaults; the first edit adds the row. This is the
 // only behaviour editor on screen, so the open cell and the timing fields it
@@ -74,8 +74,8 @@ export function screenCustomKeys() {
             <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : "—"}</span></button>`);
         cell.addEventListener("click", () => {
             // Another key's behaviour opens with no cell open, as picking
-            // another row does on the Keys screen. Only this key's own cell
-            // closes: one open in the Keys screen's row stays open there.
+            // another row does on the Keymap screen. Only this key's own cell
+            // closes: one open in the Keymap screen's row stays open there.
             if (row.keycode !== key?.keycode && state.cellRow === key?.keycode) Object.assign(state, {cell: null, cellRow: null, cellHow: null});
             state.customKey = row.keycode;
             render();
@@ -120,7 +120,7 @@ function editor(model, key, canEdit) {
 const keyFields = (model, key) => [`<div data-shortcut></div>`, placedOn(model, key)];
 
 // What the key does: in words (its shortcut, its behaviour on top, both, or
-// nothing yet), then its behaviour editor, the same one the Keys screen's
+// nothing yet), then its behaviour editor, the same one the Keymap screen's
 // Behaviours tab shows. A placed key links there too, where the board shows
 // the keys that reach it: on the layer shown if it reaches the key there,
 // otherwise on the first layer that does.
@@ -133,7 +133,7 @@ function behaviourCard(model, key) {
         <div class="card-h"><h3>What it does</h3>
             <span class="tag">${key.hasBehavior ? "Behaviour" : "No behaviour yet"}</span>
             ${placed ? `<span class="right row actions"><button class="btn tiny ghost" data-act="show-behaviour"
-                data-tip="Open this behaviour in Keys · Behaviours, with the board showing the keys that reach it.">Show on the Keys screen</button></span>` : ""}</div>
+                data-tip="Open this behaviour in Keymap · Behaviours, with the board showing the keys that reach it.">Show on the Keymap screen</button></span>` : ""}</div>
         <div class="card-b stack"><p class="note" data-does>${esc(customKeyDoes(key))}</p></div></div>`);
     const body = /** @type {HTMLElement} */ (card.querySelector(".card-b"));
     if (behaviour) body.appendChild(behaviourEditor(behaviour));

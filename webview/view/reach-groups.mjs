@@ -1,5 +1,5 @@
 // @ts-check
-// How the Keys tabs group what a layer reaches.
+// How the Keymap tabs group what a layer reaches.
 //
 // Every tab that answers "what does this layer reach" groups its rows the
 // same way and in the same order: what the layer holds itself, then what it
@@ -30,7 +30,7 @@ export const GROUP_ORDER = ["key", "view", "here", "branches", "combos", "throug
 /** @template {{id: string}} T @param {T[]} groups @returns {T[]} */
 export const inGroupOrder = (groups) => GROUP_ORDER.map((id) => groups.find((group) => group.id === id)).filter((group) => group !== undefined);
 
-// The same section means the same thing in each Keys tab. Keep one open state
+// The same section means the same thing in each Keymap tab. Keep one open state
 // by section id, including ids that only some tabs show. No section closes
 // another when it opens.
 export const initialReachGroups = () => Object.fromEntries(

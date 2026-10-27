@@ -1,12 +1,34 @@
 // @ts-check
 "use strict";
-// Settings, Backups, Keyboard and the Apply moment: the controls this
-// package draws are wired and say what the keyboard does.
+// The Settings screens, Backups, Keyboard and the Apply moment: the controls
+// this package draws are wired and say what the keyboard does.
 const {test, expect} = require("@playwright/test");
 const {openControls, change, expectPost, clearPosts} = require("./control-preview");
+const {openPreview} = require("./shell-page");
+const {hostMacros} = require("../tests/fixtures/host-macros");
+const {ProfileDraftSession} = require("../core/session/profile-draft-session");
+const {buildSnapshotModel} = require("../core/session/device-model");
+const {draftBinding} = require("../core/session/panel-session-state");
+
+test("each Settings screen draws its own sections open, with nothing to fold and no search", async ({page}) => {
+    await openControls(page, "keys");
+    for (const [screen, title, sections] of [
+        ["behaviours", "Behaviours", ["keyTiming", "behaviorSettings"]],
+        ["combos", "Combos", ["comboSettings", "comboReferences"]],
+        ["pointer", "Pointer settings", ["normalPointerSpeed", "sniping", "autoMouse"]],
+        ["host", "Host", ["host", "keyboardOptions"]],
+    ]) {
+        await page.locator(`[data-screen="${screen}"]`).click();
+        await expect(page.locator(".main > .topbar h1")).toHaveText(title);
+        await expect(page.locator(".settings-pad > [data-section]")).toHaveCount(sections.length);
+        expect(await page.locator(".settings-pad > [data-section]").evaluateAll((cards) => cards.map((card) => card.getAttribute("data-section")))).toEqual(sections);
+        await expect(page.locator(".settings-pad details, .settings-pad summary, .settings-pad input[type=search]")).toHaveCount(0);
+    }
+    await expect(page.locator('[data-section="startupLayers"], [data-f^="setting:startupLayer"]')).toHaveCount(0);
+});
 
 test("the default combo window and the combo hold threshold are editable on current firmware, even without combos", async ({page}) => {
-    await openControls(page, "settings");
+    await openControls(page, "combos");
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
@@ -23,19 +45,60 @@ test("the default combo window and the combo hold threshold are editable on curr
     await expectPost(page, {type: "updateComboHoldTerm", holdTermMs: "233"});
 });
 
-test("Settings: the combo layer matching grid posts its section whole; search says when nothing matches and where else to look", async ({page}) => {
-    await openControls(page, "settings");
-    await page.locator('[data-section="comboReferences"] > summary').click();
-    const select = page.locator('[data-f="setting:comboReference1"]');
+test("Combos: the combo layer matching grid posts its section whole", async ({page}) => {
+    await openControls(page, "combos");
+    const select = page.locator('[data-section="comboReferences"] [data-f="setting:comboReference1"]');
     await expect(select).toBeVisible();
     await select.selectOption("Layer 0");
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "updateConfigDefaults", sectionId: "comboReferences",
         fields: expect.arrayContaining([expect.objectContaining({macro: "comboReference1", value: "Layer 0"})])})]);
-    await page.locator("#settingsSearch").fill("qwerty");
-    await expect(page.locator(".settings-empty")).toHaveText("No setting matches “qwerty”.");
-    await page.locator("#settingsSearch").fill("dpi");
-    await page.getByRole("button", {name: /matches? on Mouse →/}).click();
-    await expect(page.locator('[data-screen="mouse"]')).toHaveAttribute("aria-current", "true");
+});
+
+test("Lighting's Auto-mouse link opens Pointer settings at Auto-mouse", async ({page}) => {
+    await openControls(page, "lighting", {stage: "auto"});
+    await page.getByRole("button", {name: "Open Pointer settings → Auto-mouse"}).first().click();
+    await expect(page.locator('[data-screen="pointer"]')).toHaveAttribute("aria-current", "true");
+    await expect(page.locator('[data-section="autoMouse"]')).toBeInViewport();
+});
+
+test("a review row for a setting shows it on the screen that holds it", async ({page}) => {
+    const {snapshot, capabilities} = hostMacros(1 | (2 << 16), []);
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    const connection = {connected: true, selectedDeviceId: "board", capabilities};
+    const publish = async () => {
+        const patch = {...buildSnapshotModel(draft.current, draft.capabilities, draftBinding({draft}, connection), connection), draft: {...draft.view(connection), ...draftBinding({draft}, connection)}};
+        await page.evaluate(async (patch) => {
+            const store = await import("/webview/store.mjs");
+            store.setModel({...store.getModel(), ...patch}); store.render();
+            window.__posted.length = 0;
+        }, patch);
+    };
+    await openPreview(page);
+    await publish();
+    // One change on each Settings screen, staged as the screen posts it,
+    // then each review row's Show goes back to it.
+    const edits = [["behaviours", "setting:tappingTerm", "211", "keyTiming", "Tap & hold timing"],
+        ["combos", "setting:comboReference1", "Layer 0", "comboReferences", "Combo layer matching"],
+        ["pointer", "setting:mouseTimeout", "900", "autoMouse", "Auto-mouse"], ["host", "setting:hostLayout", "3", "host", "Your computer"]];
+    for (const [screen, field, value] of edits) {
+        await page.locator(`[data-screen="${screen}"]`).click();
+        const control = page.locator(`[data-f="${field}"]`);
+        if (await control.evaluate((node) => node.tagName === "SELECT")) await control.selectOption(value);
+        else await change(control, value);
+        const message = await page.evaluate(() => window.__posted.at(-1));
+        expect(message).toMatchObject({type: "updateConfigDefaults"});
+        draft.stage({...message, draftRevision: draft.revision});
+        await publish();
+    }
+    for (const [screen, , , section, title] of edits) {
+        await page.locator('[data-screen="keys"]').click();
+        await page.locator('.commit [data-act="review"]').click();
+        const row = page.locator(".sheet .rv-item").filter({has: page.locator(".rv-title .t", {hasText: new RegExp(`^${title}$`)})});
+        await row.locator("[data-show]").click();
+        await expect(page.locator(".sheet")).toHaveCount(0);
+        await expect(page.locator(`[data-screen="${screen}"]`)).toHaveAttribute("aria-current", "true");
+        await expect(page.locator(`[data-section="${section}"]`)).toBeInViewport();
+    }
 });
 
 test("Keyboard: the title renames the keyboard, and memory and diagnostics live here", async ({page}) => {
@@ -54,7 +117,7 @@ test("Keyboard: the title renames the keyboard, and memory and diagnostics live 
     await page.locator('[data-section="diagnostics"] [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh"})]);
     await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
-    await page.locator('[data-screen="settings"]').click();
+    await page.locator('[data-screen="host"]').click();
     await expect(page.locator('[data-f="settings:keyboard-name"]')).toHaveCount(0);
 });
 

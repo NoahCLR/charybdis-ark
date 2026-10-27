@@ -1,5 +1,5 @@
 // @ts-check
-// The Configure screens show a board only after a complete editable read.
+// The Configure and Settings screens show only after a complete editable read.
 // The core keeps the gate closed across the small gaps between HID requests.
 
 import {configureReady, screenAvailable, screenDefinition} from "./screens.mjs";

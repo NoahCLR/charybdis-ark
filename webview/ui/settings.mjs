@@ -1,24 +1,27 @@
 // @ts-check
-// Settings: the keyboard's global policy, exactly as it reports it.
+// The Settings screens: the keyboard's global policy, exactly as it reports
+// it, a screen per subject (Behaviours, Combos, Pointer settings, Host).
 //
 // The sections, fields, hints and limits all come from the device snapshot, so
-// this screen renders what the firmware says it has rather than a list this
+// these screens render what the firmware says it has rather than a list this
 // app decided on. A field the firmware cannot report stays visible and
-// read-only with its reason. Each section names the screen it is edited on:
-// this one draws the Settings sections, and Mouse and Lighting draw their own
-// with the same rows.
+// read-only with its reason. Which sections each screen draws is
+// view/settings-layout.mjs's; every one is drawn open. Lighting draws its own
+// sections with the same rows.
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
-import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
+import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 import {topbar, unavailable} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 import {githubMark} from "../view/shell-panel.mjs";
+import {actionLabel} from "../view/keyface.mjs";
+import {keycodePlacements, reachLine} from "../view/placements.mjs";
 import {durationControl} from "./duration.mjs";
 import {layerSwitchGrid} from "./layer-switches.mjs";
-import {elsewhereWords, fieldParts, foldedSummary, isLayerSwitch, layerSwitchSummary, matchesElsewhere, matchesQuery, noMatchWords, settingsCards, startsFolded} from "../view/settings-layout.mjs";
+import {fieldParts, isLayerSwitch, sectionsOn} from "../view/settings-layout.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {import("../../contracts/panel.js").PresentedSection} Section */
@@ -28,129 +31,66 @@ import {elsewhereWords, fieldParts, foldedSummary, isLayerSwitch, layerSwitchSum
 /** @param {Model | null} model @param {string} area */
 export const sectionsIn = (model, area) => (model?.configDefaults || []).filter((section) => section.area === area);
 
-// A layer's name by its index, as the layer tabs call it.
-/** @param {number} index */
-const nameOf = (index) => {
-    const layer = layers().find((entry) => entry.index === index);
-    return layer ? layerName(layer) : `Layer ${index}`;
-};
+export const screenBehaviours = () => settingsScreen("behaviours", "Behaviours",
+    "How long a key waits to tell a tap from a hold, and the layers on which keys use their behaviours.");
+export const screenCombos = () => settingsScreen("combos", "Combos",
+    "Whether combos run and on which layers, the timing every combo shares, and the layer each layer matches its combos on.");
+export const screenPointer = () => settingsScreen("pointer", "Pointer settings",
+    "How the trackball moves the pointer: its speed, sniping (a slower speed for precise work), and the layer moving the ball turns on.");
+export const screenHost = () => settingsScreen("host", "Host",
+    "The computer the keyboard is plugged into, which macros type for, and the key swaps and typing options for every layer.");
 
-// A fold opened by hand or by the review's Show stays open on the next
-// render, and one closed by hand stays closed.
-/** @param {string} id */
-const isOpened = (id) => (state.settingsOpen || []).includes(id);
-/** @param {HTMLDetailsElement} node @param {string} id */
-function remember(node, id) {
-    node.addEventListener("toggle", () => {
-        const others = (state.settingsOpen || []).filter((entry) => entry !== id);
-        state.settingsOpen = node.open ? [...others, id] : others;
-    });
-}
-
-export function screenSettings() {
+// One Settings screen: its sections as cards, all open, each saved whole.
+/** @param {string} screen @param {string} title @param {string} subtitle */
+function settingsScreen(screen, title, subtitle) {
     const model = getModel();
-    const sections = sectionsIn(model, "Settings");
+    const sections = sectionsOn(model?.configDefaults || [], screen);
     const canEdit = canEditArea("settings");
-    const main = el(`<div class="main">${topbar(
-        "Settings",
-        "Tap and hold timing, key swaps, where behaviours and combos run, and your computer: what applies to the whole keyboard."
-    )}</div>`);
+    const main = el(`<div class="main">${topbar(title, subtitle)}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!sections.length) {
         pad.appendChild(el(`<div class="screen-stub"><h3>No settings read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's policy.")}</p></div>`));
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's settings.")}</p></div>`));
     }
     // Why nothing here can be edited, said once; while the keyboard is busy
     // the draft bar already says what it is doing.
-    const reason = canEdit || !sections.length || model?.draft?.busy ? "" : unavailable(model);
-    if (reason) pad.appendChild(el(`<div class="unavailable">${esc(reason)}</div>`));
-
-    if (sections.length) {
-        const search = el(`<input class="input search settings-search" id="settingsSearch" data-f="settings:search" type="search" placeholder="Search settings" aria-label="Search settings" value="${esc(state.settingsSearch || "")}">`);
-        search.addEventListener("input", () => {
-            state.settingsSearch = /** @type {HTMLInputElement} */ (search).value;
-            render();
-        });
-        pad.appendChild(search);
+    else if (!canEdit && !model?.draft?.busy) {
+        pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model) || "These settings cannot be edited right now.")}</div>`));
     }
-    const query = (state.settingsSearch || "").trim().toLowerCase();
-    // A section found by one of its other names (section.search: QMK's,
-    // or the one Ark used before) shows whole.
-    /** @param {Section} section */
-    const matching = (section) => !query || matchesQuery({label: section.label, hint: section.search}, query) ? section.fields : section.fields.filter((field) => matchesQuery(field, query));
-    let shown = 0;
-    for (const card of settingsCards(sections)) {
-        if (card.id === "comboSettings") {
-            const node = combosCard(model, card.sections, matching, query, canEdit);
-            if (node) { pad.appendChild(node); shown++; }
-            continue;
+    // A section the keyboard has not filled in yet (Key swaps before its
+    // options are read) still shows, to say why it is empty.
+    for (const section of sections) {
+        if (section.id === "comboSettings") pad.appendChild(combosCard(model, section, canEdit));
+        else if (section.id === "comboReferences") pad.appendChild(referenceCard(model, section, canEdit));
+        else {
+            const card = sectionCard(model, section, canEdit);
+            if (section.id === "sniping") card.appendChild(snipingKeys(model, canEdit));
+            pad.appendChild(card);
         }
-        // A section the keyboard has not filled in yet (Key swaps before its
-        // options are read) still shows, to say why it is empty.
-        const parts = card.sections.map((section) => ({section, fields: matching(section)}))
-            .filter((part) => part.fields.length || (!query && !part.section.fields.length));
-        if (!parts.length) continue;
-        shown++;
-        for (const {section, fields} of parts) pad.appendChild(sectionCard(model, section, fields, canEdit,
-            {searching: Boolean(query), folded: startsFolded(card, section), summary: foldedSummary(section, nameOf)}));
     }
-    if (query && sections.length && !shown) pad.appendChild(el(`<p class="note settings-empty" role="status">${esc(noMatchWords(state.settingsSearch || ""))}</p>`));
-    // A search for something edited on another screen says where it is.
-    const elsewhere = matchesElsewhere(model, query);
-    if (elsewhere.length) {
-        const note = el(`<div class="settings-elsewhere row gap-8">${elsewhere.map((entry) =>
-            `<button class="btn text compact" data-go="${esc(entry.screen)}">${esc(elsewhereWords(entry))}</button>`).join("")}</div>`);
-        /** @type {NodeListOf<HTMLButtonElement>} */ (note.querySelectorAll("[data-go]")).forEach((button) => button.addEventListener("click", () => {
-            const screen = button.dataset.go;
-            if (screen === "mouse" || screen === "lighting" || screen === "device") state.screen = screen;
-            // A search on Keyboard is for what this firmware was built with.
-            if (screen === "device") state.settingsOpen = [...(state.settingsOpen || []).filter((id) => id !== "builtIn"), "builtIn"];
-            render();
-        }));
-        pad.appendChild(note);
-    }
-
     main.appendChild(content);
     return main;
 }
 
 // Combos: the master switch, the default window and hold threshold every
-// combo shares, whether outputs use behaviours, then folded, the layers
-// combos run on and Combo layer matching. The timing is stored with the
-// combos and Combo layer matching in the layer records, so each still saves
-// on its own.
-/** @param {Model | null} model @param {Section[]} sections @param {(section: Section) => Field[]} matching @param {string} query @param {boolean} canEdit */
-function combosCard(model, sections, matching, query, canEdit) {
-    const combos = sections.find((section) => section.id === "comboSettings");
-    if (!combos) return null;
-    const references = sections.find((section) => section.id === "comboReferences");
-    const fields = matching(combos);
-    const timing = (combos.comboTiming || []).filter((entry) => matchesQuery(entry, query));
-    const referenceFields = references ? matching(references) : [];
-    if (!fields.length && !timing.length && !referenceFields.length) return null;
-    const node = sectionCard(model, combos, fields, canEdit, {searching: Boolean(query), extra: {after: "combosEnabled", nodes: timing.map((entry) => comboTimingRow(model, entry))}});
-    if (references && referenceFields.length) {
-        /** @type {HTMLElement} */ (node.querySelector(":scope > .rows")).appendChild(comboReferenceFold(model, references, referenceFields, canEdit, Boolean(query)));
-        if (draftMarks(model?.draft?.changes).settings.has(references.id) && !node.querySelector(":scope > summary .draft-dot"))
-            node.querySelector(":scope > summary h3")?.insertAdjacentHTML("beforeend", draftDot());
-    }
-    return node;
-}
+// combo shares, whether outputs use behaviours, then the layers combos run
+// on. The timing is stored with the combos rather than in the settings
+// domain, so it saves on its own.
+/** @param {Model | null} model @param {Section} section @param {boolean} canEdit */
+const combosCard = (model, section, canEdit) => sectionCard(model, section, canEdit,
+    {extra: {after: "combosEnabled", nodes: (section.comboTiming || []).map((entry) => comboTimingRow(model, entry))}});
 
 // Combo layer matching: one select per layer, four across, the sentence
-// said once, folded inside Combos. Saved whole, as every section is.
-/** @param {Model | null} model @param {Section} section @param {Field[]} shown @param {boolean} canEdit @param {boolean} searching */
-function comboReferenceFold(model, section, shown, canEdit, searching) {
-    const open = searching || isOpened(section.id);
-    const node = /** @type {HTMLDetailsElement} */ (el(`<details class="setrow subfold settings-group" data-section="${esc(section.id)}" data-tip="${esc(section.description || "")}" ${open ? "open" : ""}>
-        <summary>${DISCLOSURE}<span class="nm">Layer matching${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</span>
-            <span class="fold-summary">${esc(foldedSummary(section, nameOf))}</span></summary>
-        ${section.description ? `<div class="hint">${esc(section.description)}</div>` : ""}
-        <div class="layer-grid reference-grid" role="group" aria-label="${esc(section.label)}"></div>
-    </details>`));
-    remember(node, section.id);
+// said once. Saved whole, as every section is.
+/** @param {Model | null} model @param {Section} section @param {boolean} canEdit */
+function referenceCard(model, section, canEdit) {
+    const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
+        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3></div>
+        ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
+        <div class="rows"><div class="setrow layer-switches" data-tip="${esc(section.description || "")}"><div class="layer-grid reference-grid" role="group" aria-label="${esc(section.label)}"></div></div></div>
+    </section>`);
     const grid = /** @type {HTMLElement} */ (node.querySelector(".reference-grid"));
     const submit = () => post(edits.settingsSection(section, (field) => {
         const input = /** @type {HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
@@ -160,7 +100,7 @@ function comboReferenceFold(model, section, shown, canEdit, searching) {
         const at = field.governs?.kind === "layer" ? field.governs.layer : -1;
         const layer = layers().find((entry) => entry.index === at);
         const editable = canEdit && !field.readOnly;
-        const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${shown.includes(field) ? "" : "hidden"}>
+        const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}">
             <span class="txt">${layerCell(model, field, layer)}</span>
             <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
             ${layers().map((entry) => `<option value="Layer ${esc(entry.index)}" ${field.value === `Layer ${entry.index}` ? "selected" : ""}>${esc(entry.displayName || entry.name)}</option>`).join("")}</select></label>`);
@@ -204,24 +144,20 @@ function comboTimingRow(model, entry) {
 }
 
 /**
- * One section as a card, saved whole. Its options:
- * `searching` opens every fold; `folded` starts it closed, saying `summary`;
- * `extra` adds rows another store saves after the named field's row.
- * @param {Model | null} model @param {Section} section @param {Field[]} fields @param {boolean} canEdit
- * @param {{searching?: boolean, folded?: boolean, summary?: string, extra?: {after: string, nodes: HTMLElement[]}}} [options]
+ * One section as an open card, saved whole. `extra` adds rows another store
+ * saves after the named field's row.
+ * @param {Model | null} model @param {Section} section @param {boolean} canEdit
+ * @param {{extra?: {after: string, nodes: HTMLElement[]}}} [options]
  */
-export function sectionCard(model, section, fields, canEdit, {searching = false, folded = false, summary = "", extra} = {}) {
-    const open = searching || !folded || isOpened(section.id);
-    const node = /** @type {HTMLDetailsElement} */ (el(`<details class="card settings-group" data-section="${esc(section.id)}" ${open ? "open" : ""}>
-        <summary class="card-h">${DISCLOSURE}<h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
-            ${folded && summary ? `<span class="right fold-summary" data-tip="${esc(summary)}">${esc(summary)}</span>` : ""}</summary>
+function sectionCard(model, section, canEdit, {extra} = {}) {
+    const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
+        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3></div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
         ${section.warning ? `<div class="card-b"><div class="callout warn" role="note">${esc(section.warning)}</div></div>` : ""}
         ${section.githubLink ? `<div class="card-b"><a class="btn tiny ghost" href="${esc(section.githubLink.url)}" target="_blank" rel="noopener">${githubMark("settings-help-mark")}<span>${esc(section.githubLink.label)}</span></a></div>` : ""}
-    </details>`));
+    </section>`);
     const rows = /** @type {HTMLElement} */ (node.querySelector(".rows"));
-    if (folded) remember(node, section.id);
 
     // A section is saved whole: the core validates the complete set, so every
     // field travels together and one changed value cannot half-write a section.
@@ -239,22 +175,17 @@ export function sectionCard(model, section, fields, canEdit, {searching = false,
     };
 
     // A section's one-per-layer switches read as one setting, so they are one
-    // row of layers rather than a row each; beside a master switch they fold
-    // away under their own heading, saying which layers they leave out.
+    // row of layers rather than a row each.
     const grouped = section.layerGroup ? section.fields.filter(isLayerSwitch) : [];
     const slot = section.fields.some((entry) => entry.governs && !grouped.includes(entry));
-    for (const {part, fields: inPart} of fieldParts(section.fields)) {
-        if (part) rows.appendChild(el(`<div class="setrow-part" ${inPart.some((field) => fields.includes(field)) ? "" : "hidden"}>${esc(part)}</div>`));
-        for (const field of inPart) {
+    for (const {part, fields} of fieldParts(section.fields)) {
+        if (part) rows.appendChild(el(`<div class="setrow-part">${esc(part)}</div>`));
+        for (const field of fields) {
             if (grouped.includes(field)) {
-                if (field === grouped[0] && section.layerGroup) {
-                    const row = layerGroupRow(section.layerGroup, grouped, fields, canEdit, submit);
-                    rows.appendChild(grouped.length === section.fields.length ? row
-                        : layerFold(model, section, row, grouped.some((entry) => fields.includes(entry)) && searching, layerSwitchSummary(grouped, nameOf)));
-                }
+                if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, canEdit, submit));
                 continue;
             }
-            rows.appendChild(fieldRow(field, canEdit, submit, !fields.includes(field), slot, durations));
+            rows.appendChild(fieldRow(field, canEdit, submit, slot, durations));
             if (extra && field.macro === extra.after) rows.append(...extra.nodes);
         }
     }
@@ -263,22 +194,6 @@ export function sectionCard(model, section, fields, canEdit, {searching = false,
         node.querySelectorAll(".rows .kk-mark").forEach((mark) => mark.remove());
         node.querySelector(":scope > .card-h > h3")?.insertAdjacentHTML("afterend", keyboardKeysMark(section.fields[0]));
     }
-    return node;
-}
-
-// The row of layer switches folded under its label, saying which layers it
-// leaves out while closed.
-/** @param {Model | null} model @param {Section} section @param {HTMLElement} row @param {boolean} searching @param {string} summary */
-function layerFold(model, section, row, searching, summary) {
-    const id = `${section.id}:layers`;
-    const open = searching || isOpened(id);
-    const node = /** @type {HTMLDetailsElement} */ (el(`<details class="setrow subfold" data-subfold="${esc(id)}" ${row.hidden ? "hidden" : ""} ${open ? "open" : ""}>
-        <summary>${DISCLOSURE}<span class="nm"></span><span class="fold-summary">${esc(summary)}</span></summary></details>`));
-    // The row's label becomes the fold's; its hint and switches its body.
-    /** @type {HTMLElement} */ (node.querySelector("summary .nm")).replaceWith(/** @type {HTMLElement} */ (row.querySelector(".nm")));
-    node.append(...row.childNodes);
-    node.dataset.tip = row.dataset.tip || "";
-    remember(node, id);
     return node;
 }
 
@@ -291,14 +206,14 @@ const layerCell = (model, field, layer) => layer
 
 // A section's one-per-layer switches as one row of layers (layer-switches.mjs).
 // Each keeps its own field identity, so the section still saves whole.
-/** @param {{label: string, hint: string}} group @param {Field[]} fields @param {Field[]} shown @param {boolean} canEdit @param {() => void} submit */
-function layerGroupRow(group, fields, shown, canEdit, submit) {
-    const row = el(`<div class="setrow layer-switches" data-tip="${esc(group.hint)}" ${fields.some((field) => shown.includes(field)) ? "" : "hidden"}>
+/** @param {{label: string, hint: string}} group @param {Field[]} fields @param {boolean} canEdit @param {() => void} submit */
+function layerGroupRow(group, fields, canEdit, submit) {
+    const row = el(`<div class="setrow layer-switches" data-tip="${esc(group.hint)}">
         <div><div class="nm">${esc(group.label)}${keyboardKeysMark(fields[0])}</div><div class="hint">${esc(group.hint)}</div></div>
     </div>`);
     const grid = layerSwitchGrid(getModel(), group.label, fields.map((field) => ({
         layer: field.governs?.kind === "layer" ? field.governs.layer : -1, label: field.label, macro: field.macro, f: `setting:${field.macro}`,
-        checked: Boolean(field.enabled), disabled: !canEdit || Boolean(field.readOnly), hidden: !shown.includes(field),
+        checked: Boolean(field.enabled), disabled: !canEdit || Boolean(field.readOnly),
         tip: [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" "),
     })));
     /** @type {NodeListOf<HTMLInputElement>} */ (grid.querySelectorAll("input")).forEach((input) => input.addEventListener("change", submit));
@@ -306,15 +221,15 @@ function layerGroupRow(group, fields, shown, canEdit, submit) {
     return row;
 }
 
-/** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot @param {Map<string, ReturnType<typeof durationControl>>} durations */
-function fieldRow(field, canEdit, submit, hidden, slot, durations) {
+/** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} slot @param {Map<string, ReturnType<typeof durationControl>>} durations */
+function fieldRow(field, canEdit, submit, slot, durations) {
     const editable = canEdit && !field.readOnly;
     // A number field shows its unit inside the input, as every screen does,
     // so the label drops the "(ms)" it carries in the review.
     const affixed = Boolean(field.unit) && !field.readOnly && field.presentation !== "duration"
         && field.kind !== "toggle" && field.kind !== "layer" && !field.choices?.length;
     const label = affixed ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
-    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${hidden ? "hidden" : ""}>
+    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}">
         <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}${keyboardKeysMark(field)}${offByKeyMark(field)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
@@ -359,6 +274,32 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
     control.appendChild(node);
     return row;
+}
+
+// Sniping is on while a sniping key is held or toggled, and while an
+// auto-sniping layer is on; this says where those keys are, places one, and
+// says what sniping slows.
+/** @param {Model | null} model @param {boolean} canEdit */
+function snipingKeys(model, canEdit) {
+    const node = el(`<div class="card-b sniping-keys">
+        <div class="sect-h"><h4>Sniping keys</h4></div>
+        <p class="note">Sniping is on while one of these keys is held or toggled, and while one of the auto-sniping layers is on.</p></div>`);
+    for (const keycode of ["SNIPING", "SNP_TOG"]) {
+        const words = actionLabel(model, keycode);
+        const row = el(`<div class="row gap-10 sniping-key">
+            <span class="sniping-name">${esc(words)}</span>
+            <span class="note">${esc(reachLine(keycodePlacements(model, [keycode])))}</span>
+            <button class="btn tiny right" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key…</button></div>`);
+        /** @type {HTMLButtonElement} */ (row.querySelector("[data-place]")).addEventListener("click", () => {
+            state.placement = {keycode};
+            state.screen = "keys";
+            state.tab = "key";
+            render();
+        });
+        node.appendChild(row);
+    }
+    node.appendChild(el(`<p class="note">Sniping also slows directional pointing modes; scrolling modes ignore it. Sniping DPI keys on the keyboard change its speed too.</p>`));
+    return node;
 }
 
 // QMK keeps the live value of these, so a key on the keyboard (a Magic, DF()

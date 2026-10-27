@@ -1,7 +1,7 @@
 // @ts-check
 // Where a set of keycodes is reached: on a layer, as a behaviour's action, or
 // as a combo's output, and that said in one line. Pure, from #156's Trackball
-// rules; the Mouse screen uses it for the sniping keys.
+// rules; Pointer settings uses it for the sniping keys.
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {{keys: {layer: any, position: any}[], behaviours: any[], combos: any[], layers: string[]}} Placements */

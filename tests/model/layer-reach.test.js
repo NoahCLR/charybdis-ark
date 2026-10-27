@@ -318,6 +318,9 @@ test("transparent and KC_NO base keys have separate notices and counts", () => {
 
 test("a pointer layer that is always on, or empty, cannot work", () => {
     assert.deepEqual(layerReach(profile({settings: {4: 1, 5: 0}})).map((finding) => [finding.kind, finding.level]), [["pointerLayer", "warning"]]);
+    const [always] = layerReach(profile({settings: {4: 1, 5: 0}}));
+    assert.deepEqual(always.place, {kind: "settings", area: "Mouse", section: "autoMouse"}, "it is fixed in Auto-mouse");
+    assert.match(always.fix, /Pointer settings → Auto-mouse/);
     assert.deepEqual(layerReach(profile({settings: {4: 1, 5: 4}})).map((finding) => [finding.kind, finding.level]), [["pointerLayer", "notice"]]);
     assert.deepEqual(kinds(profile({keys: {"4:0": KC_B}, settings: {4: 1, 5: 4}})), []);
 });

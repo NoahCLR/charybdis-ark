@@ -1,5 +1,5 @@
 // @ts-check
-// The Keys screen's keyboard shortcuts: copy, paste and delete on the selected
+// The Keymap screen's keyboard shortcuts: copy, paste and delete on the selected
 // key, or on the open behaviour cell. On Custom keys they act on the open cell
 // of the selected key's behaviour, and only there.
 

@@ -77,14 +77,20 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(combo.reveal, '[data-reach][data-picked="true"]');
     assert.equal(placeState({kind: "behaviour", keycode: "KC_A"}).reveal, 'tr[data-row][data-picked="true"]',
         "a behaviour is revealed at its picked row in the Behaviours table");
-    const section = placeState({kind: "settings", section: "keyTiming"});
-    assert.deepEqual(section.settingsOpen, ["keyTiming", "keyTiming:layers"], "a folded section opens, with its layer switches");
-    assert.equal(section.reveal, '.settings-group[data-section="keyTiming"]');
-    assert.equal(section.screen, "settings");
-    assert.equal(placeState({kind: "settings"}).reveal, undefined, "settings with no section just open the screen");
-    const mouse = placeState({kind: "settings", section: "sniping", area: "Mouse"});
-    assert.equal(mouse.screen, "mouse", "a Mouse section opens on the Mouse screen");
-    assert.equal(mouse.reveal, '.settings-group[data-section="sniping"]');
+    // A section opens the Settings screen that draws it, at that section.
+    const lands = (section, area = "Settings") => placeState({kind: "settings", section, area});
+    assert.deepEqual(lands("keyTiming"), {screen: "behaviours", reveal: '.settings-group[data-section="keyTiming"]'});
+    assert.equal(lands("behaviorSettings").screen, "behaviours");
+    assert.equal(lands("comboSettings").screen, "combos", "the combo timing too, saved with the combos");
+    assert.equal(lands("comboReferences").screen, "combos");
+    assert.equal(lands("host").screen, "host");
+    assert.equal(lands("keyboardOptions").screen, "host");
+    for (const section of ["normalPointerSpeed", "sniping", "autoMouse"]) {
+        assert.deepEqual(lands(section, "Mouse"), {screen: "pointer", reveal: `.settings-group[data-section="${section}"]`}, `${section} is a pointer setting`);
+    }
+    assert.deepEqual(lands("keyboard"), {screen: "device"}, "the keyboard's name is the Keyboard screen's title");
+    assert.equal(lands("startupLayers"), null, "Default layers has no editor, so its row has no Show");
+    assert.equal(placeState({kind: "settings"}), null, "stored key options Ark has no switch for have nowhere to go");
     assert.deepEqual(placeState({kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"}), {screen: "lighting", stage: "auto"},
         "a section timed on a lighting stage opens that stage");
     assert.deepEqual(placeState({kind: "settings", section: "lightingPower", area: "Lighting"}), {screen: "lighting", reveal: '.settings-group[data-section="lightingPower"]'},

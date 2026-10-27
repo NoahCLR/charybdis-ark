@@ -2,7 +2,6 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {compileLayerAnswers} = require("../core/model/layer-resolution");
-const {openFold} = require("./shell-page");
 
 test("participation controls post placements, shared definitions and master/source-layer settings", async ({page}) => {
     const errors = [];
@@ -41,11 +40,10 @@ test("participation controls post placements, shared definitions and master/sour
     await expect.poll(posted).toEqual([expect.objectContaining({type: "addCombo", output: "KC_A", inputs: expect.any(Array), enabled: false, allowedLayers: 32767})]);
     expect((await posted())[0].inputs).toHaveLength(2);
 
-    await page.locator('[data-screen="settings"]').click();
-    // The layers each runs on fold under its master switch.
-    await openFold(page, "behaviorSettings:layers");
-    await openFold(page, "comboSettings:layers");
-    for (const [macro, sectionId] of [["behaviorsEnabled", "behaviorSettings"], ["behaviorsOnLayer15", "behaviorSettings"], ["combosEnabled", "comboSettings"], ["combosOnLayer15", "comboSettings"]]) {
+    // The layers each runs on are shown under its master switch.
+    for (const [macro, sectionId, screen] of [["behaviorsEnabled", "behaviorSettings", "behaviours"], ["behaviorsOnLayer15", "behaviorSettings", "behaviours"],
+        ["combosEnabled", "comboSettings", "combos"], ["combosOnLayer15", "comboSettings", "combos"]]) {
+        await page.locator(`[data-screen="${screen}"]`).click();
         await clear();
         await page.locator("label").filter({has: page.locator(`[data-macro="${macro}"]`)}).click();
         await expect.poll(posted).toEqual([expect.objectContaining({type: "updateConfigDefaults", sectionId, fields: expect.arrayContaining([{macro, enabled: false}])})]);

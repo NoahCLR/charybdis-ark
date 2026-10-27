@@ -4,10 +4,13 @@ import {SCREENS, configureReady, isScreenId, screenAvailable, screenDefinition, 
 
 test("the registry owns every rail screen and renderer in the existing order", () => {
     assert.deepEqual(screenGroups().map(({group, items}) => [group, items.map(({id}) => id)]), [
-        ["Configure", ["keys", "lighting", "macros", "customKeys", "mouse", "pointing", "settings"]],
+        ["Configure", ["keys", "lighting", "macros", "customKeys", "pointing"]],
+        ["Settings", ["behaviours", "combos", "pointer", "host"]],
         ["Keyboard", ["profile", "device"]],
     ]);
-    const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "CustomKeys", "Mouse", "Pointing", "Settings", "Profile", "Device"]
+    assert.deepEqual(Object.values(SCREENS).map((definition) => definition.label), ["Keymap", "Lighting", "Macros", "Custom keys", "Pointing modes",
+        "Behaviours", "Combos", "Pointer settings", "Host", "Backups", "Keyboard"]);
+    const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "CustomKeys", "Pointing", "Behaviours", "Combos", "Pointer", "Host", "Profile", "Device"]
         .map(name => [`screen${name}`, () => name[0].toLowerCase() + name.slice(1)]));
     for (const [id, definition] of Object.entries(SCREENS)) {
         assert.equal(definition.render(renderers), id, `${id} selects its own screen`);
@@ -33,7 +36,7 @@ test("every screen follows its readiness rule, including demo and read failures"
         assert.equal(screenAvailable(backup, id), definition.group === "Keyboard", id);
         assert.equal(screenAvailable(ready, id), true, id);
         assert.equal(screenAvailable(demo, id), true, id);
-        assert.equal(definition.keepOnPublish, definition.group === "Configure", id);
+        assert.equal(definition.keepOnPublish, definition.group !== "Keyboard", id);
         assert.equal(Boolean(definition.unavailable), definition.group === "Keyboard", id);
     }
 });

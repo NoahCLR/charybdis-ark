@@ -37,7 +37,7 @@ layers in view reach:
   "through". A behaviour on a key the row already names follows that key
   instead of naming it again (`tests/view/reach.test.mjs`,
   `browser-tests/marks.spec.js`).
-- Every Keys tab is as tall as the Behaviours tab, at every width: with
+- Every Keymap tab is as tall as the Behaviours tab, at every width: with
   another tab open, the editor the Behaviours tab would show is laid out
   behind it, the workbench's height read and the copy removed in the same
   step, so the page never holds two editors (`matchBehavioursHeight`,
@@ -72,7 +72,7 @@ layers in view reach:
 - Combo grouping enumerates only lower layers that can answer a transparent
   top-layer position, including disabled keys that block an input below
   (`tests/view/combo-reach.test.mjs`, `tests/view/layer-resolution.test.mjs`).
-- Reach sections keep one open state per section across the Keys tabs, and
+- Reach sections keep one open state per section across the Keymap tabs, and
   opening one closes none (`tests/view/reach-groups.test.mjs`).
 
 ## Shared controls
@@ -95,8 +95,10 @@ The same kind of control looks and sits the same on every screen.
   `titleName`: Enter commits, Escape restores the stored name, and the byte
   count shows on focus or when over the limit
   (`browser-tests/macro-ux.spec.js`, `browser-tests/custom-key-behaviour.spec.js`).
-- A folded Settings card says what it holds now; an open one says nothing
-  there (`tests/view/settings-layout.test.mjs`).
+- A Settings screen (Behaviours, Combos, Pointer settings, Host) draws its
+  sections as open cards, none folding, and offers no search
+  (`tests/view/settings-layout.test.mjs`,
+  `browser-tests/settings-screens.spec.js`).
 - A slot bank (Macros, Custom keys) and a list beside its editor (Lighting's
   layers and pointing modes) scroll on their own and keep their place across
   renders of the same screen, each list apart (`data-scroll-list`)
@@ -126,12 +128,12 @@ Each thing with a colour of its own has exactly one mark, drawn by
   layer and pointing-mode colours, colour values in the review, a pointing
   slot's Light value) or where every item is a layer (the layer bar, the
   "On layers" chips on Custom keys and Macros); a pointing slot is named by
-  its mark everywhere, its slot card, editor header and the Keys tab's
+  its mark everywhere, its slot card, editor header and the Keymap tab's
   Pointing modes table included; those call `layerSwatch` or
   `slotLight` directly, never `mark` (`browser-tests/marks.spec.js`).
   Otherwise a setting carries the mark of what it governs (`governs` in
-  `core/model/settings-editor.js`) in Settings, its per-layer switches and
-  layer matching included, the editors and the review
+  `core/model/settings-editor.js`) on the Settings screens, its per-layer
+  switches and layer matching included, the editors and the review
   (`tests/model/profile-review.test.js`).
 - A key or action is named through `actionMarked` or `keyNameMarked`; only
   attributes and plain-text messages carry the words alone
@@ -171,6 +173,7 @@ below.
 | Settings help: `hint` stays visible, `tooltip` adds to it, read-only reasons join them in `data-tip`, shown by `webview/ui/hover.mjs` | `core/model/settings-editor.js` | `browser-tests/settings-tooltips.spec.js` |
 | Number entry: whole numbers author `inputmode="numeric"`, durations `"decimal"`; typing, pasting or dropping keeps only digits (and a duration's first point) with the caret in place; range limits stay with the edit | `webview/lib/number-entry.mjs` | `tests/view/number-entry.test.mjs`, `browser-tests/number-entry.spec.js` |
 | Screens: IDs, labels, rail groups, availability, rendering and redraw; `PanelState.screen` takes its IDs from here; an unknown ID shows an unavailable screen | `webview/view/screens.mjs` | `tests/view/screens.test.mjs`, `browser-tests/screens-registry.spec.js` |
+| Which settings sections each Settings screen draws, in order (`SETTINGS_SCREENS`), and the screen a section is edited on (`screenOfSection`), where the review's Show goes; Lighting's Auto-mouse links open Pointer settings and the macro editor's Your computer link opens Host. Default layers is on none: core still publishes it, so the review lists and reverts a stored difference, and its checks, pointing links and layer reorder read the stored value | `webview/view/settings-layout.mjs` | `tests/view/settings-layout.test.mjs`, `tests/view/review.test.mjs`, `browser-tests/settings-screens.spec.js` |
 | Words, sent as `model.vocabulary`; stages are found by id, never by label | `core/model/vocabulary.js` | `tests/model/vocabulary.test.js`, `tests/view/enum-drift.test.mjs` |
 | Edit modes: their words, and the order the switch offers them (`editMode.offered`): Live edit, Live preview + save, then Review and save. The keyboard's Apply and Save both read as Save ([D-L72](../adr/0072-users-see-save-for-both-keyboard-operations.md)) | `core/model/vocabulary.js`, `core/session/panel-session.js` | `tests/model/vocabulary.test.js`, `tests/session/live-watch.test.js`, `tests/view/edit-mode.test.mjs`, `browser-tests/live-edits.spec.js` |
 | Actions, native keycodes, decode limits, layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
@@ -393,8 +396,8 @@ snapshot and leaves the editor's alone
 ## Review changes and Discard
 
 The review lists one change per thing that differs from the keyboard (D-L29):
-a key on a layer, a layer's name, a behaviour, a combo, a macro, a Settings
-card, a pointing slot, or one lighting record (LED groups and the rows that
+a key on a layer, a layer's name, a behaviour, a combo, a macro, a settings
+section, a pointing slot, or one lighting record (LED groups and the rows that
 paint them are one record; no test).
 
 - A change says added, changed or removed and lists only the fields that
@@ -402,7 +405,9 @@ paint them are one record; no test).
   shown, so a changed default or renamed layer is one change
   (`tests/model/profile-review.test.js`,
   `tests/model/profile-review-completeness.test.js`). **Show** opens it where
-  it is edited (`tests/view/review.test.mjs`).
+  it is edited, a settings section on the screen that draws it; one with no
+  editor (Default layers, key options Ark has no switch for) has no Show
+  (`tests/view/review.test.mjs`).
 - Removing one combo is one change that says later combos move up, and
   Discard puts it back in place; with another combo changed too, the
   positional differences stay visible (`tests/model/profile-review.test.js`,
@@ -584,7 +589,7 @@ Automatic's effect with Host and an explicit choice with its macro (no test).
 Ark exposes the firmware's participation contract at every scope (D-L55),
 whose rules are in
 [participation-policy.md](../../upstream/firmware/docs/spec/participation-policy.md):
-switches in Settings, enabled and allowed layers on shared behaviours and
+switches on the Behaviours and Combos screens, enabled and allowed layers on shared behaviours and
 combos, and **Use behaviour** / **Join combos** on placements
 (`browser-tests/participation.spec.js`).
 
@@ -596,7 +601,7 @@ reorder moves masks and placement bits with their layers
 
 ## Combo output behaviour permissions
 
-Settings → Combos has **Combo outputs use behaviours** and each combo builder
+The Combos screen has **Combo outputs use behaviours** and each combo builder
 **Use output behaviour**. Both default on and veto behaviour use by a combo's
 output, independently of chord participation
 (`browser-tests/combo-output-behaviors.spec.js`).

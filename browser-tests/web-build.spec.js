@@ -160,7 +160,7 @@ window.acquirePanelApi = () => ({
     await page.evaluate((model) => {window.__model = model;}, chrome.rawModel);
     await page.addScriptTag({url: `./${files.panel}`, type: "module"});
 
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     const field = page.locator('select[data-macro="normalDpi"]');
     await expect(field).toBeEnabled();
     await expect(field).toHaveValue("1400");

@@ -13,6 +13,7 @@ for (const theme of ["dark", "light"]) {
             window.__posted.length = 0;
         });
         await page.locator('[data-host-settings]').click();
+        await expect(page.locator('[data-screen="host"]')).toHaveAttribute("aria-current", "true");
         await expect(page.locator('[data-section="host"]')).toBeVisible();
         // The preview detects macOS: a keyboard layout and the ISO option, and
         // Unicode entry is the Unicode Hex Input layout rather than a switch.

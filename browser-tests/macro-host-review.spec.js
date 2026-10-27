@@ -2,7 +2,7 @@
 "use strict";
 
 const {test, expect} = require("@playwright/test");
-const {openFold, openPreview} = require("./shell-page");
+const {openPreview} = require("./shell-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
@@ -24,9 +24,8 @@ for (const theme of ["dark", "light"]) {
         await publish();
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
-            store.state.screen = "settings"; store.render(); window.__posted.length = 0;
+            store.state.screen = "host"; store.render(); window.__posted.length = 0;
         });
-        await openFold(page, "host");
         await page.locator('[data-macro="hostLayout"]').selectOption("3");
         const message = await page.evaluate(() => window.__posted.at(-1));
         expect(message).toMatchObject({type: "updateConfigDefaults", sectionId: "host"});
@@ -46,7 +45,7 @@ for (const theme of ["dark", "light"]) {
             store.state.overlay = "review"; store.render();
         });
         const review = page.getByRole("dialog", {name: "Review changes"});
-        await expect(review).toContainText("Playback changes because of Settings → Your computer");
+        await expect(review).toContainText("Playback changes because of Host → Your computer");
         await expect(review).toContainText('layout keys: "é"');
         await expect(review).toContainText('Unicode entry (macOS): "é"');
         await expect(review).toContainText("Macro 1 cannot play with the settings in Your computer");

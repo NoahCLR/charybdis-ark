@@ -71,8 +71,9 @@ How the pointer layer's light fades when auto-mouse turns it off:
 - **Fade mode**: follow the real destination, or fade to an **End colour**
   where the background effect would show, or on all keys.
 - **Hold before fading**: how much of the auto-mouse timeout the colour holds
-  before it fades. The timeout itself is on [Mouse](pointing.md#mouse), and
-  changing it keeps this share.
+  before it fades. The timeout itself is on
+  [Pointer settings](pointing.md#pointer-settings), and changing it keeps this
+  share.
 
 The board shows where the fade lands, not the animation. With auto-mouse off,
 this stage paints nothing.

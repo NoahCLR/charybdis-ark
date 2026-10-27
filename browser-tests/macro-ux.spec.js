@@ -32,7 +32,7 @@ for (const theme of ["dark", "light"]) {
         await expectPosition();
         await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("{777}{KC_A}");
 
-        await page.locator('[data-screen="settings"]').click();
+        await page.locator('[data-screen="host"]').click();
         await page.locator('[data-screen="macros"]').click();
         await expect.poll(() => bank.evaluate(node => node.scrollTop)).toBe(0);
     });

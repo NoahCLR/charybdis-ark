@@ -295,11 +295,10 @@ export interface ComboTimingField {id: 'default' | 'hold'; label: string; hint: 
 export interface SettingsSection {
     id: string;
     label: string;
+    /** The review area the section is listed under: Settings, Mouse or Lighting. */
     area?: string;
     stage?: string;
     description?: string;
-    /** Other words the section is found by in Settings search: QMK's names and earlier ones. */
-    search?: string;
     warning?: string;
     githubLink?: {label: string; url: string};
     /** The words for the section's one-per-layer switches, shown together as one row of layers. */

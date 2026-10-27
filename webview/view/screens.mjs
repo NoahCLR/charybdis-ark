@@ -5,8 +5,9 @@
 
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {{screenKeys: () => HTMLElement, screenLighting: () => HTMLElement, screenMacros: () => HTMLElement,
- * screenCustomKeys: () => HTMLElement, screenMouse: () => HTMLElement, screenPointing: () => HTMLElement,
- * screenSettings: () => HTMLElement, screenProfile: () => HTMLElement, screenDevice: () => HTMLElement}} ScreenRenderers */
+ * screenCustomKeys: () => HTMLElement, screenPointing: () => HTMLElement, screenBehaviours: () => HTMLElement,
+ * screenCombos: () => HTMLElement, screenPointer: () => HTMLElement, screenHost: () => HTMLElement,
+ * screenProfile: () => HTMLElement, screenDevice: () => HTMLElement}} ScreenRenderers */
 /** @typedef {keyof typeof SCREENS} ScreenId */
 /** @typedef {{label: string, group: string, icon: string, title: string, keepOnPublish: boolean,
  * available: (model: StatusModel) => boolean, render: (renderers: ScreenRenderers) => HTMLElement,
@@ -20,7 +21,7 @@ const screen = (definition) => Object.freeze(definition);
 
 export const SCREENS = Object.freeze({
     keys: screen({
-        label: "Keys", group: "Configure", title: "Keyboard", keepOnPublish: true,
+        label: "Keymap", group: "Configure", title: "Keyboard", keepOnPublish: true,
         icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M4 6.5h.01M6.5 6.5h.01M9 6.5h.01M11.5 6.5h.01M5 9.5h6"/></svg>',
         available: configureReady, render: renderers => renderers.screenKeys(),
     }),
@@ -39,20 +40,32 @@ export const SCREENS = Object.freeze({
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.5 8h5M8 5.5v5"/></svg>',
         available: configureReady, render: renderers => renderers.screenCustomKeys(),
     }),
-    mouse: screen({
-        label: "Mouse", group: "Configure", title: "Keyboard", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
-        available: configureReady, render: renderers => renderers.screenMouse(),
-    }),
     pointing: screen({
         label: "Pointing modes", group: "Configure", title: "Keyboard", keepOnPublish: true,
         icon: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg>',
         available: configureReady, render: renderers => renderers.screenPointing(),
     }),
-    settings: screen({
-        label: "Settings", group: "Configure", title: "Keyboard", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><path d="M2.5 5h11M2.5 11h11"/><circle cx="6" cy="5" r="1.8"/><circle cx="10.5" cy="11" r="1.8"/></svg>',
-        available: configureReady, render: renderers => renderers.screenSettings(),
+    // Settings: what applies to the whole keyboard, a screen per subject,
+    // every section shown open.
+    behaviours: screen({
+        label: "Behaviours", group: "Settings", title: "Keyboard", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8.5" r="5.5"/><path d="M8 5.5v3l2 1.5M6.5 1.5h3"/></svg>',
+        available: configureReady, render: renderers => renderers.screenBehaviours(),
+    }),
+    combos: screen({
+        label: "Combos", group: "Settings", title: "Keyboard", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="4.5" width="6" height="6" rx="1.5"/><rect x="8.5" y="4.5" width="6" height="6" rx="1.5"/><path d="M4.5 13h7"/></svg>',
+        available: configureReady, render: renderers => renderers.screenCombos(),
+    }),
+    pointer: screen({
+        label: "Pointer settings", group: "Settings", title: "Keyboard", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
+        available: configureReady, render: renderers => renderers.screenPointer(),
+    }),
+    host: screen({
+        label: "Host", group: "Settings", title: "Keyboard", keepOnPublish: true,
+        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5"/><path d="M5.5 14h5M8 11v3"/></svg>',
+        available: configureReady, render: renderers => renderers.screenHost(),
     }),
     profile: screen({
         label: "Backups", group: "Keyboard", title: "Backups", keepOnPublish: false,
@@ -95,8 +108,9 @@ export function screenGroups() {
     return [...groups].map(([group, items]) => ({group, items}));
 }
 
-// Unavailable Configure screens offer the first available keyboard surface;
-// profile backups precede diagnostics, in the same order as the rail.
+// Unavailable Configure and Settings screens offer the first available
+// keyboard surface; profile backups precede diagnostics, in the same order as
+// the rail.
 /** @param {StatusModel | null | undefined} model @param {unknown} current */
 export function secondaryScreen(model, current) {
     for (const id of /** @type {ScreenId[]} */ (Object.keys(SCREENS))) {

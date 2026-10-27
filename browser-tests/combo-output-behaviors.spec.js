@@ -5,7 +5,7 @@ const {openControls, posted, expectPost} = require("./control-preview");
 
 for (const theme of ["dark", "light"]) {
     test(`combo output permissions post from both controls (${theme})`, async ({page}) => {
-        await openControls(page, "settings", {settingsOpen: ["comboSettings"]}, theme);
+        await openControls(page, "combos", {}, theme);
         const global = page.locator('label:has([data-f="setting:comboOutputBehaviors"])');
         await global.click();
         await expect.poll(() => posted(page)).toEqual([expect.objectContaining({

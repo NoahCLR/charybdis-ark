@@ -31,7 +31,7 @@ export function screenKeys() {
     const model = getModel();
     const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
-        "Keys",
+        "Keymap",
         "Click a key to change what it does. The tabs under the board edit its behaviour, its combos and what this layer reaches.",
     )}</div>`);
 

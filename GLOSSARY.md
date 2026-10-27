@@ -133,13 +133,16 @@ _Avoid_: restore (alone), load, upload
 ## The interface
 
 **Screen**:
-One of Ark's top-level views chosen from the rail: Keys, Lighting, Macros,
-Custom keys, Mouse, Pointing modes, Settings, Backups and Keyboard.
+One of Ark's top-level views chosen from the rail, in three groups: Keymap,
+Lighting, Macros, Custom keys and Pointing modes under Configure; Behaviours,
+Combos, Pointer settings and Host under Settings; Backups and Keyboard under
+Keyboard.
 _Avoid_: page, tab, area (for this), surface, panel
 
 **Area**:
-The part of the profile one screen edits, under which Review groups its
-changes.
+The part of the profile Review groups its changes under, mostly one screen's.
+Two keep older names: Mouse is what Pointer settings edits, and Settings what
+the rest of the Settings group edits.
 _Avoid_: section, domain (for this), category
 
 **Frame**:
@@ -148,7 +151,8 @@ the bar.
 _Avoid_: shell (for this), chrome, layout
 
 **Rail**:
-The column at the left that chooses the screen and shows the keyboard, its
+The column at the left that chooses the screen, under its group's heading,
+and shows the keyboard, its
 edit mode and the draft's history. Its keyboard button opens the keyboard
 menu: the edit modes, the keyboards to switch between, Choose keyboard and
 Disconnect.

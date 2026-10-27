@@ -25,7 +25,7 @@ const {TIER_FIELDS} = edits;
 const styleLabel = (kind, style) => styleWord(getModel(), kind, style || "");
 
 // An empty timing field falls back to the keyboard's own default, which it
-// reports and Settings · Tap & hold timing edits — so the note names both.
+// reports and Settings · Behaviours · Tap & hold timing edits — so the note names both.
 /** @param {EditorBehavior} behaviour */
 function timingDefaultsNote(behaviour) {
     const defaults = behaviour.timingDefaults;
@@ -33,8 +33,8 @@ function timingDefaultsNote(behaviour) {
         .filter(([, value]) => String(value ?? "").trim() !== "")
         .map(([name, value]) => `${name} ${value} ms`);
     return values.length
-        ? `Keyboard defaults from Settings · Tap & hold timing: ${values.join(", ")}. Clear an override to follow its default.`
-        : "Clear a timing override to follow the keyboard default from Settings · Tap & hold timing.";
+        ? `Keyboard defaults from Settings · Behaviours · Tap & hold timing: ${values.join(", ")}. Clear an override to follow its default.`
+        : "Clear a timing override to follow the keyboard default from Settings · Behaviours · Tap & hold timing.";
 }
 
 // The cell open in this behaviour's grid: one opened in another behaviour's

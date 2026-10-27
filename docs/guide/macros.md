@@ -54,7 +54,7 @@ beside it says where the macro stands: **edited here** while an edit is not in
 the draft yet, **changed in draft** once the draft changes the macro, and
 **as read** when it matches the keyboard (in the demo, the demo setup).
 
-**Clear macro** empties the slot. **Place on a key…** takes you to the Keys
+**Clear macro** empties the slot. **Place on a key…** takes you to the Keymap
 screen to put the macro on a key. Beside the title, chips name the layers
 that use the macro; click one to see it there.
 
@@ -99,8 +99,8 @@ trackball and other keyboards are not held back.
 ## Your computer
 
 Text is typed through your computer's keyboard layout, so Ark needs to know
-which one you use. Set it in **Settings → Your computer**; the button at the
-foot of the macro editor takes you there.
+which one you use. Set it under **Your computer** on **Settings → Host**; the
+button at the foot of the macro editor takes you there.
 
 - **Operating system**: **Auto** (what the keyboard detects over USB),
   **macOS**, **Windows** or **Linux**. It sets how keys are named, the layouts

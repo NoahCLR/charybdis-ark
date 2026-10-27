@@ -24,8 +24,7 @@ import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
 import {escapeKeyboardMenu} from "./ui/keyboard-menu.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
-import {screenSettings} from "./ui/settings.mjs";
-import {screenMouse} from "./ui/mouse.mjs";
+import {screenBehaviours, screenCombos, screenHost, screenPointer} from "./ui/settings.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros, receiveMacroValidation} from "./ui/macros.mjs";
 import {reconcileRecording} from "./ui/macros/recorder.mjs";
@@ -44,8 +43,8 @@ const root = /** @type {HTMLElement} */ (document.getElementById("root"));
 let renderedScreen = null;
 
 const SCREEN_RENDERERS = {
-    screenKeys, screenLighting, screenSettings, screenDevice, screenMouse,
-    screenPointing, screenMacros, screenCustomKeys, screenProfile,
+    screenKeys, screenLighting, screenMacros, screenCustomKeys, screenPointing,
+    screenBehaviours, screenCombos, screenPointer, screenHost, screenProfile, screenDevice,
 };
 
 /** @param {{keepScreen?: boolean}} [options] */

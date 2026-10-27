@@ -4,7 +4,7 @@ A behaviour sets what a key does on tap, hold and long hold, for each tap
 count: a single tap, a double tap and so on. The keyboard can hold 128
 behaviours, with five tap counts each.
 
-Open one from **Keys → Behaviours**, or select a key and use the Behaviours
+Open one from **Keymap → Behaviours**, or select a key and use the Behaviours
 tab. The list on the left groups behaviours by how this layer reaches them:
 on this layer, through a combo, through a transparent key, and so on. Select
 any key and its behaviour opens, even if it doesn't have one yet; there is no
@@ -72,8 +72,8 @@ A timing that follows the keyboard's default shows it greyed, with the
 setting it comes from, such as `200 · dual-role` on an `LT` or `MT` key,
 `150 · behaviour default` on any other key, and `400 · default` for the long
 hold threshold or multi tap window. Type a value to give this behaviour its own;
-clear the field to follow the default again. The defaults are in
-**Settings → Tap & hold timing** (below).
+clear the field to follow the default again. The defaults are under
+**Tap & hold timing** on the Behaviours settings screen (below).
 
 When Review's checks find a problem with the timing, a note above the grid
 says so.
@@ -120,8 +120,8 @@ on again. A behaviour runs only where every switch allows it:
 
 | Scope | Where | Switch |
 | --- | --- | --- |
-| The whole keyboard | **Settings → Behaviours** | **Enabled** |
-| Each layer | **Settings → Behaviours** | **On these layers** |
+| The whole keyboard | **Settings → Behaviours**, the Behaviours card | **Enabled** |
+| Each layer | **Settings → Behaviours**, the Behaviours card | **On these layers** |
 | This behaviour | the behaviour editor | **Use this behaviour** and **Layers it runs on** |
 | This key on this layer | the Key tab | **Use behaviour** |
 
@@ -130,13 +130,17 @@ the switches of the layer it falls through to. When a behaviour is off for a
 key, the key does what it would without one, and the Key tab and the hover
 card say which switch is keeping it off.
 
-A key on the keyboard can turn behaviours or combos off for now. Settings
-then marks the switch **turned off by key**. That isn't a change and isn't in
+A key on the keyboard can turn behaviours or combos off for now. The
+Behaviours or Combos settings screen then marks the switch **turned off by
+key**. That isn't a change and isn't in
 Review: the key, or unplugging, turns it back on.
 
-## Settings → Tap & hold timing
+## Settings → Behaviours
 
-The keyboard's default timings, used wherever a behaviour leaves its own
+**Settings → Behaviours** in the rail shows two cards, both open: **Tap &
+hold timing** and **Behaviours**, the switches in the table above.
+
+**Tap & hold timing** holds the keyboard's default timings, used wherever a behaviour leaves its own
 empty:
 
 - **Dual-role tap / hold threshold**: for keys that type on tap and hold a

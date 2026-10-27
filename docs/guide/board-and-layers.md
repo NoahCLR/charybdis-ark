@@ -1,6 +1,6 @@
 # The board and layers
 
-The **Keys** screen opens on the board: a drawing of your Charybdis, showing
+The **Keymap** screen opens on the board: a drawing of your Charybdis, showing
 the layer you picked in the tabs underneath. Everything on it comes from the
 keyboard, with your draft's edits on top.
 
@@ -123,11 +123,13 @@ what it falls through to is listed under **Through a transparent key**.
 
 ### Default layers
 
-**Settings → Default layers** sets which layers are always on underneath
-every other layer. Normally that is only the base. A layer a pointing mode's
-link uses can't be a default layer
-([How it starts](pointing.md#how-it-starts)). A key on the keyboard can
-change this too, until the keyboard restarts.
+The base is always on underneath every other layer; to put another layer
+there, use **Make base** (above). Ark doesn't edit QMK's other default
+layers: a keyboard that keeps more than the base always on keeps them, a
+layer a pointing mode's link uses still can't be one
+([How it starts](pointing.md#how-it-starts)), and Review lists a difference
+in them that a backup brings. A key on the keyboard can change them until
+the keyboard restarts.
 
 ## The workbench
 

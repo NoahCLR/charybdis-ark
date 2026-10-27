@@ -117,7 +117,7 @@ test("an edit that would add a trap asks first; Go back and Send anyway post the
 });
 
 test("combos turned off by a key show beside the switch, not as a change", async ({page}) => {
-    await openLive(page, "settings");
+    await openLive(page, "combos");
     const mark = page.locator('.off-by-key');
     await expect(mark).toHaveCount(1);
     await expect(mark).toHaveText("turned off by key");
@@ -183,13 +183,13 @@ test("lighting: a layer colour posts", async ({page}) => {
     await change(page.locator('#benchBody [data-channel="0"]'), 71);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateLayerColor", h: 71})]);
 });
-test("settings: a timing posts", async ({page}) => {
-    await openLive(page, "settings");
+test("behaviours: a timing posts", async ({page}) => {
+    await openLive(page, "behaviours");
     await change(page.locator('[data-f="setting:tappingTerm"]'), 211);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateConfigDefaults"})]);
 });
 test("combos: the default window posts", async ({page}) => {
-    await openLive(page, "settings");
+    await openLive(page, "combos");
     await change(page.locator('[data-f="settings:combo:default"]'), 77);
     await expectPost(page, {type: "updateComboDefaultWindow", defaultTermMs: "77"});
 });
@@ -198,8 +198,8 @@ test("pointing: a scrolling field posts its record", async ({page}) => {
     await change(page.locator('[data-f="pointing:0:scroll:divisorH"]'), 71);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "savePdMode"})]);
 });
-test("mouse: a pointer setting posts", async ({page}) => {
-    await openLive(page, "mouse");
+test("pointer settings: a pointer setting posts", async ({page}) => {
+    await openLive(page, "pointer");
     await change(page.locator('[data-f="setting:mouseTimeout"]'), 900);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateConfigDefaults"})]);
 });
@@ -250,7 +250,7 @@ test("switching into Live from Live + review asks Save or Revert; from Apply wit
 
 test("in Live an edit posts as in Live + review, the bar has no Save, and leaving Live asks nothing", async ({page}) => {
     await page.goto("/preview/index.html?shell=live-auto");
-    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-screen="pointer"]').click();
     expect(await currentEditMode(page)).toBe(1);
     await page.evaluate(() => {window.__posted.length = 0;});
     const bar = page.locator(".commit.live.auto");

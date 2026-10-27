@@ -51,9 +51,10 @@ const COMBO_TIMING = Object.freeze([
 // (settings-domain-v1.js), which also holds what the keyboard accepts; the
 // words, kinds and grouping are this module's.
 //
-// `area` is the rail screen a section is edited on, and the review area it is
-// listed under; a section without one is a Settings section. Everything the
-// trackball does to the pointer — its speed, sniping, auto-mouse — is Mouse.
+// `area` is the review area a section is listed under; a section without one
+// is a Settings section. Everything the trackball does to the pointer — its
+// speed, sniping, auto-mouse — is Mouse, and what Lighting edits is Lighting.
+// Which screen draws a section is the interface's.
 //
 // `governs` names what a setting is about when that thing has a colour of its
 // own elsewhere — a behaviour tier, a tap-count branch, a pointing slot, a
@@ -103,20 +104,20 @@ const sections = [
     // QMK's master switch and idle timeout darken every LED, so Ark's stages
     // too (QMK skips its indicator hooks while the matrix is off): they are
     // the Lighting screen's own, above every stage.
-    {id: "lightingPower", label: "All lighting", area: "Lighting", search: "rgb matrix enable on off idle timeout", fields: [
+    {id: "lightingPower", label: "All lighting", area: "Lighting", fields: [
         {...toggle("lightingEnabled", SETTING.RGB_MODE, "All lighting", "Off, every LED stays dark: the background effect, layer colours and feedback."), tooltip: "QMK's RGB Matrix enable switch.", shift: 0},
         number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout", "Time without activity before lighting turns off. 0 keeps lighting on. Maximum 24 hours.", {presentation: "duration"}),
     ]},
     // QMK's own RGB Matrix effect, which every stage paints over: its effect
     // and LED classes are added from what the keyboard reports. Its LED
     // classes limit the effect alone; the stages paint any LED.
-    {id: "rgbAppearance", label: "Background effect", area: "Lighting", stage: "base", search: "base lighting base effect rgb matrix mode hsv", fields: [
+    {id: "rgbAppearance", label: "Background effect", area: "Lighting", stage: "base", fields: [
         {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the background effect, around the colour wheel."},
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
         {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the background effect. Layer colours and feedback have their own brightness."},
         {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the background effect's animation. Effects without animation ignore this setting."},
     ]},
-    {id: "lightingFeedback", label: "Key feedback flash", area: "Lighting", stage: "key", search: "lighting feedback blink", fields: [
+    {id: "lightingFeedback", label: "Key feedback flash", area: "Lighting", stage: "key", fields: [
         number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
 ];
@@ -215,13 +216,16 @@ function settingsSections(snapshot, settings) {
     const sniping = /** @type {import("../../contracts/model.js").SettingsSection} */ (result.find(section => section.id === "sniping"));
     sniping.layerGroup = {label: "Auto-sniping layers", hint: "Sniping speed while any of these layers is on. Each also keeps a separate pointer layer off, so its own keys stay under your hand while you mouse."};
     sniping.fields.push(...everyLayer(i => ({...toggle(`snipingOnLayer${i}`, SETTING.AUTO_SNIPING_LAYERS, `On ${name(i)}`, "Use sniping speed while this layer is on."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}})));
-    result.push({id: "startupLayers", area: "Settings", label: "Default layers", search: "startup layers always on default_layer_state",
+    // No screen edits the default layers: moving the base layer covers them.
+    // The section stays so the review lists, and can revert, a difference
+    // that arrives some other way (a backup restored, say).
+    result.push({id: "startupLayers", area: "Settings", label: "Default layers",
         layerGroup: {label: "Default layers", hint: "Always on underneath every other layer. Normally only Base. QMK calls these default layers."}, fields:
         everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer a default layer: always on underneath every other layer. Keep at least one on; a higher default layer covers a lower one.", bitMask: 2 ** i, keyboardKeys: true, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
     // (participation-policy.md): a key takes part only where every switch that
     // applies is on, judged by the layer its key came from. Each behaviour and
-    // combo has its own switch and layers in Keys, and each key position its
+    // combo has its own switch and layers in Keymap, and each key position its
     // own in the key's editor.
     result.push({id: "behaviorSettings", area: "Settings", label: "Behaviours",
         layerGroup: {label: "On these layers", hint: "A key uses its behaviour only when the layer it comes from is on here. Off, it does what it would without one."}, fields:
@@ -232,14 +236,14 @@ function settingsSections(snapshot, settings) {
     // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: "Combos",
         layerGroup: {label: "On these layers", hint: "A key can be part of a combo only when the layer it comes from is on here."}, fields:
-        [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."), keyboardKeys: true},
+        [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keymap · Combos."), keyboardKeys: true},
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
                 hint: "Off, combos still fire but use their normal output action. A key pressed on its own still uses its behaviour where its participation allows. A bypassed custom key sends its shortcut, or nothing if it has none."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
-    result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", search: "combo reference", description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
+    result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
-    result.push({id: "keyboardOptions", area: "Settings", label: "Key swaps & typing", search: "key options magic keymap options keyboard options", description: options ? "Keyboard-wide swaps and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
+    result.push({id: "keyboardOptions", area: "Settings", label: "Key swaps & typing", description: options ? "Keyboard-wide swaps and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
         options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
@@ -252,7 +256,7 @@ function settingsSections(snapshot, settings) {
     const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
     /** @param {number} id */
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
-    result.push({id: "host", area: "Settings", label: "Your computer", search: "host os unicode UNICODE_HOST_MODE",
+    result.push({id: "host", area: "Settings", label: "Your computer",
         ...(host.effective === 2 && host.unicodeEnabled
             ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"}} : {}),
         // Auto can follow detection onto another OS than the layout's; a
