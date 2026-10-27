@@ -93,6 +93,8 @@ test("every edit mode the keyboard stores has words, and the result words finish
     for (const mode of Object.values(EDIT_MODE)) {
         const words = VOCABULARY.editModes[mode];
         assert.ok(words?.label && words.detail && words.id, String(mode));
+        // The rail's menu says each mode on one short line; the detail is its hover.
+        assert.ok(words.hint && words.hint.length <= 36 && !/[.;]$/.test(words.hint), `${mode}: ${words.hint}`);
     }
     assert.equal(VOCABULARY.editModes[EDIT_MODE.LIVE].label, "Live edit");
     assert.equal(VOCABULARY.editModes[EDIT_MODE.LIVE_REVIEW].label, "Live preview + save");

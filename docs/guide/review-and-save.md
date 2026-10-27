@@ -6,8 +6,10 @@ it becomes permanent, depends on the edit mode.
 
 ## Edit modes
 
-Pick the mode under **Edits** in the rail. The keyboard stores it, so the
-choice holds across replugs and in every browser.
+Pick the mode under **Edits** in the keyboard menu: click the keyboard's name
+at the top of the rail. The keyboard stores it, so the choice holds across
+replugs and in every browser. If the halves stored different modes, a dot
+beside the mode says so and **Settle** in the menu stores this one on both.
 
 | Mode | An edit… | It is kept when… | Unplugging before then… |
 | --- | --- | --- | --- |
@@ -32,7 +34,8 @@ save off.
 - The bar says **Not saved yet** until then, with **Revert** and a button
   that opens Review.
 - It says **Saving on the keyboard** while the keyboard writes.
-- The rail says **Saved by the keyboard** once the keyboard reports it saved.
+- Once the keyboard reports it saved, the bar goes and the keyboard's dot in
+  the rail says **Saved by the keyboard** on hover.
 
 Ark only reports what the keyboard says; it keeps no timer of its own. If the
 keyboard's save fails, the bar says **The keyboard could not save** and offers
@@ -42,8 +45,7 @@ the keyboard until one of them works.
 ### Live preview + save
 
 Every edit takes effect on both halves as you make it, so you can try it as
-you type. The rail and the bar count the **unsaved changes** the keyboard
-runs. The bar has two buttons:
+you type. The bar counts the **unsaved changes** the keyboard runs. The bar has two buttons:
 
 - **Review and save** opens Review, which compares what the keyboard has
   **Saved** with what is **Running now**. **Save on keyboard** keeps a
@@ -68,10 +70,10 @@ like any other. **Cancel edit** cancels it instead, and the keyboard keeps
 running what it ran. Other edits wait until it is done. A **Revert** waits for
 your keys in the same way, without Cancel edit.
 
-Until the slave half has taken an edit, the rail says **Slave half catching
-up** and the next edit waits. If the slave half refuses the edits, the rail
-says **Halves apart**: the halves now run different profiles, nothing can be
-saved, and **Revert** puts both back on the saved profile.
+Until the slave half has taken an edit, the bar says **the slave half is
+catching up** and the next edit waits. If the slave half refuses the edits,
+the bar says **the halves are apart**: the halves now run different profiles,
+nothing can be saved, and **Revert** puts both back on the saved profile.
 
 If the keyboard is unplugged or restarts during a save, Ark says **Ark can't
 tell whether the save finished.**, then why. It keeps your edits as a recovery
@@ -184,8 +186,9 @@ keyboard again and shows the new value. That is not an error.
   not sent. Ark reads the keyboard; make the edit again.
 
 **Keyboard adjustment pending** means such a change is still waiting to reach
-both halves. Release any held keys. The rail says it in every edit mode; it is
-the keyboard's own change, not an edit of yours waiting to be saved.
+both halves. Release any held keys. The keyboard's dot in the rail says it on
+hover in every edit mode; it is the keyboard's own change, not an edit of
+yours waiting to be saved.
 
 ## Saving
 
@@ -231,8 +234,8 @@ Keyboard screen.
 
 Rarely, a keyboard stops saving: a flash write failed, or something else it
 can't safely carry on from. Typing still works, but it refuses edits, Save
-and Revert until it restarts. The rail says **Stopped saving · Restart** and
-the bar says **The keyboard stopped saving**, in every edit mode.
+and Revert until it restarts. The bar says **The keyboard stopped saving**, in
+every edit mode; in Review and save it still counts the changes in your draft.
 
 **Restart**, in the bar, restarts both halves without unplugging:
 

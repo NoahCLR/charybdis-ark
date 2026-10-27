@@ -46,7 +46,7 @@ const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
     "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "flashPausesAsked", "keyDetailsOpen", "stackOpen", "cellHow", "placement",
-    "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pointingSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
+    "macroClipboard", "keyClipboard", "stage", "railMenu", "layersOpen", "layersAsked", "pointingSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "settingsSearch", "overlay", "leaveDemo", "modeAsk", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",

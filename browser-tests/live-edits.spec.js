@@ -7,6 +7,7 @@
 // panel posts.
 const {test, expect} = require("@playwright/test");
 const {clearPosts, posted, expectPost, change} = require("./control-preview");
+const {chooseEditMode, currentEditMode, keyboardMenu} = require("./shell-page");
 
 /** @param {import("@playwright/test").Page} page @param {string} screen @param {object} [state] */
 async function openLive(page, screen, state = {}) {
@@ -22,38 +23,39 @@ async function openLive(page, screen, state = {}) {
 
 test("the rail says how edits reach the keyboard, and the bar says what runs unsaved", async ({page}) => {
     await openLive(page, "keys");
-    await expect(page.locator('[data-f="rail:edit-mode"]')).toHaveValue("2");
-    await expect(page.locator(".rail-status")).toContainText("1 unsaved change on the keyboard");
+    expect(await currentEditMode(page)).toBe(2);
+    const label = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().vocabulary.editModes[2].label);
+    await expect(page.locator(".rail-keyboard .rail-mode")).toHaveText(label);
+    // The bar says it; the rail keeps no status lines of its own.
+    await expect(page.locator(".rail-status")).toHaveCount(0);
     const bar = page.locator(".commit.live");
-    await expect(bar).toContainText("running on the keyboard");
+    await expect(bar).toContainText("1 unsaved change running on the keyboard");
     await bar.locator('[data-act="revert"]').click();
     await expectPost(page, {type: "revertProfileDraft"});
 });
 
 test("leaving Live + review with unsaved edits asks Save or Revert; Cancel posts nothing", async ({page}) => {
     await openLive(page, "keys");
-    const mode = page.locator('[data-f="rail:edit-mode"]');
-    await mode.selectOption("0");
+    await chooseEditMode(page, 0);
     const ask = page.locator(".sheet.edit-mode-ask");
     await expect(ask).toContainText("Save or revert first?");
     await ask.locator('[data-act="cancel"]').click();
     await expect(ask).toHaveCount(0);
     expect(await posted(page)).toEqual([]);
-    await mode.selectOption("0");
+    await chooseEditMode(page, 0);
     await page.locator('.sheet.edit-mode-ask [data-pending="save"]').click();
     await expectPost(page, {type: "setEditMode", mode: 0, pending: "save"});
     await clearPosts(page);
-    await mode.selectOption("0");
+    await chooseEditMode(page, 0);
     await page.locator('.sheet.edit-mode-ask [data-pending="revert"]').click();
     await expectPost(page, {type: "setEditMode", mode: 0, pending: "revert"});
 });
 
 test("going from Apply to Live + review with a draft asks Send or Discard; without one it switches at once", async ({page}) => {
     await page.goto("/preview/index.html");
-    const mode = page.locator('[data-f="rail:edit-mode"]');
-    await expect(mode).toHaveValue("0");
+    expect(await currentEditMode(page)).toBe(0);
     await page.evaluate(() => {window.__posted.length = 0;});
-    await mode.selectOption("2");
+    await chooseEditMode(page, 2);
     await expectPost(page, {type: "setEditMode", mode: 2});
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
@@ -63,7 +65,7 @@ test("going from Apply to Live + review with a draft asks Send or Discard; witho
         store.setModel(model); store.render();
         window.__posted.length = 0;
     });
-    await mode.selectOption("2");
+    await chooseEditMode(page, 2);
     await expect(page.locator(".sheet.edit-mode-ask")).toContainText("Send your draft live?");
     await page.locator('.sheet.edit-mode-ask [data-pending="send"]').click();
     await expectPost(page, {type: "setEditMode", mode: 2, pending: "send"});
@@ -119,7 +121,7 @@ test("combos turned off by a key show beside the switch, not as a change", async
     const mark = page.locator('.off-by-key');
     await expect(mark).toHaveCount(1);
     await expect(mark).toHaveText("turned off by key");
-    await expect(page.locator(".rail-status")).toContainText("1 unsaved change");
+    await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });
 
 /** @param {import("@playwright/test").Page} page @param {(model: any) => void} change */
@@ -136,7 +138,6 @@ async function withModel(page, change) {
 test("halves apart: the rail says so and the bar offers Revert, not Save", async ({page}) => {
     await openLive(page, "keys");
     await withModel(page, model => {model.draft.live.slaveRefused = true; model.draft.live.converged = false;});
-    await expect(page.locator(".rail-status")).toContainText("Halves apart");
     const bar = page.locator(".commit.live");
     await expect(bar).toContainText("the halves are apart");
     await expect(bar.locator('[data-act="review"]')).toHaveCount(0);
@@ -149,7 +150,10 @@ test("halves that stored different modes are settled by choosing the mode again;
     await openLive(page, "keys");
     await withModel(page, model => {model.editMode.conflict = true; model.editMode.notStored = true;});
     await expect(page.locator('.rail-mode [data-tip*="Unplugging it now may lose the mode"]')).toHaveCount(1);
-    await page.locator('[data-act="edit-mode-settle"]').click();
+    await expect(page.locator('.rail-mode [data-tip*="halves stored different modes"]')).toHaveCount(1);
+    const menu = await keyboardMenu(page);
+    await expect(menu.locator(".rail-menu-note")).toHaveAttribute("data-tip", /Unplugging it now may lose the mode/);
+    await menu.locator('[data-act="edit-mode-settle"]').click();
     const ask = page.locator(".sheet.edit-mode-ask");
     await expect(ask).toContainText("settles halves");
     await ask.locator('[data-pending="revert"]').click();
@@ -159,7 +163,7 @@ test("halves that stored different modes are settled by choosing the mode again;
 test("the mode question lists the checks Save confirms, and Save anyway confirms them", async ({page}) => {
     await openLive(page, "keys");
     await withModel(page, model => {model.draft.checks = [{id: "w", kind: "unowned", level: "warning", status: "existing", title: "Layer 3 has no way back", detail: "", place: null}];});
-    await page.locator('[data-f="rail:edit-mode"]').selectOption("0");
+    await chooseEditMode(page, 0);
     const ask = page.locator(".sheet.edit-mode-ask");
     await expect(ask).toContainText("In Review and save");
     await expect(ask.locator(".live-ask-checks")).toContainText("Layer 3 has no way back");
@@ -225,31 +229,35 @@ test("custom keys: a name posts", async ({page}) => {
 // bar saying what the keyboard has not saved yet, with no Save.
 test("switching into Live from Live + review asks Save or Revert; from Apply with nothing pending it switches at once", async ({page}) => {
     await openLive(page, "keys");
-    const mode = page.locator('[data-f="rail:edit-mode"]');
-    await expect(mode.locator("option")).toHaveText(["Live edit", "Live preview + save", "Review and save"]);
-    expect(await mode.locator("option").evaluateAll(options => options.map(option => /** @type {HTMLOptionElement} */ (option).value))).toEqual(["1", "2", "0"]);
-    await mode.selectOption("1");
+    // The menu lists the modes in the order the keyboard offers them, each with its words.
+    const words = await page.evaluate(async () => {
+        const model = (await import("/webview/store.mjs")).getModel();
+        return model.editMode.offered.map((mode) => `${model.vocabulary.editModes[mode].label}${model.vocabulary.editModes[mode].hint}`);
+    });
+    const modes = (await keyboardMenu(page)).locator('[data-act="edit-mode"] .rail-menu-text');
+    await expect(modes).toHaveText(words);
+    await expect(modes).toHaveText([/^Live edit/, /^Live preview \+ save/, /^Review and save/]);
+    await chooseEditMode(page, 1);
     const ask = page.locator(".sheet.edit-mode-ask");
     await expect(ask).toContainText("In Live edit the keyboard saves edits by itself");
     await ask.locator('[data-pending="save"]').click();
     await expectPost(page, {type: "setEditMode", mode: 1, pending: "save"});
     await page.goto("/preview/index.html");
     await page.evaluate(() => {window.__posted.length = 0;});
-    await page.locator('[data-f="rail:edit-mode"]').selectOption("1");
+    await chooseEditMode(page, 1);
     await expectPost(page, {type: "setEditMode", mode: 1});
 });
 
 test("in Live an edit posts as in Live + review, the bar has no Save, and leaving Live asks nothing", async ({page}) => {
     await page.goto("/preview/index.html?shell=live-auto");
     await page.locator('[data-screen="mouse"]').click();
+    expect(await currentEditMode(page)).toBe(1);
     await page.evaluate(() => {window.__posted.length = 0;});
-    const mode = page.locator('[data-f="rail:edit-mode"]');
-    await expect(mode).toHaveValue("1");
     const bar = page.locator(".commit.live.auto");
     await expect(bar).toContainText("Not saved yet");
     await expect(bar).toContainText("after 3 seconds without typing");
     await expect(bar.locator('[data-act="save-again"]')).toHaveCount(0);
-    await expect(page.locator(".rail-status")).toContainText("1 change not saved yet");
+    await expect(bar.locator('[data-act="review"]')).toHaveText("1 change");
     const field = page.locator('select[data-macro="normalDpi"]');
     const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected)?.value);
     await field.selectOption(/** @type {string} */ (other));
@@ -259,7 +267,7 @@ test("in Live an edit posts as in Live + review, the bar has no Save, and leavin
     await expect(page.locator('.sheet [data-act="apply"]')).toHaveCount(0);
     await page.locator('.sheet [data-act="close"]').click();
     await clearPosts(page);
-    await mode.selectOption("2");
+    await chooseEditMode(page, 2);
     await expect(page.locator(".sheet.edit-mode-ask")).toHaveCount(0);
     await expectPost(page, {type: "setEditMode", mode: 2});
 });
@@ -294,14 +302,14 @@ test("in Live the keyboard's own save, a failed one and halves apart each say wh
     await set({saveFailed: false});
     await change({"draft.live": {...(await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().draft.live)), slaveRefused: true}});
     await expect(page.locator(".commit.live")).toContainText("the halves are apart");
-    await expect(page.locator(".rail-status")).toContainText("Halves apart");
     await expect(page.locator('.commit.live [data-act="save-again"]')).toHaveCount(0);
     await page.locator('.commit.live [data-act="revert"]').click();
     await expectPost(page, {type: "revertProfileDraft"});
     await change({"editMode.notStored": true});
     await set({savedByKeyboard: true}, false);
     await expect(page.locator(".commit.live")).toHaveCount(0);
-    await expect(page.locator(".rail-status")).toContainText("Saved by the keyboard");
+    // With no bar, the keyboard's dot says it saved.
+    await expect(page.locator(".rail-keyboard > .dot")).toHaveAttribute("data-tip", /Saved by the keyboard\./);
     await expect(page.locator(".rail-mode .dot.warn")).toHaveCount(1);
 });
 
@@ -334,7 +342,6 @@ test("a keyboard that stopped saving says so, for either half, and Restart posts
     const bar = page.locator(".commit.live.stopped");
     await expect(bar).toContainText("The keyboard stopped saving");
     await expect(bar).toContainText("Restart it to continue.");
-    await expect(page.locator(".rail-status")).toContainText("Stopped saving · Restart");
     await expect(page.locator("body")).not.toContainText("catching up");
     await expect(bar.locator('[data-act="review"], [data-act="save-again"], [data-act="revert"]')).toHaveCount(0);
     await clearPosts(page);
@@ -358,8 +365,8 @@ test("an Apply draft's keyboard that stopped saving says so, for either half, an
     await expect(bar).toContainText("The keyboard stopped saving");
     await expect(bar).toContainText("Restart it to continue.");
     await expect(bar).not.toHaveClass(/\blive\b/);
-    await expect(page.locator(".rail-status")).toContainText("Stopped saving · Restart");
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    // The draft is kept as it is, and the bar still counts it.
+    await expect(bar).toContainText("1 change in your draft");
     await expect(page.locator("body")).not.toContainText("not ready");
     await expect(page.locator('.commit [data-act="review"], .commit [data-act="discard"]')).toHaveCount(0);
     await clearPosts(page);
@@ -372,7 +379,6 @@ test("an Apply draft's keyboard that stopped saving says so, for either half, an
         store.setModel(model); store.render();
     });
     await expect(page.locator(".commit.stopped")).toContainText("The keyboard stopped saving");
-    await expect(page.locator(".rail-status")).toContainText("Stopped saving · Restart");
     // Back saving: the draft's own bar again.
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");

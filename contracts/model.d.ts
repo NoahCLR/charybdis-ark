@@ -83,7 +83,7 @@ export type WordList<T = Scalar> = readonly (readonly [T, string])[];
 export type HalvesId = 'agree' | 'alone' | 'apart' | 'unread';
 export interface Vocabulary {
     phases: Readonly<Record<PhaseId, Readonly<PhaseWords>>>;
-    editModes: Readonly<Record<number, Readonly<{id: EditModeId; label: string; detail: string}>>>;
+    editModes: Readonly<Record<number, Readonly<{id: EditModeId; label: string; hint: string; detail: string}>>>;
     halves: Readonly<Record<HalvesId, Readonly<{label: string; detail: string}>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];
     hostOs: WordList<number>;

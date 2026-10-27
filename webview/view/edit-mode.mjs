@@ -75,8 +75,6 @@ export function questionWords(question, changes, {mode = question === "saveOrRev
 export const STOPPED_WORDS = Object.freeze({
     title: "The keyboard stopped saving",
     detail: "Restart it to continue. Ark keeps any unsaved edits and puts them back once it is back; typing works meanwhile.",
-    rail: "Stopped saving · Restart",
-    tip: "The keyboard stopped saving and refuses Save, Revert and edits until it restarts. Restart it from the bar below; unplugging works too, but loses unsaved edits.",
 });
 
 // A DPI or lighting key change still reaching both halves, in any edit mode:
@@ -120,30 +118,6 @@ export function liveSaveState(draft, {adjustment = true} = {}) {
     if (keyboard?.savedByKeyboard) return {kind: "saved", tone: "ok", title: "Saved by the keyboard",
         detail: "The keyboard saved its edits by itself; they survive a replug.", action: null};
     return null;
-}
-
-// The rail's line for it: Live's "not saved yet" with its count, a stopped
-// keyboard in short, anything else by its title, the detail on hover. Null
-// when there is nothing to say, or only what the rail says another way (the
-// halves apart).
-/** @param {Draft | null | undefined} draft @param {{adjustment?: boolean}} [options] @returns {null | {kind: NonNullable<ReturnType<typeof liveSaveState>>["kind"], tone: string, text: string, tip: string}} */
-export function railSaveLine(draft, options) {
-    const saving = liveSaveState(draft, options);
-    if (!saving || saving.kind === "refused") return null;
-    if (saving.kind === "stopped") return {kind: saving.kind, tone: saving.tone, text: STOPPED_WORDS.rail, tip: STOPPED_WORDS.tip};
-    const count = draft?.changes?.length || 0;
-    const text = saving.kind === "pending" ? `${count ? `${count} change${count === 1 ? "" : "s"}` : "Edits"} not saved yet` : saving.title;
-    return {kind: saving.kind, tone: saving.tone, text, tip: saving.detail};
-}
-
-// The rail's lines: a pending adjustment, then what stands beneath it (Live's
-// own "not saved yet" keeps its count), so neither is said on the other's
-// account.
-/** @param {Draft | null | undefined} draft */
-export function railSaveLines(draft) {
-    const first = railSaveLine(draft);
-    const beneath = first?.kind === "adjustment" ? railSaveLine(draft, {adjustment: false}) : null;
-    return /** @type {NonNullable<ReturnType<typeof railSaveLine>>[]} */ ([first, beneath].filter(Boolean));
 }
 
 // What jumping in the draft history, renaming the keyboard and importing a

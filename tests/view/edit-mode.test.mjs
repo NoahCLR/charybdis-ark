@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, liveSaveState, questionWords, quietWords, railSaveLine, railSaveLines, switchQuestion} from "../../webview/view/edit-mode.mjs";
+import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, liveSaveState, questionWords, quietWords, switchQuestion} from "../../webview/view/edit-mode.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 
 const vocabulary = {editModes: {
@@ -57,35 +57,29 @@ test("a pending keyboard adjustment is said as itself in every edit mode", () =>
     const changes = (count) => Array.from({length: count}, () => ({}));
     /** @param {object} live @param {number} [count] */
     const liveDraft = (live, count = 0) => /** @type {any} */ ({changes: changes(count), dirty: count > 0, live: {unsaved: false, converged: true, keyboard: adjusting, ...live}, keyboard: adjusting});
-    const words = {kind: "adjustment", tone: "draft", text: "Keyboard adjustment pending",
-        tip: "A DPI or lighting key change is waiting to reach both halves. Release held keys; Ark will read it when it takes effect."};
+    const words = {kind: "adjustment", tone: "draft", title: "Keyboard adjustment pending",
+        detail: "A DPI or lighting key change is waiting to reach both halves. Release held keys; Ark will read it when it takes effect.", action: null};
 
-    // Live, nothing unsaved: not "Edits not saved yet".
-    assert.deepEqual(railSaveLine(liveDraft({mode: LIVE})), words);
-    // Live and Live + review with unsaved changes: not "N changes not saved yet".
-    assert.deepEqual(railSaveLine(liveDraft({mode: LIVE, unsaved: true}, 2)), words);
-    assert.deepEqual(railSaveLine(liveDraft({mode: LIVE_REVIEW, unsaved: true}, 2)), words);
+    // Live, nothing unsaved: not "Not saved yet".
+    assert.deepEqual(liveSaveState(liveDraft({mode: LIVE})), words);
+    // Live and Live + review with unsaved changes: not "Not saved yet".
+    assert.deepEqual(liveSaveState(liveDraft({mode: LIVE, unsaved: true}, 2)), words);
+    assert.deepEqual(liveSaveState(liveDraft({mode: LIVE_REVIEW, unsaved: true}, 2)), words);
     // An Apply draft: the keyboard's own status, outside `live`.
     const apply = (keyboardView, count = 1) => /** @type {any} */ ({changes: changes(count), dirty: count > 0, live: null, keyboard: keyboardView});
-    assert.deepEqual(railSaveLine(apply(adjusting)), words);
-    assert.deepEqual(railSaveLine(apply(adjusting, 0)), words, "with no edits in the draft too");
-    assert.equal(liveSaveState(apply(adjusting))?.title, "Keyboard adjustment pending");
-    assert.equal(railSaveLine(apply(keyboard)), null, "nothing else is said under an Apply draft");
-    assert.equal(railSaveLine(apply(null)), null);
+    assert.deepEqual(liveSaveState(apply(adjusting)), words);
+    assert.deepEqual(liveSaveState(apply(adjusting, 0)), words, "with no edits in the draft too");
+    assert.equal(liveSaveState(apply(keyboard)), null, "nothing else is said under an Apply draft");
+    assert.equal(liveSaveState(apply(null)), null);
 
-    // Beside it, what stands beneath: Live's own "not saved yet" with its
-    // count; nothing more in Live + review, whose unsaved line is the rail's own.
-    assert.deepEqual(railSaveLines(liveDraft({mode: LIVE, unsaved: true}, 2)).map((line) => line.text), ["Keyboard adjustment pending", "2 changes not saved yet"]);
-    assert.deepEqual(railSaveLines(liveDraft({mode: LIVE})).map((line) => line.text), ["Keyboard adjustment pending"]);
-    assert.deepEqual(railSaveLines(liveDraft({mode: LIVE_REVIEW, unsaved: true}, 2)).map((line) => line.text), ["Keyboard adjustment pending"]);
-    assert.deepEqual(railSaveLines(apply(adjusting)).map((line) => line.text), ["Keyboard adjustment pending"]);
-    // Live's own "not saved yet" keeps its count, with no adjustment.
-    assert.equal(railSaveLine(liveDraft({mode: LIVE, unsaved: true, keyboard}, 2))?.text, "2 changes not saved yet");
-    assert.equal(railSaveLine(liveDraft({mode: LIVE, unsaved: true, keyboard}))?.text, "Edits not saved yet");
+    // What stands beneath it, asked for on its own: Live's own "not saved yet".
+    assert.equal(liveSaveState(liveDraft({mode: LIVE, unsaved: true}, 2), {adjustment: false})?.kind, "pending");
+    assert.equal(liveSaveState(liveDraft({mode: LIVE}), {adjustment: false}), null);
+    assert.equal(liveSaveState(liveDraft({mode: LIVE_REVIEW, unsaved: true}, 2), {adjustment: false}), null);
+    assert.equal(liveSaveState(apply(adjusting), {adjustment: false}), null);
     // A stopped keyboard and halves apart outrank it.
-    assert.equal(railSaveLine(liveDraft({mode: LIVE, keyboard: {...adjusting, stopped: true}}))?.text, STOPPED_WORDS.rail);
+    assert.equal(liveSaveState(liveDraft({mode: LIVE, keyboard: {...adjusting, stopped: true}}))?.kind, "stopped");
     assert.equal(liveSaveState(liveDraft({mode: LIVE_REVIEW, unsaved: true, slaveRefused: true}))?.kind, "refused");
-    assert.equal(railSaveLine(liveDraft({mode: LIVE_REVIEW, unsaved: true, slaveRefused: true})), null, "the halves apart have their own rail line");
 });
 
 // Firmware D-F34: a keyboard that stopped saving used to look like "not
@@ -114,7 +108,6 @@ test("an Apply draft's keyboard that stopped saving says so for either half and 
     for (const flag of ["stopped", "slaveStopped"]) for (const count of [0, 2]) {
         const draft = apply({adjustmentPending: true, [flag]: true}, count);
         assert.deepEqual(liveSaveState(draft), {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"}, `${flag}, ${count} changes`);
-        assert.deepEqual(railSaveLines(draft), [{kind: "stopped", tone: "err", text: STOPPED_WORDS.rail, tip: STOPPED_WORDS.tip}], "one line, in place of the adjustment's");
     }
     assert.equal(liveSaveState(apply({})), null, "a keyboard saving normally says nothing");
 });

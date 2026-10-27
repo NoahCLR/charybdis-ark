@@ -22,6 +22,7 @@ import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, matchBehavioursHeight, screenKeys} from "./ui/keys.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
+import {escapeKeyboardMenu} from "./ui/keyboard-menu.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
 import {screenMouse} from "./ui/mouse.mjs";
@@ -208,6 +209,7 @@ addEventListener("keydown", (event) => {
     if (trapTab(root, event) || activateOnKey(event)) return;
     if (event.key !== "Escape") return;
     hideHover();
+    if (escapeKeyboardMenu()) return;
     if (state.picker) { state.picker = null; render(); return; }
     if (state.retarget) { state.retarget = null; render(); return; }
     if (state.layersOpen) { discardLayers(); render(); return; }
