@@ -853,6 +853,7 @@ button.tier:hover { background: var(--surface-3); }
 .key-participation > .sect-h { margin: 6px 0 2px; }
 .def-layers > summary { cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
 .def-layers > summary:hover { color: var(--text-2); }
+.def-layers > .layer-grid { margin-top: 10px; }
 /* The Behaviours tab: nothing to open, and the open behaviour's title, its
    keycode, the notes under them and its actions (ui/keys/behaviour-editor.mjs). */
 .beh-empty { padding: 16px; }
