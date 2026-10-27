@@ -40,11 +40,11 @@ export function reviewOverlay() {
         show: stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
             data-tip="Close the review and open this where it is edited.">Show</button>` : ""});
     const demo = demoOf(model);
-    // Live + review compares the keyboard's saved profile with what it runs
-    // now; Save makes that permanent (firmware D-F32).
+    // Live preview + save compares the keyboard's saved profile with what it
+    // runs now; Save makes that permanent (firmware D-F32).
     const live = Boolean(draft.live);
-    // In Live the keyboard saves by itself: the review only shows what is not
-    // saved yet, with Revert, and Save again only once its own save failed.
+    // In Live edit the keyboard saves by itself: the review only shows what is
+    // not saved yet, with Revert, and Save again only once its own save failed.
     const keyboardSaves = draft.live?.mode === 1;
     const columns = live ? reviewColumns("What changes", "Saved", "Running now")
         : reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");

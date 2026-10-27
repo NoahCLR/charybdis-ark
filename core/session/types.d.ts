@@ -174,7 +174,7 @@ export interface PanelSession extends DemoSession {
     portableLayers?: LayerEditState;
     acceptedEdit?: ReturnType<NonNullable<DemoSession['draft']>['stage']>;
     /** A live edit waiting on its trap check (plan answer 2): sent on confirmLiveEdit, dropped on cancelLiveEdit. */
-    /** What the live watch last saw of a keyboard under an Apply draft (live-watch.js). */
+    /** What the live watch last saw of a keyboard under a Review and save draft (live-watch.js). */
     liveReadRetry?: {draftId: string; attempts: number};
     applyWatch?: {draftId: string; session: number; revision: number; savedGeneration: number};
     liveProposal?: {id: number; draftId: string; revision: number; target: import('./profile-draft-session.js').LiveTarget;
@@ -237,7 +237,7 @@ export interface LiveKeyboardStatus {
     /** A save runs, Ark's or the keyboard's own. */
     saving: boolean;
     autoSaving: boolean;
-    /** Nothing unsaved, and the keyboard saved this revision by itself (Live). */
+    /** Nothing unsaved, and the keyboard saved this revision by itself (Live edit). */
     savedByKeyboard: boolean;
     /** The last save of these edits failed; they are still unsaved. */
     saveFailed: boolean;
@@ -254,7 +254,7 @@ export interface LiveKeyboardStatus {
     slaveStopped: boolean;
     quietMs: number;
 }
-/** A Live + review read: the working copy as the snapshot, the saved profile beside it. */
+/** A Live preview + save read: the working copy as the snapshot, the saved profile beside it. */
 export type LiveSnapshot = import('../model/types.js').CompleteSnapshot & import('../model/types.js').SnapshotFacts & {
     status: ProfileStatus;
     saved: import('../model/types.js').CompleteSnapshot & import('../model/types.js').SnapshotFacts;

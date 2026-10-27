@@ -173,8 +173,8 @@ class LiveEditCoordinator {
     // something else holds the profile: asked again until it is taken. A
     // BUSY because the halves are apart, the slave half is not connected or a
     // half stopped never ends by waiting. A save holds
-    // the profile until it lands (in Live the keyboard's own starts 3 s after
-    // an edit and takes seconds, more for a large profile), so while the
+    // the profile until it lands (in Live edit the keyboard's own starts 3 s
+    // after an edit and takes seconds, more for a large profile), so while the
     // keyboard says one runs the wait is a save's, asked at a save's pace.
     /** @param {() => Buffer} build @param {string} what */
     async sendWhenFree(build, what) {
@@ -331,10 +331,10 @@ class LiveEditCoordinator {
         }
     }
 
-    // Leaving Live: the keyboard saves at once whatever it has not saved yet,
-    // since it refuses a mode change with unsaved edits (firmware D-F32). A
-    // save of its own that is running is waited for, not raced; the pair
-    // saved is the keyboard's own, since in Live it would save it anyway.
+    // Leaving Live edit: the keyboard saves at once whatever it has not saved
+    // yet, since it refuses a mode change with unsaved edits (firmware D-F32).
+    // A save of its own that is running is waited for, not raced; the pair
+    // saved is the keyboard's own, since in Live edit it would save it anyway.
     /** @param {(progress: import("../protocol/types.js").EditStatus) => void} [onProgress]
      * @param {(status: import("../protocol/types.js").EditStatus) => Promise<void>} [beforeSave] */
     async flush(onProgress = () => {}, beforeSave = async () => {}) {

@@ -5,15 +5,16 @@
 // the panel posts, every undo, redo, discard, import and layer change, goes
 // to the keyboard's working copy through one path, and the draft moves only
 // once the keyboard confirms it. Save and Revert are the keyboard's; in Live
-// the keyboard saves by itself and Ark only says so (live-watch.js). The mode
-// switch asks what to do with work in progress before it changes.
+// edit the keyboard saves by itself and Ark only says so (live-watch.js). The
+// mode switch asks what to do with work in progress before it changes.
 //
 //   proposeLive   the trap check, then the edit: asks first when the edit
 //                 would add a trap or warning, as review does (answer 2)
 //   LIVE_ACTIONS  the draft controls a live draft runs instead of local ones
-//   setEditMode   between Apply, Live and Live + review: Save/Revert or
-//                 Send/Discard first where work would be lost; leaving Live
-//                 has the keyboard save first, with no question
+//   setEditMode   between Review and save, Live edit and Live preview +
+//                 save: Save/Revert or Send/Discard first where work would be
+//                 lost; leaving Live edit has the keyboard save first, with
+//                 no question
 //   closingLoses  whether closing Ark now loses edits
 //   saveCutShortResult  after a Save the connection cut short, what the next
 //                 read shows became of the edits
@@ -86,8 +87,8 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
     // A step that lands on exactly the saved profile (an undo, a redo of a
     // Revert, an edit put back by hand) is a Revert: sent as an edit it would
     // leave the keyboard a working copy identical to what it saved, still
-    // "unsaved", which Live would save again as a new generation of the same
-    // bytes.
+    // "unsaved", which Live edit would save again as a new generation of the
+    // same bytes.
     if (live.unsaved && !draft.base.incomplete && fingerprint(target.document) === draft.base.fingerprint) {
         await revertTo(session, draft, target);
         session.acceptedEdit = accepted;
@@ -224,7 +225,8 @@ async function reread(session) {
 
 // Only a read that moved underneath us is automatically retried. Three
 // failed reads in this cycle leave Read keyboard to the person; unrelated
-// stale Apply drafts and persistent device failures are never polled away.
+// stale Review and save drafts and persistent device failures are never polled
+// away.
 /** @param {Session} session @param {unknown} error */
 function retryRead(session, error) {
     const draft = session.draft;
@@ -233,8 +235,8 @@ function retryRead(session, error) {
     session.liveReadRetry = {draftId: draft.id, attempts: attempts + 1};
 }
 
-// A posted edit, in Live + review: the same editors stage it, the keyboard
-// takes it.
+// A posted edit, in Live preview + save: the same editors stage it, the
+// keyboard takes it.
 /** @param {Session} session @param {import("./types.js").DraftEdit} message */
 async function liveEdit(session, message) {
     const draft = liveDraft(session);
@@ -270,8 +272,8 @@ const LIVE_ACTIONS = Object.freeze({
     },
     // Save: a recovery copy of what is saved, then the keyboard writes what it
     // runs as its new saved profile on both halves.
-    // In Live the keyboard saves by itself; Ark's Save is only its way to try
-    // again after the keyboard's own save failed, and asks for no review:
+    // In Live edit the keyboard saves by itself; Ark's Save is only its way to
+    // try again after the keyboard's own save failed, and asks for no review:
     // every edit was checked before it was sent.
     save: async ({draft, revision, session, service, message, saveRecovery}) => {
         draft.assertRevision(revision);
@@ -317,13 +319,13 @@ const LIVE_ACTIONS = Object.freeze({
 
 // Between the three modes (plan answer 3). The keyboard refuses a mode change
 // while it has unsaved edits (firmware D-F32), so they are settled first:
-// outside Live a live draft with unsaved edits needs Save or Revert, whichever
-// way it goes (choosing the same mode again settles halves that stored
-// different modes), and entering a live mode from Apply with a draft needs
-// Send or Discard; the question shows the checks it confirms, and Cancel
-// posts nothing. Leaving Live needs no question: the keyboard saves what it
-// has not saved yet, as it would have a moment later, then switches. A
-// failure leaves the mode as it was.
+// outside Live edit a live draft with unsaved edits needs Save or Revert,
+// whichever way it goes (choosing the same mode again settles halves that
+// stored different modes), and entering a live mode from Review and save with
+// a draft needs Send or Discard; the question shows the checks it confirms,
+// and Cancel posts nothing. Leaving Live edit needs no question: the keyboard
+// saves what it has not saved yet, as it would have a moment later, then
+// switches. A failure leaves the mode as it was.
 /** @param {Session} session @param {{mode: number, pending?: string, draftRevision: number, confirmChecks?: boolean}} message @param {(cause: import("../../contracts/model.js").RecoveryCause) => LiveContext["saveRecovery"]} recoveryFor @param {Shell} shell */
 async function setEditMode(session, message, recoveryFor, shell) {
     const draft = session.draft, service = session.service;
@@ -375,9 +377,9 @@ async function setEditMode(session, message, recoveryFor, shell) {
     else session.notice = notice;
 }
 
-// The Apply draft goes live as one edit, its checks confirmed by the
-// question. Until the keyboard takes it, the draft is kept: refused, the
-// keyboard goes back to Apply and the draft is there as it was.
+// The Review and save draft goes live as one edit, its checks confirmed by
+// the question. Until the keyboard takes it, the draft is kept: refused, the
+// keyboard goes back to Review and save and the draft is there as it was.
 /** @param {Session} session @param {Draft} kept @param {number} mode @param {string} notice what the mode change says */
 async function sendApplyDraft(session, kept, mode, notice) {
     const draft = /** @type {Draft} */ (session.draft), service = session.service;
@@ -386,8 +388,9 @@ async function sendApplyDraft(session, kept, mode, notice) {
         if (!published) throw refusal("The keyboard changed before it took the draft. Read it again before sending.", "LIVE_EDIT_STALE");
         session.notice = `${notice} ${mode === EDIT_MODE.LIVE ? "Your draft is running on the keyboard, which saves it in a moment." : "Your draft is running on the keyboard, unsaved."}`;
     } catch (error) {
-        // The Apply draft belongs to the person until publication succeeds,
-        // even if the keyboard refuses the return to Apply.
+        // The Review and save draft belongs to the person until publication
+        // succeeds, even if the keyboard refuses the return to Review and
+        // save.
         replaceDraft(session, kept);
         kept.needsRead = true;
         session.observedPortable = service.portable || undefined;
@@ -408,10 +411,10 @@ async function sendApplyDraft(session, kept, mode, notice) {
     }
 }
 
-// Whether closing Ark now loses edits: an Apply draft not applied, or edits
-// in Live + review not saved (a replug puts back what is saved). In Live the
-// keyboard keeps and saves them without Ark, so only an edit still on its
-// way to the keyboard is at stake.
+// Whether closing Ark now loses edits: a Review and save draft not applied,
+// or edits in Live preview + save not saved (a replug puts back what is
+// saved). In Live edit the keyboard keeps and saves them without Ark, so only
+// an edit still on its way to the keyboard is at stake.
 /** @param {Pick<Session, "draft"> & {service?: {phase?: string, busy?: boolean}}} session */
 function closingLoses(session) {
     const draft = session.draft;

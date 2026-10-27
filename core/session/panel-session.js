@@ -320,8 +320,8 @@ function routeMessage(session, message, state) {
             throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to current firmware.");
         }
         const draft = boundDraft(session, state, message, "Reconnect the keyboard this draft belongs to and wait for its current operation.");
-        // Live + review sends the edit to the keyboard (live-edits.js); the
-        // loop awaits it.
+        // Live preview + save sends the edit to the keyboard (live-edits.js);
+        // the loop awaits it.
         if (draft.live) return "live";
         // The command set selects the decoder; stage validates payload values.
         session.acceptedEdit = draft.stage(/** @type {import("./types.js").DraftEdit} */ (message));

@@ -1,7 +1,7 @@
 "use strict";
-// Live through the panel loop: the keyboard saves by itself and Ark only says
-// so (live-watch.js reads its status between edits), its own keys' edits are
-// read as news, and its flags show with the one action that helps.
+// Live edit through the panel loop: the keyboard saves by itself and Ark only
+// says so (live-watch.js reads its status between edits), its own keys' edits
+// are read as news, and its flags show with the one action that helps.
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {openPanelLoop} = require("../../core/session/panel-loop");
@@ -163,7 +163,8 @@ test("under an Apply draft, a key adjustment the keyboard saved is read again; o
     assert.equal(validateSnapshot(session.draft.current.document).layers[3][2], 0x06, "showing what the keyboard saved");
     assert.equal(session.draft.dirty, false);
     // Read while an adjustment is unsaved, the draft opens live (only Save or
-    // Revert could settle it), and returns to Apply once the keyboard saved it.
+    // Revert could settle it), and returns to Review and save once the
+    // keyboard saved it.
     changed[3][2] = 0x07;
     keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
     await session.service.readKeyboardProfile();

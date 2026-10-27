@@ -398,8 +398,8 @@ test("flushing (leaving Live) waits for the keyboard's own save, saves what is l
 });
 
 
-// In Live the keyboard saves by itself 3 s after an edit, and a save holds
-// the profile for its whole length (about 6 s for a 6 KB profile on the
+// In Live edit the keyboard saves by itself 3 s after an edit, and a save
+// holds the profile for its whole length (about 6 s for a 6 KB profile on the
 // keyboard, longer for larger ones). An edit made meanwhile waits for it,
 // however long it takes, rather than being refused after an ordinary wait.
 test("an edit made while the keyboard saves by itself waits for the save to land", async t => {

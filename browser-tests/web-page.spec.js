@@ -563,9 +563,10 @@ test("the web shell reads, edits and Applies one profile generation without VIA"
     expect(errors).toEqual([]); ownFilesOnly();
 });
 
-// Live + review through the real web shell (firmware D-F32): an edit reaches
-// the keyboard at once, review compares it with what is saved, and Save makes
-// it the saved profile, with a recovery copy of what was saved before.
+// Live preview + save through the real web shell (firmware D-F32): an edit
+// reaches the keyboard at once, review compares it with what is saved, and
+// Save makes it the saved profile, with a recovery copy of what was saved
+// before.
 test("in Live + review an edit reaches the keyboard at once, and review and Save make it permanent", async ({page, context, baseURL}) => {
     test.setTimeout(90000);
     const keyboard = liveKeyboard({document: pdDocument()});
@@ -611,10 +612,10 @@ test("in Live + review an edit reaches the keyboard at once, and review and Save
     ownFilesOnly();
 });
 
-// Live through the real web shell: Ark switches into it (no unsaved edits, so
-// no question), an edit runs at once, and the page shows "saved by the
-// keyboard" once the keyboard's status says so; Ark never sends Save. Leaving
-// the page then loses nothing, so it does not ask.
+// Live edit through the real web shell: Ark switches into it (no unsaved
+// edits, so no question), an edit runs at once, and the page shows "saved by
+// the keyboard" once the keyboard's status says so; Ark never sends Save.
+// Leaving the page then loses nothing, so it does not ask.
 test("in Live the keyboard saves an edit by itself and the page says so, without asking on leaving", async ({page, context, baseURL}) => {
     test.setTimeout(90000);
     const keyboard = liveKeyboard({document: pdDocument(), autoSaveAfterReads: 2});
@@ -656,9 +657,9 @@ test("in Live the keyboard saves an edit by itself and the page says so, without
 });
 
 // Chrome on macOS holds back a page's input reports while one of its native
-// menus is open. In Live, a press on a select pauses the looks at the keyboard
-// until the menu closes, and answers held back for longer than any timeout do
-// not drop the keyboard.
+// menus is open. In Live edit, a press on a select pauses the looks at the
+// keyboard until the menu closes, and answers held back for longer than any
+// timeout do not drop the keyboard.
 test("in Live a held-open menu pauses the looks, and answers held back never drop the keyboard", async ({page, context, baseURL}) => {
     test.setTimeout(60000);
     const keyboard = liveKeyboard({document: pdDocument()});

@@ -44,13 +44,14 @@ test("in Live the keyboard's own saving is said from its status; flags show with
     assert.equal(liveSaveState(draft({unsaved: true, slaveRefused: true, keyboard: {...keyboard, saveFailed: true}}))?.action, "revert", "the halves apart come first: Save is refused");
     assert.equal(liveSaveState(draft({keyboard: {...keyboard, adjustmentPending: true}}))?.title, "Keyboard adjustment pending");
     assert.equal(liveSaveState(draft({mode: LIVE_REVIEW, keyboard: {...keyboard, adjustmentPending: true}}))?.kind, "adjustment");
-    // Live + review: the commit bar says "unsaved" itself; only trouble is said here.
+    // Live preview + save: the commit bar says "unsaved" itself; only trouble
+    // is said here.
     assert.equal(liveSaveState(draft({mode: LIVE_REVIEW, unsaved: true})), null);
     assert.equal(liveSaveState(draft({mode: LIVE_REVIEW, unsaved: true, slaveRefused: true}))?.kind, "refused");
 });
 
 // A DPI or lighting key change still reaching both halves is the keyboard's
-// own: never "not saved yet", and said under an Apply draft too.
+// own: never "not saved yet", and said under a Review and save draft too.
 test("a pending keyboard adjustment is said as itself in every edit mode", () => {
     const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, stopped: false, slaveStopped: false, quietMs: 3000};
     const adjusting = {...keyboard, adjustmentPending: true};
@@ -60,19 +61,21 @@ test("a pending keyboard adjustment is said as itself in every edit mode", () =>
     const words = {kind: "adjustment", tone: "draft", title: "Keyboard adjustment pending",
         detail: "A DPI or lighting key change is waiting to reach both halves. Release held keys; Ark will read it when it takes effect.", action: null};
 
-    // Live, nothing unsaved: not "Not saved yet".
+    // Live edit, nothing unsaved: not "Not saved yet".
     assert.deepEqual(liveSaveState(liveDraft({mode: LIVE})), words);
-    // Live and Live + review with unsaved changes: not "Not saved yet".
+    // Live edit and Live preview + save with unsaved changes: not "Not saved
+    // yet".
     assert.deepEqual(liveSaveState(liveDraft({mode: LIVE, unsaved: true}, 2)), words);
     assert.deepEqual(liveSaveState(liveDraft({mode: LIVE_REVIEW, unsaved: true}, 2)), words);
-    // An Apply draft: the keyboard's own status, outside `live`.
+    // A Review and save draft: the keyboard's own status, outside `live`.
     const apply = (keyboardView, count = 1) => /** @type {any} */ ({changes: changes(count), dirty: count > 0, live: null, keyboard: keyboardView});
     assert.deepEqual(liveSaveState(apply(adjusting)), words);
     assert.deepEqual(liveSaveState(apply(adjusting, 0)), words, "with no edits in the draft too");
     assert.equal(liveSaveState(apply(keyboard)), null, "nothing else is said under an Apply draft");
     assert.equal(liveSaveState(apply(null)), null);
 
-    // What stands beneath it, asked for on its own: Live's own "not saved yet".
+    // What stands beneath it, asked for on its own: Live edit's own "not saved
+    // yet".
     assert.equal(liveSaveState(liveDraft({mode: LIVE, unsaved: true}, 2), {adjustment: false})?.kind, "pending");
     assert.equal(liveSaveState(liveDraft({mode: LIVE}), {adjustment: false}), null);
     assert.equal(liveSaveState(liveDraft({mode: LIVE_REVIEW, unsaved: true}, 2), {adjustment: false}), null);
@@ -98,9 +101,9 @@ test("a keyboard that stopped saving outranks every other state and offers Resta
     assert.notEqual(liveSaveState(draft({keyboard}))?.kind, "stopped", "a keyboard catching up is not stopped");
 });
 
-// Under an Apply draft too: the look between edits reads the same flags, so a
-// stopped half is said with Restart, ahead of a pending adjustment, and not
-// as a keyboard that is not ready.
+// Under a Review and save draft too: the look between edits reads the same
+// flags, so a stopped half is said with Restart, ahead of a pending
+// adjustment, and not as a keyboard that is not ready.
 test("an Apply draft's keyboard that stopped saving says so for either half and offers Restart", () => {
     const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, adjustmentPending: false, stopped: false, slaveStopped: false, quietMs: 3000};
     /** @param {object} flags @param {number} [count] */

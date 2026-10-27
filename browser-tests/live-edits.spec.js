@@ -1,10 +1,10 @@
 // @ts-check
 "use strict";
-// Live + review (firmware D-F32) in the preview: the mode switch and its
+// Live preview + save (firmware D-F32) in the preview: the mode switch and its
 // questions, Save and Revert, a live edit's trap question, a toggle turned off
 // by key, and an edit in every domain posted from the same controls as in
-// Apply. The core sends each one to the keyboard; the preview logs what the
-// panel posts.
+// Review and save. The core sends each one to the keyboard; the preview logs
+// what the panel posts.
 const {test, expect} = require("@playwright/test");
 const {clearPosts, posted, expectPost, change} = require("./control-preview");
 const {chooseEditMode, currentEditMode, keyboardMenu} = require("./shell-page");
@@ -171,8 +171,8 @@ test("the mode question lists the checks Save confirms, and Save anyway confirms
     await expectPost(page, {type: "setEditMode", mode: 0, pending: "save", confirmChecks: true});
 });
 
-// Each domain's own control posts its edit in Live + review exactly as in
-// Apply; the core sends it live.
+// Each domain's own control posts its edit in Live preview + save exactly as
+// in Review and save; the core sends it live.
 test("keys: a key change posts", async ({page}) => {
     await openLive(page, "keys");
     await change(page.locator('[data-f="key:0:0:keycode"]'), "KC_Q");
@@ -225,8 +225,8 @@ test("custom keys: a name posts", async ({page}) => {
     await expect.poll(() => posted(page).then(rows => JSON.stringify(rows))).toContain("Copy 777");
 });
 
-// Live (the keyboard saves by itself): the switch into it, an edit, and the
-// bar saying what the keyboard has not saved yet, with no Save.
+// Live edit (the keyboard saves by itself): the switch into it, an edit, and
+// the bar saying what the keyboard has not saved yet, with no Save.
 test("switching into Live from Live + review asks Save or Revert; from Apply with nothing pending it switches at once", async ({page}) => {
     await openLive(page, "keys");
     // The menu lists the modes in the order the keyboard offers them, each with its words.
@@ -357,8 +357,8 @@ test("a keyboard that stopped saving says so, for either half, and Restart posts
     await expect(page.locator(".commit.live.stopped")).toContainText("The keyboard stopped saving");
 });
 
-// The same under an Apply draft: the look between edits reads the same flags,
-// and Restart is the one action, not Review and save.
+// The same under a Review and save draft: the look between edits reads the
+// same flags, and Restart is the one action, not Review and save.
 test("an Apply draft's keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
     await page.goto("/preview/index.html?shell=apply-stopped");
     const bar = page.locator(".commit.stopped");

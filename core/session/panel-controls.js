@@ -177,7 +177,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     }
     if (macroFailure) session.notice += macroFailure;
     // A live keyboard that restarted (a replug, a lost connection) since Ark
-    // knew of unsaved edits: in Live it may have saved them first.
+    // knew of unsaved edits: in Live edit it may have saved them first.
     const restarted = session.draft?.restartedWithUnsaved;
     // A Save cut short says what became of its edits, which also tells the restart.
     const saveResult = saveCutShortResult(session, portable);
@@ -209,8 +209,8 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
 // reset) saying what happened; the caller publishes.
 /** @typedef {import('../../contracts/messages.js').DraftControl & {draftRevision: number}} DraftMessage */
 /** @typedef {{session: Session, draft: NonNullable<Session['draft']>, service: Session['service'], revision: number, message: DraftMessage, shell: Shell}} DraftContext */
-// In Live + review the history, discards, Save and Revert go through the
-// keyboard (live-edits.js); `local` is what an Apply draft does.
+// In Live preview + save the history, discards, Save and Revert go through
+// the keyboard (live-edits.js); `local` is what a Review and save draft does.
 /** @param {string} name @param {(context: DraftContext) => void | Promise<void>} [local] @returns {(context: DraftContext) => Promise<void>} */
 const liveOr = (name, local) => async (context) => {
     if (context.draft.live) {
@@ -382,7 +382,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         }
         const document = entry.kind === "layers" ? layerEditDocument(entry.editor) : entry.editor.document;
         if (session.draft?.live) {
-            // Live + review: the import or the layer change goes to the
+            // Live preview + save: the import or the layer change goes to the
             // keyboard as one edit; an import too large for one is a whole
             // replacement, which needs nothing unsaved (firmware D-F32).
             const draft = session.draft;

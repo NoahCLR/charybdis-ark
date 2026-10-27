@@ -109,7 +109,8 @@ async function webShells() {
         "live-stopped": WEB_SHELL,
         // An edit the keyboard holds until a key and a modifier are let go.
         "live-held": WEB_SHELL,
-        // A keyboard in Apply, with a draft of edits, that stopped saving.
+        // A keyboard in Review and save, with a draft of edits, that stopped
+        // saving.
         "apply-stopped": WEB_SHELL,
         // An Apply cut short by the keyboard restarting during the copy to
         // the slave half: the bar and the notice it leaves.
@@ -146,14 +147,15 @@ function demoModel(shell, edits = []) {
 /** @type {Extract<import("../contracts/edits.js").PanelEdit, {type: "updateConfigDefaults"}>} */
 const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1400"}, {macro: "snipingDpi", value: "200"}]};
 
-// `live` renders a keyboard in Live + review (firmware D-F32): the draft is
-// its working copy, with one unsaved edit, and a combos key has turned combos
-// off for now. ?shell=live shows it; ?shell=live-auto the same keyboard in Live
-// (`mode` 1), waiting to save the edit by itself; ?shell=live-stopped one that
-// stopped saving (firmware D-F34, `stopped`), with Restart; ?shell=live-held
-// one holding Ark's next edit until a key and a modifier are let go (`held`),
-// with Cancel edit. ?shell=apply-stopped is a keyboard in Apply that stopped
-// saving (`stopped` without `live`), under a draft holding one edit.
+// `live` renders a keyboard in Live preview + save (firmware D-F32): the draft
+// is its working copy, with one unsaved edit, and a combos key has turned
+// combos off for now. ?shell=live shows it; ?shell=live-auto the same keyboard
+// in Live edit (`mode` 1), waiting to save the edit by itself;
+// ?shell=live-stopped one that stopped saving (firmware D-F34, `stopped`), with
+// Restart; ?shell=live-held one holding Ark's next edit until a key and a
+// modifier are let go (`held`), with Cancel edit. ?shell=apply-stopped is a
+// keyboard in Review and save that stopped saving (`stopped` without `live`),
+// under a draft holding one edit.
 // What the keyboard says of its own saving: nothing pending, its master half
 // stopped when `stopped`.
 /** @param {boolean} stopped @returns {import("../core/session/types.js").LiveKeyboardStatus} */
@@ -202,7 +204,8 @@ function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false,
         baseRgb: {state: "read", effectId: 1, brightness: 180, hue: 140, saturation: 210, speed: 60},
         // No name of its own: the keyboard reports its built-in one.
         storedKeyboardName: "",
-        // How edits reach it, stored on the keyboard: Apply here, Live + review with `live`.
+        // How edits reach it, stored on the keyboard: Review and save here,
+        // Live preview + save with `live`.
         editMode: {mode: live ? mode : 0, counter: 1, slaveMode: live ? mode : 0, slaveCounter: 1, slaveKnown: true, conflict: false, agreed: true},
         runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true},
             live: {defaultDpi: 1200, snipingDpi: 400, rgbMode: 1, rgbColor: 0, defaultLayers: 1, keymapOptions: 0}} : null,

@@ -7,7 +7,7 @@ export interface PhaseWords {label: string; read?: string; busy?: string; writes
 
 export interface CountedProgress {done: number; total: number}
 export interface BuildInfo {version: string; commit: string}
-/** What made a recovery copy: an Apply, an Import restore, a Save, a restart, or leaving Live. */
+/** What made a recovery copy: an Apply, an Import restore, a Save, a restart, or leaving Live edit. */
 export type RecoveryCause = 'apply' | 'restore' | 'save' | 'restart' | 'leave-live';
 /** `cause` and `keyboard` are absent on copies stored before they were recorded. */
 export interface RecoveryCopy {id: string | number; name: string; savedAt: string; cause?: RecoveryCause; keyboard?: string}

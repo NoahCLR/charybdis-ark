@@ -196,8 +196,9 @@ class ProfileDeviceService {
         // capabilities; undefined when the keyboard does not say.
         /** @type {(import("../protocol/types.js").EditModeRead & {notStored?: boolean}) | undefined} */
         this.editMode = undefined;
-        // The edit mode could not be read (not refused as unknown): Apply's
-        // reads meanwhile, and the next status refresh or read tries again.
+        // The edit mode could not be read (not refused as unknown): Review and
+        // save's reads meanwhile, and the next status refresh or read tries
+        // again.
         this.editModeUnknown = false;
         // The toggles' stored masters and runtime overrides (GET 0x22).
         /** @type {import("../protocol/types.js").RuntimeRead | null} */
@@ -652,7 +653,7 @@ class ProfileDeviceService {
                     this.status = result.status;
                     this.combos = {state: "read", ...snapshot.readback.combos, readAt: new Date().toISOString()};
                     this.baseRgb = baseRgb;
-                    // Apply mode shows a toggle a key turned off as well.
+                    // Review and save shows a toggle a key turned off as well.
                     await this.#readLiveFacts(connection);
                 }
                 // Export is an independent snapshot. Only an editor read or a
@@ -693,10 +694,10 @@ class ProfileDeviceService {
         } catch {}
     }
 
-    // Live + review reads the working copy and the saved profile together
-    // (live-profile-session.js): whenever the keyboard's edit mode is not
-    // Apply, and in Apply too while it still runs unsaved live edits, which
-    // only Save or Revert can settle.
+    // Live preview + save reads the working copy and the saved profile
+    // together (live-profile-session.js): whenever the keyboard's edit mode is
+    // not Review and save, and in Review and save too while it still runs
+    // unsaved live edits, which only Save or Revert can settle.
     /** @param {Connection} connection */
     async #readsLive(connection) {
         if (this.editModeUnknown) await this.#readEditMode(connection);
@@ -814,7 +815,7 @@ class ProfileDeviceService {
         return Boolean(this.liveWaiting && this.liveEdits?.cancelWaiting());
     }
 
-    // Leaving Live: the keyboard saves at once what it has not saved yet
+    // Leaving Live edit: the keyboard saves at once what it has not saved yet
     // (live-edit-coordinator.js), so its mode can change. Resolves with the
     // edit status after it.
     /** @param {(document: import("../model/types.js").PortableDocument) => Promise<string | undefined>} saveRecovery */

@@ -33,8 +33,9 @@ const PHASE = Object.freeze({
     DISCONNECT: "disconnect",
     READ_COMBOS: "read-combos",
     READ_BASE_RGB: "read-base-rgb",
-    // Live + review (firmware D-F32): an edit reaching the keyboard's working
-    // copy, Save writing it, Revert discarding it, the edit mode changing.
+    // Live preview + save (firmware D-F32): an edit reaching the keyboard's
+    // working copy, Save writing it, Revert discarding it, the edit mode
+    // changing.
     LIVE_EDIT: "live-edit",
     LIVE_SAVE: "live-save",
     LIVE_REVERT: "live-revert",
@@ -114,8 +115,8 @@ function heldWords({kind, reasons, cancelling}) {
         refusal: "Let go of the held keys first: the keyboard is still taking the last edit."};
 }
 
-// How long a keyboard in Live waits, with no edit and no key held, before it
-// saves by itself, in words: the quiet interval it reports, or 3 seconds
+// How long a keyboard in Live edit waits, with no edit and no key held, before
+// it saves by itself, in words: the quiet interval it reports, or 3 seconds
 // until it has reported one (firmware D-F32).
 const QUIET_FALLBACK_MS = 3000;
 /** @param {number | null | undefined} [quietMs] */

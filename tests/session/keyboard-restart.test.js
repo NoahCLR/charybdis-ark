@@ -272,16 +272,16 @@ test("a keyboard that stops again at once is told apart: the edits stay in the r
     assert.match(said, /not put back\. Your unsaved edits are in the recovery copy: \/recovery\/1\.json/);
 });
 
-// Under an Apply draft the edits are Ark's own, not the keyboard's: a restart
-// loses nothing, so there is no recovery copy and nothing to put back, and
-// the draft stays as it was once the keyboard is back.
+// Under a Review and save draft the edits are Ark's own, not the keyboard's:
+// a restart loses nothing, so there is no recovery copy and nothing to put
+// back, and the draft stays as it was once the keyboard is back.
 /** @param {import("node:test").TestContext} t @param {"stopped" | "slaveStopped"} flag @param {Parameters<typeof open>[1]} [options] */
 async function stoppedUnderApply(t, flag, options) {
     const opened = await open(t, {mode: EDIT_MODE.APPLY, ...options});
     await opened.key(10, "KC_X");
     await opened.key(11, "KC_Y");
     opened.keyboard.raised[flag] = true;
-    // The live watch's look under an Apply draft.
+    // The live watch's look under a Review and save draft.
     opened.loop.session.draft.observeApplyStatus(await opened.loop.session.service.readLiveStatus());
     opened.loop.publish();
     return opened;

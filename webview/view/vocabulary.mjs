@@ -52,7 +52,8 @@ export const phaseWords = (model, phase) => phase ? model?.vocabulary?.phases?.[
 /** @param {{vocabulary?: Partial<Pick<import('../../contracts/model.js').Vocabulary, 'halves'>>} | null | undefined} model @param {import("../../contracts/model.js").HalvesId | undefined} halves @returns {{label: string, detail: string}} */
 export const halvesWords = (model, halves) => (halves && model?.vocabulary?.halves?.[halves]) || {label: String(halves ?? ""), detail: ""};
 
-// How edits reach the keyboard, in the words core chose: 0 Apply, 1 Live,
-// 2 Live + review. A mode the table does not know reads as its number.
+// How edits reach the keyboard, in the words core chose: 0 Review and save,
+// 1 Live edit, 2 Live preview + save. A mode the table does not know reads as
+// its number.
 /** @param {VocabularyModel | null | undefined} model @param {number} mode @returns {{id: string, label: string, hint: string, detail: string}} */
 export const editModeWords = (model, mode) => vocabulary(model).editModes?.[mode] || {id: String(mode), label: `Mode ${mode}`, hint: "", detail: ""};

@@ -99,8 +99,8 @@ function materializeProfile(active, defaults, combos, settings) {
 }
 // The whole profile as stored bytes say it, every domain: each domain the
 // profile holds, otherwise the compiled default the firmware falls back to.
-// Live + review compares the saved profile with the working copy this way
-// (firmware D-F32: settings readback reports the stored values, and the
+// Live preview + save compares the saved profile with the working copy this
+// way (firmware D-F32: settings readback reports the stored values, and the
 // profile is their only durable owner), and a live edit's splices are made
 // against these bytes, so they must be the keyboard's own, not a re-encoding.
 /** @param {Uint8Array} stored @param {Uint8Array} defaults */

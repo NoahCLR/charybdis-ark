@@ -5,17 +5,17 @@
 // once a second while the panel is open: Ark starts no save timer of its own,
 // it only reads what the keyboard says.
 //
-//   - Live: the keyboard saved by itself, so what is saved moves to what it
-//     runs ("saved by the keyboard"), or its save failed, which is shown.
+//   - Live edit: the keyboard saved by itself, so what is saved moves to what
+//     it runs ("saved by the keyboard"), or its save failed, which is shown.
 //   - The revision moved without Ark (an adjustment key such as DPI or an RGB
 //     key, another app's edit): the keyboard is read again, as news, not as
 //     a failure.
 //   - Its halves and flags: the slave half refusing the working copy, a save
 //     waiting for a quiet keyboard, the edit mode not yet stored.
-//   - Under an Apply draft: a change its keys made and it then saved is read
-//     again, as a Refresh would; until then, what it says of itself (an
-//     adjustment still reaching both halves, a half that stopped saving) is
-//     shown.
+//   - Under a Review and save draft: a change its keys made and it then saved
+//     is read again, as a Refresh would; until then, what it says of itself
+//     (an adjustment still reaching both halves, a half that stopped saving)
+//     is shown.
 //
 // It never runs while an operation or the panel holds the keyboard, and a
 // look that raced with one (the draft moved meanwhile) is dropped. It pauses
@@ -54,8 +54,8 @@ async function checkLive(session) {
     // Anything that moved the draft while the look was out wins over it.
     if (!status || session.draft !== draft || draft.revision !== before.revision || draft.live !== before.live || session.portableBusy || service.busy) return false;
     if (!draft.live) return checkApply(session, draft, status);
-    // An Apply keyboard opened live while it ran unsaved key adjustments
-    // goes back to an Apply draft once it has saved them.
+    // A Review and save keyboard opened live while it ran unsaved key
+    // adjustments goes back to a Review and save draft once it has saved them.
     const settled = draft.live.mode === EDIT_MODE.APPLY && status.mode === EDIT_MODE.APPLY && !status.unsaved;
     if (settled || status.session !== draft.live.session || status.revision !== draft.live.revision || status.mode !== draft.live.mode) {
         const restarted = status.session !== draft.live.session;
@@ -94,10 +94,11 @@ function retryPending(session, draft) {
     return Boolean(draft.needsRead && retry?.draftId === draft.id && retry.attempts < LIVE_READ_RETRIES);
 }
 
-// An Apply draft: the keyboard's own keys may still change what it runs
-// (its adjustment keys, saved by the keyboard after a quiet moment). Once it
-// has saved such a change, it is read again as a Refresh would: an untouched
-// draft shows it, one with edits says the keyboard changed (review again).
+// A Review and save draft: the keyboard's own keys may still change what it
+// runs (its adjustment keys, saved by the keyboard after a quiet moment). Once
+// it has saved such a change, it is read again as a Refresh would: an
+// untouched draft shows it, one with edits says the keyboard changed (review
+// again).
 /** @param {import("./types.js").RunningPanelSession} session @param {NonNullable<import("./types.js").RunningPanelSession["draft"]>} draft @param {import("../protocol/types.js").EditStatus} status */
 async function checkApply(session, draft, status) {
     // What it says of itself meanwhile, such as an adjustment still reaching
