@@ -328,8 +328,8 @@ back input reports then, and while hidden (`web/native-popups.mjs`).
 - Under a Review and save draft: a key adjustment the keyboard has saved is read again;
   the first look compares with the snapshot's saved generation and origin.
   Until then the draft keeps what the keyboard says of itself
-  (`observeApplyStatus`) and publishes it as `draft.keyboard`, so the rail
-  says an adjustment is pending, and the bar and rail that a half stopped
+  (`observeApplyStatus`) and publishes it as `draft.keyboard`, so the rail's
+  keyboard dot says an adjustment is pending, and the bar that a half stopped
   saving, in Review and save too.
 - A read refused `PROFILE_CHANGED` is retried, up to three times per draft.
 - A live draft whose follow-back read failed that way stays bound to the old

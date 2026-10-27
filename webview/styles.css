@@ -137,38 +137,52 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
   margin-top: 12px; text-align: center;
   font-size: 10px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--text-3);
 }
-/* The keyboard, whether it is connected, and reading it again sit on one line,
-   so a stale panel is corrected where it is noticed. */
-.rail-keyboard { margin-top: 18px; display: flex; align-items: flex-start; gap: 8px; }
+/* The keyboard: one button under the mark, with its dot, its name and its
+   edit mode, and a chevron that says it opens a menu. */
+.rail-keyboard-wrap { position: relative; margin-top: 16px; }
+.rail-keyboard {
+  width: 100%; display: flex; align-items: flex-start; gap: 8px; padding: 7px 9px; text-align: left;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+}
+div.rail-keyboard { border-color: transparent; background: none; }
+button.rail-keyboard:hover:not(:disabled), button.rail-keyboard[aria-expanded="true"] { background: var(--surface-2); border-color: var(--line-2); }
+button.rail-keyboard:disabled { cursor: default; }
+button.rail-keyboard:disabled .rail-keyboard-text { color: var(--text-2); }
 .rail-keyboard .dot { width: 6px; height: 6px; margin-top: 6px; }
-.rail-product { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 560; line-height: 1.4; overflow-wrap: anywhere; }
+.rail-keyboard-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rail-product { font-size: 12.5px; font-weight: 560; line-height: 1.4; overflow-wrap: anywhere; }
+.rail-mode { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.4; color: var(--text-3); }
+.rail-mode .dot { margin-top: 0; }
+.rail-chevron { flex: none; align-self: center; font-size: 10px; color: var(--text-3); }
 /* Reading pulses the dot instead of adding a line. */
 .rail-keyboard .dot.busy { animation: dot-busy 1.4s ease-in-out infinite; }
 @keyframes dot-busy { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .rail-keyboard .dot.busy { animation: none; opacity: .5; } }
-/* The name as a picker: the same words, with a chevron that says it opens. */
-select.rail-picker {
-  appearance: none; -webkit-appearance: none; margin: -3px 0 0 -6px; padding: 2px 20px 2px 6px;
-  border: 1px solid transparent; border-radius: 6px; background-color: transparent; color: var(--text);
-  font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: right 10px top 50%, right 6px top 50%; background-size: 4px 4px; background-repeat: no-repeat;
+/* Its menu opens under it, over the navigation: the edit modes, each with
+   its meaning, then the keyboards, then Choose keyboard and Disconnect. */
+.rail-menu {
+  position: absolute; z-index: 30; top: calc(100% + 4px); left: -6px; right: -6px; padding: 4px;
+  border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface-3); box-shadow: var(--shadow);
+  font-size: 12px;
 }
-select.rail-picker:hover, select.rail-picker:focus-visible { background-color: var(--surface-2); border-color: var(--line); }
-select.rail-picker:disabled { cursor: default; color: var(--text-2); }
-.rail-mode { margin-top: 8px; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
-.rail-mode select { flex: 1; min-width: 0; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px;
-  background: var(--surface-2); color: var(--text); font: inherit; }
-.rail-mode select:disabled { color: var(--text-2); }
-.rail-status:not(:has(*)) { display: none; }
-.rail-status { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.rail-menu-h { padding: 6px 9px 2px; font-size: 10px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--text-3); }
+.rail-menu-item, .rail-menu-note { width: 100%; display: flex; align-items: flex-start; gap: 8px; padding: 6px 9px; border-radius: 5px; text-align: left; line-height: 1.35; }
+.rail-menu-item:hover:not(:disabled), .rail-menu-item:focus-visible { background: var(--surface-2); }
+.rail-menu-item[aria-checked="true"] { font-weight: 560; }
+.rail-menu-item:disabled { color: var(--text-disabled); cursor: default; }
+.rail-menu-item.quiet { color: var(--text-2); }
+.rail-menu-note { font-size: 11px; color: var(--text-2); }
+.rail-menu-tick { width: 10px; flex: none; display: flex; justify-content: center; padding-top: 4px; font-size: 11px; line-height: 1; }
+.rail-menu-tick .dot { margin-top: 1px; }
+.rail-menu-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rail-menu-hint { display: block; font-size: 11px; font-weight: 400; color: var(--text-3); }
+.rail-menu-sep { margin: 4px 2px; border-top: 1px solid var(--line); }
 .rail-message { margin: 0 12px 12px; flex: none; display: flex; align-items: flex-start; gap: 6px; padding: 7px 6px 7px 9px;
   border-left: 2px solid var(--text-2); border-radius: 0 7px 7px 0; background: var(--surface-2);
   font-size: 11.5px; line-height: 1.45; color: var(--text-2); overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
 .rail-message.err { border-left-color: var(--danger); color: var(--text); }
 .rail-message span { flex: 1; min-width: 0; }
 .rail-message .btn { flex: none; margin-top: -2px; }
-.stat { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-2); }
 .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); flex: none; }
 .dot.on { background: var(--text); }
 .dot.ok { background: var(--ok); }
@@ -197,10 +211,7 @@ select.rail-picker:disabled { cursor: default; color: var(--text-2); }
 .rail-foot .rail-history { margin-right: auto; margin-left: -9px; color: var(--text-3); }
 .rail-foot .rail-history:hover { color: var(--text); }
 .rail-history .c { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-left: 5px; }
-/* What the page adds to the rail: its picker, what it is doing, and the
-   build it is. */
-.rail-choose { margin-top: 16px; display: grid; gap: 8px; }
-.rail-choose .btn { width: 100%; justify-content: center; min-height: 28px; }
+/* What the page adds to the rail: what it is doing, and the build it is. */
 .rail-progress { margin: 0 12px 10px; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
 .rail-build { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; font-size: 10.5px; font-family: var(--mono); color: var(--text-3); text-decoration: none; white-space: nowrap; }
 .rail-build span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -904,9 +915,6 @@ table.t.fixed { table-layout: fixed; }
 table.t td.t-act { text-align: right; }
 /* Numbers line up on their last digit. */
 table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
-/* The rail's change count opens the review. */
-.stat.link { background: none; border: 0; padding: 0; font-family: inherit; color: inherit; cursor: pointer; text-align: left; }
-.stat.link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 
 /* What the draft changed, marked where it is edited: the draft's own dot. */
 .draft-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--draft); margin-left: 6px; vertical-align: middle; flex: none; }

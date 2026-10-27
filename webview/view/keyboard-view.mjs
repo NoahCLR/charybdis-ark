@@ -26,16 +26,16 @@ export function halvesRows(model) {
 }
 
 // A save the keyboard is in the middle of and will finish
-// (`health.recoveryPending`), in the words the rail and the Keyboard screen
-// both use.
+// (`health.recoveryPending`), in the words the rail's keyboard dot and the
+// Keyboard screen both use.
 export const SAVE_IN_PROGRESS = Object.freeze({
     label: "Save in progress",
     detail: "A save is in progress on the keyboard: it keeps its previous profile until both halves confirm the new one.",
 });
 
 // A keyboard whose slave half never confirmed a cancelled save
-// (`health.restartNeeded`), in the words the rail and the Keyboard screen
-// both use. Ark's Restart is only for a stopped keyboard (D-L67), so the way
+// (`health.restartNeeded`), in the words the rail's keyboard dot and the
+// Keyboard screen both use. Ark's Restart is only for a stopped keyboard (D-L67), so the way
 // out is to unplug the master half's USB cable.
 export const RESTART_NEEDED = Object.freeze({
     label: "Restart the keyboard",
@@ -46,18 +46,6 @@ export const RESTART_NEEDED = Object.freeze({
         "Read the keyboard again.",
     ]),
 });
-
-// The rail's line about the keyboard itself, under the draft's: a restart it
-// needs, or a save it is finishing. Null when there is neither, and in the
-// demo.
-/** @param {Model | null | undefined} model @returns {{tone: string, text: string, tip: string} | null} */
-export function keyboardStatusLine(model) {
-    const health = model?.device?.health;
-    if (model?.demo?.active || !health) return null;
-    if (health.restartNeeded) return {tone: "err", text: RESTART_NEEDED.label, tip: [RESTART_NEEDED.detail, ...RESTART_NEEDED.steps].join(" ")};
-    if (health.recoveryPending) return {tone: "draft", text: SAVE_IN_PROGRESS.label, tip: SAVE_IN_PROGRESS.detail};
-    return null;
-}
 
 // The Keyboard screen's Product row: the firmware's built-in name, which Ark
 // knows while the keyboard carries no stored name (it is then the keyboard's

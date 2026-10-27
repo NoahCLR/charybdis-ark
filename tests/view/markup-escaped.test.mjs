@@ -53,7 +53,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/pointing/form-controls.mjs", ["options.labelHtml"], "the movement arms' labels: an arrow constant and an escaped label (pointing/movement.mjs)"],
     ["webview/ui/review-items.mjs", ['head.map(row).join("")', 'rest.map(row).join("")', "show", "discard"], "field rows from field(), and the Show and Discard buttons the review overlay builds"],
     ["webview/ui/marks.mjs", ["SCREENS.pointing.icon", "look"], "the Pointing modes screen's authored SVG icon (view/screens.mjs), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],
-    ["webview/ui/frame.mjs", ["definition.icon", "liveStatus(draft)"], "a screen's authored SVG icon (view/screens.mjs), and the live status lines, markup templates"],
+    ["webview/ui/frame.mjs", ["definition.icon"], "a screen's authored SVG icon (view/screens.mjs)"],
     ["webview/view/geometry.mjs", ['keys.join("")'], "the outline's key rectangles, templates of GEO numbers"],
 ];
 

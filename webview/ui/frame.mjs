@@ -5,18 +5,16 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
-import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
+import {getModel, post, render, state} from "../store.mjs";
 import {changesKept, statusBesideCount} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
 import {isScreenId, screenGroups} from "../view/screens.mjs";
-import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, githubMark, shellOf, themeLabel} from "../view/shell-panel.mjs";
+import {buildLine, commitUrl, githubMark, shellOf, themeLabel} from "../view/shell-panel.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
-import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
+import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
-import {bindEditModeSwitch, editModeSwitch} from "./edit-mode.mjs";
-import {LIVE, editsAreLive, liveSaveState, railSaveLines} from "../view/edit-mode.mjs";
-import {keyboardStatusLine} from "../view/keyboard-view.mjs";
+import {bindKeyboardMenu, keyboardMenu} from "./keyboard-menu.mjs";
+import {LIVE, liveSaveState} from "../view/edit-mode.mjs";
 import {ariaShortcut, shortcut} from "../view/shortcuts.mjs";
 
 // The review opens at once; the core marks it reviewed when it answers.
@@ -28,40 +26,8 @@ function openReview() {
 
 export function rail() {
     const model = getModel();
-    /** @type {Partial<import("../../contracts/panel.js").PublishedModel["device"]>} */
-    const device = model?.device || {};
-    /** @type {Partial<import("../../contracts/panel.js").PublishedModel["device"]["health"]>} */
-    const health = device.health || {};
     const draft = model?.draft;
     const shell = shellOf(model);
-    const demo = demoOf(model);
-    const devices = model?.devices || [];
-    // A keyboard that went to take its new name is shown under it, coming back.
-    const reconnecting = model?.reconnecting;
-    // With more than one keyboard, the keyboard's name is where to pick another.
-    const name = reconnecting ? `<span class="rail-product">${esc(reconnecting.name || "Charybdis")}</span>` : devices.length > 1 ? `<select class="rail-product rail-picker" id="rail-device-picker" data-f="rail:device" data-act="select-device"
-                aria-label="Keyboard" title="${esc(device.label || "")}" ${health.busy ? "disabled" : ""}>
-                ${devices.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === model?.selectedDeviceId ? "selected" : ""}>${esc(entry.label)}</option>`).join("")}
-            </select>` : `<span class="rail-product">${esc(device.label || "No keyboard connected")}</span>`;
-    /** @param {string} tone @param {string} text @param {string} tip */
-    const line = (tone, text, tip) =>
-        `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${esc(tone)}"></i> ${esc(text)}</div>`;
-
-    // The keyboard's line never changes shape: what it is doing and whether
-    // its halves agree are the dot's colour, said in words on hover. The
-    // screen and the Device tab say the rest, with Read where it helps.
-    const busyWords = health.busy ? `${phaseWords(model, health.phase)?.label || "Working"}. ` : "";
-    const halves = halvesWords(model, health.halves);
-    const keyboardDot = demo.active
-        ? {tone: "demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only saving needs a keyboard."}
-        : reconnecting ? {tone: "", tip: reconnecting.restart ? "The keyboard is restarting. It comes back by itself in a moment, and Ark reads it again." : reconnecting.lost ? "Ark lost the keyboard and is connecting it again." : "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
-        : !device.connected ? {tone: "err", tip: "No keyboard is connected."}
-        : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
-
-    const keyboardLine = keyboardStatusLine(model);
-    // Under an Apply draft the keyboard says only that it stopped saving or
-    // that an adjustment is pending.
-    const applySaving = draft && !draft.live ? railSaveLines(draft) : [];
 
     const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
         <button class="nav-item" data-screen="${esc(id)}" aria-current="${state.screen === id}"
@@ -73,22 +39,7 @@ export function rail() {
         <div class="rail-device">
             ${boardOutlineMarkup("rail-board")}
             <div class="rail-mark">Charybdis Ark</div>
-            <div class="rail-keyboard">
-                <i class="dot ${keyboardDot.tone}${(health.busy || reconnecting) && !demo.active ? " busy" : ""}" data-tip="${esc(keyboardDot.tip)}"></i>
-                ${name}</div>
-            ${device.connected && !demo.active ? editModeSwitch(Boolean(health.busy)) : ""}
-            ${shell.chooseKeyboard ? `<div class="rail-choose">
-                <button class="btn tiny" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
-                    data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>
-                ${device.connected && !demo.active ? `<button class="btn tiny ghost" data-act="forget-keyboard" ${health.busy ? "disabled" : ""}
-                    data-tip="Let go of this keyboard. The page will not open it again until you choose it.">Disconnect</button>` : ""}</div>` : ""}
-            <div class="rail-status">
-                ${draft?.live ? (device.connected ? liveStatus(draft) : "") : !draft?.dirty ? "" : draft.matching && !draft.stale
-                    ? `<button class="stat link" data-act="open-review" data-tip="${demo.active ? esc(DEMO_WORDS.draftTip) : "Edits waiting in this window. The keyboard still runs its saved profile."} Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
-                    : line("draft", `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft`, demo.active ? DEMO_WORDS.draftTip : "Edits waiting in this window. The keyboard still runs its saved profile.")}
-                ${applySaving.map(saveLine).join("")}
-                ${keyboardLine ? line(keyboardLine.tone, keyboardLine.text, keyboardLine.tip) : ""}
-            </div>
+            ${keyboardMenu()}
         </div>
         <nav class="rail-nav">${nav}</nav>
         ${shell.progress ? `<div class="rail-progress" role="status">${spinner()}<span>${esc(shell.progress)}</span></div>` : ""}
@@ -111,48 +62,13 @@ export function rail() {
         render();
     }));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="dismiss"]'))?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
-    // From the demo, reading or choosing a keyboard leaves it, asking first.
-    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="choose-keyboard"]'))?.addEventListener("click", () => postLeavingDemo(chooseKeyboard()));
-    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="forget-keyboard"]'))?.addEventListener("click", () => post(forgetKeyboard()));
-    /** @type {HTMLSelectElement | null} */ (node.querySelector('[data-act="select-device"]'))?.addEventListener("change", (event) => post(controls.selectDevice(/** @type {HTMLSelectElement} */ (event.target).value)));
-    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="open-review"]'))?.addEventListener("click", openReview);
-    bindEditModeSwitch(node);
+    bindKeyboardMenu(node);
     // Draft history, undo and redo show once there is a draft to step through.
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="history"]'))?.addEventListener("click", openHistory);
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="undo"]'))?.addEventListener("click", () => post(controls.control("undoProfileDraft")));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="redo"]'))?.addEventListener("click", () => post(controls.control("redoProfileDraft")));
     return node;
 }
-
-// The live modes: what the keyboard runs that is not saved, whether both
-// halves hold the last edit, and in Live what the keyboard says of its own
-// saving ("saved by the keyboard").
-/** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft */
-function liveStatus(draft) {
-    const live = /** @type {NonNullable<typeof draft.live>} */ (draft.live);
-    const count = draft.changes.length;
-    const lines = [];
-    // The halves apart have their own line below.
-    const saving = railSaveLines(draft);
-    // A keyboard that stopped saving: one line, in place of the halves'.
-    if (saving[0]?.kind === "stopped") return saveLine(saving[0]);
-    lines.push(...saving.map(saveLine));
-    // A pending adjustment is the keyboard's own: unsaved edits still say so.
-    if (saving.every((line) => line.kind === "adjustment") && (live.unsaved || draft.dirty)) {
-        // Every edit undone: the keyboard still runs its working copy, the same
-        // as what is saved, until Save or Revert (the bar says so too).
-        const words = count ? `${count} unsaved change${count === 1 ? "" : "s"} on the keyboard` : "Unsaved edits match what is saved";
-        lines.push(draft.matching && !draft.stale
-            ? `<button class="stat link" data-act="open-review" data-tip="The keyboard runs these edits now. Review and save them to keep them; Revert or unplugging the keyboard puts back what is saved."><i class="dot draft"></i> ${esc(words)}</button>`
-            : `<div class="stat" data-tip="The keyboard runs these edits now; nothing is saved yet."><i class="dot draft"></i> ${esc(words)}</div>`);
-    }
-    if (live.slaveRefused) lines.push(`<div class="stat" data-tip="The slave half refused the keyboard's unsaved edits, so the halves run different profiles. Save waits until they agree: Revert puts both back on the saved profile."><i class="dot err"></i> Halves apart · Revert</div>`);
-    else if (!live.converged) lines.push(`<div class="stat" data-tip="The master half runs the last edit; the slave half is still taking it. The next edit waits for it; if this stays, check the cable between the halves."><i class="dot warn"></i> Slave half catching up</div>`);
-    return lines.join("");
-}
-
-/** @param {ReturnType<typeof railSaveLines>[number]} saving */
-const saveLine = (saving) => `<div class="stat live-save ${esc(saving.kind)}" data-tip="${esc(saving.tip)}"><i class="dot ${esc(saving.tone)}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(saving.text)}</div>`;
 
 // The theme toggle sits at the top right of every screen, the Keyboard
 // screen's own header included.
@@ -333,14 +249,17 @@ export function commitBar() {
 
 // A keyboard that stopped saving (firmware D-F34), for either half and in
 // every edit mode. A live draft's unsaved edits are kept in a recovery copy
-// and put back; an Apply draft is Ark's own, so the restart leaves it as it is.
+// and put back; an Apply draft is Ark's own, so the restart leaves it as it is,
+// and the bar still counts what it holds.
 /** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft @param {NonNullable<ReturnType<typeof liveSaveState>>} saving */
 function stoppedBar(draft, saving) {
     const tip = draft.live ? "Restart both halves. A recovery copy of any unsaved edits is saved first; the keyboard comes back in a moment and Ark puts them back."
         : "Restart both halves. Your draft stays as it is in Ark; the keyboard comes back in a moment and Ark reads it again.";
+    const count = !draft.live && draft.dirty ? draft.changes.length : 0;
     const node = el(`<div class="commit${draft.live ? " live" : ""} stopped">
         <span class="n"><i class="dot err"></i> <strong>${esc(saving.title)}</strong>
         <span class="muted">${esc(saving.detail)}</span></span>
+        ${count ? `<span class="peek"><span class="note">${count} change${count === 1 ? "" : "s"} in your draft</span></span>` : ""}
         <span class="sep"></span>
         <button class="btn primary" data-act="restart" ${draft.connected ? "" : "disabled"} data-tip="${esc(tip)}">Restart</button></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restart"]')).addEventListener("click", () => post(controls.restartKeyboard()));

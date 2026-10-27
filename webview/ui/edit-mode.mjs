@@ -1,31 +1,20 @@
 // @ts-check
-// The edit mode switch beside the keyboard, the question switching asks, and
-// the question a live edit asks before it adds a trap or warning.
+// Switching the edit mode from the rail's keyboard menu, the question
+// switching asks, and the question a live edit asks before it adds a trap or
+// warning.
 
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render as rerender, state} from "../store.mjs";
-import {editModeChoices, questionWords, switchQuestion} from "../view/edit-mode.mjs";
+import {questionWords, switchQuestion} from "../view/edit-mode.mjs";
 import {editModeWords} from "../view/vocabulary.mjs";
 import {checksToConfirm, confirmText} from "../view/checks.mjs";
 
-// A select, so it reads as the browser draws one; its words
-// say what each mode does on hover.
-/** @param {boolean} busy */
-export function editModeSwitch(busy) {
-    const model = getModel(), modes = editModeChoices(model);
-    if (!modes || !model?.draft) return "";
-    const current = modes.choices.find((choice) => choice.value === modes.mode);
-    return `<label class="rail-mode" data-tip="${esc(current?.detail || "")}"><span>Edits</span>
-        <select id="rail-edit-mode" data-f="rail:edit-mode" data-act="edit-mode" aria-label="How edits reach the keyboard" ${busy ? "disabled" : ""}>
-            ${modes.choices.map((choice) => `<option value="${esc(choice.value)}" ${choice.value === modes.mode ? "selected" : ""} ${choice.offered ? "" : "disabled"}>${esc(choice.label)}</option>`).join("")}
-        </select>${modes.conflict ? `<button class="btn ghost tiny" data-act="edit-mode-settle" ${busy ? "disabled" : ""}
-            data-tip="The halves stored different modes. Settle stores this one on both."><i class="dot warn"></i> Settle</button>` : ""}${model.editMode?.notStored
-            ? `<i class="dot warn" data-tip="The keyboard has not stored its edit mode yet and keeps trying. Unplugging it now may lose the mode."></i>` : ""}</label>`;
-}
-
+// Choosing a mode in the rail's keyboard menu: what switching has to ask
+// first opens as a question; otherwise the mode is posted at once. Choosing
+// the mode on already settles halves that stored different ones.
 /** @param {number} mode */
-function chooseMode(mode) {
+export function chooseMode(mode) {
     const question = switchQuestion(getModel(), mode);
     if (question) {
         state.modeAsk = {mode, question};
@@ -34,18 +23,6 @@ function chooseMode(mode) {
         return;
     }
     post(controls.setEditMode(/** @type {0 | 1 | 2} */ (mode)));
-}
-
-/** @param {HTMLElement} node */
-export function bindEditModeSwitch(node) {
-    /** @type {HTMLSelectElement | null} */ (node.querySelector('[data-act="edit-mode"]'))?.addEventListener("change", (event) => {
-        chooseMode(Number(/** @type {HTMLSelectElement} */ (event.target).value));
-    });
-    // Choosing the same mode again settles halves that stored different ones.
-    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="edit-mode-settle"]'))?.addEventListener("click", () => {
-        const mode = getModel()?.editMode?.mode;
-        if (mode !== undefined) chooseMode(mode);
-    });
 }
 
 export function editModeOverlay() {

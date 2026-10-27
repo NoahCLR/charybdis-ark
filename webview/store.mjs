@@ -73,6 +73,7 @@ export const STATE_FIELDS = {
     macroClipboard: kept(null), // copied macro steps, shared between slots in this Ark window
     keyClipboard: kept(null),  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
     stage: kept("layers"),
+    railMenu: kept(false),    // the keyboard menu under the rail's mark
     layersOpen: kept(false),  // the layer-stack panel on the layer row
     layersAsked: kept(false), // its stack is requested once per opening
     pointingSlot: kept(0),

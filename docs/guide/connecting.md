@@ -41,30 +41,41 @@ halves.
 
 The column on the left is the rail. From the top:
 
-- The keyboard's name, with a dot that says how it is:
+- The keyboard button: the keyboard's name, its edit mode under it, and a
+  dot that says how it is:
   - green: connected, both halves together
   - orange: the slave half isn't found, or the halves disagree
-  - red: no keyboard
+  - red: no keyboard, or the keyboard needs a restart
   - grey: not read yet, or reconnecting
   - a hollow ring: the demo
 
   The dot pulses while Ark is reading or busy. Hover it for what it means and
-  what to do.
-- **Edits**: how your edits reach the keyboard: **Live edit**, **Live
-  preview + save** or **Review and save**. See
-  [Review and save](review-and-save.md#edit-modes).
-- **Choose keyboard** and **Disconnect**. Disconnect lets go of
-  the keyboard and takes back the page's permission to open it, until you
-  choose it again.
+  what to do: it also says when the keyboard is finishing a save, when a DPI
+  or lighting key change is still reaching both halves, and in Live edit when the
+  keyboard has saved by itself.
+
+  Click the button, or press Enter or ↓ on it, for its menu. The arrow keys
+  move in it and Esc closes it.
+  - **Edits**: how your edits reach the keyboard, each mode with what it
+    does, and a ✓ on the current one. See
+    [Review and save](review-and-save.md#edit-modes).
+  - **Keyboard**: with more than one Charybdis connected, which one to edit.
+  - **Choose keyboard…** and **Disconnect**. Disconnect lets go of the
+    keyboard and takes back the page's permission to open it, until you
+    choose it again.
+
+  While the keyboard is busy the button waits. With no keyboard, or in the
+  demo, its menu offers only Choose keyboard.
 - The screens: **Keys**, **Lighting**, **Macros**, **Custom keys**, **Mouse**,
   **Pointing modes** and **Settings** under Configure; **Backups** and
   **Keyboard** under Keyboard.
 - Messages from Ark, each with ✕ to dismiss it.
 - **Draft history**, with undo (↺) and redo (↻).
 
-With more than one Charybdis connected, the name becomes a menu that picks
-which one to edit. A draft with edits stays with its own keyboard; the other
-stays read-only until you switch back or discard the draft.
+With more than one Charybdis connected, pick which one to edit under
+**Keyboard** in the keyboard menu. A draft with edits stays with its own
+keyboard; the other stays read-only until you switch back or discard the
+draft.
 
 ## One tab, one keyboard
 

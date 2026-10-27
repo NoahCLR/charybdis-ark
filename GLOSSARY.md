@@ -149,7 +149,9 @@ _Avoid_: shell (for this), chrome, layout
 
 **Rail**:
 The column at the left that chooses the screen and shows the keyboard, its
-edit mode and the draft's history.
+edit mode and the draft's history. Its keyboard button opens the keyboard
+menu: the edit modes, the keyboards to switch between, Choose keyboard and
+Disconnect.
 _Avoid_: sidebar, nav, menu
 
 **Bar**:

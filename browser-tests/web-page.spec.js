@@ -10,6 +10,7 @@ const {installFakeHid} = require("./fake-hid");
 const {fakeKeyboard} = require("../tests/fixtures/fake-keyboard");
 const {liveKeyboard} = require("../tests/fixtures/live-keyboard");
 const {dropFiles} = require("./profile-drop");
+const {chooseEditMode, currentEditMode, keyboardMenu} = require("./shell-page");
 const {document32: pdDocument} = require("../tests/fixtures/pointing-slots-32");
 const {CHARYBDIS_PRODUCT_ID, CHARYBDIS_VENDOR_ID, QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE_PAGE} = require("../core/transport/device-adapter");
 
@@ -82,10 +83,10 @@ for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "d
     await expect(page.locator(".import-sheet")).toContainText("dropped.charybdis.json");
     expect(keyboard.mutations).toEqual([]);
     await page.locator('[data-act="restore"]').click();
-    await expect(page.locator(".rail-status")).toContainText(/\d+ changes? in draft/);
+    await expect(page.locator(".commit")).toContainText(/\d+ changes?\s+in your draft/);
     await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
     await page.keyboard.press("Meta+z");
-    await expect(page.locator(".rail-status")).not.toContainText(/\d+ changes? in draft/);
+    await expect(page.locator(".commit", {hasText: /in your draft/})).toHaveCount(0);
     expect(keyboard.mutations).toEqual([]);
     expect(errors).toEqual([]);
     ownFilesOnly();
@@ -110,15 +111,15 @@ test("a file that matches the keyboard changes nothing, but still puts a draft w
     await dropFiles(page, [{name: "edited.charybdis.json", text: JSON.stringify(edited), type: ""}]);
     await expect(page.locator('[data-act="restore"]')).toBeEnabled();
     await page.locator('[data-act="restore"]').click();
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText("1 change in your draft");
     await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
     await dropFiles(page, [same]);
     await expect(card).toContainText("Using it puts your draft back to that, as Discard all does; Undo brings your 1 change back.");
     await expect(page.locator('[data-act="restore"]')).toBeEnabled();
     await page.locator('[data-act="restore"]').click();
-    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
+    await expect(page.locator(".commit", {hasText: /in your draft/})).toHaveCount(0);
     await page.keyboard.press("Meta+z");
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText("1 change in your draft");
     expect(keyboard.mutations).toEqual([]);
     expect(errors).toEqual([]);
 });
@@ -149,7 +150,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     await expect(field).toBeEnabled();
     const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
     await field.selectOption(other);
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText("1 change in your draft");
     expect(keyboard.mutations).toEqual([]);
 
     // Export downloads the file the loop names.
@@ -215,7 +216,8 @@ test("a second tab is refused, and takes over when the first closes", async ({pa
     const placeholder = second.locator(".read-placeholder");
     await expect(placeholder.locator("h2")).toHaveText("Ark is open in another tab");
     await expect(placeholder.locator("button")).toHaveCount(0);
-    await expect(second.locator('.rail [data-act="choose-keyboard"]')).toHaveCount(0);
+    // Nothing to choose from the rail either: its keyboard has no menu to open.
+    await expect(second.locator('.rail [data-act="keyboard-menu"]')).toHaveCount(0);
     await expect(second.locator('.rail [data-act="refresh"]')).toHaveCount(0);
     expect(await second.evaluate(() => window.__fakeHid.opened)).toBe(0);
 
@@ -264,28 +266,29 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await expect(banner).toContainText("No keyboard is connected");
     await expect(page.locator(".rail-product")).toHaveText("Demo");
     await expect(page.locator(".rail-keyboard .dot.demo")).toHaveCount(1);
-    await expect(page.locator(".rail-status")).not.toContainText(/Connected|halves|Recovery/);
+    await expect(page.locator(".rail-keyboard")).not.toContainText(/Connected|halves|Recovery/);
+    await expect(page.locator(".rail-keyboard > .dot")).toHaveAttribute("data-tip", /^Nothing is connected\. The demo/);
 
     // Mouse: a pointer speed.
     await page.locator('[data-screen="mouse"]').click();
     const dpi = page.locator('select[data-macro="normalDpi"]');
     await expect(dpi).toBeEnabled();
     await dpi.selectOption(await dpi.evaluate((select) => [...select.options].find((option) => !option.selected).value));
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText("1 change in your draft");
     // Custom keys: a name.
     await page.locator('[data-screen="customKeys"]').click();
     const keyName = page.locator(".main [data-name]").first();
     await expect(keyName).toBeEnabled();
     await keyName.fill("Demo key");
     await keyName.dispatchEvent("change");
-    await expect(page.locator(".rail-status")).toContainText("2 changes in draft");
+    await expect(page.locator(".commit")).toContainText("2 changes in your draft");
     // Macros: a name.
     await page.locator('[data-screen="macros"]').click();
     const macroName = page.locator(".main [data-name]").first();
     await expect(macroName).toBeEnabled();
     await macroName.fill("Demo macro");
     await macroName.dispatchEvent("change");
-    await expect(page.locator(".rail-status")).toContainText("3 changes in draft");
+    await expect(page.locator(".commit")).toContainText("3 changes in your draft");
 
     // The review shows them, says saving needs a keyboard and offers Export.
     await page.locator('.commit [data-act="review"]').click();
@@ -306,7 +309,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await chooser.setFiles({name: "mine.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(replacement))});
     await expect(page.locator(".rail-message")).toContainText("Opened mine.charybdis.json in the demo.");
     await expect(banner).toContainText("mine.charybdis.json");
-    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
+    await expect(page.locator(".commit", {hasText: /in your draft/})).toHaveCount(0);
 
     // The exported file is one Import takes, as on a keyboard.
     await page.locator('[data-screen="profile"]').click();
@@ -314,7 +317,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await importChooser.setFiles({name: "demo.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file))});
     await expect(page.locator('[data-act="restore"]')).toBeEnabled();
     await page.locator('[data-act="restore"]').click();
-    await expect(page.locator(".rail-status")).toContainText(/\d+ changes? in draft/);
+    await expect(page.locator(".commit")).toContainText(/\d+ changes?\s+in your draft/);
 
     // Leaving with edits not exported asks first, and offers Export.
     await banner.locator('[data-act="leave-demo"]').click();
@@ -429,9 +432,9 @@ test("literal macro steps stage through the real web shell, export exactly, undo
     const text = ' {"key": "{KC_A}"}\nhello ';
     await page.locator("[data-step-text]").fill(text);
     await expect(page.locator("[data-macro-feedback]")).toBeHidden();
-    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
+    await expect(page.locator(".commit", {hasText: /in your draft/})).toHaveCount(0);
     await page.locator("[data-step-text]").dispatchEvent("change");
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText("1 change in your draft");
     await page.locator('.commit [data-act="review"]').click();
     const [exported] = await Promise.all([page.waitForEvent("download"), page.locator('.sheet [data-act="export"]').click()]);
     const file = JSON.parse(await (await exported.createReadStream()).toArray().then(chunks => Buffer.concat(chunks).toString("utf8")));
@@ -462,9 +465,11 @@ test("Disconnect lets go of the keyboard, and the page does not reopen it", asyn
     await open(page);
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
-    await page.locator('.rail [data-act="forget-keyboard"]').click();
+    await (await keyboardMenu(page)).locator('[data-act="forget-keyboard"]').click();
     await expect(page.locator(".rail-product")).toHaveText("No keyboard connected");
-    await expect(page.locator('.rail [data-act="forget-keyboard"]')).toHaveCount(0);
+    // Its menu offers only Choose keyboard now.
+    await expect((await keyboardMenu(page)).locator('[role^="menuitem"]')).toHaveText(["Choose keyboard…"]);
+    await page.keyboard.press("Escape");
     await expect(page.locator(".rail-message")).toContainText("Disconnected");
     expect(await page.evaluate(() => window.__fakeHid.forgotten)).toBe(1);
 
@@ -487,31 +492,36 @@ test("a keyboard that restarts under a new name is followed, and called by it", 
     expect(errors).toEqual([]);
 });
 
-test("every keyboard Chrome allows is the connected one or in the selector, as they come and go", async ({page, context, baseURL}) => {
+test("every keyboard Chrome allows is the connected one or in the keyboard menu, as they come and go", async ({page, context, baseURL}) => {
     await withKeyboard(context, baseURL, 2);
     await open(page);
-    const picker = page.locator("select#rail-device-picker");
     const name = page.locator(".rail-keyboard");
+    // The keyboards the rail's menu lists, closing it again.
+    const listed = async () => {
+        const count = await (await keyboardMenu(page)).locator('[data-act="select-device"]').count();
+        await page.keyboard.press("Escape");
+        return count;
+    };
 
-    // Allow both; the second chosen is the one connected, the selector holds both.
+    // Allow both; the second chosen is the one connected, the menu lists both.
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
-    await expect(picker).toHaveCount(0);
+    expect(await listed()).toBe(0);
     await page.evaluate(() => {window.__fakeHidPick = 1;});
-    await page.locator('.rail [data-act="choose-keyboard"]').click();
-    await expect(picker.locator("option")).toHaveCount(2);
+    await (await keyboardMenu(page)).locator('[data-act="choose-keyboard"]').click();
+    await expect.poll(listed).toBe(2);
     await expect(name.locator(".dot.ok")).toHaveCount(1);
 
-    // Unplugged, a keyboard leaves the selector; plugged back in, it returns.
+    // Unplugged, a keyboard leaves the menu; plugged back in, it returns.
     await page.evaluate(() => window.__fakeHidPlug(0, false));
-    await expect(picker).toHaveCount(0);
+    await expect.poll(listed).toBe(0);
     await expect(name.locator(".dot.ok")).toHaveCount(1);
     await page.evaluate(() => window.__fakeHidPlug(0, true));
-    await expect(picker.locator("option")).toHaveCount(2);
+    await expect.poll(listed).toBe(2);
 
     // Disconnecting one connects the one still allowed, not "No keyboard".
-    await page.locator('.rail [data-act="forget-keyboard"]').click();
-    await expect(picker).toHaveCount(0);
+    await (await keyboardMenu(page)).locator('[data-act="forget-keyboard"]').click();
+    await expect.poll(listed).toBe(0);
     await expect(name.locator(".dot.ok")).toHaveCount(1);
     await expect(page.locator(".rail-product")).not.toHaveText("No keyboard connected");
 
@@ -535,12 +545,12 @@ test("the web shell reads, edits and Applies one profile generation without VIA"
     const dpi = page.locator('select[data-macro="normalDpi"]');
     const next = await dpi.evaluate(select => [...select.options].find(option => !option.selected).value);
     await dpi.selectOption(next);
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText("1 change in your draft");
     await page.locator('.commit [data-act="review"]').click();
     await page.locator('.sheet [data-act="apply"]').click();
     const confirm = page.locator('[data-act="apply-anyway"]');
     if (await confirm.count()) await confirm.click();
-    await expect(page.locator(".rail-status")).not.toContainText(/changes? in draft/, {timeout: 20000});
+    await expect(page.locator(".commit", {hasText: /in your draft/})).toHaveCount(0, {timeout: 20000});
     await expect(dpi).toBeEnabled({timeout: 20000});
     await expect(dpi).toHaveValue(next);
     expect(keyboard.generation).toBe(8);
@@ -563,14 +573,14 @@ test("in Live + review an edit reaches the keyboard at once, and review and Save
     const errors = await open(page);
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
-    await expect(page.locator('[data-f="rail:edit-mode"]')).toHaveValue("2");
+    expect(await currentEditMode(page)).toBe(2);
 
     await page.locator('[data-screen="mouse"]').click();
     const field = page.locator('select[data-macro="normalDpi"]');
     await expect(field).toBeEnabled();
     const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
     await field.selectOption(other);
-    await expect(page.locator(".rail-status")).toContainText("1 unsaved change on the keyboard");
+    await expect(page.locator(".commit.live")).toContainText("1 unsaved change running on the keyboard");
     expect(keyboard.working, "the keyboard runs the edit").toBeTruthy();
     expect(keyboard.events).toContain("published");
 
@@ -612,7 +622,7 @@ test("in Live the keyboard saves an edit by itself and the page says so, without
     const errors = await open(page);
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
-    await page.locator('[data-f="rail:edit-mode"]').selectOption("1");
+    await chooseEditMode(page, 1);
     await expect(page.locator(".rail-message")).toContainText("Now in Live edit:", {timeout: 20000});
     expect(keyboard.mode).toBe(1);
 
@@ -621,7 +631,7 @@ test("in Live the keyboard saves an edit by itself and the page says so, without
     await expect(field).toBeEnabled();
     const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
     await field.selectOption(other);
-    await expect(page.locator(".rail-status")).toContainText("Saved by the keyboard", {timeout: 20000});
+    await expect(page.locator(".rail-keyboard > .dot")).toHaveAttribute("data-tip", /Saved by the keyboard\./, {timeout: 20000});
     expect(keyboard.events).toContain("auto-saved");
     expect(keyboard.working).toBe(null);
     expect(keyboard.mutations.some(report => report[2] === 0x25), "Ark never asked it to save").toBe(false);
@@ -631,13 +641,13 @@ test("in Live the keyboard saves an edit by itself and the page says so, without
     const third = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
     await field.selectOption(third);
     await expect.poll(() => keyboard.events.filter((event) => event === "auto-saved").length, {timeout: 20000}).toBe(2);
-    await expect(page.locator(".rail-status")).toContainText("Saved by the keyboard", {timeout: 20000});
+    await expect(page.locator(".rail-keyboard > .dot")).toHaveAttribute("data-tip", /Saved by the keyboard\./, {timeout: 20000});
     const dialogs = [];
     page.on("dialog", (dialog) => {dialogs.push(dialog.type()); void dialog.accept();});
     await page.reload();
     expect(dialogs).toEqual([]);
     await ready(page);
-    await expect(page.locator('[data-f="rail:edit-mode"]')).toHaveValue("1");
+    expect(await currentEditMode(page)).toBe(1);
     await page.locator('[data-screen="mouse"]').click();
     await expect(page.locator('select[data-macro="normalDpi"]')).toHaveValue(third);
     await expect(page.locator(".commit.live")).toHaveCount(0);
@@ -656,14 +666,16 @@ test("in Live a held-open menu pauses the looks, and answers held back never dro
     const errors = await open(page);
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
-    await page.locator('[data-f="rail:edit-mode"]').selectOption("1");
+    await chooseEditMode(page, 1);
     await expect(page.locator(".rail-message")).toContainText("Now in Live edit:", {timeout: 20000});
     await expect.poll(() => page.evaluate(() => window.__fakeHidSent), {timeout: 5000}).toBeGreaterThan(0);
 
-    // The menu opens: no look goes out while it may be open. A real press
-    // moves focus to the select, so the control focused before (a screen
-    // button clicked earlier) loses it just after the press.
-    const menu = page.locator('[data-f="rail:edit-mode"]');
+    // A select's menu opens: no look goes out while it may be open. A real
+    // press moves focus to the select, so the control focused before (a
+    // screen button clicked earlier) loses it just after the press.
+    await page.locator('[data-screen="mouse"]').click();
+    const menu = page.locator('select[data-macro="normalDpi"]');
+    await expect(menu).toBeEnabled();
     await page.locator('[data-screen="mouse"]').focus();
     await menu.dispatchEvent("pointerdown");
     await menu.focus();

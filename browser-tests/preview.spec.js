@@ -2,7 +2,7 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {dropFiles} = require("./profile-drop");
-const {openPreview} = require("./shell-page");
+const {keyboardMenu, openPreview} = require("./shell-page");
 
 for (const shell of ["", "?shell=demo"]) {
     test(`Import card posts a dropped file and refuses multiple, oversized and unreadable files (${shell || "keyboard"})`, async ({page}) => {
@@ -184,6 +184,105 @@ for (const theme of ["dark", "light"]) {
     });
 }
 
+// The keyboard button under the rail's mark opens one menu: the edit modes,
+// the keyboards, Choose keyboard and Disconnect. It works from the keyboard
+// alone, as a menu button does.
+test("the rail's keyboard menu works from the keyboard alone and posts what it chose", async ({page}) => {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const posted = () => page.evaluate(() => window.__posted.filter((message) => message.type !== "ready"));
+    const focused = () => page.evaluate(() => document.activeElement?.id || "");
+    await page.goto("/preview/index.html");
+    // Two keyboards, the first selected.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.devices = [{id: "first", label: "Charybdis - Home"}, {id: "second", label: "Charybdis - Travel"}];
+        model.selectedDeviceId = "first";
+        store.setModel(model); store.render();
+        window.__posted.length = 0;
+    });
+    const button = page.locator('.rail [data-act="keyboard-menu"]');
+    await expect(button).toHaveAttribute("aria-haspopup", "menu");
+    await expect(button).toHaveAttribute("aria-expanded", "false");
+    await expect(button.locator(".rail-mode")).toHaveText(await page.evaluate(async () => {
+        const model = (await import("/webview/store.mjs")).getModel();
+        return model.vocabulary.editModes[model.editMode.mode].label;
+    }));
+    await expect(page.locator(`#${await button.getAttribute("aria-describedby")}`)).toHaveText(await button.locator("> .dot").getAttribute("data-tip") || "");
+
+    // Arrow down opens it on the current mode; the arrows wrap, Home and End jump.
+    await button.focus();
+    await page.keyboard.press("ArrowDown");
+    const menu = page.locator("#rail-menu");
+    await expect(menu).toHaveAttribute("role", "menu");
+    await expect(button).toHaveAttribute("aria-expanded", "true");
+    const current = await menu.locator('[role="menuitemradio"][aria-checked="true"]').first().getAttribute("id");
+    expect(await focused()).toBe(current);
+    const items = await menu.locator('[role^="menuitem"]:not([disabled])').evaluateAll((nodes) => nodes.map((node) => node.id));
+    const offered = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().editMode.offered);
+    expect(items).toEqual([...offered.map((mode) => `rail-menu-mode-${mode}`), "rail-menu-device-first", "rail-menu-device-second", "rail-menu-choose", "rail-menu-forget"]);
+    await page.keyboard.press("End");
+    expect(await focused()).toBe("rail-menu-forget");
+    await page.keyboard.press("ArrowDown");
+    expect(await focused()).toBe(items[0]);
+    await page.keyboard.press("ArrowUp");
+    expect(await focused()).toBe("rail-menu-forget");
+    await page.keyboard.press("Home");
+    expect(await focused()).toBe(items[0]);
+    // A model publish redraws the rail; the menu stays open where it was.
+    await page.evaluate(async () => {const store = await import("/webview/store.mjs"); store.setModel(structuredClone(store.getModel())); store.render();});
+    expect(await focused()).toBe(items[0]);
+
+    // Esc closes it, focus back on the button; Enter opens it again, Tab closes it.
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    expect(await focused()).toBe("rail-keyboard");
+    await page.keyboard.press("Enter");
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(menu).toHaveCount(0);
+    expect(await focused()).toBe("rail-keyboard");
+    expect(await posted()).toEqual([]);
+
+    // Enter on another mode posts it; the current one posts nothing.
+    const other = items.find((id) => id.startsWith("rail-menu-mode-") && id !== current);
+    await page.keyboard.press("ArrowUp");
+    await page.locator(`#${other}`).focus();
+    await page.keyboard.press("Enter");
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "setEditMode", mode: Number(other?.slice("rail-menu-mode-".length))})]);
+    await expect(menu).toHaveCount(0);
+    expect(await focused()).toBe("rail-keyboard");
+    await page.evaluate(() => {window.__posted.length = 0;});
+    await (await keyboardMenu(page)).locator(`#${current}`).click();
+    expect(await posted()).toEqual([]);
+
+    // Another keyboard posts its selection; the selected one posts nothing.
+    await (await keyboardMenu(page)).locator("#rail-menu-device-first").click();
+    expect(await posted()).toEqual([]);
+    await (await keyboardMenu(page)).locator("#rail-menu-device-second").click();
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "selectDevice", deviceId: "second"})]);
+
+    // A press outside closes it and still lands where it was.
+    await keyboardMenu(page);
+    await page.locator('[data-screen="device"]').click();
+    await expect(menu).toHaveCount(0);
+    await expect(page.locator('[data-screen="device"]')).toHaveAttribute("aria-current", "true");
+
+    // While the keyboard is busy the button takes no choice, and an open menu closes.
+    await keyboardMenu(page);
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.device.health.busy = true;
+        store.setModel(model); store.render();
+    });
+    await expect(menu).toHaveCount(0);
+    await expect(button).toBeDisabled();
+    await expect(page.locator(".rail-keyboard > .dot.busy")).toHaveCount(1);
+    expect(errors).toEqual([]);
+});
+
 test("the web shell's controls post their messages", async ({page}) => {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
@@ -192,8 +291,11 @@ test("the web shell's controls post their messages", async ({page}) => {
     await expect(page.locator(".rail-build")).toHaveText(/^Ark .+ · preview$/);
 
     await page.evaluate(() => {window.__posted.length = 0;});
-    await page.locator('.rail [data-act="choose-keyboard"]').click();
+    await (await keyboardMenu(page)).locator('[data-act="choose-keyboard"]').click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "chooseKeyboard"})]);
+    await page.evaluate(() => {window.__posted.length = 0;});
+    await (await keyboardMenu(page)).locator('[data-act="forget-keyboard"]').click();
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "forgetKeyboard"})]);
 
     await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
     await page.evaluate(() => {window.__posted.length = 0;});
@@ -230,6 +332,7 @@ test("with no keyboard the web shell offers its picker first, and without WebHID
     await page.goto("/preview/index.html?shell=unsupported");
     await expect(page.locator(".read-placeholder h2")).toHaveText("Ark needs Chrome or Edge");
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
+    await expect(page.locator('.rail [data-act="keyboard-menu"]')).toHaveCount(0, {message: "nothing to choose, so the rail's keyboard opens no menu"});
     await expect(page.locator('.rail [data-act="refresh"]')).toHaveCount(0);
 });
 
@@ -304,17 +407,23 @@ test("the demo's controls post their messages", async ({page}) => {
     await expect.poll(posted).toEqual([expect.objectContaining({type: "exportPortableProfile"})]);
     await page.locator('.sheet [data-act="close"]').first().click();
 
+    // The rail's Choose keyboard sits in its keyboard menu, opened first.
+    /** @param {string} control */
+    const press = async (control) => {
+        if (control.startsWith(".rail ")) await keyboardMenu(page);
+        await page.locator(control).click();
+    };
     for (const [control, type] of [['.demo-banner [data-act="leave-demo"]', "leaveDemo"], ['.demo-banner [data-act="open-demo-profile"]', "openDemoProfile"],
         ['.rail [data-act="choose-keyboard"]', "chooseKeyboard"]]) {
         await clear();
-        await page.locator(control).click();
+        await press(control);
         const ask = page.locator(".sheet.leave-demo");
         await expect(ask).toBeVisible();
         expect(await posted()).toEqual([]);
         await ask.locator('[data-act="stay"]').click();
         await expect(ask).toHaveCount(0);
         expect(await posted()).toEqual([]);
-        await page.locator(control).click();
+        await press(control);
         await ask.locator('[data-act="confirm-leave"]').click();
         await expect.poll(posted).toEqual([expect.objectContaining({type, discardDemo: true})]);
     }
