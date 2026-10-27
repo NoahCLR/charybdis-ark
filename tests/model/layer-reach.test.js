@@ -2,7 +2,7 @@
 const {profileLayers, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {layerReach, draftChecks, compareFindings, LEVELS} = require("../../core/model/layer-reach");
+const {layerReach, draftChecks, compareFindings, keycodeLayersOn, LEVELS} = require("../../core/model/layer-reach");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 const {spawnSync} = require("node:child_process");
 const {compiled, settings} = require("../fixtures/portable-profile");
@@ -752,4 +752,28 @@ test("a custom key with its own row sends its shortcut where the row leaves a ti
     assert.deepEqual([HOLD, TAP_TOGGLE, ONESHOT].map(reached), [false, true, true]);
     // A row with steps replaces the tap-toggle's own taps: no lock, no trap.
     assert.deepEqual(traps(profile({keys: covered, rows: [both], shortcuts: {9: {layers: 1 << 5, layerKind: TAP_TOGGLE}}})), []);
+});
+
+test("the layers a keycode turns on, as the keyboard runs it", () => {
+    // A layer key's layer, a pointing-mode key's linked layers and a custom
+    // key's shortcut layers; DF and PDF only make a layer the default, which
+    // the keyboard leaves to QMK, so they turn none on.
+    const decoded = {settings: settings(), pdModes: [{id: 5, kind: 1, name: "Zoom", linkedLayers: 0, linkTurnsOn: (1 << 3) | (1 << 4), linkEnds: 0}]};
+    decoded.settings.customKeyShortcuts = Array.from({length: 128}, (_, slot) => (slot === 2 ? {mods: 0, key: 0, layers: (1 << 3) | (1 << 6), layerKind: 1} : {mods: 0, key: 0, layers: 0, layerKind: 0}));
+    const turnsOn = keycodeLayersOn(decoded);
+    const {PD_SLOT_BINDINGS} = require("../../core/data/pd-bindings");
+    const {customKeyCode} = require("../../core/data/user-keycodes");
+    assert.equal(turnsOn(0x5223), 1 << 3, "MO(3)");
+    assert.equal(turnsOn(0x5263), 1 << 3, "TG(3)");
+    assert.equal(turnsOn(0x5203), 1 << 3, "TO(3)");
+    assert.equal(turnsOn(0x5283), 1 << 3, "OSL(3)");
+    assert.equal(turnsOn(0x52c3), 1 << 3, "TT(3)");
+    assert.equal(turnsOn(0x4338), 1 << 3, "LT(3,KC_SLASH)");
+    assert.equal(turnsOn(0x5243), 0, "DF(3)");
+    assert.equal(turnsOn(0x52e3), 0, "PDF(3)");
+    assert.equal(turnsOn(0x0004), 0, "KC_A");
+    assert.equal(turnsOn(PD_SLOT_BINDINGS[5].holdCode), 1 << 3, "a pointing-mode key: its linked layers, less the pointer layer the keyboard ignores");
+    assert.equal(turnsOn(PD_SLOT_BINDINGS[5].lockCode), 1 << 3);
+    assert.equal(turnsOn(customKeyCode(2)), (1 << 3) | (1 << 6), "a custom key's shortcut layers");
+    assert.equal(turnsOn(customKeyCode(3)), 0);
 });

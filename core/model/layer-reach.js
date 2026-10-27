@@ -45,8 +45,8 @@ const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {SETTING, SHORTCUT_LAYER_KINDS, alwaysOnLayers} = require("../schema/settings-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
 const {layerName, slotName} = require("./vocabulary");
-const {inertLinkLayers} = require("./pointing-links");
-const {PD_LINK_ENDS, PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
+const {inertLinkLayers, linkStarts} = require("./pointing-links");
+const {PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
 const {analyzeLayerStates, maskOf: layersOf, lowest} = require("./layer-state-graph");
 const {compileLayerAnswers, answeringLayer} = require("./layer-resolution");
 
@@ -238,6 +238,55 @@ function keyEffects(code, row, values, links) {
 
 // The parts of a validated profile (portable-profile.validateSnapshot) the
 // walk reads, in its own terms.
+// Pointing links the keyboard runs (firmware D-F62; the pointer layer or
+// a default layer in a link does nothing): the slots whose key turns
+// layers on, and the linked layers that start a mode, each of which keeps
+// a separate pointer layer off while it starts it, as a sniping layer
+// does. A link that a higher layer, or any other layer, ends starts its
+// mode from a linked layer only while none of those is on (linkStarts,
+// pointing-links.js). The custom keys whose shortcut turns layers on, and how.
+// What the links and shortcuts read of a profile: its settings and its modes.
+/** @typedef {{settings: Pick<import("../schema/types.js").SettingsDomain, "values" | "names" | "customKeyShortcuts">, pdModes?: import("../schema/types.js").PdSlot[]}} LinkProfile */
+/** @param {LinkProfile} decoded */
+function linkFacts(decoded) {
+    /** @type {ModeLinks} */
+    const modes = new Map();
+    let layerStarted = 0;
+    /** @type {{layer: number, ends: number}[]} */
+    const endedStarts = [];
+    /** @param {number} mask */
+    const live = (mask) => layersIn(mask & ((1 << PD_LINK_LAYERS) - 1) & ~inertLinkLayers(decoded.settings, mask));
+    for (const slot of decoded.pdModes || []) {
+        if (!slot.kind) continue;
+        const turnsOn = live(slot.linkTurnsOn);
+        if (turnsOn.length) modes.set(slot.id, {layers: turnsOn.reduce((layers, layer) => layers | bit(layer), 0) >>> 0, name: slotName(slot)});
+        for (const {layer, ends} of linkStarts(decoded.settings, slot)) {
+            if (ends) endedStarts.push({layer, ends});
+            else layerStarted |= bit(layer);
+        }
+    }
+    // The custom keys whose shortcut turns layers on (firmware D-F26), and
+    // how; the layers always on never are among them.
+    /** @type {LayerOwners["shortcuts"]} */
+    const shortcuts = new Map();
+    (decoded.settings.customKeyShortcuts || []).forEach((shortcut, slot) => {if (shortcut.layers) shortcuts.set(slot, {layers: shortcut.layers & 0xffff, layerKind: shortcut.layerKind ?? SHORTCUT_LAYER_KINDS.HOLD});});
+    /** @type {LayerOwners} */
+    const modeLinks = {modes, shortcuts};
+    return {modeLinks, layerStarted: layerStarted >>> 0, endedStarts};
+}
+
+// The layers a stored keycode turns on as the key pressed, as a mask: a layer
+// key's layer, a pointing-mode key's linked layers, a custom key's shortcut
+// layers (layerEffects). DF, PDF and the other layer keycodes the keyboard
+// leaves to QMK turn none on. The model publishes it per keycode
+// (qmkKeyTurnsOn), so the interface never works it out of a keycode itself.
+/** @param {LinkProfile} decoded @returns {(code: number) => number} */
+function keycodeLayersOn(decoded) {
+    const {modeLinks} = linkFacts(decoded);
+    return (code) => layerEffects(code, modeLinks).reduce((mask, effect) =>
+        effect.kind === "unowned" ? mask : mask | (effect.layers ?? bit(effect.layer)), 0) >>> 0;
+}
+
 /** @param {import("./types.js").DecodedProfile} decoded */
 function profileFacts(decoded) {
     const values = decoded.settings.values;
@@ -270,42 +319,7 @@ function profileFacts(decoded) {
     // The auto-sniping layers, none with its master switch off. Any of them
     // that is on keeps a separate pointer layer off (pointer_layer_policy_apply).
     const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? (values[SETTING.AUTO_SNIPING_LAYERS] & 0xffff) >>> 0 : 0;
-    // Pointing links the keyboard runs (firmware D-F62; the pointer layer or
-    // a default layer in a link does nothing): the slots whose key turns
-    // layers on, and the linked layers that start a mode, each of which keeps
-    // a separate pointer layer off while it starts it, as a sniping layer
-    // does. A link that a higher layer, or any other layer, ends starts its
-    // mode from a linked layer only while none of those is on
-    // (pointing_mode_link_ended): a layer above it, or any layer outside both
-    // of the link's sets. The pointer layer and the default layers never end it, nor does
-    // Base, which is always on here but not in the keyboard's layer state.
-    /** @type {ModeLinks} */
-    const modes = new Map();
-    let layerStarted = 0;
-    /** @type {{layer: number, ends: number}[]} */
-    const endedStarts = [];
-    const neverEnds = (bit(values[SETTING.AUTO_MOUSE_LAYER]) | values[SETTING.DEFAULT_LAYERS] | 1) >>> 0;
-    /** @param {number} mask */
-    const live = (mask) => layersIn(mask & ((1 << PD_LINK_LAYERS) - 1) & ~inertLinkLayers(decoded.settings, mask));
-    for (const slot of decoded.pdModes || []) {
-        if (!slot.kind) continue;
-        const turnsOn = live(slot.linkTurnsOn);
-        if (turnsOn.length) modes.set(slot.id, {layers: turnsOn.reduce((layers, layer) => layers | bit(layer), 0) >>> 0, name: slotName(slot)});
-        const link = (slot.linkedLayers | slot.linkTurnsOn) >>> 0;
-        for (const layer of live(slot.linkedLayers)) {
-            const ends = slot.linkEnds === PD_LINK_ENDS.HIGHER_LAYER ? (0xffff << (layer + 1)) & 0xffff & ~neverEnds
-                : slot.linkEnds === PD_LINK_ENDS.OTHER_LAYER ? 0xffff & ~link & ~neverEnds : 0;
-            if (ends) endedStarts.push({layer, ends: ends >>> 0});
-            else layerStarted |= bit(layer);
-        }
-    }
-    // The custom keys whose shortcut turns layers on (firmware D-F26), and
-    // how; the layers always on never are among them.
-    /** @type {LayerOwners["shortcuts"]} */
-    const shortcuts = new Map();
-    (decoded.settings.customKeyShortcuts || []).forEach((shortcut, slot) => {if (shortcut.layers) shortcuts.set(slot, {layers: shortcut.layers & 0xffff, layerKind: shortcut.layerKind ?? SHORTCUT_LAYER_KINDS.HOLD});});
-    /** @type {LayerOwners} */
-    const modeLinks = {modes, shortcuts};
+    const {modeLinks, layerStarted, endedStarts} = linkFacts(decoded);
     const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
     return {names, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, modeLinks, layerStarted, endedStarts, values, behaviorUsed, comboPress, generatedLayers,
         // Base is always on, and so are the default layers the keyboard keeps.
@@ -813,4 +827,4 @@ function draftChecks(keyboard, draft, order = IDENTITY) {
     return compareFindings(keyboard ? layerReach(keyboard) : [], layerReach(draft), order);
 }
 
-module.exports = {layerReach, draftChecks, compareFindings, findingKey, LEVELS};
+module.exports = {layerReach, draftChecks, compareFindings, findingKey, keycodeLayersOn, LEVELS};

@@ -4,7 +4,7 @@ import test from "node:test";
 import {keyMeaning, behaviourFor} from "../../webview/view/keyface.mjs";
 import {resolvedPositions, reachablePositions} from "../../webview/view/layer-resolution.mjs";
 import {combosInView, combosForKey} from "../../webview/view/combo-reach.mjs";
-import {reachKeys, reachText, behavioursInView, reachInView, behaviourGroups, behaviourRouteKeys, macroKeycodes, macroPlacements, customKeyPlacements, macroReach, pointingReach, pointingSlotFor, pointingAction, macroAction, namedAction, slotKeycodes, slotKeycodeNames, bindingsForSlot, bindingKeycode} from "../../webview/view/reach.mjs";
+import {reachKeys, reachText, behavioursInView, reachInView, behaviourGroups, behaviourRouteKeys, macroKeycodes, macroPlacements, customKeyPlacements, macroReach, pointingReach, pointingReachInView, pointingSlotFor, pointingAction, macroAction, namedAction, slotKeycodes, slotKeycodeNames, bindingsForSlot, bindingKeycode} from "../../webview/view/reach.mjs";
 import {createRequire} from "node:module";
 const {PD_SLOT_BINDINGS: PD_BINDINGS} = createRequire(import.meta.url)("../../core/data/pd-bindings.js");
 const slotWith = (fields) => ({...fields, binding: PD_BINDINGS[fields.id]});
@@ -483,6 +483,86 @@ test("a combo reaches the pointing mode it sends", () => {
     const reach = pointingReach(model, stack, 0);
     assert.deepEqual(reach.fromCombos.map((entry) => entry.name), ["0"]);
     assert.deepEqual(reach.elsewhere, []);
+});
+
+// A pointing slot as the core publishes it: its link's live starting layers,
+// each with the layers that end a start from it (core/model/pointing-links.js).
+/** @param {number} id @param {string} name @param {{layer: number, ends?: number}[]} starts */
+const linkedSlot = (id, name, starts) => ({id, name, kind: 1, linkedLayers: starts.reduce((mask, start) => mask | 1 << start.layer, 0), linkTurnsOn: 0, linkEnds: 0,
+    linkStarts: starts.map((start) => ({ends: 0, ...start})), binding: {hold: `PD_SLOT_${id}`, lock: `PD_SLOT_${id}_LOCK`, holdCode: 0x7e80 + id, lockCode: 0x7ea0 + id}});
+
+test("a layer that starts a pointing mode reaches it on that layer, with no key", () => {
+    // A slot's starting layers start its mode whenever one turns on (firmware
+    // D-F62), so the layer reaches the mode by itself. The core leaves out of
+    // linkStarts the layers the keyboard ignores in a link.
+    const model = {pdModes: [linkedSlot(4, "Arrow", [{layer: 3}]), {...linkedSlot(5, "Zoom", []), linkedLayers: 1 << 2},
+        linkedSlot(6, "Scroll", [{layer: 1}, {layer: 3}])], qmkKeycodeAliases: {}, qmkKeyTurnsOn: {}};
+    const stack = withAnswers([0, 1, 2, 3].map((index) => ({index, name: `L${index}`,
+        positions: [{layoutIndex: 0, keycode: index === 3 ? "PD_SLOT_6" : "KC_A"}]})));
+
+    const top = pointingReach(model, stack, 3);
+    assert.deepEqual(top.onKeys.map((entry) => entry.name), ["6", "4"], "the key here, then the modes the layer starts");
+    assert.deepEqual(top.onKeys.map((entry) => entry.starts?.map((layer) => layer.index)), [[3], [3]],
+        "a mode on a key here that the layer also starts names both");
+    assert.equal(top.onKeys[1].keys.length, 0, "a started mode rings no key");
+    assert.deepEqual(top.elsewhere, ["5"]);
+    assert.deepEqual(pointingReach(model, stack, 2).onKeys, [], "a layer the keyboard ignores in a link starts nothing");
+    assert.deepEqual(pointingReach(model, stack, 1).onKeys.map((entry) => entry.name), ["6"]);
+    assert.deepEqual(pointingReach(model, stack, 0).elsewhere, ["4", "5", "6"]);
+
+    assert.deepEqual(pointingReachInView(model, stack, 1, []).map((entry) => entry.name), ["6"], "a layer shown alone starts its mode");
+    assert.deepEqual(pointingReachInView(model, stack, 1, [3]).map((entry) => [entry.name, entry.starts?.map((layer) => layer.index)]),
+        [["4", [3]], ["6", [1, 3]]], "in a view, every layer on starts its mode, in slot order");
+});
+
+test("a key that turns on a layer starting a pointing mode reaches the mode", () => {
+    // Turning the layer on starts the mode, whatever turns it on: a layer key,
+    // a custom key's shortcut layers, a pointing-mode key's link, a behaviour
+    // branch or a combo sending one. What each keycode turns on is the core's
+    // (qmkKeyTurnsOn), which leaves out DF and PDF.
+    const model = {
+        pdModes: [linkedSlot(4, "Arrow", [{layer: 3}]), {...linkedSlot(5, "Zoom", []), linkTurnsOn: 1 << 3}],
+        qmkKeycodeAliases: {},
+        qmkKeyTurnsOn: {"MO(3)": 1 << 3, "TG(3)": 1 << 3, "TO(3)": 1 << 3, "CUSTOM_KEY_2": 1 << 3, "PD_SLOT_5": 1 << 3, "MO(2)": 1 << 2},
+        keyBehaviors: [{keycode: "KC_B", steps: [{tapCount: 0, hold: {action: "TG(3)"}}]}],
+        combos: [{id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "TO(3)"}],
+    };
+    const keys = ["MO(3)", "CUSTOM_KEY_2", "KC_B", "DF(3)", "MO(2)", "KC_J", "KC_K", "PD_SLOT_5"];
+    const stack = withAnswers([0, 1, 2, 3].map((index) => ({index, name: `L${index}`,
+        positions: index ? [] : keys.map((keycode, layoutIndex) => ({layoutIndex, keycode}))})));
+
+    const reach = pointingReach(model, stack, 0);
+    const arrow = reach.onKeys.find((entry) => entry.name === "4");
+    assert.deepEqual(arrow?.keys.map((key) => key.position.keycode), ["MO(3)", "CUSTOM_KEY_2", "PD_SLOT_5"],
+        "a layer key, a custom key's layers and another mode's key start it; DF and another layer do not");
+    assert.deepEqual(arrow?.startVia, {"MO(3)": 1 << 3, "CUSTOM_KEY_2": 1 << 3, "PD_SLOT_5": 1 << 3}, "each route says the layer it starts the mode through");
+    assert.deepEqual(reach.fromBranches.find((entry) => entry.name === "4")?.behaviours.map((row) => row.action), ["TG(3)"]);
+    assert.deepEqual(reach.fromCombos.find((entry) => entry.name === "4")?.combos.map((route) => route.action), ["TO(3)"]);
+    assert.deepEqual(reach.onKeys.find((entry) => entry.name === "5")?.startVia, undefined, "Zoom's own key holds Zoom");
+    assert.deepEqual(reachKeys(stack, 0, arrow), [0, 1, 7], "the board rings the keys that turn the layer on");
+});
+
+test("a route reaches a mode its layer starts only while no layer ending that start is on", () => {
+    // What ends a mode its layers started (linkEnds, published as each start's
+    // `ends`): a key pressed on a layer that ends the start, or one turning on
+    // such a layer with it, starts nothing, as the keyboard runs it. A key a
+    // transparent key answers from a layer held below has that layer on too.
+    const higher = (layer) => (0xffff << (layer + 1)) & 0xffff;
+    const model = {pdModes: [linkedSlot(4, "Arrow", [{layer: 2, ends: higher(2)}])], qmkKeycodeAliases: {},
+        qmkKeyTurnsOn: {"MO(2)": 1 << 2, "CUSTOM_KEY_1": (1 << 2) | (1 << 5)}};
+    const stack = withAnswers([0, 1, 2, 3].map((index) => ({index, name: `L${index}`,
+        positions: index === 0 ? [{layoutIndex: 0, keycode: "MO(2)"}, {layoutIndex: 1, keycode: "CUSTOM_KEY_1"}]
+            : index === 1 ? [{layoutIndex: 0, keycode: "MO(2)"}, {layoutIndex: 1, keycode: "KC_TRNS"}]
+                : [{layoutIndex: 0, keycode: "MO(2)"}, {layoutIndex: 1, keycode: "KC_TRNS"}]})));
+
+    const base = pointingReach(model, stack, 0).onKeys.find((entry) => entry.name === "4");
+    assert.deepEqual(base?.keys.map((key) => key.position.keycode), ["MO(2)"], "MO(2) on Base starts it; a key also turning on a higher layer ends it");
+    assert.deepEqual(pointingReach(model, stack, 1).onKeys.map((entry) => entry.name), ["4"], "on a layer below the starting layer");
+    assert.deepEqual(pointingReach(model, stack, 3).onKeys, [], "on a higher layer, which ends it");
+    assert.ok(pointingReach(model, stack, 3).elsewhere.includes("4"));
+    assert.deepEqual(pointingReachInView(model, stack, 1, [3]).map((entry) => entry.name), [], "a view with a higher layer on ends it");
+    assert.deepEqual(pointingReachInView(model, stack, 2, []).map((entry) => entry.name), ["4"], "the starting layer shown alone starts it");
+    assert.deepEqual(pointingReachInView(model, stack, 2, [3]), [], "and not with a higher layer held");
 });
 
 test("cold macro placement lookup avoids combinations of layers that cannot change combo answers", () => {

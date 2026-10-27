@@ -215,7 +215,7 @@ test("the hover card's title, the Combos table and the Key and Pointing modes ta
     // the key, then its cell. The fixture's Right Option taps Arrow's lock, and
     // Dragscroll's own key locks it on a double tap held, so that cell follows
     // the key rather than naming the key a second time.
-    const reached = (keycode) => page.locator(`.reach-table tbody tr:has(td:first-child code:text-is('${keycode}'))`).first().locator("td").nth(2);
+    const reached = (keycode) => page.locator(`.reach-table tbody tr:has(td:first-child code:text-is('${keycode}'))`).first().locator("td").nth(5);
     const arrow = await reached("PD_SLOT_4_LOCK").evaluate(namedIn);
     expect(arrow.text).toMatch(/^from Right Option KC_RIGHT_ALT · 1× ?tap$/);
     const dragscroll = reached("PD_SLOT_0_LOCK");

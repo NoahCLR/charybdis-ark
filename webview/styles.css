@@ -870,6 +870,9 @@ button.tier:hover { background: var(--surface-3); }
 .combo-actions { gap: 8px; }
 /* A reach table's last column holds the row's Edit, at its end. */
 .reach-edit { text-align: right; }
+/* A reach cell with a line per route (the Pointing modes tab). */
+.reach-line { display: block; }
+.reach-line + .reach-line { margin-top: 3px; }
 /* Layout switches follow the content box, not the window: the rail takes
    232 px of it (window widths in brackets). */
 @container content (max-width: 948px) { /* window 1180 */

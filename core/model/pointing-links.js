@@ -7,11 +7,11 @@
 // its domain cannot see, so Ark refuses those in the editor (published in the
 // model) and when a changed link is staged. One rule, here, for both.
 
-const {PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
+const {PD_LINK_ENDS, PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
 const {SETTING, SETTINGS} = require("../schema/settings-domain-v1");
 const {layerName, slotName} = require("./vocabulary");
 
-/** @typedef {{id: number, kind: number, name: string, linkedLayers?: number, linkTurnsOn?: number, pointerLayer?: number}} LinkSlot */
+/** @typedef {{id: number, kind: number, name: string, linkedLayers?: number, linkTurnsOn?: number, linkEnds?: number, pointerLayer?: number}} LinkSlot */
 /** @typedef {Pick<import("../schema/types.js").SettingsDomain, "values" | "names">} LinkSettings */
 
 /** @param {number} mask */
@@ -64,6 +64,24 @@ function pointerCoveredLayers(settings, slot) {
     const pointer = settings.values[SETTING.AUTO_MOUSE_LAYER];
     if (!slot.kind || slot.pointerLayer !== 0 || !(pointer < PD_LINK_LAYERS)) return 0;
     return ((slot.linkTurnsOn ?? 0) & ((1 << pointer) - 1)) >>> 0;
+}
+
+// The layers that start a slot's mode as the keyboard runs its link, each
+// with the layers whose being on ends a start from it, as a mask (zero when
+// nothing does): a higher layer ends a start from every layer above it, any
+// layer one from every layer outside both of the link's sets
+// (pointing_mode_link_ended). Base, the default layers and the pointer layer
+// never end it, and a layer the keyboard ignores in a link starts nothing.
+// Layer reach (layer-reach.js) walks these; the interface reads them per
+// slot (pdModes[].linkStarts) to say which layers reach a mode.
+/** @param {LinkSettings} settings @param {Partial<LinkSlot>} slot @returns {{layer: number, ends: number}[]} */
+function linkStarts(settings, slot) {
+    if (!slot.kind) return [];
+    const starting = ((slot.linkedLayers ?? 0) & ((1 << PD_LINK_LAYERS) - 1)) >>> 0;
+    const neverEnds = ((1 << settings.values[SETTING.AUTO_MOUSE_LAYER]) | settings.values[SETTING.DEFAULT_LAYERS] | 1) >>> 0;
+    return layersOf(starting & ~inertLinkLayers(settings, starting)).map(layer => ({layer,
+        ends: (slot.linkEnds === PD_LINK_ENDS.HIGHER_LAYER ? (0xffff << (layer + 1)) & 0xffff & ~neverEnds
+            : slot.linkEnds === PD_LINK_ENDS.OTHER_LAYER ? 0xffff & ~linkNamed(slot) & ~neverEnds : 0) >>> 0}));
 }
 
 // Why a slot cannot take this link, in words; "" when it can. A layer its
@@ -133,4 +151,4 @@ function reorderLinkRefusal(before, after, was, now, moved, keysFollow) {
     return "";
 }
 
-module.exports = {inertLinkLayers, inertLinkReason, linkTargets, linkRefusal, linkNamed, pointerCoveredLayers, reorderLinkRefusal, settingsLinkRefusal};
+module.exports = {inertLinkLayers, inertLinkReason, linkStarts, linkTargets, linkRefusal, linkNamed, pointerCoveredLayers, reorderLinkRefusal, settingsLinkRefusal};

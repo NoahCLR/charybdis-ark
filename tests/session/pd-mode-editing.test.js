@@ -259,3 +259,29 @@ test("links and auto-sniping layers survive export, import, layer rename and reo
     const moved = reorderLayers(draft.document, [0, 3, 1, 2, 4, 6, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.deepEqual(kept(moved), [bit(1) | bit(7), bit(5), 1, bit(1) | bit(6)]);
 });
+
+test("the model publishes the layers that start each mode and what each keycode turns on", () => {
+    // The Keys workbench reads which layers reach a mode from these, never
+    // from a keycode or a link itself (core/model/pointing-links.js linkStarts,
+    // core/model/layer-reach.js keycodeLayersOn).
+    const {draft, stage, caps} = fixture();
+    stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30, linkedLayers: 1 << 3, linkTurnsOn: 1 << 5, linkEnds: 1,
+        directions: {left: {keycode: "KC_LEFT"}, right: {keycode: "KC_RIGHT"}}}});
+    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}, {layoutIndex: 1, keycode: "MO(3)"},
+        {layoutIndex: 2, keycode: "LT(3,KC_B)"}, {layoutIndex: 3, keycode: "CUSTOM_KEY_2"}, {layoutIndex: 4, keycode: "KC_A"}]});
+    stage({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", shortcut: {mods: 0, key: 0, layers: (1 << 3) | (1 << 6), layerKind: 1}});
+    const state = {capabilities: caps, phase: "idle", committed: {state: "unavailable"}, combos: {state: "unavailable"}};
+    const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""}, state);
+    const [start] = model.pdModes[7].linkStarts;
+    assert.equal(model.pdModes[7].linkStarts.length, 1);
+    assert.equal(start.layer, 3);
+    assert.ok(start.ends & (1 << 5) && start.ends & (1 << 15), "a higher layer ends it");
+    assert.equal(start.ends & 0b1111, 0, "no layer at or below it does");
+    assert.deepEqual(model.pdModes[0].linkStarts, [], "an unlinked mode starts from no layer");
+    assert.equal(model.qmkKeyTurnsOn["MO(3)"], 1 << 3);
+    assert.equal(model.qmkKeyTurnsOn["PD_SLOT_7"], 1 << 5, "a pointing-mode key, by the name the profile gives it");
+    assert.equal(model.qmkKeyTurnsOn["PD_SLOT_7_LOCK"], 1 << 5);
+    assert.equal(model.qmkKeyTurnsOn["CUSTOM_KEY_2"], (1 << 3) | (1 << 6));
+    assert.equal(model.qmkKeyTurnsOn["LT(3,KC_B)"], 1 << 3, "a layer-tap's hold");
+    assert.equal(model.qmkKeyTurnsOn["KC_A"], undefined);
+});

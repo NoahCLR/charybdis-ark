@@ -105,17 +105,20 @@ export function sends(model, action, {inline = false} = {}) {
 const tagged = (name, tags) => `<span class="sends-name">${esc(name)}</span>${tags.map((tag) => `<span class="sends-tag">${esc(tag)}</span>`).join("")}`;
 // A layer by its mark and name, with the tags that qualify it, as `sends`
 // draws a layer action: a shortcut's layers, which no keycode names.
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} layer @param {string} name @param {string[]} tags */
-export const layerTagged = (model, layer, name, tags) => `<span class="sends">${mark(model, {kind: "layer", layer})}${tagged(name, tags)}</span>`;
+// `inline` draws it in the words around it, as `sends` does.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} layer @param {string} name @param {string[]} tags @param {{inline?: boolean}} [options] */
+export const layerTagged = (model, layer, name, tags, {inline = false} = {}) =>
+    `<span class="sends${inline ? " inline" : ""}">${mark(model, {kind: "layer", layer})}${tagged(name, tags)}</span>`;
 // The same, inline and without a mark, for a list where every item is one kind
 // and a swatch beside it stands in for the mark (D-L31): "Zoom `HOLD`".
 /** @param {string} name @param {string[]} tags */
 export const namedWithTags = (name, tags) => `<span class="sends inline">${tagged(name, tags)}</span>`;
 // A pointing slot by name, then each keycode that reaches it after its hold or
-// lock tag: "Dragscroll `HOLD` PD_SLOT_0 `LOCK` PD_SLOT_0_LOCK".
-/** @param {string} name @param {[string, string][]} keycodes */
+// lock tag: "Dragscroll `HOLD` PD_SLOT_0 `LOCK` PD_SLOT_0_LOCK". A tag with no
+// keycode (null) stands alone: a mode its link starts, "Arrow `STARTED`".
+/** @param {string} name @param {[string, string | null][]} keycodes */
 export const slotNamedWithKeycodes = (name, keycodes) => `<span class="sends inline"><span class="sends-name">${esc(name)}</span>${keycodes
-    .map(([how, code]) => `<span class="sends-tag">${esc(how)}</span><code class="dim">${esc(code)}</code>`).join("")}</span>`;
+    .map(([how, code]) => `<span class="sends-tag">${esc(how)}</span>${code ? `<code class="dim">${esc(code)}</code>` : ""}`).join("")}</span>`;
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} action */
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 

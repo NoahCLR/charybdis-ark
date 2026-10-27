@@ -46,7 +46,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/keys/combos-tab.mjs", ["reachedBy"], "keysReach() and reachText(): marked key names and escaped layer names"],
     ["webview/ui/keys/macros-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],
     ["webview/ui/keys/custom-keys-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],
-    ["webview/ui/keys/pointing-tab.mjs", ["reachedBy"], "keysReach() and branchReach(): marked key names and escaped layer names"],
+    ["webview/ui/keys/pointing-tab.mjs", ["line"], "pointingReachLines(): keysReach(), branchReach(), comboReach() and layersNamed(), marked key names and escaped layer names"],
     ["webview/ui/keys/key-tab.mjs", ["stackRows(model, layer, position)"], "the layer stack's rows, markup templates joined"],
     ["webview/ui/layerbar.mjs", ["tint"], "a style attribute holding layerSwatch()'s css() colour"],
     ["webview/ui/macros/editor.mjs", ["placedOn(model, slot)", "chips"], "layer chips, markup templates of escaped names and layer swatches"],
