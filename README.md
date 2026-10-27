@@ -7,6 +7,19 @@ Plug the keyboard in and you see exactly what is on it, because everything Ark
 shows comes from the keyboard itself. Change it and save it back to both
 halves. No C, no reflash, no firmware checkout.
 
+## Try the demo first
+
+The quickest way to see what Ark does is to use it. Open
+**<https://ark.ncleroy.dev>** and choose **Explore a demo**: Ark opens on a
+complete setup exported from a real keyboard, with 16 layers, 32 pointing
+modes, 128 macros and 128 custom keys, and no keyboard connected. Every screen
+works and every edit shows up in Review; only saving needs a keyboard.
+
+The demo shows far more than this page can explain: every editor, every
+setting and how they fit together. The list below is only a summary, so if
+you want to know what Ark can do, start there. The demo runs in any browser on
+a computer; connecting a keyboard needs Chrome or Edge.
+
 ## What you can change
 
 - **Keys and layers.** Pick keys from a board labelled for your computer's
@@ -51,9 +64,6 @@ a recovery copy first and writes both halves as one complete profile.
 
 **Export profile** saves your whole setup as one file and **Import profile**
 brings it back, through the same review.
-
-No keyboard to hand? **Explore a demo** opens Ark on a complete setup with
-nothing connected.
 
 ## Install
 
