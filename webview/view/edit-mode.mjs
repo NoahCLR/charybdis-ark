@@ -34,9 +34,10 @@ export const editsAreLive = (model) => Boolean(model?.draft?.live);
 // What switching to `mode` has to ask first. The keyboard changes its mode
 // only with nothing unsaved, so a live draft with unsaved edits asks Save or
 // Revert whichever way it goes, and so does choosing the same mode again to
-// settle halves that stored different modes; outside Live, that is: in Live
-// the keyboard saves them itself, so leaving it asks nothing. Entering a live
-// mode with an Apply draft asks Send or Discard; anything else switches at once.
+// settle halves that stored different modes; outside Live edit, that is: in
+// Live edit the keyboard saves them itself, so leaving it asks nothing.
+// Entering a live mode with a Review and save draft asks Send or Discard;
+// anything else switches at once.
 /** @param {Partial<Model> | null | undefined} model @param {number} mode @returns {null | 'saveOrRevert' | 'sendOrDiscard'} */
 export function switchQuestion(model, mode) {
     const draft = model?.draft, current = model?.editMode?.mode;
@@ -82,18 +83,18 @@ export const STOPPED_WORDS = Object.freeze({
 const ADJUSTMENT = Object.freeze({kind: /** @type {const} */ ("adjustment"), tone: /** @type {const} */ ("draft"), title: "Keyboard adjustment pending",
     detail: "A DPI or lighting key change is waiting to reach both halves. Release held keys; Ark will read it when it takes effect.", action: null});
 
-// How long the keyboard in Live waits with no edit and no key held before it
-// saves, in the words core gives the interval it reports (`quietWords`).
+// How long the keyboard in Live edit waits with no edit and no key held before
+// it saves, in the words core gives the interval it reports (`quietWords`).
 /** @param {{quietWords?: string} | null | undefined} keyboard */
 export const quietWords = (keyboard) => keyboard?.quietWords || "a few seconds";
 
 /**
  * Where a live keyboard's edits stand, by what it says (edit status), as one
  * line with its tone and the one action that helps. Null when there is
- * nothing to say. Live + review's ordinary "unsaved" is the commit bar's own.
- * Under an Apply draft the keyboard can say only that it stopped saving or
- * that an adjustment is pending. `adjustment: false` asks what stands beneath
- * one.
+ * nothing to say. Live preview + save's ordinary "unsaved" is the commit bar's
+ * own. Under a Review and save draft the keyboard can say only that it stopped
+ * saving or that an adjustment is pending. `adjustment: false` asks what
+ * stands beneath one.
  * @param {Draft | null | undefined} draft
  * @param {{adjustment?: boolean}} [options]
  * @returns {null | {kind: 'stopped' | 'refused' | 'failed' | 'adjustment' | 'saving' | 'pending' | 'saved', tone: 'err' | 'warn' | 'draft' | 'ok', title: string, detail: string, action: null | 'restart' | 'revert' | 'save'}}

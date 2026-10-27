@@ -26,9 +26,9 @@ export interface ControlPayloads {
         discardProfileDraftChanges: {group: number};
         /** Replace the draft with what the keyboard held before the last Apply. */
         putBackProfile: Record<never, never>;
-        /** Live + review: the keyboard writes what it runs as its saved profile. */
+        /** Live preview + save: the keyboard writes what it runs as its saved profile. */
         saveProfileDraft: {confirmChecks?: boolean};
-        /** Live + review: the keyboard runs its saved profile again. */
+        /** Live preview + save: the keyboard runs its saved profile again. */
         revertProfileDraft: Record<never, never>;
         /** Send the edit waiting on its trap check, or drop it. */
         confirmLiveEdit: {proposal: number};

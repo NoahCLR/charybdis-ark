@@ -36,9 +36,9 @@ export function initialTheme(saved, prefersLight) {
 }
 
 // Whether leaving the page would lose something: unapplied edits (in the
-// demo, edits not exported since), edits in Live + review not saved (in Live
-// the keyboard keeps and saves them, so only an edit on its way counts), or an
-// Apply, a Save (or a restore) part way through.
+// demo, edits not exported since), edits in Live preview + save not saved (in
+// Live edit the keyboard keeps and saves them, so only an edit on its way
+// counts), or an Apply, a Save (or a restore) part way through.
 /** @param {import("../core/session/types.js").PanelSession & {service: {phase?: import("../contracts/model.js").PhaseId}}} session */
 export function leaving(session) {
     const edits = session.demo ? demoUnsaved(session) : closingLoses(session);

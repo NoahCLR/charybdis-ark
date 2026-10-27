@@ -18,7 +18,7 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
 - `core/session/profile-device-service.js` owns the connection: one operation
   at a time (`runOperation`, else `SERVICE_BUSY`), each failure recorded in
   `snapshot().error`, every change published as `snapshot()`.
-- Below it: `portable-profile-session.js` (Apply-mode snapshot, Apply),
+- Below it: `portable-profile-session.js` (Review and save snapshot, Apply),
   `live-profile-session.js`, `live-edit-coordinator.js` and
   `candidate-upload-coordinator.js`.
 - `core/transport/request-coordinator.js` sends one request at a time; a

@@ -92,7 +92,7 @@ function keyboardDot(model) {
 }
 
 // What the keyboard says of its own saving that the commit bar may not: a
-// key adjustment still reaching both halves (in every edit mode), Live's
+// key adjustment still reaching both halves (in every edit mode), Live edit's
 // "saved by the keyboard" once nothing is left unsaved, and the slave half
 // still taking the last edit.
 /** @param {Model["draft"] | undefined} draft */

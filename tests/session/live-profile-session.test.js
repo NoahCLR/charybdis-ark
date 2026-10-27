@@ -71,9 +71,9 @@ test("a working copy that moves during the read is read again, never mixed; one 
     assert.equal(reads, 3, "three tries, then the words");
 });
 
-// The keyboard's own save (Live, 3 s after an edit) landing under a read:
-// the saved profile moves on beneath it, during its chunks or the working
-// copy's. The pair is read again and is the saved one.
+// The keyboard's own save (Live edit, 3 s after an edit) landing under a
+// read: the saved profile moves on beneath it, during its chunks or the
+// working copy's. The pair is read again and is the saved one.
 for (const during of [0x04, 0x21]) test(`an automatic save landing during the ${during === 0x04 ? "saved profile's" : "working copy's"} chunks is read again`, async t => {
     const {keyboard, snapshot} = await live(t, {mode: EDIT_MODE.LIVE});
     const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});

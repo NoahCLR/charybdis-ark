@@ -80,7 +80,7 @@ const EDIT_FLAGS = Object.freeze({
 const KNOWN_EDIT_FLAGS = 0xffff;
 
 // How the client's edits reach the keyboard, stored on the keyboard outside
-// every profile. A keyboard never set is in Live + review.
+// every profile. A keyboard never set is in Live preview + save.
 const EDIT_MODE = Object.freeze({APPLY: 0, LIVE: 1, LIVE_REVIEW: 2});
 const SPLICE_FLAGS = Object.freeze({CREATE: 1 << 0, DROP: 1 << 1});
 
@@ -247,9 +247,10 @@ function decodeSafeBoundaryPage(page) {
     return page.readUInt32LE(14);
 }
 
-// Page 3: the saves the keyboard made by itself (Live, and adjustment keys in
-// Apply) since this master half booted. The counter names an event between
-// polls; only a success counts, and a failure is the save's on page 1.
+// Page 3: the saves the keyboard made by itself (Live edit, and adjustment
+// keys in Review and save) since this master half booted. The counter names an
+// event between polls; only a success counts, and a failure is the save's on
+// page 1.
 /** @param {Buffer} page @returns {import("./types.js").AutoSaveStatus} */
 function decodeAutoSavePage(page) {
     if (!page || page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "An edit status page has 25 bytes.");

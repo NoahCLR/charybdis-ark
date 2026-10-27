@@ -13,12 +13,13 @@
 //                         (keyboard-reconnect.js). Firmware without restart
 //                         answers unhandled, and nothing happens.
 //   putBackAfterRestart   once the restarted keyboard is read again: the kept
-//                         edits go back as one live edit, unsaved (in Live the
-//                         keyboard saves them by itself, in Live + review they
-//                         wait for Save), and the panel says how it went,
-//                         naming the recovery copy whenever something failed.
-//                         An Apply draft had nothing on the keyboard: it stays
-//                         as it is, and the keyboard is looked at at once.
+//                         edits go back as one live edit, unsaved (in Live
+//                         edit the keyboard saves them by itself, in Live
+//                         preview + save they wait for Save), and the panel
+//                         says how it went, naming the recovery copy whenever
+//                         something failed. A Review and save draft had
+//                         nothing on the keyboard: it stays as it is, and the
+//                         keyboard is looked at at once.
 //
 // Ark never restarts the keyboard by itself.
 
@@ -44,9 +45,9 @@ const messageOf = error => (error instanceof Error ? error.message : String(erro
 const inRecovery = recovery => recovery ? ` Your unsaved edits are in the recovery copy: ${recovery}` : "";
 const UNANSWERED = " The slave half did not answer the restart: if the halves do not agree now, unplug the keyboard and plug it back in.";
 
-// What a restart would lose: the keyboard's working copy, as a document. An
-// Apply draft is Ark's own and survives it; so does a keyboard with nothing
-// unsaved.
+// What a restart would lose: the keyboard's working copy, as a document. A
+// Review and save draft is Ark's own and survives it; so does a keyboard with
+// nothing unsaved.
 /** @param {Session} session @param {Draft} draft */
 async function keptEdits(session, draft) {
     const live = draft.live;
@@ -119,10 +120,10 @@ async function putBackAfterRestart(session) {
         followed.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined);
         session.observedPortable = portable;
     }
-    // An Apply draft takes the new connection when the keyboard still holds
-    // what it began from. Its read says nothing of the keyboard's saving:
-    // look at it now, so a keyboard that stopped again is told from one that
-    // is back.
+    // A Review and save draft takes the new connection when the keyboard
+    // still holds what it began from. Its read says nothing of the keyboard's
+    // saving: look at it now, so a keyboard that stopped again is told from
+    // one that is back.
     else if (followed && !followed.live && followed.deviceId === state.selectedDeviceId) {
         followed.followRestart(state.connectionToken ?? null);
         followed.observeApplyStatus(await session.service.readLiveStatus());

@@ -1,7 +1,7 @@
 "use strict";
-// Live + review through the panel loop the page runs: edits, undo, the trap
-// check, Save, Revert, reconnect and replug, and the mode switch, against a
-// keyboard with a working copy (firmware D-F32).
+// Live preview + save through the panel loop the page runs: edits, undo, the
+// trap check, Save, Revert, reconnect and replug, and the mode switch, against
+// a keyboard with a working copy (firmware D-F32).
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {openPanelLoop} = require("../../core/session/panel-loop");
@@ -88,8 +88,8 @@ test("undo and redo send the inverse edit through the same path", async t => {
 
 // A working copy identical to what is saved is no unsaved edit: "Unsaved
 // edits match what is saved" (keyboard check, 2026-10-19). A step that lands
-// on the saved profile reverts the keyboard instead, and Live has nothing to
-// save; the history keeps its steps, so redo sends the edit again.
+// on the saved profile reverts the keyboard instead, and Live edit has
+// nothing to save; the history keeps its steps, so redo sends the edit again.
 test("undo back to the saved profile reverts the keyboard; redo sends the edit again", async t => {
     const {keyboard, shell, session, key, send} = await open(t);
     await key(0, 12, "KC_Y");
@@ -478,7 +478,7 @@ for (const mode of [EDIT_MODE.LIVE_REVIEW, EDIT_MODE.LIVE]) test(`a live rename 
 });
 const posted = shell => shell.posted.filter(message => message.notice).map(message => message.notice);
 
-// In Live a rename restarts USB about 1.5 s after the edit, before the
+// In Live edit a rename restarts USB about 1.5 s after the edit, before the
 // keyboard's own save 3 s after it, so the follow-back read runs while that
 // save lands: the saved profile moves on (and, to a shorter name, gets
 // shorter) under the read. Seen on the keyboard twice out of twice on

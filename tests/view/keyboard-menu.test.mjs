@@ -134,7 +134,8 @@ test("the keyboard's own saving news is said on the dot: an adjustment pending, 
     assert.match(tip({}, {savedByKeyboard: true}), /Saved by the keyboard\. The keyboard saved its edits by itself; they survive a replug\./);
     assert.match(tip({converged: false}), /Slave half catching up\./);
     assert.doesNotMatch(tip({}), /adjustment|Saved by|catching up/);
-    // Under an Apply draft the keyboard's flags sit on the draft itself.
+    // Under a Review and save draft the keyboard's flags sit on the draft
+    // itself.
     const apply = connected({draft: {changes: [{}], dirty: true, live: null, keyboard: {...keyboard, adjustmentPending: true}}});
     assert.match(keyboardControl(apply).dot.tip, /Keyboard adjustment pending/);
     // Nothing is said of a keyboard that is not there.

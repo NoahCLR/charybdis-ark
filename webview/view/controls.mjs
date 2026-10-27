@@ -28,8 +28,8 @@ export const layersFollow = (keysFollow, names) => ({type: 'editPortableLayer', 
 /** @param {number} id @param {LayerMove} change @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const moveLayer = (id, change, names) => ({type: 'editPortableLayer', id, ...change, names});
 
-// Live + review (firmware D-F32): the keyboard's Save and Revert, the answer to
-// a live edit's trap check, and how edits reach the keyboard.
+// Live preview + save (firmware D-F32): the keyboard's Save and Revert, the
+// answer to a live edit's trap check, and how edits reach the keyboard.
 /** @param {boolean} [confirmChecks] @returns {import("../../contracts/messages.js").DraftControl} */
 export const saveDraft = (confirmChecks) => ({type: 'saveProfileDraft', ...(confirmChecks === undefined ? {} : {confirmChecks})});
 /** @returns {import("../../contracts/messages.js").DraftControl} */

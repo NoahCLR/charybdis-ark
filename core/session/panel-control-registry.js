@@ -21,8 +21,8 @@ const CONTROLS = Object.freeze({
     rebaseProfileDraft: Object.freeze({route: "draft", action: "rebase", binding: "none", demo: "refuse", phase: "panel", identity: true}),
     putBackProfile: Object.freeze({route: "draft", action: "putBack", binding: "none", demo: "refuse", phase: "panel", identity: true}),
     closeProfileDraftReview: Object.freeze({route: "draft", action: "closeReview", binding: "none", demo: "allow", phase: "panel", identity: true}),
-    // Live + review (firmware D-F32): the keyboard's Save and Revert, the
-    // answer to an edit's trap check, and how edits reach the keyboard.
+    // Live preview + save (firmware D-F32): the keyboard's Save and Revert,
+    // the answer to an edit's trap check, and how edits reach the keyboard.
     saveProfileDraft: Object.freeze({route: "draft", action: "save", binding: "apply", demo: "refuse", phase: "apply", identity: true}),
     revertProfileDraft: Object.freeze({route: "draft", action: "revert", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
     confirmLiveEdit: Object.freeze({route: "draft", action: "confirmLive", binding: "apply", demo: "refuse", phase: "panel", identity: true}),

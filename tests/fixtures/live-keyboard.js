@@ -6,10 +6,11 @@
 // toggles, and the reads that show them. It models what the host sees, not
 // the firmware's scheduling: an edit is checked and published when its commit
 // arrives, the slave half follows at once unless told to lag, and Save writes
-// a new generation at once. In Live the keyboard's own save happens when a
-// test says the quiet period passed (`autoSave()`), or, for the preview and
-// browser tests, after `autoSaveAfterReads` reads of its status. Every read it does not own goes to a read-only
-// fake keyboard built from what it runs now, so a complete read reproduces it.
+// a new generation at once. In Live edit the keyboard's own save happens when
+// a test says the quiet period passed (`autoSave()`), or, for the preview and
+// browser tests, after `autoSaveAfterReads` reads of its status. Every read it
+// does not own goes to a read-only fake keyboard built from what it runs now,
+// so a complete read reproduces it.
 //
 // It keeps the firmware's rules a host can trip over: a new begin while an
 // edit is being received is BUSY; an edit being received holds a 15 s lease
@@ -82,8 +83,9 @@ function liveKeyboard(options) {
     let cached = reader(), savedCached = stored();
     const savedReader = () => savedCached;
     const refreshReader = () => {cached = reader(); savedCached = stored();};
-    // The keyboard's own save, as after its quiet period: in Live (or in
-    // Apply for key adjustments) it writes what it runs, once per revision.
+    // The keyboard's own save, as after its quiet period: in Live edit (or in
+    // Review and save for key adjustments) it writes what it runs, once per
+    // revision.
     function autoSave() {
         if (!working || raised.slaveRefused || slaveRefused) return false;
         auto.transaction++; save.lastTransactionId = auto.transaction; auto.lastWasAutomatic = true;

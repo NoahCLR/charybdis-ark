@@ -151,9 +151,9 @@ function wireProfileDrop(card) {
 }
 
 // The recovery copies Ark keeps before an Apply, a Save, a restart, leaving
-// Live or restoring a backup, each named by what made it and its keyboard. The
-// browser keeps them in its storage, each usable as a draft (through the same
-// comparison as a backup file), downloadable as a file, or deletable.
+// Live edit or restoring a backup, each named by what made it and its keyboard.
+// The browser keeps them in its storage, each usable as a draft (through the
+// same comparison as a backup file), downloadable as a file, or deletable.
 /** @param {import("../../contracts/model.js").RecoveryCopy[]} recoveries */
 function recoveriesCard(recoveries) {
     const canImport = canEditArea("import");

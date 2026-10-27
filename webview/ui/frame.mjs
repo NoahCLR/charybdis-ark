@@ -249,8 +249,8 @@ export function commitBar() {
 
 // A keyboard that stopped saving (firmware D-F34), for either half and in
 // every edit mode. A live draft's unsaved edits are kept in a recovery copy
-// and put back; an Apply draft is Ark's own, so the restart leaves it as it is,
-// and the bar still counts what it holds.
+// and put back; a Review and save draft is Ark's own, so the restart leaves it
+// as it is, and the bar still counts what it holds.
 /** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft @param {NonNullable<ReturnType<typeof liveSaveState>>} saving */
 function stoppedBar(draft, saving) {
     const tip = draft.live ? "Restart both halves. A recovery copy of any unsaved edits is saved first; the keyboard comes back in a moment and Ark puts them back."
@@ -266,10 +266,10 @@ function stoppedBar(draft, saving) {
     return node;
 }
 
-// The live modes: the keyboard already runs the edits. In Live + review the
-// review leads to Save; in Live the keyboard saves by itself, so the bar only
-// says where that stands. Revert puts back what is saved (undo sends the
-// edits again). When the keyboard's own save failed, the bar says so with
+// The live modes: the keyboard already runs the edits. In Live preview + save
+// the review leads to Save; in Live edit the keyboard saves by itself, so the
+// bar only says where that stands. Revert puts back what is saved (undo sends
+// the edits again). When the keyboard's own save failed, the bar says so with
 // Save again; when the halves are apart, Revert is the only way on.
 /** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft */
 function liveCommitBar(draft) {

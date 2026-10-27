@@ -99,8 +99,9 @@ class ProfileDraftSession {
         // keys as this app does can be trusted with.
         if (!knownActionAbi(capabilities.actionAbiDigest ?? 0)) throw fail("This keyboard's firmware numbers its keys differently from this app. Update both halves before editing.");
         validateSnapshot(snapshot.document, capabilities);
-        // Live + review (firmware D-F32): the draft is the keyboard's working
-        // copy, and review compares it with the saved profile beside it.
+        // Live preview + save (firmware D-F32): the draft is the keyboard's
+        // working copy, and review compares it with the saved profile beside
+        // it.
         const live = "live" in snapshot && snapshot.live ? /** @type {import("./types.js").LiveSnapshot} */ (snapshot) : null;
         if (live) validateSnapshot(live.saved.document, capabilities);
         this.deviceId = deviceId;
@@ -118,8 +119,8 @@ class ProfileDraftSession {
         this.hostOs = copy(snapshot.hostOs ?? null);
         /** @type {import("./types.js").LiveState | null} */
         this.live = live ? {...live.live} : null;
-        // An Apply draft's keyboard, as the look between edits last read it
-        // (a live draft's is `live.keyboard`).
+        // A Review and save draft's keyboard, as the look between edits last
+        // read it (a live draft's is `live.keyboard`).
         /** @type {import("./types.js").LiveKeyboardStatus | undefined} */
         this.applyKeyboard = undefined;
         this.history = [this.historyEntry(snapshot.document)];
@@ -197,7 +198,8 @@ class ProfileDraftSession {
     // A live draft is the keyboard's own state, so only a lost connection or
     // a read it has not taken makes it stale; a confirmed edit is progress.
     // What the keyboard last said of itself, in any edit mode: a live draft's
-    // `live.keyboard`, or what the look between edits read under an Apply draft.
+    // `live.keyboard`, or what the look between edits read under a Review and
+    // save draft.
     get keyboardStatus() {return this.live ? this.live.keyboard : this.applyKeyboard;}
     get stale() {return Boolean(this.needsRead || this.connectionChanged || (!this.live && this.latest.fingerprint !== this.base.fingerprint));}
     /** @param {import("./types.js").ConnectionToken} connectionToken */
@@ -234,10 +236,10 @@ class ProfileDraftSession {
         this.deviceId = deviceId;
     }
     // The keyboard Ark restarted, back and read over a new connection
-    // (keyboard-restart.js). An Apply draft's edits are Ark's own, so if the
-    // read shows the keyboard still holds what the draft began from, the new
-    // connection is the draft's: its edits and history stay, with nothing to
-    // review again. True when it took it.
+    // (keyboard-restart.js). A Review and save draft's edits are Ark's own,
+    // so if the read shows the keyboard still holds what the draft began from,
+    // the new connection is the draft's: its edits and history stay, with
+    // nothing to review again. True when it took it.
     /** @param {import("./types.js").ConnectionToken} connectionToken */
     followRestart(connectionToken) {
         const token = connectionToken ?? null;
@@ -305,7 +307,7 @@ class ProfileDraftSession {
         // Exactly Ark's own edit, published (one revision on, its transaction
         // the last, the bytes it sent): the edit landed, so the draft
         // confirms it and keeps its history.
-        // In Live the keyboard may have saved it by itself since.
+        // In Live edit the keyboard may have saved it by itself since.
         const expected = this.expectedLive;
         this.expectedLive = undefined;
         if (expected && this.showsExpected(liveSnapshot, expected) && JSON.stringify(capabilities) === JSON.stringify(this.capabilities)) {
@@ -331,8 +333,8 @@ class ProfileDraftSession {
     }
     // Whether a read shows exactly the edit Ark sent, published: the same
     // session, one revision on, its transaction the last the keyboard
-    // finished, its bytes, over the same saved profile (or, in Live, saved
-    // by the keyboard itself as exactly those bytes).
+    // finished, its bytes, over the same saved profile (or, in Live edit,
+    // saved by the keyboard itself as exactly those bytes).
     /** @param {import("./types.js").LiveSnapshot} snapshot @param {LiveExpectation} expected */
     showsExpected(snapshot, expected) {
         const live = snapshot.live;
@@ -418,8 +420,9 @@ class ProfileDraftSession {
         this.replace(document, message.draftRevision, "edit", label);
         return {message: copy(message), previousFingerprint, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
     }
-    // The document an edit would make, without making it: Apply stages it
-    // at once, Live + review sends it to the keyboard first (live-edits.js).
+    // The document an edit would make, without making it: Review and save
+    // stages it at once, Live preview + save sends it to the keyboard first
+    // (live-edits.js).
     /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
     propose(message) {
         this.assertRevision(message.draftRevision);
@@ -746,8 +749,8 @@ class ProfileDraftSession {
         return {document: this.history[step].document, cursor: step, label: null, origin: null, order: this.history[step].order};
     }
     // A live edit the keyboard confirmed: the draft moves to it, as staging
-    // moves an Apply draft. `target.cursor` moves through the history (undo,
-    // redo); otherwise the document is one more step.
+    // moves a Review and save draft. `target.cursor` moves through the history
+    // (undo, redo); otherwise the document is one more step.
     /** @param {LiveTarget} target @param {{session: number, revision: number, bytes: Buffer, converged: boolean, slaveRefused?: boolean, unsaved?: boolean}} result */
     confirmLive(target, result) {
         const live = /** @type {import("./types.js").LiveState} */ (this.live);
@@ -787,7 +790,7 @@ class ProfileDraftSession {
         if (status.unsaved !== live.unsaved) this.live.unsaved = status.unsaved;
         return changed ? "changed" : "same";
     }
-    // A look at the keyboard between edits under an Apply draft
+    // A look at the keyboard between edits under a Review and save draft
     // (live-watch.js): what it says of itself. The panel says there a key
     // adjustment still reaching both halves and a half that stopped saving,
     // so true when either changed. No status (a restarted keyboard not yet
@@ -800,8 +803,9 @@ class ProfileDraftSession {
         this.applyKeyboard = status ? liveKeyboardStatus(status) : undefined;
         return before !== panelFlags(this.applyKeyboard);
     }
-    // The keyboard saved what it runs by itself (Live): what is saved moves
-    // to it, and the history stays, so undo still sends the last edits back.
+    // The keyboard saved what it runs by itself (Live edit): what is saved
+    // moves to it, and the history stays, so undo still sends the last edits
+    // back.
     // Saved any other way (another app's Save) the draft starts there.
     /** @param {{savedGeneration: number, savedOrigin: number, session: number, revision: number}} status */
     confirmKeyboardSaved(status) {
@@ -863,7 +867,7 @@ class ProfileDraftSession {
             live: this.live ? {unsaved: this.live.unsaved, converged: this.live.converged, slaveRefused: Boolean(this.live.slaveRefused), mode: this.live.mode, keyboard: connected ? liveKeyboardView(this.live.keyboard) : null} : null,
             // What the keyboard says of itself in any edit mode: a live
             // draft's `live.keyboard`, or what the look between edits read
-            // under an Apply draft.
+            // under a Review and save draft.
             keyboard: connected ? liveKeyboardView(this.keyboardStatus) : null};
     }
 }

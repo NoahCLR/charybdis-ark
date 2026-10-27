@@ -209,8 +209,8 @@ test("bytes already read stand in for a payload only when they pass its checks",
     }
 });
 
-// A save that lands between the chunks (a Live keyboard's own save, after a
-// rename to a shorter name) shortens the payload under the read: the page
+// A save that lands between the chunks (a Live edit keyboard's own save, after
+// a rename to a shorter name) shortens the payload under the read: the page
 // that comes back short, or past the new end, is the save showing, so page 0
 // is read again and the read retried when it moved. Seen on the keyboard on
 // 2026-10-24 as "Chunk 258 returned 1 bytes where 3 were expected."

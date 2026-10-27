@@ -1,10 +1,11 @@
 // @ts-check
 "use strict";
 
-// The read Live + review starts from (firmware D-F32): the keyboard's working
-// copy, which it runs now, and its saved profile, which a replug or Revert
-// puts back, read as one coherent pair. Review compares the two; a live edit
-// is made against the working copy's own bytes, so they are kept exactly.
+// The read Live preview + save starts from (firmware D-F32): the keyboard's
+// working copy, which it runs now, and its saved profile, which a replug or
+// Revert puts back, read as one coherent pair. Review compares the two; a
+// live edit is made against the working copy's own bytes, so they are kept
+// exactly.
 
 const {PROFILE_ACTIVE_KIND, readProfileStatus} = require("../protocol/profile-wire-v1");
 const {EDIT_PHASE, EDIT_RESULT, readActiveProfile, readEditProgress, readEditStatus, readEditMode, readRuntime} = require("../protocol/profile-edit-v1");
