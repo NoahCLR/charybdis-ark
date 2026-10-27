@@ -7,6 +7,8 @@
 import {editModeWords} from "./vocabulary.mjs";
 import {confirmText} from "./checks.mjs";
 import {shortcut} from "./shortcuts.mjs";
+import {RESTART_NEEDED} from "./keyboard-view.mjs";
+import {demoOf} from "./demo.mjs";
 
 export const APPLY = 0;
 export const LIVE = 1;
@@ -61,7 +63,7 @@ export function questionWords(question, changes, {mode = question === "saveOrRev
                     : `The keyboard switches to ${label} only with nothing unsaved`;
         return {title: "Save or revert first?", checks,
             detail: `The keyboard runs ${changes === 1 ? "a change that is" : `${count} that are`} not saved. ${why}: save them on the keyboard, or revert to what is saved.${confirm}`,
-            answers: [{pending: /** @type {const} */ ("revert"), label: "Revert"}, {pending: /** @type {const} */ ("save"), label: checks.length ? "Save anyway" : "Save on keyboard", primary: true}]};
+            answers: [{pending: /** @type {const} */ ("revert"), label: "Revert"}, {pending: /** @type {const} */ ("save"), label: checks.length ? "Save anyway" : "Save to keyboard", primary: true}]};
     }
     const how = mode === LIVE
         ? "In Live edit every edit takes effect on the keyboard at once, and the keyboard saves it by itself a moment later. Send the draft to the keyboard now, or discard it."
@@ -118,6 +120,25 @@ export function liveSaveState(draft, {adjustment = true} = {}) {
         detail: `The keyboard saves these edits by itself after ${quietWords(keyboard)} without typing, with or without Ark. Unplugging it sooner loses them.`, action: null};
     if (keyboard?.savedByKeyboard) return {kind: "saved", tone: "ok", title: "Saved by the keyboard",
         detail: "The keyboard saved its edits by itself; they survive a replug.", action: null};
+    return null;
+}
+
+/**
+ * Whether the bar offers Restart, in every edit mode, and in which words: a
+ * keyboard that stopped saving (firmware D-F34), or one whose slave half
+ * never confirmed a cancelled save (`health.restartNeeded`), which refuses
+ * new saves until it restarts (D-L67). Stopped outranks it, so a keyboard
+ * that says both gets one bar. Restart is a draft control, so with no draft
+ * nothing is offered here and the Keyboard screen's steps say it; nor in the
+ * demo, which has no keyboard.
+ * @param {Partial<Model> | null | undefined} model
+ * @returns {null | {kind: 'stopped' | 'restartNeeded', title: string, detail: string}}
+ */
+export function restartOffer(model) {
+    const draft = model?.draft;
+    if (!draft || demoOf(model).active) return null;
+    if (liveSaveState(draft)?.kind === "stopped") return {kind: "stopped", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail};
+    if (model?.device?.health?.restartNeeded) return {kind: "restartNeeded", title: RESTART_NEEDED.label, detail: RESTART_NEEDED.detail};
     return null;
 }
 

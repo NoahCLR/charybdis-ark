@@ -34,9 +34,10 @@ export const SAVE_IN_PROGRESS = Object.freeze({
 });
 
 // A keyboard whose slave half never confirmed a cancelled save
-// (`health.restartNeeded`), in the words the rail's keyboard dot and the
-// Keyboard screen both use. Ark's Restart is only for a stopped keyboard (D-L67), so the way
-// out is to unplug the master half's USB cable.
+// (`health.restartNeeded`), in the words the rail's keyboard dot, the
+// Keyboard screen and the bar use. The bar offers Ark's Restart for it
+// (D-L67); the steps say the other way out, unplugging the master half's USB
+// cable, for where there is no bar.
 export const RESTART_NEEDED = Object.freeze({
     label: "Restart the keyboard",
     detail: "The slave half did not confirm a cancelled save, so the keyboard refuses new saves until it restarts. Nothing was lost.",

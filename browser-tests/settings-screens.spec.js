@@ -116,9 +116,9 @@ test("Backups: a recovery copy is named by what made it and its keyboard, can be
     await page.locator('[data-screen="profile"]').click();
     await expect(page.locator(".card.usage")).toHaveCount(0);
     const names = page.locator(".recovery-row .recovery-name");
-    await expect(names.nth(0)).toHaveText(/^Before Save · Charybdis - Home · 6 Oct 2026, \d\d:\d\d$/);
+    await expect(names.nth(0)).toHaveText(/^Before saving live edits · Charybdis - Home · 6 Oct 2026, \d\d:\d\d$/);
     await expect(names.nth(1)).toHaveText(/^Before leaving Live edit · Charybdis - Home · 4 Oct 2026, \d\d:\d\d$/);
-    await expect(names.nth(2)).toHaveText(/^Before Save · Charybdis - Office · 3 Oct 2026, \d\d:\d\d$/);
+    await expect(names.nth(2)).toHaveText(/^Before saving a draft · Charybdis - Office · 3 Oct 2026, \d\d:\d\d$/);
     await expect(names.nth(3)).toHaveText(/^Recovery copy · 1 Oct 2026, \d\d:\d\d$/);
     await expect(page.locator(".card.recoveries h3")).toHaveText("Recovery copies");
     await clearPosts(page);

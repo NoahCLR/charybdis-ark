@@ -65,9 +65,10 @@ export function keyboardControl(model) {
 }
 
 // The dot never changes the button's shape: what the keyboard is doing and
-// whether its halves agree are its colour, said in words on hover, with what
-// the keyboard says of itself that no bar or notice says: a restart it needs,
-// a save it is finishing, and in the live modes its own saving.
+// whether its halves agree are its colour, said in words on hover, with a
+// restart it needs (which the bar offers too) and what the keyboard says of
+// itself that no bar or notice says: a save it is finishing, and in the live
+// modes its own saving.
 /** @param {Partial<Model> | null | undefined} model @returns {{tone: string, tip: string, busy: boolean}} */
 function keyboardDot(model) {
     const health = model?.device?.health;

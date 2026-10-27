@@ -14,7 +14,7 @@ import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 import {bindKeyboardMenu, keyboardMenu} from "./keyboard-menu.mjs";
-import {LIVE, liveSaveState} from "../view/edit-mode.mjs";
+import {LIVE, liveSaveState, restartOffer} from "../view/edit-mode.mjs";
 import {ariaShortcut, shortcut} from "../view/shortcuts.mjs";
 
 // The review opens at once; the core marks it reviewed when it answers.
@@ -223,9 +223,10 @@ export function commitBar() {
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }
-    // A keyboard that stopped saving, in any edit mode: Restart is the one way on.
-    const saving = liveSaveState(draft);
-    if (saving?.kind === "stopped") return stoppedBar(draft, saving);
+    // A keyboard that stopped saving or needs a restart, in any edit mode:
+    // Restart is the one way on.
+    const restart = restartOffer(model);
+    if (restart) return restartBar(draft, restart);
     if (draft.live) return liveCommitBar(draft);
     if (!draft.dirty) return null;
 
@@ -247,18 +248,18 @@ export function commitBar() {
     return node;
 }
 
-// A keyboard that stopped saving (firmware D-F34), for either half and in
-// every edit mode. A live draft's unsaved edits are kept in a recovery copy
-// and put back; a Review and save draft is Ark's own, so the restart leaves it
-// as it is, and the bar still counts what it holds.
-/** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft @param {NonNullable<ReturnType<typeof liveSaveState>>} saving */
-function stoppedBar(draft, saving) {
+// A keyboard that stopped saving (firmware D-F34), for either half, or that
+// needs a restart, in every edit mode. A live draft's unsaved edits are kept
+// in a recovery copy and put back; a Review and save draft is Ark's own, so the
+// restart leaves it as it is, and the bar still counts what it holds.
+/** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft @param {NonNullable<ReturnType<typeof restartOffer>>} offer */
+function restartBar(draft, offer) {
     const tip = draft.live ? "Restart both halves. A recovery copy of any unsaved edits is saved first; the keyboard comes back in a moment and Ark puts them back."
         : "Restart both halves. Your draft stays as it is in Ark; the keyboard comes back in a moment and Ark reads it again.";
     const count = !draft.live && draft.dirty ? draft.changes.length : 0;
-    const node = el(`<div class="commit${draft.live ? " live" : ""} stopped">
-        <span class="n"><i class="dot err"></i> <strong>${esc(saving.title)}</strong>
-        <span class="muted">${esc(saving.detail)}</span></span>
+    const node = el(`<div class="commit${draft.live ? " live" : ""} ${offer.kind === "stopped" ? "stopped" : "restart-needed"}">
+        <span class="n"><i class="dot err"></i> <strong>${esc(offer.title)}</strong>
+        <span class="muted">${esc(offer.detail)}</span></span>
         ${count ? `<span class="peek"><span class="note">${count} change${count === 1 ? "" : "s"} in your draft</span></span>` : ""}
         <span class="sep"></span>
         <button class="btn primary" data-act="restart" ${draft.connected ? "" : "disabled"} data-tip="${esc(tip)}">Restart</button></div>`);

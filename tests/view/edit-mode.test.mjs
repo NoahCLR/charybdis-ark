@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, liveSaveState, questionWords, quietWords, switchQuestion} from "../../webview/view/edit-mode.mjs";
+import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, liveSaveState, questionWords, quietWords, restartOffer, switchQuestion} from "../../webview/view/edit-mode.mjs";
+import {RESTART_NEEDED} from "../../webview/view/keyboard-view.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 
 const vocabulary = {editModes: {
@@ -115,6 +116,29 @@ test("an Apply draft's keyboard that stopped saving says so for either half and 
     assert.equal(liveSaveState(apply({})), null, "a keyboard saving normally says nothing");
 });
 
+// A slave half that never confirmed a cancelled save (`health.restartNeeded`)
+// leaves the keyboard refusing new saves until it restarts. The bar offers
+// Restart for it in every edit mode, in the words the keyboard dot uses; a
+// keyboard that also stopped saving is offered Restart once, as stopped.
+test("a keyboard that needs a restart is offered Restart in every edit mode, once", () => {
+    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, adjustmentPending: false, stopped: false, slaveStopped: false, quietMs: 3000};
+    const needs = (draft, restartNeeded = true) => /** @type {any} */ ({device: {connected: true, health: {restartNeeded}}, draft});
+    const drafts = {
+        "Review and save, clean": {changes: [], dirty: false, live: null, keyboard},
+        "Review and save, with edits": {changes: [{}], dirty: true, live: null, keyboard},
+        "Live edit": {changes: [], dirty: false, live: {mode: LIVE, unsaved: true, converged: true, keyboard}},
+        "Live preview + save": {changes: [{}], dirty: true, live: {mode: LIVE_REVIEW, unsaved: true, converged: true, keyboard}},
+    };
+    for (const [name, draft] of Object.entries(drafts)) {
+        assert.deepEqual(restartOffer(needs(draft)), {kind: "restartNeeded", title: RESTART_NEEDED.label, detail: RESTART_NEEDED.detail}, name);
+        assert.equal(restartOffer(needs(draft, false)), null, `${name}: nothing to offer`);
+        const stopped = draft.live ? {...draft, live: {...draft.live, keyboard: {...keyboard, stopped: true}}} : {...draft, keyboard: {...keyboard, slaveStopped: true}};
+        assert.deepEqual(restartOffer(needs(stopped)), {kind: "stopped", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail}, `${name}: stopped says it, one bar`);
+    }
+    assert.equal(restartOffer(needs(null)), null, "no draft: Restart is a draft control, so the Keyboard screen's steps say it");
+    assert.equal(restartOffer({...needs(drafts["Live edit"]), demo: {active: true}}), null, "never in the demo");
+});
+
 test("leaving Live + review with unsaved edits asks Save or Revert; entering it with a draft asks Send or Discard", () => {
     assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}), APPLY), "saveOrRevert");
     assert.equal(switchQuestion(model({live: {unsaved: false}, dirty: false}), APPLY), null);
@@ -130,6 +154,8 @@ test("each question's answers post the mode with what happens to the work first"
     assert.match(save.detail, /2 changes that are not saved/);
     assert.match(questionWords("saveOrRevert", 1).detail, /a change that is not saved/);
     assert.deepEqual(save.answers.map(answer => answer.pending), ["revert", "save"]);
+    // Save reads as the review's own button does, in every mode.
+    assert.deepEqual(save.answers.map(answer => answer.label), ["Revert", "Save to keyboard"]);
     const send = questionWords("sendOrDiscard", 1);
     assert.match(send.detail, /1 change\b/);
     assert.deepEqual(send.answers.map(answer => answer.pending), ["discard", "send"]);
