@@ -1,6 +1,6 @@
 {
   "profile": {
-    "formatVersion": 1,
+    "formatVersion": 4,
     "stageEnableMask": 31,
     "groups": [
       {"id": 0, "leds": []},
@@ -63,7 +63,7 @@
       ]},
       {"id": "lightingFeedback", "fields": [
         {"macro": "RGB_AUTOMOUSE_GRADIENT_ENABLE", "enabled": true},
-        {"macro": "RGB_PD_MODE_FEEDBACK_ENABLE", "enabled": true},
+        {"macro": "RGB_POINTING_MODE_FEEDBACK_ENABLE", "enabled": true},
         {"macro": "RGB_COMBO_FEEDBACK_ENABLE", "enabled": true},
         {"macro": "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE", "enabled": true}
       ]}
@@ -85,16 +85,16 @@
       ],
       "automouseFade": {"mode": "END_COLOR_ON_ALL_KEYS", "end_color": {"h": "8", "s": "9", "v": "10"}},
       "pdModeColors": [
-        {"pointingMode": "PD_MODE_PINCH", "color": {"h": "61", "s": "62", "v": "63"}, "locality": "RGB_RIGHT_HALF"},
-        {"pointingMode": "PD_MODE_DRAGSCROLL", "color": {"h": "11", "s": "12", "v": "13"}, "locality": "RGB_RIGHT_HALF"},
-        {"pointingMode": "PD_MODE_ARROW", "color": {"h": "51", "s": "52", "v": "53"}, "locality": "RGB_RIGHT_HALF"},
-        {"pointingMode": "PD_MODE_VOLUME", "color": {"h": "21", "s": "22", "v": "23"}, "locality": "RGB_RIGHT_HALF"},
-        {"pointingMode": "PD_MODE_ZOOM", "color": {"h": "41", "s": "42", "v": "43"}, "locality": "RGB_RIGHT_HALF"},
-        {"pointingMode": "PD_MODE_BRIGHTNESS", "color": {"h": "31", "s": "32", "v": "33"}, "locality": "RGB_RIGHT_HALF"}
+        {"pointingMode": "POINTING_MODE_PINCH", "color": {"h": "61", "s": "62", "v": "63"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "POINTING_MODE_DRAGSCROLL", "color": {"h": "11", "s": "12", "v": "13"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "POINTING_MODE_ARROW", "color": {"h": "51", "s": "52", "v": "53"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "POINTING_MODE_VOLUME", "color": {"h": "21", "s": "22", "v": "23"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "POINTING_MODE_ZOOM", "color": {"h": "41", "s": "42", "v": "43"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "POINTING_MODE_BRIGHTNESS", "color": {"h": "31", "s": "32", "v": "33"}, "locality": "RGB_RIGHT_HALF"}
       ],
       "pdModeLedGroups": [
-        {"owner": "RGB_PD_MODE_GROUP_ALL", "color": {"h": "0", "s": "0", "v": "0"}, "ledGroup": "RGB_LED_GROUP_THUMBS", "ledIndices": [0, 1], "ledGroupKind": "reusable"},
-        {"owner": "PD_MODE_VOLUME", "color": {"h": "70", "s": "71", "v": "72"}, "ledGroup": "RGB_LED_GROUP_TRACKBALL", "ledIndices": [57], "ledGroupKind": "reusable"}
+        {"owner": "RGB_POINTING_MODE_GROUP_ALL", "color": {"h": "0", "s": "0", "v": "0"}, "ledGroup": "RGB_LED_GROUP_THUMBS", "ledIndices": [0, 1], "ledGroupKind": "reusable"},
+        {"owner": "POINTING_MODE_VOLUME", "color": {"h": "70", "s": "71", "v": "72"}, "ledGroup": "RGB_LED_GROUP_TRACKBALL", "ledIndices": [57], "ledGroupKind": "reusable"}
       ],
       "comboFeedback": {"color": {"h": "80", "s": "81", "v": "82"}, "locality": "RGB_KEY_HALF"},
       "comboFeedbackLedGroups": [

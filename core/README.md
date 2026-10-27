@@ -1,217 +1,165 @@
-# Charybdis Ark Core
+# Charybdis Ark core
 
-This is the app itself: everything except the VS Code shell and the webview.
-It has no VS Code or webview dependency. Its layers — `data`, `transport`,
-`schema`, `protocol`, `model`, `session` — import in one direction only; the
-table is in [`../AGENTS.md`](../AGENTS.md) and `tests/layering.test.js`
-enforces it.
+The app without a shell: no DOM and no shell import (D-L71), layers that
+import one way (D-L10, [architecture](../docs/architecture/README.md)). This page maps the modules
+and the contracts a shell or adapter must keep. The rules for reading, the
+draft, Apply and the live modes are in
+[reading, applying and progress](../docs/architecture/profile-snapshot-and-progress.md);
+the draft binding, panel controls and model are in the
+[interface contracts](../docs/spec/interface-contracts.md).
 
-## Reading the keyboard
+## How data flows
 
-`session/profile-device-service.js` enumerates matching interfaces, keeps
-native paths and handles out of the webview, and reads what the keyboard says
-about itself: VIA and firmware versions, the Profile Wire capability and status
-pages, the layout, the committed profile, combos, macro banks, settings,
-keyboard options and the base RGB effect. It publishes a sanitized snapshot;
-`session/device-model.js` turns that into the `model` the webview renders, and
-`session/panel-session.js` adds the draft and the panel's own state to it,
-routes each message the webview posts, and runs the Rename & Reorder panel.
-`session/panel-loop.js` is the loop every host runs around them: route a
-message, run it, publish the model, turn a failure into the panel's notice,
-and decide what an export holds. A host passes in only its own functions
-(posting to the panel, toasts, progress, saving a recovery copy, choosing a
-profile file, saving an export), listed at the top of that file, so
-`extension.js` keeps only VS Code's dialogs, files and progress, and the web
-page's host (`web/web-host.mjs`) only the browser's. What differs between
-hosts reaches the panel as `model.host` (`panel-session.js`): whether it offers
-Choose keyboard or a theme toggle, its recovery copies, its words for
-connecting, and why it cannot reach a keyboard at all. `session/demo-session.js`
-is the demo (D-L53): the same draft over the bundled demo profile with no device
-behind it, which the loop answers to in place of the device service's state
-while it is open.
+**Reading.** A device adapter (`transport/`) carries 32-byte reports; one
+`DeviceRequestCoordinator` serializes them per keyboard. `protocol/` modules
+build requests and decode answers; `schema/` decodes the stored bytes.
+`session/profile-device-service.js` owns the connection and publishes what it
+holds as `snapshot()`. Its complete read, `readKeyboardProfile`, takes one
+verified snapshot: `snapshotProfile` (`session/portable-profile-session.js`)
+for a keyboard in Review and save, `snapshotLive` (`session/live-profile-session.js`) for
+one in a live edit mode or still running unsaved live edits; that read also
+keeps the working copy's exact bytes, which live edits splice against.
 
-Custom Profile Wire pages use one monotonically increasing nonzero request-id
-sequence per connected session (wrapping `255` to `1`), so a delayed response
-from an older request cannot satisfy a newer one.
+**Editing.** The snapshot seeds `ProfileDraftSession`
+(`session/profile-draft-session.js`): one complete document with its history.
+`session/panel-session.js` routes each message the panel posts; an edit
+reaches `stage()`, which finds its editor through `model/draft-edits.js` and
+rewrites one domain. Review (`model/profile-review.js`) and the checks
+(`model/profile-checks.js`, `model/layer-reach.js`) compare the draft with
+the keyboard. `buildPanelModel` projects the draft through
+`session/device-model.js` into the model the panel draws.
 
-## Editing and applying
+**Applying.** In Review and save, `session/panel-controls.js` hands the reviewed
+document to the service's `restorePortableProfile`, which runs
+`restoreProfile` (`session/portable-profile-session.js`): recovery copy first,
+then one candidate through `session/candidate-upload-coordinator.js` and
+`protocol/profile-candidate-v1.js`. In the live modes,
+`session/live-edits.js` computes each target with the same editors and sends
+it through the service's `postLiveEdit`; `session/live-edit-coordinator.js`
+splices it per domain (`schema/profile-splices.js`), and
+`session/live-watch.js` looks at the keyboard between edits.
 
-Every edit is staged in `session/profile-draft-session.js`: a complete
-portable profile (`model/portable-profile.js`) with undo and redo history, a
-review built by `model/profile-review.js`, the checks of what the layers let
-you reach from `model/layer-reach.js` (a trap has to be confirmed before
-Apply), and staleness checks on every message (draft id, revision, and the base
-the form was built from). The domain
-edits themselves live in `session/device-profile-edits.js` and
-`session/key-behavior-edits.js`.
+## The panel loop
 
-Apply goes through `session/portable-profile-session.js`: a recovery copy is
-written before the first device write, the profile is staged on both halves
-through the candidate mailbox (`protocol/profile-candidate-v1.js`,
-`session/candidate-upload-coordinator.js`) and the peer VIA stage
-(`session/logical-via-stage-coordinator.js`), and one generation is published.
-Staging never retries an ambiguous transport outcome, commit is
-transaction/digest-correlated and idempotent across a lost acknowledgement, and
-success is accepted only after a fresh status read reports the new generation
-on both halves. A keyboard the app cannot open a draft for is read-only; the
-host refuses edits rather than writing them directly.
+`session/panel-loop.js` is the loop the web page's shell runs: route a
+message, run it, publish the model, turn a failure into the panel's notice.
+The shell passes in only what it has, as listed at the top of that file, plus
+the device service's `adapter` and `sleep(ms)`. A background tab throttles
+timers, so the page passes a `sleep` kept by a worker; otherwise `setTimeout`
+is used. What the page offers reaches the panel as `model.shell`, whose
+defaults are the page's (`SHELL_WORDS` in `session/panel-session.js`).
+(`tests/session/panel-loop.test.js`)
 
-## Byte formats
+## Current firmware, in one place each
 
-`schema/profile-blob-v1.js` encodes and strictly decodes the `NLP1` header and
-its ordered domain envelopes, the four-byte semantic action values, and the
-FNV-1a 32-bit and CRC32 helpers. Unknown domains are rejected. The domain
-codecs — `rgb-domain-v1.js`, `key-behavior-domain-v1.js`,
-`combo-domain-v1.js`, `pd-mode-domain-v1.js`, `settings-domain-v1.js` — are
-exact inverses of their decoders and enforce the firmware's limits. The RGB
-byte contract is frozen in [`rgb-domain-v1.md`](../upstream/firmware/docs/architecture/rgb-domain-v1.md), a pinned firmware spec;
-its firmware counterpart is `users/noah/lib/profile/schema/profile_rgb_v1.c`.
-`schema/compiled-profile-v1.js` resolves expressions in the keyboard's
-vocabulary (`KC_A`, `LT(1, KC_A)`, `PD_SLOT_0`, `VIA_MACRO_3`) to actions and
-native keycodes, refusing any whose bits would land on another keycode.
+Ark supports only current firmware (D-L64): the exact Profile Wire and schema
+versions, which imply everything the keyboard does. Supporting the next
+firmware is one change to this table, its codec and tests, pinned and
+released with it (D-L44, D-L50).
+
+| What | Current | Where |
+| --- | --- | --- |
+| Profile Wire | 2.0, exactly | `PROFILE_WIRE_V1` in `protocol/profile-wire-v1.js` |
+| Profile schema | 4.3, exactly | `PROFILE_BLOB_V1` in `schema/profile-blob-v1.js` |
+| Domain versions | RGB 4, key behaviours 2, combos 3, settings 11, PD 4, keymap 1, macros 1 | `schema/profile-domains.js` |
+| Store format | 6 (implied by Profile Wire 2, not on the wire) | `PROFILE_CANDIDATE_V1` in `protocol/profile-candidate-v1.js` |
+| Profile size | 130,048 bytes; lengths and offsets 32 bits | `PROFILE_CANDIDATE_V1`, `PROFILE_BLOB_V1` |
+| Action vocabulary | `0x67df11b3` | `ACTION_ABI` in `schema/actions.js` |
+| Feature word | split, saves, pointing (bits 0–2) | `PROFILE_WIRE_FEATURES` in `protocol/profile-wire-v1.js` |
+| Backup | version 5; 196,608-byte file limit | `DOCUMENT_VERSION`, `FILE_MAX_BYTES` in `model/portable-profile.js` |
+
+The feature word holds only what a build varies by (firmware D-F28); a later
+capability raises the minor version instead. The gates that judge a keyboard
+against this table, and what each one requires, are in
+`session/firmware-support.js` (`tests/session/firmware-support.test.js`). A
+keyboard that fails them, or stores a schema or domain in another version
+(`FIRMWARE_UPDATE_REQUIRED`), is read no further than its identity.
+
+## The device service
+
+`ProfileDeviceService` runs one operation at a time: an overlapping required
+operation rejects with `SERVICE_BUSY` and changes nothing. A failure rejects
+and is also recorded in `snapshot()`, so the panel shows it whoever awaited
+it; the optional reads (base RGB, combos) never reject and record
+`{state: "unavailable"}` instead. The full convention is the class comment.
+(`tests/session/service-operation-lock.test.js`)
+
+## Domain codecs
+
+`schema/profile-domains.js` registers each domain once: ID, version, wire bit,
+review area and codecs. Adding a domain or bumping its version starts there.
+Every codec is `decode(bytes, options) → value` and
+`encode(value, options) → Buffer`, and decoding then encoding gives back
+exactly the bytes read. Decoders enforce this with `canonical` from
+`schema/bytes.js` and refuse bytes that come out differently, with a string
+`code`. The one exception is the macro domain: an unused tail after the last
+slot is accepted on read, and encoding writes the streams alone.
+`tests/schema/profile-domains.test.js` holds the contract for every domain.
+
+## Backups
+
+A backup is Ark's envelope (D-L15), version 5, with exactly these fields:
+`format` (`"charybdis-profile"`), `version`, `keyboard` (`"charybdis-4x6"`),
+`actionAbiDigest` (one Ark knows) and `profile`, the complete canonical
+schema-4 blob in base64 with all seven domains once. Decoded layers and macro
+slots are views for the editors, never extra fields. Anything else (version 4
+or older, another schema, action vocabulary or domain version, an unknown
+field) is refused, never translated (D-L54), and a file over
+`FILE_MAX_BYTES` is refused before parsing. The firmware's
+[portable profile](../upstream/firmware/docs/spec/portable-profile-v1.md) and
+[Profile Wire](../upstream/firmware/docs/spec/profile-wire-v1/README.md) own
+the domain contracts. `tests/model/portable-profile.test.js` holds it.
 
 ## Adapter contract
 
-An injected device adapter implements:
+A device adapter (native, browser or the tests' fake) implements
+`listDevices()` and `connect(id)`; a connected device implements `write`,
+`onReport`, `onDisconnect` and `close`, as typed in `transport/types.d.ts`.
+Reports cross this boundary as exactly 32 bytes (`Buffer` or `Uint8Array`);
+anything else is `INVALID_REPORT`. Every adapter matches the same four Raw HID
+identifiers (`transport/device-adapter.js`), and every error carries a stable
+`code` from `LIVE_LINK_ERROR_CODES`: branch on it, never on the message.
 
-```js
-listDevices() -> Promise<Array<{id: string, ...metadata}>>
-connect(deviceId) -> Promise<ConnectedDevice>
-```
+The device service has no default adapter: `new ProfileDeviceService({adapter})`
+takes the one its caller passes, and throws a `TypeError` without one, so the
+page can never reach for a native module.
 
-Each connected device implements:
+**Native** (`NodeHidDeviceAdapter`), for development: Node scripts and agents
+pass it to drive a keyboard (`scripts/probe-live-link.js`,
+`npm run preview -- --device`); node-hid is a development dependency and the
+web build refuses it. node-hid loads at the first
+`listDevices()` or `connect()`, not on `require`, so a missing native module
+is `NATIVE_MODULE_UNAVAILABLE`, not a crash. It opens only a path its last
+enumeration returned, and on macOS opens it non-exclusively. node-hid wants a
+zero report-id byte: writes get it, reads accept 32 bytes or 33 with it, and
+any other report ends the connection. (`tests/transport/node-hid-adapter.test.js`)
 
-```js
-write(report32) -> Promise<void>
-onReport(listener) -> disposer
-onDisconnect(listener) -> disposer
-close() -> Promise<void>
-```
-
-Reports are always `Buffer` or `Uint8Array` values of exactly 32 bytes. Adapters
-may return a disposer function or an object with `dispose()` from either event
-subscription.
-
-`FakeDeviceAdapter` implements the same contract for unit tests.
-
-## Native desktop adapter
-
-`NodeHidDeviceAdapter` is the concrete `node-hid` 3.x implementation. Requiring
-its module does not load `node-hid`; the native dependency is first requested
-when `listDevices()` or `connect()` runs. Tests may inject either `hidModule` or
-`loadHid` into its constructor.
-
-Enumeration is restricted to all four QMK Raw HID identifiers:
-
-- vendor id `0xA8F8`
-- product id `0x1833`
-- usage page `0xFF60`
-- usage `0x61`
-
-Only paths returned by a matching enumeration may be opened. On macOS the
-adapter requests non-exclusive access so a desktop connection does not claim
-the full HID device. The adapter boundary always uses 32-byte protocol frames;
-native writes are prefixed with the zero report-id byte required by `node-hid`,
-and reads accept either 32 protocol bytes or 33 bytes with that zero prefix.
-Any other native report invalidates the device session.
-
-The four identifiers live in `transport/device-adapter.js` and are shared by
-every adapter.
-
-## Browser adapter
-
-`WebHidDeviceAdapter` implements the same contract over Chrome's WebHID. It
-takes the `hid` object (`navigator.hid`) as an option and never names
-`navigator` itself; without one, every call fails with
-`NATIVE_MODULE_UNAVAILABLE`.
-
-`listDevices()` returns only the interfaces this page has already been allowed
-to open (`getDevices()`) whose collections carry the Raw HID usage page and
-usage. `requestDevice()` opens Chrome's picker filtered to all four
-identifiers and must run from a user gesture; a dismissed picker fails with
-`CANCELLED`. WebHID has no device path, so each `HIDDevice` object gets an id
-(`webhid:1`, `webhid:2`, …) the first time the adapter sees it and keeps it
-while Chrome keeps that object, which is as long as the keyboard stays plugged
-in. Descriptors carry node-hid's keys; those WebHID cannot know (path, serial
-number, manufacturer, release, interface) are `undefined`.
-
-Reports are sent with report id 0. An `inputreport` must carry report id 0 and
-exactly 32 bytes and reaches `onReport` as a `Buffer`; anything else
-invalidates the session. Chrome's `disconnect` event for the open device ends
-the connection; `close()` removes both listeners and closes the device once.
-
-A browser tab in the background has its timers throttled, so the waits between
-polls while reading and saving a profile (the candidate and VIA stage
-coordinators, and the storage wait) take a `sleep(ms)` the host passes as an
-option of `ProfileDeviceService` (or of `openPanelLoop`); the web page passes
-one kept by a worker. Without it they use `setTimeout`, as the extension does.
-
-The read-only CLI lists matching interfaces without opening or writing to one:
-
-```sh
-npm run probe:live-link
-npm run probe:live-link -- --json
-```
+**Browser** (`WebHidDeviceAdapter`). It takes `navigator.hid` as its `hid`
+option and never names `navigator`; without one every call is
+`NATIVE_MODULE_UNAVAILABLE`. `listDevices()` lists only interfaces the page
+may already open, the one last chosen first. `requestDevice()` opens Chrome's
+picker and must run inside a click. WebHID has no path, so each `HIDDevice`
+object gets an id (`webhid:1`, …) that lasts until the keyboard is unplugged.
+`forget()` closes the keyboard last opened and withdraws the page's
+permission. (`tests/transport/webhid-adapter.test.js`)
 
 ## Coordinator contract
 
-Create one `DeviceRequestCoordinator` for an adapter, then call `connect(id)` to
-obtain a `CoordinatedDeviceConnection`. Connections for different device ids
-have independent queues. A single device sends exactly one request at a time.
+`DeviceRequestCoordinator.connect(id)` gives a connection whose `request()`
+queues per keyboard: one request is on the wire at a time. A request's
+`matchResponse` decides which report answers it (byte 0 by default; Profile
+Wire also matches its request ID, 1 to 255 per connection); a report that
+matches nothing is set aside as unexpected.
 
-```js
-const connection = await coordinator.connect(deviceId);
-const response = await connection.request(report, {
-    timeoutMs: 1000,
-    signal,
-    matchResponse(responseReport, requestReport) {
-        return responseReport[0] === requestReport[0];
-    },
-});
-```
+The stale-reply rule: once a request may have reached the keyboard, an
+ambiguous outcome (timeout, cancellation, failed write, malformed report, a
+matcher that throws) ends the connection and fails everything queued.
+Reconnect before retrying. Cancelling a request still queued removes only
+that one. The exception is `softTimeout`, for background reads the caller can
+miss: its timeout fails that request alone, and its late answer is set aside.
 
-The default matcher compares byte 0. Versioned custom live-profile frames must
-supply a matcher that also checks their transaction id.
-
-When nothing on the keyboard handles a report, QMK answers with the request
-echoed back and byte 0 set to `0xFF`. Every protocol module accepts exactly that
-echo of its own request (`protocol/via-unhandled-v1.js`) and treats it as a
-definite refusal: a stable error such as `UNHANDLED` or `KEYBOARD_NOT_READY`,
-with the connection left open. A `0xFF` report that is not an echo of the
-request — another client's reply — is never taken for an answer.
-
-Cancellation of a queued request removes only that request. Timeout,
-cancellation, write failure, malformed input, or matcher failure after a
-request has reached the device invalidates the whole connection. This is the
-stale-reply isolation rule: a request with an ambiguous outcome is never
-followed by another request on the same HID session. Reconnect before retrying.
-
-Stable error codes are exported as `LIVE_LINK_ERROR_CODES`:
-
-- `ALREADY_CONNECTED`
-- `CANCELLED`
-- `CONNECT_FAILED`
-- `DEVICE_NOT_FOUND`
-- `DISCONNECTED`
-- `ENUMERATION_FAILED`
-- `INVALID_ADAPTER`
-- `INVALID_REPORT`
-- `NATIVE_MODULE_UNAVAILABLE`
-- `NOT_CONNECTED`
-- `RESPONSE_MATCH_FAILED`
-- `TIMEOUT`
-- `WRITE_FAILED`
-
-The UI should branch on `error.code`, not error message text.
-
-## Tests
-
-```sh
-npm run check   # syntax across the tree, then every test
-npm test        # the tests alone
-```
-
-The tests use Node's built-in runner and the fake adapter. Golden vectors are
-read from the firmware repository's `tests/fixtures/` and the upstream
-`keyboard.json` in `../bastardkb-qmk`, so the suite expects this checkout's
-sibling layout; the app itself never reads either at runtime.
+When nothing on the keyboard handles a request, firmware echoes it with byte 0
+set to `0xFF`. `protocol/raw-hid-unhandled.js` takes exactly that echo of the
+request just sent as a definite refusal (`UNHANDLED`) and keeps the
+connection; any other `0xFF` report is never an answer.
+(`tests/transport/transport.test.js`, `tests/protocol/raw-hid-unhandled.test.js`)

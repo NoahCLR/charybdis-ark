@@ -1,16 +1,17 @@
+// @ts-check
 "use strict";
 
 // The web build: the web version of Ark as a complete static site in
-// dist/web/, ready to publish as it is. The VS Code extension never uses it and
-// has no build step; core/ and webview/ stay the sources it runs as they are.
+// dist/web/, ready to publish as it is. core/ and webview/ stay the sources
+// it bundles as they are.
 //
 //     index.html                the page (web/index.html, with the names below)
 //     _headers                  what Cloudflare Pages sends with it (web/_headers)
-//     host-<hash>.js            the page's host (web/page.mjs), with the core it runs;
+//     shell-<hash>.js           the page's shell (web/page.mjs), with the core it runs;
 //                               it loads the panel, or on a phone shows a notice instead
-//     core-<hash>.js            core/ for a browser host (web/core.mjs)
-//     chunk-<hash>.js           what host and core share
-//     worker-<hash>.js          the host's clock (web/sleep-worker.js)
+//     core-<hash>.js            core/ for the web page (web/core.mjs)
+//     chunk-<hash>.js           what shell and core share
+//     worker-<hash>.js          the shell's clock (web/sleep-worker.js)
 //     panel-<hash>.js           the panel (webview/app.mjs)
 //     styles-<hash>.css         its styles
 //
@@ -27,9 +28,9 @@
 // keeps index.html from being cached and lets every hashed file be cached for
 // good, by one rule per file the build wrote.
 //
-// The build fails if node-hid, fs, vscode or any other Node built-in would
-// reach a bundle. node-hid-adapter.js is the one module core/ loads that cannot
-// run in a browser; web/no-native-hid.js takes its place.
+// The build fails if node-hid, its adapter (core/transport/node-hid-adapter.js,
+// which only Node scripts load), fs or any other Node built-in would reach a
+// bundle. The page passes the WebHID adapter to the device service itself.
 
 const {execFileSync} = require("node:child_process");
 const fs = require("node:fs");
@@ -40,15 +41,16 @@ const esbuild = require("esbuild");
 const APP_ROOT = path.resolve(__dirname, "..");
 const OUTDIR = path.join(APP_ROOT, "dist", "web");
 // Beside the site it describes, so publishing the folder never publishes it.
+/** @param {string} outdir */
 const manifestFileFor = (outdir) => path.join(path.dirname(outdir), `${path.basename(outdir)}-manifest.json`);
 const NODE_HID_ADAPTER = path.join(APP_ROOT, "core", "transport", "node-hid-adapter.js");
-const NO_NATIVE_HID = path.join(APP_ROOT, "web", "no-native-hid.js");
 
 // A current Chrome, which WebHID needs anyway.
 const TARGET = ["chrome120"];
 const NODE_BUILTINS = new Set(builtinModules);
-const HOST_PACKAGES = ["vscode", "node-hid"];
+const NATIVE_PACKAGES = ["node-hid"];
 // What a bundle may take from node_modules: the buffer package and its two dependencies.
+/** @type {Record<"core" | "panel" | "worker", string[]>} */
 const PACKAGES = {core: ["buffer", "base64-js", "ieee754"], panel: [], worker: []};
 
 // The page's policy: scripts, styles and the worker from the page's own origin,
@@ -65,18 +67,18 @@ const headerPolicy = () => [...POLICY, ...HEADER_ONLY_POLICY].join("; ");
 // and a release shows on the next load).
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
+/** @type {import("esbuild").Plugin} */
 const browserOnly = {
     name: "browser-only",
     setup(build) {
         build.onResolve({filter: /.*/}, (args) => {
             const name = args.path.split("/")[0];
-            if (NODE_BUILTINS.has(args.path) || args.path.startsWith("node:") || HOST_PACKAGES.includes(name)) {
+            if (NODE_BUILTINS.has(args.path) || args.path.startsWith("node:") || NATIVE_PACKAGES.includes(name)) {
                 const importer = args.importer ? path.relative(APP_ROOT, args.importer) : "the entry";
                 return {errors: [{text: `${args.path} cannot be in the web build (imported by ${importer})`}]};
             }
-            if (args.path.startsWith(".") && args.importer
-                && path.resolve(path.dirname(args.importer), args.path).replace(/\.js$/, "") === NODE_HID_ADAPTER.replace(/\.js$/, "")) {
-                return {path: NO_NATIVE_HID};
+            if (args.importer && path.resolve(path.dirname(args.importer), args.path).replace(/\.js$/, "") === NODE_HID_ADAPTER.replace(/\.js$/, "")) {
+                return {errors: [{text: `${path.relative(APP_ROOT, NODE_HID_ADAPTER)} cannot be in the web build (imported by ${path.relative(APP_ROOT, args.importer)})`}]};
             }
             return undefined;
         });
@@ -85,6 +87,7 @@ const browserOnly = {
 
 // The metafile names every input a bundle took. A package that is not listed,
 // or the node-hid adapter, fails the build even if it resolved quietly.
+/** @param {import("esbuild").Metafile} metafile @param {keyof typeof PACKAGES} bundle */
 function checkInputs(metafile, bundle) {
     const problems = [];
     for (const input of Object.keys(metafile.inputs)) {
@@ -97,7 +100,9 @@ function checkInputs(metafile, bundle) {
 }
 
 // The written file for each entry, by the entry's name.
+/** @param {import("esbuild").Metafile} metafile @param {string} outdir @returns {Record<string, string>} */
 function outputsOf(metafile, outdir) {
+    /** @type {Record<string, string>} */
     const names = {};
     for (const [file, output] of Object.entries(metafile.outputs)) {
         if (!output.entryPoint) continue;
@@ -107,6 +112,12 @@ function outputsOf(metafile, outdir) {
     return names;
 }
 
+/**
+ * @param {keyof typeof PACKAGES} name
+ * @param {NonNullable<import("esbuild").BuildOptions["entryPoints"]>} entryPoints
+ * @param {string} outdir
+ * @param {Omit<import("esbuild").BuildOptions, "metafile"> & {metafile?: true}} [options]
+ */
 async function bundle(name, entryPoints, outdir, options = {}) {
     const result = await esbuild.build({
         absWorkingDir: APP_ROOT,
@@ -127,9 +138,13 @@ async function bundle(name, entryPoints, outdir, options = {}) {
 }
 
 // What the page says it was built from.
+/** @param {NodeJS.ProcessEnv} [env] @returns {import("../contracts/model.js").BuildInfo} */
 function buildInfo(env = process.env) {
+    // The committed package manifest owns this required version string.
+    /** @type {Pick<typeof import("../package.json"), "version">} */
     const {version} = JSON.parse(fs.readFileSync(path.join(APP_ROOT, "package.json"), "utf8"));
     if (env.ARK_COMMIT) return {version, commit: env.ARK_COMMIT};
+    /** @param {...string} args */
     const git = (...args) => execFileSync("git", args, {cwd: APP_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]}).trim();
     try {
         const dirty = git("status", "--porcelain", "--untracked-files=no") !== "";
@@ -140,6 +155,12 @@ function buildInfo(env = process.env) {
 }
 
 // Fills a {{name}} template from `names`; a name the build does not write fails it.
+/**
+ * @param {string} template
+ * @param {string} file
+ * @param {Record<string, string>} names
+ * @param {(value: string) => string} [escape]
+ */
 function fill(template, file, names, escape = (value) => value) {
     return template.replace(/\{\{(\w+)\}\}/g, (match, name) => {
         if (names[name] === undefined) throw new Error(`${file} names ${match}, which the build does not write`);
@@ -149,16 +170,19 @@ function fill(template, file, names, escape = (value) => value) {
 
 // _headers for the hashed files the build wrote: one exact rule each, so no
 // splat can ever mark a file immutable whose name does not change with it.
+/** @param {Iterable<string>} hashedFiles */
 function headersFile(hashedFiles) {
     const hashed = [...hashedFiles].sort().map((file) => `/${file}\n  Cache-Control: ${IMMUTABLE}`).join("\n");
     return fill(fs.readFileSync(path.join(APP_ROOT, "web", "_headers"), "utf8"), "web/_headers", {csp: headerPolicy(), hashed});
 }
 
+/** @param {string} value */
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`);
 
 // Builds into `outdir`, emptied first so no earlier release's file lingers, and
 // returns the manifest it wrote.
-async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir), entries = {core: "web/core.mjs", host: "web/page.mjs"}, build = buildInfo()} = {}) {
+/** @param {import("./build-types.js").WebBuildOptions} [options] */
+async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir), entries = {core: "web/core.mjs", shell: "web/page.mjs"}, build = buildInfo()} = {}) {
     fs.rmSync(outdir, {recursive: true, force: true});
     fs.rmSync(manifestFile, {force: true});
     fs.mkdirSync(outdir, {recursive: true});
@@ -179,7 +203,7 @@ async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir)
             },
         }),
     };
-    if (manifest.host) {
+    if (manifest.shell) {
         const names = {...manifest, version: build.version, commit: build.commit, csp: pagePolicy()};
         const page = fill(fs.readFileSync(path.join(APP_ROOT, "web", "index.html"), "utf8"), "web/index.html", names, escapeHtml);
         fs.writeFileSync(path.join(outdir, "index.html"), page);
@@ -193,10 +217,15 @@ if (require.main === module) {
     buildWeb().then((manifest) => {
         for (const [name, file] of Object.entries(manifest)) console.log(`${name.padEnd(7)}${path.relative(APP_ROOT, path.join(OUTDIR, file))}`);
         console.log(`written ${path.relative(APP_ROOT, path.join(OUTDIR, "index.html"))}, _headers and ${path.relative(APP_ROOT, manifestFileFor(OUTDIR))}`);
-    }).catch((error) => {
-        console.error(error.errors?.length ? error.errors.map((entry) => entry.text).join("\n") : String(error.message || error));
+    }).catch(/** @param {unknown} error */ (error) => {
+        const details = error && typeof error === "object" ? error : {};
+        const errors = "errors" in details ? details.errors : undefined;
+        const message = "message" in details ? details.message : undefined;
+        console.error(Array.isArray(errors) && errors.length
+            ? errors.map(/** @param {unknown} entry */ (entry) => entry && typeof entry === "object" && "text" in entry ? entry.text : undefined).join("\n")
+            : String(message || error));
         process.exit(1);
     });
 }
 
-module.exports = {buildInfo, buildWeb, headerPolicy, pagePolicy, manifestFileFor, IMMUTABLE, OUTDIR};
+module.exports = {buildInfo, buildWeb, bundle, headerPolicy, pagePolicy, manifestFileFor, IMMUTABLE, OUTDIR};

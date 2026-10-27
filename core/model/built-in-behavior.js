@@ -1,12 +1,24 @@
+// @ts-check
 "use strict";
 
 // What a key does where its behaviour row leaves a tier empty. The keyboard
 // fills that gap with the key's own meaning, so an empty cell is not "nothing".
 //
-// The key's own tap fills an empty tap at every tap count the row reaches, sent
-// once per press: a double tap that authors no tap sends it twice. A plain key
+// The key's own tap fills an empty first tap. An empty later tap repeats the
+// first tap, the row's own or else the key's, once per press: a double tap that
+// authors no tap sends it twice (firmware D-F33; the grid decides it,
+// webview/view/keyface.mjs). A plain key
 // (a basic keycode, alone or with modifiers) taps itself; LT() taps its key,
-// MT() taps its key and OSM() arms its one-shot.
+// MT() taps its key and OSM() arms its one-shot. A custom key with a shortcut
+// (firmware D-F26) is a plain key whose own action is that shortcut: it taps
+// it, and holds it as a fallback. One whose shortcut's layers are Tap-toggle
+// or One-shot is a momentary layer key instead, as TT() and OSL() are: it
+// holds its shortcut from every press (`fromPress`, no fallback), and its own
+// tap is left only what it does to the layers: One-shot's arms them, and
+// Tap-toggle's does nothing until its TAPPING_TOGGLE-th tap, which a row with
+// steps replaces, so it has no tap of its own. (Under an authored first-press
+// hold the keyboard does tap a Tap-toggle shortcut's keys from an empty tap;
+// the grid, one built-in tap per row, leaves that cell empty.)
 //
 // The built-in hold belongs to the first press. LT() holds its layer and MT()
 // and OSM() their modifiers, whatever else the row authors. A plain key's hold
@@ -19,34 +31,57 @@
 // keys and macros. Layer keys send no tap once held past Tap / hold, pointing
 // keys hold their mode, and dual-role keys always have their own hold.
 //
-// Plain keys have done this on every firmware with a Profile Wire. Dual-role
-// keys are claimed only by firmware that advertises it: authored LT() rows since
-// physical gesture timing (Profile Wire bit 17), MT() and OSM() rows since
-// runtime-owned tapping (bit 18). Older firmware classified those keys in QMK
-// first, and the app does not guess what that produced. A bare modifier key is
+// Some keys hold from the press rather than at Tap / hold (`fromPress`): MO()
+// turns its layer on, LM() its layer and modifiers, and a pointing-mode key
+// (PD_MODE_n) runs its mode, all as soon as the key goes down
+// (handled_key_defaults.c, handled_key_hold_behavior). A pointing-mode key
+// whose later tap counts enter another mode waits for Tap / hold instead; that
+// depends on the row, so the grid decides it (webview/view/keyface.mjs).
+//
+// The keyboard owns the gesture timing of authored LT(), MT() and OSM() rows
+// (physical gesture timing and runtime-owned tapping). A bare modifier key is
 // buffered rather than tapped, so it claims nothing.
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
+const {SHORTCUT_LAYER_KINDS, shortcutPresent} = require("../schema/settings-domain-v1");
 
+/** @param {number} code @param {number} start @param {number} end */
 const within = (code, start, end) => code >= start && code <= end;
+/** @param {number} code */
 const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
 
-function builtInActions(target, {physicalGestureTiming = false, ownedTapping = false} = {}) {
-    if (target?.kind === ACTION.CUSTOM_KEY || target?.kind === ACTION.VIA_MACRO) return {releaseTaps: true};
+/** @typedef {{customKeyShortcuts?: readonly import("../schema/types.js").CustomKeyShortcut[]}} BuiltInFeatures */
+/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean}} */
+function builtInActions(target, {customKeyShortcuts = []} = {}) {
+    const slot = target?.kind === ACTION.CUSTOM_KEY ? target.operand : target?.kind === ACTION.QMK_KEYCODE ? customKeyOfCode(target.operand) : undefined;
+    if (slot !== undefined) {
+        const shortcut = customKeyShortcuts[slot];
+        if (!shortcutPresent(shortcut)) return {releaseTaps: true};
+        const own = {kind: ACTION.CUSTOM_KEY, operand: slot};
+        if (shortcut.layers && shortcut.layerKind === SHORTCUT_LAYER_KINDS.ONESHOT) return {tap: own, hold: own, fromPress: true};
+        if (shortcut.layers && shortcut.layerKind === SHORTCUT_LAYER_KINDS.TAP_TOGGLE) return {hold: own, fromPress: true};
+        return {tap: own, hold: own, fallback: true, releaseTaps: true};
+    }
+    if (target?.kind === ACTION.MACRO) return {releaseTaps: true};
+    if (target?.kind === ACTION.LAYER_MOMENTARY) return {hold: target, fromPress: true};
+    if (target?.kind === ACTION.POINTING_MODE_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
-    if (customKeyOfCode(code) !== undefined || within(code, 0x7700, 0x777f)) return {releaseTaps: true};
+    if (within(code, 0x7700, 0x777f)) return {releaseTaps: true};
     if (plainKey(code)) {
         return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true, releaseTaps: true};
     }
-    if (within(code, 0x4000, 0x4fff) && physicalGestureTiming) {
+    if (within(code, 0x4000, 0x4fff)) {
         return {tap: keycodeAction(code & 0xff), hold: {kind: ACTION.LAYER_MOMENTARY, operand: (code >> 8) & 0x0f}};
     }
-    if (within(code, 0x2000, 0x3fff) && ownedTapping) {
+    if (within(code, 0x2000, 0x3fff)) {
         return {tap: keycodeAction(code & 0xff), hold: keycodeAction(((code >> 8) & 0x1f) << 8)};
     }
-    if (within(code, 0x52a0, 0x52bf) && ownedTapping) {
+    if (within(code, 0x5220, 0x523f)) return {hold: {kind: ACTION.LAYER_MOMENTARY, operand: code & 0x0f}, fromPress: true};
+    if (within(code, 0x5000, 0x51ff)) return {hold: keycodeAction(code), fromPress: true};
+    if (within(code, 0x7e80, 0x7e9f)) return {hold: keycodeAction(code), fromPress: true};
+    if (within(code, 0x52a0, 0x52bf)) {
         return {tap: keycodeAction(code), hold: keycodeAction((code & 0x1f) << 8)};
     }
     return {};

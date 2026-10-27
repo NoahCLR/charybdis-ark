@@ -1,53 +1,12 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const test = require("node:test");
 
-const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
-const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const {
     buildCanonicalStudioProfileV1,
     semanticActionForExpression,
 } = require("../../core/schema/compiled-profile-v1");
-
-const fixturePath = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_v1.fixture");
-const fixture = new Map(fs.readFileSync(fixturePath, "utf8")
-    .split(/\r?\n/)
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => {
-        const separator = line.indexOf("=");
-        return [line.slice(0, separator), line.slice(separator + 1)];
-    }));
-
-test("real compiled defaults remain a canonical cross-language Profile Blob v1 fixture", () => {
-    const bytes = Buffer.from(fixture.get("profile.full.hex"), "hex");
-    const decoded = decodeProfileBlob(bytes);
-    const codecOptions = {
-        compiledStageMask: 0x1f,
-        logicalLayerCount: 5,
-        maximumBrightness: 200,
-        tapBranchColorCount: 4,
-        supportedPdModeIds: [0, 1, 2, 3, 4, 5],
-    };
-    const rgb = decodeRgbDomainV1(decoded.domains[0].payload, codecOptions);
-    const behaviors = decodeKeyBehaviorDomain(decoded.domains[1].payload);
-
-    assert.equal(bytes.length, Number(fixture.get("profile.byte_length")));
-    assert.equal(decoded.crc32, Number.parseInt(fixture.get("profile.crc32"), 16));
-    assert.equal(decoded.digest, Number.parseInt(fixture.get("profile.fnv1a32"), 16));
-    assert.equal(decoded.domains[0].payload.length, Number(fixture.get("profile.rgb_payload_length")));
-    assert.equal(decoded.domains[1].payload.length, Number(fixture.get("profile.behavior_payload_length")));
-    assert.equal(rgb.layerColors.length, 5);
-    assert.equal(rgb.pdModeColors.length, 6);
-    assert.equal(behaviors.rowCount, Number(fixture.get("profile.behavior_rows")));
-    assert.equal(behaviors.populatedStepCount, Number(fixture.get("profile.populated_behavior_steps")));
-    assert.deepEqual(encodeRgbDomainV1(rgb, codecOptions), decoded.domains[0].payload);
-    assert.deepEqual(encodeKeyBehaviorDomain({rows: behaviors.rows}), decoded.domains[1].payload);
-    assert.deepEqual(encodeProfileBlob({domains: decoded.domains}), bytes);
-});
 
 function minimalStudioModel() {
     return {
@@ -67,8 +26,8 @@ function minimalStudioModel() {
             tapHoldTerm: "180",
             steps: [{
                 tapCount: 0,
-                tap: {helper: "TAP_SENDS", action: "KC_A"},
-                hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(_BASE)"},
+                tap: {style: "TAP_SENDS", action: "KC_A"},
+                hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(_BASE)"},
             }],
         }],
         qmkKeycodeValues: {KC_A: 4},
@@ -77,19 +36,20 @@ function minimalStudioModel() {
 }
 
 const milestoneCapabilities = {
-    maxLogicalLayers: 8,
-    maxBehaviorRows: 64,
+    maxLogicalLayers: 16,
+    maxBehaviorRows: 128,
     maxTapStepsPerBehavior: 5,
-    maxPopulatedBehaviorSteps: 128,
-    customKeySlots: 64,
-    viaMacroSlots: 64,
-    maxProfilePayload: 4064,
+    maxPopulatedBehaviorSteps: 640,
+    customKeySlots: 128,
+    macroSlots: 128,
+    maxProfilePayload: 65504,
     physicalLedCount: 58,
 };
 
 test("semantic compiler maps stable actions and rejects source-only helpers", () => {
     const model = minimalStudioModel();
-    assert.deepEqual(semanticActionForExpression("VIA_MACRO_12", model), {kind: 6, operand: 12});
+    assert.deepEqual(semanticActionForExpression("MACRO_12", model), {kind: 6, operand: 12});
+    assert.deepEqual(semanticActionForExpression("VIA_MACRO_12", model), {kind: 6, operand: 12}, "the former name");
     assert.deepEqual(semanticActionForExpression("LOCK_LAYER(_BASE)", model), {kind: 3, operand: 0});
     assert.throws(
         () => semanticActionForExpression("SOME_LOCAL_C_FUNCTION(KC_A)", model),
@@ -102,11 +62,27 @@ test("the native resolver refuses expressions whose bits would land on another k
     // Well-formed expressions still resolve, including nested modifiers.
     assert.equal(resolve("C(S(0x04))", {}), 0x0304);
     assert.equal(resolve("LT(15,0x04)", {}), 0x4f04);
-    assert.equal(resolve("LOCK_LAYER(7)", {}) - resolve("LOCK_LAYER(0)", {}), 7);
+    assert.equal(resolve("LOCK_LAYER(15)", {}) - resolve("LOCK_LAYER(0)", {}), 15);
     // Each of these used to OR into an unrelated keycode: a dead user keycode,
     // a macro with Ctrl dropped, RIGHT_THUMB, TO(4), QK_BOOTLOADER, MO(1)+mods.
-    for (const expression of ["G(VIA_MACRO_3)", "C(VIA_MACRO_3)", "C(PD_SLOT_0)", "LOCK_LAYER(8)",
+    for (const expression of ["G(MACRO_3)", "C(MACRO_3)", "C(PD_MODE_0)", "LOCK_LAYER(16)",
         "LT(18,0x04)", "LT(60,0x00)", "LCTL(MO(1))"]) {
         assert.equal(resolve(expression, {}), undefined, expression);
     }
+});
+
+
+test("authored compact expressions cannot silently switch a modifier's side", () => {
+    const {resolveNativeQmkExpression: resolve} = require("../../core/schema/compiled-profile-v1");
+    const model = {qmkKeycodeValues: {KC_A: 4, KC_EXLM: 0x021e}};
+    for (const expression of ["RSFT(C(KC_A))", "C(RSFT(KC_A))", "RALT(KC_EXLM)",
+        "MT(MOD_LCTL|MOD_RSFT, KC_A)", "OSM(MOD_RSFT|MOD_LCTL)"]) {
+        assert.equal(resolve(expression, model), undefined, expression);
+        assert.throws(() => semanticActionForExpression(expression, model), /cannot be represented/);
+    }
+    assert.equal(resolve("S(C(KC_A))", model), 0x0304);
+    assert.equal(resolve("RSFT(RCTL(KC_A))", model), 0x1304);
+    assert.equal(resolve("MT(MOD_RCTL|MOD_RSFT, KC_A)", model), 0x3304);
+    assert.equal(resolve("OSM(MOD_RCTL|MOD_RSFT)", model), 0x52b3);
+    assert.equal(resolve("0x1304", model), 0x1304);
 });

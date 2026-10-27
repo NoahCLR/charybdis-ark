@@ -7,44 +7,60 @@ const {document} = require("../fixtures/portable-profile");
 
 test("whole-profile checks report inert actions and destination blockers", () => {
     const decoded = validateSnapshot(document());
-    decoded.danglingPdBindings = {7: 2};
-    decoded.document.macros[0] = Buffer.from("A".repeat(520)).toString("base64");
+    decoded.danglingPointingKeys = {7: 2};
+    // Text the US layout cannot type, with Unicode playback off.
+    decoded.macroSlots[0] = Buffer.from("é");
     const checks = profileFindings(decoded, {brightnessMax: 100, effects: [{id: 2}]});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.count, 2);
-    assert.equal(checks.find(row => row.kind === "unplayableMacro")?.place.index, 0);
+    const unplayable = checks.find(row => row.kind === "unplayableMacro");
+    assert.equal(unplayable?.place.index, 0);
+    assert.equal(unplayable?.title, "Macro 0 cannot play with the settings in Your computer");
+    assert.equal(unplayable?.fix, "Fix the macro or change Host → Your computer before playing it.");
     assert.deepEqual(checks.filter(row => row.level === "blocker").map(row => row.kind), ["brightnessBlocker", "effectBlocker"]);
 });
 
 test("whole-profile findings retain new and fixed status beside the keyboard", () => {
     const keyboard = validateSnapshot(document());
     const draft = validateSnapshot(document());
-    draft.danglingPdBindings = {7: 1};
-    const checks = draftProfileChecks(keyboard, draft, [0, 1, 2, 3, 4, 5, 6, 7], {});
+    draft.danglingPointingKeys = {7: 1};
+    const checks = draftProfileChecks(keyboard, draft, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], {});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.status, "new");
-});
-
-test("gesture timing advice is gated by the destination firmware", () => {
-    const decoded = validateSnapshot(document());
-    // The imported layout has an authored LT; use it as a reachable witness.
-    decoded.behaviors.rows = [{target: {kind: 1, flags: 0, operand: 0x4131}, steps: [{tapIndex: 1, tap: {kind: 1, flags: 0, operand: 4}}]}];
-    assert.ok(profileFindings(decoded, {physicalGestureTiming: false}).some(x => x.kind === "gestureTiming"));
-    assert.ok(!profileFindings(decoded, {physicalGestureTiming: true}).some(x => x.kind === "gestureTiming"));
-    const draft = structuredClone(decoded);
-    draft.behaviors.rows = [];
-    const checks = draftProfileChecks(decoded, draft, undefined, {physicalGestureTiming: false});
-    assert.equal(checks.find(x => x.kind === "gestureTiming").status, "fixed");
 });
 
 test("timing changes report new, existing and fixed findings, including inherited defaults", () => {
     const keyboard = validateSnapshot(document());
     const action = operand => ({kind: 1, flags: 0, operand});
-    keyboard.behaviors.rows = [{target: action(4), tapHoldTerm: 0, longerHoldTerm: 0,
-        steps: [{tapIndex: 0, hold: {mode: 4, action: action(5)}, longHold: {mode: 4, action: action(6)}}]}];
+    keyboard.behaviors.rows = [{target: action(4), tapHoldTerm: 0, longHoldTerm: 0,
+        steps: [{tapIndex: 0, hold: {style: 4, action: action(5)}, longHold: {style: 4, action: action(6)}}]}];
     keyboard.settings.values[1] = 100; keyboard.settings.values[2] = 200;
     const draft = structuredClone(keyboard); draft.settings.values[2] = 100;
-    const checks = (before, after) => draftProfileChecks(before, after, undefined, {physicalGestureTiming: true, ownedTapping: true})
+    const checks = (before, after) => draftProfileChecks(before, after, undefined, {})
         .filter(f => f.kind === "gestureTiming" && f.title.includes("cannot send"));
     assert.equal(checks(keyboard, draft)[0].status, "new");
     assert.equal(checks(draft, draft)[0].status, "existing");
     assert.equal(checks(draft, keyboard)[0].status, "fixed");
+});
+
+test("a behaviour step that sends a custom key without a shortcut is flagged, and one with a shortcut is not", () => {
+    const decoded = validateSnapshot(document());
+    const customKey = operand => ({kind: 7, flags: 0, operand});
+    decoded.behaviors.rows = [{target: {kind: 1, flags: 0, operand: 4}, steps: [
+        {tapIndex: 0, tap: customKey(3), hold: {style: 0, repeatHz: 0, action: customKey(5)}},
+        {tapIndex: 1, longHold: {style: 0, repeatHz: 0, action: customKey(3)}},
+    ]}];
+    decoded.settings.customKeyShortcuts[5] = {mods: 0, keys: [0xd1], layers: 0, layerKind: 0};
+    decoded.settings.customKeyNames[3] = "";
+    const flagged = profileFindings(decoded, {}).filter(row => row.kind === "shortcutlessCustomKeyStep");
+    assert.deepEqual(flagged.map(row => [row.level, row.title]), [
+        ["warning", "KC_A: press 1 tap sends custom key 3, which has no shortcut"],
+        ["warning", "KC_A: press 2 long hold sends custom key 3, which has no shortcut"],
+    ]);
+    decoded.settings.customKeyNames[3] = "Hyper";
+    assert.equal(profileFindings(decoded, {}).find(row => row.kind === "shortcutlessCustomKeyStep")?.title,
+        "KC_A: press 1 tap sends custom key “Hyper”, which has no shortcut", "the custom key by its name");
+    assert.deepEqual(flagged[0].place, {kind: "behaviour", keycode: "KC_A"});
+    decoded.settings.customKeyShortcuts[3] = {mods: 0x0f, keys: [], layers: 0, layerKind: 0};
+    assert.ok(!profileFindings(decoded, {}).some(row => row.kind === "shortcutlessCustomKeyStep"), "modifiers alone are a shortcut");
+    decoded.settings.customKeyShortcuts[3] = {mods: 0, keys: [], layers: 1 << 3, layerKind: 0};
+    assert.ok(!profileFindings(decoded, {}).some(row => row.kind === "shortcutlessCustomKeyStep"), "so are layers alone (firmware D-F26)");
 });

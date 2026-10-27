@@ -1,35 +1,43 @@
+// @ts-check
 "use strict";
 
 // Whether a profile's actions sit where the keyboard can run them. The
 // keyboard checks a profile it is asked to save and refuses the whole domain
 // when one action is misplaced, so the editors check every row before they
 // encode, and an upload is checked before it starts, with a message naming the
-// row instead of the keyboard's bare rejection.
+// row instead of the keyboard's bare rejection. A combo is named by its badge
+// (C0, C1, …), as the combo table and Review name it.
 
-const {PLACEMENT, actionLimitsOfBlob, actionName, behaviorEmitProblem, keycodeAction, placementProblem} = require("../schema/actions");
+/** @typedef {{layerCount?: number, capabilities?: import("./types.js").ProfileDestination}} PlacementOptions */
+
+const {PLACEMENT, actionName, keycodeAction, placementProblem} = require("../schema/actions");
 const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
-const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
+const {profileDepthOptions} = require("../schema/profile-depth");
 
+/** @param {import("../schema/types.js").BehaviorRow[]} rows @param {PlacementOptions} [options] */
 function behaviorPlacementProblem(rows, options) {
     for (const row of rows) {
         const where = `The behaviour on ${actionName(row.target)}`;
         // The target is sent too: a tap with no branch of its own sends the key.
-        const at = (action, placement) => placementProblem(action, placement, options) || behaviorEmitProblem(action, options);
+        /** @param {import("../schema/types.js").SemanticAction} action @param {(typeof PLACEMENT)[keyof typeof PLACEMENT]} placement */
+        const at = (action, placement) => placementProblem(action, placement, options);
         const problem = at(row.target, PLACEMENT.KEY)
             || row.steps.map(step => (step.tap && at(step.tap, PLACEMENT.TAP))
                 || [step.hold, step.longHold].map(hold => hold && at(hold.action,
-                    hold.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE ? PLACEMENT.HOLD_PRESS : PLACEMENT.HOLD_OTHER)).find(Boolean))
+                    hold.style === KEY_BEHAVIOR_HOLD_STYLES.PRESS_AND_HOLD_UNTIL_RELEASE ? PLACEMENT.HOLD_PRESS : PLACEMENT.HOLD_OTHER)).find(Boolean))
                 .find(Boolean);
         if (problem) return `${where}: ${problem}`;
     }
     return undefined;
 }
 
+/** @param {{output: import("../schema/types.js").SemanticAction}[]} rows @param {PlacementOptions} [options] */
 function comboPlacementProblem(rows, options) {
     for (const [index, row] of rows.entries()) {
         const problem = placementProblem(row.output, PLACEMENT.COMBO_OUTPUT, options);
-        if (problem) return `Combo ${index}: ${problem}`;
+        if (problem) return `C${index}: ${problem}`;
     }
     return undefined;
 }
@@ -38,17 +46,20 @@ function comboPlacementProblem(rows, options) {
 // covers behaviours and combos only; a layout key it does not own (DF(), PDF(),
 // a layer past the bank) would reach QMK's own layer code, so the editors
 // refuse to place one.
+/** @param {number} code @param {PlacementOptions} [options] */
 const keyPlacementProblem = (code, options) => placementProblem(keycodeAction(code), PLACEMENT.KEY, options);
 
 // The first misplaced action in an encoded profile, or undefined.
+/** @param {Uint8Array} bytes @param {PlacementOptions} [options] */
 function profilePlacementProblem(bytes, options) {
     const profile = decodeProfileBlob(bytes);
-    const actionOptions = actionLimitsOfBlob(profile);
+    /** @param {number} id */
     const domain = id => profile.domains.find(row => row.id === id);
     const behaviors = domain(PROFILE_DOMAIN_IDS.KEY_BEHAVIORS)?.payload;
     const combos = domain(PROFILE_DOMAIN_IDS.COMBOS);
-    return (behaviors && behaviorPlacementProblem(decodeKeyBehaviorDomain(behaviors, actionOptions).rows, options))
-        || (combos && comboPlacementProblem(decodeComboDomain(combos.payload, combos.version, actionOptions).rows, options))
+    const depth = profileDepthOptions(options?.capabilities, domain(PROFILE_DOMAIN_IDS.RGB)?.payload);
+    return (behaviors && behaviorPlacementProblem(decodeKeyBehaviorDomain(behaviors, depth.behaviors).rows, options))
+        || (combos && comboPlacementProblem(decodeComboDomain(combos.payload).rows, options))
         || undefined;
 }
 

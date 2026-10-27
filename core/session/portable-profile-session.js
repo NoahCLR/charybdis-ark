@@ -1,176 +1,168 @@
+// @ts-check
 "use strict";
-const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
-const {readLegacyPdSource, readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
+const {readSettings} = require("../protocol/portable-profile-v1");
 const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
-const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
+const {ProfilePayloadReader, payloadMatchesActive} = require("./profile-payload-reader");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
-const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
+const {candidateMetadataForBlob, readCandidateSlaveStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
 const {ApplyProgress, failureReason} = require("./apply-progress");
+const {interruption} = require("./interruption");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
-const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
-const {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {readEditProgress} = require("../protocol/profile-edit-v1");
+const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {requireReady: checkFirmwareReady, supportsCompleteProfile, canSnapshot, canReadIdentity, identityStateFlags} = require("./firmware-support");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
+/**
+ * @typedef {import("../transport/types.js").RequestConnection} Connection
+ * @typedef {import("../protocol/types.js").RequestIds} Ids
+ * @typedef {import("./types.js").DeviceCapabilities} Caps
+ * @typedef {import("./types.js").ReadSnapshot} ReadSnapshot
+ * @typedef {import("./types.js").OperationFailure} Failure
+ */
+/** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
+const requireReady = checkFirmwareReady;
+/** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
+/** @param {import("./types.js").ProfileStatus} s */
 const statusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags]);
-const identityStatusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags & ~4]);
+/** @param {import("./types.js").ProfileStatus} s */
+const identityStatusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, identityStateFlags(s)]);
+/** @param {import("./types.js").SnapshotIdentity} identity */
 const identityKey = identity => JSON.stringify(identity);
-const snapshotIdentity = (profile, storage, settings) => ({profile: identityStatusKey(profile), storageGeneration: storage.generation, storageDigest: storage.digest, settingsCrc: crc32(settings), settingsDigest: fnv1a32(settings)});
-// The bytes the keyboard's VIA bank holds, which differential transfer must
-// compare with. A document keeps only the 64 macro streams, and a valid bank
-// may hold stale bytes after them (a writer that shortened the macros need not
-// clear the rest); rebuilding the bank from the document would read those as
-// zeros, send no write for them, and fail the whole-bank digest. So a capture
-// keeps what it read beside the identity it verified, and an Apply result
-// keeps the target it proved the keyboard holds.
-const heldStorage = (layout, macros) => ({layout: Buffer.from(layout), macros: Buffer.from(macros)});
-const hasStorage = (snapshot, capabilities) => snapshot?.storage?.layout?.length === 960 && snapshot.storage.macros?.length === capabilities.viaMacroBytes;
-function capturedBase(before, capabilities) {
-    if (!before.incomplete) {
-        const base = validateSnapshot(before.document, capabilities);
-        if (!hasStorage(before, capabilities)) throw fail("BASE_STORAGE_UNAVAILABLE", "The keyboard read did not include its stored keys and macros. Read the keyboard again before saving.");
-        return {...base, layout: before.storage.layout, macros: before.storage.macros};
-    }
-    const decode = field => Buffer.from(before.document[field], "base64");
-    const base = {profile: decode("profile"), layout: decode("layout"), macros: decode("macros")};
-    if (base.layout.length !== 960 || base.macros.length !== capabilities.viaMacroBytes || base.profile.length < 1) throw fail("INVALID_RECOVERY_CAPTURE", "The interrupted recovery capture is malformed.");
-    return base;
+/** @param {import("./types.js").ProfileStatus} profile @param {Buffer} settings */
+const snapshotIdentity = (profile, settings) => ({profile: identityStatusKey(profile), settingsCrc: crc32(settings), settingsDigest: fnv1a32(settings)});
+// Exact active bytes, retained only as a verified differential-transfer source.
+/** @param {Buffer} profile */
+const heldStorage = profile => ({profile: Buffer.from(profile)});
+/** @param {ReadSnapshot} before @returns {import("./types.js").CandidateBaseSource | undefined} */
+function candidateBaseSource(before) {
+    const bytes = before.storage?.profile, status = before.status;
+    if (!bytes || !status
+        || !(/** @type {number[]} */ ([PROFILE_ACTIVE_KIND.COMPILED_ONLY, PROFILE_ACTIVE_KIND.COMMITTED])).includes(status.activeKind)
+        || fnv1a32(bytes) !== status.activeDigest) return undefined;
+    // Compiled GET status has no committed half and leaves origin zero; REUSE
+    // explicitly names that origin-independent source with the sentinel 255.
+    return {bytes, kind: status.activeKind, generation: status.activeGeneration, digest: status.activeDigest,
+        crc32: crc32(bytes), origin: status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY ? 255 : status.activeOriginHalf};
 }
-function requireReady(capabilities, writing = false) {
-    if ((writing ? capabilities?.compiledLayerCount !== 8 : ![5, 8].includes(capabilities?.compiledLayerCount)) || (capabilities?.supportedDomainMask & 15) !== 15 || (writing && !(capabilities?.featureFlags & (1 << 12)))) {
-        const guidance = capabilities?.compiledLayerCount === 5 ? "Use the five-layer backup bridge on both halves and export your profile before installing the eight-layer firmware. Import becomes available after that update." : "Complete profile Apply requires firmware with atomic profile support on both halves.";
-        throw fail("FIRMWARE_UPDATE_REQUIRED", guidance + " Your current keyboard configuration has not been changed.");
+// Waiting for the halves to agree is pointless while the slave half is not
+// there at all: it would only time out, and hold the keyboard until it did.
+/** @param {Connection} connection @param {{nextRequestId: () => number}} options */
+async function requireSlave(connection, options) {
+    if (!(await readProfileStatus(connection, options)).slaveKnown) {
+        throw fail("KEYBOARD_NOT_READY", "The slave half is not connected. Connect the cable between the halves and read again.");
     }
 }
-// `sleep`, here and below, is the host's wait between polls (the timer's when omitted).
-async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false, {sleep} = {}) {
+// `sleep`, here and below, is the shell's wait between polls (the timer's when omitted).
+/** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {(text: string) => void} [onProgress] @param {boolean} [allowCandidate] @param {boolean} [allowIncomplete] @param {import("./types.js").SnapshotOptions} [options] @returns {Promise<import("./types.js").VerifiedSnapshot>} */
+async function snapshotProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false,
+    {sleep, payloadReader = new ProfilePayloadReader(connection), reuseReadback = false} = {}) {
     requireReady(capabilities);
+    if (payloadReader.connection !== connection) throw fail("PROFILE_CHANGED", "The profile reader belongs to another connection. Read the keyboard again.");
     const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the complete keyboard configuration");
-    const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
-    if (![PROFILE_ACTIVE_KIND.COMMITTED, PROFILE_ACTIVE_KIND.COMPILED_ONLY].includes(before.activeKind) || !(before.stateFlags & 32) || (before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
-    const defaults = await readCompiledPayload(connection, options);
-    const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await readCommittedPayload(connection, options) : defaults;
+    await requireSlave(connection, options);
+    const before = await readProfileStatus(connection, options);
+    if (!canSnapshot(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
+    /** @param {string} label */
+    const counted = label => /** @param {import("../../contracts/model.js").CountedProgress} progress */ progress => onProgress(`${label} · ${progress.done} of ${progress.total} bytes`);
+    const defaults = await payloadReader.readCompiled({...options, onProgress: counted("Reading compiled defaults")});
+    const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await payloadReader.readCommitted({...options, reuse: reuseReadback, onProgress: counted("Reading saved behaviours and lighting")}) : defaults;
+    if (!payloadMatchesActive(active, before)
+        || fnv1a32(defaults.bytes) !== before.compiledDefaultDigest) throw fail("PROFILE_CHANGED", "The keyboard's payload did not match its active identity. Read it again before continuing.");
+    onProgress("Reading combos and global settings");
     const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
-    const pdSource = capabilities.featureFlags & (1 << 13) ? await readLegacyPdSource(connection, ids) : null;
-    const via = await readViaStorage(connection, {allowIncomplete});
+    onProgress("Checking the complete read");
     if (!settings.equals(await readSettings(connection, ids))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
     const profile = materializeProfile(active.bytes, defaults.bytes, combos, settings);
-    const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
-    if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed during the backup. Read it again before continuing.");
-    if (allowIncomplete && via.macros.at(-1) !== 0) {
-        // Preserve the interrupted bytes for diagnosis without presenting them
-        // as an importable profile. A valid chosen backup can replace them.
-        const bytes = Buffer.concat([profile, via.layout, via.macros]);
-        return {document: {format: "charybdis-recovery-capture", version: 1, keyboard: "charybdis-4x6", actionAbiDigest: capabilities.actionAbiDigest,
-            profile: profile.toString("base64"), layout: via.layout.toString("base64"), macros: via.macros.toString("base64")},
-            fingerprint: `incomplete:${capabilities.actionAbiDigest}:${crc32(bytes)}:${fnv1a32(bytes)}`, summary: null, incomplete: true, status: after,
-            identity: snapshotIdentity(after, storageAfter, settings)};
-    }
-    const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
-    if (pdSource) document.pdModeSource = {version: 1, actionAbiDigest: capabilities.actionAbiDigest, compiledDefaultDigest: capabilities.compiledDefaultDigest, domain: pdSource.toString("base64")};
+    const after = await readProfileStatus(connection, options);
+    if (statusKey(before) !== statusKey(after)) throw fail("PROFILE_CHANGED", "The keyboard changed during the backup. Read it again before continuing.");
+    const document = createSnapshot({profile, actionAbiDigest: capabilities.actionAbiDigest});
     validateSnapshot(document, capabilities);
-    return {document, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros)};
+    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, settings), storage: heldStorage(active.bytes)};
 }
+/** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>}} [options] */
 async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
     const options = {nextRequestId: () => ids.next()};
-    const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
-    if ((before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
+    await requireSlave(connection, options);
+    const before = await readProfileStatus(connection, options);
+    if (!canReadIdentity(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
     const settings = await readSettings(connection, ids);
-    const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
-    if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
-    return snapshotIdentity(after, storageAfter, settings);
+    const after = await readProfileStatus(connection, options);
+    if (statusKey(before) !== statusKey(after)) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
+    return snapshotIdentity(after, settings);
 }
-async function verifyRanges(connection, readStored, command, target, ranges, {verifyFinalByte = false} = {}) {
-    for (const range of ranges) {
-        const actual = await readStored(connection, command, range.bytes.length, {startOffset: range.offset});
-        if (!actual.equals(range.bytes)) throw fail("RESTORE_VERIFY_FAILED", "Layout or macro readback did not match the imported profile.");
-    }
-    if (verifyFinalByte) {
-        const actual = await readStored(connection, command, 1, {startOffset: target.length - 1});
-        if (actual[0] !== target.at(-1)) throw fail("RESTORE_VERIFY_FAILED", "Layout or macro readback did not match the imported profile.");
-    }
-}
-
-async function rollForwardLocalStorage(connection, target, base, layoutRanges, macroRanges, onProgress) {
-    const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
-    const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
-    const total = layoutBytes + macroBytes || 2;
-    let completed = 0;
-    for (const range of layoutRanges) {
-        await writeRegion(connection, VIA_STORAGE.LAYOUT_WRITE, range.bytes, {
-            startOffset: range.offset,
-            onProgress: progress => onProgress({completed: completed + progress.completed, total}),
-        });
-        completed += range.bytes.length;
-    }
-    if (macroRanges.length) {
-        await writeViaMacros(connection, target.macros, {
-            current: base.macros,
-            onProgress: progress => onProgress({completed: completed + progress.completed, total}),
-        });
-        completed += macroBytes;
-    }
-    if (!layoutRanges.length && !macroRanges.length) {
-        // A custom-only change still advances the bound VIA generation. A
-        // verified no-op keycode write gives QMK's normal mutation tracker the
-        // durable generation transition without changing the layout.
-        await writeRegion(connection, VIA_STORAGE.LAYOUT_WRITE, target.layout.subarray(0, 2), {
-            onProgress: progress => onProgress({completed: progress.completed, total}),
-        });
-    }
-}
-// A peer that never acknowledged a cancelled save keeps its lease until it
-// restarts, and the keyboard refuses new saves until then. Best effort: the
+// A slave half that never acknowledged a cancelled save keeps its lease until
+// it restarts, and the keyboard refuses new saves until then. Best effort: the
 // save has already failed, so an unreadable status only loses the hint.
-async function peerRestartGuidance(connection, readProfile, options) {
+/** @param {Connection} connection @param {import("../protocol/types.js").ReadOptions} options */
+async function slaveRestartGuidance(connection, options) {
     try {
-        const status = await readProfile(connection, options);
-        if (status?.peerCleanupPending) return " The other half did not confirm the cancel. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in before saving again.";
+        const status = await readProfileStatus(connection, options);
+        if (status?.slaveCleanupPending) return ["The slave half did not confirm the cancel.", "Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in before saving again."];
     } catch {}
-    return "";
+    return [];
 }
-// What the keyboard is doing for the "Copy the profile to the other half" step,
+// AUTHORITY_FAILED cannot finish without a restart. No input fence exists:
+// until activation each half continues running a complete old generation.
+/** @param {Connection} connection @param {import("../protocol/types.js").ReadOptions} options @param {Failure} error @param {number} transactionId */
+async function authorityFailure(connection, options, error, transactionId) {
+    for (let cause = /** @type {Failure | undefined} */ (error); cause; cause = cause.cause) {
+        if (cause.code === "AUTHORITY_FAILED" && cause.deviceError) return {deviceError: cause.deviceError};
+    }
+    try {
+        const status = await readCandidateStatus(connection, options);
+        if (status.transactionId === transactionId && status.state === CANDIDATE_STATE.AUTHORITY_FAILED) return {deviceError: status.error};
+    } catch {}
+    return null;
+}
+// What the keyboard is doing for the "Copy the profile to the slave half" step,
 // from candidate status page 1.
-const PEER_DETAIL = Object.freeze({
-    BINDING: "Binding keys and macros to the new profile",
+/** @type {Readonly<Record<string, string>>} */
+const SLAVE_DETAIL = Object.freeze({
     BEGINNING: "Starting the copy",
     SENDING: "Sending",
-    PREPARING: "The other half is checking and storing its copy",
-    PREPARED: "The other half is ready",
-    COMMITTING: "The other half is saving",
-    ABORTING: "Cancelling the copy on the other half",
+    PREPARING: "The slave half is checking and storing its copy",
+    PREPARED: "The slave half is ready",
+    COMMITTING: "The slave half is saving",
+    ABORTING: "Cancelling the copy on the slave half",
     WAITING: "Waiting for the link between the halves",
 });
-// What the other half says it is waiting on, once it has said BUSY a few
+// What the slave half says it is waiting on, once it has said BUSY a few
 // times in a row; a single BUSY is the routine first answer to a request.
-const PEER_BUSY_DETAIL = Object.freeze({
-    MAILBOX_FULL: "the other half has not handled the last request yet",
-    OTHER_COPY: "the other half still holds an earlier copy",
-    NO_LEASE: "the other half dropped this copy; starting it again",
-    STORE_WORKING: "the other half is still storing",
-    PULLING: "the other half is fetching a profile itself",
-    CONVERGENCE_ONLY: "the other half is finishing another save",
+/** @type {Readonly<Record<string, string>>} */
+const SLAVE_BUSY_DETAIL = Object.freeze({
+    MAILBOX_FULL: "the slave half has not handled the last request yet",
+    OTHER_COPY: "the slave half still holds an earlier copy",
+    NO_LEASE: "the slave half dropped this copy; starting it again",
+    STORE_WORKING: "the slave half is still storing",
+    PULLING: "the slave half is fetching a profile itself",
+    CONVERGENCE_ONLY: "the slave half is finishing another save",
 });
-function peerReport(peer) {
-    if (!peer) return {detail: "Waiting for the other half"};
-    if (peer.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
-    const busy = peer.busyStreak >= 3 ? ` · ${PEER_BUSY_DETAIL[peer.busyReason] || "the other half is busy"}` : "";
-    const report = {detail: `${PEER_DETAIL[peer.phaseName] || "Waiting for the other half"}${busy}`};
-    if (peer.phaseName === "SENDING" || peer.phaseName === "BEGINNING") Object.assign(report, {completed: peer.transferOffset, total: peer.transferLength});
+/** @param {import("./types.js").CandidateSlave | null | undefined} slave @returns {{detail: string, completed?: number, total?: number}} */
+function slaveReport(slave) {
+    if (!slave) return {detail: "Waiting for the slave half"};
+    if (slave.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
+    const busy = slave.busyStreak >= 3 ? ` · ${SLAVE_BUSY_DETAIL[slave.busyReason] || "the slave half is busy"}` : "";
+    const report = {detail: `${SLAVE_DETAIL[slave.phaseName] || "Waiting for the slave half"}${busy}`};
+    if (slave.phaseName === "SENDING" || slave.phaseName === "BEGINNING") Object.assign(report, {completed: slave.transferOffset, total: slave.transferLength});
     return report;
 }
 // The coordinators report phases; each lands on the step it belongs to.
+/** @param {import("./types.js").CandidateProgress} progress @param {InstanceType<typeof ApplyProgress>} applyProgress */
 function coordinatorReport(progress, applyProgress) {
     const state = progress.status?.state;
-    if (["preflight", "begin", "writing"].includes(progress.phase)) applyProgress.report("upload", {completed: progress.bytesSent, total: progress.totalBytes});
+    if (["preflight", "begin", "writing"].includes(progress.phase)) applyProgress.report("upload", {completed: progress.bytesSent, total: progress.totalBytes,
+        detail: progress.adjustmentPending ? "Waiting for a DPI or lighting key change to reach both halves" : ""});
     else if (["validate", "validating", "complete"].includes(progress.phase) && !progress.operation) applyProgress.report("validate");
-    else if (state === CANDIDATE_STATE.PREPARING_PEER) applyProgress.report("peer", peerReport(progress.peer));
+    else if (state === CANDIDATE_STATE.PREPARING_PEER) applyProgress.report("slave", slaveReport(progress.slave));
     else if (state === CANDIDATE_STATE.COMMITTING) applyProgress.report("commit", {detail: "Writing the profile"});
     else if (state === CANDIDATE_STATE.CONVERGING_PEER) applyProgress.report("converge");
     else if (state === CANDIDATE_STATE.ACTIVATING) applyProgress.report("verify", {detail: "Switching to the new profile"});
 }
 // The step view as one line, for the Profile screen and notifications.
+/** @param {import("../../contracts/model.js").ApplyView} view */
 function progressText(view) {
     if (view.failure) return `Failed at: ${view.failure.label}`;
     const step = view.steps.find(item => item.id === view.current);
@@ -179,14 +171,49 @@ function progressText(view) {
 }
 
 // Every failure leaves with the step it happened in, the keyboard's reason,
-// and what can honestly be said about what was saved.
-function withFailure(error, applyProgress, saved) {
-    const cause = error.cause || error;
-    const failure = applyProgress.fail({reason: failureReason(cause, cause.progress?.peer), saved});
-    return Object.assign(error, {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved});
+// and what can honestly be said about what was saved. An Apply cut short (once
+// the upload began, or by a lost connection or a keyboard that stopped
+// answering at any step) says so in whole
+// sentences: its verdict, the bar's words, then why, then what to do. Keep
+// both halves connected is said only while the keyboard still is. The
+// coordinators' and the transport's own text stays in `cause` (and the
+// device diagnostics). A refusal before the upload keeps its own sentence.
+/** @typedef {Failure & {outcome?: "none" | "decided" | "unknown", advice?: string[], keepConnected?: boolean}} Interrupted */
+/** @param {Interrupted} error @param {InstanceType<typeof ApplyProgress>} applyProgress @param {Connection} connection */
+function withFailure(error, applyProgress, connection) {
+    const cut = interruption(error), lost = cut === "lost";
+    const cutShort = Boolean(error.outcome) || Boolean(cut);
+    const saved = error.outcome || "none";
+    // A device reason found after the step failed (AUTHORITY_FAILED read
+    // back) outranks the step's own error.
+    const cause = /** @type {Failure} */ (error.deviceError ? error : error.cause || error);
+    const failure = applyProgress.fail({reason: failureReason(cause, slaveOf(error)), saved});
+    const fields = {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved};
+    if (!cutShort) return Object.assign(error, fields);
+    const connected = !lost && /** @type {{connected?: boolean}} */ (connection).connected !== false;
+    const sentences = [failure.verdict, failure.reason, connected && error.keepConnected ? "Keep both halves connected." : "", ...(error.advice || [])];
+    return Object.assign(fail(error.code || "RESTORE_NOT_SAVED", sentences.filter(Boolean).join(" ")),
+        {cause: error.outcome ? error.cause : error, deviceError: error.deviceError}, fields, {verdict: failure.verdict});
+}
+// What the slave half last said, from the coordinator's error in the cause.
+/** @param {unknown} error @returns {import("./types.js").CandidateSlave | undefined} */
+function slaveOf(error) {
+    for (let cause = /** @type {Failure | undefined} */ (error), depth = 0; cause && depth < 8; cause = cause.cause, depth++) {
+        if (cause.progress?.slave) return cause.progress.slave;
+    }
+    return undefined;
+}
+// Where the profile from before Apply is, as whole sentences; `ifOld` when
+// it matters only if the keyboard still shows the old profile once read.
+/** @param {boolean | undefined} incomplete @param {string} recovery @param {boolean} ifOld */
+function recoveryAdvice(incomplete, recovery, ifOld) {
+    if (incomplete) return [ifOld ? "If it still shows the old profile then, restore your original complete backup again." : "Restore your original complete backup again.",
+        `Interrupted data was saved for diagnosis at ${recovery}.`];
+    return [ifOld ? `If it still shows the old profile then, use the copy kept before the save (${recovery}) on Backups.` : `The copy kept before the save is on Backups (${recovery}).`];
 }
 
-async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, operations = {}, sleep} = {}) {
+/** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {unknown} input @param {import("./types.js").RestoreOptions} [options] */
+async function restoreProfile(connection, ids, capabilities, input, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, sleep} = {}) {
     const applyProgress = new ApplyProgress(view => {
         onApplyProgress(view);
         onProgress(progressText(view));
@@ -196,119 +223,106 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
     try {
         return await restoreSteps();
     } catch (error) {
-        // Nothing reached the keyboard before the upload; after it, the
+        // Nothing reached the keyboard before the upload; from it on, the
         // inner handler has already said whether anything was saved.
-        throw withFailure(error, applyProgress, !mutated || error.code === "RESTORE_NOT_SAVED" ? "none" : "unknown");
+        throw withFailure(/** @type {Interrupted} */ (error), applyProgress, connection);
     }
 
     async function restoreSteps() {
         const startedAt = Date.now();
         requireReady(capabilities);
         requireReady(capabilities, true);
-        const target = validateSnapshot(document, capabilities);
-        document = target.document;
-        const capture = operations.capture || captureProfile;
-        const currentIdentity = operations.readIdentity || readIdentity;
-        const readCandidate = operations.readCandidate || readCandidateStatus;
-        const waitStorage = operations.waitStorage || waitForStorage;
-        const readStorage = operations.readStorage || readStorageStatus;
-        const readStored = operations.readStored || readRegion;
-        const readProfile = operations.readProfile || readProfileStatus;
-        const createCoordinator = operations.createCoordinator || ((c, options) => new CandidateUploadCoordinator(c, options));
-        const createViaCoordinator = operations.createViaCoordinator || ((c, options) => new LogicalViaStageCoordinator(c, options));
-        const rollForwardLocal = operations.rollForwardLocal || rollForwardLocalStorage;
-        if (typeof saveRecovery !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
+        const target = validateSnapshot(input, capabilities);
+        const document = target.document;
+        const saveCopy = saveRecovery;
+        if (typeof saveCopy !== "function") throw fail("RECOVERY_REQUIRED", "Save a copy of what the keyboard has before saving over it.");
+        /** @type {ReadSnapshot} */
         let before;
-        // A reviewed snapshot is reused only with the exact bank it was read
-        // from; one without it (an older cache) is read again instead.
-        if (baseSnapshot?.document && baseSnapshot.identity && (baseSnapshot.incomplete || hasStorage(baseSnapshot, capabilities)) && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
+        // Reuse a reviewed snapshot only after checking its live identity.
+        if (baseSnapshot?.document && baseSnapshot.identity && !baseSnapshot.incomplete && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
             if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
             applyProgress.report("check", {detail: "Comparing with the reviewed profile"});
-            const liveIdentity = await currentIdentity(connection, ids, {allowCandidate: false, sleep});
-            if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
+            const liveIdentity = await readIdentity(connection, ids, {allowCandidate: false, sleep});
+            if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since this was reviewed. Review it again.");
             before = baseSnapshot;
         } else {
-            before = await capture(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true, {sleep});
+            before = await snapshotProfile(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true, {sleep});
         }
-        if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
+        if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since this was reviewed. Review it again.");
         applyProgress.report("backup");
-        const recovery = await saveRecovery(before.document);
+        const recovery = await saveCopy(before.document);
         if (!recovery) throw fail("RECOVERY_REQUIRED", "A recovery copy could not be saved. The keyboard has not been changed.");
         const options = {nextRequestId: () => ids.next()};
-        const base = capturedBase(before, capabilities);
         const beforeIdentity = before.identity;
         if (!beforeIdentity) throw fail("PROFILE_IDENTITY_UNAVAILABLE", "The keyboard read did not include a stable save identity.");
-        const candidate = await readCandidate(connection, options);
-        if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Finish or recover it before restoring.");
-        const coordinator = createCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, sleep,
-            readPeerStatus: operations.readPeerStatus === undefined ? readCandidatePeerStatus : operations.readPeerStatus,
+        const candidate = await readCandidateStatus(connection, options);
+        if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Read the keyboard again and wait for it to finish before saving.");
+        const coordinator = new CandidateUploadCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, sleep,
+            readEditProgress: () => readEditProgress(connection, options),
+            readSlaveStatus: readCandidateSlaveStatus,
             onProgress: progress => coordinatorReport(progress, applyProgress)});
-        const viaCoordinator = createViaCoordinator(connection, {requestIds: ids, sleep, onProgress: progress => applyProgress.report("stage", {completed: progress.completed, total: progress.total})});
-        const expectedStorageDigest = viaStorageDigest(target);
-        if (beforeIdentity.storageGeneration >= 0xffffffff) throw fail("STORAGE_GENERATION_EXHAUSTED", "The keyboard storage generation cannot advance safely.");
-        const targetStorageGeneration = beforeIdentity.storageGeneration + 1;
-        const macroRanges = changedRanges(base.macros, target.macros, {end: target.macros.length - 1});
-        const layoutRanges = changedRanges(base.layout, target.layout);
-        let prepared, decisionObserved = false, commitRequested = false;
+        /** @type {import("./types.js").PreparedCandidate | undefined} */
+        let prepared;
+        let decisionObserved = false, commitRequested = false;
         try {
             applyProgress.report("upload");
-            prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
-                const identity = await currentIdentity(connection, ids, {allowCandidate: true, sleep});
-                if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
+            prepared = await coordinator.upload(target.candidate, {baseSource: candidateBaseSource(before),
+                metadata: candidateMetadataForBlob(target.candidate, {capabilities, actionAbiDigest: capabilities.actionAbiDigest}), verifyBase: async () => {
+                const identity = await readIdentity(connection, ids, {allowCandidate: true, sleep});
+                if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
             }});
             mutated = true;
-            applyProgress.report("stage");
-            await viaCoordinator.stage({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest, target, current: base});
-            applyProgress.report("peer", peerReport(null));
+            applyProgress.report("slave", slaveReport(null));
             commitRequested = true;
             await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async () => {
                 decisionObserved = true;
-                applyProgress.report("converge", {detail: "Waiting for the other half's copy of keys and macros"});
-                await viaCoordinator.waitUntilAccepted({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest});
-                applyProgress.report("local");
-                await rollForwardLocal(connection, target, base, layoutRanges, macroRanges, counted => applyProgress.report("local", counted));
+                applyProgress.report("converge");
             }});
-            const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
-            const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
-            const macroWriteNeeded = macroRanges.length > 0 || base.macros.at(-1) !== target.macros.at(-1);
             applyProgress.report("verify", {detail: "Reading back both halves"});
-            const storage = await waitStorage(connection, ids, {sleep});
-            await verifyRanges(connection, readStored, VIA_STORAGE.LAYOUT_READ, target.layout, layoutRanges);
-            await verifyRanges(connection, readStored, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macroRanges.length > 0});
-            const status = await readProfile(connection, options);
-            const storageAfter = await readStorage(connection, ids);
-            // The keyboard activates only after the other half confirmed its
+            const status = await readProfileStatus(connection, options);
+            // The keyboard activates only after the slave half confirmed its
             // copy, so an active target is saved on both halves even when the
             // cable between them came out after that confirmation.
-            const peerUnseen = !(status.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED);
-            if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== targetStorageGeneration || storageAfter.generation !== targetStorageGeneration || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
+            const slaveUnseen = !(status.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED);
+            if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.candidate) || status.committedDigest !== fnv1a32(target.candidate) || status.conflictCount || status.activeGeneration <= Math.max(before.status.activeGeneration, before.status.committedGeneration) || (!slaveUnseen && (status.slaveGeneration !== status.activeGeneration || status.slaveOriginHalf !== status.activeOriginHalf)) || status.activeGeneration !== status.committedGeneration || status.activeOriginHalf !== status.committedOriginHalf || status.lastCommittedTransactionId !== prepared.transactionId) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
             const resultFingerprint = fingerprint(document);
             applyProgress.finish();
             // Both halves were just proved to hold the whole target bank.
-            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), storage: heldStorage(target.layout, target.macros), recovery, peerUnseen,
-                performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
+            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, encodeSettings(target.settings)), storage: heldStorage(target.candidate), recovery, slaveUnseen,
+                performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", profileBytes: target.candidate.length}};
         } catch (error) {
             let cancelled = false;
             if (prepared && !decisionObserved) {
                 // The keyboard returns to idle on ABORT only while no commit
                 // marker exists, so a completed abort proves nothing was saved.
-                // It cancels the other half's staged keys and macros with it;
-                // this app never cancels them itself, because a decision it
-                // failed to see may already make them the recovery copy.
+                // Firmware cancels the slave half's prepared record with the
+                // candidate.
                 try { await coordinator.abort(prepared.transactionId); cancelled = true; } catch {}
             }
-            if (!mutated) throw error;
-            const restart = await peerRestartGuidance(connection, readProfile, options);
+            // The upload cut short: nothing is saved before the commit.
+            // It keeps the code it failed with: the draft needs no read.
+            if (!mutated) throw Object.assign(fail(/** @type {Failure} */ (error).code || "RESTORE_NOT_SAVED", "Nothing was saved."), {cause: error, outcome: "none"});
+            const restart = await slaveRestartGuidance(connection, options);
             // Before the commit was sent, or once the keyboard confirmed the
             // cancel, the profile it had is still the one it runs.
             if (!decisionObserved && (!commitRequested || cancelled)) {
-                throw Object.assign(fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${error.message}${restart}`), {cause: error});
+                throw Object.assign(fail("RESTORE_NOT_SAVED", "Nothing was saved."), {cause: error, outcome: "none", advice: restart});
             }
-            // After the decision the keyboard owns the outcome: once this app
-            // stops writing, it copies the other half's complete target itself.
-            const finishing = decisionObserved ? "The keyboard had already decided to save it and finishes from the other half's copy by itself, about 15 seconds after both halves are connected; read the keyboard again then. Only if it still shows the old profile: " : "";
-            throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${finishing}${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}${restart}`), {cause: error});
+            const authority = prepared ? await authorityFailure(connection, options, /** @type {Failure} */ (error), prepared.transactionId) : null;
+            if (authority) {
+                // Only a restart ends it, so the advice is to restart even when
+                // the master half may still be typing.
+                throw Object.assign(fail("RESTORE_INCOMPLETE", "The save was cut short after the keyboard decided to go ahead."), {cause: error, deviceError: authority.deviceError, outcome: "unknown", keepConnected: true,
+                    advice: ["The keyboard had already decided to save it, but the halves then stopped agreeing on the saved profile, so it cannot finish by itself.",
+                        "The keyboard keeps running a complete profile until it restarts.",
+                        "Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in, then read the keyboard again.",
+                        ...recoveryAdvice(before.incomplete, recovery, true)]});
+            }
+            // After the decision firmware owns commit recovery and activation:
+            // the keyboard finishes the new profile by itself ("decided").
+            throw Object.assign(fail("RESTORE_INCOMPLETE", "The save was cut short."), {cause: error, outcome: decisionObserved ? "decided" : "unknown", keepConnected: true,
+                advice: [...recoveryAdvice(before.incomplete, recovery, decisionObserved), ...restart]});
         }
     }
 }
-module.exports = {upgradePdSnapshot, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};
+module.exports = {requireReady, supportsCompleteProfile, snapshotProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, slaveReport};

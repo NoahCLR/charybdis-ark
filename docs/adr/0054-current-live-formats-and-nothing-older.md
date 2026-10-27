@@ -1,0 +1,5 @@
+# Ark's codecs speak only the current formats
+
+Cited as D-L54.
+
+Ark's live codecs follow firmware D-F14 and firmware D-F28: they read and write exactly the Profile Wire, profile schema, domain versions and action vocabulary that current firmware stores and reports, one version per domain, and translate nothing older. A backup in an older schema, action vocabulary or domain version is refused at import, demo opening and restore, and malformed input fails rather than falling back to a version that drops data, so what Ark writes is always something the keyboard validates as its own. The connected keyboard's advertised tap depth governs behaviour steps and the RGB tap-branch palette (`core/schema/profile-depth.js`); an offline backup carries its depth in its RGB palette. D-L64 narrows this decision: it owns the table of current versions, the gates in `core/session/firmware-support.js` and the refusal of older keyboards, and it removed the translation of preceding backups this decision once allowed.

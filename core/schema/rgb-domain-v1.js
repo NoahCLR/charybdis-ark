@@ -1,27 +1,42 @@
+// @ts-check
 "use strict";
+const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
+const {LAYERS} = require("../data/charybdis-layout");
+const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError, canonical} = require("./bytes");
 
-const {PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
+/**
+ * @typedef {ReturnType<typeof normalizeOptions>} Limits
+ * @typedef {ReturnType<typeof normalizeGroups>} GroupState
+ * @typedef {(selector: number, row: number) => number} SelectorCheck
+ */
+const {MAX_TAP_DEPTH} = require("./profile-depth");
+
+const {PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
 
 const RGB_DOMAIN_V1 = Object.freeze({
     DOMAIN_ID: PROFILE_DOMAIN_IDS.RGB,
-    DOMAIN_VERSION: 1,
-    FORMAT_VERSION: 1,
+    // Format 4, the only one the keyboard stores: a colour row per pointing
+    // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14).
+    DOMAIN_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
+    FORMAT_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
+    POINTING_SLOTS: 32,
     HEADER_SIZE: 16,
     PHYSICAL_LED_COUNT: 58,
     LED_BITMAP_SIZE: 8,
     MAX_GROUPS: 16,
-    MAX_LOGICAL_LAYERS: 8,
-    MAX_PD_MODES: 6,
+    MAX_LOGICAL_LAYERS: LAYERS,
     MAX_STAGE_GROUP_ROWS: 32,
     MAX_TAP_BRANCH_COLORS: 4,
-    MAX_PAYLOAD_SIZE: 4052,
+    // The domain's own offsets are 16 bits (unchanged by schema 4, firmware
+    // D-F28), so its payload stays within 65,535 bytes whatever the blob's.
+    MAX_PAYLOAD_SIZE: Math.min(PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE, 0xffff),
     SELECTOR_ALL: 0xff,
 });
 
 const RGB_STAGE_BITS = Object.freeze({
     LAYER: 1 << 0,
     AUTOMOUSE: 1 << 1,
-    PD_MODE: 1 << 2,
+    POINTING_MODE: 1 << 2,
     COMBO: 1 << 3,
     KEY_BEHAVIOR: 1 << 4,
 });
@@ -54,45 +69,28 @@ const RGB_KEY_SEMANTICS = Object.freeze({
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: 3,
     KEY_FEEDBACK_GROUP_ALL: RGB_DOMAIN_V1.SELECTOR_ALL,
 });
-const RGB_PD_MODE_IDS = Object.freeze({
-    PD_MODE_DRAGSCROLL: 0,
-    PD_MODE_VOLUME: 1,
-    PD_MODE_BRIGHTNESS: 2,
-    PD_MODE_ZOOM: 3,
-    PD_MODE_ARROW: 4,
-    PD_MODE_PINCH: 5,
-    PD_MODE_SLOT_6: 6,
-    PD_MODE_SLOT_7: 7,
+/** @type {Readonly<Record<string, number>>} */
+const RGB_POINTING_MODE_IDS = Object.freeze({
+    POINTING_MODE_DRAGSCROLL: 0,
+    POINTING_MODE_VOLUME: 1,
+    POINTING_MODE_BRIGHTNESS: 2,
+    POINTING_MODE_ZOOM: 3,
+    POINTING_MODE_ARROW: 4,
+    POINTING_MODE_PINCH: 5,
+    POINTING_MODE_6: 6,
+    POINTING_MODE_7: 7,
     // The 32-slot firmware's further slots (format 3).
-    ...Object.fromEntries(Array.from({length: 24}, (_, index) => [`PD_MODE_SLOT_${index + 8}`, index + 8])),
+    ...Object.fromEntries(Array.from({length: 24}, (_, index) => [`POINTING_MODE_${index + 8}`, index + 8])),
 });
-// How many pointing slots each payload format colours: format 1 the six
-// factory modes, 2 the eight configurable slots, 3 the 32-slot firmware's.
-const RGB_PD_SLOTS_BY_FORMAT = Object.freeze({1: 6, 2: 8, 3: 32});
-const RGB_FORMAT_VERSIONS = Object.freeze(Object.keys(RGB_PD_SLOTS_BY_FORMAT).map(Number));
-// The payload format that colours a given number of pointing slots.
-function rgbFormatForPdSlots(slotCount) {
-    const entry = Object.entries(RGB_PD_SLOTS_BY_FORMAT).find(([, slots]) => slots === slotCount);
-    if (!entry) throw new RangeError(`No RGB payload format colours ${slotCount} pointing slots.`);
-    return Number(entry[0]);
-}
 
-const BLACK = Object.freeze({h: 0, s: 0, v: 0});
+const RgbDomainProtocolError = protocolError("RgbDomainProtocolError");
 
-class RgbDomainProtocolError extends Error {
-    constructor(code, message, details = {}) {
-        super(message);
-        this.name = "RgbDomainProtocolError";
-        this.code = code;
-        Object.assign(this, details);
-    }
-}
-
+/** @param {import("./types.js").RgbInput} profile @param {import("./types.js").RgbOptions} [options] */
 function encodeRgbDomainV1(profile, options = {}) {
-    const limits = normalizeOptions({...options, formatVersion: profile?.formatVersion ?? options.formatVersion ?? 1});
+    const limits = normalizeOptions(options);
     const value = normalizeProfile(profile, limits);
     const header = Buffer.alloc(RGB_DOMAIN_V1.HEADER_SIZE);
-    header[0] = value.formatVersion;
+    header[0] = RGB_DOMAIN_V1.FORMAT_VERSION;
     header[1] = 0;
     header.writeUInt16LE(value.stageEnableMask, 2);
     header[4] = value.groups.length;
@@ -164,21 +162,17 @@ function encodeRgbDomainV1(profile, options = {}) {
     return payload;
 }
 
-// A payload decodes by the format its header names; given the format a
-// keyboard takes (options.formatVersion), a payload of another is refused.
+/** @param {unknown} value @param {import("./types.js").RgbOptions} [options] */
 function decodeRgbDomainV1(value, options = {}) {
     const bytes = copyBytes(value, "RGB domain payload");
-    if (options.formatVersion !== undefined && bytes.length && bytes[0] !== options.formatVersion) {
-        throw rgbError("INVALID_VERSION", `RGB payload format ${bytes[0]} is not the expected format ${options.formatVersion}.`);
-    }
-    const limits = normalizeOptions({...options, formatVersion: bytes[0]});
+    const limits = normalizeOptions(options);
     if (bytes.length < RGB_DOMAIN_V1.HEADER_SIZE) {
         throw rgbError("TRUNCATED", `RGB domain needs a ${RGB_DOMAIN_V1.HEADER_SIZE}-byte header.`);
     }
     if (bytes.length > RGB_DOMAIN_V1.MAX_PAYLOAD_SIZE) {
         throw rgbError("CAPACITY_EXCEEDED", `RGB domain payload is ${bytes.length} bytes; maximum is ${RGB_DOMAIN_V1.MAX_PAYLOAD_SIZE}.`);
     }
-    if (!RGB_FORMAT_VERSIONS.includes(bytes[0])) {
+    if (bytes[0] !== RGB_DOMAIN_V1.FORMAT_VERSION) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${bytes[0]} is not supported.`);
     }
     if (bytes[1] !== 0 || bytes[14] !== 0 || bytes[15] !== 0) {
@@ -237,7 +231,7 @@ function decodeRgbDomainV1(value, options = {}) {
         const pdModeId = reader.u8("pdModeColors", index, "pdModeId");
         assertSupportedPdId(pdModeId, limits, "pdModeColors", index, "pdModeId");
         if (pdModeId <= priorPdId) {
-            throw rgbError("NONCANONICAL_ORDER", "PD-mode color ids must be unique and strictly ascending.", {table: "pdModeColors", row: index, field: "pdModeId"});
+            throw rgbError("NONCANONICAL_ORDER", "Pointing mode color ids must be unique and strictly ascending.", {table: "pdModeColors", row: index, field: "pdModeId"});
         }
         pdModeColors.push({pdModeId, color: reader.hsv(limits, "pdModeColors", index, "color"), locality: reader.enumValue(4, "pdModeColors", index, "locality")});
         priorPdId = pdModeId;
@@ -285,22 +279,21 @@ function decodeRgbDomainV1(value, options = {}) {
         keyFeedback,
         keyGroupRows,
     };
-    const normalized = normalizeProfile(decoded, limits);
-    if (!encodeRgbDomainV1(normalized, limits).equals(bytes)) {
-        throw rgbError("NONCANONICAL", "RGB domain does not use its canonical representation.");
-    }
-    return normalized;
+    return canonical(bytes, normalizeProfile(decoded, limits), value => encodeRgbDomainV1(value, limits),
+        () => rgbError("NONCANONICAL", "RGB domain does not use its canonical representation."));
 }
 
+/** @param {import("./types.js").RgbInput} profile @param {import("./types.js").RgbOptions} [options] */
 function createRgbDomainV1(profile, options = {}) {
-    return {id: RGB_DOMAIN_V1.DOMAIN_ID, version: profile.formatVersion ?? 1, payload: encodeRgbDomainV1(profile, options)};
+    return {id: RGB_DOMAIN_V1.DOMAIN_ID, version: RGB_DOMAIN_V1.DOMAIN_VERSION, payload: encodeRgbDomainV1(profile, options)};
 }
 
+/** @param {import("./types.js").RgbInput} profile @param {Limits} limits @returns {import("./types.js").RgbProfile} */
 function normalizeProfile(profile, limits) {
     if (!profile || typeof profile !== "object") {
         throw new TypeError("RGB domain input must be an object.");
     }
-    if (profile.formatVersion !== undefined && !RGB_FORMAT_VERSIONS.includes(profile.formatVersion)) {
+    if (profile.formatVersion !== undefined && profile.formatVersion !== RGB_DOMAIN_V1.FORMAT_VERSION) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${profile.formatVersion} is not supported.`);
     }
     const stageEnableMask = assertStageMask(profile.stageEnableMask, limits.compiledStageMask, "stageEnableMask");
@@ -346,7 +339,7 @@ function normalizeProfile(profile, limits) {
         throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`);
     }
     const normalized = {
-        formatVersion: profile.formatVersion ?? limits.formatVersion,
+        formatVersion: RGB_DOMAIN_V1.FORMAT_VERSION,
         stageEnableMask,
         groups,
         layerColors,
@@ -363,9 +356,9 @@ function normalizeProfile(profile, limits) {
     return normalized;
 }
 
+/** @param {import("./types.js").RgbOptions} [options] */
 function normalizeOptions(options = {}) {
-    const formatVersion = options.formatVersion ?? 1;
-    const maxPdModes = RGB_PD_SLOTS_BY_FORMAT[formatVersion] ?? RGB_PD_SLOTS_BY_FORMAT[1];
+    const maxPdModes = RGB_DOMAIN_V1.POINTING_SLOTS;
     const maxLogicalLayers = options.maxLogicalLayers === undefined ? RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS : assertU8(options.maxLogicalLayers, "maxLogicalLayers");
     if (maxLogicalLayers > RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS) {
         throw new RangeError(`maxLogicalLayers cannot exceed ${RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS}.`);
@@ -375,18 +368,18 @@ function normalizeOptions(options = {}) {
         throw new RangeError("logicalLayerCount must be between one and maxLogicalLayers.");
     }
     const supportedPdModeIds = options.supportedPdModeIds === undefined
-        ? Object.values(RGB_PD_MODE_IDS).filter(id => id < maxPdModes)
+        ? Object.values(RGB_POINTING_MODE_IDS).filter(id => id < maxPdModes)
         : Array.from(options.supportedPdModeIds, (value) => assertU8(value, "supportedPdModeIds entry"));
     supportedPdModeIds.sort((left, right) => left - right);
     if (supportedPdModeIds.length > maxPdModes || new Set(supportedPdModeIds).size !== supportedPdModeIds.length) {
         throw new RangeError(`supportedPdModeIds must contain at most ${maxPdModes} unique ids.`);
     }
-    const knownPdModeIds = new Set(Object.values(RGB_PD_MODE_IDS).filter(id => id < maxPdModes));
+    const knownPdModeIds = new Set(Object.values(RGB_POINTING_MODE_IDS).filter(id => id < maxPdModes));
     if (supportedPdModeIds.some((id) => !knownPdModeIds.has(id))) {
-        throw new RangeError("supportedPdModeIds contains an id outside the Profile Wire v1 PD-mode registry.");
+        throw new RangeError("supportedPdModeIds contains an id outside the Profile Wire v1 pointing mode registry.");
     }
     return {
-        formatVersion, maxPdModes,
+        maxPdModes,
         compiledStageMask: assertStageMask(options.compiledStageMask === undefined ? RGB_STAGE_MASK_ALL : options.compiledStageMask, RGB_STAGE_MASK_ALL, "compiledStageMask"),
         logicalLayerCount,
         maxLogicalLayers,
@@ -397,6 +390,7 @@ function normalizeOptions(options = {}) {
     };
 }
 
+/** @param {readonly {id: number, leds: number[]}[]} input */
 function normalizeGroups(input) {
     if (input.length > RGB_DOMAIN_V1.MAX_GROUPS) {
         throw rgbError("CAPACITY_EXCEEDED", `RGB group count ${input.length}; maximum is ${RGB_DOMAIN_V1.MAX_GROUPS}.`, {table: "groups"});
@@ -421,6 +415,7 @@ function normalizeGroups(input) {
         bitmapKeys.add(key);
     }
     const canonical = [...groupsByInputId].sort((left, right) => Buffer.compare(left.bitmap, right.bitmap));
+    /** @type {Map<number, number>} */
     const remappedIdByInputId = new Map();
     const groups = canonical.map((group, id) => {
         remappedIdByInputId.set(group.inputId, id);
@@ -429,14 +424,17 @@ function normalizeGroups(input) {
     return {groups, remappedIdByInputId};
 }
 
-function normalizeGroupRows(input, groupState, limits, table, selectorCheck, selectorField = "selector") {
-    return requiredArray(input, table).map((row, index) => ({
+/** @template {'selector' | 'semantic'} [K='selector'] @param {import("./types.js").RgbGroupRow<K>[] | undefined} input @param {GroupState} groupState @param {Limits} limits @param {string} table @param {SelectorCheck} selectorCheck @param {K} [selectorField] @returns {import("./types.js").RgbGroupRow<K>[]} */
+function normalizeGroupRows(input, groupState, limits, table, selectorCheck, selectorField = /** @type {K} */ ("selector")) {
+    // The computed property is exactly the selector field selected by the caller.
+    return /** @type {import("./types.js").RgbGroupRow<K>[]} */ (requiredArray(input, table).map((row, index) => ({
         [selectorField]: selectorCheck(assertU8(row?.[selectorField], `${table}[${index}].${selectorField}`), index),
         color: normalizeHsv(row?.color, limits, table, index, "color"),
         groupId: remapGroupId(row?.groupId, groupState, table, index),
-    }));
+    })));
 }
 
+/** @param {{color: import("./types.js").Hsv, groupId: number}[] | undefined} input @param {GroupState} groupState @param {Limits} limits */
 function normalizeComboRows(input, groupState, limits) {
     return requiredArray(input, "comboGroupRows").map((row, index) => ({
         color: normalizeHsv(row?.color, limits, "comboGroupRows", index, "color"),
@@ -444,10 +442,11 @@ function normalizeComboRows(input, groupState, limits) {
     }));
 }
 
+/** @param {Partial<import("./types.js").RgbKeyFeedback> | undefined} value @param {Limits} limits */
 function normalizeKeyFeedback(value, limits) {
     const branches = requiredArray(value?.tapBranchColors, "keyFeedback.tapBranchColors");
-    if (branches.length > RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS) {
-        throw rgbError("CAPACITY_EXCEEDED", `Key-feedback tap-branch color count ${branches.length}; maximum is ${RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS}.`, {table: "keyFeedback.tapBranchColors"});
+    if (branches.length > limits.tapBranchColorCount) {
+        throw rgbError("CAPACITY_EXCEEDED", `Key-feedback tap-branch color count ${branches.length}; maximum is ${limits.tapBranchColorCount}.`, {table: "keyFeedback.tapBranchColors"});
     }
     if ((limits.compiledStageMask & RGB_STAGE_BITS.KEY_BEHAVIOR) !== 0 && branches.length !== limits.tapBranchColorCount) {
         throw rgbError("INCOMPLETE_SURFACE", `Key-feedback tap-branch colors must contain exactly ${limits.tapBranchColorCount} compiled entries.`, {table: "keyFeedback.tapBranchColors"});
@@ -462,6 +461,7 @@ function normalizeKeyFeedback(value, limits) {
     };
 }
 
+/** @param {import("./types.js").RgbProfile} profile @param {Limits} limits */
 function assertCompiledSurfaces(profile, limits) {
     const compiled = limits.compiledStageMask;
     if ((compiled & RGB_STAGE_BITS.LAYER) !== 0) {
@@ -474,12 +474,12 @@ function assertCompiledSurfaces(profile, limits) {
     if ((compiled & RGB_STAGE_BITS.AUTOMOUSE) === 0 && (profile.automouseFade.mode !== 0 || !isBlack(profile.automouseFade.endColor))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Auto-mouse RGB data must be canonical zero when the stage is not compiled.");
     }
-    if ((compiled & RGB_STAGE_BITS.PD_MODE) !== 0) {
+    if ((compiled & RGB_STAGE_BITS.POINTING_MODE) !== 0) {
         if (!sameNumbers(profile.pdModeColors.map((row) => row.pdModeId), limits.supportedPdModeIds)) {
-            throw rgbError("INCOMPLETE_SURFACE", "PD-mode colors must contain each supported stable PD id exactly once.", {table: "pdModeColors"});
+            throw rgbError("INCOMPLETE_SURFACE", "Pointing mode colors must contain each supported pointing slot exactly once.", {table: "pdModeColors"});
         }
     } else if (profile.pdModeColors.length || profile.pdModeGroupRows.length) {
-        throw rgbError("UNSUPPORTED_STAGE_DATA", "PD-mode RGB data is present but the stage is not compiled.");
+        throw rgbError("UNSUPPORTED_STAGE_DATA", "Pointing mode RGB data is present but the stage is not compiled.");
     }
     if ((compiled & RGB_STAGE_BITS.COMBO) === 0 && (profile.comboGroupRows.length || profile.comboFeedback.locality !== 0 || !isBlack(profile.comboFeedback.color))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Combo RGB data must be canonical zero when the stage is not compiled.");
@@ -489,8 +489,9 @@ function assertCompiledSurfaces(profile, limits) {
     }
 }
 
+/** @param {{groups: number, layerColors: number, pdColors: number, branchColors: number, layerGroups: number, pdGroups: number, comboGroups: number, keyGroups: number}} counts @param {Limits} limits */
 function assertHeaderCounts(counts, limits) {
-    if (counts.groups > RGB_DOMAIN_V1.MAX_GROUPS || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS) {
+    if (counts.groups > RGB_DOMAIN_V1.MAX_GROUPS || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > limits.tapBranchColorCount) {
         throw rgbError("CAPACITY_EXCEEDED", "RGB payload header count exceeds a fixed v1 capacity.");
     }
     if (counts.layerGroups + counts.pdGroups + counts.comboGroups + counts.keyGroups > RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS) {
@@ -498,7 +499,8 @@ function assertHeaderCounts(counts, limits) {
     }
 }
 
-function readGroupRows(reader, count, groupCount, selectorCheck, table, limits, selectorField = "selector") {
+/** @template {'selector' | 'semantic'} [K='selector'] @param {Reader} reader @param {number} count @param {number} groupCount @param {SelectorCheck} selectorCheck @param {string} table @param {Limits} limits @param {K} [selectorField] @returns {import("./types.js").RgbGroupRow<K>[]} */
+function readGroupRows(reader, count, groupCount, selectorCheck, table, limits, selectorField = /** @type {K} */ ("selector")) {
     const rows = [];
     for (let index = 0; index < count; index += 1) {
         const selector = selectorCheck(reader.u8(table, index, selectorField), index);
@@ -508,26 +510,31 @@ function readGroupRows(reader, count, groupCount, selectorCheck, table, limits, 
             groupId: reader.groupId(groupCount, table, index),
         });
     }
-    return rows;
+    // Each row carries the caller's computed selector field.
+    return /** @type {import("./types.js").RgbGroupRow<K>[]} */ (rows);
 }
 
 class Reader {
+    /** @param {Buffer} bytes @param {number} offset */
     constructor(bytes, offset) {
         this.value = bytes;
         this.offset = offset;
     }
 
+    /** @param {number} length @param {string} table @param {number} row @param {string} field */
     ensure(length, table, row, field) {
         if (this.offset + length > this.value.length) {
             throw rgbError("TRUNCATED", `RGB ${table}[${row}].${field} is truncated.`, {table, row, field, offset: this.offset});
         }
     }
 
+    /** @param {string} table @param {number} row @param {string} field */
     u8(table, row, field) {
         this.ensure(1, table, row, field);
         return this.value[this.offset++];
     }
 
+    /** @param {number} length @param {string} table @param {number} row @param {string} field */
     bytes(length, table, row, field) {
         this.ensure(length, table, row, field);
         const result = Buffer.from(this.value.subarray(this.offset, this.offset + length));
@@ -535,20 +542,24 @@ class Reader {
         return result;
     }
 
+    /** @param {Limits} limits @param {string} table @param {number} row @param {string} field */
     hsv(limits, table, row, field) {
         const color = {h: this.u8(table, row, `${field}.h`), s: this.u8(table, row, `${field}.s`), v: this.u8(table, row, `${field}.v`)};
         return normalizeHsv(color, limits, table, row, field);
     }
 
+    /** @param {number} maximum @param {string} table @param {number} row @param {string} field */
     enumValue(maximum, table, row, field) {
         return assertEnum(this.u8(table, row, field), maximum, table, row, field);
     }
 
+    /** @param {number} groupCount @param {string} table @param {number} row */
     groupId(groupCount, table, row) {
         return assertGroupId(this.u8(table, row, "groupId"), groupCount, table, row);
     }
 }
 
+/** @param {import("./types.js").Hsv | undefined} value @param {Limits} limits @param {string} table @param {number} row @param {string} field */
 function normalizeHsv(value, limits, table, row, field) {
     if (!value || typeof value !== "object") throw new TypeError(`${table}[${row}].${field} must be an HSV object.`);
     const color = {h: assertU8(value.h, `${table}[${row}].${field}.h`), s: assertU8(value.s, `${table}[${row}].${field}.s`), v: assertU8(value.v, `${table}[${row}].${field}.v`)};
@@ -558,6 +569,7 @@ function normalizeHsv(value, limits, table, row, field) {
     return color;
 }
 
+/** @param {readonly number[] | undefined} value @param {string} table @param {number} row */
 function normalizeLeds(value, table, row) {
     const leds = requiredArray(value, `${table}[${row}].leds`).map((led, index) => {
         const parsed = Number(led);
@@ -569,6 +581,7 @@ function normalizeLeds(value, table, row) {
     return Array.from(new Set(leds)).sort((left, right) => left - right);
 }
 
+/** @param {readonly number[]} value */
 function ledsToBitmap(value) {
     const leds = normalizeLeds(value, "LED bitmap", 0);
     const bitmap = Buffer.alloc(RGB_DOMAIN_V1.LED_BITMAP_SIZE);
@@ -576,6 +589,7 @@ function ledsToBitmap(value) {
     return bitmap;
 }
 
+/** @param {unknown} value */
 function bitmapToLeds(value) {
     const bitmap = copyBytes(value, "LED bitmap");
     if (bitmap.length !== RGB_DOMAIN_V1.LED_BITMAP_SIZE) throw new RangeError(`LED bitmap must be ${RGB_DOMAIN_V1.LED_BITMAP_SIZE} bytes.`);
@@ -586,12 +600,14 @@ function bitmapToLeds(value) {
     return leds;
 }
 
+/** @param {Uint8Array} bitmap @param {number} row */
 function assertBitmap(bitmap, row) {
     if ((bitmap[7] & 0xfc) !== 0) {
         throw rgbError("RESERVED_BITS", "RGB LED bitmap bits 58 through 63 must be zero.", {table: "groups", row, field: "bitmap"});
     }
 }
 
+/** @param {number} value @param {number} count @param {string} table @param {number} row */
 function assertSelector(value, count, table, row) {
     if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value >= count) throw rgbError("INVALID_SELECTOR", `${table}[${row}] selector ${value} does not reference a layer.`, {table, row, field: "selector"});
     return value;
@@ -599,6 +615,7 @@ function assertSelector(value, count, table, row) {
 
 // A group row naming a slot the keyboard does not colour has an invalid
 // selector, as the firmware reports it.
+/** @param {number} value @param {Limits} limits @param {string} table @param {number} row */
 function assertPdSelector(value, limits, table, row) {
     if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && !limits.supportedPdModeSet.has(value)) {
         throw rgbError("INVALID_SELECTOR", `${table}[${row}] selector ${value} does not reference a pointing slot.`, {table, row, field: "selector"});
@@ -606,42 +623,50 @@ function assertPdSelector(value, limits, table, row) {
     return value;
 }
 
+/** @param {number} value @param {string} table @param {number} row */
 function assertKeySemantic(value, table, row) {
     if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && value > RGB_KEY_SEMANTICS.KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE) throw rgbError("INVALID_SELECTOR", `${table}[${row}] semantic ${value} is unknown.`, {table, row, field: "semantic"});
     return value;
 }
 
+/** @param {number} value @param {Limits} limits @param {string} table @param {number} row @param {string} field */
 function assertSupportedPdId(value, limits, table, row, field) {
     if (!limits.supportedPdModeSet.has(value)) throw rgbError("INVALID_ID", `${table}[${row}].${field} PD id ${value} is not supported.`, {table, row, field});
     return value;
 }
 
+/** @param {unknown} value @param {number} count @param {string} table @param {number} row */
 function assertGroupId(value, count, table, row) {
     const groupId = assertU8(value, `${table}[${row}].groupId`);
     if (groupId >= count) throw rgbError("INVALID_REFERENCE", `${table}[${row}] references RGB group ${groupId}; dictionary size is ${count}.`, {table, row, field: "groupId"});
     return groupId;
 }
 
+/** @param {unknown} value @param {GroupState} groupState @param {string} table @param {number} row */
 function remapGroupId(value, groupState, table, row) {
     const inputId = assertU8(value, `${table}[${row}].groupId`);
     if (!groupState.remappedIdByInputId.has(inputId)) {
         throw rgbError("INVALID_REFERENCE", `${table}[${row}] references RGB group ${inputId}; dictionary size is ${groupState.groups.length}.`, {table, row, field: "groupId"});
     }
-    return groupState.remappedIdByInputId.get(inputId);
+    // Membership was checked above; every normalized group has a numeric id.
+    return /** @type {number} */ (groupState.remappedIdByInputId.get(inputId));
 }
 
+/** @param {unknown} value @param {number} maximum @param {string} table @param {number} row @param {string} field */
 function assertEnum(value, maximum, table, row, field) {
     const parsed = assertU8(value, `${table}[${row}].${field}`);
     if (parsed > maximum) throw rgbError("INVALID_ENUM", `${table}[${row}].${field} value ${parsed} exceeds ${maximum}.`, {table, row, field});
     return parsed;
 }
 
+/** @template T @param {T[]} rows @param {Extract<keyof T, string>} field @param {string} table */
 function assertUniqueIds(rows, field, table) {
     for (let index = 1; index < rows.length; index += 1) {
         if (rows[index - 1][field] === rows[index][field]) throw rgbError("DUPLICATE_ID", `${table} contains duplicate ${field} ${rows[index][field]}.`, {table, row: index, field});
     }
 }
 
+/** @param {unknown} value @param {number} allowed @param {string} label */
 function assertStageMask(value, allowed, label) {
     const mask = assertU16(value, label);
     if ((mask & ~RGB_STAGE_MASK_ALL) !== 0) throw rgbError("RESERVED_BITS", `${label} contains unknown RGB stage bits.`, {field: label});
@@ -649,44 +674,32 @@ function assertStageMask(value, allowed, label) {
     return mask;
 }
 
+/** @template T @param {readonly T[] | undefined} value @param {string} label @returns {readonly T[]} */
 function requiredArray(value, label) {
     if (!Array.isArray(value)) throw new TypeError(`${label} must be an array.`);
     return value;
 }
 
-function assertU8(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xff) throw new RangeError(`${label} must be an 8-bit integer.`);
-    return number;
-}
-
-function assertU16(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xffff) throw new RangeError(`${label} must be a 16-bit integer.`);
-    return number;
-}
-
+/** @param {number} value */
 function assertTapBranchColorCount(value) {
     const count = assertU8(value, "tapBranchColorCount");
-    if (count === 0 || count > RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS) {
-        throw new RangeError(`tapBranchColorCount must be between one and ${RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS}.`);
+    if (count === 0 || count >= MAX_TAP_DEPTH) {
+        throw new RangeError(`tapBranchColorCount must be between one and ${MAX_TAP_DEPTH - 1}.`);
     }
     return count;
 }
 
+/** @param {readonly number[]} left @param {readonly number[]} right */
 function sameNumbers(left, right) {
     return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+/** @param {import("./types.js").Hsv} color */
 function isBlack(color) {
     return color.h === 0 && color.s === 0 && color.v === 0;
 }
 
-function copyBytes(value, label) {
-    if (!(value instanceof Uint8Array)) throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-}
-
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function rgbError(code, message, details = {}) {
     return new RgbDomainProtocolError(code, message, details);
 }
@@ -697,8 +710,7 @@ module.exports = {
     RGB_KEY_SEMANTICS,
     RGB_LAYER_MODES,
     RGB_LOCALITIES,
-    RGB_PD_MODE_IDS,
-    RGB_PD_SLOTS_BY_FORMAT,
+    RGB_POINTING_MODE_IDS,
     RGB_STAGE_BITS,
     RGB_STAGE_MASK_ALL,
     RGB_TAP_COMMIT_MODES,
@@ -708,5 +720,4 @@ module.exports = {
     decodeRgbDomainV1,
     encodeRgbDomainV1,
     ledsToBitmap,
-    rgbFormatForPdSlots,
 };

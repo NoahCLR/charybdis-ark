@@ -13,65 +13,7 @@ const {
     readCommittedPayload,
 } = require("../../core/protocol/profile-payload-v1");
 
-// A reference encoder for the firmware page layout in
-// users/noah/lib/compat/qmk_via_profile_channel.c. Written independently of
-// the decoder so these tests check the contract rather than restate the code.
-function metadataPage(state) {
-    const page = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
-    page[0] = state.layoutVersion ?? PROFILE_PAYLOAD_V1.LAYOUT_VERSION;
-    page[1] = state.chunkSize ?? PROFILE_WIRE_V1.PAYLOAD_SIZE;
-    page.writeUInt16LE(state.payloadLength ?? state.bytes.length, 2);
-    page.writeUInt32LE(state.generation, 4);
-    page.writeUInt32LE(state.digest ?? fnv1a32(state.bytes), 8);
-    page.writeUInt32LE(state.crc ?? crc32(state.bytes), 12);
-    page[16] = state.schemaMajor ?? 1;
-    page[17] = state.schemaMinor ?? 0;
-    page[18] = state.domainMask ?? 0x30;
-    page[19] = state.originHalf ?? 1;
-    page[20] = state.flags ?? 0;
-    return page;
-}
-
-function payloadOf(length) {
-    return Buffer.from(Array.from({length}, (unused, index) => (index * 7 + 3) & 0xff));
-}
-
-// Serves pages the way the firmware does, including a short final chunk.
-function payloadDevice(states) {
-    const snapshots = Array.isArray(states) ? states : [states];
-    const requests = [];
-    let served = 0;
-    return {
-        requests,
-        async request(report) {
-            const request = Buffer.from(report);
-            assert.equal(request[2], PROFILE_PAYLOAD_V1.VALUE);
-            assert.notEqual(request[3], 0);
-            const page = request[4];
-            requests.push(page);
-            const state = snapshots[Math.min(served, snapshots.length - 1)];
-            if (page === 0) {
-                served += 1;
-            }
-
-            let payload;
-            if (page === 0) {
-                payload = metadataPage(state);
-            } else {
-                const chunkSize = state.chunkSize ?? PROFILE_WIRE_V1.PAYLOAD_SIZE;
-                const offset = (page - 1) * chunkSize;
-                payload = state.bytes.subarray(offset, Math.min(offset + chunkSize, state.bytes.length));
-            }
-
-            const response = Buffer.alloc(RAW_HID_REPORT_SIZE);
-            request.copy(response, 0, 0, 5);
-            response[5] = PROFILE_WIRE_STATUS.OK;
-            response[6] = payload.length;
-            payload.copy(response, PROFILE_WIRE_V1.PAYLOAD_OFFSET);
-            return response;
-        },
-    };
-}
+const {metadataPage, payloadOf, payloadDevice} = require("../fixtures/profile-payload");
 
 test("reads a committed payload and verifies it against the reported digest", async () => {
     const bytes = payloadOf(60);
@@ -201,12 +143,12 @@ test("a corrupted payload is refused, not decoded", async () => {
 test("metadata that does not describe a readable payload is refused", () => {
     const bytes = payloadOf(10);
     for (const [overrides, code] of [
-        [{layoutVersion: 2}, "INCOMPATIBLE_RESPONSE"],
+        // Layout 1 is Profile Wire 1's, with a 16-bit length.
+        [{layoutVersion: 1}, "INCOMPATIBLE_RESPONSE"],
+        [{layoutVersion: 3}, "INCOMPATIBLE_RESPONSE"],
         [{chunkSize: 0}, "MALFORMED_RESPONSE"],
         [{chunkSize: 26}, "MALFORMED_RESPONSE"],
         [{payloadLength: 0}, "MALFORMED_RESPONSE"],
-        // 255 pages of 25 bytes is the addressable ceiling.
-        [{payloadLength: 25 * 256}, "INCOMPATIBLE_RESPONSE"],
     ]) {
         assert.throws(
             () => decodePayloadMetadata(metadataPage({bytes, generation: 1, ...overrides})),
@@ -216,6 +158,21 @@ test("metadata that does not describe a readable payload is refused", () => {
             }
         );
     }
+});
+
+test("wide pages address a whole 52 KiB slot", () => {
+    // Pages are 16 bits: past 255 pages, up to 53,216 bytes; the length is 32
+    // bits (layout 2), so a profile past 64 KiB is described too.
+    for (const payloadLength of [25 * 256, 53216, 65536, 131040]) {
+        assert.equal(decodePayloadMetadata(metadataPage({bytes: payloadOf(10), generation: 1, payloadLength})).payloadLength, payloadLength);
+    }
+});
+
+test("a payload past page 255 is read through wide pages", async () => {
+    // 255 chunks plus metadata fit one byte of page index; one byte more needs page 256.
+    const over = payloadOf(25 * 255 + 1), device = payloadDevice({bytes: over, generation: 1});
+    assert.deepEqual((await readCommittedPayload(device)).bytes, over);
+    assert.ok(device.requests.includes(256), "the last chunk is page 256");
 });
 
 test("metadata with nonzero reserved bytes is refused", () => {
@@ -233,4 +190,83 @@ test("reads require a connection that can issue requests", async () => {
         () => readCommittedPayload(payloadDevice({bytes: payloadOf(10), generation: 1}), {generationRetries: 99}),
         TypeError
     );
+});
+
+// Bytes the keyboard just served from the same record (`sameAs`) stand in for
+// the download only when they have its length, CRC and digest; the metadata is
+// still read before and after them.
+test("bytes already read stand in for a payload only when they pass its checks", async () => {
+    const bytes = payloadOf(60);
+    const device = payloadDevice({bytes, generation: 7});
+    const same = await readCommittedPayload(device, {sameAs: Buffer.from(bytes)});
+    assert.deepEqual(same.bytes, bytes);
+    assert.deepEqual(device.requests, [0, 0], "no chunk is downloaded");
+    for (const other of [Buffer.concat([bytes, Buffer.from([0])]), Buffer.from(bytes).fill(1, 10, 11), bytes.subarray(1)]) {
+        const fresh = payloadDevice({bytes, generation: 7});
+        const read = await readCommittedPayload(fresh, {sameAs: other});
+        assert.deepEqual(read.bytes, bytes, "the keyboard's own bytes, not the stand-in");
+        assert.deepEqual(fresh.requests, [0, 1, 2, 3, 0]);
+    }
+});
+
+// A save that lands between the chunks (a Live edit keyboard's own save, after
+// a rename to a shorter name) shortens the payload under the read: the page
+// that comes back short, or past the new end, is the save showing, so page 0
+// is read again and the read retried when it moved. Seen on the keyboard on
+// 2026-10-24 as "Chunk 258 returned 1 bytes where 3 were expected."
+/** @param {{bytes: Buffer, generation: number}} first @param {{bytes: Buffer, generation: number}} second @param {number} landsAfter chunk page after which the save lands @param {{metadataMoves?: boolean}} [options] */
+function savingDuringRead(first, second, landsAfter, {metadataMoves = true} = {}) {
+    let state = first;
+    /** @type {number[]} */
+    const requests = [];
+    return {
+        requests,
+        /** @param {Uint8Array} report */
+        async request(report) {
+            const request = Buffer.from(report);
+            const page = request[4] | (request[5] << 8);
+            requests.push(page);
+            const offset = (page - 1) * 25;
+            const past = page !== 0 && offset >= state.bytes.length;
+            const payload = page === 0 ? metadataPage(metadataMoves ? state : first) : past ? Buffer.alloc(0) : state.bytes.subarray(offset, offset + 25);
+            if (page === landsAfter) state = second;
+            const response = Buffer.alloc(RAW_HID_REPORT_SIZE);
+            request.copy(response, 0, 0, 5);
+            response[5] = past ? PROFILE_WIRE_STATUS.UNKNOWN_PAGE : PROFILE_WIRE_STATUS.OK;
+            response[6] = payload.length;
+            payload.copy(response, PROFILE_WIRE_V1.PAYLOAD_OFFSET);
+            return response;
+        },
+    };
+}
+
+test("a save that shortens the payload between chunks is read again, not refused", async () => {
+    // 60 bytes become 58: the last chunk is 8 bytes where 10 were expected.
+    // 60 bytes become 50: page 3 is past the new end.
+    for (const length of [58, 50]) {
+        const first = {bytes: payloadOf(60), generation: 4}, second = {bytes: payloadOf(length).fill(9, 0, 1), generation: 5};
+        const device = savingDuringRead(first, second, 2);
+        const read = await readCommittedPayload(device);
+        assert.equal(read.metadata.generation, 5, `length ${length}`);
+        assert.deepEqual(read.bytes, second.bytes, "the new generation, not a mix of both");
+        assert.deepEqual(device.requests.slice(0, 5), [0, 1, 2, 3, 0], "page 0 is read again at the page that did not fit");
+    }
+});
+
+test("a short chunk under unchanged metadata is still a malformed response", async () => {
+    const bytes = payloadOf(60);
+    // The chunks shorten, but page 0 still names the first payload.
+    const device = savingDuringRead({bytes, generation: 4}, {bytes: bytes.subarray(0, 58), generation: 4}, 2, {metadataMoves: false});
+    await assert.rejects(readCommittedPayload(device), (error) => {
+        assert.equal(error.code, "MALFORMED_RESPONSE");
+        return true;
+    });
+    assert.deepEqual(device.requests, [0, 1, 2, 3, 0], "page 0 was read again before refusing");
+    // Past the end, under unchanged metadata: the keyboard's refusal stands.
+    const past = savingDuringRead({bytes, generation: 4}, {bytes: bytes.subarray(0, 50), generation: 4}, 2, {metadataMoves: false});
+    await assert.rejects(readCommittedPayload(past), (error) => {
+        assert.equal(error.code, "DEVICE_REJECTED");
+        return true;
+    });
+    assert.deepEqual(past.requests, [0, 1, 2, 3, 0]);
 });

@@ -1,4 +1,15 @@
+// @ts-check
 "use strict";
+
+/**
+ * @typedef {import("../../contracts/model.js").ApplyView} ApplyView
+ * @typedef {import("../../contracts/model.js").ApplyStep} ApplyStep
+ * @typedef {{name?: string, domainId?: number, rowIndex?: number}} DeviceFailure
+ * @typedef {{name?: string, code?: string, message?: string, cause?: unknown, deviceError?: DeviceFailure, status?: {error?: DeviceFailure}}} FailureDetails
+ * @typedef {{waitingSafeBoundary?: boolean, lastStatusName?: string, busyStreak?: number, busyReason?: string, transportFailureCount?: number}} SlaveFailure
+ */
+
+const {APPLY_VERDICTS, INTERRUPTION_REASONS, interruption} = require("./interruption");
 
 // The steps of one Apply, as the person watching it sees them.
 //
@@ -8,32 +19,34 @@
 // keeps arriving while the connected half writes its keys). A failure is
 // pinned to the step that was running, with the reason the keyboard gave.
 
-const APPLY_STEPS = Object.freeze([
+/** @type {readonly {id: ApplyStep, label: string}[]} */
+const APPLY_STEPS = Object.freeze(/** @type {const} */ ([
     {id: "check", label: "Check the keyboard"},
     {id: "backup", label: "Save a recovery copy"},
     {id: "upload", label: "Send the profile"},
     {id: "validate", label: "Keyboard checks the profile"},
-    {id: "stage", label: "Stage keys and macros on the other half"},
-    {id: "peer", label: "Copy the profile to the other half"},
-    {id: "commit", label: "Save it on this half"},
-    {id: "converge", label: "Finish the other half"},
-    {id: "local", label: "Write keys and macros on this half"},
+    {id: "slave", label: "Copy the profile to the slave half"},
+    {id: "commit", label: "Save it on the master half"},
+    {id: "converge", label: "Finish the slave half"},
     {id: "verify", label: "Check both halves"},
-]);
+]));
+/** @type {Readonly<Record<string, number>>} */
 const STEP_INDEX = Object.freeze(Object.fromEntries(APPLY_STEPS.map((step, index) => [step.id, index])));
 
 // Up to this step nothing reaches durable storage; the commit decision is made
 // inside "commit". Where a failure lands decides what can honestly be said
 // about what was saved, together with whether the keyboard confirmed a cancel.
-const LAST_UNSAVED_STEP = STEP_INDEX.peer;
+const LAST_UNSAVED_STEP = STEP_INDEX.slave;
 
+/** @param {number | undefined} completed @param {number | undefined} total */
 function bytes(completed, total) {
-    return Number.isInteger(completed) && Number.isInteger(total) && total > 0 ? {completed: Math.min(completed, total), total} : null;
+    return typeof completed === "number" && typeof total === "number" && Number.isInteger(completed) && Number.isInteger(total) && total > 0 ? {completed: Math.min(completed, total), total} : null;
 }
 
 let applySequence = 0;
 
 class ApplyProgress {
+    /** @param {(view: ApplyView) => void} [onChange] */
     constructor(onChange = () => {}) {
         this.onChange = onChange;
         // Tells one Apply's view from the next, so a dismissed failure stays
@@ -41,12 +54,15 @@ class ApplyProgress {
         this.id = ++applySequence;
         this.index = -1;
         this.detail = "";
+        /** @type {{completed: number, total: number} | null} */
         this.bytes = null;
+        /** @type {import("../../contracts/model.js").ApplyFailure | null} */
         this.failure = null;
         this.finished = false;
     }
 
     // Moves to `step` (never backwards) and records what it is doing now.
+    /** @param {ApplyStep} step @param {{detail?: string, completed?: number, total?: number}} [progress] */
     report(step, {detail = "", completed, total} = {}) {
         const index = STEP_INDEX[step];
         if (index === undefined) throw new RangeError(`Unknown Apply step ${step}.`);
@@ -70,10 +86,12 @@ class ApplyProgress {
         return this.index <= LAST_UNSAVED_STEP;
     }
 
+    /** @param {{reason?: string, saved?: string}} [failure] */
     fail({reason = "", saved = "unknown"} = {}) {
         if (this.failure) return this.failure;
         const step = APPLY_STEPS[Math.max(this.index, 0)];
-        this.failure = {step: step.id, label: step.label, reason, saved};
+        const verdict = APPLY_VERDICTS[/** @type {keyof typeof APPLY_VERDICTS} */ (saved)] || APPLY_VERDICTS.unknown;
+        this.failure = {step: step.id, label: step.label, reason, saved, verdict};
         this.onChange(this.view());
         return this.failure;
     }
@@ -86,12 +104,13 @@ class ApplyProgress {
         this.onChange(this.view());
     }
 
+    /** @returns {ApplyView} */
     view() {
         const failedAt = this.failure ? STEP_INDEX[this.failure.step] : -1;
         return {
             id: this.id,
             state: this.failure ? "failed" : this.finished ? "done" : "applying",
-            steps: APPLY_STEPS.map((step, index) => ({
+            steps: APPLY_STEPS.map(/** @returns {ApplyView["steps"][number]} */ (step, index) => ({
                 id: step.id,
                 label: step.label,
                 state: index === failedAt ? "failed"
@@ -106,10 +125,12 @@ class ApplyProgress {
     }
 }
 
+/** @type {Readonly<Record<number, string>>} */
 const DOMAIN_NAMES = Object.freeze({0x10: "lighting", 0x20: "key behaviours", 0x30: "combos", 0x40: "settings", 0x50: "pointing modes"});
 
 // What the keyboard's candidate error means, in the words of the person who
 // pressed Apply. Unlisted errors fall back to their wire name.
+/** @type {Readonly<Record<string, string>>} */
 const DEVICE_REASONS = Object.freeze({
     CAPACITY_EXCEEDED: "The profile is larger than the keyboard can store.",
     INCOMPATIBLE_SCHEMA: "The keyboard's firmware does not accept this profile format.",
@@ -121,61 +142,92 @@ const DEVICE_REASONS = Object.freeze({
     ACTIVATION_FAILED: "The keyboard saved the profile but could not start using it.",
     DURABILITY_UNKNOWN: "The keyboard could not confirm whether the save was written.",
     TIMEOUT: "The keyboard gave up waiting for this save.",
-    PEER_SUPERSEDED: "The other half already had a newer profile.",
-    PEER_PREPARE_YIELDED: "The other half was saving a profile of its own at the same time.",
-    POSTCOMMIT_AUTHORITY_LOST: "The other half reported a newer profile after this half saved.",
+    PEER_SUPERSEDED: "The slave half already had a newer profile.",
+    PEER_PREPARE_YIELDED: "The slave half was saving a profile of its own at the same time.",
+    POSTCOMMIT_AUTHORITY_LOST: "The slave half reported a newer profile after the master half saved.",
     PEER_COMMIT_CONFLICT: "The two halves disagree about which profile is current.",
-    PEER_TRANSFER_FAILED: "The other half could not take the profile.",
+    PEER_TRANSFER_FAILED: "The slave half could not take the profile.",
 });
 
-// The other half's last answer to the split transfer, when the keyboard
+// The slave half's last answer to the split transfer, when the keyboard
 // reports it (candidate status page 1).
-const PEER_REASONS = Object.freeze({
-    BUSY: "The other half kept answering that it was busy.",
-    STALE: "The other half already had a newer profile.",
-    CONFLICT: "The other half holds a conflicting profile.",
-    CORRUPT: "The other half's copy was damaged.",
-    INCOMPATIBLE: "The other half runs incompatible firmware.",
-    STORAGE_ERROR: "The other half could not store the profile, even after trying again.",
-    VALIDATION_ERROR: "The other half rejected the profile.",
-    DIGEST_MISMATCH: "The copy on the other half did not match what was sent.",
-    RANGE_ERROR: "The copy to the other half went out of order.",
+/** @type {Readonly<Record<string, string>>} */
+const SLAVE_REASONS = Object.freeze({
+    BUSY: "The slave half kept answering that it was busy.",
+    STALE: "The slave half already had a newer profile.",
+    CONFLICT: "The slave half holds a conflicting profile.",
+    CORRUPT: "The slave half's copy was damaged.",
+    INCOMPATIBLE: "The slave half runs incompatible firmware.",
+    STORAGE_ERROR: "The slave half could not store the profile, even after trying again.",
+    VALIDATION_ERROR: "The slave half rejected the profile.",
+    DIGEST_MISMATCH: "The copy on the slave half did not match what was sent.",
+    RANGE_ERROR: "The copy to the slave half went out of order.",
     INVALID_FRAME: "The link between the halves garbled a message.",
 });
 
+/** @param {DeviceFailure | null | undefined} error */
 function locate(error) {
     if (!error || error.domainId === 0xff || error.domainId === undefined) return "";
     const domain = DOMAIN_NAMES[error.domainId] || `domain 0x${error.domainId.toString(16)}`;
     return error.rowIndex !== 0xffff && error.rowIndex !== undefined ? ` in ${domain}, row ${error.rowIndex + 1}` : ` in ${domain}`;
 }
 
-// Why the other half kept answering BUSY, when it said.
-const PEER_BUSY_REASONS = Object.freeze({
-    MAILBOX_FULL: "The other half stopped handling requests from this half.",
-    OTHER_COPY: "The other half was still holding an earlier, unfinished copy.",
-    NO_LEASE: "The other half dropped the copy partway and did not take it up again.",
-    STORE_WORKING: "The other half did not finish storing its copy.",
-    PULLING: "The other half was fetching a profile of its own.",
-    CONVERGENCE_ONLY: "The other half was finishing another save.",
+// Why the slave half kept answering BUSY, when it said.
+/** @type {Readonly<Record<string, string>>} */
+const SLAVE_BUSY_REASONS = Object.freeze({
+    MAILBOX_FULL: "The slave half stopped handling requests from the master half.",
+    OTHER_COPY: "The slave half was still holding an earlier, unfinished copy.",
+    NO_LEASE: "The slave half dropped the copy partway and did not take it up again.",
+    STORE_WORKING: "The slave half did not finish storing its copy.",
+    PULLING: "The slave half was fetching a profile of its own.",
+    CONVERGENCE_ONLY: "The slave half was finishing another save.",
 });
 
-// The keyboard's own reason when it gave one, else the other half's last
-// answer, else the host's message.
-function failureReason(error, peer) {
+// Ark's own wait running out, from the upload coordinator: the keyboard kept
+// answering but made no progress Ark could see.
+const STALLED = new Set(["COMMIT_OUTCOME_AMBIGUOUS", "VALIDATION_OUTCOME_AMBIGUOUS", "OPERATION_OUTCOME_AMBIGUOUS", "MAILBOX_BUSY", "UPLOAD_BUSY"]);
+const HELD = "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
+const HELD_ARK_WAIT = "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard waited to save until Ark stopped waiting for it.";
+
+// Errors whose text is for diagnostics only: the coordinators' and the
+// transport's. Two coordinator codes carry whatever stopped them (CARRIED).
+const CARRIED = new Set(["UPLOAD_FAILED", "COMMIT_FAILED"]);
+/** @param {FailureDetails | null | undefined} error */
+const diagnosticOnly = error => error?.name === "CandidateUploadError" || error?.name === "LiveLinkTransportError";
+
+// Why an Apply stopped, in the words of the person who pressed it: a lost
+// connection anywhere in the cause first (a restarted keyboard makes the slave
+// half look busy), then the keyboard's own reason, then the slave half's last
+// answer. The coordinators' and the transport's text is never said: it stays
+// in the cause and the diagnostics. Ark's own sentences are.
+/** @param {FailureDetails | null | undefined} error @param {SlaveFailure | null | undefined} slave @returns {string} */
+function failureReason(error, slave) {
+    const cut = interruption(error);
+    if (cut === "lost") return INTERRUPTION_REASONS.lost;
     const device = error?.deviceError || error?.status?.error;
     if (device?.name && device.name !== "NONE") {
-        // The copy was ready; the save waited for this half to go idle.
-        if (device.name === "TIMEOUT" && peer?.waitingSafeBoundary) return "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
-        // The copy to the other half stopped: its last answer says why.
-        if (device.name === "PEER_TRANSFER_FAILED" && peer?.lastStatusName && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
+        // The copy was ready; the save waited for the master half to go idle.
+        if (device.name === "TIMEOUT" && slave?.waitingSafeBoundary) return HELD;
+        // The copy to the slave half stopped: its last answer says why.
+        if (device.name === "PEER_TRANSFER_FAILED" && slave?.lastStatusName && SLAVE_REASONS[slave.lastStatusName]) return SLAVE_REASONS[slave.lastStatusName];
         const known = DEVICE_REASONS[device.name];
         if (known) return device.name === "VALIDATION_REJECTED" ? `${known}${locate(device)}.` : known;
         return `The keyboard reported ${device.name}.`;
     }
-    if (peer && peer.busyStreak >= 3 && PEER_BUSY_REASONS[peer.busyReason]) return PEER_BUSY_REASONS[peer.busyReason];
-    if (peer && peer.lastStatusName && peer.lastStatusName !== "OK" && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
-    if (peer && peer.transportFailureCount > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
-    return error?.message || "The keyboard stopped answering.";
+    // Ark's own wait ran out while the keyboard waited for a safe moment.
+    if (slave?.waitingSafeBoundary && STALLED.has(error?.code || "")) return HELD_ARK_WAIT;
+    if (slave && (slave.busyStreak ?? 0) >= 3 && slave.busyReason && SLAVE_BUSY_REASONS[slave.busyReason]) return SLAVE_BUSY_REASONS[slave.busyReason];
+    if (slave && slave.lastStatusName && slave.lastStatusName !== "OK" && SLAVE_REASONS[slave.lastStatusName]) return SLAVE_REASONS[slave.lastStatusName];
+    if (slave && (slave.transportFailureCount ?? 0) > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
+    if (cut === "unanswered") return INTERRUPTION_REASONS.unanswered;
+    if (STALLED.has(error?.code || "")) return "The keyboard stopped making progress, so Ark stopped waiting for it.";
+    if (diagnosticOnly(error)) {
+        // An Ark refusal the coordinator carried (a keyboard that changed
+        // under the upload) is said as Ark says it.
+        const cause = /** @type {FailureDetails | undefined} */ (error?.cause);
+        return CARRIED.has(error?.code || "") && cause?.message && !diagnosticOnly(cause) ? failureReason(cause, slave) : "The keyboard answered in a way Ark did not expect.";
+    }
+    return error?.message || INTERRUPTION_REASONS.unanswered;
 }
 
 module.exports = {APPLY_STEPS, ApplyProgress, failureReason};

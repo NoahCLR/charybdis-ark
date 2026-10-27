@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // A static file server for this machine only, for trying the web page
@@ -11,6 +12,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
 
+/** @type {Readonly<Record<string, string>>} */
 const TYPES = {
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
@@ -20,10 +22,11 @@ const TYPES = {
     ".svg": "image/svg+xml",
 };
 
+/** @param {string} root @param {number} port @returns {Promise<import("node:http").Server>} */
 function serve(root, port) {
     const base = path.resolve(root);
     const server = http.createServer((request, response) => {
-        const url = new URL(request.url, "http://127.0.0.1");
+        const url = new URL(request.url ?? "/", "http://127.0.0.1");
         let file;
         try {file = path.join(base, decodeURIComponent(url.pathname));} catch {file = "";}
         if (file !== base && !file.startsWith(base + path.sep)) {

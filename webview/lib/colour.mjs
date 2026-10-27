@@ -1,15 +1,21 @@
+// @ts-check
+/** @typedef {{h?: string | number, s?: string | number, v?: string | number} | null | undefined} Colour */
+
 // Colour, exactly as the keyboard means it.
 //
 // The device stores HSV in QMK's 0–255 space and the model hands it over as
 // strings. Everything that turns those numbers into pixels goes through here,
 // so one rule decides what a colour looks like and when a legend is black.
 
+/** @param {Colour} colour @returns {[number, number, number]} */
 export const hsv = (colour) => colour
     ? [Number(colour.h) || 0, Number(colour.s) || 0, Number(colour.v) || 0]
     : [0, 0, 0];
 
+/** @param {Colour} colour */
 export const isOff = (colour) => hsv(colour)[2] === 0;
 
+/** @param {Colour} colour */
 export function rgb(colour) {
     const [h255, s255, v255] = hsv(colour);
     const h = h255 * 360 / 255, s = s255 / 255, v = v255 / 255;
@@ -19,24 +25,30 @@ export function rgb(colour) {
     return [r, g, b].map((channel) => Math.round((channel + m) * 255));
 }
 
+/** @param {Colour} colour */
 export const css = (colour) => `rgb(${rgb(colour).join(", ")})`;
 
+/** @param {Colour} colour */
 export const label = (colour) => {
     const [h, s, v] = hsv(colour);
     return `HSV(${h}, ${s}, ${v})`;
 };
 
-export const brightnessLimit = (value) => Number.isInteger(value)
+/** @param {unknown} value */
+export const brightnessLimit = (value) => typeof value === "number" && Number.isInteger(value)
     ? Math.max(0, Math.min(255, value))
     : 255;
 
+/** @param {unknown} value @param {number} maximum */
 const clamp = (value, maximum) => Math.max(0, Math.min(maximum, Math.round(Number(value) || 0)));
 
+/** @param {readonly unknown[]} channels @param {unknown} maximumBrightness */
 export function clampHsv(channels, maximumBrightness) {
     const maximum = brightnessLimit(maximumBrightness);
     return {h: clamp(channels[0], 255), s: clamp(channels[1], 255), v: clamp(channels[2], maximum)};
 }
 
+/** @param {unknown} value @param {unknown} maximumBrightness */
 export function valuePercent(value, maximumBrightness) {
     const maximum = brightnessLimit(maximumBrightness);
     return maximum ? clamp(value, maximum) * 100 / maximum : 0;
@@ -44,6 +56,7 @@ export function valuePercent(value, maximumBrightness) {
 
 // Relative luminance decides black or white legends: the keyboard picks the
 // colour, the label still has to be readable on it.
+/** @param {Colour} colour */
 export function idealText(colour) {
     const [r, g, b] = rgb(colour).map((channel) => {
         const c = channel / 255;

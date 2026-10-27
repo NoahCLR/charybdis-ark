@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Which keyboard layer each slot of a draft holds.
@@ -12,12 +13,16 @@
 
 const {reorderLayers, validateSnapshot} = require("./portable-profile");
 
-const IDENTITY = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7]);
+const IDENTITY = Object.freeze(Array.from({length: 16}, (_, layer) => layer));
+/** @param {readonly number[]} order */
 const isIdentity = order => order.every((layer, slot) => layer === slot);
 // `step` rearranges a document already in `order`, as reorderLayers reads it:
 // slot n takes what slot step[n] held.
+/** @param {readonly number[]} order @param {readonly number[]} step */
 const compose = (order, step) => Object.freeze(step.map(slot => order[slot]));
+/** @param {readonly number[]} order */
 const inverse = order => {
+    /** @type {number[]} */
     const result = [];
     order.forEach((layer, slot) => {result[layer] = slot;});
     return Object.freeze(result);
@@ -25,6 +30,7 @@ const inverse = order => {
 
 // A document rearranged by `step`: every layer moves with its keys, name,
 // colour and settings, and every reference to it follows.
+/** @param {import("./types.js").PortableDocument} document @param {readonly number[]} step */
 function rearranged(document, step) {
     const names = validateSnapshot(document).settings.names;
     return reorderLayers(document, [...step], step.map(slot => names[slot]), {keysFollow: true});
@@ -32,13 +38,16 @@ function rearranged(document, step) {
 
 // A review unit named by the layer it belongs to rather than the slot it sits
 // in, so edits made before and after a reorder link by what they touched.
+/** @param {string} unit @param {readonly number[]} order */
 function layerUnit(unit, order) {
     const layout = /^layout:(\d+):(\d+)$/.exec(unit);
-    if (layout) return `layout@${order[layout[1]]}:${layout[2]}`;
+    if (layout) return `layout@${order[Number(layout[1])]}:${layout[2]}`;
+    const placement = /^placement:(\d+):(\d+)$/.exec(unit);
+    if (placement) return `placement@${order[Number(placement[1])]}:${placement[2]}`;
     const name = /^layerName:(\d+)$/.exec(unit);
-    if (name) return `layerName@${order[name[1]]}`;
+    if (name) return `layerName@${order[Number(name[1])]}`;
     const colour = /^rgb:layer:(\d+)$/.exec(unit);
-    if (colour) return `rgb:layer@${order[colour[1]]}`;
+    if (colour) return `rgb:layer@${order[Number(colour[1])]}`;
     return unit;
 }
 

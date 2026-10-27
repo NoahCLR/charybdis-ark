@@ -1,15 +1,16 @@
-// The Configure screens show a board only after a complete editable read.
-// The host keeps the gate closed across the small gaps between HID requests.
+// @ts-check
+// The Configure and Settings screens show only after a complete editable read.
+// The core keeps the gate closed across the small gaps between HID requests.
 
-const PHASES = {
-    enumerating: "Looking for a keyboard",
-    connecting: "Connecting to the keyboard",
-    refreshing: "Checking both halves",
-    "reading layout": "Reading keys and layers",
-    "reading profile": "Reading lighting and behaviours",
-    "reading complete profile": "Reading the complete profile",
-};
+import {configureReady, screenAvailable, screenDefinition} from "./screens.mjs";
+export {configureReady, screenAvailable};
 
+/** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
+/** @typedef {import("../../contracts/model.js").CountedProgress} CountedProgress */
+
+import {phaseWords} from "./vocabulary.mjs";
+
+/** @type {Readonly<Record<string, string>>} */
 const POST_APPLY_READ = {
     layout: "Reading keys and layers",
     profile: "Reading saved lighting, behaviours and settings",
@@ -17,50 +18,62 @@ const POST_APPLY_READ = {
     baseRgb: "Checking base lighting",
 };
 
+/** @param {{step: string, progress?: CountedProgress | null} | null | undefined} read */
 export function postApplyReadText(read) {
-    const label = POST_APPLY_READ[read?.step] || "Confirming the completed save";
+    const label = (read ? POST_APPLY_READ[read.step] : undefined) || "Confirming the completed save";
     const progress = read?.progress;
-    return Number.isInteger(progress?.done) && Number.isInteger(progress?.total) && progress.total > 0
+    return progress && Number.isInteger(progress.done) && Number.isInteger(progress?.total) && progress.total > 0
         ? `${label} · ${progress.done} of ${progress.total}` : label;
 }
 
 // The commit bar while the keyboard is busy with anything but an Apply: what
 // is happening in words, and whether it writes to the keyboard. Reads and
 // exports save nothing, so they make no claim about the saved profile.
-const BUSY = {...PHASES, "restoring complete profile": "Saving the profile to both halves"};
-
-export function busyText(phase) {
-    return {detail: BUSY[phase] || "Finishing the current step", writes: phase === "restoring complete profile"};
+/** @param {import("../../contracts/model.js").PhaseId | undefined} phase @param {StatusModel | null | undefined} model */
+export function busyText(phase, model) {
+    const words = phaseWords(model, phase);
+    return {detail: words?.busy || "Finishing the current step", writes: words?.writes || false};
 }
 
-export const configureReady = (model) => model?.load?.state === "ready";
-
-export function screenAvailable(model, screen) {
-    if (!model || model.load?.state === "loading") return false;
-    if (screen === "device") return Boolean(model.device?.connected || model.demo?.active);
-    if (screen === "profile") return Boolean(model.portable?.available);
-    return configureReady(model);
-}
-
+/** @param {StatusModel | null | undefined} model @param {string} [screen] */
 export function readScreen(model, screen = "keys") {
-    // A host that cannot reach a keyboard at all says why, in place of reading.
-    if (model?.host?.blocked) return {state: "blocked", title: model.host.blocked.title, detail: model.host.blocked.detail};
+    const definition = screenDefinition(screen);
+    if (!definition) return {state: "unavailable", title: "Screen unavailable",
+        detail: "Choose a screen from the menu to continue."};
+    // A shell that cannot reach a keyboard at all says why, in place of reading.
+    if (model?.shell?.blocked) return {state: "blocked", title: model.shell.blocked.title, detail: model.shell.blocked.detail};
     if (!model || model.load?.state === "loading") {
-        const phase = model?.load?.phase || "enumerating";
+        const phase = model?.load?.phase;
         const progress = model?.load?.progress;
-        const count = Number.isInteger(progress?.done) && Number.isInteger(progress?.total) && progress.total > 0
+        const count = progress && typeof progress !== "string" && Number.isInteger(progress.done) && Number.isInteger(progress.total) && progress.total > 0
             ? ` · ${progress.done} of ${progress.total}` : "";
-        return {state: "loading", title: "Reading your keyboard", detail: `${PHASES[phase] || "Finishing the read"}${count}`};
+        return {state: "loading", title: "Reading your keyboard", detail: typeof progress === "string" && progress ? progress : `${phaseWords(model, phase)?.read || (!phase ? "Looking for a keyboard" : "Finishing the read")}${count}`};
     }
-    if (screen === "profile" && !screenAvailable(model, screen)) return {state: "unavailable", title: "Backups unavailable",
-        detail: "Connect a keyboard with complete-profile firmware, then read it to manage backups."};
-    if (screen === "device" && !screenAvailable(model, screen)) return {state: "unavailable", title: "Device status unavailable",
-        detail: "Read the keyboard to see its connection and diagnostics."};
+    if (!screenAvailable(model, screen) && definition.unavailable) return {state: "unavailable", ...definition.unavailable};
     if (configureReady(model)) return null;
     const device = model.device || {};
     if (!device.connected) return {state: "unavailable", title: "Connect your keyboard",
-        detail: device.health?.error || model.host?.words?.connectHint || "Connect a Charybdis, then read it to begin editing."};
-    if (model.portable?.legacy) return {state: "unavailable", title: "This keyboard is read-only", detail: "This firmware has five layers. You can back up its profile, then install the eight-layer firmware to edit it."};
-    return {state: "unavailable", title: "Keyboard not ready for edits",
-        detail: device.health?.error || "A complete profile could not be read. Read the keyboard again to retry."};
+        detail: device.health?.error || model.shell?.words?.connectHint || "Connect a Charybdis, then read it to begin editing."};
+    // Halves that are not together are the usual reason, and say what to do.
+    const halves = device.health?.halves;
+    const halvesDetail = halves === "alone" || halves === "apart" ? model.vocabulary?.halves?.[halves]?.detail : "";
+    if (halvesDetail || device.health?.error) return {state: "unavailable", title: "Keyboard not ready for edits", detail: halvesDetail || /** @type {string} */ (device.health?.error)};
+    // A read that worked, held by its draft: why, and what the bar offers.
+    const held = model.load?.held ? heldWords(model.load.held, Boolean(model.draft?.live)) : null;
+    return held ? {state: "unavailable", ...held}
+        : {state: "unavailable", title: "Keyboard not ready for edits", detail: "A complete profile could not be read. Read the keyboard again to retry."};
+}
+
+// Why editing is held by the open draft (D-L60), in the words the bar uses
+// for the same draft. A live draft is what the keyboard runs, so it is read
+// again rather than reviewed.
+/** @param {import("../../contracts/panel.js").DraftBlock} reason @param {boolean} live @returns {{title: string, detail: string} | null} */
+function heldWords(reason, live) {
+    const next = live ? "Choose Read keyboard in the bar: the draft is what the keyboard runs, so Ark reads it again before the next edit."
+        : "Your changes are kept. Choose Review against the keyboard in the bar to compare them with what it runs now, or discard the draft.";
+    if (reason === "stale") return {title: "The keyboard changed since this draft began", detail: next};
+    if (reason === "connection-changed") return {title: "Keyboard connection changed", detail: next};
+    if (reason === "other-keyboard") return {title: "Draft belongs to another keyboard",
+        detail: "Its changes are kept for that keyboard. Select it to continue editing, or discard the draft in the bar to edit this one."};
+    return null;
 }

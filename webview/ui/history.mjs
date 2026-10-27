@@ -1,26 +1,31 @@
+// @ts-check
 // The draft history sheet: what happened to the draft, step by step. Where
 // the review compares the draft with the keyboard, this compares each step
 // with the step before it, so an edit reads as what it did when it was made,
 // undone steps included. Going to a step is several undos or redos at once.
 
+// Selector assertions refer to elements created by this module's authored markup.
+import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
 import {historyEntries, stepTime} from "../view/history.mjs";
+import {historyFooter} from "../view/edit-mode.mjs";
 import {reviewColumns, reviewItem} from "./review-items.mjs";
 
 export function openHistory() {
     state.overlay = "history";
-    post({type: "openProfileDraftHistory"});
+    post(controls.control("openProfileDraftHistory"));
     render();
 }
 
 export function closeHistory() {
     state.overlay = null;
-    post({type: "closeProfileDraftHistory"});
+    post(controls.control("closeProfileDraftHistory"));
     render();
 }
 
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {import("../../contracts/model.js").HistoryStep} entry @param {number} now */
 function stepCard(model, entry, now) {
     const time = stepTime(entry.at, now);
     const changes = entry.changes;
@@ -35,7 +40,7 @@ function stepCard(model, entry, now) {
             : `<p class="note hs-empty">Nothing that the review lists changed in this step.</p>`;
     const where = entry.current
         ? `<span class="hs-here"><i class="dot draft"></i> Your draft is here</span>`
-        : `<button class="btn tiny" data-step="${entry.step}" ${model.draft.busy ? "disabled" : ""}
+        : `<button class="btn tiny" data-step="${esc(entry.step)}" ${model.draft?.busy ? "disabled" : ""}
             data-tip="${esc(entry.undone ? "Redo every step up to and including this one." : "Undo every step after this one. Redo brings them back.")}">${entry.undone ? "Redo to here" : "Go back to here"}</button>`;
     return `<section class="hs-step ${entry.current ? "current" : ""} ${entry.undone ? "undone" : ""}">
         <div class="hs-head">
@@ -57,21 +62,21 @@ export function historyOverlay() {
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Draft history">
         <div class="sheet-h"><h2>Draft history</h2>
             <span class="note">${count ? `${count} step${count === 1 ? "" : "s"} · each compared with the step before it` : "No edits yet"}</span>
-            <span class="right" style="margin-left:auto"><button class="btn ghost" data-act="close">Close</button></span></div>
+            <span class="right"><button class="btn ghost" data-act="close">Close</button></span></div>
         <div class="sheet-b rv hs">
             ${entries ? `<div class="hs-cols">${reviewColumns("What changed", "Before", "After")}</div>
                 ${entries.map((entry) => stepCard(model, entry, now)).join("")}`
                 : `<p class="note hs-empty">Reading the history…</p>`}
         </div>
-        <div class="sheet-f"><span class="note">Going to a step changes only the draft. The keyboard is not touched until you apply.</span></div>
+        <div class="sheet-f"><span class="note">${esc(historyFooter(draft))}</span></div>
     </div></div>`);
     node.addEventListener("click", (event) => {
-        const step = event.target.closest("[data-step]");
+        const step = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-step]"));
         if (step) {
-            post({type: "jumpProfileDraft", step: Number(step.dataset.step)});
+            post(controls.jumpDraft(Number(step.dataset.step)));
             return;
         }
-        if (event.target === node || event.target.closest('[data-act="close"]')) closeHistory();
+        if (event.target === node || /** @type {Element} */ (event.target).closest('[data-act="close"]')) closeHistory();
     });
     return node;
 }

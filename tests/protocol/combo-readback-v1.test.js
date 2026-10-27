@@ -2,7 +2,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {decodeComboPages, readDeviceCombos} = require("../../core/protocol/combo-readback-v1");
-const {fixturePages, rehash, responseFor} = require("../fixtures/device-combos");
+const {fixturePages, retiredPages, rehash, responseFor} = require("../fixtures/device-combos");
 const decode = pages => decodeComboPages(pages[0], pages.slice(1));
 
 test("the firmware fixture decodes native inputs, output and timing without a repository lookup", async () => {
@@ -11,70 +11,88 @@ test("the firmware fixture decodes native inputs, output and timing without a re
     const actual = await readDeviceCombos({request: async (request, options) => {
         requests.push(request);
         assert.deepEqual([...request.subarray(0, 3)], [8, 0, 6]);
-        assert.ok(request[3] && request.subarray(5).every(byte => byte === 0));
+        assert.ok(request[3] && request.subarray(6).every(byte => byte === 0));
         const response = responseFor(request, pages);
         assert.equal(options.matchResponse(response, request), true);
         const stale = Buffer.from(response); stale[3]++;
         assert.equal(options.matchResponse(stale, request), false);
         return response;
     }});
-    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false});
-    assert.equal(actual.version, 2);
+    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false, enabled: true, useOutputBehavior: true, allowedLayers: 0xffff});
+    assert.equal(actual.version, 3);
     assert.equal(actual.defaultTermMs, 50);
     assert.equal(actual.holdTermMs, 200);
     assert.deepEqual(actual.rows[1].inputs, [0x0806, 0x0819]);
     assert.equal(actual.rows[1].output, 0x0804);
-    assert.deepEqual(actual.layerReferences, [0, 1, 2, 3, 4]);
-    assert.deepEqual(requests.map(request => request[4]), [0, 1, 2, 0]);
-    assert.equal(new Set(requests.map(request => request[3])).size, 4);
+    assert.deepEqual(actual.layerReferences, Array.from({length: 16}, (_, layer) => layer));
+    // Metadata, the reference page, two pages per row, then metadata again.
+    assert.deepEqual(requests.map(request => request[4]), [0, 1, 2, 3, 4, 5, 0]);
+    assert.equal(new Set(requests.map(request => request[3])).size, 7);
 });
 
-test("older firmware's readback repeats the hold threshold on every row and has no default", () => {
-    const actual = decode(fixturePages(1));
-    assert.equal(actual.version, 1);
-    assert.equal(actual.defaultTermMs, null);
-    assert.equal(actual.holdTermMs, 200);
-    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, followsDefault: false, mustHold: false, mustTap: false, ordered: false});
-    const split = fixturePages(1); split[2].writeUInt16LE(199, 6);
-    assert.throws(() => decode(rehash(split)), {code: "COMBO_MALFORMED"});
-    // Version 1 has no follow-the-default flag.
-    const flagged = fixturePages(1); flagged[1][8] = 8;
-    assert.throws(() => decode(rehash(flagged)), {code: "COMBO_MALFORMED"});
+test("retired combo readback is rejected before rows are requested", async () => {
+    for (const version of [1, 2]) {
+        const pages = retiredPages(version);
+        assert.throws(() => decode(pages), {code: "COMBO_INCOMPATIBLE"});
+        const seen = [];
+        await assert.rejects(readDeviceCombos({request: async request => {
+            seen.push(request[4]); return responseFor(request, pages);
+        }}), {code: "COMBO_INCOMPATIBLE"});
+        assert.deepEqual(seen, [0]);
+    }
+});
+
+test("sixteen inputs fill a row's two pages, and a disabled row keeps its layers", () => {
+    const pages = fixturePages();
+    const a = pages[2], b = pages[3];
+    a[1] = 16;
+    for (let input = 0; input < 16; input++) {
+        const at = input < 7 ? [a, 11 + 2 * input] : [b, 2 * (input - 7)];
+        at[0].writeUInt16LE(0x04 + input, at[1]);
+    }
+    a[6] |= 16; a.writeUInt32LE(0x8001, 7);
+    const row = decode(rehash(pages)).rows[0];
+    assert.deepEqual(row.inputs, Array.from({length: 16}, (_, input) => 0x04 + input));
+    assert.equal(row.enabled, false);
+    assert.equal(row.allowedLayers, 0x8001);
 });
 
 test("combo policy flags, callback output, timing zeros and a disabled empty table survive decoding", () => {
     const pages = fixturePages();
-    pages[0][4] = 0; pages[0][5] = 63; pages[0].fill(0, 6, 11);
-    pages[1].fill(0, 2, 8); pages[1][8] = 7;
+    pages[0][4] = 0; pages[0][5] = 63; pages[0].fill(0, 10, 14);
+    // A fixed reference uses one layer throughout.
+    pages[1].fill(3, 0, 16);
+    pages[2].fill(0, 2, 6); pages[2][6] = 7; pages[4][6] &= ~8;
     const actual = decode(rehash(pages));
     assert.equal(actual.enabled, false);
     for (const key of ["noTimer", "strictTimer", "customTrigger", "customRelease", "customRepress", "fixedReference"]) assert.equal(actual[key], true);
-    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0, termMs: 0, followsDefault: false, mustHold: true, mustTap: true, ordered: true});
+    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0, termMs: 0, followsDefault: false, mustHold: true, mustTap: true, ordered: true, enabled: true, useOutputBehavior: true, allowedLayers: 0xffff});
     pages[0][1] = 0;
-    assert.deepEqual(decode(rehash([pages[0]])).rows, []);
+    assert.deepEqual(decode(rehash(pages.slice(0, 2))).rows, []);
     // Firmware without combos reports no default and no threshold.
-    const none = fixturePages(); none[0][1] = 0; none[0].fill(0, 18, 22);
-    assert.equal(decode(rehash([none[0]])).defaultTermMs, 0);
+    const none = fixturePages(); none[0][1] = 0; none[0].fill(0, 10, 14);
+    assert.equal(decode(rehash(none.slice(0, 2))).defaultTermMs, 0);
 });
 
 test("malformed limits, row shape, duplicates and reserved bytes are rejected before display", () => {
     for (const mutate of [
-        pages => {pages[0][1] = 33;}, pages => {pages[0][2] = 5;}, pages => {pages[0][3] = 0;},
-        pages => {pages[0][4] = 2;}, pages => {pages[0][5] = 64;}, pages => {pages[0][6] = 5;},
-        pages => {pages[0][13] = 1;}, pages => {pages[0][22] = 1;}, pages => {pages[0][24] = 1;}, pages => {pages.pop();},
+        pages => {pages[0][1] = 129;}, pages => {pages[0][2] = 15;}, pages => {pages[0][3] = 0;}, pages => {pages[0][3] = 17;},
+        pages => {pages[0][4] = 2;}, pages => {pages[0][5] = 64;}, pages => {pages[0][14] = 1;},
+        pages => {pages[0][15] = 1;}, pages => {pages[0][24] = 1;}, pages => {pages.pop();},
         pages => {pages[0][5] = 32;},
-        pages => {pages[1][0] = 1;}, pages => {pages[1][1] = 1;}, pages => {pages[1][1] = 5;},
-        pages => {pages[1][8] = 16;}, pages => {pages[1][6] = 1;}, pages => {pages[1][13] = 1;}, pages => {pages[1][24] = 1;},
-        pages => {pages[1][4] = 51;},
-        pages => {pages[1].writeUInt16LE(7, 11);}, pages => {pages[1].writeUInt16LE(0, 9);},
+        pages => {pages[1][0] = 16;}, pages => {pages[1][16] = 1;},
+        pages => {pages[2][0] = 1;}, pages => {pages[2][1] = 1;}, pages => {pages[2][1] = 17;},
+        pages => {pages[2][6] = 64;}, pages => {pages[2].writeUInt32LE(0x10000, 7);}, pages => {pages[2][15] = 1;}, pages => {pages[3][24] = 1;}, pages => {pages[3][0] = 1;},
+        pages => {pages[2][4] = 51;},
+        pages => {pages[2].writeUInt16LE(7, 13);}, pages => {pages[2].writeUInt16LE(0, 11);},
     ]) {
         const pages = fixturePages(); mutate(pages);
-        assert.throws(() => decode(pages), {code: "COMBO_MALFORMED"});
+        assert.throws(() => decode(rehash(pages)), {code: "COMBO_MALFORMED"});
     }
-    const corrupt = fixturePages(); corrupt[1][2]++;
+    const corrupt = fixturePages(); corrupt[2][2]++;
     assert.throws(() => decode(corrupt), {code: "COMBO_CORRUPT"});
     assert.throws(() => decodeComboPages(Buffer.alloc(24), []), {code: "COMBO_MALFORMED"});
-    const version = fixturePages(); version[0][0] = 3;
+    const version = fixturePages(); version[0][0] = 4;
     assert.throws(() => decode(version), {code: "COMBO_INCOMPATIBLE"});
 });
 
@@ -91,17 +109,27 @@ test("older firmware is explicitly unsupported and changing readout has a bounde
     const once = {request: async request => {
         calls++;
         const response = responseFor(request, pages);
-        if (calls === 4) response[11] = 0;
+        if (calls === 7) response[13] = 0;
         return response;
     }};
     assert.equal((await readDeviceCombos(once)).rows.length, 2);
-    assert.equal(calls, 8);
+    assert.equal(calls, 14);
     calls = 0;
     await assert.rejects(readDeviceCombos({request: async request => {
         calls++;
         const response = responseFor(request, pages);
-        if (calls % 4 === 0) response[11] = 0;
+        if (calls % 7 === 0) response[13] = 0;
         return response;
     }}), {code: "COMBO_CHANGED"});
-    assert.equal(calls, 8);
+    assert.equal(calls, 14);
+});
+
+
+test("native readback retains independent permissions for combos sharing an output", () => {
+    const pages = fixturePages();
+    pages[4].writeUInt16LE(pages[2].readUInt16LE(2), 2);
+    pages[4][6] |= 32;
+    const rows = decode(rehash(pages)).rows;
+    assert.equal(rows[0].output, rows[1].output);
+    assert.deepEqual(rows.map(row => row.useOutputBehavior), [true, false]);
 });

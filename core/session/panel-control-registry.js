@@ -1,0 +1,79 @@
+// @ts-check
+"use strict";
+const {PHASE, PHASE_WORDS} = require("../model/vocabulary");
+
+// Panel controls have one policy: where they run, what they bind to, what
+// the demo permits and which operation surrounds them. The actions themselves
+// live in the controller modules; this inert table cannot import them. A
+// control `within` runs inside the operation already running, which it ends,
+// so the busy guard lets it through.
+/** @typedef {'draft' | 'portable' | 'demo' | 'read' | 'view' | 'shell' | 'inspect' | 'diagnose'} Route */
+/** @typedef {{route: Route, action: string, binding: 'none' | 'apply' | 'import' | 'profile' | 'inspect', demo: 'allow' | 'refuse' | 'ignore' | 'leave' | 'export' | 'open' | 'replace' | 'close' | 'shell-leave', phase: 'panel' | 'apply' | 'restore' | 'read' | 'view' | 'shell' | 'inspect' | 'within' | 'diagnose', identity: boolean}} Control */
+/** @type {Readonly<Record<import('../../contracts/messages.js').ControlType, Readonly<Control>>>} */
+const CONTROLS = Object.freeze({
+    reviewProfileDraft: Object.freeze({route: "draft", action: "review", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    undoProfileDraft: Object.freeze({route: "draft", action: "undo", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    redoProfileDraft: Object.freeze({route: "draft", action: "redo", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    jumpProfileDraft: Object.freeze({route: "draft", action: "jump", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    discardProfileDraft: Object.freeze({route: "draft", action: "discard", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    discardProfileDraftChanges: Object.freeze({route: "draft", action: "discardChanges", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    applyProfileDraft: Object.freeze({route: "draft", action: "apply", binding: "apply", demo: "refuse", phase: "apply", identity: true}),
+    rebaseProfileDraft: Object.freeze({route: "draft", action: "rebase", binding: "none", demo: "refuse", phase: "panel", identity: true}),
+    putBackProfile: Object.freeze({route: "draft", action: "putBack", binding: "none", demo: "refuse", phase: "panel", identity: true}),
+    closeProfileDraftReview: Object.freeze({route: "draft", action: "closeReview", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    // Live preview + save (firmware D-F32): the keyboard's Save and Revert,
+    // the answer to an edit's trap check, and how edits reach the keyboard.
+    saveProfileDraft: Object.freeze({route: "draft", action: "save", binding: "apply", demo: "refuse", phase: "apply", identity: true}),
+    revertProfileDraft: Object.freeze({route: "draft", action: "revert", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
+    confirmLiveEdit: Object.freeze({route: "draft", action: "confirmLive", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
+    cancelLiveEdit: Object.freeze({route: "draft", action: "cancelLive", binding: "none", demo: "allow", phase: "panel", identity: true}),
+    // Cancel edit: aborts Ark's own edit while the keyboard holds it until no
+    // key is held, which is while the edit is still running.
+    abortLiveEdit: Object.freeze({route: "draft", action: "abortLive", binding: "none", demo: "refuse", phase: "within", identity: true}),
+    setEditMode: Object.freeze({route: "draft", action: "setMode", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
+    // A keyboard that stopped saving (firmware D-F34): restart both halves.
+    // Bound to no Apply: a stopped keyboard's draft may be stale.
+    restartKeyboard: Object.freeze({route: "draft", action: "restart", binding: "none", demo: "refuse", phase: "panel", identity: true}),
+    exportPortableProfile: Object.freeze({route: "portable", action: "export", binding: "none", demo: "export", phase: "panel", identity: false}),
+    choosePortableProfile: Object.freeze({route: "portable", action: "choose", binding: "profile", demo: "allow", phase: "panel", identity: false}),
+    reviewPortableProfile: Object.freeze({route: "portable", action: "reviewImport", binding: "import", demo: "allow", phase: "panel", identity: false}),
+    restorePortableProfile: Object.freeze({route: "portable", action: "restore", binding: "profile", demo: "allow", phase: "restore", identity: false}),
+    managePortableLayers: Object.freeze({route: "portable", action: "manageLayers", binding: "profile", demo: "allow", phase: "panel", identity: false}),
+    editPortableLayer: Object.freeze({route: "portable", action: "editLayer", binding: "profile", demo: "allow", phase: "panel", identity: false}),
+    savePortableLayers: Object.freeze({route: "portable", action: "saveLayers", binding: "profile", demo: "allow", phase: "restore", identity: false}),
+    cancelPortableReview: Object.freeze({route: "portable", action: "cancel", binding: "none", demo: "allow", phase: "panel", identity: false}),
+    openDemo: Object.freeze({route: "demo", action: "open", binding: "none", demo: "open", phase: "panel", identity: false}),
+    openDemoProfile: Object.freeze({route: "demo", action: "openProfile", binding: "none", demo: "replace", phase: "panel", identity: false}),
+    leaveDemo: Object.freeze({route: "demo", action: "leave", binding: "none", demo: "close", phase: "panel", identity: false}),
+    ready: Object.freeze({route: "read", action: "read", binding: "none", demo: "ignore", phase: "read", identity: false}),
+    refresh: Object.freeze({route: "read", action: "read", binding: "none", demo: "leave", phase: "read", identity: false}),
+    selectDevice: Object.freeze({route: "read", action: "select", binding: "none", demo: "leave", phase: "read", identity: false}),
+    openProfileDraftHistory: Object.freeze({route: "view", action: "openHistory", binding: "none", demo: "allow", phase: "view", identity: false}),
+    closeProfileDraftHistory: Object.freeze({route: "view", action: "closeHistory", binding: "none", demo: "allow", phase: "view", identity: false}),
+    chooseKeyboard: Object.freeze({route: "shell", action: "chooseKeyboard", binding: "none", demo: "shell-leave", phase: "shell", identity: false}),
+    forgetKeyboard: Object.freeze({route: "shell", action: "forgetKeyboard", binding: "none", demo: "allow", phase: "shell", identity: false}),
+    setTheme: Object.freeze({route: "shell", action: "setTheme", binding: "none", demo: "allow", phase: "shell", identity: false}),
+    downloadRecovery: Object.freeze({route: "shell", action: "downloadRecovery", binding: "none", demo: "allow", phase: "shell", identity: false}),
+    useRecovery: Object.freeze({route: "shell", action: "useRecovery", binding: "none", demo: "refuse", phase: "shell", identity: false}),
+    deleteRecovery: Object.freeze({route: "shell", action: "deleteRecovery", binding: "none", demo: "allow", phase: "shell", identity: false}),
+    validateMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    // The Keyboard screen's Diagnostics opened: each half's flash pauses, a
+    // background read (flash-pauses.js) skipped while anything runs.
+    readFlashPauses: Object.freeze({route: "diagnose", action: "readFlashPauses", binding: "none", demo: "ignore", phase: "diagnose", identity: false}),
+});
+
+/** @param {string | null | undefined} type @returns {Readonly<Control> | undefined} */
+function panelControl(type) {
+    return type && Object.hasOwn(CONTROLS, type) ? CONTROLS[/** @type {import('../../contracts/messages.js').ControlType} */ (type)] : undefined;
+}
+/** @param {Route} route */
+const controlsOn = (route) => new Set(Object.entries(CONTROLS).filter(([, control]) => control.route === route).map(([type]) => type));
+
+// Only the active write states warn on closing a browser tab. A portable
+// control may merely stage a draft, choose a file or export; it is not a write.
+/** @param {{applyRunning?: boolean, service?: {phase?: import("../../contracts/model.js").PhaseId}}} session */
+function writingProfile(session) {
+    return Object.values(CONTROLS).some(control => control.phase === "apply" && session.applyRunning
+        || control.phase === "restore" && Boolean(PHASE_WORDS[session.service?.phase || PHASE.IDLE]?.writes));
+}
+module.exports = {CONTROLS, panelControl, controlsOn, writingProfile};

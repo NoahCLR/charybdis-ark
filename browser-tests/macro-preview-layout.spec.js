@@ -1,0 +1,48 @@
+// @ts-check
+"use strict";
+const {test, expect} = require("@playwright/test");
+const {openPreview} = require("./shell-page");
+
+for (const theme of ["dark", "light"]) {
+    test(`long literal macro text stays inside its row (${theme})`, async ({page}) => {
+        await openPreview(page, theme);
+        await page.evaluate(async () => {
+            const store = await import("/webview/store.mjs");
+            // Macro memory with 400 bytes free, so the long texts show their
+            // error feedback beside the field.
+            const model = store.getModel();
+            store.setModel({...model, macroBank: {...model.macroBank, free: 400}});
+            store.state.screen = "macros"; store.state.macroSlot = "MACRO_17"; store.render();
+            window.__posted.length = 0;
+        });
+        await page.locator('[data-insert-kind="text"]').click();
+        const pastedCode = "Skip to content\nNoahCLR\ncharybdis-4x6\n".repeat(80) + "{\n.keycode = CUSTOM_KEY_0,\n}";
+        for (const text of ["word ".repeat(80), "x".repeat(1200), pastedCode]) {
+            const field = page.locator("[data-step-text]");
+            await field.fill(text);
+            await field.dispatchEvent("change");
+            await expect(field).toHaveValue(text);
+            const bounds = await field.evaluate(node => {
+                const box = node.getBoundingClientRect(), row = node.closest(".macro-step").getBoundingClientRect();
+                const controls = node.closest(".macro-step").querySelector(".macro-step-head").getBoundingClientRect();
+                const feedbackNode = /** @type {HTMLElement} */ (document.querySelector("[data-macro-feedback]")), feedback = feedbackNode.getBoundingClientRect();
+                return {fieldContained: box.top >= row.top && box.bottom <= row.bottom && box.left >= row.left && box.right <= row.right,
+                    controlsContained: controls.left >= row.left && controls.right <= row.right,
+                    controlsSeparate: controls.bottom <= box.top, feedbackSeparate: feedbackNode.hidden || row.bottom <= feedback.top,
+                    preservesWhitespace: getComputedStyle(node).whiteSpace === "pre-wrap", scrollsInside: getComputedStyle(node).overflowY !== "visible"};
+            });
+            expect(bounds).toEqual({fieldContained: true, controlsContained: true, controlsSeparate: true,
+                feedbackSeparate: true, preservesWhitespace: true, scrollsInside: true});
+        }
+        await expect(page.locator("[data-macro-feedback]")).toContainText("Shorten it or clear another macro");
+        await expect(page.locator("[data-macro-feedback]")).not.toContainText("not a key");
+        const updates = await page.evaluate(() => window.__posted.filter(message => message.type === "updateMacro"));
+        expect(updates).toHaveLength(1); // Only the 400-byte prose fits.
+        await page.locator("[data-raw-toggle]").click();
+        await page.locator("[data-raw-payload]").fill(pastedCode);
+        await page.locator("[data-raw-payload]").dispatchEvent("change");
+        await expect(page.locator("[data-macro-feedback]")).toContainText(".keycode = CUSTOM_KEY_0 is not a key");
+        await expect(page.locator("[data-step-text]")).toBeDisabled();
+        expect(await page.evaluate(() => window.__posted.filter(message => message.type === "updateMacro").length)).toBe(1);
+    });
+}

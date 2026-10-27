@@ -235,3 +235,57 @@ test("manual disconnect permits a clean reconnect", async () => {
 
     await coordinator.close();
 });
+
+test("a soft timeout keeps the connection, and the late reply never answers the next request", async () => {
+    const unexpected = [];
+    const adapter = new FakeDeviceAdapter();
+    const coordinator = new DeviceRequestCoordinator(adapter, {defaultTimeoutMs: 20, onUnexpectedReport: (event) => unexpected.push(event)});
+    const connection = await coordinator.connect("fake-charybdis");
+    const fake = adapter.lastConnection();
+    // Both requests match any reply with the same first byte, as two reads of
+    // the same kind would without request IDs.
+    const missed = connection.request(report(0x51, 1), {softTimeout: true});
+    const queued = connection.request(report(0x51, 2));
+    await assert.rejects(missed, (error) => error.code === LIVE_LINK_ERROR_CODES.TIMEOUT && error.soft === true);
+    assert.equal(connection.connected, true, "a missed background read is no disconnect");
+    assert.equal(fake.closed, false);
+    await tick();
+    assert.deepEqual(fake.writes.map((value) => value[31]), [1, 2], "the queued request goes out");
+
+    // The keyboard answers late, in order: the first reply is the missed one's.
+    fake.emitReport(report(0x51, 1));
+    await tick();
+    assert.equal(unexpected.length, 1, "the late reply is set aside");
+    assert.match(unexpected[0].reason, /timed out/);
+    fake.emitReport(report(0x51, 2));
+    assert.equal((await queued)[31], 2, "the next request gets its own reply");
+    await coordinator.close();
+});
+
+test("a late reply after a soft timeout with nothing active is set aside, and a strict timeout still disconnects", async () => {
+    const unexpected = [];
+    const adapter = new FakeDeviceAdapter();
+    const coordinator = new DeviceRequestCoordinator(adapter, {defaultTimeoutMs: 20, onUnexpectedReport: (event) => unexpected.push(event)});
+    const connection = await coordinator.connect("fake-charybdis");
+    const fake = adapter.lastConnection();
+    await rejectsWithCode(connection.request(report(0x61), {softTimeout: true}), LIVE_LINK_ERROR_CODES.TIMEOUT);
+    fake.emitReport(report(0x61));
+    await tick();
+    assert.equal(unexpected.length, 1);
+    assert.equal(connection.connected, true);
+    await rejectsWithCode(connection.request(report(0x62)), LIVE_LINK_ERROR_CODES.TIMEOUT);
+    assert.equal(connection.connected, false);
+});
+
+test("abandoning a connection closes it with the given cause", async () => {
+    const adapter = new FakeDeviceAdapter();
+    const coordinator = new DeviceRequestCoordinator(adapter, {defaultTimeoutMs: 20});
+    const connection = await coordinator.connect("fake-charybdis");
+    const reasons = [];
+    connection.onDisconnect((reason) => reasons.push(reason));
+    const cause = Object.assign(new Error("gone quiet"), {code: LIVE_LINK_ERROR_CODES.TIMEOUT});
+    await connection.abandon(cause);
+    assert.equal(connection.connected, false);
+    assert.equal(adapter.lastConnection().closed, true);
+    assert.deepEqual(reasons, [cause]);
+});

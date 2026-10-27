@@ -1,294 +1,384 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {captureProfile, restoreProfile, fingerprint, summary, validateSnapshot} = require("../../core/session/portable-profile-session");
-const {legacyDocument: document} = require("../fixtures/portable-profile");
-const pd = require("../fixtures/pd-profile");
-const {changedRanges, viaStorageDigest} = require("../../core/protocol/via-storage-v1");
-const {decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
+const {snapshotProfile, restoreProfile, fingerprint, validateSnapshot} = require("../../core/session/portable-profile-session");
+const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {encodeSettings} = require("../../core/schema/settings-domain-v1");
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 15, featureFlags: 1 << 12, actionAbiDigest: 0xeb80829c, candidateChunkMax: 20, viaMacroBytes: 7191};
-function fixture() {
-    const source = document(), targetDocument = structuredClone(source), events = [];
-    targetDocument.layers[0][0] ^= 1; targetDocument.macros[0] = Buffer.from("hello").toString("base64");
-    const target = validateSnapshot(targetDocument), identity = {profile: "base", storageGeneration: 4, storageDigest: 5, settingsCrc: 6, settingsDigest: 7};
-    const held = validateSnapshot(source), storage = {layout: held.layout, macros: held.macros};
-    const capture = async () => ({document: source, fingerprint: fingerprint(source), summary: summary(source), identity, storage});
-    const storageDigest = viaStorageDigest(target);
-    const operations = {capture, readIdentity: async () => identity, readCandidate: async () => ({state: 0}),
-        createCoordinator: () => ({upload: async (bytes, options) => {events.push("stage"); await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};}, commit: async (id, options) => {events.push("commit"); await options.afterDecision();}}),
-        createViaCoordinator: () => ({stage: async options => {events.push("via stage"); assert.equal(options.generation, 5); assert.equal(options.digest, storageDigest);}, waitUntilAccepted: async () => {events.push("via accepted");}, abort: async () => {events.push("via abort");}}),
-        rollForwardLocal: async (connection, actualTarget, base, layoutRanges, macroRanges) => {events.push("local roll-forward"); assert.equal(actualTarget.profile.equals(target.profile), true); assert.equal(layoutRanges.length, 1); assert.equal(macroRanges.length, 1);},
-        waitStorage: async () => {events.push("both halves"); return {ready: true, generation: 5, digest: storageDigest};},
-        readStorage: async () => ({ready: true, generation: 5, digest: storageDigest}),
-        readStored: async (connection, command, length, options = {}) => (command === 0x12 ? target.layout : target.macros).subarray(options.startOffset || 0, (options.startOffset || 0) + length),
-        readProfile: async () => ({activeKind: 1, activeDigest: require("../../core/schema/profile-blob-v1").fnv1a32(target.profile), committedDigest: require("../../core/schema/profile-blob-v1").fnv1a32(target.profile), stateFlags: 32, conflictCount: 0})};
-    const options = {operations, expectedFingerprint: fingerprint(source), saveRecovery: async backup => {assert.equal(fingerprint(backup), fingerprint(source)); events.push("backup"); return "/recovery.json";}};
-    return {source, targetDocument, target, identity, storage, events, operations, options};
+const {PROFILE_CANDIDATE_V1: C, CANDIDATE_ERROR: E} = require("../../core/protocol/profile-candidate-v1");
+const {CandidateUploadCoordinator} = require("../../core/session/candidate-upload-coordinator");
+const {fakeKeyboard} = require("../fixtures/fake-keyboard");
+const {capabilities, fixture} = require("../fixtures/portable-restore");
+const {document32: document, backup32, CAPABILITIES_32} = require("../fixtures/pointing-slots-32");
+const {profileMacros, editLayers, editMacros} = require("../fixtures/profile-document");
+const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
+const {APPLY_VERDICTS} = require("../../core/session/interruption");
+const candidateMutations = f => f.keyboard.mutations.filter(r => [7, 9].includes(r[0]));
+const payloadReads = f => f.keyboard.requests.filter(r => r[0] === 8 && [4, 5, 6].includes(r[2]));
+function assertTarget(f) {
+    assert.deepEqual(f.keyboard.local.profile, f.target.candidate);
+    assert.deepEqual(f.keyboard.slave.profile, f.target.candidate);
+    assert.deepEqual(f.keyboard.active, f.target.candidate);
+    assert.ok(f.keyboard.mutations.every(r => [7, 9].includes(r[0]) && r[1] === 0 &&
+        [C.VALUE_BEGIN, C.VALUE_STREAM_CHUNK, C.VALUE_CHUNK, C.VALUE_REUSE, C.VALUE_VALIDATE, C.VALUE_COMMIT, C.VALUE_ABORT].includes(r[2])), "only Profile Wire candidate commands are written");
+    assert.ok(f.keyboard.requests.every(r => ![0x01, 0x02, 0x0c, 0x0e, 0x11, 0x12].includes(r[0])), "no VIA reads");
 }
-test("restore saves recovery first, restores both stores, then verifies complete readback", async () => {
+function stall(f, t, extra = {}) {
+    t.mock.timers.enable({apis: ["Date"], now: 0});
+    Object.assign(f.keyboard.faults, {stallCommit: true, ...extra});
+    f.options.sleep = async () => t.mock.timers.tick(120000);
+}
+// What a person reads about an Apply cut short: its verdict first, whole
+// sentences, none of the transport's or the coordinators' words.
+const DEVELOPER_TEXT = /DevSrvsID|Device \S+ disconnected|Candidate|candidate|mutation|ambiguous|wait window|decision/;
+/** @param {any} error @param {keyof typeof APPLY_VERDICTS} saved */
+function saysVerdict(error, saved) {
+    assert.equal(error.saved, saved);
+    assert.equal(error.verdict, APPLY_VERDICTS[saved]);
+    assert.ok(error.message.startsWith(`${APPLY_VERDICTS[saved]} `), error.message);
+    assert.doesNotMatch(error.message, DEVELOPER_TEXT);
+    for (const sentence of error.message.split(/(?<=[.!?])\s+/)) assert.match(sentence, /^[A-Z(]/, `"${sentence}" starts lowercase in: ${error.message}`);
+    return true;
+}
+// The keyboard restarting under a request, as the real transport says it.
+const unplug = keyboard => {
+    keyboard.faults.disconnected = true;
+    throw liveLinkError(LIVE_LINK_ERROR_CODES.DISCONNECTED, "Device DevSrvsID:4295254514 disconnected.", {deviceId: "DevSrvsID:4295254514"});
+};
+const lostSaid = error => error.reason === "The keyboard was disconnected or restarted." && error.message.includes(error.reason)
+    && !/Keep both halves connected/.test(error.message) && !/slave half (kept answering|did not finish)/.test(error.message);
+async function fullUpload(f) {
+    const snapshot = await f.snapshot(); delete snapshot.storage; f.options.baseSnapshot = snapshot;
+}
+test("restore saves recovery first, uploads one candidate and verifies one generation on both halves", async () => {
     const f = fixture(), views = [];
     f.options.onApplyProgress = view => views.push(view);
-    const result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
-    const reached = [...new Set(views.map(view => view.current))];
-    assert.deepEqual(reached, ["check", "backup", "upload", "stage", "peer", "converge", "local", "verify"],
-        "each boundary the fake coordinators pass through is reported, in order");
+    const result = await f.restore();
+    assert.deepEqual([...new Set(views.map(view => view.current))], ["check", "backup", "upload", "validate", "slave", "converge", "verify"]);
     assert.equal(views.at(-1).state, "done");
     assert.equal(result.fingerprint, fingerprint(f.targetDocument));
-    assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", layoutBytes: 28, macroBytes: 28, viaConfigReports: 1, layoutReports: 3, macroReports: 3});
-    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward", "both halves"]);
+    assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", profileBytes: f.target.candidate.length});
+    assert.equal(result.status.activeGeneration, 5);
+    assert.equal(result.status.committedGeneration, 5);
+    assert.equal(result.status.slaveGeneration, 5);
+    assert.equal(result.status.lastCommittedTransactionId, 1);
+    assertTarget(f);
+    assert.deepEqual(f.keyboard.events, ["backup", "begin", "validated", "commit", "decision", "activated"]);
+    assert.equal((await f.snapshot()).fingerprint, result.fingerprint);
 });
-test("restore hands the host's sleep to every wait on the way", async () => {
-    const f = fixture(), sleep = async () => {}, seen = [];
-    const {createCoordinator, createViaCoordinator, waitStorage, readIdentity, capture} = f.operations;
-    Object.assign(f.operations, {
-        createCoordinator: (connection, options) => {seen.push(["upload", options.sleep]); return createCoordinator(connection, options);},
-        createViaCoordinator: (connection, options) => {seen.push(["via", options.sleep]); return createViaCoordinator(connection, options);},
-        waitStorage: (connection, ids, options) => {seen.push(["storage", options?.sleep]); return waitStorage(connection, ids, options);},
-        readIdentity: (connection, ids, options) => {seen.push(["identity", options?.sleep]); return readIdentity(connection, ids, options);},
-        capture: (...args) => {seen.push(["capture", args[6]?.sleep]); return capture(...args);},
-    });
-    await restoreProfile({}, {}, capabilities, f.targetDocument, {...f.options, sleep});
-    assert.deepEqual(seen.map(([name]) => name), ["capture", "upload", "via", "identity", "storage"]);
-    assert.ok(seen.every(([, given]) => given === sleep), "each wait is given the host's sleep");
+test("restore uses the shell's sleep for candidate polling", async () => {
+    const f = fixture(), waits = [];
+    f.options.sleep = async ms => {assert.ok(ms > 0); waits.push(ms);};
+    await f.restore(); assert.ok(waits.length > 0); assertTarget(f);
 });
-test("restore verifies and reuses the reviewed snapshot without rereading its complete payload", async () => {
-    const f = fixture();
-    let captures = 0, identityReads = 0;
-    f.operations.capture = async () => {captures++; throw Error("must not capture");};
-    f.operations.readIdentity = async () => {identityReads++; return f.identity;};
-    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), summary: summary(f.source), identity: f.identity, storage: f.storage};
-    const result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
-    assert.equal(captures, 0);
-    assert.equal(identityReads, 2);
-    assert.equal(result.performance.baseSource, "verified-cache");
-    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward", "both halves"]);
+test("restore verifies and reuses the reviewed snapshot without rereading payload bytes", async () => {
+    const f = fixture(); f.options.baseSnapshot = await f.snapshot(); f.keyboard.requests.length = 0;
+    const result = await f.restore();
+    assert.equal(payloadReads(f).length, 0); assert.equal(result.performance.baseSource, "verified-cache"); assertTarget(f);
 });
-test("a changed device identity rejects a cached recovery base before saving or staging", async () => {
-    const f = fixture();
-    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), summary: summary(f.source), identity: f.identity, storage: f.storage};
-    f.operations.readIdentity = async () => ({...f.identity, storageGeneration: f.identity.storageGeneration + 1});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /changed/);
-    assert.deepEqual(f.events, []);
+test("a changed profile or settings identity rejects the cached base before recovery and writes", async () => {
+    for (const changed of ["profile", "settings"]) {
+        const f = fixture(); f.options.baseSnapshot = await f.snapshot();
+        f.keyboard.faults.afterRequest = (r, response) => {
+            if (r[0] !== 8) return;
+            if (changed === "profile" && r[2] === 2 && r.readUInt16LE(4) === 1) response.writeUInt32LE(5, 7);
+            if (changed === "settings" && r[2] === 7) {
+                const settings = validateSnapshot(f.source).settings; settings.values[0]++;
+                const bytes = encodeSettings(settings), page = r.readUInt16LE(4);
+                if (!page) {response.writeUInt32LE(crc32(bytes), 11); response.writeUInt32LE(fnv1a32(bytes), 15);}
+                else bytes.copy(response, 7, (page - 1) * 25, page * 25);
+            }
+        };
+        await assert.rejects(f.restore(), error => error.code === "PROFILE_CHANGED" && error.step === "check" && error.saved === "none");
+        assert.deepEqual(f.keyboard.mutations, []); assert.deepEqual(f.keyboard.events, []);
+    }
 });
 test("stale review and failed recovery save perform no device mutations", async () => {
     const f = fixture(); f.options.expectedFingerprint = "stale";
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /changed/); assert.deepEqual(f.events, []);
+    await assert.rejects(f.restore(), /changed/);
     f.options.expectedFingerprint = fingerprint(f.source); f.options.saveRecovery = async () => {throw Error("disk full");};
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /disk full/); assert.deepEqual(f.events, []);
+    await assert.rejects(f.restore(), /disk full/); assert.deepEqual(f.keyboard.mutations, []);
 });
-test("changes after acquiring the profile lease prevent commit", async () => {
+test("no recovery writer or an empty recovery path refuses without mutations", async () => {
+    for (const saveRecovery of [undefined, async () => null]) {
+        const f = fixture(); f.options.saveRecovery = saveRecovery;
+        await assert.rejects(f.restore(), error => error.code === "RECOVERY_REQUIRED" && error.saved === "none");
+        assert.deepEqual(f.keyboard.mutations, []);
+    }
+});
+test("changes after acquiring the lease abort before bytes or commit", async () => {
     const f = fixture();
-    f.operations.readIdentity = async () => ({...f.identity, storageDigest: 99});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /changed/);
-    assert.deepEqual(f.events, ["backup", "stage"]);
-});
-test("a failure before the commit is sent reports that nothing was saved, not a recovery import", async () => {
-    const f = fixture(); f.operations.createViaCoordinator = () => ({stage: async () => {throw Error("disconnected");}, abort: async () => {}});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
-        && /Nothing was saved/.test(error.message) && error.message.includes("disconnected") && !error.message.includes("/recovery.json"));
-    assert.deepEqual(f.events, ["backup", "stage"]);
-});
-// The coordinator for a commit that was sent and then stopped answering, as
-// on 2026-09-23. Its abort resolves only when the keyboard returns to idle.
-function stalledCommit(f, {abortConfirmed}) {
-    f.operations.createCoordinator = () => ({
-        upload: async (bytes, options) => {f.events.push("stage"); await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};},
-        commit: async () => {f.events.push("commit"); throw Object.assign(Error("Candidate commit made no observable progress within its firmware-aware wait window."), {code: "COMMIT_OUTCOME_AMBIGUOUS"});},
-        abort: async () => {f.events.push("abort"); if (!abortConfirmed) throw Object.assign(Error("could not cancel"), {code: "ABORT_FAILED"}); return {transactionId: 1, status: {state: 0}};},
-    });
-}
-test("a failure carries the step it happened in, why, and what was saved", async () => {
-    const f = fixture(), views = [];
-    f.options.onApplyProgress = view => views.push(view);
-    f.operations.createCoordinator = () => ({
-        upload: async (bytes, options) => {await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};},
-        commit: async () => {throw Object.assign(Error("Candidate commit made no observable progress."), {code: "COMMIT_OUTCOME_AMBIGUOUS", progress: {peer: {lastStatusName: "BUSY"}}});},
-        abort: async () => ({transactionId: 1, status: {state: 0}}),
-    });
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
-        && error.step === "peer" && error.stepLabel === "Copy the profile to the other half"
-        && error.reason === "The other half kept answering that it was busy." && error.saved === "none");
-    assert.equal(views.at(-1).state, "failed");
-    assert.equal(views.at(-1).failure.step, "peer");
-
-    const early = fixture();
-    early.operations.readIdentity = async () => ({...early.identity, storageDigest: 99});
-    early.options.baseSnapshot = {document: early.source, fingerprint: fingerprint(early.source), summary: summary(early.source), identity: early.identity, storage: early.storage};
-    await assert.rejects(restoreProfile({}, {}, capabilities, early.targetDocument, early.options), error => error.code === "PROFILE_CHANGED"
-        && error.step === "check" && error.saved === "none", "a refusal before the upload changed nothing");
-});
-test("a sent commit the keyboard then cancels is reported as not saved", async () => {
-    const f = fixture(); stalledCommit(f, {abortConfirmed: true});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
-        && /Nothing was saved/.test(error.message) && /no observable progress/.test(error.message) && !/Unplug/.test(error.message));
-    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "abort"], "the keyboard cancels the staged keys and macros with the candidate");
-});
-test("a sent commit the keyboard never confirms cancelling stays an interrupted restore with its recovery file", async () => {
-    const f = fixture(); stalledCommit(f, {abortConfirmed: false});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json")
-        && !/finishes from the other half's copy/.test(error.message), "no decision was seen, so the keyboard may not finish it");
-});
-test("a peer that never confirmed the cancel adds restart guidance", async () => {
-    const f = fixture(); stalledCommit(f, {abortConfirmed: true});
-    f.operations.readProfile = async () => ({peerCleanupPending: true});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
-        && /Unplug the USB cable \(not the cable between the halves\)/.test(error.message));
-    f.operations.readProfile = async () => {throw Error("unreadable");};
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED" && !/Unplug/.test(error.message),
-        "an unreadable status only loses the hint");
-});
-test("an active target with the other half out of sight is a completed save, reported as such", async () => {
-    const f = fixture();
-    const read = f.operations.readProfile;
-    f.operations.readProfile = async () => ({...await read(), stateFlags: 0});
-    const result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
-    assert.equal(result.peerUnseen, true, "the keyboard switched only after the other half confirmed");
-    f.operations.readProfile = read;
-    assert.equal((await restoreProfile({}, {}, capabilities, f.targetDocument, f.options)).peerUnseen, false);
-    // The other half being out of sight never excuses a wrong active profile.
-    f.operations.readProfile = async () => ({...await read(), stateFlags: 0, activeDigest: 1});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /did not confirm the imported profile/);
-});
-test("a post-decision local-write interruption preserves the peer recovery copy", async () => {
-    const f = fixture();
-    f.operations.rollForwardLocal = async () => {f.events.push("local roll-forward"); throw Error("disconnected");};
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json")
-        && /finishes from the other half's copy/.test(error.message), "after the decision the keyboard finishes the save itself");
-    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward"]);
-});
-test("mismatching final hardware readback fails verification", async () => {
-    const f = fixture(); f.operations.readStored = async () => Buffer.alloc(1);
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /readback/);
-});
-test("a concurrent change outside the edited blocks fails whole-store verification", async () => {
-    const f = fixture();
-    f.operations.readStorage = async () => ({ready: true, generation: 8, digest: viaStorageDigest(f.target) + 1});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /confirm/);
-});
-test("recovery retries allow an incomplete base and prove the repaired target", async () => {
-    const f = fixture();
-    f.operations.capture = async (connection, ids, caps, progress, candidate, allowIncomplete) => {
-        assert.equal(allowIncomplete, true);
-        const base = validateSnapshot(f.source);
-        return {document: {format: "charybdis-recovery-capture", version: 1, keyboard: "charybdis-4x6", actionAbiDigest: capabilities.actionAbiDigest,
-            profile: base.profile.toString("base64"), layout: base.layout.toString("base64"), macros: base.macros.toString("base64")}, incomplete: true, fingerprint: "interrupted", summary: null, identity: f.identity};
+    f.keyboard.faults.afterRequest = (r, response, keyboard) => {
+        if (keyboard.events.includes("begin") && r[0] === 8 && r[2] === 2 && r.readUInt16LE(4) === 1) response.writeUInt32LE(5, 7);
     };
-    f.options.expectedFingerprint = "interrupted";
-    f.options.saveRecovery = async value => {assert.equal(value.format, "charybdis-recovery-capture"); return "/interrupted.diagnostic.json";};
-    const restored = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
-    assert.equal(restored.fingerprint, fingerprint(f.targetDocument));
+    await assert.rejects(f.restore(), /changed/);
+    assert.deepEqual(candidateMutations(f).map(r => r[2]), [C.VALUE_BEGIN, C.VALUE_ABORT]);
+    assert.deepEqual(f.keyboard.active, validateSnapshot(f.source).candidate);
 });
-test("older firmware is rejected before any device read or write", async () => {
-    const connection = {request: () => {throw Error("must not access device");}};
-    await assert.rejects(captureProfile(connection, {}, {compiledLayerCount: 5}), error => error.code === "FIRMWARE_UPDATE_REQUIRED");
-});
-// The commit marker became durable, then a status read failed before the app
-// saw CONVERGING_PEER. The app asks the keyboard to cancel, which the keyboard
-// refuses after its decision; it never cancels the other half's staged keys
-// and macros itself, which are then the recovery copy the keyboard finishes from.
-test("an unobserved decision is left to the keyboard to finish", async () => {
+test("validation refusal cancels the candidate before commit and leaves the old generation", async () => {
     const f = fixture();
-    let durable = false;
-    f.operations.createCoordinator = () => ({
-        upload: async (bytes, options) => {await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};},
-        commit: async () => {durable = true; throw Object.assign(Error("Candidate status could not be decoded."), {code: "TRANSPORT_OUTCOME_AMBIGUOUS"});},
-        abort: async () => {assert.equal(durable, true); f.events.push("abort refused"); throw Object.assign(Error("invalid state"), {code: "ABORT_FAILED"});},
-    });
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json"));
-    assert.deepEqual(f.events, ["backup", "via stage", "abort refused"]);
+    f.keyboard.faults.afterRequest = (r, response) => {if (r[0] === 7 && r[2] === C.VALUE_VALIDATE) {response[5] = 4; response[6] = E.INVALID_STATE;}};
+    await assert.rejects(f.restore());
+    assert.equal(f.keyboard.events.includes("commit"), false);
+    assert.equal(f.keyboard.events.at(-1), "aborted");
+    assert.deepEqual(f.keyboard.active, validateSnapshot(f.source).candidate);
 });
-
-// A valid bank whose bytes after the 64th macro are not zero, as a writer
-// that shortened the macros leaves it. The document cannot carry those bytes.
-function tailedBank(source) {
-    const held = validateSnapshot(source), macros = Buffer.from(held.macros);
-    macros[macros.length - 20] = 0x41;
-    return {layout: Buffer.from(held.layout), macros};
+test("a failure carries its real slave-half BUSY reason and the step where it happened", async t => {
+    const f = fixture(), views = []; stall(f, t); f.options.onApplyProgress = view => views.push(view);
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && error.step === "slave"
+        && error.stepLabel === "Copy the profile to the slave half" && error.reason === "The slave half stopped handling requests from the master half." && error.saved === "none");
+    assert.equal(views.at(-1).state, "failed"); assert.equal(views.at(-1).failure.step, "slave");
+});
+test("a sent commit the keyboard cancels is reported as not saved", async t => {
+    const f = fixture(); stall(f, t);
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && saysVerdict(error, "none") && error.cause?.code === "COMMIT_OUTCOME_AMBIGUOUS"
+        && /^Nothing was saved: the keyboard kept the profile it had\. The slave half stopped handling requests from the master half\.$/.test(error.message));
+    assert.equal(f.keyboard.durable, false); assert.equal(f.keyboard.events.at(-1), "aborted");
+});
+test("a sent commit without a confirmed cancel keeps its recovery copy and unknown outcome", async t => {
+    const f = fixture(); stall(f, t, {abortRejected: true});
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && saysVerdict(error, "unknown") && error.message.includes("/recovery.json")
+        && /Keep both halves connected\./.test(error.message), "still connected, the keyboard needs both halves to finish");
+    assert.equal(f.keyboard.events.at(-1), "abort refused");
+});
+test("unconfirmed slave-half cleanup adds restart guidance; unreadable status loses only that hint", async t => {
+    const f = fixture(); stall(f, t, {cleanupPending: true});
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && saysVerdict(error, "none") && /Unplug the USB cable from the master half \(not the cable between the halves\)/.test(error.message));
+    const g = fixture(); g.keyboard.faults.stallCommit = true; g.options.sleep = f.options.sleep;
+    g.keyboard.faults.beforeRequest = (r, keyboard) => {if (keyboard.events.includes("aborted") && r[0] === 8 && r[2] === 2) throw Error("unreadable");};
+    await assert.rejects(g.restore(), error => error.code === "RESTORE_NOT_SAVED" && !/Unplug/.test(error.message));
+});
+test("an active target with the slave half out of sight is saved, while wrong digest, generation or transaction fails", async () => {
+    const f = fixture(); f.keyboard.faults.slaveUnseen = true;
+    assert.equal((await f.restore()).slaveUnseen, true); assertTarget(f);
+    for (const [page, offset] of [[0, 12], [1, 0], [1, 17]]) {
+        const g = fixture();
+        g.keyboard.faults.afterRequest = (r, response, keyboard) => {
+            if (keyboard.events.includes("activated") && r[0] === 8 && r[2] === 2 && r.readUInt16LE(4) === page) response[7 + offset] ^= 1;
+        };
+        await assert.rejects(g.restore(), /did not confirm the imported profile/);
+    }
+});
+test("an observed decision followed by disconnect needs no roll-forward from Ark on reconnect", async () => {
+    const f = fixture(); f.keyboard.faults.stallConvergence = true;
+    let seen = false;
+    f.options.onApplyProgress = view => {if (view.current === "converge") seen = true;};
+    f.keyboard.faults.beforeRequest = (r, keyboard) => {if (seen && keyboard.durable) unplug(keyboard);};
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && saysVerdict(error, "decided") && lostSaid(error)
+        && error.message.includes("/recovery.json"));
+    assert.equal(f.keyboard.events.includes("aborted"), false);
+    delete f.keyboard.faults.beforeRequest; f.keyboard.recover(); assertTarget(f);
+    assert.equal((await f.snapshot()).fingerprint, fingerprint(f.targetDocument));
+});
+test("an unobserved durable decision refuses abort and firmware completes the same profile", async () => {
+    const f = fixture(); f.keyboard.faults.disconnectAfterDecision = true; f.keyboard.faults.stallConvergence = true;
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && saysVerdict(error, "unknown") && lostSaid(error) && error.message.includes("/recovery.json"));
+    assert.equal(f.keyboard.durable, true); f.keyboard.faults.disconnected = false;
+    await assert.rejects(new CandidateUploadCoordinator(f.connection, {requestIds: f.ids, sleep: async () => {}}).abort(1));
+    assert.equal(f.keyboard.events.at(-1), "abort refused");
+    assert.deepEqual(f.keyboard.active, validateSnapshot(f.source).candidate);
+    f.keyboard.recover(); assertTarget(f);
+});
+for (const error of [E.POSTCOMMIT_AUTHORITY_LOST, E.PEER_COMMIT_CONFLICT]) {
+    test(`post-decision authority failure ${error} requires restart without inventing an input fence`, async () => {
+        const f = fixture(); f.keyboard.faults.authorityFailed = {error};
+        await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE" && saysVerdict(failure, "unknown")
+            && failure.cause.code === "AUTHORITY_FAILED" && /Unplug the USB cable/.test(failure.message)
+            && /keeps running a complete profile/.test(failure.message) && !/types nothing|ACCEPT/.test(failure.message));
+        assert.equal(f.keyboard.events.includes("activated"), false);
+        assert.deepEqual(f.keyboard.active, validateSnapshot(f.source).candidate);
+    });
 }
+test("lost replies retain ambiguous upload ownership; a commit is safe only after confirmed cancel", async () => {
+    for (const value of [C.VALUE_STREAM_CHUNK, C.VALUE_COMMIT]) {
+        const f = fixture(); await fullUpload(f); f.keyboard.faults.loseReply = value;
+        if (value === C.VALUE_COMMIT) f.keyboard.faults.stallCommit = true;
+        await assert.rejects(f.restore(), error => saysVerdict(error, "none") && (value === C.VALUE_STREAM_CHUNK ? error.code === "TRANSPORT_OUTCOME_AMBIGUOUS" && error.cause.ambiguous : error.code === "RESTORE_NOT_SAVED"));
+        if (value === C.VALUE_STREAM_CHUNK) {
+            assert.equal(f.keyboard.events.at(-1), "begin");
+            await new CandidateUploadCoordinator(f.connection, {requestIds: f.ids}).abort(1);
+        }
+        assert.equal(f.keyboard.events.at(-1), "aborted"); assert.equal(f.keyboard.durable, false);
+    }
+});
+// The keyboard restarted at each point of an Apply (keyboard session,
+// 2026-10-24): the notice says the verdict, then that the connection went.
+test("an Apply cut short by a lost connection says its verdict first and the disconnect as the reason", async () => {
+    for (const [point, saved, trigger] of /** @type {const} */ ([
+        ["before the upload", "none", (r, keyboard) => keyboard.events.includes("backup") && r[0] === 8 && r[2] === C.VALUE_STATUS],
+        ["during the upload", "none", (r) => r[0] === 7 && r[2] === C.VALUE_STREAM_CHUNK],
+        ["during the copy to the slave half", "unknown", (r, keyboard) => keyboard.events.includes("commit") && r[0] === 8],
+    ])) {
+        const f = fixture(); await fullUpload(f);
+        f.keyboard.faults.stallCommit = true;
+        f.keyboard.faults.beforeRequest = (r, keyboard) => {if (trigger(r, keyboard)) unplug(keyboard);};
+        const views = []; f.options.onApplyProgress = view => views.push(view);
+        await assert.rejects(f.restore(), error => saysVerdict(error, saved) && lostSaid(error) && error.cause?.code !== undefined, point);
+        assert.equal(views.at(-1).failure.reason, "The keyboard was disconnected or restarted.", `${point}: the bar gives the same reason`);
+        assert.equal(views.at(-1).failure.verdict, APPLY_VERDICTS[saved]);
+        assert.equal(f.keyboard.durable, false, `${point}: nothing was saved`);
+    }
+});
+test("an Apply whose keyboard stopped answering before the upload says nothing was saved, without the transport's words", async () => {
+    const f = fixture();
+    f.keyboard.faults.beforeRequest = (r, keyboard) => {
+        if (keyboard.events.includes("backup") && r[0] === 8 && r[2] === C.VALUE_STATUS) throw liveLinkError(LIVE_LINK_ERROR_CODES.TIMEOUT, "Device DevSrvsID:1 did not respond within 1000 ms.", {timeoutMs: 1000});
+    };
+    await assert.rejects(f.restore(), error => saysVerdict(error, "none") && error.reason === "The keyboard stopped answering."
+        && error.message === "Nothing was saved: the keyboard kept the profile it had. The keyboard stopped answering." && error.cause.code === "TIMEOUT");
+    assert.deepEqual(f.keyboard.mutations, []);
+});
+test("BUSY admission retries real status without duplicating accepted bytes", async () => {
+    const f = fixture(); await fullUpload(f); f.keyboard.faults.busy = C.VALUE_STREAM_CHUNK;
+    await f.restore(); assertTarget(f);
+    const chunks = candidateMutations(f).filter(r => r[2] === C.VALUE_STREAM_CHUNK);
+    assert.equal(chunks[0].readUInt32LE(5), chunks[1].readUInt32LE(5));
+    assert.equal(chunks.length, Math.ceil(f.target.candidate.length / 20) + 1);
+});
+test("changed settings during a read or a corrupted payload refuses before recovery or writes", async () => {
+    for (const corrupt of ["settings", "payload"]) {
+        const f = fixture(); let settingsReads = 0;
+        f.keyboard.faults.afterRequest = (r, reply) => {
+            if (r[0] !== 8) return;
+            if (corrupt === "payload" && r[2] === 4 && r.readUInt16LE(4) === 1) reply[7] ^= 1;
+            if (corrupt === "settings" && r[2] === 7 && r.readUInt16LE(4) === 0 && ++settingsReads === 2) reply[11] ^= 1;
+        };
+        await assert.rejects(f.restore()); assert.deepEqual(f.keyboard.mutations, []);
+    }
+});
+test("old backups and incompatible capabilities are refused before any report", async () => {
+    const f = fixture();
+    for (const version of [1, 3, 4]) await assert.rejects(restoreProfile(f.connection, f.ids, capabilities, {...f.targetDocument, version}, f.options), {code: "INVALID_PORTABLE_PROFILE"});
+    for (const incompatible of [{...capabilities, compiledLayerCount: 5}, {...capabilities, supportedDomainMask: 15}, {...capabilities, actionAbiDigest: 0x1d3fcacc}])
+        await assert.rejects(snapshotProfile(f.connection, f.ids, incompatible), {code: "FIRMWARE_UPDATE_REQUIRED"});
+    assert.deepEqual(f.keyboard.requests, []);
+});
 function withSetting(source) {
-    const result = structuredClone(source), decoded = validateSnapshot(source);
-    decoded.settings.values[0] += 1;
-    const blob = decodeProfileBlob(decoded.profile);
-    result.profile = encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 64 ? {...domain, payload: encodeSettings(decoded.settings)} : domain)}).toString("base64");
-    return result;
+    const result = structuredClone(source), decoded = validateSnapshot(source); decoded.settings.values[0]++;
+    const blob = decodeProfileBlob(decoded.profile); blob.domains.find(d => d.id === 64).payload = encodeSettings(decoded.settings);
+    result.profile = encodeProfileBlob(blob).toString("base64"); return result;
 }
 const EDITS = {
-    "layout-only": source => {const result = structuredClone(source); result.layers[0][0] ^= 1; return result;},
-    "custom-only": withSetting,
-    "imported macro": source => ({...JSON.parse(JSON.stringify(source)), macros: source.macros.map((slot, index) => index === 3 ? Buffer.from("imported").toString("base64") : slot)}),
+    "layout-only": source => editLayers(structuredClone(source), layers => layers[0][0] ^= 1),
+    "settings-only": withSetting,
+    "macro-only": source => editMacros(structuredClone(source), macros => macros[3] = Buffer.from("imported").toString("base64")),
 };
-const FIXTURES = {
-    legacy: {document, capabilities},
-    "schema-2": {document: pd.document, capabilities: {...capabilities, actionAbiDigest: pd.document().actionAbiDigest, supportedDomainMask: 31}},
-};
-// Both banks start as the keyboard holds them; the fakes apply exactly the
-// ranges the session hands over, the way the staging coordinator and the
-// local VIA writes compare them, and report the whole-bank digest.
-function transfer(fixtureName, editName, {cached = false} = {}) {
-    const {document: make, capabilities: caps} = FIXTURES[fixtureName];
-    const source = make(), targetDocument = EDITS[editName](source), target = validateSnapshot(targetDocument, caps);
-    const raw = tailedBank(source), peer = {layout: Buffer.from(raw.layout), macros: Buffer.from(raw.macros)}, local = {layout: Buffer.from(raw.layout), macros: Buffer.from(raw.macros)};
-    const identity = {profile: "base", storageGeneration: 4, storageDigest: viaStorageDigest(raw), settingsCrc: 6, settingsDigest: 7};
-    const events = [], digest = viaStorageDigest(target);
-    const apply = (bank, ranges, region) => ranges.forEach(range => range.bytes.copy(bank[region], range.offset));
-    const snapshot = {document: source, fingerprint: fingerprint(source), summary: summary(source), identity, storage: raw};
-    const operations = {
-        capture: async () => {events.push("capture"); return snapshot;}, readIdentity: async () => identity, readCandidate: async () => ({state: 0}),
-        createCoordinator: () => ({upload: async (bytes, options) => {await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};}, commit: async (id, options) => {await options.afterDecision();}}),
-        createViaCoordinator: () => ({
-            stage: async ({target: staged, current}) => {for (const region of ["layout", "macros"]) apply(peer, changedRanges(current[region], staged[region]), region);},
-            waitUntilAccepted: async () => {},
-        }),
-        rollForwardLocal: async (connection, staged, base, layoutRanges) => {
-            apply(local, layoutRanges, "layout");
-            apply(local, changedRanges(base.macros, staged.macros, {end: staged.macros.length - 1}), "macros");
-            events.push("local");
-        },
-        waitStorage: async () => ({ready: true, generation: 5, digest: viaStorageDigest(local)}),
-        readStorage: async () => ({ready: true, generation: 5, digest: viaStorageDigest(peer) === viaStorageDigest(local) ? viaStorageDigest(local) : 0}),
-        readStored: async (connection, command, length, options = {}) => (command === 0x12 ? local.layout : local.macros).subarray(options.startOffset || 0, (options.startOffset || 0) + length),
-        readProfile: async () => ({activeKind: 1, activeDigest: fnv1a32(target.profile), committedDigest: fnv1a32(target.profile), stateFlags: 32, conflictCount: 0}),
-    };
-    const options = {operations, expectedFingerprint: fingerprint(source), saveRecovery: async () => "/recovery.json", ...(cached ? {baseSnapshot: snapshot} : {})};
-    return {caps, targetDocument, target, raw, peer, local, digest, events, options, snapshot};
-}
-for (const fixtureName of Object.keys(FIXTURES)) {
-    for (const editName of Object.keys(EDITS)) {
-        for (const cached of [false, true]) {
-            test(`a ${editName} ${fixtureName} Apply from a ${cached ? "cached" : "fresh"} read clears stale bytes after the macros`, async () => {
-                const t = transfer(fixtureName, editName, {cached});
-                const result = await restoreProfile({}, {}, t.caps, t.targetDocument, t.options);
-                assert.equal(t.events.includes("capture"), !cached);
-                for (const bank of [t.peer, t.local]) {
-                    assert.ok(bank.layout.equals(t.target.layout) && bank.macros.equals(t.target.macros), "the stored bank is exactly the target");
-                    assert.equal(viaStorageDigest(bank), t.digest);
-                }
-                const stale = changedRanges(t.raw.macros, t.target.macros, {end: t.target.macros.length - 1});
-                assert.ok(stale.some(range => range.offset <= t.raw.macros.length - 20 && range.offset + range.bytes.length > t.raw.macros.length - 20), "the stale bytes are written");
-                assert.equal(result.performance.macroBytes, stale.reduce((sum, range) => sum + range.bytes.length, 0), "and nothing that already matches");
-                assert.ok(result.storage.macros.equals(t.target.macros), "the result keeps the bank it proved, for the next Apply");
-                assert.equal(result.document.macros.length, 64, "the document stays canonical");
-            });
-        }
+for (const [name, source] of [["current", document], ["six configured slots", require("../fixtures/pd-profile").document]]) {
+    for (const [editName, edit] of Object.entries(EDITS)) for (const cached of [false, true]) {
+        test(`${editName} Apply of ${name} from ${cached ? "cached" : "fresh"} snapshot preserves every other domain`, async () => {
+            const f = fixture({source: source()}); f.targetDocument = edit(f.source); f.target = validateSnapshot(f.targetDocument);
+            if (cached) f.options.baseSnapshot = await f.snapshot(); f.keyboard.requests.length = 0;
+            const result = await f.restore(); assertTarget(f);
+            assert.equal(payloadReads(f).length > 0, !cached);
+            assert.deepEqual(result.storage.profile, f.target.candidate);
+            assert.deepEqual(Object.keys(result.document).sort(), ["actionAbiDigest", "format", "keyboard", "profile", "version"]);
+        });
     }
 }
-test("a cached read of the same keyboard without its stored bank is read again", async () => {
-    const t = transfer("legacy", "layout-only", {cached: true});
-    t.options.baseSnapshot = {...t.snapshot, storage: undefined};
-    await restoreProfile({}, {}, t.caps, t.targetDocument, t.options);
-    assert.deepEqual(t.events, ["capture", "local"]);
-    assert.ok(t.peer.macros.equals(t.target.macros));
+test("Apply reuses exact committed or compiled source ranges and streams changes", async () => {
+    for (const compiledOnly of [false, true]) {
+        const f = fixture({compiledOnly}); f.options.baseSnapshot = await f.snapshot(); await f.restore(); assertTarget(f);
+        const reuse = candidateMutations(f).find(r => r[2] === C.VALUE_REUSE);
+        assert.ok(reuse); assert.equal(reuse[29], compiledOnly ? 0 : 1); assert.equal(reuse[30], compiledOnly ? 255 : 0);
+        assert.ok(candidateMutations(f).some(r => r[2] === C.VALUE_STREAM_CHUNK));
+    }
 });
-test("a cached bank for a keyboard that changed since is never compared against", async () => {
-    const t = transfer("legacy", "layout-only", {cached: true});
-    t.options.operations.readIdentity = async () => ({...t.snapshot.identity, storageDigest: t.snapshot.identity.storageDigest + 1});
-    await assert.rejects(restoreProfile({}, {}, t.caps, t.targetDocument, t.options), error => error.code === "PROFILE_CHANGED");
-    assert.ok(t.peer.macros.equals(t.raw.macros) && t.local.macros.equals(t.raw.macros), "nothing was written");
+test("missing or corrupted exact source bytes fall back to full transfer without trusting reconstructed bytes", async () => {
+    for (const missing of [true, false]) {
+        const f = fixture(), snapshot = await f.snapshot(); f.options.baseSnapshot = snapshot;
+        if (missing) delete snapshot.storage; else snapshot.storage.profile[10] ^= 1;
+        await f.restore(); assertTarget(f);
+        assert.equal(candidateMutations(f).some(r => r[2] === C.VALUE_REUSE), false);
+    }
 });
-test("a read that lost its stored bank refuses before anything is sent", async () => {
-    const t = transfer("legacy", "layout-only");
-    t.options.operations.capture = async () => ({...t.snapshot, storage: undefined});
-    await assert.rejects(restoreProfile({}, {}, t.caps, t.targetDocument, t.options), error => error.code === "BASE_STORAGE_UNAVAILABLE" && error.saved === "none");
-    assert.ok(t.peer.macros.equals(t.raw.macros));
+
+const {settings: currentSettings} = require("../fixtures/portable-profile");
+const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
+const {decodeSettings} = require("../../core/schema/settings-domain-v1");
+const snapshotCapabilities = {...CAPABILITIES_32, candidateChunkMax: 20, macroBytes: 34903};
+function wired(keyboard) {
+    let id = 0;
+    return {connection: {request: async (report) => keyboard.answer(report)[0]}, ids: {next: () => (id = id % 255 + 1)}};
+}
+function factoryProfile(source) {
+    const factory = currentSettings(); factory.values[0] = 1600; factory.names[1] = "Factory";
+    const combos = {version: 3, defaultTermMs: 40, holdTermMs: 180, rows: [{inputs: [6, 7].map(operand => ({kind: 1, operand, flags: 0})), output: {kind: 1, operand: 9, flags: 0}, termMs: null, mustHold: false, mustTap: true, ordered: false}]};
+    const blob = decodeProfileBlob(validateSnapshot(source).candidate);
+    return encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(factory)}
+        : domain.id === 0x30 ? {...domain, payload: encodeComboDomain(combos)} : domain)});
+}
+for (const compiledOnly of [false, true]) {
+    test(`a snapshot ${compiledOnly ? "of a keyboard running its defaults" : "of a committed profile"} keeps the live settings and the stored combos beside a seven-domain compiled read`, async () => {
+        const source = backup32(), compiled = factoryProfile(source);
+        assert.deepEqual(decodeProfileBlob(compiled).domains.map(domain => domain.id), [16, 32, 48, 64, 80, 96, 112], "the compiled read has every domain");
+        const keyboard = fakeKeyboard({document: source, compiled, compiledOnly});
+        const {connection, ids} = wired(keyboard);
+        const snapshot = await snapshotProfile(connection, ids, snapshotCapabilities);
+        const reads = new Set(keyboard.requests.filter(r => r[0] === 0x08 && r[1] === 0).map(r => r[2]));
+        assert.ok(reads.has(0x05) && reads.has(0x06) && reads.has(0x07), "the compiled, combo and settings reads all ran");
+        assert.equal(reads.has(0x04), !compiledOnly);
+        const domains = decodeProfileBlob(Buffer.from(snapshot.document.profile, "base64")).domains;
+        assert.deepEqual(domains.map(domain => domain.id), [16, 32, 48, 64, 80, 96, 112], "each domain once, in registry order");
+        const live = validateSnapshot(source);
+        assert.deepEqual(decodeSettings(domains[3].payload), live.settings, "the live settings, not the factory ones");
+        assert.notEqual(decodeSettings(domains[3].payload).values[0], 1600);
+        // Combos are the active profile's stored domain (firmware D-F32: the
+        // running table is projected from it), never the running table
+        // re-encoded: committed, the saved profile's; running defaults, theirs.
+        const active = compiledOnly ? decodeProfileBlob(compiled) : decodeProfileBlob(live.profile);
+        assert.ok(domains[2].payload.equals(active.domains[2].payload), "the active profile's combos, exactly as stored");
+        if (!compiledOnly) assert.equal(snapshot.fingerprint, fingerprint(source), "the export is the keyboard's effective profile");
+    });
+}
+
+test("a snapshot never reads the retired PD page, and asks for nothing the keyboard does not serve", async () => {
+    const source = backup32(), keyboard = fakeKeyboard({document: source});
+    const {connection, ids} = wired(keyboard);
+    const snapshot = await snapshotProfile(connection, ids, snapshotCapabilities);
+    assert.equal(keyboard.requests.some(r => r[0] === 0x08 && r[1] === 0 && r[2] === 0x09), false, "no GET 0x09");
+    assert.equal(Object.hasOwn(snapshot.document, "pdModeSource"), false, "no pointing-mode source is written");
+    assert.deepEqual(keyboard.unhandled, []);
+});
+
+test("a complete snapshot preserves Unicode bank bytes", async () => {
+    const source = backup32();
+    const text = ' café “hello” 🙂 e\u0301 👩‍💻 ';
+    editMacros(source, macros => macros[0] = Buffer.from(text).toString('base64'));
+    const keyboard = fakeKeyboard({document:source});
+    const {connection, ids} = wired(keyboard);
+    const snapshot = await snapshotProfile(connection, ids, snapshotCapabilities);
+    assert.deepEqual(profileMacros(snapshot.document), profileMacros(source));
+    assert.equal(snapshot.fingerprint, fingerprint(source));
+    assert.equal(Buffer.from(profileMacros(snapshot.document)[0], 'base64').toString('utf8'), text);
+    assert.deepEqual(keyboard.mutations, []);
+    const malformed = structuredClone(source);
+    const invalid = decodeProfileBlob(Buffer.from(malformed.profile, "base64"));
+    invalid.domains.find(d => d.id === 112).payload = Buffer.concat([Buffer.from([0xc0, 0xaf]), Buffer.alloc(128)]);
+    malformed.profile = encodeProfileBlob(invalid).toString("base64");
+    assert.throws(() => validateSnapshot(malformed), /valid|UTF-8/);
+});
+
+
+test("a keyboard without its slave half refuses a snapshot at once, without waiting for the halves", async () => {
+    const source = backup32();
+    const keyboard = fakeKeyboard({document: source, compiled: factoryProfile(source), slaveKnown: false});
+    const {connection, ids} = wired(keyboard);
+    let waits = 0;
+    await assert.rejects(snapshotProfile(connection, ids, snapshotCapabilities, undefined, false, false, {sleep: async () => {waits += 1;}}),
+        {code: "KEYBOARD_NOT_READY", message: /slave half is not connected/});
+    assert.equal(waits, 0, "no poll for the halves to agree");
+});
+
+// Ark reads and writes only current firmware: a keyboard storing settings in
+// another version is neither snapshot nor written.
+test("a keyboard storing settings in another version is not snapshot, and a restore to it is refused before any write", async () => {
+    const keyboard = fakeKeyboard({document: document(), settingsVersion: 7});
+    let id = 0;
+    const ids = {next: () => (id = id % 255 + 1)};
+    const connection = {request: async report => keyboard.answer(report)[0]};
+    await assert.rejects(snapshotProfile(connection, ids, capabilities), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
+    let recovered = false;
+    await assert.rejects(restoreProfile(connection, ids, capabilities, document(), {sleep: async () => {}, saveRecovery: async () => {recovered = true; return "/r.json";}}),
+        {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
+    assert.equal(recovered, false, "refused before the recovery copy");
+    assert.deepEqual(keyboard.mutations, []);
 });

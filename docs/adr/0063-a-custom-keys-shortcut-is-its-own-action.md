@@ -1,0 +1,7 @@
+# A custom key's shortcut is its own action
+
+Cited as D-L63.
+
+Firmware D-F26 gives each custom key an optional shortcut, any mix of the eight modifiers plus at most one key, stored in settings domain version 8 (`core/schema/settings-domain-v1.js`). Ark treats the shortcut as the key's own action, the way a plain key's action is its keycode: the key's behaviour works on top of it, a bypassed custom key sends it, and a behaviour step that names a custom key sends only its shortcut, so behaviours never chain. Because one keycode cannot hold modifiers from both sides, a key field's picker offers a custom key carrying that shortcut instead, staged in the same draft step. The firmware accepts a step naming a custom key with no shortcut, so Review warns about one rather than refusing it.
+
+Amended (2026-10-27, firmware D-F26 amended): the shortcut holds up to six keys together, media, system and mouse keys among them, beside its modifiers and layers (settings domain version 11). The codec's caps on the keys (at most six, each once, one media key, one system key) are data, `SHORTCUT_KEY_CAPS`, which the codec checks and core publishes as they are, each with its keycodes and its words, as `customKeyShortcutKeyLimits`; the picker reads them against the keycodes it would post and refuses exactly what the codec would, in those words, before anything posts, with no rule or name matching of its own. Every refusal's words are core's (`SHORTCUT_KEY_REFUSALS`). A symbol's modifiers join the shortcut's one modifier mask, so they are held for the whole shortcut.

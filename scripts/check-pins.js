@@ -1,10 +1,18 @@
 "use strict";
+// @ts-check
 // Developer-only ancestry check. Never fetches or reads a runtime dependency.
 const fs = require("node:fs");
 const path = require("node:path");
 const {spawnSync} = require("node:child_process");
 
+/**
+ * @param {Pick<import("./contract-types.js").UpstreamManifest, "sources">} manifest
+ * @param {import("./contract-types.js").RepositoryRoots} roots
+ * @param {Partial<Record<import("./contract-types.js").RepositoryName, string>>} refs
+ * @returns {import("./contract-types.js").PublishedPin[]}
+ */
 function checkPins(manifest, roots, refs = {}) {
+    /** @type {Record<string, [import("./contract-types.js").RepositoryName, string] | undefined>} */
     const repositories = {
         "https://github.com/NoahCLR/charybdis-4x6": ["firmware", refs.firmware || "refs/remotes/origin/dev"],
         "https://github.com/NoahCLR/bastardkb-qmk": ["qmk", refs.qmk || "refs/remotes/origin/noah-userspace-contracts-dev"],
@@ -20,7 +28,11 @@ function checkPins(manifest, roots, refs = {}) {
     });
 }
 
+/**
+ * @param {string[]} argv
+ */
 function run(argv) {
+    /** @type {Record<string, string | undefined>} */
     const flags = {};
     for (let i = 0; i < argv.length; i += 2) {
         const key = argv[i];
@@ -28,12 +40,13 @@ function run(argv) {
         flags[key] = argv[i + 1];
     }
     if (!flags["--firmware"] || !flags["--qmk"]) throw new Error("Pass --firmware PATH --qmk PATH (fetch their origin trunks first)");
-    const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "../upstream/manifest.json")));
+    /** @type {import("./contract-types.js").UpstreamManifest} */
+    const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "../upstream/manifest.json"), "utf8"));
     const pins = checkPins(manifest, {firmware: flags["--firmware"], qmk: flags["--qmk"]}, {firmware: flags["--firmware-ref"], qmk: flags["--qmk-ref"]});
     for (const pin of pins) console.log(`${pin.published ? "PASS" : "FAIL"}: ${pin.name} ${pin.commit} on ${pin.ref}`);
     return pins.every(pin => pin.published) ? 0 : 1;
 }
 if (require.main === module) {
-    try {process.exitCode = run(process.argv.slice(2));} catch (error) {console.error(error.message); process.exitCode = 1;}
+    try {process.exitCode = run(process.argv.slice(2));} catch (error) {console.error((error instanceof Error ? error.message : String(error))); process.exitCode = 1;}
 }
 module.exports = {checkPins, run};

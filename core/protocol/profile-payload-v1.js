@@ -1,6 +1,7 @@
+// @ts-check
 "use strict";
 
-const {requestHandled} = require("./via-unhandled-v1");
+const {requestHandled} = require("./raw-hid-unhandled");
 // Reads the committed profile payload off the keyboard.
 //
 // The device serves page 0 as metadata and pages 1..N as raw payload, a full
@@ -19,6 +20,7 @@ const {
     ProfileWireProtocolError,
     buildProfileGetRequest,
     decodeProfileResponse,
+    isUnknownPage,
     profileResponseMatcher,
 } = require("./profile-wire-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
@@ -29,27 +31,31 @@ const PROFILE_PAYLOAD_V1 = Object.freeze({
     // same page layout. A keyboard with nothing committed is still running
     // something, and this is it.
     COMPILED_VALUE: 0x05,
-    LAYOUT_VERSION: 1,
+    // Layout 2 (Profile Wire 2, firmware D-F28): a 32-bit payload length at
+    // offset 2, every later field two bytes on from layout 1's.
+    LAYOUT_VERSION: 2,
     METADATA_PAGE: 0,
-    METADATA_SIZE: 21,
+    METADATA_SIZE: 23,
     DEFAULT_GENERATION_RETRIES: 3,
-    // A page index is one byte, so page 255 is the last addressable chunk.
-    MAX_CHUNKS: 0xff,
+    // A page index is 16 bits: a full 130,048-byte payload is 5,202 chunks of
+    // 25 bytes, and 16 bits of page reach 1.6 MB.
+    MAX_CHUNKS: 0xffff,
 });
 
+/** @param {unknown} payload */
 function decodePayloadMetadata(payload) {
     const page = normalizePayload(payload, "profile payload metadata page");
     const decoded = {
         layoutVersion: page[0],
         chunkSize: page[1],
-        payloadLength: readU16(page, 2),
-        generation: readU32(page, 4),
-        digest: readU32(page, 8),
-        crc32: readU32(page, 12),
-        schema: {major: page[16], minor: page[17]},
-        domainMask: page[18],
-        originHalf: page[19],
-        flags: page[20],
+        payloadLength: readU32(page, 2),
+        generation: readU32(page, 6),
+        digest: readU32(page, 10),
+        crc32: readU32(page, 14),
+        schema: {major: page[18], minor: page[19]},
+        domainMask: page[20],
+        originHalf: page[21],
+        flags: page[22],
     };
 
     assertZeroRange(page, PROFILE_PAYLOAD_V1.METADATA_SIZE, PROFILE_WIRE_V1.PAYLOAD_SIZE, "profile payload metadata page");
@@ -71,36 +77,65 @@ function decodePayloadMetadata(payload) {
     return decoded;
 }
 
+/** @param {{payloadLength: number, chunkSize: number}} metadata */
 function chunkCount(metadata) {
     return Math.ceil(metadata.payloadLength / metadata.chunkSize);
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").PayloadReadOptions} [options] */
 async function readCommittedPayload(connection, options = {}) {
-    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.VALUE, options);
+    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.VALUE, options, options.previous);
 }
 
 // The compiled defaults carry no generation, so there is nothing for the
 // coherence check to compare; they cannot change while the firmware runs.
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").PayloadReadOptions} [options] */
 async function readCompiledPayload(connection, options = {}) {
-    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.COMPILED_VALUE, options);
+    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.COMPILED_VALUE, options, options.previous);
 }
 
-async function readProfilePayload(connection, value, options = {}) {
+
+/** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {import("./types.js").PayloadReadOptions} [options] @param {import("./types.js").PayloadRead} [previous] */
+async function readProfilePayload(connection, value, options = {}, previous) {
     assertConnection(connection);
     const retries = normalizeRetryCount(options.generationRetries);
     const requestIds = createRequestIdSource(options);
+    /** @type {{expectedGeneration: number, actualGeneration: number} | undefined} */
     let lastMismatch;
 
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
+    attempts: for (let attempt = 0; attempt <= retries; attempt += 1) {
         const metadata = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
-        const total = chunkCount(metadata);
-        const bytes = Buffer.alloc(metadata.payloadLength);
+        // The same bytes, already in hand: an earlier verified read of this
+        // payload, or bytes the keyboard just served from the same place
+        // that pass the checks a download must.
+        const known = previous && sameMetadata(previous.metadata, metadata) ? previous.bytes
+            : options.sameAs && matchesMetadata(options.sameAs, metadata) ? options.sameAs : undefined;
+        const reused = known !== undefined;
+        const total = reused ? 0 : chunkCount(metadata);
+        const bytes = reused ? Buffer.from(known) : Buffer.alloc(metadata.payloadLength);
         let written = 0;
 
         for (let chunk = 0; chunk < total; chunk += 1) {
-            const page = await requestPage(connection, value, chunk + 1, requestIds, options);
             const expected = Math.min(metadata.chunkSize, metadata.payloadLength - written);
-            if (page.length < expected) {
+            /** @type {Buffer | undefined} */
+            let page;
+            /** @type {unknown} */
+            let refusal;
+            try {page = await requestPage(connection, value, chunk + 1, requestIds, options);}
+            catch (error) {
+                if (!isUnknownPage(error)) throw error;
+                refusal = error;
+            }
+            if (!page || page.length < expected) {
+                // A page shorter than the metadata said, or past its end, is
+                // what a save landing mid-read looks like when it shortens the
+                // payload: page 0 says whether one did.
+                const now = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
+                if (!sameMetadata(now, metadata)) {
+                    lastMismatch = {expectedGeneration: metadata.generation, actualGeneration: now.generation};
+                    continue attempts;
+                }
+                if (!page) throw refusal;
                 throw protocolError(
                     "MALFORMED_RESPONSE",
                     `Chunk ${chunk} returned ${page.length} bytes where ${expected} were expected.`
@@ -116,12 +151,13 @@ async function readProfilePayload(connection, value, options = {}) {
         // Re-read the metadata. A generation that has not moved means no commit
         // landed while the chunks were in flight.
         const after = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
-        if (after.generation !== metadata.generation || after.digest !== metadata.digest) {
+        if (!sameMetadata(after, metadata)) {
             lastMismatch = {expectedGeneration: metadata.generation, actualGeneration: after.generation};
             continue;
         }
 
         verify(bytes, metadata);
+        if (reused) options.onProgress?.({done: bytes.length, total: bytes.length});
         return {metadata, bytes};
     }
 
@@ -132,9 +168,18 @@ async function readProfilePayload(connection, value, options = {}) {
     );
 }
 
+/** @param {import("./types.js").PayloadMetadata} left @param {import("./types.js").PayloadMetadata} right */
+function sameMetadata(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
+
+/** @param {Uint8Array} bytes @param {import("./types.js").PayloadMetadata} metadata */
+function matchesMetadata(bytes, metadata) {
+    return bytes.length === metadata.payloadLength && crc32(bytes) === metadata.crc32 && fnv1a32(bytes) === metadata.digest;
+}
+
 // Both checks, not one. The CRC catches transport damage; the digest is what
 // the rest of the system identifies a generation by, so a mismatch there means
 // this payload is not the generation the device claimed.
+/** @param {Uint8Array} bytes @param {import("./types.js").PayloadMetadata} metadata */
 function verify(bytes, metadata) {
     const actualCrc = crc32(bytes);
     if (actualCrc !== metadata.crc32) {
@@ -152,6 +197,7 @@ function verify(bytes, metadata) {
     }
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {number} page @param {import("./types.js").RequestIds} requestIds @param {import("./types.js").PayloadReadOptions} options */
 async function requestPage(connection, value, page, requestIds, options) {
     const request = buildProfileGetRequest(value, page, requestIds.next());
     const response = await requestHandled(connection, request, {
@@ -162,6 +208,7 @@ async function requestPage(connection, value, page, requestIds, options) {
     return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));
 }
 
+/** @param {unknown} value @param {string} label */
 function normalizePayload(value, label) {
     if (!(value instanceof Uint8Array) || value.byteLength < PROFILE_PAYLOAD_V1.METADATA_SIZE) {
         throw protocolError("MALFORMED_RESPONSE", `${label} is shorter than its ${PROFILE_PAYLOAD_V1.METADATA_SIZE}-byte layout.`);
@@ -169,6 +216,7 @@ function normalizePayload(value, label) {
     return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
 }
 
+/** @param {Uint8Array} buffer @param {number} start @param {number} end @param {string} label */
 function assertZeroRange(buffer, start, end, label) {
     for (let index = start; index < Math.min(end, buffer.length); index += 1) {
         if (buffer[index] !== 0) {
@@ -177,6 +225,7 @@ function assertZeroRange(buffer, start, end, label) {
     }
 }
 
+/** @param {import("./types.js").ReadOptions} options */
 function createRequestIdSource(options) {
     if (options.nextRequestId !== undefined) {
         if (typeof options.nextRequestId !== "function") {
@@ -194,6 +243,7 @@ function createRequestIdSource(options) {
     };
 }
 
+/** @param {number} [value] */
 function normalizeRetryCount(value) {
     if (value === undefined) {
         return PROFILE_PAYLOAD_V1.DEFAULT_GENERATION_RETRIES;
@@ -204,24 +254,24 @@ function normalizeRetryCount(value) {
     return value;
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection */
 function assertConnection(connection) {
     if (!connection || typeof connection.request !== "function") {
         throw new TypeError("connection must provide request(report, options).");
     }
 }
 
-function readU16(buffer, offset) {
-    return buffer[offset] | (buffer[offset + 1] << 8);
-}
-
+/** @param {Uint8Array} buffer @param {number} offset */
 function readU32(buffer, offset) {
     return (buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16) | (buffer[offset + 3] << 24)) >>> 0;
 }
 
+/** @param {number} value */
 function hex(value) {
     return `0x${(value >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
 }
 
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function protocolError(code, message, details = {}) {
     return new ProfileWireProtocolError(code, message, details);
 }

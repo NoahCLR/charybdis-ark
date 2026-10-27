@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {
@@ -11,8 +12,13 @@ const {
 } = require("./device-adapter");
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 1000;
+// A request that timed out softly keeps the connection; its reply, if it
+// comes, is the next one the keyboard sends (it answers in order), and is set
+// aside for this long rather than taken as another request's.
+const LATE_REPLY_MS = 10000;
 
 class DeviceRequestCoordinator {
+    /** @param {import("./types.js").DeviceAdapter} adapter @param {import("./types.js").CoordinatorOptions} [options] */
     constructor(adapter, options = {}) {
         this.adapter = assertDeviceAdapter(adapter);
         this.defaultTimeoutMs = normalizeTimeout(
@@ -21,6 +27,7 @@ class DeviceRequestCoordinator {
         this.onUnexpectedReport = typeof options.onUnexpectedReport === "function"
             ? options.onUnexpectedReport
             : undefined;
+        /** @type {Map<string, CoordinatedDeviceConnection>} */
         this.connections = new Map();
         this.connecting = new Set();
     }
@@ -29,6 +36,7 @@ class DeviceRequestCoordinator {
         return normalizeDeviceDescriptors(await this.adapter.listDevices());
     }
 
+    /** @param {string} deviceId */
     async connect(deviceId) {
         const normalizedDeviceId = normalizeDeviceId(deviceId);
         if (this.connections.has(normalizedDeviceId) || this.connecting.has(normalizedDeviceId)) {
@@ -71,10 +79,12 @@ class DeviceRequestCoordinator {
         return connection;
     }
 
+    /** @param {string} deviceId */
     getConnection(deviceId) {
         return this.connections.get(normalizeDeviceId(deviceId));
     }
 
+    /** @param {string} deviceId */
     async disconnect(deviceId) {
         const connection = this.getConnection(deviceId);
         if (connection) {
@@ -89,6 +99,7 @@ class DeviceRequestCoordinator {
 }
 
 class CoordinatedDeviceConnection {
+    /** @param {import("./types.js").ConnectedDevice} device @param {string} deviceId @param {import("./types.js").CoordinatedConnectionOptions} options */
     constructor(device, deviceId, options) {
         this.device = device;
         this.deviceId = deviceId;
@@ -96,12 +107,20 @@ class CoordinatedDeviceConnection {
         this.onUnexpectedReport = options.onUnexpectedReport;
         this.onClosed = options.onClosed;
         this.state = "created";
+        /** @type {import("./types.js").RequestOperation[]} */
         this.queue = [];
+        /** @type {import("./types.js").RequestOperation | undefined} */
         this.active = undefined;
+        /** @type {Set<import("./types.js").DisconnectListener>} */
         this.disconnectListeners = new Set();
+        /** @type {import("./types.js").Disposer | undefined} */
         this.disposeReportListener = undefined;
+        /** @type {import("./types.js").Disposer | undefined} */
         this.disposeDisconnectListener = undefined;
+        /** @type {Promise<unknown> | undefined} */
         this.closePromise = undefined;
+        /** @type {{matchResponse: (response: Buffer, request: Buffer) => boolean, report: Buffer, until: number}[]} */
+        this.late = [];
     }
 
     start() {
@@ -119,7 +138,7 @@ class CoordinatedDeviceConnection {
         } catch (cause) {
             const error = liveLinkError(
                 LIVE_LINK_ERROR_CODES.CONNECT_FAILED,
-                `Could not subscribe to device ${this.deviceId}.`,
+                "Ark could not listen to the keyboard.",
                 {cause, deviceId: this.deviceId}
             );
             void this.terminate(error, {activeError: error, closeDevice: true});
@@ -131,6 +150,7 @@ class CoordinatedDeviceConnection {
         return this.state === "connected";
     }
 
+    /** @param {Uint8Array} report @param {import("./types.js").RequestOptions} [options] @returns {Promise<Buffer>} */
     request(report, options = {}) {
         let normalizedReport;
         try {
@@ -142,7 +162,7 @@ class CoordinatedDeviceConnection {
         if (!this.connected) {
             return Promise.reject(liveLinkError(
                 LIVE_LINK_ERROR_CODES.NOT_CONNECTED,
-                `Device ${this.deviceId} is not connected.`,
+                "The keyboard is not connected.",
                 {deviceId: this.deviceId}
             ));
         }
@@ -172,6 +192,7 @@ class CoordinatedDeviceConnection {
         }
 
         return new Promise((resolve, reject) => {
+            /** @type {import("./types.js").RequestOperation} */
             const operation = {
                 matchResponse,
                 reject,
@@ -179,6 +200,7 @@ class CoordinatedDeviceConnection {
                 resolve,
                 settled: false,
                 signal,
+                softTimeout: options.softTimeout === true,
                 status: "queued",
                 timeoutId: undefined,
                 timeoutMs,
@@ -192,6 +214,7 @@ class CoordinatedDeviceConnection {
         });
     }
 
+    /** @param {import("./types.js").DisconnectListener} listener */
     onDisconnect(listener) {
         if (typeof listener !== "function") {
             throw new TypeError("disconnect listener must be a function.");
@@ -200,10 +223,17 @@ class CoordinatedDeviceConnection {
         return () => this.disconnectListeners.delete(listener);
     }
 
+    // Ends the connection as a failure, with `reason` as what its disconnect
+    // listeners hear: a keyboard that stopped answering background reads.
+    /** @param {unknown} reason */
+    abandon(reason) {
+        return this.terminate(reason, {activeError: reason, closeDevice: true, queuedError: reason});
+    }
+
     async disconnect() {
         const reason = liveLinkError(
             LIVE_LINK_ERROR_CODES.DISCONNECTED,
-            `Device ${this.deviceId} was disconnected by Charybdis Ark.`,
+            "Ark disconnected the keyboard.",
             {deviceId: this.deviceId}
         );
         await this.terminate(reason, {activeError: reason, closeDevice: true});
@@ -216,7 +246,7 @@ class CoordinatedDeviceConnection {
 
         while (this.queue.length && !this.active) {
             const operation = this.queue.shift();
-            if (operation.settled) {
+            if (!operation || operation.settled) {
                 continue;
             }
             if (operation.signal?.aborted) {
@@ -239,6 +269,7 @@ class CoordinatedDeviceConnection {
         }
     }
 
+    /** @param {unknown} report */
     handleReport(report) {
         if (!this.connected) {
             return;
@@ -250,7 +281,7 @@ class CoordinatedDeviceConnection {
         } catch (cause) {
             const invalidReport = liveLinkError(
                 LIVE_LINK_ERROR_CODES.INVALID_REPORT,
-                `Device ${this.deviceId} returned an invalid report.`,
+                "The keyboard sent a report Ark could not read.",
                 {cause, deviceId: this.deviceId}
             );
             void this.terminate(invalidReport, {
@@ -258,6 +289,19 @@ class CoordinatedDeviceConnection {
                 closeDevice: true,
                 queuedError: disconnectedAfter(this.deviceId, invalidReport),
             });
+            return;
+        }
+
+        // The keyboard answers in order, so a reply to a request that timed
+        // out softly comes before the active request's own.
+        const now = Date.now();
+        this.late = this.late.filter((entry) => entry.until > now);
+        const late = this.late.findIndex((entry) => {
+            try {return Boolean(entry.matchResponse(normalizedReport, Buffer.from(entry.report)));} catch {return false;}
+        });
+        if (late !== -1) {
+            this.late.splice(late, 1);
+            this.reportUnexpected(normalizedReport, "it answers a request that timed out");
             return;
         }
 
@@ -273,7 +317,7 @@ class CoordinatedDeviceConnection {
         } catch (error) {
             const matchError = liveLinkError(
                 LIVE_LINK_ERROR_CODES.RESPONSE_MATCH_FAILED,
-                `Response matcher failed for device ${this.deviceId}.`,
+                "Ark could not match the keyboard's answer to its request.",
                 {cause: error, deviceId: this.deviceId}
             );
             void this.terminate(matchError, {
@@ -294,6 +338,7 @@ class CoordinatedDeviceConnection {
         queueMicrotask(() => this.pump());
     }
 
+    /** @param {Buffer} report @param {string} reason */
     reportUnexpected(report, reason) {
         if (!this.onUnexpectedReport) {
             return;
@@ -309,24 +354,36 @@ class CoordinatedDeviceConnection {
         }
     }
 
+    /** @param {unknown} reason */
     handleDeviceDisconnect(reason) {
         const error = liveLinkError(
             LIVE_LINK_ERROR_CODES.DISCONNECTED,
-            `Device ${this.deviceId} disconnected.`,
+            "The keyboard was disconnected.",
             {cause: reason instanceof Error ? reason : undefined, deviceId: this.deviceId}
         );
         void this.terminate(error, {activeError: error, closeDevice: false, queuedError: error});
     }
 
+    /** @param {import("./types.js").RequestOperation} operation */
     timeoutOperation(operation) {
         if (!this.connected || this.active !== operation || operation.settled) {
             return;
         }
         const error = liveLinkError(
             LIVE_LINK_ERROR_CODES.TIMEOUT,
-            `Device ${this.deviceId} did not respond within ${operation.timeoutMs} ms.`,
-            {deviceId: this.deviceId}
+            `The keyboard did not answer within ${operation.timeoutMs} ms.`,
+            // Which request went unanswered, for the diagnostics.
+            {deviceId: this.deviceId, timeoutMs: operation.timeoutMs, request: operation.report.subarray(0, 5).toString("hex")}
         );
+        // A background read the caller can miss: only it fails, and its late
+        // reply is set aside. The keyboard is still the one connected.
+        if (operation.softTimeout) {
+            this.late.push({matchResponse: operation.matchResponse, report: operation.report, until: Date.now() + LATE_REPLY_MS});
+            this.active = undefined;
+            this.settle(operation, "reject", Object.assign(error, {soft: true}));
+            queueMicrotask(() => this.pump());
+            return;
+        }
         void this.terminate(error, {
             activeError: error,
             closeDevice: true,
@@ -334,6 +391,7 @@ class CoordinatedDeviceConnection {
         });
     }
 
+    /** @param {import("./types.js").RequestOperation} operation */
     cancelOperation(operation) {
         if (operation.settled) {
             return;
@@ -355,13 +413,14 @@ class CoordinatedDeviceConnection {
         this.settle(operation, "reject", error);
     }
 
+    /** @param {import("./types.js").RequestOperation} operation @param {unknown} cause */
     failWrite(operation, cause) {
         if (!this.connected || this.active !== operation || operation.settled) {
             return;
         }
         const error = liveLinkError(
             LIVE_LINK_ERROR_CODES.WRITE_FAILED,
-            `Could not write a report to device ${this.deviceId}.`,
+            "Ark could not send a report to the keyboard.",
             {cause, deviceId: this.deviceId}
         );
         void this.terminate(error, {
@@ -371,6 +430,9 @@ class CoordinatedDeviceConnection {
         });
     }
 
+    /** @overload @param {import("./types.js").RequestOperation | undefined} operation @param {'resolve'} method @param {Buffer} value @returns {void} */
+    /** @overload @param {import("./types.js").RequestOperation | undefined} operation @param {'reject'} method @param {unknown} value @returns {void} */
+    /** @param {import("./types.js").RequestOperation | undefined} operation @param {'resolve' | 'reject'} method @param {unknown} value */
     settle(operation, method, value) {
         if (!operation || operation.settled) {
             return;
@@ -383,9 +445,11 @@ class CoordinatedDeviceConnection {
         if (operation.signal && operation.abortListener) {
             operation.signal.removeEventListener("abort", operation.abortListener);
         }
-        operation[method](value);
+        // The overloads require a report for resolve; reject accepts any cause.
+        operation[method](/** @type {Buffer} */ (value));
     }
 
+    /** @param {unknown} reason @param {import("./types.js").TerminationOptions} [options] */
     terminate(reason, options = {}) {
         if (this.state === "disconnected") {
             return this.closePromise || Promise.resolve();
@@ -425,6 +489,7 @@ class CoordinatedDeviceConnection {
     }
 }
 
+/** @param {unknown} deviceId */
 function normalizeDeviceId(deviceId) {
     const value = typeof deviceId === "string" ? deviceId.trim() : "";
     if (!value) {
@@ -433,6 +498,7 @@ function normalizeDeviceId(deviceId) {
     return value;
 }
 
+/** @param {unknown} value */
 function normalizeTimeout(value) {
     const timeout = Number(value);
     if (!Number.isInteger(timeout) || timeout <= 0) {
@@ -441,12 +507,14 @@ function normalizeTimeout(value) {
     return timeout;
 }
 
+/** @param {AbortSignal | null | undefined} value */
 function isAbortSignal(value) {
     return value && typeof value.aborted === "boolean" &&
         typeof value.addEventListener === "function" &&
         typeof value.removeEventListener === "function";
 }
 
+/** @param {import("./types.js").Subscription} value @returns {import("./types.js").Disposer} */
 function normalizeDisposer(value) {
     if (typeof value === "function") {
         return value;
@@ -457,28 +525,32 @@ function normalizeDisposer(value) {
     return () => undefined;
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function defaultResponseMatcher(response, request) {
     return response[0] === request[0];
 }
 
+/** @param {string} deviceId */
 function cancelledError(deviceId) {
     return liveLinkError(
         LIVE_LINK_ERROR_CODES.CANCELLED,
-        `Request for device ${deviceId} was cancelled.`,
+        "A request to the keyboard was cancelled.",
         {deviceId}
     );
 }
 
+/** @param {string} deviceId @param {InstanceType<typeof LiveLinkTransportError>} cause */
 function disconnectedAfter(deviceId, cause) {
     return liveLinkError(
         LIVE_LINK_ERROR_CODES.DISCONNECTED,
-        `Device ${deviceId} connection was invalidated after ${cause.code || "a transport failure"}.`,
+        "Ark closed the connection to the keyboard after a request to it failed.",
         {cause, deviceId}
     );
 }
 
 module.exports = {
     DEFAULT_REQUEST_TIMEOUT_MS,
+    LATE_REPLY_MS,
     CoordinatedDeviceConnection,
     DeviceRequestCoordinator,
     defaultResponseMatcher,

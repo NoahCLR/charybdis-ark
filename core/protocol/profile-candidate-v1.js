@@ -1,11 +1,12 @@
+// @ts-check
 "use strict";
+const {u8: assertU8, u16: assertU16, u32: assertU32, asBytes: copyBytes, protocolError, zeroRange} = require("../schema/bytes");
 
-const {requestHandled} = require("./via-unhandled-v1");
+const {profileDomain, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
+const {requestHandled} = require("./raw-hid-unhandled");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
-const {crc32, decodeProfileBlob, fnv1a32, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
+const {crc32, decodeProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {
-    PROFILE_WIRE_DOMAINS,
-    PROFILE_WIRE_STATUS,
     PROFILE_WIRE_V1,
     buildProfileGetRequest,
     decodeProfileResponse,
@@ -23,12 +24,27 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     VALUE_ABORT: 0x14,
     VALUE_STATUS: 0x18,
     CHUNK_MAX: 20,
+    REUSE_MAX: 1024,
+    VALUE_REUSE: 0x1b,
+    VALUE_STREAM_CHUNK: 0x1c,
     MIN_BLOB_SIZE: 8,
-    MAX_BLOB_SIZE: 5088,
-    STATUS_LAYOUT_VERSION: 1,
+    // A 128 KiB flash slot less its 1 KiB record (firmware D-F29). Lengths and
+    // offsets on the wire are 32 bits (Profile Wire 2, firmware D-F28); this
+    // is the slot's ceiling, not the frame's.
+    MAX_BLOB_SIZE: 130048,
+    // Status page 0 (layout 2) is the candidate's progress, page 3 (layout 1)
+    // where its error is; pages 1 and 2 (layout 2) the copy to the slave half.
+    STATUS_LAYOUT_VERSION: 2,
+    ERROR_PAGE: 3,
+    ERROR_LAYOUT_VERSION: 1,
+    PEER_STATUS_LAYOUT_VERSION: 2,
     STATUS_PAYLOAD_SIZE: 25,
-    LOGICAL_STORE_FORMAT: 2,
-    KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS | PROFILE_WIRE_DOMAINS.PD_MODES,
+    // Store format 6, the one current firmware writes. Profile Wire 2 implies
+    // it, so BEGIN no longer carries it; bytes 24–31 stay zero.
+    STORE_FORMAT: 6,
+    SCHEMA_MAJOR: 4,
+    SCHEMA_MINOR: 3,
+    KNOWN_DOMAIN_MASK: PROFILE_DOMAIN_MASK,
 });
 
 const CANDIDATE_ADMISSION = Object.freeze({
@@ -36,6 +52,7 @@ const CANDIDATE_ADMISSION = Object.freeze({
     MALFORMED: 1,
     BUSY: 2,
     UNSUPPORTED: 3,
+    REJECTED: 4,
 });
 
 const CANDIDATE_STATE = Object.freeze({
@@ -63,6 +80,7 @@ const CANDIDATE_OPERATION = Object.freeze({
     VALIDATE: 3,
     ABORT: 4,
     COMMIT: 5,
+    REUSE: 6,
 });
 
 const CANDIDATE_STATUS_FLAGS = Object.freeze({
@@ -107,16 +125,10 @@ const CANDIDATE_ADMISSION_NAMES = Object.freeze(Object.fromEntries(
     Object.entries(CANDIDATE_ADMISSION).map(([name, value]) => [value, name])
 ));
 
-class ProfileCandidateProtocolError extends Error {
-    constructor(code, message, details = {}) {
-        super(message);
-        this.name = "ProfileCandidateProtocolError";
-        this.code = code;
-        Object.assign(this, details);
-    }
-}
+const ProfileCandidateProtocolError = protocolError("ProfileCandidateProtocolError");
 
 class CandidateTransactionIdSequence {
+    /** @param {number} [start] */
     constructor(start = 1) {
         this.value = assertU16(start, "Candidate transaction id", {nonzero: true});
     }
@@ -129,6 +141,7 @@ class CandidateTransactionIdSequence {
 }
 
 class CandidateRequestIdSequence {
+    /** @param {number} [start] */
     constructor(start = 1) {
         this.value = assertU8(start, "Candidate status request id", {nonzero: true});
     }
@@ -140,29 +153,27 @@ class CandidateRequestIdSequence {
     }
 }
 
+/** @param {number} transactionId @param {import("./types.js").CandidateMetadataInput} metadata */
 function buildCandidateBeginRequest(transactionId, metadata) {
     const normalizedTransactionId = assertU16(transactionId, "Candidate transaction id", {nonzero: true});
     const normalized = normalizeCandidateMetadata(metadata);
     const report = buildMutationHeader(PROFILE_CANDIDATE_V1.VALUE_BEGIN, normalizedTransactionId);
+    // Profile Wire 2 dropped the always-zero flags byte and the store format
+    // (implied by the version) to make room for a 32-bit length.
     report[5] = normalized.schemaMajor;
     report[6] = normalized.schemaMinor;
     report[7] = normalized.requestedDomains;
-    report[8] = normalized.flags;
-    report.writeUInt16LE(normalized.payloadLength, 9);
-    report.writeUInt32LE(normalized.crc32, 11);
-    report.writeUInt32LE(normalized.digest, 15);
-    report.writeUInt32LE(normalized.actionAbiDigest, 19);
-    report[23] = normalized.storeFormatVersion;
-    if (normalized.storeFormatVersion !== 0) {
-        report.writeUInt32LE(normalized.viaGeneration, 24);
-        report.writeUInt32LE(normalized.viaDigest, 28);
-    }
+    report.writeUInt32LE(normalized.payloadLength, 8);
+    report.writeUInt32LE(normalized.crc32, 12);
+    report.writeUInt32LE(normalized.digest, 16);
+    report.writeUInt32LE(normalized.actionAbiDigest, 20);
     return report;
 }
 
+/** @param {number} transactionId @param {number} offset @param {Uint8Array} value */
 function buildCandidateChunkRequest(transactionId, offset, value) {
     const normalizedTransactionId = assertU16(transactionId, "Candidate transaction id", {nonzero: true});
-    const normalizedOffset = assertU16(offset, "Candidate chunk offset");
+    const normalizedOffset = assertU32(offset, "Candidate chunk offset");
     const bytes = copyBytes(value, "Candidate chunk");
     if (bytes.length < 1 || bytes.length > PROFILE_CANDIDATE_V1.CHUNK_MAX) {
         throw new RangeError(`Candidate chunk must contain 1 through ${PROFILE_CANDIDATE_V1.CHUNK_MAX} bytes.`);
@@ -171,12 +182,29 @@ function buildCandidateChunkRequest(transactionId, offset, value) {
         throw new RangeError(`Candidate chunk must end at or before byte ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE}.`);
     }
     const report = buildMutationHeader(PROFILE_CANDIDATE_V1.VALUE_CHUNK, normalizedTransactionId);
-    report.writeUInt16LE(normalizedOffset, 5);
-    report[7] = bytes.length;
-    bytes.copy(report, 8);
+    report.writeUInt32LE(normalizedOffset, 5);
+    report[9] = bytes.length;
+    bytes.copy(report, 10);
     return report;
 }
 
+/** @param {number} transactionId @param {{offset: number, sourceOffset: number, length: number, source: import("./types.js").ReuseSource}} range */
+function buildCandidateReuseRequest(transactionId, {offset, sourceOffset, length, source}) {
+    const report = buildMutationHeader(PROFILE_CANDIDATE_V1.VALUE_REUSE, assertU16(transactionId, "Candidate transaction id", {nonzero: true}));
+    offset = assertU32(offset, "Reuse destination offset");
+    sourceOffset = assertU32(sourceOffset, "Reuse source offset");
+    length = assertU32(length, "Reuse length", {nonzero: true});
+    if (length > PROFILE_CANDIDATE_V1.REUSE_MAX || offset + length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE || sourceOffset + length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) throw new RangeError("Reuse range exceeds the candidate bounds.");
+    const kind = assertU8(source.kind, "Reuse source kind"), origin = assertU8(source.origin, "Reuse source origin");
+    const generation = assertU32(source.generation, "Reuse source generation");
+    if ((kind === 0 && (origin !== 255 || generation !== 0)) || (kind === 1 && (origin > 1 || generation === 0)) || kind > 1) throw new RangeError("Reuse source must identify compiled defaults or a committed generation.");
+    report.writeUInt32LE(offset, 5); report.writeUInt32LE(sourceOffset, 9); report.writeUInt32LE(length, 13);
+    report.writeUInt32LE(generation, 17); report.writeUInt32LE(assertU32(source.digest, "Reuse source digest"), 21);
+    report.writeUInt32LE(assertU32(source.crc32, "Reuse source CRC32"), 25); report[29] = kind; report[30] = origin;
+    return report;
+}
+
+/** @param {number} transactionId */
 function buildCandidateValidateRequest(transactionId) {
     return buildMutationHeader(
         PROFILE_CANDIDATE_V1.VALUE_VALIDATE,
@@ -184,6 +212,7 @@ function buildCandidateValidateRequest(transactionId) {
     );
 }
 
+/** @param {number} transactionId */
 function buildCandidateCommitRequest(transactionId) {
     return buildMutationHeader(
         PROFILE_CANDIDATE_V1.VALUE_COMMIT,
@@ -192,6 +221,7 @@ function buildCandidateCommitRequest(transactionId) {
     );
 }
 
+/** @param {number} transactionId */
 function buildCandidateAbortRequest(transactionId) {
     return buildMutationHeader(
         PROFILE_CANDIDATE_V1.VALUE_ABORT,
@@ -199,14 +229,17 @@ function buildCandidateAbortRequest(transactionId) {
     );
 }
 
-function buildCandidateStatusRequest(requestId) {
+/** @param {number} requestId @param {number} [page] */
+function buildCandidateStatusRequest(requestId, page = 0) {
+    if (page !== 0 && page !== PROFILE_CANDIDATE_V1.ERROR_PAGE) throw new RangeError("Candidate status is read from page 0 or the error page.");
     return buildProfileGetRequest(
         PROFILE_CANDIDATE_V1.VALUE_STATUS,
-        0,
+        page,
         assertU8(requestId, "Candidate status request id", {nonzero: true})
     );
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function candidateMutationResponseMatcher(response, request) {
     const actual = normalizeRawHidReport(response, "Candidate mutation response");
     const expected = normalizeRawHidReport(request, "Candidate mutation request");
@@ -217,6 +250,7 @@ function candidateMutationResponseMatcher(response, request) {
         && actual[4] === expected[4];
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function decodeCandidateAcknowledgement(response, request) {
     const report = Buffer.from(normalizeRawHidReport(response, "Candidate mutation response"));
     if (!candidateMutationResponseMatcher(report, request)) {
@@ -229,7 +263,7 @@ function decodeCandidateAcknowledgement(response, request) {
     const admission = report[5];
     const errorId = report[6];
     const frameOffset = report[7];
-    if (!Object.values(CANDIDATE_ADMISSION).includes(admission)) {
+    if (!/** @type {number[]} */ (Object.values(CANDIDATE_ADMISSION)).includes(admission)) {
         throw candidateProtocolError("MALFORMED_RESPONSE", `Unknown candidate admission id ${admission}.`);
     }
     assertKnownCandidateError(errorId);
@@ -247,6 +281,9 @@ function decodeCandidateAcknowledgement(response, request) {
         && (errorId !== CANDIDATE_ERROR.UNSUPPORTED_OPERATION || frameOffset !== 0xff)) {
         throw candidateProtocolError("NONCANONICAL_RESPONSE", "An unsupported acknowledgment must report only the unsupported-operation error.");
     }
+    if (admission === CANDIDATE_ADMISSION.REJECTED && (errorId === CANDIDATE_ERROR.NONE || (frameOffset !== 0xff && frameOffset >= RAW_HID_REPORT_SIZE))) {
+        throw candidateProtocolError("NONCANONICAL_RESPONSE", "A rejected acknowledgment must identify the admission failure.");
+    }
     return {
         admission,
         admissionName: CANDIDATE_ADMISSION_NAMES[admission],
@@ -258,6 +295,13 @@ function decodeCandidateAcknowledgement(response, request) {
     };
 }
 
+// Where an error is, when there is none: every field its sentinel.
+const NO_ERROR_LOCATION = Object.freeze({domainId: 0xff, tableId: 0xff, rowIndex: 0xffff, tapIndex: 0xff, fieldId: 0xff, byteOffset: 0xffffffff});
+
+// Page 0 (layout 2): the candidate's progress and its error id. The error's
+// location is on page 3 (decodeCandidateErrorResponse), joined by
+// readCandidateStatus; decoded alone, the location is the no-error sentinels.
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function decodeCandidateStatusResponse(response, request) {
     const payload = decodeProfileResponse(response, request);
     if (payload.length !== PROFILE_CANDIDATE_V1.STATUS_PAYLOAD_SIZE) {
@@ -269,36 +313,19 @@ function decodeCandidateStatusResponse(response, request) {
     const state = payload[1];
     const lastOperation = payload[2];
     const flags = payload[3];
-    const errorId = payload[14];
-    if (!Object.values(CANDIDATE_STATE).includes(state)) {
+    const errorId = payload[18];
+    if (!/** @type {number[]} */ (Object.values(CANDIDATE_STATE)).includes(state)) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown candidate state ${state}.`);
     }
-    if (!Object.values(CANDIDATE_OPERATION).includes(lastOperation)) {
+    if (!/** @type {number[]} */ (Object.values(CANDIDATE_OPERATION)).includes(lastOperation)) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown candidate operation ${lastOperation}.`);
     }
     if ((flags & ~CANDIDATE_STATUS_FLAGS.KNOWN_MASK) !== 0) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Candidate status contains unknown flag bits 0x${(flags & ~CANDIDATE_STATUS_FLAGS.KNOWN_MASK).toString(16)}.`);
     }
     assertKnownCandidateError(errorId);
-    const error = {
-        id: errorId,
-        name: CANDIDATE_ERROR_NAMES[errorId],
-        domainId: payload[15],
-        tableId: payload[16],
-        rowIndex: payload.readUInt16LE(17),
-        tapIndex: payload[19],
-        fieldId: payload[20],
-        byteOffset: payload.readUInt16LE(21),
-    };
-    if (errorId === CANDIDATE_ERROR.NONE && (
-        error.domainId !== 0xff
-        || error.tableId !== 0xff
-        || error.rowIndex !== 0xffff
-        || error.tapIndex !== 0xff
-        || error.fieldId !== 0xff
-        || error.byteOffset !== 0xffff
-    )) {
-        throw candidateProtocolError("NONCANONICAL_RESPONSE", "Candidate status without an error must use all location sentinels.");
+    if (payload[23] !== 0 || payload[24] !== 0) {
+        throw candidateProtocolError("NONCANONICAL_RESPONSE", "Candidate status reserved bytes must be zero.");
     }
     return {
         layoutVersion: payload[0],
@@ -308,32 +335,93 @@ function decodeCandidateStatusResponse(response, request) {
         mailboxPending: (flags & CANDIDATE_STATUS_FLAGS.MAILBOX_PENDING) !== 0,
         poisoned: (flags & CANDIDATE_STATUS_FLAGS.POISONED) !== 0,
         transactionId: payload.readUInt16LE(4),
-        nextOffset: payload.readUInt16LE(6),
-        payloadLength: payload.readUInt16LE(8),
-        digest: payload.readUInt32LE(10),
-        error,
-        operationSequence: payload.readUInt16LE(23),
+        nextOffset: payload.readUInt32LE(6),
+        payloadLength: payload.readUInt32LE(10),
+        digest: payload.readUInt32LE(14),
+        error: {id: errorId, name: CANDIDATE_ERROR_NAMES[errorId], ...NO_ERROR_LOCATION},
+        operationSequence: payload.readUInt16LE(19),
+        // Advances whenever the error or its location changes, including
+        // between mailbox items, so page 3 can be tied to this page.
+        errorSequence: payload.readUInt16LE(21),
     };
 }
 
+// Page 3 (layout 1, firmware D-F28): where the error is, with the transaction,
+// operation sequence and error sequence of the page 0 it belongs to.
+/** @param {Uint8Array} response @param {Uint8Array} request */
+function decodeCandidateErrorResponse(response, request) {
+    const payload = decodeProfileResponse(response, request);
+    if (payload.length !== PROFILE_CANDIDATE_V1.STATUS_PAYLOAD_SIZE || payload[0] !== PROFILE_CANDIDATE_V1.ERROR_LAYOUT_VERSION) {
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported candidate error page layout.");
+    }
+    const errorId = payload[1];
+    assertKnownCandidateError(errorId);
+    if (payload.subarray(18).some(Boolean)) {
+        throw candidateProtocolError("NONCANONICAL_RESPONSE", "Candidate error page reserved bytes must be zero.");
+    }
+    const location = {
+        domainId: payload[2],
+        tableId: payload[3],
+        rowIndex: payload.readUInt16LE(4),
+        tapIndex: payload[6],
+        fieldId: payload[7],
+        byteOffset: payload.readUInt32LE(8),
+    };
+    if (errorId === CANDIDATE_ERROR.NONE && Object.entries(NO_ERROR_LOCATION).some(([field, value]) => location[/** @type {keyof typeof location} */ (field)] !== value)) {
+        throw candidateProtocolError("NONCANONICAL_RESPONSE", "Candidate status without an error must use all location sentinels.");
+    }
+    return {
+        id: errorId,
+        name: CANDIDATE_ERROR_NAMES[errorId],
+        ...location,
+        transactionId: payload.readUInt16LE(12),
+        operationSequence: payload.readUInt16LE(14),
+        errorSequence: payload.readUInt16LE(16),
+    };
+}
+
+// Reads of page 0 before the error page's location is given up on. Validation,
+// commit and slave-half events can replace the error between the two reads;
+// each replacement moves the error sequence, and the pair is reread.
+const ERROR_PAGE_ATTEMPTS = 3;
+
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readCandidateStatus(connection, options = {}) {
     if (!connection || typeof connection.request !== "function") {
         throw new TypeError("connection must provide request(report, options).");
     }
-    const requestId = options.nextRequestId
-        ? assertNextRequestId(options.nextRequestId)
+    const fixedRequestId = options.nextRequestId ? undefined
         : assertU8(options.requestId === undefined ? 1 : options.requestId, "Candidate status request id", {nonzero: true});
-    const request = buildCandidateStatusRequest(requestId);
-    const response = await requestHandled(connection, request, {
-        matchResponse: profileResponseMatcher,
-        signal: options.signal,
-        timeoutMs: options.timeoutMs,
-    }, "the candidate status read");
-    return decodeCandidateStatusResponse(response, request);
+    const requestId = () => options.nextRequestId ? assertNextRequestId(options.nextRequestId) : /** @type {number} */ (fixedRequestId);
+    /** @param {number} page @param {string} label */
+    const read = async (page, label) => {
+        const request = buildCandidateStatusRequest(requestId(), page);
+        const response = await requestHandled(connection, request, {
+            matchResponse: profileResponseMatcher,
+            signal: options.signal,
+            timeoutMs: options.timeoutMs,
+        }, label);
+        return {response, request};
+    };
+    let status;
+    for (let attempt = 0; attempt < ERROR_PAGE_ATTEMPTS; attempt += 1) {
+        const progress = await read(0, "the candidate status read");
+        status = decodeCandidateStatusResponse(progress.response, progress.request);
+        if (status.error.id === CANDIDATE_ERROR.NONE) return status;
+        const located = await read(PROFILE_CANDIDATE_V1.ERROR_PAGE, "the candidate error read");
+        const error = decodeCandidateErrorResponse(located.response, located.request);
+        if (error.id === status.error.id && error.transactionId === status.transactionId
+            && error.operationSequence === status.operationSequence && error.errorSequence === status.errorSequence) {
+            const {transactionId, operationSequence, errorSequence, ...where} = error;
+            return {...status, error: where};
+        }
+    }
+    // The error kept moving: its id on page 0 stands, its location is unknown.
+    return /** @type {NonNullable<typeof status>} */ (status);
 }
 
-// Candidate status page 1: how far a save's copy to the other half has got,
-// and the other half's last answer. The phase names mirror
+// Candidate status page 1: how far a save's copy to the slave half has got,
+// and the slave half's last answer. The phase names mirror
 // noah_profile_candidate_v1_peer_phase_t; the reasons mirror
 // noah_profile_split_v1_status_t.
 const CANDIDATE_PEER_PHASE = Object.freeze({
@@ -344,42 +432,44 @@ const SPLIT_STATUS_NAMES = Object.freeze([
     "OK", "INVALID_FRAME", "INCOMPATIBLE", "STALE", "CONFLICT", "CORRUPT", "BUSY", "RANGE_ERROR", "DIGEST_MISMATCH", "STORAGE_ERROR", "VALIDATION_ERROR",
 ]);
 const CANDIDATE_PEER_FLAGS = Object.freeze({CLEANUP_PENDING: 1 << 0, MASTER: 1 << 1, WAITING_SAFE_BOUNDARY: 1 << 2, KNOWN_MASK: 0x07});
-// Why the other half last answered BUSY, and what it held then; these mirror
-// noah_profile_split_v1_busy_reason_t, noah_profile_peer_store_state_t and
+// Why the slave half last answered BUSY, and what it held then; these mirror
+// noah_profile_split_v1_busy_reason_t, noah_profile_other_half_store_state_t and
 // noah_profile_split_transfer_owner_t.
 const PEER_BUSY_REASON_NAMES = Object.freeze(["UNSPECIFIED", "ADMITTED", "MAILBOX_FULL", "OTHER_COPY", "NO_LEASE", "STORE_WORKING", "PULLING", "CONVERGENCE_ONLY"]);
 const PEER_STORE_STATE_NAMES = Object.freeze(["UNINITIALIZED", "IDLE", "RECEIVING", "VALIDATING", "PREPARING", "PREPARED", "COMMITTING", "COMMITTED", "REJECTED", "RECONCILE_REQUIRED"]);
 const PEER_TRANSFER_OWNER_NAMES = Object.freeze(["NONE", "REMOTE_PUSH", "LOCAL_PULL"]);
-// noah_profile_storage_admission_owner_t: who holds the peer's storage.
+// noah_profile_storage_admission_owner_t: who holds the slave half's storage.
 const PEER_ADMISSION_NAMES = Object.freeze(["NONE", "HOST", "PEER"]);
 
-function buildCandidatePeerStatusRequest(requestId) {
-    return buildProfileGetRequest(PROFILE_CANDIDATE_V1.VALUE_STATUS, 1, assertU8(requestId, "Candidate peer status request id", {nonzero: true}));
+/** @param {number} requestId */
+function buildCandidateSlaveStatusRequest(requestId) {
+    return buildProfileGetRequest(PROFILE_CANDIDATE_V1.VALUE_STATUS, 1, assertU8(requestId, "Candidate slave-half status request id", {nonzero: true}));
 }
 
-function decodeCandidatePeerStatusResponse(response, request) {
+/** @param {Uint8Array} response @param {Uint8Array} request */
+function decodeCandidateSlaveStatusResponse(response, request) {
     const payload = decodeProfileResponse(response, request);
-    if (payload.length !== PROFILE_CANDIDATE_V1.STATUS_PAYLOAD_SIZE || payload[0] !== 1) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported candidate peer status layout.");
+    if (payload.length !== PROFILE_CANDIDATE_V1.STATUS_PAYLOAD_SIZE || payload[0] !== PROFILE_CANDIDATE_V1.PEER_STATUS_LAYOUT_VERSION) {
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported candidate slave-half status layout.");
     }
     const phase = payload[1];
     const lastStatus = payload[2];
     const flags = payload[3];
     if (CANDIDATE_PEER_PHASE_NAMES[phase] === undefined) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown peer transfer phase ${phase}.`);
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown slave-half transfer phase ${phase}.`);
     }
     if (SPLIT_STATUS_NAMES[lastStatus] === undefined) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown peer status ${lastStatus}.`);
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown slave-half status ${lastStatus}.`);
     }
     if ((flags & ~CANDIDATE_PEER_FLAGS.KNOWN_MASK) !== 0) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Candidate peer status contains unknown flag bits.");
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Candidate slave-half status contains unknown flag bits.");
     }
-    const [busyReason, busyStoreState, busyOwner, busyAdmission] = payload.subarray(18, 22);
+    // Layout 2 packs the transfer owner (low nibble) and the storage admission
+    // (high nibble) into the last byte.
+    const [busyReason, busyStoreState] = payload.subarray(22, 24);
+    const busyOwner = payload[24] & 0x0f, busyAdmission = payload[24] >> 4;
     if (PEER_BUSY_REASON_NAMES[busyReason] === undefined || PEER_STORE_STATE_NAMES[busyStoreState] === undefined || PEER_TRANSFER_OWNER_NAMES[busyOwner] === undefined || PEER_ADMISSION_NAMES[busyAdmission] === undefined) {
-        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unknown peer busy detail.");
-    }
-    if (payload.subarray(22).some(Boolean)) {
-        throw candidateProtocolError("NONCANONICAL_RESPONSE", "Candidate peer status reserved bytes must be zero.");
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unknown slave-half busy detail.");
     }
     return {
         phase,
@@ -389,13 +479,13 @@ function decodeCandidatePeerStatusResponse(response, request) {
         cleanupPending: (flags & CANDIDATE_PEER_FLAGS.CLEANUP_PENDING) !== 0,
         master: (flags & CANDIDATE_PEER_FLAGS.MASTER) !== 0,
         waitingSafeBoundary: (flags & CANDIDATE_PEER_FLAGS.WAITING_SAFE_BOUNDARY) !== 0,
-        transferOffset: payload.readUInt16LE(4),
-        transferLength: payload.readUInt16LE(6),
-        retryCount: payload.readUInt32LE(8),
-        transportFailureCount: payload.readUInt32LE(12),
-        // The other half's BUSY replies in a row, and the last one that said
+        transferOffset: payload.readUInt32LE(4),
+        transferLength: payload.readUInt32LE(8),
+        retryCount: payload.readUInt32LE(12),
+        transportFailureCount: payload.readUInt32LE(16),
+        // The slave half's BUSY replies in a row, and the last one that said
         // why (never the routine "admitted" reply to a new request).
-        busyStreak: payload.readUInt16LE(16),
+        busyStreak: payload.readUInt16LE(20),
         busyReason: PEER_BUSY_REASON_NAMES[busyReason],
         busyStoreState: PEER_STORE_STATE_NAMES[busyStoreState],
         busyOwner: PEER_TRANSFER_OWNER_NAMES[busyOwner],
@@ -403,33 +493,30 @@ function decodeCandidatePeerStatusResponse(response, request) {
     };
 }
 
-// Firmware before page 1 answers UNKNOWN_PAGE; that is "not reported", not a
-// failure, and resolves to null.
-async function readCandidatePeerStatus(connection, options = {}) {
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
+async function readCandidateSlaveStatus(connection, options = {}) {
     if (typeof options.nextRequestId !== "function") throw new TypeError("nextRequestId must be a function.");
-    const request = buildCandidatePeerStatusRequest(assertNextRequestId(options.nextRequestId));
-    const response = await requestHandled(connection, request, {matchResponse: profileResponseMatcher, signal: options.signal, timeoutMs: options.timeoutMs}, "the candidate peer status read");
-    try {
-        return decodeCandidatePeerStatusResponse(response, request);
-    } catch (error) {
-        if (error?.code === "DEVICE_REJECTED" && error.status === PROFILE_WIRE_STATUS.UNKNOWN_PAGE) return null;
-        throw error;
-    }
+    const request = buildCandidateSlaveStatusRequest(assertNextRequestId(options.nextRequestId));
+    const response = await requestHandled(connection, request, {matchResponse: profileResponseMatcher, signal: options.signal, timeoutMs: options.timeoutMs}, "the candidate slave-half status read");
+    return decodeCandidateSlaveStatusResponse(response, request);
 }
 
+// The candidate is the complete profile; firmware assigns its one generation.
+/** @overload @param {Uint8Array} value @param {import("./types.js").CandidateBlobOptions} options @returns {import("./types.js").CandidateMetadata} */
+/** @param {Uint8Array} value @param {Partial<import("./types.js").CandidateBlobOptions>} [options] @returns {import("./types.js").CandidateMetadata} */
 function candidateMetadataForBlob(value, options = {}) {
     const blob = copyBytes(value, "Candidate profile blob");
+    const storeFormatVersion = options.storeFormatVersion ?? PROFILE_CANDIDATE_V1.STORE_FORMAT;
+    const maximum = options.capabilities?.maxProfilePayload ?? PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE;
+    if (blob.length > maximum) throw new RangeError(`Candidate profile blob exceeds the keyboard's ${maximum}-byte capacity.`);
     if (blob.length < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || blob.length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
         throw new RangeError(`Candidate profile blob must contain ${PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE} through ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE} bytes.`);
     }
     const decoded = decodeProfileBlob(blob);
+    assertCurrentSchema(decoded.schema.major, decoded.schema.minor);
     let derivedDomains = 0;
     for (const domain of decoded.domains) {
-        if (domain.id === PROFILE_DOMAIN_IDS.RGB) derivedDomains |= PROFILE_WIRE_DOMAINS.RGB;
-        if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) derivedDomains |= PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS;
-        if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) derivedDomains |= PROFILE_WIRE_DOMAINS.SETTINGS;
-        if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) derivedDomains |= PROFILE_WIRE_DOMAINS.PD_MODES;
-        if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) derivedDomains |= PROFILE_WIRE_DOMAINS.COMBOS;
+        derivedDomains |= profileDomain(domain.id)?.wireBit ?? 0;
     }
     const requestedDomains = options.requestedDomains === undefined
         ? derivedDomains
@@ -450,36 +537,35 @@ function candidateMetadataForBlob(value, options = {}) {
         crc32: crc32(blob),
         digest: fnv1a32(blob),
         actionAbiDigest: assertU32(options.actionAbiDigest, "Action-ABI digest"),
-        storeFormatVersion: options.viaGeneration === undefined && options.viaDigest === undefined ? 0 : (decoded.schema.major === 2 ? 3 : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT),
-        viaGeneration: options.viaGeneration === undefined ? 0 : assertU32(options.viaGeneration, "VIA generation"),
-        viaDigest: options.viaDigest === undefined ? 0 : assertU32(options.viaDigest, "VIA digest"),
+        storeFormatVersion,
     };
 }
 
+/** @param {import("./types.js").CandidateMetadataInput} metadata @returns {import("./types.js").CandidateMetadata} */
 function normalizeCandidateMetadata(metadata) {
     if (!metadata || typeof metadata !== "object") {
         throw new TypeError("Candidate metadata must be an object.");
     }
     const flags = assertU8(metadata.flags === undefined ? 0 : metadata.flags, "Candidate flags");
     if (flags !== 0) {
-        throw new RangeError("Candidate flags must be zero for Profile Wire v1.");
+        throw new RangeError("Candidate flags must be zero.");
     }
-    const payloadLength = assertU16(metadata.payloadLength, "Candidate payload length");
-    if (payloadLength < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || payloadLength > (metadata.schemaMajor === 2 ? 5088 : 4064)) {
+    const payloadLength = assertU32(metadata.payloadLength, "Candidate payload length");
+    if (payloadLength < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || payloadLength > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
         throw new RangeError(`Candidate payload length must be ${PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE} through ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE}.`);
     }
-    const storeFormatVersion = metadata.storeFormatVersion === undefined ? 0 : assertU8(metadata.storeFormatVersion, "Candidate store format");
-    if (storeFormatVersion !== 0 && storeFormatVersion !== (metadata.schemaMajor === 2 ? 3 : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT)) {
-        throw new RangeError(`Candidate store format must be zero or ${PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT}.`);
-    }
-    const viaGeneration = metadata.viaGeneration === undefined ? 0 : assertU32(metadata.viaGeneration, "VIA generation");
-    const viaDigest = metadata.viaDigest === undefined ? 0 : assertU32(metadata.viaDigest, "VIA digest");
-    if (storeFormatVersion === 0 ? (viaGeneration !== 0 || viaDigest !== 0) : (viaGeneration === 0 || viaDigest === 0)) {
-        throw new RangeError("Logical candidates require a nonzero VIA generation and digest; legacy candidates require both to be zero.");
+    const schemaMajor = assertU8(metadata.schemaMajor, "Candidate schema major");
+    const schemaMinor = assertU8(metadata.schemaMinor, "Candidate schema minor");
+    assertCurrentSchema(schemaMajor, schemaMinor);
+    // Not on the wire since Profile Wire 2, which implies it; a caller that
+    // names another format is refused rather than silently ignored.
+    const storeFormatVersion = assertU8(metadata.storeFormatVersion ?? PROFILE_CANDIDATE_V1.STORE_FORMAT, "Candidate store format");
+    if (storeFormatVersion !== PROFILE_CANDIDATE_V1.STORE_FORMAT) {
+        throw new RangeError(`Candidate store format must be ${PROFILE_CANDIDATE_V1.STORE_FORMAT}.`);
     }
     return {
-        schemaMajor: assertU8(metadata.schemaMajor, "Candidate schema major"),
-        schemaMinor: assertU8(metadata.schemaMinor, "Candidate schema minor"),
+        schemaMajor,
+        schemaMinor,
         requestedDomains: assertDomainMask(metadata.requestedDomains),
         flags,
         payloadLength,
@@ -487,11 +573,17 @@ function normalizeCandidateMetadata(metadata) {
         digest: assertU32(metadata.digest, "Candidate digest"),
         actionAbiDigest: assertU32(metadata.actionAbiDigest, "Candidate action-ABI digest"),
         storeFormatVersion,
-        viaGeneration,
-        viaDigest,
     };
 }
 
+/** @param {number} major @param {number} minor */
+function assertCurrentSchema(major, minor) {
+    if (major !== PROFILE_CANDIDATE_V1.SCHEMA_MAJOR || minor !== PROFILE_CANDIDATE_V1.SCHEMA_MINOR) {
+        throw candidateProtocolError("INCOMPATIBLE_SCHEMA", `Candidates use profile schema ${PROFILE_CANDIDATE_V1.SCHEMA_MAJOR}.${PROFILE_CANDIDATE_V1.SCHEMA_MINOR}; this blob is ${major}.${minor}.`);
+    }
+}
+
+/** @param {number} valueId @param {number} transactionId @param {number} [command] */
 function buildMutationHeader(valueId, transactionId, command = PROFILE_CANDIDATE_V1.COMMAND_SET) {
     const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
     report[0] = command;
@@ -501,6 +593,7 @@ function buildMutationHeader(valueId, transactionId, command = PROFILE_CANDIDATE
     return report;
 }
 
+/** @param {number} value */
 function assertDomainMask(value) {
     const mask = assertU8(value, "Candidate requested-domain mask");
     if ((mask & ~PROFILE_CANDIDATE_V1.KNOWN_DOMAIN_MASK) !== 0) {
@@ -509,12 +602,14 @@ function assertDomainMask(value) {
     return mask;
 }
 
+/** @param {number} value */
 function assertKnownCandidateError(value) {
     if (!Object.prototype.hasOwnProperty.call(CANDIDATE_ERROR_NAMES, value)) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown candidate error id ${value}.`);
     }
 }
 
+/** @param {() => number} nextRequestId */
 function assertNextRequestId(nextRequestId) {
     if (typeof nextRequestId !== "function") {
         throw new TypeError("nextRequestId must be a function.");
@@ -522,45 +617,12 @@ function assertNextRequestId(nextRequestId) {
     return assertU8(nextRequestId(), "Candidate status request id", {nonzero: true});
 }
 
+/** @param {Uint8Array} buffer @param {number} start @param {number} end @param {string} label */
 function assertZeroRange(buffer, start, end, label) {
-    for (let index = start; index < end; index += 1) {
-        if (buffer[index] !== 0) {
-            throw candidateProtocolError("NONCANONICAL_RESPONSE", `${label} has nonzero reserved byte ${index}.`, {frameOffset: index});
-        }
-    }
+    zeroRange(buffer, start, end, index => candidateProtocolError("NONCANONICAL_RESPONSE", `${label} has nonzero reserved byte ${index}.`, {frameOffset: index}));
 }
 
-function copyBytes(value, label) {
-    if (!(value instanceof Uint8Array)) {
-        throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    }
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-}
-
-function assertU8(value, label, options = {}) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < (options.nonzero ? 1 : 0) || number > 0xff) {
-        throw new RangeError(`${label} must be ${options.nonzero ? "a nonzero " : "an "}8-bit integer.`);
-    }
-    return number;
-}
-
-function assertU16(value, label, options = {}) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < (options.nonzero ? 1 : 0) || number > 0xffff) {
-        throw new RangeError(`${label} must be ${options.nonzero ? "a nonzero " : "an "}16-bit integer.`);
-    }
-    return number;
-}
-
-function assertU32(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xffffffff) {
-        throw new RangeError(`${label} must be an unsigned 32-bit integer.`);
-    }
-    return number >>> 0;
-}
-
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function candidateProtocolError(code, message, details) {
     return new ProfileCandidateProtocolError(code, message, details);
 }
@@ -585,19 +647,21 @@ module.exports = {
     buildCandidateAbortRequest,
     buildCandidateBeginRequest,
     buildCandidateChunkRequest,
+    buildCandidateReuseRequest,
     buildCandidateCommitRequest,
     buildCandidateStatusRequest,
     buildCandidateValidateRequest,
     candidateMetadataForBlob,
     candidateMutationResponseMatcher,
     decodeCandidateAcknowledgement,
+    decodeCandidateErrorResponse,
     decodeCandidateStatusResponse,
     normalizeCandidateMetadata,
     readCandidateStatus,
     CANDIDATE_PEER_PHASE,
     CANDIDATE_PEER_PHASE_NAMES,
     SPLIT_STATUS_NAMES,
-    buildCandidatePeerStatusRequest,
-    decodeCandidatePeerStatusResponse,
-    readCandidatePeerStatus,
+    buildCandidateSlaveStatusRequest,
+    decodeCandidateSlaveStatusResponse,
+    readCandidateSlaveStatus,
 };

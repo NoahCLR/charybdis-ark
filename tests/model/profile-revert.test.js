@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers, profileMacros} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {profileReview} = require("../../core/model/profile-review");
@@ -7,7 +8,7 @@ const {settingsEditorView} = require("../../core/model/settings-editor");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0x1d3fcacc};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
 const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
 
 // A draft with one edit of every kind the review describes.
@@ -19,21 +20,20 @@ function edited() {
         return {type: "updateConfigDefaults", sectionId: id, expectedFingerprint: draft.current.fingerprint,
             fields: section.fields.map((field) => field.kind === "toggle" ? {macro: field.macro, enabled: updates[field.macro] ?? field.enabled} : {macro: field.macro, value: updates[field.macro] ?? field.value})};
     };
-    stage({type: "updateLayoutKeys", layers: [{layer: "Layer 1", changes: [{layoutIndex: 3, keycode: "KC_B"}, {layoutIndex: 4, keycode: "KC_C"}]}]});
-    stage({type: "updateViaMacro", keycode: "VIA_MACRO_2", payload: "hello"});
-    stage({type: "updateViaMacro", keycode: "VIA_MACRO_5", name: "Greeting", expectedFingerprint: draft.current.fingerprint});
+    stage({type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 3, keycode: "KC_B"}, {layoutIndex: 4, keycode: "KC_C"}]});
+    stage({type: "updateMacro", keycode: "MACRO_2", payload: "hello"});
+    stage({type: "updateMacro", keycode: "MACRO_5", name: "Greeting", expectedFingerprint: draft.current.fingerprint});
     stage(settings("keyTiming", {tapHoldTerm: "175", multiTapTerm: "190"}));
     stage({type: "retargetBehavior", keycode: "KC_ESCAPE", target: "KC_Q", expectedBase: draft.identity()});
     stage({type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "50", holdTermMs: "200"});
-    stage({type: "updateComboDefaultTerm", defaultTermMs: "70"});
+    stage({type: "updateComboDefaultWindow", defaultTermMs: "70"});
     stage({type: "updateLayerColor", layer: "Layer 2", mode: "ALL_KEYS", h: "20", s: "200", v: "100"});
     stage({type: "updateRgbStages", stageEnableMask: validateSnapshot(draft.document).rgb.stageEnableMask ^ 1});
     stage({type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 3", ledIndices: [1, 2, 3], h: "0", s: "0", v: "0"}});
     const slot = validateSnapshot(draft.document).pdModes[1];
     stage({type: "savePdMode", slot: 1, expectedBase: draft.identity(), config: {...slot, name: "Loudness", thresholdY: 90,
         directions: Object.fromEntries(Object.entries(slot.directions).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}])),
-        diagonals: Object.fromEntries(Object.entries(slot.diagonals || {}).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}])),
-        buttons: slot.buttons.map((button) => ({...button, tap: {...button.tap, keycode: String(button.tap.keycode)}}))}});
+        diagonals: Object.fromEntries(Object.entries(slot.diagonals || {}).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}]))}});
     return draft;
 }
 
@@ -84,11 +84,31 @@ test("several units revert together, and every one of them back is the keyboard'
     const document = revertUnits(base, current, units, capabilities);
     const left = profileReview(base, {...current, document, fingerprint: fingerprint(document)});
     assert.ok(left.every((row) => row.unit === "profile"), "nothing described is left");
-    assert.deepEqual(document.layers, validateSnapshot(base.document, capabilities).document.layers);
-    assert.deepEqual(document.macros, validateSnapshot(base.document, capabilities).document.macros);
+    assert.deepEqual(profileLayers(document), profileLayers(validateSnapshot(base.document, capabilities).document));
+    assert.deepEqual(profileMacros(document), profileMacros(validateSnapshot(base.document, capabilities).document));
 });
 
 test("a unit this module does not know is refused rather than skipped", () => {
     const draft = edited();
     assert.throws(() => revertUnits(draft.base, draft.current, new Set(["mystery:1"]), capabilities), {code: "PROFILE_REVERT_UNSUPPORTED"});
+});
+
+test("discarding a default-layer change alone that would put a shortcut on an always-on layer is refused in words", () => {
+    const {editSettings} = require("../../core/model/settings-editor");
+    const {editCustomKey} = require("../../core/model/custom-key-editor");
+    const fields = (snapshot, updates) => settingsEditorView(snapshot).sections.find((row) => row.id === "startupLayers").fields
+        .map((field) => ({macro: field.macro, enabled: updates[field.macro] ?? field.enabled}));
+    // The keyboard has Navigation (3) as a default layer.
+    const plain = snapshotOf(pdDocument());
+    const keyboard = snapshotOf(editSettings(plain, {type: "updateConfigDefaults", sectionId: "startupLayers", expectedFingerprint: plain.fingerprint, fields: fields(plain, {startupLayer3: true})}, capabilities));
+    // The draft makes it an ordinary layer, then a custom key turns it on.
+    const freed = snapshotOf(editSettings(keyboard, {type: "updateConfigDefaults", sectionId: "startupLayers", expectedFingerprint: keyboard.fingerprint, fields: fields(keyboard, {startupLayer3: false})}, capabilities));
+    const draft = snapshotOf(editCustomKey(freed, {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind: 0}, expectedFingerprint: freed.fingerprint}, capabilities));
+    const units = profileReview(keyboard, draft).map((row) => row.unit);
+    const startup = units.find((unit) => unit.startsWith("settings:") && unit.includes("startupLayers"));
+    assert.ok(startup, units.join());
+    assert.throws(() => revertUnits(keyboard, draft, new Set([startup]), capabilities),
+        /^Error: These settings cannot be discarded on their own: \S+ is turned on by Custom key 9's shortcut, and a shortcut cannot turn on a default layer/);
+    // Discarded together, both go back.
+    assert.doesNotThrow(() => revertUnits(keyboard, draft, new Set([startup, "customKey:9"]), capabilities));
 });

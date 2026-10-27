@@ -1,3 +1,4 @@
+// @ts-check
 // The board: the one constant surface. It paints the light the keyboard would
 // show for this layer, draws the legend on top in whichever of black or white
 // stays readable, and marks what each key reaches.
@@ -12,20 +13,24 @@
 // preview (combosInPreview). Selection and
 // edits still name this layer's own position.
 
+// Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
-import {behaviourFor, behaviourTiers, combosShownAt, keyFace, keyMeaning, resolvedPositions} from "../view/keyface.mjs";
+import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
+import {combosShownAt} from "../view/combo-reach.mjs";
+import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer | undefined} layer @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(model, layer, options = {}) {
     const {selected, mode = "light", picks = [], reach = [], pdActive = null, drafted = null,
         faces = true, trackball = false, held = [], onKey, onOpen, onSwap, onTrackball} = options;
     const positions = layer?.positions || [];
     const stack = model?.layers || [];
     const heldIds = held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
-    const answering = held.length && mode !== "leds"
+    const answering = layer && held.length && mode !== "leds"
         ? new Map(resolvedPositions(stack, stack.indexOf(layer), held).map((entry) => [entry.position.layoutIndex, entry]))
         : null;
     const feedbackOn = stageEnabled(model, "key");
@@ -49,14 +54,14 @@ export function board(model, layer, options = {}) {
             from ? "kc-under" : "",
             options.picking ? "pickable" : ""].filter(Boolean).join(" ");
 
-        let fill = "", text = "";
+        let fill = "", text = "", picked = "";
         if (mode === "leds") {
-            fill = picks.includes(index) ? ` style="fill:var(--key-hi);stroke:var(--text);stroke-width:2"` : "";
+            picked = picks.includes(index) ? " picked" : "";
         } else {
             const light = keyLight(model, layer, position, {pdActive, held: heldIds});
             text = idealText(light.colour);
             const paint = css(light.colour);
-            fill = ` style="fill:${paint};stroke:${glass ? "none" : "rgba(255,255,255,.3)"}"`;
+            fill = ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
             glow += `<rect class="kc-glow${glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
         }
 
@@ -73,10 +78,10 @@ export function board(model, layer, options = {}) {
             const x = startX + order * step;
             const colour = tierColour(model, tier.kind);
             if (!feedbackOn || isOff(colour)) {
-                return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="none" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
+                return `<circle cx="${esc(x)}" cy="${esc(rows.tierY)}" r="3.9" fill="none" stroke="${text || "var(--light-detail)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
             }
-            return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="${css(colour)}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1.1"></circle>`
-                + (tier.count > 1 ? `<text x="${x}" y="${rows.tierY + 0.5}" class="kc-dotn" fill="${idealText(colour)}">${tier.count}</text>` : "");
+            return `<circle cx="${esc(x)}" cy="${esc(rows.tierY)}" r="3.9" fill="${css(colour)}" stroke="${text || "var(--light-detail)"}" stroke-width="1.1"></circle>`
+                + (tier.count > 1 ? `<text x="${esc(x)}" y="${esc(/** @type {number} */ (rows.tierY) + 0.5)}" class="kc-dotn" fill="${idealText(colour)}">${esc(tier.count)}</text>` : "");
         }).join("");
 
         if (combos.length) {
@@ -93,8 +98,8 @@ export function board(model, layer, options = {}) {
             let x = cx - (widths.reduce((sum, width) => sum + width, 0) + between) / 2;
             marks += combos.map((combo, order) => {
                 const width = widths[order];
-                const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight * 0.22}" fill="rgba(8,8,10,.86)" stroke="${comboLit ? css(comboColour) : "rgba(245,245,243,.7)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
-                    + `<text x="${x + width / 2}" y="${rows.comboY + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
+                const badge = `<rect x="${esc(x)}" y="${esc(rows.comboY)}" width="${esc(width)}" height="${esc(rows.comboHeight)}" rx="${rows.comboHeight * 0.22}" fill="var(--badge-ink)" stroke="${comboLit ? css(comboColour) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
+                    + `<text x="${x + width / 2}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
                 x += width + gap;
                 return badge;
             }).join("");
@@ -102,6 +107,7 @@ export function board(model, layer, options = {}) {
 
         // The selection and indication rings ride on top: the light owns the key
         // face, so state is never told by recolouring it.
+        /** @param {string} name */
         const ring = (name) => `<rect class="${name}" x="${visual.x + 1.4}" y="${visual.y + 1.4}" width="${GEO.keyW - 2.8}" height="${GEO.keyH - 2.8}" rx="${GEO.radius - 1}"></rect>`;
         const main = mode === "leds" ? String(LED_INDEX[index] ?? index) : face.main;
         const above = (tiers.length ? 1 : 0) + (combos.length ? 1 : 0);
@@ -113,18 +119,19 @@ export function board(model, layer, options = {}) {
         const subFit = sub ? fitText(sub, above
             ? {max: 6.4, min: 5.2, width: GEO.keyW - 12}
             : {max: 8, min: 6.2, width: GEO.keyW - 12}) : null;
-        const squeeze = (fit) => fit.squeeze ? ` textLength="${fit.squeeze}" lengthAdjust="spacingAndGlyphs"` : "";
+        /** @param {ReturnType<typeof fitText>} fit */
+        const squeeze = (fit) => fit.squeeze ? ` textLength="${esc(fit.squeeze)}" lengthAdjust="spacingAndGlyphs"` : "";
 
-        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
-            aria-label="${esc(keyMeaning(shown))} at index ${index}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
-            <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
+        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"
+            aria-label="${esc(keyMeaning(shown))} at index ${esc(index)}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
+            <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
-            ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1"></line>` : ""}
-            <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
-            ${sub ? `<text class="kc-sub" x="${cx}" y="${rows.subY}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
+            ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${esc(rows.separatorY)}" x2="${visual.x + GEO.keyW - 8}" y2="${esc(rows.separatorY)}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
+            <text class="kc-label" x="${cx}" y="${esc(rows.mainY)}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
+            ${subFit ? `<text class="kc-sub" x="${cx}" y="${esc(rows.subY)}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
         </g>`;
     }
 
@@ -133,16 +140,16 @@ export function board(model, layer, options = {}) {
     // outline of where the ball sits.
     const ball = trackballGlyph(model, layer, {mode, pdActive, held: heldIds, trackball, clickable: Boolean(onTrackball)});
     if (ball.glow) glow += ball.glow;
-    const node = el(`<div class="board ${options.picking ? "picking" : ""}">
-        <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`);
+    const node = /** @type {import("./surface-types.js").BoardNode} */ (el(`<div class="board ${options.picking ? "picking" : ""}">
+        <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`));
 
-    node.querySelectorAll("[data-key]").forEach((group) => {
+    /** @type {NodeListOf<SVGGElement>} */ (node.querySelectorAll("[data-key]")).forEach((group) => {
         const index = Number(group.dataset.key);
         if (onKey) group.addEventListener("click", () => { if (!node.justDragged) onKey(index); });
         if (onOpen) group.addEventListener("dblclick", () => onOpen(index));
         if (onSwap) dragToSwap(node, group, index, onSwap);
     });
-    node.querySelector("[data-trackball]")?.addEventListener("click", () => onTrackball());
+    /** @type {SVGGElement | null} */ (node.querySelector("[data-trackball]"))?.addEventListener("click", () => onTrackball?.());
     return node;
 }
 
@@ -151,16 +158,20 @@ export function board(model, layer, options = {}) {
 // lands; a press that never moves stays a click.
 const DRAG_THRESHOLD = 4;
 
+/** @param {import("./surface-types.js").BoardNode} node @param {SVGGElement} group @param {number} index @param {(from: number, to: number) => void} onSwap */
 function dragToSwap(node, group, index, onSwap) {
-    const svg = node.querySelector("svg");
+    const svg = /** @type {SVGSVGElement} */ (node.querySelector("svg"));
     const resting = group.getAttribute("transform") || "";
+    /** @type {import("./surface-types.js").KeyDrag | null} */
     let drag = null;
 
+    /** @param {PointerEvent} event @returns {SVGGElement | null} */
     const targetAt = (event) => document.elementsFromPoint(event.clientX, event.clientY)
-        .map((hit) => hit.closest?.("[data-key]"))
+        .map((hit) => /** @type {SVGGElement | null} */ (hit.closest("[data-key]")))
         .find((hit) => hit && hit !== group) || null;
+    /** @param {SVGGElement | null} target */
     const mark = (target) => {
-        if (drag.target === target) return;
+        if (!drag || drag.target === target) return;
         drag.target?.classList.remove("drop-target");
         target?.classList.add("drop-target");
         drag.target = target;
@@ -215,20 +226,20 @@ function dragToSwap(node, group, index, onSwap) {
 // A mapped-keys-only layer never reaches it, since no key maps to it. In the LED
 // selector it shows its index and whether the pending group has picked it, the
 // same two things every key shows there.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer | undefined} layer @param {import("./surface-types.js").TrackballOptions} options */
 function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickable}) {
     const {x, y, r} = GEO.trackball;
     const light = trackballLight(model, layer, {pdActive, held});
     const paint = css(light.colour);
     const glass = mode !== "leds" && !ownLight(light, layer?.index ?? 0);
-    const picked = mode === "leds"
-        ? `fill:${trackball ? "var(--key-hi)" : "var(--key)"};stroke:var(--text);stroke-width:${trackball ? 2 : 1}`
-        : `fill:${paint};stroke:${glass ? "none" : "rgba(255,255,255,.3)"}`;
-    const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
+    // Picking LEDs, the ball is drawn like a key (.kc-ball.leds); otherwise in its light.
+    const lit = mode === "leds" ? "" : ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
+    const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}${mode === "leds" ? " leds" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
         aria-label="Trackball LED ${TRACKBALL_LED}">
-        <circle cx="${x}" cy="${y}" r="${r}" style="${picked}"></circle>
-        ${mode === "leds" ? `<text class="kc-label sm" x="${x}" y="${y}">${TRACKBALL_LED}</text>` : ""}</g>`;
+        <circle cx="${esc(x)}" cy="${y}" r="${r}"${lit}></circle>
+        ${mode === "leds" ? `<text class="kc-label sm" x="${esc(x)}" y="${y}">${TRACKBALL_LED}</text>` : ""}</g>`;
     return {
         markup,
-        glow: mode === "leds" ? "" : `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${x}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
+        glow: mode === "leds" ? "" : `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${esc(x)}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
     };
 }

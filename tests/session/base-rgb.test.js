@@ -1,39 +1,39 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {ProfileDeviceService} = require("../../core/session/profile-device-service");
+const {connectedService} = require("../fixtures/connected-service");
 const {buildDeviceModel} = require("../../core/session/device-model");
-const {baseRgbForView} = require("../../core/session/device-profile-view");
+const {baseRgbForView} = require("../../core/model/device-profile-view");
 
-test("base RGB survives independently of the profile, but never survives failure or disconnect", async () => {
-    const service = new ProfileDeviceService();
+test("base RGB reads Profile Wire settings and preserves earlier errors across optional failure", async t => {
+    const {document} = require("../fixtures/portable-profile");
+    const {validateSnapshot} = require("../../core/model/portable-profile");
+    const {replaceDomain} = require("../../core/schema/profile-domains");
+    const {encodeSettings} = require("../../core/schema/settings-domain-v1");
+    const doc = document(), settings = validateSnapshot(doc).settings;
+    settings.values[21] = 1 | (1 << 8) | (32 << 16); settings.values[22] = (255 << 8) | (200 << 16);
+    doc.profile = replaceDomain(Buffer.from(doc.profile, "base64"), 64, () => encodeSettings(settings)).toString("base64");
+    const {service, adapter} = await connectedService(t, {document: doc});
+    const keyboard = adapter.keyboard;
     let fail = false;
-    service.connection = {connected: true, async request(request) {
-        const response = Buffer.from(request);
-        if (fail) response[0] = 0xff;
-        else response.set({1: [255], 2: [1], 3: [32], 4: [0, 255]}[request[2]], 3);
-        return response;
+    adapter.keyboard = {...keyboard, answer(request) {
+        if (!fail) return keyboard.answer(request);
+        const response = Buffer.from(request); response[0] = 0xff; return [response];
     }};
-    service.error = {message: "Earlier profile failure"};
+    service.setError(Error("Earlier profile failure"));
     let state = await service.readBaseRgb();
-    assert.equal(state.baseRgb.state, "read");
+    assert.equal(state.baseRgb.state, "read"); assert.equal(state.error.message, "Earlier profile failure");
+    const model = buildDeviceModel({...state, settingsView: {brightnessMax: 200}});
+    assert.equal(model.rgb.maximumBrightness, 200);
+    assert.equal(model.rgb.baseEffect.brightness, 200);
+    assert.equal(model.rgb.baseEffect.brightnessPercent, Math.round(200 * 100 / 255));
+    assert.deepEqual(model.rgb.baseEffect.previewColor, {h: "0", s: "255", v: "200"});
+    assert.ok(keyboard.requests.every(r => r[0] === 8 && r[1] === 0), "no VIA RGB reads");
+    state.baseRgb.hue = 99; assert.equal(service.snapshot().baseRgb.hue, 0);
+    fail = true; state = await service.readBaseRgb();
+    assert.equal(state.baseRgb.state, "unavailable"); assert.equal(buildDeviceModel(state).rgb.baseEffect.previewColor, undefined);
     assert.equal(state.error.message, "Earlier profile failure");
-    assert.deepEqual(buildDeviceModel(state).rgb.baseEffect.previewColor, {h: "0", s: "255", v: "255"});
-    const limitedModel = buildDeviceModel({...state, settingsView: {brightnessMax: 200}});
-    const limited = limitedModel.rgb.baseEffect;
-    assert.equal(limitedModel.rgb.maximumBrightness, 200, "the picker receives the same absolute brightness domain");
-    assert.equal(limited.brightness, 255, "the VIA read remains verbatim");
-    assert.equal(limited.brightnessPercent, 100);
-    assert.deepEqual(limited.previewColor, {h: "0", s: "255", v: "200"}, "the preview uses the keyboard's absolute brightness domain");
-    state.baseRgb.hue = 99;
-    assert.equal(service.snapshot().baseRgb.hue, 0, "snapshots cannot mutate the cached read");
-    fail = true;
-    state = await service.readBaseRgb();
-    assert.equal(state.baseRgb.state, "unavailable");
-    assert.equal(buildDeviceModel(state).rgb.baseEffect.previewColor, undefined);
-    assert.equal(state.error.message, "Earlier profile failure");
-    service.handleDisconnect(new Error("Unplugged"));
-    assert.equal(service.snapshot().baseRgb, null);
+    adapter.lastConnection().emitDisconnect(Error("Unplugged")); assert.equal(service.snapshot().baseRgb, null);
 });
 
 test("off, brightness zero, and unrecognised effects have distinct presentation", () => {
@@ -48,8 +48,7 @@ test("off, brightness zero, and unrecognised effects have distinct presentation"
     assert.equal(unknown.previewColor, undefined, "an effect's configured hue is not its rendered frame");
 });
 
-test("relative VIA brightness is normalized to the reported keyboard maximum", () => {
+test("settings brightness is absolute and is never scaled by the keyboard limit", () => {
     const state = {state: "read", effectId: 1, brightness: 128, hue: 17, saturation: 240, speed: 0};
-    assert.deepEqual(baseRgbForView(state, 200).previewColor, {h: "17", s: "240", v: "100"});
-    assert.deepEqual(baseRgbForView(state).previewColor, {h: "17", s: "240", v: "128"}, "unknown limits preserve the raw read");
+    for (const maximum of [0, 128, 200, 255, undefined]) assert.deepEqual(baseRgbForView(state, maximum).previewColor, {h: "17", s: "240", v: "128"});
 });

@@ -1,31 +1,52 @@
+// @ts-check
 "use strict";
 
 const catalog = require("../data/keycode-catalog");
-const {validateMacroIr} = require("./settings-domain-v1");
+const {layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
+const MACRO_PROTECTION = Object.freeze({AUTO: "auto", ON: "on", OFF: "off"});
+/** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
-const validKey = key => Number.isInteger(key) && ((key >= 4 && key <= 0xa4) || (key >= 0xe0 && key <= 0xe7));
+/** @param {unknown} key @returns {key is number} */
+const validKey = key => typeof key === "number" && Number.isInteger(key) && ((key >= 4 && key <= 0xa4) || (key >= 0xe0 && key <= 0xe7));
+/** @param {string} text */
 const escapeText = text => text.replace(/[{}]/g, brace => brace + brace);
+/** @param {number} key */
 const keyName = key => catalog.resolve(key).name;
 
 function macroKeycodes() {
     return catalog.entries().filter(entry => validKey(entry.value)).flatMap(entry => [entry.name, ...entry.aliases]);
 }
 
+function macroModifierKeycodes() {
+    return catalog.entries().filter(entry => entry.value >= 0xE0 && entry.value <= 0xE7).flatMap(entry => [entry.name, ...entry.aliases]);
+}
+
 // The existing recorder and step builder use text plus {key}, {+key}, {-key}
 // and {milliseconds}. Doubled braces preserve literal text from device bytes.
-function parsePayload(payload) {
-    if (typeof payload !== "string" || payload.length > 32768) throw fail("Enter a macro of at most 32,768 characters.");
-    const steps = [], held = new Set();
+// The keyboard types text through the host layout and the rest by host
+// Unicode entry, which an ordinary key held across it would corrupt.
+/** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] @returns {import("./types.js").MacroStep[]} */
+function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT} = {}) {
+    if (typeof payload !== "string") throw fail("Enter a macro as text.");
+    /** @type {import("./types.js").MacroStep[]} */
+    const steps = [];
+    /** @type {Set<number>} */
+    const held = new Set();
     let text = "";
-    const flush = () => {if (text) steps.push({kind: "text", text}); text = "";};
+    const flush = () => {
+        if (textEntry && [...text].some(character => !layoutTypes(layout, character)) && [...held].some(key => key < 0xE0)) throw fail("Release ordinary keys before text your keyboard layout cannot type, which needs Unicode entry; modifier holds are supported.");
+        if (text) steps.push({kind: "text", text}); text = "";
+    };
     for (let index = 0; index < payload.length;) {
         const char = payload[index++];
         if ((char === "{" || char === "}") && payload[index] === char) {text += char; index++; continue;}
         if (char === "}") throw fail("Unexpected }. Use }} for a literal closing brace.");
         if (char !== "{") {
-            const code = char.charCodeAt(0);
-            if (!(code === 9 || code === 10 || (code >= 32 && code <= 126))) throw fail("Macros support ASCII text, tabs and newlines.");
-            text += char; continue;
+            // The loop has just read this character, so its index is in range.
+            const code = /** @type {number} */ (payload.codePointAt(index - 1));
+            if (!(code === 9 || code === 10 || (code >= 32 && code <= 126) || (code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF)))) throw fail("Macro text must contain valid Unicode characters, tabs or newlines; control characters and unpaired surrogates are unsupported.");
+            if (code > 0xFFFF) {text += payload.slice(index - 1, index + 1); index++;} else text += char;
+            continue;
         }
         flush();
         const end = payload.indexOf("}", index);
@@ -39,7 +60,7 @@ function parsePayload(payload) {
         const kind = command[0] === "+" ? "down" : command[0] === "-" ? "up" : "tap";
         const names = (kind === "tap" ? command : command.slice(1)).split(",").map(name => name.trim());
         const keys = names.map(name => catalog.encode(name));
-        if (!keys.length || keys.length > 16 || keys.some(key => !validKey(key)) || new Set(keys).size !== keys.length || (kind !== "tap" && keys.length !== 1)) throw fail("Choose up to 16 distinct basic keys for a chord, or one key for a press or release.");
+        if (!keys.length || keys.length > 16 || !keys.every(validKey) || new Set(keys).size !== keys.length || (kind !== "tap" && keys.length !== 1)) throw fail("Choose up to 16 distinct basic keys for a chord, or one key for a press or release.");
         if (kind === "up") {
             if (!held.delete(keys[0])) throw fail("A macro releases a key that is not held.");
         } else {
@@ -53,114 +74,122 @@ function parsePayload(payload) {
     return steps;
 }
 
-function encodeMacroPayload(payload, kind) {
-    if (!["via", "user"].includes(kind)) throw fail("Unknown macro bank.");
+// A macro as the bytes QMK stores: text as is, then 1 and an opcode for a
+// key tap (1), press (2), release (3) or a delay (4, digits, '|').
+/** @param {string} payload @param {import("./types.js").MacroOptions} [options] */
+function encodeMacroPayload(payload, options) {
+    /** @type {Buffer[]} */
     const chunks = [];
-    for (const step of parsePayload(payload)) {
+    const protection = options?.protection ?? "auto";
+    if (!Object.values(MACRO_PROTECTION).includes(protection)) throw fail("Choose Automatic, On or Off for uninterruptible playback.");
+    if (protection !== "auto") chunks.push(Buffer.from([1, 5, protection === "on" ? 1 : 2]));
+    for (const step of parsePayload(payload, options)) {
         if (step.kind === "text") {
-            const bytes = Buffer.from(step.text, "ascii");
-            if (kind === "via") chunks.push(bytes);
-            else for (let offset = 0; offset < bytes.length; offset += 255) {
-                const part = bytes.subarray(offset, offset + 255);
-                chunks.push(Buffer.from([1, part.length]), part);
-            }
+            chunks.push(Buffer.from(step.text, "utf8"));
         } else if (step.kind === "delay") {
-            chunks.push(kind === "via" ? Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${step.delay}|`)]) : Buffer.from([2, step.delay & 255, step.delay >> 8]));
-        } else if (kind === "user") {
-            chunks.push(Buffer.from(step.kind === "tap" ? [5, step.keys.length, ...step.keys] : [step.kind === "down" ? 3 : 4, step.keys[0]]));
+            chunks.push(Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${step.delay}|`)]));
         } else if (step.kind === "tap" && step.keys.length > 1) {
-            for (const key of step.keys) chunks.push(Buffer.from([1, 2, key]));
-            for (const key of [...step.keys].reverse()) chunks.push(Buffer.from([1, 3, key]));
+            // The firmware's own chord form: press every key but the last,
+            // tap the last, release the rest in reverse.
+            const last = step.keys.length - 1;
+            for (const key of step.keys.slice(0, last)) chunks.push(Buffer.from([1, 2, key]));
+            chunks.push(Buffer.from([1, 1, step.keys[last]]));
+            for (const key of step.keys.slice(0, last).reverse()) chunks.push(Buffer.from([1, 3, key]));
         } else {
             chunks.push(Buffer.from([1, {tap: 1, down: 2, up: 3}[step.kind], step.keys[0]]));
         }
     }
-    const bytes = Buffer.concat(chunks);
-    if (kind === "user") validateMacroIr(bytes);
-    return bytes;
+    return Buffer.concat(chunks);
 }
 
-function decodeMacroPayload(bytes, kind) {
-    if (!Buffer.isBuffer(bytes) || !["via", "user"].includes(kind)) throw fail("Invalid macro bytes or bank.");
-    if (kind === "user") validateMacroIr(bytes);
-    let output = "", offset = 0;
-    while (offset < bytes.length) {
-        let op = bytes[offset++];
-        if (kind === "via") {
-            if (op !== 1) {output += escapeText(String.fromCharCode(op)); continue;}
-            op = bytes[offset++];
-            if (op === 4) {
-                const end = bytes.indexOf(124, offset);
-                if (end < 0) throw fail("Truncated macro delay.");
-                output += `{${bytes.subarray(offset, end).toString("ascii")}}`; offset = end + 1;
-            } else {
-                if (![1, 2, 3].includes(op) || !validKey(bytes[offset])) throw fail("Invalid macro key instruction.");
-                output += `{${op === 2 ? "+" : op === 3 ? "-" : ""}${keyName(bytes[offset++])}}`;
-            }
-        } else if (op === 1) {
-            const length = bytes[offset++];
-            output += escapeText(bytes.subarray(offset, offset + length).toString("ascii")); offset += length;
-        } else if (op === 2) {
-            output += `{${bytes.readUInt16LE(offset)}}`; offset += 2;
-        } else if (op === 3 || op === 4) {
-            output += `{${op === 3 ? "+" : "-"}${keyName(bytes[offset++])}}`;
-        } else {
-            const length = bytes[offset++];
-            output += `{${[...bytes.subarray(offset, offset + length)].map(keyName).join(",")}}`; offset += length;
+/** @typedef {{kind: "text", text: string} | {kind: "delay", digits: string} | {kind: "tap" | "down" | "up", key: number}} MacroCommand */
+
+// One chord found at commands[at]: a run of presses, then either a tap whose
+// releases follow in reverse (the firmware's form) or, for Ark's older form,
+// at least two presses released straight away in reverse. Presses before the
+// longest matching tail stay presses. Returns the keys and the commands used.
+/** @param {MacroCommand[]} commands @param {number} at @returns {{downs: number, keys: number[], length: number} | undefined} */
+function chordAt(commands, at) {
+    let end = at;
+    while (commands[end]?.kind === "down") end++;
+    if (end === at) return undefined;
+    const tap = commands[end]?.kind === "tap" ? /** @type {{key: number}} */ (commands[end]).key : undefined;
+    const ups = tap === undefined ? end : end + 1;
+    const keyOf = /** @param {number} index */ index => /** @type {{key: number}} */ (commands[index]).key;
+    for (let start = at; start < end; start++) {
+        const held = end - start, total = held + (tap === undefined ? 0 : 1);
+        if (total < 2 || total > 16) continue;
+        let matched = true;
+        for (let index = 0; index < held && matched; index++) {
+            const up = commands[ups + index];
+            matched = up?.kind === "up" && up.key === keyOf(end - 1 - index);
         }
+        if (!matched) continue;
+        const keys = [];
+        for (let index = start; index < end; index++) keys.push(keyOf(index));
+        if (tap !== undefined) keys.push(tap);
+        return {downs: start - at, keys, length: ups + held - at};
     }
-    parsePayload(output);
+    return undefined;
+}
+
+/** @param {MacroCommand} command */
+const commandText = command => command.kind === "text" ? escapeText(command.text)
+    : command.kind === "delay" ? `{${command.digits}}`
+    : `{${command.kind === "down" ? "+" : command.kind === "up" ? "-" : ""}${keyName(command.key)}}`;
+
+/** @param {MacroCommand[]} commands */
+function commandsText(commands) {
+    let output = "";
+    for (let index = 0; index < commands.length;) {
+        const chord = chordAt(commands, index);
+        if (!chord) {output += commandText(commands[index++]); continue;}
+        for (let press = 0; press < chord.downs; press++) output += commandText(commands[index + press]);
+        output += `{${chord.keys.map(keyName).join(",")}}`;
+        index += chord.length;
+    }
     return output;
 }
 
-// The keyboard plays a VIA macro only after compiling its stored bytes into a
-// program of at most this many bytes; a longer one is kept but never plays.
-const MACRO_PROGRAM_MAX = 512;
-
-// The program size the firmware's decoder (macro_payload_decode_qmk_stream)
-// produces for well-formed VIA macro bytes. It mirrors that decoder step for
-// step: text runs cost 2 bytes per 255 characters plus one per character; a
-// tap 3; a held key's press and release 2 each; a chord of held keys closed
-// around one tap becomes one tap list; a delay 3.
-function macroProgramBytes(bytes) {
+/** @param {Buffer} bytes @param {import("./types.js").MacroOptions} [options] */
+function decodeMacroPayload(bytes, options) {
     if (!Buffer.isBuffer(bytes)) throw fail("Invalid macro bytes.");
-    let length = 0, chunk = 0, downs = [], tap = null, matched = 0;
-    const flush = () => {
-        length += 2 * downs.length + (tap === null ? 0 : 3) + 2 * matched;
-        downs = []; tap = null; matched = 0;
-    };
-    for (let index = 0; index < bytes.length;) {
-        const byte = bytes[index++];
-        if (byte !== 1) {
-            flush();
-            if (!chunk || chunk === 255) { length += 2; chunk = 0; }
-            length++; chunk++;
-            continue;
+    /** @type {MacroCommand[]} */
+    const commands = [];
+    let offset = 0;
+    while (offset < bytes.length) {
+        let op = bytes[offset++];
+        if (op !== 1) {
+            const start = offset - 1;
+            while (offset < bytes.length && bytes[offset] !== 1) offset++;
+            const raw = bytes.subarray(start, offset), text = raw.toString("utf8");
+            if (!Buffer.from(text, "utf8").equals(raw)) throw fail("Malformed UTF-8 macro text.");
+            commands.push({kind: "text", text}); continue;
         }
-        chunk = 0;
-        const op = bytes[index++];
-        if (op === 4) {
-            flush();
-            while (index < bytes.length && bytes[index] !== 124) index++;
-            index++; length += 3;
-            continue;
-        }
-        const key = bytes[index++];
-        if (op === 1) {
-            if (tap !== null) flush();
-            if (!downs.length) length += 3;
-            else { tap = key; matched = 0; }
-        } else if (op === 2) {
-            if (tap !== null) flush();
-            downs.push(key);
-        } else if (tap !== null && matched < downs.length && key === downs[downs.length - 1 - matched]) {
-            if (++matched === downs.length) { length += 3 + downs.length; downs = []; tap = null; matched = 0; }
+        op = bytes[offset++];
+        if (op === 5) {
+            macroProtectionOf(bytes);
+            if (offset !== 2) throw fail("Macro protection must be a single prefix before the steps.");
+            offset++;
+        } else if (op === 4) {
+            const end = bytes.indexOf(124, offset);
+            if (end < 0) throw fail("Truncated macro delay.");
+            commands.push({kind: "delay", digits: bytes.subarray(offset, end).toString("ascii")}); offset = end + 1;
         } else {
-            flush(); length += 2;
+            if (![1, 2, 3].includes(op) || !validKey(bytes[offset])) throw fail("Invalid macro key instruction.");
+            commands.push({kind: op === 2 ? "down" : op === 3 ? "up" : "tap", key: bytes[offset++]});
         }
     }
-    flush();
-    return length;
+    const output = commandsText(commands);
+    parsePayload(output, options);
+    return output;
 }
 
-module.exports = {macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};
+/** @param {Uint8Array} bytes @returns {"auto" | "on" | "off"} */
+function macroProtectionOf(bytes) {
+    if (bytes[0] !== 1 || bytes[1] !== 5) return "auto";
+    if (bytes[2] !== 1 && bytes[2] !== 2) throw fail("Invalid macro playback protection prefix.");
+    return bytes[2] === 1 ? "on" : "off";
+}
+
+module.exports = {macroModifierKeycodes, MACRO_PROTECTION, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload};

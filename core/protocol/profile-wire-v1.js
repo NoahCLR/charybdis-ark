@@ -1,10 +1,20 @@
+// @ts-check
 "use strict";
+const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 
-const {isUnhandledEcho, requestHandled} = require("./via-unhandled-v1");
+const {requestHandled} = require("./raw-hid-unhandled");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 
 const PROFILE_WIRE_V1 = Object.freeze({
-    CAPABILITY_PAGE_COUNT: 2,
+    // Profile Wire 2.0 opens the new base (firmware D-F28): every profile
+    // length and offset is 32 bits, and the feature word holds only what a
+    // build varies by. Ark requires this version exactly (D-L64).
+    PROTOCOL_MAJOR: 2,
+    PROTOCOL_MINOR: 0,
+    // Response layout 3 (firmware D-F28): page 1 the ceilings that fit a byte,
+    // page 2 the wider ones. Any other layout is refused.
+    CAPABILITY_LAYOUT: 3,
+    CAPABILITY_PAGE_COUNT: 3,
     CHANNEL: 0x00,
     COMMAND_GET: 0x08,
     PAYLOAD_OFFSET: 7,
@@ -21,47 +31,31 @@ const PROFILE_WIRE_STATUS = Object.freeze({
     UNAVAILABLE: 3,
 });
 
-const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x0007ffff,
-    REQUIRED_READ_FEATURES: 0x0000000f,
-    STATE_FLAGS: 0x01ff,
-    SUPPORTED_DOMAINS: 0x1f,
-});
-
+// The feature word describes the build, never a step in the firmware's
+// history: everything the base does is implied by its version (firmware
+// D-F28, which retired every Profile Wire 1 bit). The bits are in firmware's
+// profile-wire-v1/hid-channel.md, "The feature word".
 const PROFILE_WIRE_FEATURES = Object.freeze({
-    READ_SURFACE: 1 << 0,
-    STORAGE_LAYOUT: 1 << 1,
-    RGB_SCHEMA: 1 << 2,
-    KEY_BEHAVIOR_SCHEMA: 1 << 3,
-    SPLIT_KEYBOARD: 1 << 4,
-    CANDIDATE_WRITE: 1 << 5,
-    PERSISTENT_COMMIT: 1 << 6,
-    RGB_PREVIEW: 1 << 7,
-    RUNTIME_ACTIVATION: 1 << 8,
-    PEER_RECONCILIATION: 1 << 9,
-    ACTION_ABI_DIGEST: 1 << 10,
-    COMPILED_PROFILE_HASH: 1 << 11,
-    ATOMIC_LOGICAL_APPLY: 1 << 12,
-    LEGACY_PD_SOURCE: 1 << 13,
-    // TG(), TO(), TT() and OSL() act through the keyboard's layer ownership.
-    OWNED_LAYER_TOGGLES: 1 << 14,
-    // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix…)
-    // through QMK's key processing, so they may sit in a behaviour.
-    BEHAVIOR_QMK_FUNCTIONS: 1 << 15,
-    // Userspace keycodes sit in fixed blocks, action kind 7 is a custom key and
-    // settings v5 names the 64 custom keys. It comes with the action ABI the
-    // app knows (schema/actions.js), so the model tests that digest.
-    CUSTOM_KEYS: 1 << 16,
-    PHYSICAL_GESTURE_TIMING: 1 << 17,
-    OWNED_TAPPING: 1 << 18,
+    // One half of a split pair: a save copies the profile to the slave half.
+    SPLIT_KEYBOARD: 1 << 0,
+    // Candidate writes (with reuse and streaming chunks), durable commit and
+    // activation; set once the live-profile owner reports.
+    SAVES: 1 << 1,
+    // The build has a pointing device.
+    POINTING: 1 << 2,
 });
 
-const PROFILE_WIRE_DOMAINS = Object.freeze({
-    RGB: 1 << 0,
-    KEY_BEHAVIORS: 1 << 1,
-    COMBOS: 1 << 2,
-    SETTINGS: 1 << 3,
-    PD_MODES: 1 << 4,
+// Apply needs a build that saves and copies to the slave half;
+// CURRENT_PAIR_FEATURES is everything the flashable pair reports. Reading needs
+// no bit: the version says what the keyboard does (session/firmware-support.js).
+const F = PROFILE_WIRE_FEATURES;
+const CURRENT_MUTATION_FEATURES = (F.SPLIT_KEYBOARD | F.SAVES) >>> 0;
+const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
+    FEATURE_FLAGS: (F.SPLIT_KEYBOARD | F.SAVES | F.POINTING) >>> 0,
+    CURRENT_MUTATION_FEATURES,
+    CURRENT_PAIR_FEATURES: (CURRENT_MUTATION_FEATURES | F.POINTING) >>> 0,
+    STATE_FLAGS: 0x03ff,
+    SUPPORTED_DOMAINS: PROFILE_DOMAIN_MASK,
 });
 
 const PROFILE_ACTIVE_KIND = Object.freeze({
@@ -69,6 +63,10 @@ const PROFILE_ACTIVE_KIND = Object.freeze({
     COMMITTED: 1,
     PREVIEW: 2,
     PENDING: 3,
+    // Unsaved live edits (firmware D-F32): the keyboard runs its working copy.
+    // Status page 0's active digest then carries the working copy's revision,
+    // and page 1's generation and origin are its saved base's.
+    WORKING: 4,
 });
 
 const PROFILE_STATE_FLAGS = Object.freeze({
@@ -80,24 +78,19 @@ const PROFILE_STATE_FLAGS = Object.freeze({
     PEER_CONVERGED: 1 << 5,
     WAITING_SAFE_BOUNDARY: 1 << 6,
     DIGESTS_UNAVAILABLE: 1 << 7,
-    // A cancelled save's peer ABORT was never acknowledged. No save starts
-    // until the peer confirms; a peer that never does needs a restart.
+    // The slave half never acknowledged a cancelled save's ABORT. No save
+    // starts until it confirms; a slave half that never does needs a restart.
     PEER_CLEANUP_PENDING: 1 << 8,
+    // A slot holds a profile in an earlier store format or retired test
+    // layout (firmware D-F28). The
+    // keyboard neither reads nor converts it and runs its compiled defaults
+    // until a profile is saved (D-L64).
+    STORED_EARLIER_FORMAT: 1 << 9,
 });
 
-const VIA_READS = Object.freeze({
-    COMMAND_GET_PROTOCOL_VERSION: 0x01,
-    COMMAND_GET_KEYBOARD_VALUE: 0x02,
-    VALUE_FIRMWARE_VERSION: 0x04,
-    UNHANDLED: 0xff,
-    // QMK 0.34.6 moved VIA from 12 to 13 by adding one keyboard value
-    // (keycodes version, 0x06); the commands Ark sends are unchanged. Firmware
-    // released before it reports 12, so Ark accepts both.
-    PROTOCOL_VERSION: 0x000d,
-    SUPPORTED_PROTOCOL_VERSIONS: Object.freeze([0x000c, 0x000d]),
-});
 
 class ProfileWireProtocolError extends Error {
+    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
     constructor(code, message, details = {}) {
         super(message);
         this.name = "ProfileWireProtocolError";
@@ -106,6 +99,7 @@ class ProfileWireProtocolError extends Error {
     }
 }
 
+/** @param {number} value @param {string} label @param {{nonzero?: boolean}} [options] */
 function assertByte(value, label, {nonzero = false} = {}) {
     if (!Number.isInteger(value) || value < (nonzero ? 1 : 0) || value > 0xff) {
         throw new RangeError(`${label} must be ${nonzero ? "a nonzero " : "an "}8-bit integer.`);
@@ -113,16 +107,23 @@ function assertByte(value, label, {nonzero = false} = {}) {
     return value;
 }
 
+// A page is 16 bits: its low byte goes in request byte 4 and its high byte in
+// byte 5, which only the wide readbacks (GET 0x04..0x07) read; every other
+// value's byte 5 stays zero.
+/** @param {number} valueId @param {number} page @param {number} requestId */
 function buildProfileGetRequest(valueId, page, requestId) {
     const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
     report[0] = PROFILE_WIRE_V1.COMMAND_GET;
     report[1] = PROFILE_WIRE_V1.CHANNEL;
     report[2] = assertByte(valueId, "valueId");
     report[3] = assertByte(requestId, "requestId", {nonzero: true});
-    report[4] = assertByte(page, "page");
+    if (!Number.isInteger(page) || page < 0 || page > 0xffff) throw new RangeError("page must be a 16-bit integer.");
+    report[4] = page & 0xff;
+    report[5] = page >> 8;
     return report;
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function profileResponseMatcher(response, request) {
     const actual = normalizeRawHidReport(response, "Profile Wire response");
     const expected = normalizeRawHidReport(request, "Profile Wire request");
@@ -137,6 +138,7 @@ function profileResponseMatcher(response, request) {
 // partial, such as the tail chunk of a committed payload. It stays opt-in so
 // the fixed-size status and capability pages keep failing on a short read,
 // where a short page really does mean something is wrong.
+/** @param {Uint8Array} response @param {Uint8Array} request @param {{allowShortPayload?: boolean}} [options] */
 function decodeProfileResponse(response, request, options = {}) {
     const report = Buffer.from(normalizeRawHidReport(response, "Profile Wire response"));
     if (!profileResponseMatcher(report, request)) {
@@ -167,10 +169,19 @@ function decodeProfileResponse(response, request, options = {}) {
     return report.subarray(PROFILE_WIRE_V1.PAYLOAD_OFFSET, PROFILE_WIRE_V1.PAYLOAD_OFFSET + payloadLength);
 }
 
+// The keyboard's answer to a page past the end of a paged value: what a
+// value that got shorter during a read answers (profile-payload-v1.js,
+// profile-edit-v1.js read page 0 again on it).
+/** @param {unknown} error */
+const isUnknownPage = error => error instanceof ProfileWireProtocolError && error.code === "DEVICE_REJECTED"
+    && /** @type {{status?: number}} */ (/** @type {unknown} */ (error)).status === PROFILE_WIRE_STATUS.UNKNOWN_PAGE;
+
+/** @param {Uint8Array} buffer @param {number} offset */
 function readU16(buffer, offset) {
     return buffer[offset] | (buffer[offset + 1] << 8);
 }
 
+/** @param {Uint8Array} buffer @param {number} offset */
 function readU32(buffer, offset) {
     return (
         buffer[offset]
@@ -180,14 +191,17 @@ function readU32(buffer, offset) {
     ) >>> 0;
 }
 
+/** @param {Uint8Array[]} pages */
 function decodeCapabilityPages(pages) {
     assertPageSet(pages, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, "capability");
     const identity = pages[0];
     const capacity = pages[1];
-    if (identity[0] !== 1 || identity[1] !== PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT) {
-        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout.");
+    const wide = pages[2];
+    if (identity[0] !== PROFILE_WIRE_V1.CAPABILITY_LAYOUT || identity[1] !== PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT) {
+        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout: Ark supports only current firmware. Update both halves.");
     }
-    assertZeroRange(capacity, 22, 25, "capability page 1");
+    assertZeroRange(capacity, 16, 25, "capability page 1");
+    assertZeroRange(wide, 18, 25, "capability page 2");
     const decoded = {
         responseVersion: identity[0],
         protocol: {major: identity[2], minor: identity[3]},
@@ -203,20 +217,23 @@ function decodeCapabilityPages(pages) {
         maxLogicalLayers: capacity[1],
         maxBehaviorRows: capacity[2],
         maxTapStepsPerBehavior: capacity[3],
-        maxPopulatedBehaviorSteps: capacity[4],
-        maxCombos: capacity[5],
-        maxKeysPerCombo: capacity[6],
-        maxReusableRgbGroups: capacity[7],
-        maxRgbStageGroupRows: capacity[8],
-        physicalLedCount: capacity[9],
-        ledBitmapSize: capacity[10],
-        customKeySlots: capacity[11],
-        viaMacroSlots: capacity[12],
-        maxProfilePayload: readU16(capacity, 13),
-        profileSlotPayload: readU16(capacity, 15),
-        profileSlotSize: readU16(capacity, 17),
-        viaMacroBytes: readU16(capacity, 19),
-        supportedDomainMask: capacity[21],
+        maxCombos: capacity[4],
+        maxKeysPerCombo: capacity[5],
+        maxReusableRgbGroups: capacity[6],
+        maxRgbStageGroupRows: capacity[7],
+        physicalLedCount: capacity[8],
+        ledBitmapSize: capacity[9],
+        customKeySlots: capacity[10],
+        macroSlots: capacity[11],
+        supportedDomainMask: capacity[12],
+        nameMaxBytes: capacity[13],
+        layerMaskBits: capacity[14],
+        placementPositions: capacity[15],
+        maxPopulatedBehaviorSteps: readU16(wide, 0),
+        profileSlotSize: readU32(wide, 2),
+        maxProfilePayload: readU32(wide, 6),
+        profileSlotPayload: readU32(wide, 10),
+        macroBytes: readU32(wide, 14),
     };
     assertKnownMask(decoded.featureFlags, PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS, "capability feature flags");
     assertKnownMask(decoded.supportedDomainMask, PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS, "supported domain mask");
@@ -229,32 +246,8 @@ function decodeCapabilityPages(pages) {
     if (decoded.candidateChunkMax > 20) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Candidate chunk capacity exceeds the 32-byte Profile Wire frame.");
     }
-    const hasFeature = (feature) => (decoded.featureFlags & feature) !== 0;
-    const hasDomain = (domain) => (decoded.supportedDomainMask & domain) !== 0;
-    if (hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE) !== (decoded.candidateChunkMax > 0)) {
-        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Candidate-write support and candidate chunk capacity disagree.");
-    }
-    if (hasDomain(PROFILE_WIRE_DOMAINS.RGB) !== hasFeature(PROFILE_WIRE_FEATURES.RGB_SCHEMA)
-        || hasDomain(PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS) !== hasFeature(PROFILE_WIRE_FEATURES.KEY_BEHAVIOR_SCHEMA)) {
-        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Supported profile domains and schema feature flags disagree.");
-    }
-    if (hasFeature(PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT) && !hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE)) {
-        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Persistent commit requires candidate-write support.");
-    }
-    if (hasFeature(PROFILE_WIRE_FEATURES.RGB_PREVIEW)
-        && (!hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE) || !hasDomain(PROFILE_WIRE_DOMAINS.RGB))) {
-        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "RGB preview requires candidate-write support and the RGB domain.");
-    }
-    if (hasFeature(PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION) && !hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE)) {
-        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Runtime activation requires candidate-write support.");
-    }
-    if (hasFeature(PROFILE_WIRE_FEATURES.PEER_RECONCILIATION)
-        && (!hasFeature(PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD) || !hasFeature(PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT))) {
-        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Peer reconciliation requires split-keyboard and persistent-commit support.");
-    }
-    if (hasFeature(PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY)
-        && (!hasFeature(PROFILE_WIRE_FEATURES.PEER_RECONCILIATION) || !hasFeature(PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION))) {
-        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Atomic logical Apply requires peer reconciliation and runtime activation.");
+    if (((decoded.featureFlags & PROFILE_WIRE_FEATURES.SAVES) !== 0) !== (decoded.candidateChunkMax > 0)) {
+        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Save support and candidate chunk capacity disagree.");
     }
     if (decoded.compiledLayerCount > decoded.maxLogicalLayers) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Compiled layer count exceeds the advertised logical-layer capacity.");
@@ -268,6 +261,7 @@ function decodeCapabilityPages(pages) {
     return decoded;
 }
 
+/** @param {Uint8Array[]} pages */
 function decodeStatusPages(pages) {
     assertPageSet(pages, PROFILE_WIRE_V1.STATUS_PAGE_COUNT, "status");
     const identity = pages[0];
@@ -289,35 +283,39 @@ function decodeStatusPages(pages) {
         activeOriginHalf: generation[4],
         committedGeneration: readU32(generation, 5),
         committedOriginHalf: generation[9],
-        peerGeneration: readU32(generation, 10),
-        peerOriginHalf: generation[14],
+        slaveGeneration: readU32(generation, 10),
+        slaveOriginHalf: generation[14],
         candidateTransactionId: readU16(generation, 15),
         lastCommittedTransactionId: readU16(generation, 17),
         conflictCount: readU16(generation, 19),
         validationState: generation[21],
         lastError: generation[22],
     };
-    decoded.candidatePending = (decoded.stateFlags & PROFILE_STATE_FLAGS.CANDIDATE_PENDING) !== 0;
-    decoded.peerKnown = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_KNOWN) !== 0;
-    decoded.peerConverged = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) !== 0;
-    decoded.waitingSafeBoundary = (decoded.stateFlags & PROFILE_STATE_FLAGS.WAITING_SAFE_BOUNDARY) !== 0;
-    decoded.peerCleanupPending = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING) !== 0;
     assertKnownMask(decoded.stateFlags, PROFILE_WIRE_KNOWN_MASKS.STATE_FLAGS, "status state flags");
-    if (!Object.values(PROFILE_ACTIVE_KIND).includes(decoded.activeKind)) {
+    if (!/** @type {number[]} */ (Object.values(PROFILE_ACTIVE_KIND)).includes(decoded.activeKind)) {
         throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", `Unknown active profile kind ${decoded.activeKind}.`);
     }
-    for (const [label, value] of [
+    for (const [label, value] of /** @type {[string, number][]} */ ([
         ["active origin half", decoded.activeOriginHalf],
         ["committed origin half", decoded.committedOriginHalf],
-        ["peer origin half", decoded.peerOriginHalf],
-    ]) {
+        ["slave half's generation origin", decoded.slaveOriginHalf],
+    ])) {
         if (value > 1) {
             throw new ProfileWireProtocolError("MALFORMED_RESPONSE", `${label} must be 0 or 1.`);
         }
     }
-    return decoded;
+    return {
+        ...decoded,
+        candidatePending: (decoded.stateFlags & PROFILE_STATE_FLAGS.CANDIDATE_PENDING) !== 0,
+        slaveKnown: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_KNOWN) !== 0,
+        slaveConverged: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) !== 0,
+        waitingSafeBoundary: (decoded.stateFlags & PROFILE_STATE_FLAGS.WAITING_SAFE_BOUNDARY) !== 0,
+        slaveCleanupPending: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING) !== 0,
+        storedEarlierFormat: (decoded.stateFlags & PROFILE_STATE_FLAGS.STORED_EARLIER_FORMAT) !== 0,
+    };
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {number} valueId @param {number} pageCount @param {import("./types.js").ReadOptions} [options] */
 async function readProfilePages(connection, valueId, pageCount, options = {}) {
     if (!connection || typeof connection.request !== "function") {
         throw new TypeError("connection must provide request(report, options).");
@@ -344,78 +342,24 @@ async function readProfilePages(connection, valueId, pageCount, options = {}) {
     return pages;
 }
 
-function buildViaProtocolVersionRequest() {
-    const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
-    report[0] = VIA_READS.COMMAND_GET_PROTOCOL_VERSION;
-    return report;
-}
-
-function buildViaFirmwareVersionRequest() {
-    const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
-    report[0] = VIA_READS.COMMAND_GET_KEYBOARD_VALUE;
-    report[1] = VIA_READS.VALUE_FIRMWARE_VERSION;
-    return report;
-}
-
-function viaReadResponseMatcher(response, request) {
-    const actual = normalizeRawHidReport(response, "VIA read response");
-    const expected = normalizeRawHidReport(request, "VIA read request");
-    return actual[0] === expected[0] || isUnhandledEcho(actual, expected);
-}
-
-function decodeViaProtocolVersion(response) {
-    const report = Buffer.from(normalizeRawHidReport(response, "VIA protocol-version response"));
-    assertViaHandled(report, VIA_READS.COMMAND_GET_PROTOCOL_VERSION);
-    assertZeroRange(report, 3, RAW_HID_REPORT_SIZE, "VIA protocol-version response");
-    return (report[1] << 8) | report[2];
-}
-
-function decodeViaFirmwareVersion(response) {
-    const report = Buffer.from(normalizeRawHidReport(response, "VIA firmware-version response"));
-    assertViaHandled(report, VIA_READS.COMMAND_GET_KEYBOARD_VALUE);
-    if (report[1] !== VIA_READS.VALUE_FIRMWARE_VERSION) {
-        throw new ProfileWireProtocolError("CORRELATION_MISMATCH", "VIA firmware-version response has the wrong keyboard-value id.");
-    }
-    assertZeroRange(report, 6, RAW_HID_REPORT_SIZE, "VIA firmware-version response");
-    return ((report[2] << 24) | (report[3] << 16) | (report[4] << 8) | report[5]) >>> 0;
-}
-
-async function readViaIdentity(connection, options = {}) {
-    if (!connection || typeof connection.request !== "function") {
-        throw new TypeError("connection must provide request(report, options).");
-    }
-    const protocolRequest = buildViaProtocolVersionRequest();
-    const protocolResponse = await connection.request(protocolRequest, {
-        matchResponse: viaReadResponseMatcher,
-        signal: options.signal,
-        timeoutMs: options.timeoutMs,
-    });
-    const firmwareRequest = buildViaFirmwareVersionRequest();
-    const firmwareResponse = await connection.request(firmwareRequest, {
-        matchResponse: viaReadResponseMatcher,
-        signal: options.signal,
-        timeoutMs: options.timeoutMs,
-    });
-    return {
-        protocolVersion: decodeViaProtocolVersion(protocolResponse),
-        firmwareVersion: decodeViaFirmwareVersion(firmwareResponse),
-    };
-}
-
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readProfileCapabilities(connection, options) {
     return decodeCapabilityPages(await readProfilePages(connection, PROFILE_WIRE_V1.VALUE_CAPABILITIES, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options));
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readProfileStatus(connection, options) {
     return decodeStatusPages(await readProfilePages(connection, PROFILE_WIRE_V1.VALUE_STATUS, PROFILE_WIRE_V1.STATUS_PAGE_COUNT, options));
 }
 
+/** @param {Uint8Array[]} pages @param {number} count @param {string} label */
 function assertPageSet(pages, count, label) {
     if (!Array.isArray(pages) || pages.length !== count || pages.some((page) => !(page instanceof Uint8Array) || page.byteLength !== PROFILE_WIRE_V1.PAYLOAD_SIZE)) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", `Profile Wire ${label} response requires ${count} complete pages.`);
     }
 }
 
+/** @param {Uint8Array} buffer @param {number} start @param {number} end @param {string} label */
 function assertZeroRange(buffer, start, end, label) {
     for (let index = start; index < end; index += 1) {
         if (buffer[index] !== 0) {
@@ -424,19 +368,11 @@ function assertZeroRange(buffer, start, end, label) {
     }
 }
 
+/** @param {number} value @param {number} knownMask @param {string} label */
 function assertKnownMask(value, knownMask, label) {
     const unknown = (Number(value) >>> 0) & (~knownMask >>> 0);
     if (unknown !== 0) {
         throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", `${label} contains unknown bits 0x${unknown.toString(16)}.`);
-    }
-}
-
-function assertViaHandled(report, command) {
-    if (report[0] === VIA_READS.UNHANDLED) {
-        throw new ProfileWireProtocolError("DEVICE_REJECTED", "Firmware rejected a standard VIA identity read.");
-    }
-    if (report[0] !== command) {
-        throw new ProfileWireProtocolError("CORRELATION_MISMATCH", "VIA identity response has the wrong command id.");
     }
 }
 
@@ -449,19 +385,13 @@ module.exports = {
     PROFILE_WIRE_DOMAINS,
     PROFILE_WIRE_V1,
     ProfileWireProtocolError,
-    VIA_READS,
     buildProfileGetRequest,
-    buildViaFirmwareVersionRequest,
-    buildViaProtocolVersionRequest,
     decodeCapabilityPages,
     decodeProfileResponse,
     decodeStatusPages,
-    decodeViaFirmwareVersion,
-    decodeViaProtocolVersion,
+    isUnknownPage,
     profileResponseMatcher,
     readProfileCapabilities,
     readProfilePages,
     readProfileStatus,
-    readViaIdentity,
-    viaReadResponseMatcher,
 };

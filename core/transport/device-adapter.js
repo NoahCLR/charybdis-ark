@@ -1,9 +1,10 @@
+// @ts-check
 "use strict";
 
 const RAW_HID_REPORT_SIZE = 32;
 
 // The four identifiers of the Charybdis QMK Raw HID interface. Every adapter
-// matches on all four, whatever its host calls them.
+// matches on all four, whatever its shell calls them.
 const CHARYBDIS_VENDOR_ID = 0xA8F8;
 const CHARYBDIS_PRODUCT_ID = 0x1833;
 const QMK_RAW_HID_USAGE_PAGE = 0xFF60;
@@ -25,7 +26,15 @@ const LIVE_LINK_ERROR_CODES = Object.freeze({
     WRITE_FAILED: "WRITE_FAILED",
 });
 
+// A transport failure: its `code` is what code acts on; its message is a
+// person's sentence naming no device path, since a shell may show it. Which
+// device it was is `deviceId`, which the diagnostics record.
 class LiveLinkTransportError extends Error {
+    /**
+     * @param {import("./types.js").TransportErrorCode} code
+     * @param {string} message
+     * @param {import("./types.js").TransportErrorOptions} [options]
+     */
     constructor(code, message, options = {}) {
         super(message, options.cause === undefined ? undefined : {cause: options.cause});
         this.name = "LiveLinkTransportError";
@@ -33,13 +42,23 @@ class LiveLinkTransportError extends Error {
         if (options.deviceId !== undefined) {
             this.deviceId = options.deviceId;
         }
+        if (options.timeoutMs !== undefined) {
+            this.timeoutMs = options.timeoutMs;
+            this.request = options.request;
+        }
     }
 }
 
+/**
+ * @param {import("./types.js").TransportErrorCode} code
+ * @param {string} message
+ * @param {import("./types.js").TransportErrorOptions} [options]
+ */
 function liveLinkError(code, message, options) {
     return new LiveLinkTransportError(code, message, options);
 }
 
+/** @param {unknown} value @param {string} [label] */
 function normalizeRawHidReport(value, label = "Raw HID report") {
     if (!(value instanceof Uint8Array)) {
         throw liveLinkError(
@@ -56,6 +75,7 @@ function normalizeRawHidReport(value, label = "Raw HID report") {
     return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
 }
 
+/** @param {import("./types.js").DeviceAdapter | null | undefined} adapter */
 function assertDeviceAdapter(adapter) {
     if (!adapter || typeof adapter.listDevices !== "function" || typeof adapter.connect !== "function") {
         throw liveLinkError(
@@ -66,7 +86,9 @@ function assertDeviceAdapter(adapter) {
     return adapter;
 }
 
+/** @param {import("./types.js").ConnectedDevice | null | undefined} device @param {string} deviceId */
 function assertConnectedDevice(device, deviceId) {
+    /** @type {(keyof import("./types.js").ConnectedDevice)[]} */
     const requiredMethods = ["write", "onReport", "onDisconnect", "close"];
     const missing = requiredMethods.filter((method) => typeof device?.[method] !== "function");
     if (missing.length) {
@@ -79,6 +101,7 @@ function assertConnectedDevice(device, deviceId) {
     return device;
 }
 
+/** @param {import("./types.js").DeviceDescriptor[]} devices */
 function normalizeDeviceDescriptors(devices) {
     if (!Array.isArray(devices)) {
         throw liveLinkError(

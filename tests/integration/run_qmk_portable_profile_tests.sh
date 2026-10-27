@@ -9,12 +9,16 @@ trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 for variant in normal sanitized; do
     flags=""
     if [ "$variant" = sanitized ]; then flags="-fsanitize=address,undefined -fno-omit-frame-pointer"; fi
-    cc -std=c11 -Wall -Wextra -Werror $flags -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_PD_PROFILE_ENABLE -DQMK_KEYBOARD_H='"portable_profile_keyboard.h"' \
+    cc -std=c11 -Wall -Wextra -Werror $flags -DNOAH_PORTABLE_PROFILE_ENABLE -DQMK_KEYBOARD_H='"portable_profile_keyboard.h"' \
         -I"$ROOT/tests/host/include/portable_profile" -I"$ROOT/tests/host/include" -I"$ROOT" -I"$ROOT/users/noah" \
         "$ROOT/tests/host/qmk_portable_profile_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_portable_profile.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_settings_runtime.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/test"
     "$BUILD_DIR/test" "$BUILD_DIR/responses.fixture" "$BUILD_DIR/named.fixture"
@@ -23,24 +27,37 @@ for variant in normal sanitized; do
     node - "$ROOT" "$BUILD_DIR/responses.fixture" "$BUILD_DIR/named.fixture" <<'JS'
 const assert = require("node:assert/strict"), fs = require("node:fs");
 const {readSettings} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/protocol/portable-profile-v1");
-const {decodeSettings, macroNamesOf} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/settings-domain-v1");
+const {decodeSettings} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/settings-domain-v1");
 function read(path) {
     const fixture = fs.readFileSync(path), pages = fixture.length / 32;
     let id = 0;
     return readSettings({request: async request => {
-        assert.ok(request[4] < pages);
-        const response = Buffer.from(fixture.subarray(request[4] * 32, request[4] * 32 + 32));
+        const page = request[4] | (request[5] << 8);
+        assert.ok(page < pages);
+        const response = Buffer.from(fixture.subarray(page * 32, page * 32 + 32));
         request.copy(response, 0, 0, 5);
         return response;
     }}, {next: () => ++id}).then(decodeSettings);
 }
 (async () => {
-    const stored = macroNamesOf(await read(process.argv[3]));
+    const stored = (await read(process.argv[3])).macroNames;
     assert.equal(stored[5], "Screenshot");
     assert.equal(stored.filter(Boolean).length, 1);
     const authored = await read(process.argv[4]);
-    assert.deepEqual(macroNamesOf(authored).filter(Boolean), ["Drag Screenshot", "Twenty characters!!!"]);
-    assert.deepEqual([authored.names[0], authored.names[1], authored.names[7]], ["Base", "", "Twenty-three bytes long"]);
+    // Names are counted UTF-8 of up to 32 bytes (firmware D-F14), on all
+    // sixteen layers.
+    assert.deepEqual(authored.macroNames.filter(Boolean), ["Drag Screenshot", "Thirty-two bytes of name, exact!"]);
+    assert.deepEqual([authored.names[0], authored.names[1], authored.names[7], authored.names[15]], ["Base", "", "Été", "Thirty-two bytes of name, exact!"]);
+    assert.deepEqual(authored.customKeyNames.filter(Boolean), ["Right Thumb", "Last"]);
+    // The keyboard's own name follows, empty for the built-in one.
+    assert.equal(authored.keyboardName, "");
+    // Settings v11 (firmware D-F26): each custom key's shortcut, the keymap's
+    // until a profile has its own: mixed sides with a key, modifiers alone, a
+    // mouse button alone, and none for every other key.
+    const shortcuts = authored.customKeyShortcuts;
+    assert.deepEqual([shortcuts[1], shortcuts[63], shortcuts[127]], [{mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}, {mods: 0x0f, keys: [], layers: 0, layerKind: 0}, {mods: 0, keys: [0xd1], layers: 0, layerKind: 0}]);
+    assert.equal(shortcuts.filter(({mods, keys}) => mods || keys.length).length, 3);
+    assert.equal((await read(process.argv[3])).keyboardName, "");
     console.log("app reads the firmware's streamed settings and its macro and layer names");
 })().catch(error => {console.error(error); process.exitCode = 1;});
 JS

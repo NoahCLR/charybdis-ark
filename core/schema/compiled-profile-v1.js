@@ -1,13 +1,27 @@
+// @ts-check
 "use strict";
 
-// Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
-// PD_SLOT_0, VIA_MACRO_3 — resolved to profile actions and native keycodes.
+/** @typedef {{qmkKeycodeValues?: Record<string, number>, layers?: {name: string}[]}} ExpressionModel */
 
-const {PD_SLOT_BINDINGS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
+// Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
+// PD_MODE_0, MACRO_3 — resolved to profile actions and native keycodes.
+
+const {PD_MODE_KEYS, formerNames, pdModeKeyOfName} = require("../data/pd-mode-keys");
+const {combineModifiers} = require("../data/keycode-catalog");
 const {customKeyCode, customKeyOfName, layerLockCode, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 
 const QMK_MACRO_BASE = 0x7700;
+
+// The macro slot a name reaches: MACRO_n, or VIA_MACRO_n, the name before
+// firmware D-F31 dropped VIA, so a name typed the old way still reaches its
+// macro. Ark only ever writes MACRO_n.
+/** @param {string} name */
+const macroOfName = name => {
+    const match = /^(?:MACRO_|VIA_MACRO_)(\d+)$/.exec(name);
+    return match && Number(match[1]) < 128 ? Number(match[1]) : undefined;
+};
+/** @type {Readonly<Record<string, number>>} */
 const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
     DPI_MOD: 0x7e00,
     DPI_RMOD: 0x7e01,
@@ -19,19 +33,23 @@ const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
     DRG_TOG: 0x7e07,
 });
 
-// Every pointing-mode binding as the action a behaviour or combo stores.
-const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_SLOT_BINDINGS.flatMap(({slot, hold, lock}) => {
+// Every pointing key's name, former names included, as the action a
+// behaviour or combo stores.
+/** @type {Readonly<Record<string, import("./types.js").SemanticAction>>} */
+const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_MODE_KEYS.flatMap(({slot, hold, lock}) => {
+    /** @type {[string, import("./types.js").SemanticAction][]} */
     const entries = [
-        [hold, {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
-        [lock, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
+        [hold, {kind: PROFILE_ACTION_KINDS.POINTING_MODE_MOMENTARY, operand: slot}],
+        [lock, {kind: PROFILE_ACTION_KINDS.POINTING_MODE_LOCK, operand: slot}],
     ];
-    if (FORMER_NAMES[slot]) entries.push(
-        [FORMER_NAMES[slot], {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
-        [`${FORMER_NAMES[slot]}_LOCK`, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
+    for (const former of formerNames(slot)) entries.push(
+        [former.hold, {kind: PROFILE_ACTION_KINDS.POINTING_MODE_MOMENTARY, operand: slot}],
+        [former.lock, {kind: PROFILE_ACTION_KINDS.POINTING_MODE_LOCK, operand: slot}],
     );
     return entries;
 })));
 
+/** @type {Readonly<Record<string, number>>} */
 const MODIFIER_WRAPPERS = Object.freeze({
     C: 0x0100, LCTL: 0x0100,
     S: 0x0200, LSFT: 0x0200,
@@ -43,6 +61,7 @@ const MODIFIER_WRAPPERS = Object.freeze({
     RCTL: 0x1100, RSFT: 0x1200, RALT: 0x1400, RGUI: 0x1800,
 });
 
+/** @type {Readonly<Record<string, number>>} */
 const MODIFIER_BITS = Object.freeze({
     MOD_LCTL: 0x01, MOD_LSFT: 0x02, MOD_LALT: 0x04, MOD_LGUI: 0x08,
     MOD_RCTL: 0x11, MOD_RSFT: 0x12, MOD_RALT: 0x14, MOD_RGUI: 0x18,
@@ -50,6 +69,7 @@ const MODIFIER_BITS = Object.freeze({
 });
 
 class ProfileExpressionError extends Error {
+    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
     constructor(code, message, details = {}) {
         super(message);
         this.name = "ProfileExpressionError";
@@ -58,14 +78,15 @@ class ProfileExpressionError extends Error {
     }
 }
 
+/** @param {unknown} value @param {ExpressionModel} model @param {string} [label] @returns {import("./types.js").SemanticAction} */
 function semanticActionForExpression(value, model, label = "Action") {
     const expression = normalizeExpression(value);
     if (!expression) throw compileError("UNSUPPORTED_ACTION", `${label} is empty.`, {expression});
     if (PD_ACTIONS[expression]) return {...PD_ACTIONS[expression]};
 
-    let match = expression.match(/^VIA_MACRO_(\d+)$/);
-    if (match) return {kind: PROFILE_ACTION_KINDS.VIA_MACRO, operand: Number(match[1])};
-    match = expression.match(/^CUSTOM_KEY_(\d+)$/);
+    const macro = macroOfName(expression);
+    if (macro !== undefined) return {kind: PROFILE_ACTION_KINDS.MACRO, operand: macro};
+    const match = expression.match(/^CUSTOM_KEY_(\d+)$/);
     if (match) return {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, operand: Number(match[1])};
 
     const call = parseCall(expression);
@@ -82,6 +103,7 @@ function semanticActionForExpression(value, model, label = "Action") {
 
 const QK_MODS_MAX = 0x1fff;
 
+/** @param {unknown} value @param {ExpressionModel} model @returns {number | undefined} */
 function resolveNativeQmkExpression(value, model) {
     const expression = normalizeExpression(value);
     if (/^(?:0x[0-9a-f]+|\d+)$/i.test(expression)) {
@@ -94,22 +116,23 @@ function resolveNativeQmkExpression(value, model) {
     if (expression === "_______") return catalog.KC_TRNS ?? catalog.KC_TRANSPARENT ?? 1;
     if (expression === "XXXXXXX") return catalog.KC_NO ?? 0;
 
-    let match = expression.match(/^VIA_MACRO_(\d+)$/);
-    if (match && Number(match[1]) < 64) return QMK_MACRO_BASE + Number(match[1]);
+    const macro = macroOfName(expression);
+    if (macro !== undefined) return QMK_MACRO_BASE + macro;
     const custom = customKeyOfName(expression);
     if (custom !== undefined) return customKeyCode(custom);
 
-    const pd = pdBindingOfName(expression);
-    if (pd) return pd.locked ? PD_SLOT_BINDINGS[pd.slot].lockCode : PD_SLOT_BINDINGS[pd.slot].holdCode;
+    const pd = pdModeKeyOfName(expression);
+    if (pd) return pd.locked ? PD_MODE_KEYS[pd.slot].lockCode : PD_MODE_KEYS[pd.slot].holdCode;
 
     const call = parseCall(expression);
     if (!call) return undefined;
     if (["TO", "MO", "DF", "TG", "OSL"].includes(call.name) && call.args.length === 1) {
         const layer = layerIdOrUndefined(call.args[0], model);
+        /** @type {Record<string, number>} */
         const bases = {TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280};
         return layer === undefined || layer > 0x1f ? undefined : bases[call.name] | layer;
     }
-    // The firmware supports a lock for each of its eight layers; the rest of
+    // The firmware supports a lock for each of its sixteen layers; the rest of
     // the reserved block has no key behind it.
     if (call.name === "LOCK_LAYER" && call.args.length === 1) {
         const layer = layerIdOrUndefined(call.args[0], model);
@@ -117,10 +140,12 @@ function resolveNativeQmkExpression(value, model) {
     }
     // A modifier wrapper only applies to a basic or already-modified key
     // (QK_MODS, up to 0x1FFF). Anything above would OR the modifier bits into
-    // an unrelated keycode, e.g. C(VIA_MACRO_3) into a macro without Ctrl.
+    // an unrelated keycode, e.g. C(MACRO_3) into a macro without Ctrl.
     if (MODIFIER_WRAPPERS[call.name] !== undefined && call.args.length === 1) {
         const keycode = resolveNativeQmkExpression(call.args[0], model);
-        return keycode === undefined || keycode > QK_MODS_MAX ? undefined : MODIFIER_WRAPPERS[call.name] | keycode;
+        if (keycode === undefined || keycode > QK_MODS_MAX) return undefined;
+        const mods = combineModifiers((keycode >> 8) & 0x1f, MODIFIER_WRAPPERS[call.name] >> 8);
+        return mods === undefined ? undefined : (mods << 8) | (keycode & 0xff);
     }
     if (call.name === "OSM" && call.args.length === 1) {
         const mods = resolveModifierBits(call.args[0]);
@@ -141,23 +166,28 @@ function resolveNativeQmkExpression(value, model) {
     return undefined;
 }
 
+/** @param {unknown} value */
 function resolveModifierBits(value) {
     const parts = normalizeExpression(value).split("|").map((part) => part.trim()).filter(Boolean);
     if (!parts.length) return undefined;
     let result = 0;
     for (const part of parts) {
         if (MODIFIER_BITS[part] === undefined) return undefined;
-        result |= MODIFIER_BITS[part];
+        const combined = combineModifiers(result, MODIFIER_BITS[part]);
+        if (combined === undefined) return undefined;
+        result = combined;
     }
     return result & 0x1f;
 }
 
+/** @param {unknown} value @param {ExpressionModel} model @param {string} label */
 function layerId(value, model, label) {
     const id = layerIdOrUndefined(value, model);
     if (id === undefined) throw compileError("UNKNOWN_LAYER", `${label} references unknown layer ${normalizeExpression(value) || "<empty>"}.`, {expression: value});
     return id;
 }
 
+/** @param {unknown} value @param {ExpressionModel} model */
 function layerIdOrUndefined(value, model) {
     const expression = normalizeExpression(value);
     if (/^\d+$/.test(expression)) return Number(expression);
@@ -166,6 +196,7 @@ function layerIdOrUndefined(value, model) {
     return index < 0 ? undefined : index;
 }
 
+/** @param {unknown} value */
 function parseCall(value) {
     const expression = normalizeExpression(value);
     const match = expression.match(/^([A-Z][A-Z0-9_]*)\((.*)\)$/);
@@ -173,6 +204,7 @@ function parseCall(value) {
     return {name: match[1], args: splitArguments(match[2])};
 }
 
+/** @param {string} value */
 function splitArguments(value) {
     const parts = [];
     let depth = 0;
@@ -191,14 +223,17 @@ function splitArguments(value) {
     return parts;
 }
 
+/** @param {unknown} value */
 function normalizeExpression(value) {
     return String(value ?? "").replace(/\s+/g, " ").replace(/\s*,\s*/g, ",").trim();
 }
 
+/** @param {string} label @param {string} expression */
 function unsupportedAction(label, expression) {
     return compileError("UNSUPPORTED_ACTION", `${label} expression ${expression} cannot be represented by the stable live-profile action schema.`, {expression});
 }
 
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function compileError(code, message, details = {}) {
     return new ProfileExpressionError(code, message, details);
 }

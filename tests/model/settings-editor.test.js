@@ -1,12 +1,53 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {legacyDocument: document} = require("../fixtures/portable-profile");
+const {document} = require("../fixtures/portable-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView, editSettings} = require("../../core/model/settings-editor");
 const {buildDeviceModel} = require("../../core/session/device-model");
 const {POINTER_DPI} = require("../../core/model/pointer-dpi");
 const snapshot = () => {const value = document(); return {document: value, fingerprint: fingerprint(value), limits: {brightnessMax: 200}};};
+
+test("macOS Unicode warnings follow the effective setup, including US with the Unicode switch", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    for (const [word, detected, visible] of [
+        [1 | (3 << 16), 2, true], // Explicit macOS UHI.
+        [3 << 16, 1, true], // Auto detects macOS.
+        [0x101, 2, true], // US with Unicode on.
+        [1 | (2 << 16), 1, false], // Dutch uses native entry.
+        [0x101 | (2 << 16), 1, false], // Switch does not enable entry on Dutch.
+        [1, 1, false], // US without entry.
+        [2 | (3 << 16), 1, false], // Effective Windows: the layout mismatch warns instead.
+        [3 << 16, 0, false], // Unknown Auto.
+    ]) {
+        const {snapshot} = hostMacros(word, []);
+        snapshot.hostOs.detected = detected;
+        const host = settingsEditorView(snapshot).sections.find(section => section.id === "host");
+        assert.equal(/Option\+Left/.test(host.warning || ""), visible, `Host word ${word}, detected ${detected}`);
+        if (visible) {
+            assert.match(host.warning, /Option\+Left\/Right for word navigation/);
+            assert.match(host.warning, /Ark does not switch your Mac's input source/);
+        }
+    }
+});
+
+test("WinCompose setup links follow the effective Windows host and enabled Unicode playback", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    for (const [word, detected, visible] of [
+        [0x102, 1, true], // Manual Windows overrides macOS detection.
+        [0x100, 2, true], // Auto uses Windows detection.
+        [2, 2, false], // Unicode off.
+        [0x101, 2, false], // Manual macOS overrides Windows detection.
+        [0x103, 2, false], // Linux.
+        [0x100, 0, false], // Unknown Auto.
+    ]) {
+        const {snapshot} = hostMacros(word, []);
+        snapshot.hostOs.detected = detected;
+        const host = settingsEditorView(snapshot).sections.find(section => section.id === "host");
+        assert.deepEqual(host.githubLink, visible ? {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"} : undefined,
+            `Host word ${word}, detected ${detected}`);
+    }
+});
 function message(current, sectionId, updates = {}) {
     const section = settingsEditorView(current).sections.find(section => section.id === sectionId);
     return {sectionId, expectedFingerprint: current.fingerprint, fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: updates[field.macro] ?? field.enabled} : {macro: field.macro, value: updates[field.macro] ?? field.value})};
@@ -15,16 +56,16 @@ function message(current, sectionId, updates = {}) {
 test("Defaults and inherited behaviour timing come entirely from the complete keyboard snapshot", () => {
     const current = snapshot(), view = settingsEditorView(current);
     assert.equal(view.brightnessMax, 200);
-    const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 8}});
-    assert.equal(model.configDefaults.length, 11, "Combos has a section of its own");
+    const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}});
+    assert.equal(model.configDefaults.length, 14, "Combos, behaviours, the read-only macro host setup and All lighting each have a section");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
-    assert.equal(fields.find(field => field.macro === "mouseLayer").value, "Layer 4");
+    assert.equal(fields.find(field => field.macro === "pointerLayer").value, "Layer 4");
     assert.equal(fields.find(field => field.macro === "brightness").value, "200");
     assert.equal(model.behaviorTimingDefaults.tapHoldTerm, "150");
     assert.equal(model.settingsEditing.writable, true);
     assert.equal(buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 5}}).settingsEditing.writable, false);
-    assert.equal(buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 8}, busy: true}).settingsEditing.writable, false);
+    assert.equal(buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}, busy: true}).settingsEditing.writable, false);
     assert.equal(settingsEditorView({incomplete: true}), null);
     assert.deepEqual(buildDeviceModel().configDefaults, []);
 });
@@ -32,14 +73,53 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
 test("every section names the screen it is edited on, and the pointer's own settings are Mouse", () => {
     const areas = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.area]));
     assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Mouse"), ["normalPointerSpeed", "sniping", "autoMouse"]);
-    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade"], "the fade is timed where it is coloured");
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade", "lightingPower", "rgbAppearance", "lightingFeedback"],
+        "lighting is set where it is coloured: the fade's timing, all lighting, the background effect and the feedback flash");
+    const stages = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.stage]));
+    assert.deepEqual([stages.automouseFade, stages.rgbAppearance, stages.lightingFeedback, stages.lightingPower], ["auto", "base", "key", undefined],
+        "a section is edited on its stage; All lighting darkens every stage, so it has none");
     assert.ok(Object.values(areas).every(area => ["Mouse", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
+});
+
+test("every field edits a stored value the schema names, within what the keyboard accepts", () => {
+    const {SETTINGS, validSetting} = require("../../core/schema/settings-domain-v1");
+    const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
+    const fields = settingsEditorView(snapshot(), CURRENT_CAPABILITIES).sections.flatMap(section => section.fields);
+    for (const field of fields) {
+        if (field.header) {
+            assert.equal(field.header, "comboOutputBehaviors");
+            assert.equal(field.id, undefined);
+            assert.equal(field.kind, "toggle");
+            continue;
+        }
+        if (field.record) continue;
+        assert.ok(Number.isInteger(field.id) && field.id >= 0 && field.id < SETTINGS.COUNT, field.macro);
+        if (field.kind === "share") assert.ok(Number.isInteger(field.of) && field.of < SETTINGS.COUNT, field.macro);
+        // A whole word's own limits are values the keyboard accepts there.
+        if (field.shift !== undefined || field.bitMask || field.kind !== "number") continue;
+        for (const v of [field.min ?? 0, field.max ?? 65535]) assert.ok(validSetting(field.id, v) || field.choices, `${field.macro} offers ${v}`);
+        for (const choice of field.choices || []) assert.ok(validSetting(field.id, typeof choice === "object" ? choice.value : choice), `${field.macro} offers ${JSON.stringify(choice)}`);
+    }
+});
+
+test("range hints and numeric bounds follow the stored field rules", () => {
+    const {SETTING_FIELD} = require("../../core/schema/settings-domain-v1");
+    const fields = settingsEditorView(snapshot()).sections.flatMap(section => section.fields);
+    const timeout = fields.find(field => field.macro === "lightingTimeout");
+    assert.deepEqual([timeout.label, timeout.presentation, timeout.unit, timeout.min, timeout.max], ["Idle timeout", "duration", "ms", 0, 86400000]);
+    for (const [macro, rule, unit] of [["normalDpi", SETTING_FIELD.DEFAULT_DPI, ""], ["snipingDpi", SETTING_FIELD.SNIPING_DPI, ""], ["mouseDebounce", SETTING_FIELD.AUTO_MOUSE_DEBOUNCE, " ms"]]) {
+        const field = fields.find(field => field.macro === macro);
+        assert.deepEqual([field.min, field.max], [rule.min, rule.max], macro);
+        assert.equal(field.hint, `${rule.min}–${rule.max}${unit}${rule.step > 1 ? ", in steps of " + rule.step : ""}`, macro);
+    }
+    const next = editSettings(snapshot(), message(snapshot(), "lightingPower", {lightingTimeout: "86400000"}));
+    assert.equal(validateSnapshot(next).settings.values[SETTING_FIELD.RGB_TIMEOUT.id], SETTING_FIELD.RGB_TIMEOUT.max, "a uint32 duration is not constrained by an unrelated uint16 fallback");
 });
 
 test("every unchanged section is a byte-exact round trip and edits preserve unrelated domains and banks", () => {
     const current = snapshot();
     for (const section of settingsEditorView(current).sections) assert.deepEqual(editSettings(current, message(current, section.id)), current.document);
-    const next = editSettings(current, message(current, "autoMouse", {mouseTimeout: "900", mouseLayer: "Layer 7", autoMouse: false}));
+    const next = editSettings(current, message(current, "autoMouse", {mouseTimeout: "900", pointerLayer: "Layer 7", autoMouse: false}));
     const before = validateSnapshot(current.document), after = validateSnapshot(next);
     assert.deepEqual({...next, profile: current.document.profile}, current.document);
     assert.deepEqual(after.rgb, before.rgb); assert.deepEqual(after.behaviors, before.behaviors); assert.deepEqual(after.combos, before.combos);
@@ -72,9 +152,14 @@ test("the auto-mouse fade is a share of the timeout, so no edit can make it outl
     }
 });
 
-test("base lighting edits preserve the effect and flags while independently updating packed channels", () => {
+test("background effect and All lighting edits preserve the effect and flags while independently updating packed channels", () => {
     const current = snapshot(), before = validateSnapshot(current.document).settings.values;
-    const next = editSettings(current, message(current, "rgbAppearance", {hue: "23", saturation: "0", brightness: "0", effectSpeed: "255", lightingEnabled: false, lightingTimeout: "0"}));
+    const effect = editSettings(current, message(current, "rgbAppearance", {hue: "23", saturation: "0", brightness: "0", effectSpeed: "255"}));
+    const between = validateSnapshot(effect).settings.values;
+    assert.equal(between[21] & 255, before[21] & 255, "the effect's section leaves the master switch it shares a word with");
+    assert.equal(between[17], before[17], "and the idle timeout");
+    const middle = {document: effect, fingerprint: fingerprint(effect)};
+    const next = editSettings(middle, message(middle, "lightingPower", {lightingEnabled: false, lightingTimeout: "0"}));
     const values = validateSnapshot(next).settings.values;
     assert.equal(values[21] & 0xff00ff00, before[21] & 0xff00ff00);
     assert.equal(values[21] & 255, 0); assert.equal((values[21] >>> 16) & 255, 255);
@@ -87,12 +172,12 @@ test("invalid settings, incomplete sections and stale drafts fail before any dev
     assert.throws(() => edit("autoMouse", {mouseTimeout: "0"}), /Timeout.*range/, "the fade needs a timeout to be a share of");
     assert.throws(() => edit("automouseFade", {mouseFadeHold: "100"}), /range/, "a share is shorter than the whole");
     assert.throws(() => edit("autoMouse", {mouseDebounce: "256"}), /debounce.*range/);
-    assert.throws(() => edit("autoMouse", {mouseLayer: "Layer 8"}), /layer/);
+    assert.throws(() => edit("autoMouse", {pointerLayer: "Layer 16"}), /layer/);
     assert.throws(() => edit("comboSettings", {combosEnabled: "false"}), /enabled or disabled/);
     for (const value of ["", "1.5", "Infinity", "-1", "65536", " 150 "]) assert.throws(() => edit("keyTiming", {tapHoldTerm: value}));
     assert.throws(() => edit("normalPointerSpeed", {normalDpi: "500"}), /range/);
     assert.throws(() => edit("lightingFeedback", {feedbackFlash: "0"}), /range/);
-    assert.throws(() => edit("rgbAppearance", {lightingTimeout: "86400001"}), /range/);
+    assert.throws(() => edit("lightingPower", {lightingTimeout: "86400001"}), /range/);
     const invalid = message(current, "keyTiming"); invalid.fields[0] = invalid.fields[1];
     assert.throws(() => editSettings(current, invalid), /repeated/);
     assert.throws(() => editSettings(current, {...invalid, fields: []}), /complete/);
@@ -107,7 +192,7 @@ test("every DPI field offers the one list, limited only where the keyboard limit
         assert.ok(field.choices.every(choice => choice.value === 0 || POINTER_DPI.includes(choice.value)), `${field.macro} picks from the shared list`);
     }
     const values = macro => fields.find(field => field.macro === macro).choices.map(choice => choice.value);
-    assert.deepEqual(values("normalDpi"), POINTER_DPI.filter(v => v >= 400 && v % 200 === 0), "the steps the firmware stores");
+    assert.deepEqual(values("normalDpi"), POINTER_DPI.filter(v => v >= 400 && v <= 3400 && v % 200 === 0), "the steps the firmware stores");
     assert.deepEqual(values("snipingDpi"), [100, 200, 300, 400], "the steps the firmware stores");
     assert.throws(() => editSettings(current, {sectionId: "pointingModeSpeeds", expectedFingerprint: current.fingerprint, fields: []}),
         /complete settings section/, "the old per-mode speeds are no longer a settings section");
@@ -140,18 +225,22 @@ test("all native controls preserve a complete profile unchanged, including unkno
     assert.equal(fields.find(field => field.macro === "swapLeftAltGui").enabled, true);
     assert.equal(fields.find(field => field.macro === "autocorrect").readOnly, true);
     assert.equal(fields.find(field => field.macro === "effectMode").choices[1].label, "Breathing");
+    assert.equal(fields.find(field => field.macro === "effectMode").choices[0].label, "Solid colour", "spelled as the rest of the app spells colour");
     const next = editSettings(current, message(current, "keyboardOptions", {swapLeftAltGui:false, swapControlCaps:true}));
     assert.equal(validateSnapshot(next).settings.values[24], 0x8001);
-    assert.throws(() => editSettings(current, message(current, "keyboardOptions", {autocorrect:true})), /not enabled/);
+    assert.throws(() => editSettings(current, message(current, "keyboardOptions", {autocorrect:true})), /Not in this firmware/);
 });
-test("startup layers validate the final mask, and combo references preserve untouched nibbles", () => {
+test("startup layers validate the final mask, and combo references edit only their layer's record", () => {
     const current = withSettings(() => {});
-    const next = editSettings(current, message(current, "startupLayers", {startupLayer0:false, startupLayer7:true}));
-    assert.equal(validateSnapshot(next).settings.values[23], 128);
+    const next = editSettings(current, message(current, "startupLayers", {startupLayer0:false, startupLayer15:true}));
+    assert.equal(validateSnapshot(next).settings.values[23], 0x8000);
     assert.throws(() => editSettings(current, message(current, "startupLayers", {startupLayer0:false})), /at least one/);
-    const combos = editSettings(current, message(current, "comboReferences", {comboReference7:"Layer 0", comboReference2:"Layer 1"}));
-    assert.equal(validateSnapshot(combos).settings.values[27], 0x06543110);
-    assert.throws(() => editSettings(current, message(current, "comboReferences", {comboReference0:"Layer 8"})), /layer/);
+    const combos = editSettings(current, message(current, "comboReferences", {comboReference15:"Layer 0", comboReference2:"Layer 1"}));
+    const records = validateSnapshot(combos).settings.layers;
+    assert.deepEqual(records.map(record => record.reference), [0, 1, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0]);
+    // The retired v5 scalar stays zero; the references live in the records.
+    assert.equal(validateSnapshot(combos).settings.values[27], 0);
+    assert.throws(() => editSettings(current, message(current, "comboReferences", {comboReference0:"Layer 16"})), /layer/);
 });
 test("lighting choices only allow reported effects and LED classes, while preserving other bytes", () => {
     const current = withSettings(settings => {settings.values[21] = 0xff1e0101;});
@@ -169,4 +258,102 @@ test("key options use masks supplied by the keyboard rather than assuming bitfie
     assert.equal(field.enabled, true);
     const next = editSettings(current, message(current, "keyboardOptions", {swapControlCaps:false}));
     assert.equal(validateSnapshot(next).settings.values[24], 0);
+});
+
+test("Key Options follows the effective host vocabulary, including unknown Auto and manual overrides", () => {
+    for (const [detected, selected, alt, gui] of [[0,0,"Alt","GUI"], [1,0,"Option","Command"], [2,0,"Alt","Windows"], [3,0,"Alt","Super"], [1,3,"Alt","Super"]]) {
+        const current = withSettings(settings => {settings.values[27] = selected;});
+        current.hostOs = {detected};
+        const fields = settingsEditorView(current).sections.find(({id}) => id === "keyboardOptions").fields;
+        const label = macro => fields.find(field => field.macro === macro).label;
+        assert.equal(label("swapLeftAltGui"), `Swap left ${alt} and ${gui}`);
+        assert.equal(label("swapRightAltGui"), `Swap right ${alt} and ${gui}`);
+        assert.equal(label("disableGui"), `Disable ${gui} keys`);
+        assert.equal(label("swapLeftControlGui"), `Swap left Ctrl and ${gui}`);
+    }
+});
+
+test("the Host section offers the effective OS's layouts", () => {
+    const {document} = require("../fixtures/portable-profile");
+    const {fingerprint} = require("../../core/model/portable-profile");
+    const {settingsEditorView} = require("../../core/model/settings-editor");
+    const current = {document: document(), fingerprint: fingerprint(document())};
+    const host = detected => settingsEditorView({...current, hostOs: {detected}}).sections.find(s => s.id === "host");
+    const fields = section => section.fields.map(field => field.macro);
+    const mac = host(1);
+    assert.deepEqual(fields(mac), ["hostOs", "hostLayout", "macosIso"], "on macOS, Unicode entry is the Unicode Hex Input layout");
+    assert.deepEqual(mac.fields[1].choices.map(choice => choice.label), ["US", "ABC (macOS)", "Dutch (macOS)", "Unicode Hex Input (macOS)", "British (macOS)", "German (macOS)", "French (macOS)"]);
+    const windows = host(2);
+    assert.deepEqual(fields(windows), ["hostOs", "hostLayout", "unicodeEnabled"]);
+    assert.deepEqual(windows.fields[1].choices.map(choice => choice.value), [0, 7, 8, 9, 10]);
+    assert.equal(host(0).fields[1].choices.length, 15, "with no known OS, every layout");
+    assert.ok(windows.fields.every(field => !field.readOnly), "every Host field is editable");
+});
+
+test("choosing a Host OS carries the layout to that OS, and a mismatch left by Auto warns", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const host = current => settingsEditorView(current).sections.find(section => section.id === "host");
+    const choose = (word, detected, shown) => {
+        const {snapshot: current, capabilities} = hostMacros(word, []);
+        current.hostOs.detected = detected;
+        const section = host(current);
+        const next = editSettings(current, {sectionId: "host", expectedFingerprint: current.fingerprint,
+            fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled: f.enabled} : {macro: f.macro, value: shown[f.macro] ?? f.value})}, capabilities);
+        return validateSnapshot(next).settings.values[27];
+    };
+    // Auto on a Mac with German, then Windows chosen: Windows German.
+    assert.equal(choose(5 << 16, 1, {hostOs: "2"}), 2 | (9 << 16));
+    assert.equal(choose(4 << 16, 1, {hostOs: "3"}), 3 | (12 << 16), "British is the United Kingdom layout on Linux");
+    assert.equal(choose(1 | (3 << 16), 1, {hostOs: "2"}), 2, "Unicode Hex Input has no Windows counterpart, so US");
+    assert.equal(choose(2 | (7 << 16) | 0x100, 2, {hostOs: "1"}), 1 | 0x100, "US International falls back to US and keeps the switch");
+    assert.equal(choose(2 | (9 << 16), 1, {hostOs: "0"}), 5 << 16, "back to Auto follows the detected Mac");
+    assert.equal(choose(1 | (2 << 16), 1, {hostOs: "0"}), 2 << 16, "the effective OS is unchanged, so the layout stays");
+    assert.equal(choose(2 << 16, 0, {hostOs: "2"}), 2, "Dutch has no Windows counterpart");
+    assert.equal(choose(2 | (8 << 16), 2, {hostOs: "0"}), 8 << 16, "Auto with no detection fits every layout");
+    assert.equal(choose(1 | (5 << 16), 1, {hostOs: "2", hostLayout: "6"}), 2 | (6 << 16), "a layout changed in the same edit is kept");
+
+    // Auto keeps the layout when detection moves to another OS; Host and the
+    // macro editor say so instead.
+    const {snapshot: current, capabilities} = hostMacros(5 << 16, []);
+    current.hostOs.detected = 2;
+    assert.match(host(current).warning, /^German \(macOS\) is not a Windows layout, so macros may type the wrong characters on Windows/);
+    const {macroEditorView} = require("../../core/model/macro-editor");
+    assert.equal(macroEditorView(current, capabilities).unicode.layoutFits, false);
+    current.hostOs.detected = 1;
+    assert.equal(macroEditorView(current, capabilities).unicode.layoutFits, true);
+    assert.equal(host(current).warning, undefined);
+});
+
+
+test("settings presentation owns combo timing words and explicit duration units", () => {
+    const view = settingsEditorView(snapshot());
+    const combos = view.sections.find(section => section.id === "comboSettings");
+    assert.deepEqual(combos.comboTiming.map(field => [field.id, field.label]),
+        [["default", "Default combo window"], ["hold", "Combo hold threshold"]]);
+    assert.ok(combos.comboTiming.every(field => field.hint));
+    const fields = view.sections.flatMap(section => section.fields);
+    for (const macro of ["tappingTerm", "tapHoldTerm", "longHoldTerm", "multiTapTerm", "mouseTimeout", "mouseDebounce", "mouseDelay", "lightingTimeout", "feedbackFlash"]) {
+        assert.equal(fields.find(field => field.macro === macro).unit, "ms", macro);
+    }
+    for (const macro of ["normalDpi", "snipingDpi", "mouseThreshold", "hue", "brightness", "hostOs"]) {
+        assert.equal(fields.find(field => field.macro === macro).unit, undefined, macro);
+    }
+});
+
+// Settings v9: auto-sniping follows a set of layers beside its master switch,
+// drawn as one row of layer switches like the other per-layer settings.
+test("auto-sniping is its switch and one switch per layer, saved as one layer mask", () => {
+    const current = snapshot();
+    const section = settingsEditorView(current).sections.find(entry => entry.id === "sniping");
+    assert.equal(section.area, "Mouse");
+    assert.deepEqual(section.layerGroup, {label: "Auto-sniping layers", hint: section.layerGroup.hint});
+    assert.deepEqual(section.fields.map(field => field.macro), ["autoSniping", ...Array.from({length: 16}, (_, i) => `snipingOnLayer${i}`)]);
+    assert.deepEqual(section.fields.filter(field => field.enabled).map(field => field.macro), ["autoSniping", "snipingOnLayer3"], "Navigation alone, as the test profile has it");
+    assert.deepEqual(section.fields[4].governs, {kind: "layer", layer: 3});
+    assert.equal(section.fields[4].label, "On Navigation");
+    const values = updates => validateSnapshot(editSettings(current, message(current, "sniping", updates))).settings.values;
+    assert.equal(values({snipingOnLayer2: true, snipingOnLayer5: true})[9], (1 << 2) | (1 << 3) | (1 << 5), "several layers");
+    const off = values({autoSniping: false, snipingOnLayer2: true});
+    assert.deepEqual([off[8], off[9]], [0, (1 << 2) | (1 << 3)], "off keeps the layers chosen");
+    assert.equal(values({snipingOnLayer3: false})[9], 0, "no layer at all is a set the keyboard stores");
 });

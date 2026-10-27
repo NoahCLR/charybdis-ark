@@ -1,0 +1,201 @@
+export type ActionKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export interface SemanticAction {
+    kind: ActionKind;
+    operand: number;
+    flags?: 0;
+}
+
+/** Inputs are validated and canonicalized by the schema, including omitted operands. */
+export interface ActionInput {
+    kind: number;
+    operand?: number;
+    flags?: number;
+}
+
+export interface ActionLimits {
+    maxLogicalLayers: number;
+    maxPdModes: number;
+    maxMacroSlots: number;
+    maxCustomKeys: number;
+}
+
+export type ActionOptions = Partial<ActionLimits> & {actionLimits?: Partial<ActionLimits>};
+export type DomainVersions = Map<number | string, number> | Record<string, number>;
+export interface BlobOptions {domainVersions?: DomainVersions}
+export interface DomainInput {id: number; version: number; payload?: Uint8Array}
+export interface ProfileDomain {id: number; version: number; payload: Buffer}
+export interface BlobInput {
+    schema?: {major: number; minor: number};
+    domains?: DomainInput[];
+}
+
+export interface BehaviorLimits {
+    maxRows: number;
+    maxPopulatedSteps: number;
+    maxTapStepsPerBehavior: number;
+    maxLayers: number;
+    maxRepeatHz: number;
+    maxPayloadSize: number;
+}
+export type BehaviorOptions = Partial<BehaviorLimits> & {
+    limits?: Partial<BehaviorLimits>;
+    actionLimits?: Partial<ActionLimits>;
+};
+
+export interface HoldInput {style: number; repeatHz?: number; action: ActionInput}
+export interface BehaviorStepInput {
+    tapIndex: number;
+    tap?: ActionInput;
+    hold?: HoldInput;
+    longHold?: HoldInput;
+}
+export interface BehaviorRowInput {
+    target: ActionInput;
+    steps: BehaviorStepInput[];
+    tapHoldTerm?: number;
+    longHoldTerm?: number;
+    multiTapTerm?: number;
+    keepsAutoMouseAnchored?: boolean;
+    enabled?: boolean;
+    allowedLayers?: number;
+}
+export interface HoldBranch {style: number; repeatHz: number; action: SemanticAction}
+export interface BehaviorStep {
+    tapIndex: number;
+    tap?: SemanticAction;
+    hold?: HoldBranch;
+    longHold?: HoldBranch;
+}
+export interface BehaviorRow {
+    target: SemanticAction;
+    steps: BehaviorStep[];
+    tapHoldTerm: number;
+    longHoldTerm: number;
+    multiTapTerm: number;
+    keepsAutoMouseAnchored: boolean;
+    enabled: boolean;
+    allowedLayers: number;
+}
+
+export interface ComboRowInput {
+    useOutputBehavior?: boolean;
+    inputs: ActionInput[];
+    output: ActionInput;
+    termMs: number | null;
+    mustHold?: boolean;
+    mustTap?: boolean;
+    ordered?: boolean;
+    enabled?: boolean;
+    allowedLayers?: number;
+}
+export interface ComboInput {
+    version?: number;
+    defaultTermMs: number;
+    holdTermMs: number;
+    rows: ComboRowInput[];
+}
+export interface LayerRecord {reference: number; bypass: number[]; exclude: number[]}
+// What the firmware accepts for one stored settings value; a plain range
+// also carries its bounds.
+export interface SettingRule {valid(v: number, layers: number): boolean; min?: number; max?: number; step?: number; layerReference?: 'layer' | 'mask'; layerReorder?: 'storage' | 'reach'}
+export interface SettingField<Name extends string = string> extends SettingRule {id: number; name: Name}
+/** A custom key's own action (firmware D-F26): a HID report modifier mask, the keys it holds together and the layers it turns on; all empty is no shortcut. */
+export interface CustomKeyShortcut {
+    /** The modifiers held with its keys, in HID report order: bit 0 Left Ctrl … bit 7 Right GUI, any combination. */
+    mods: number;
+    /** The keys it holds together, in the order they are pressed: at most six, each once, at most one media and one system key (firmware D-F26). */
+    keys: number[];
+    /** The layers it turns on (firmware D-F26), never the base or a default layer. */
+    layers: number;
+    /** How it turns them on, as a layer key does (SHORTCUT_LAYER_KINDS): 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers. */
+    layerKind: number;
+}
+
+export interface SettingsDomain {
+    comboOutputBehaviors?: boolean;
+    formatVersion?: number;
+    values: number[];
+    names: string[];
+    layers: LayerRecord[];
+    macroNames: string[];
+    customKeyNames: string[];
+    /** Each custom key's shortcut, custom key 0 first; `{mods: 0, keys: [], layers: 0, layerKind: 0}` is none. */
+    customKeyShortcuts: CustomKeyShortcut[];
+    /** The keyboard's own name, its USB product string; empty for the firmware's built-in name. */
+    keyboardName: string;
+}
+
+export type MacroStep =
+    | {kind: 'text'; text: string}
+    | {kind: 'delay'; delay: number}
+    | {kind: 'tap' | 'down' | 'up'; keys: number[]};
+export interface MacroOptions {
+    textEntry?: boolean;
+    layout?: number;
+    protection?: 'auto' | 'on' | 'off';
+}
+
+export interface PdTap {keycode: number; modifierPolicy: number; mask: number}
+export interface PointingSlot {
+    id: number;
+    kind: number;
+    pointerLayer: number;
+    axis: number;
+    dpi: number;
+    heldModifiers: number;
+    name: string;
+    /** The linked layers, bit n layer n: the layers that start the mode (firmware D-F62). */
+    linkedLayers: number;
+    /** The layers the mode's key turns on while it runs the mode, bit n layer n, any mix. */
+    linkTurnsOn: number;
+    /** PD_LINK_ENDS: what ends a mode its linked layers started, 0 nothing, 1 a higher layer, 2 any other layer. */
+    linkEnds: number;
+    thresholdX: number;
+    thresholdY: number;
+    directions: Record<string, PdTap>;
+    scroll: Record<string, number>;
+    diagonals: Record<string, PdTap>;
+    emptyDirection: number;
+    directionOutput: number;
+}
+export type PointingSlotInput = Partial<Omit<PointingSlot, 'directions' | 'diagonals'>> & {
+    id: number;
+    name: string;
+    directions?: Record<string, Partial<PdTap>>;
+    diagonals?: Record<string, Partial<PdTap>>;
+};
+
+export interface Hsv {h: number; s: number; v: number}
+export type RgbGroupRow<K extends 'selector' | 'semantic' = 'selector'> = Record<K, number> & {color: Hsv; groupId: number};
+export interface RgbKeyFeedback {
+    tapBranchColors: Hsv[];
+    tapCommittedColor: Hsv;
+    holdActiveColor: Hsv;
+    longHoldActiveColor: Hsv;
+    tapCommitMode: number;
+    locality: number;
+}
+export interface RgbProfile {
+    formatVersion: number;
+    stageEnableMask: number;
+    groups: {id: number; leds: number[]}[];
+    layerColors: {layerId: number; color: Hsv; mode: number}[];
+    layerGroupRows: RgbGroupRow[];
+    automouseFade: {mode: number; endColor: Hsv};
+    pdModeColors: {pdModeId: number; color: Hsv; locality: number}[];
+    pdModeGroupRows: RgbGroupRow[];
+    comboFeedback: {color: Hsv; locality: number};
+    comboGroupRows: {color: Hsv; groupId: number}[];
+    keyFeedback: RgbKeyFeedback;
+    keyGroupRows: RgbGroupRow<'semantic'>[];
+}
+export type RgbInput = Partial<Omit<RgbProfile, 'keyFeedback'>> & {keyFeedback?: Partial<RgbKeyFeedback>};
+export interface RgbOptions {
+    maxLogicalLayers?: number;
+    logicalLayerCount?: number;
+    supportedPdModeIds?: Iterable<number>;
+    compiledStageMask?: number;
+    maximumBrightness?: number;
+    tapBranchColorCount?: number;
+}

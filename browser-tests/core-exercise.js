@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // One run through core/: decode every input, encode it again, stage edits in a
@@ -32,26 +33,23 @@ function exerciseCore(core, inputs) {
         }
     };
 
-    const {portable, actions, profileBlob, rgbDomain, keyBehaviorDomain, comboDomain, settingsDomain, pdModeDomain} = core;
+    const {portable, profileBlob, rgbDomain, keyBehaviorDomain, comboDomain, settingsDomain, pdModeDomain} = core;
     // A profile's domains, each decoded and encoded again the way a snapshot
     // decodes them (portable-profile.js validateSnapshot).
-    const domainCodec = (domain, schemaMajor, pdSlots) => {
-        const limits = actions.actionLimitsFor(schemaMajor, pdSlots);
+    const domainCodec = (domain) => {
         switch (domain.id) {
             case 0x10: return [(bytes) => rgbDomain.decodeRgbDomainV1(bytes), (value) => rgbDomain.encodeRgbDomainV1(value)];
-            case 0x20: return [(bytes) => keyBehaviorDomain.decodeKeyBehaviorDomain(bytes, limits), (value) => keyBehaviorDomain.encodeKeyBehaviorDomain(value, limits)];
-            case 0x30: return [(bytes) => comboDomain.decodeComboDomain(bytes, domain.version, limits), (value) => comboDomain.encodeComboDomain(value, limits)];
+            case 0x20: return [(bytes) => keyBehaviorDomain.decodeKeyBehaviorDomain(bytes), (value) => keyBehaviorDomain.encodeKeyBehaviorDomain(value)];
+            case 0x30: return [(bytes) => comboDomain.decodeComboDomain(bytes), (value) => comboDomain.encodeComboDomain(value)];
             case 0x40: return [(bytes) => settingsDomain.decodeSettings(bytes), (value) => settingsDomain.encodeSettings(value)];
-            case 0x50: return [(bytes) => pdModeDomain.decodePdDomain(bytes, {version: domain.version}), (value) => pdModeDomain.encodePdDomain(value)];
+            case 0x50: return [(bytes) => pdModeDomain.decodePdDomain(bytes), (value) => pdModeDomain.encodePdDomain(value)];
             default: return null;
         }
     };
     const blobs = inputs.blobs.map(({name, hex: text}) => attempt(() => {
         const decoded = profileBlob.decodeProfileBlob(bytesOf(text));
-        const pd = decoded.domains.find((domain) => domain.id === 0x50);
-        const pdSlots = pd ? pdModeDomain.decodePdDomain(pd.payload, {version: pd.version}).length : undefined;
         const domains = decoded.domains.map((domain) => {
-            const codec = domainCodec(domain, decoded.schema.major, pdSlots);
+            const codec = domainCodec(domain);
             if (!codec) return {id: domain.id, payload: domain.payload};
             const value = attempt(() => codec[0](domain.payload));
             const encoded = value.error ? value : attempt(() => codec[1](codec[0](domain.payload)));
@@ -66,7 +64,7 @@ function exerciseCore(core, inputs) {
         rgb: [(bytes, options) => rgbDomain.decodeRgbDomainV1(bytes, options), (value, options) => rgbDomain.encodeRgbDomainV1(value, options)],
         behaviors: [(bytes, options) => keyBehaviorDomain.decodeKeyBehaviorDomain(bytes, options), (value, options) => keyBehaviorDomain.encodeKeyBehaviorDomain(value, options)],
         behaviorEnvelope: [(bytes, options) => keyBehaviorDomain.decodeKeyBehaviorDomainEnvelope(bytes, options), (value, options) => keyBehaviorDomain.encodeKeyBehaviorDomainEnvelope(value, options)],
-        combos: [(bytes, options) => comboDomain.decodeComboDomain(bytes, options.version, options), (value, options) => comboDomain.encodeComboDomain(value, options)],
+        combos: [(bytes, options) => comboDomain.decodeComboDomain(bytes, options), (value, options) => comboDomain.encodeComboDomain(value, options)],
         pd: [(bytes, options) => pdModeDomain.decodePdDomain(bytes, options), (value) => pdModeDomain.encodePdDomain(value)],
     };
     const domains = inputs.domains.map(({name, kind, hex: text, options = {}}) => {
@@ -79,23 +77,21 @@ function exerciseCore(core, inputs) {
     // summary, and the document written again from what was decoded.
     const documents = inputs.documents.map(({name, document}) => attempt(() => {
         const decoded = portable.validateSnapshot(document);
-        const rewritten = portable.createSnapshot({profile: decoded.profile, actionAbiDigest: document.actionAbiDigest,
-            via: {layers: document.layers.length, layout: decoded.layout, macros: decoded.macros, macroSlots: document.macros.length}});
+        const rewritten = portable.createSnapshot({profile: decoded.candidate, actionAbiDigest: document.actionAbiDigest});
         return {name, decoded, fingerprint: portable.fingerprint(document), summary: portable.summary(document), rewritten};
     }));
 
-    // A draft as the host keeps one: staged edits, then the panel model, as
+    // A draft as the core keeps one: staged edits, then the panel model, as
     // scripts/preview.js builds it. The id and the clock are pinned, being the
     // two things two runs may not share.
     const {document, capabilities, messages, deviceId} = inputs.draft;
     const snapshot = {document, fingerprint: portable.fingerprint(document), summary: portable.summary(document), identity: {generation: 42}};
-    const draft = new core.ProfileDraftSession(snapshot, deviceId, capabilities);
+    class DeterministicDraft extends core.ProfileDraftSession {now() {return 0;}}
+    const draft = new DeterministicDraft(snapshot, deviceId, capabilities);
     draft.id = "draft";
-    draft.now = () => 0;
-    draft.times = draft.times.map(() => 0);
     const staged = messages.map((message) => attempt(() => draft.stage({draftId: draft.id, draftRevision: draft.revision, ...message})));
     const state = {selectedDeviceId: deviceId, connected: true, busy: false, capabilities,
-        status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, peerGeneration: 42},
+        status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, slaveGeneration: 42},
         devices: [{id: deviceId, label: "Charybdis 4x6 · web build", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"}]};
     const panel = {service: {portable: null}, draft, portableLayers: core.startLayerEdit(snapshot, draft.revision)};
     const model = core.buildPanelModel(panel, state);

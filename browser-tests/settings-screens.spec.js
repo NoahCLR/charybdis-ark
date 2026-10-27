@@ -1,0 +1,221 @@
+// @ts-check
+"use strict";
+// The Settings screens, Backups, Keyboard and the Apply moment: the controls
+// this package draws are wired and say what the keyboard does.
+const {test, expect} = require("@playwright/test");
+const {openControls, change, expectPost, clearPosts} = require("./control-preview");
+const {openPreview} = require("./shell-page");
+const {hostMacros} = require("../tests/fixtures/host-macros");
+const {ProfileDraftSession} = require("../core/session/profile-draft-session");
+const {buildSnapshotModel} = require("../core/session/device-model");
+const {draftBinding} = require("../core/session/panel-session-state");
+
+test("each Settings screen draws its own sections open, with nothing to fold and no search", async ({page}) => {
+    await openControls(page, "keys");
+    for (const [screen, title, sections] of [
+        ["behaviours", "Behaviours", ["keyTiming", "behaviorSettings"]],
+        ["combos", "Combos", ["comboSettings", "comboReferences"]],
+        ["pointer", "Pointer settings", ["normalPointerSpeed", "sniping", "autoMouse"]],
+        ["host", "Host", ["host", "keyboardOptions"]],
+    ]) {
+        await page.locator(`[data-screen="${screen}"]`).click();
+        await expect(page.locator(".main > .topbar h1")).toHaveText(title);
+        await expect(page.locator(".settings-pad > [data-section]")).toHaveCount(sections.length);
+        expect(await page.locator(".settings-pad > [data-section]").evaluateAll((cards) => cards.map((card) => card.getAttribute("data-section")))).toEqual(sections);
+        await expect(page.locator(".settings-pad details, .settings-pad summary, .settings-pad input[type=search]")).toHaveCount(0);
+    }
+    await expect(page.locator('[data-section="startupLayers"], [data-f^="setting:startupLayer"]')).toHaveCount(0);
+});
+
+test("the sniping keys sit under Sniping DPI, in the pointer speed card", async ({page}) => {
+    await openControls(page, "pointer");
+    await expect(page.locator('[data-section="normalPointerSpeed"] .sniping-keys')).toHaveCount(1);
+    await expect(page.locator('[data-section="sniping"] .sniping-keys')).toHaveCount(0);
+    // Nothing comes between the Sniping DPI field and the keys that turn it on.
+    expect(await page.locator('[data-section="normalPointerSpeed"] .sniping-keys').evaluate((node) =>
+        node.previousElementSibling?.textContent?.includes("Sniping DPI"))).toBe(true);
+});
+
+test("the default combo window and the combo hold threshold are editable on current firmware, even without combos", async ({page}) => {
+    await openControls(page, "combos");
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.combos = [];
+        store.setModel(model); store.render();
+        window.__posted.length = 0;
+    });
+    await expect(page.getByText("Flash the updated firmware")).toHaveCount(0);
+    const window = page.locator('[data-f="settings:combo:default"]');
+    await change(window, 77);
+    await expectPost(page, {type: "updateComboDefaultWindow", defaultTermMs: "77"});
+    await clearPosts(page);
+    await change(page.locator('[data-f="settings:combo:hold"]'), 233);
+    await expectPost(page, {type: "updateComboHoldTerm", holdTermMs: "233"});
+});
+
+test("Combos: the combo layer matching grid posts its section whole", async ({page}) => {
+    await openControls(page, "combos");
+    const select = page.locator('[data-section="comboReferences"] [data-f="setting:comboReference1"]');
+    await expect(select).toBeVisible();
+    await select.selectOption("Layer 0");
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "updateConfigDefaults", sectionId: "comboReferences",
+        fields: expect.arrayContaining([expect.objectContaining({macro: "comboReference1", value: "Layer 0"})])})]);
+});
+
+test("Lighting's Auto-mouse link opens Pointer settings at Auto-mouse", async ({page}) => {
+    await openControls(page, "lighting", {stage: "auto"});
+    await page.getByRole("button", {name: "Open Pointer settings → Auto-mouse"}).first().click();
+    await expect(page.locator('[data-screen="pointer"]')).toHaveAttribute("aria-current", "true");
+    await expect(page.locator('[data-section="autoMouse"]')).toBeInViewport();
+});
+
+test("a review row for a setting shows it on the screen that holds it", async ({page}) => {
+    const {snapshot, capabilities} = hostMacros(1 | (2 << 16), []);
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    const connection = {connected: true, selectedDeviceId: "board", capabilities};
+    const publish = async () => {
+        const patch = {...buildSnapshotModel(draft.current, draft.capabilities, draftBinding({draft}, connection), connection), draft: {...draft.view(connection), ...draftBinding({draft}, connection)}};
+        await page.evaluate(async (patch) => {
+            const store = await import("/webview/store.mjs");
+            store.setModel({...store.getModel(), ...patch}); store.render();
+            window.__posted.length = 0;
+        }, patch);
+    };
+    await openPreview(page);
+    await publish();
+    // One change on each Settings screen, staged as the screen posts it,
+    // then each review row's Show goes back to it.
+    const edits = [["behaviours", "setting:tappingTerm", "211", "keyTiming", "Tap & hold timing"],
+        ["combos", "setting:comboReference1", "Layer 0", "comboReferences", "Combo layer matching"],
+        ["pointer", "setting:mouseTimeout", "900", "autoMouse", "Auto-mouse"], ["host", "setting:hostLayout", "3", "host", "Your computer"]];
+    for (const [screen, field, value] of edits) {
+        await page.locator(`[data-screen="${screen}"]`).click();
+        const control = page.locator(`[data-f="${field}"]`);
+        if (await control.evaluate((node) => node.tagName === "SELECT")) await control.selectOption(value);
+        else await change(control, value);
+        const message = await page.evaluate(() => window.__posted.at(-1));
+        expect(message).toMatchObject({type: "updateConfigDefaults"});
+        draft.stage({...message, draftRevision: draft.revision});
+        await publish();
+    }
+    for (const [screen, , , section, title] of edits) {
+        await page.locator('[data-screen="keys"]').click();
+        await page.locator('.commit [data-act="review"]').click();
+        const row = page.locator(".sheet .rv-item").filter({has: page.locator(".rv-title .t", {hasText: new RegExp(`^${title}$`)})});
+        await row.locator("[data-show]").click();
+        await expect(page.locator(".sheet")).toHaveCount(0);
+        await expect(page.locator(`[data-screen="${screen}"]`)).toHaveAttribute("aria-current", "true");
+        await expect(page.locator(`[data-section="${section}"]`)).toBeInViewport();
+    }
+});
+
+test("Keyboard: the title renames the keyboard, and memory and diagnostics live here", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await expect(title).toBeEnabled();
+    await title.click();
+    await expect(page.locator(".rename-note")).toBeVisible();
+    await clearPosts(page);
+    await title.fill("Desk 777");
+    await title.press("Enter");
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "renameKeyboard", name: "Desk 777"})]);
+    await expect(page.locator(".card.usage")).toHaveCount(1);
+    await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
+    await clearPosts(page);
+    await page.locator('[data-section="diagnostics"] [data-act="read"]').click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh"})]);
+    await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
+    await page.locator('[data-screen="host"]').click();
+    await expect(page.locator('[data-f="settings:keyboard-name"]')).toHaveCount(0);
+});
+
+test("Keyboard: opening Diagnostics reads the flash pauses once, and its Read keyboard reads them after the keyboard", async ({page}) => {
+    await openControls(page, "device");
+    const fold = page.locator('[data-section="diagnostics"]');
+    await clearPosts(page);
+    await fold.locator("summary h3").click();
+    await expect(fold).toHaveAttribute("open", "");
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "readFlashPauses"})]);
+    await expect(fold.locator(".flash-pauses-section")).toContainText("Not read yet.");
+    await clearPosts(page);
+    await fold.locator('[data-act="read"]').click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh", flashPauses: true})]);
+    await expect(fold).toHaveAttribute("open", "");
+    await clearPosts(page);
+    await fold.locator("summary h3").click();
+    await expect(fold).not.toHaveAttribute("open", "");
+    await fold.locator('[data-act="read"]').click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([{type: "refresh", draftId: expect.any(String), draftRevision: expect.any(Number)}]);
+});
+
+test("Keyboard: an open Diagnostics reads the flash pauses of each connection once, when nothing holds the keyboard", async ({page}) => {
+    await openControls(page, "device");
+    await page.locator('[data-section="diagnostics"] summary h3').click();
+    /** @param {{connectionToken: number, busy?: boolean, read?: boolean}} next */
+    const publish = (next) => page.evaluate(async ({connectionToken, busy, read}) => {
+        const {getModel} = await import("/webview/store.mjs");
+        const model = structuredClone(getModel());
+        model.load = {...model.load, connectionToken};
+        model.device.health.busy = Boolean(busy);
+        model.device.flashPauses = read ? {state: "unavailable", error: "x"} : null;
+        window.__posted.length = 0;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return window.__posted.map((message) => message.type);
+    }, next);
+    expect(await publish({connectionToken: 7, busy: true})).toEqual([]);
+    expect(await publish({connectionToken: 7})).toEqual(["readFlashPauses"]);
+    expect(await publish({connectionToken: 7}), "asked once for this connection").toEqual([]);
+    expect(await publish({connectionToken: 8, read: true}), "figures already read").toEqual([]);
+    expect(await publish({connectionToken: 9}), "a reconnected keyboard is read too").toEqual(["readFlashPauses"]);
+});
+
+test("Keyboard: the demo's Diagnostics shows sample flash pauses for both halves and reads nothing", async ({page}) => {
+    await page.goto("/preview/index.html?shell=demo&screen=device");
+    const fold = page.locator('[data-section="diagnostics"]');
+    await clearPosts(page);
+    await fold.locator("summary h3").click();
+    const table = fold.locator("table.flash-pauses");
+    await expect(table.locator("thead th")).toHaveText(["", "Master half (right)", "Slave half (left)"]);
+    await expect(table.locator("tbody tr").first()).toHaveText(/Longest sector erase\s*49\.0 ms\s*48\.7 ms/);
+    await expect(table.locator("tbody td.num").first()).toHaveAttribute("data-tip", "49,045 µs");
+    expect(await page.evaluate(() => window.__posted)).toEqual([]);
+});
+
+test("Backups: a recovery copy is named by what made it and its keyboard, can be used as a draft or deleted, and a chosen file opens as a sheet", async ({page}) => {
+    await page.goto("/preview/index.html");
+    await page.locator('[data-screen="profile"]').click();
+    await expect(page.locator(".card.usage")).toHaveCount(0);
+    const names = page.locator(".recovery-row .recovery-name");
+    await expect(names.nth(0)).toHaveText(/^Before saving live edits · Charybdis - Home · 6 Oct 2026, \d\d:\d\d$/);
+    await expect(names.nth(1)).toHaveText(/^Before leaving Live edit · Charybdis - Home · 4 Oct 2026, \d\d:\d\d$/);
+    await expect(names.nth(2)).toHaveText(/^Before saving a draft · Charybdis - Office · 3 Oct 2026, \d\d:\d\d$/);
+    await expect(names.nth(3)).toHaveText(/^Recovery copy · 1 Oct 2026, \d\d:\d\d$/);
+    await expect(page.locator(".card.recoveries h3")).toHaveText("Recovery copies");
+    await clearPosts(page);
+    await page.locator(".recovery-row [data-use]").first().click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "useRecovery", id: 4})]);
+    await clearPosts(page);
+    await page.locator(".recovery-row [data-delete]").first().click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "deleteRecovery", id: 4})]);
+    // A copy stored before causes were recorded works as any other.
+    for (const [attribute, type] of [["data-use", "useRecovery"], ["data-recovery", "downloadRecovery"], ["data-delete", "deleteRecovery"]]) {
+        await clearPosts(page);
+        await page.locator(`.recovery-row [${attribute}]`).nth(3).click();
+        await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type, id: 1})]);
+    }
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.portable.review = {incoming: {layers: 16, behaviors: 1, combos: 0, macros: 0, names: []}, current: {layers: 16, behaviors: 1, combos: 0, macros: 0, names: []},
+            fileName: "home.charybdis.json", differences: [], fits: {used: 4101, capacity: 53216}};
+        store.setModel(model); store.render();
+        window.__posted.length = 0;
+    });
+    const sheet = page.locator(".import-sheet");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator(".import-fits")).toHaveText("This file fits: 4,101 of 53,216 bytes");
+    await sheet.locator('[data-act="cancel"]').click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "cancelPortableReview"})]);
+});

@@ -3,68 +3,79 @@
 **Adjust, Review, Keep.**
 
 Ark is the editor for [my Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6).
-Plug the keyboard in and you see exactly what is on it. Change it, and save it
-back. You don't write C, you don't reflash, and you don't need a firmware
-checkout. Everything Ark shows comes from the keyboard itself.
+Plug the keyboard in and you see exactly what is on it, because everything Ark
+shows comes from the keyboard itself. Change it and save it back to both
+halves. No C, no reflash, no firmware checkout.
+
+## Try the demo first
+
+The quickest way to see what Ark does is to use it. Open
+**<https://ark.ncleroy.dev>** and choose **Explore a demo**: Ark opens on a
+complete setup exported from a real keyboard, with 16 layers, 32 pointing
+modes, 128 macros and 128 custom keys, and no keyboard connected. Every screen
+works and every edit shows up in Review; only saving needs a keyboard.
+
+The demo shows far more than this page can explain: every editor, every
+setting and how they fit together. The list below is only a summary, so if
+you want to know what Ark can do, start there. The demo runs in any browser on
+a computer; connecting a keyboard needs Chrome or Edge.
 
 ## What you can change
 
-- **Keys and layers.** Pick keys from an ANSI board or search all of QMK. Drag
-  one key onto another to swap them. Rename, reorder and re-base layers, and
-  preview several layers stacked the way the keyboard would resolve them.
-- **Behaviours.** Set what a key does on tap, hold and long hold, for each tap
+- **Keys and layers.** Pick keys from a board labelled for your computer's
+  keyboard layout, or search every key the firmware supports. Drag one key
+  onto another to swap them. Rename and reorder the 16 layers, make any of
+  them the base, and preview several stacked the way the keyboard resolves
+  them.
+- **Behaviours.** What a key does on tap, hold and long hold, for each tap
   count, in one grid with its timing.
-- **Combos, macros and custom keys.** Build combos, write named macros or
-  record them, and name your own custom keys.
-- **Lighting.** Set layer and mode colours, combo and key feedback, and the
-  auto-mouse fade. The board on screen is painted the way the keyboard will
-  light up.
-- **Trackball.** Set pointer speed, sniping and auto-mouse, and up to 32 pointing
-  modes, as many as your firmware has (scroll, volume, zoom, arrows, your own
-  shortcuts…), with their keys.
+- **Combos.** Keys pressed together, with their own timing and layers.
+- **Macros.** Paste text straight in, code and emoji included, add shortcuts
+  and delays, or record what you type. Macros type through your computer's
+  keyboard layout.
+- **Custom keys.** Name your own keys, give each a shortcut and a behaviour.
+  A shortcut holds up to six keys at once, media keys among them, and can
+  turn layers on too, several at once, held, locked, moved to, tap-toggled or
+  one-shot, as a layer key would.
+- **The trackball.** Pointer speed, sniping on the layers you pick,
+  auto-mouse, and 32 pointing modes that scroll or send arrows and shortcuts
+  as the ball moves, each of which can run while its layers are on and turn
+  layers on with its key.
+- **Lighting.** The background effect, layer and pointing-mode colours, combo
+  and key feedback, and the idle timeout. The board on screen lights up the
+  way the keyboard will.
+- **Its name.** Call the keyboard what you like; your computer and Chrome show
+  that name too.
 
-## Nothing is saved until you say so
+## Nothing is permanent until you say so
 
-Every edit goes into a draft with undo, redo and a full history. **Review**
-lists what changed and checks what the layers let you reach. It warns you
-about a layer you could lock yourself into, combos that can't fire and macros
-that are too long to play. **Apply** saves a recovery copy, writes both halves
-and reads the result back to prove it.
+Pick how edits reach the keyboard, under **Edits** beside its name.
+**Live edit** works like VIA: every edit runs on the keyboard straight away,
+and the keyboard saves by itself a few seconds after you stop. In
+**Live preview + save**, the default, every edit runs on the keyboard straight
+away so you can try it, and nothing is kept until you review it and **Save**.
+Unplug it and it goes back to what was saved. **Review and save** keeps your
+edits in Ark until you review and save them.
 
-**Export profile** saves your whole setup as one file. **Import profile**
-restores it after the same review.
+Whichever you pick, every edit goes into one draft with undo, redo and a full
+history. **Review** lists every change and checks what your layers let you
+reach, so you don't lock yourself into a layer with no way back. Saving keeps
+a recovery copy first and writes both halves as one complete profile.
 
-No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
-connected. Every screen works and every edit shows up in the review; only Apply
-needs the keyboard, and Export takes what you made there to yours.
+**Export profile** saves your whole setup as one file and **Import profile**
+brings it back, through the same review.
 
 ## Install
 
-It's early days: Ark runs as a VS Code extension, installed from a checkout,
-and now also as a web page in Chrome or Edge, talking to the keyboard over
-WebHID. The released page is at **https://ark.ncleroy.dev**; nothing to install,
-just open it on your computer. On a phone it just says so.
-You can also build it and open it locally (`npm run web`).
+Open **<https://ark.ncleroy.dev>** in Chrome or Edge on your computer. Nothing
+to install: Ark is a web page.
 
-For the extension:
-
-```sh
-git clone https://github.com/NoahCLR/charybdis-ark.git
-cd charybdis-ark
-npm ci
-ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0   # then reload VS Code
-```
-
-Click **Charybdis Ark** in the status bar, or run **Charybdis: Open Charybdis
-Ark** from the command palette.
-
-The keyboard needs the left/right pair from a
-[firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest).
-A plain `qmk compile` image can't be read or saved by Ark.
+The keyboard needs both halves from the
+[latest firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest).
+Ark works with current firmware only.
 
 ## Learn more
 
-- [Ark guide](docs/GUIDE.md): every screen, Review's checks, what happens
-  while a profile is applied, backups, and using Ark in Chrome
-- [Product goal](docs/PRODUCT_GOAL.md): what Ark is meant to become
-- [Developing Ark](docs/REPOSITORY.md#development-and-installation)
+- [The Ark guide](docs/guide/README.md): every screen, one page each
+- [What Ark is for](docs/adr/0068-the-keyboard-alone-is-enough.md)
+- [Developing Ark](docs/development.md)

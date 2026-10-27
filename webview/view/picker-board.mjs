@@ -1,10 +1,30 @@
+// @ts-check
+/** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 // The ANSI board the keycode picker draws, taken from the app that ships it so
 // a second interface cannot teach a different keyboard.
+
+// Layout legends already carry dead-key marks and the macOS ISO swap from the
+// model. Keep the stored value and board geometry while choosing what to draw.
+export function pickerBoardKey(/** @type {{x: number, y: number, w: number, h: number, value: string, labels: string[]}} */ source, /** @type {Model} */ model) {
+  const spoken = model?.qmkKeyLabels?.[source.value];
+  const modifier = /^KC_(?:LEFT_|RIGHT_|L|R)(?:CTL|SFT|ALT|GUI)$/.test(source.value);
+  const legend = model?.hostLayoutLegends?.[source.value];
+  return modifier ? {...source, labels: [(spoken || source.value).replace(/^(Left|Right) /, "")]} : legend ? {...source, labels: legend} : source;
+}
+
+// A key's one legend is drawn at full size when it fits the key, and smaller
+// when it does not: Shift and Space stay full size on their wide keys, while
+// Insert and Command shrink on narrow ones. The estimate is the legend's
+// characters at .55 of the full size (.pkb-main's 21 units), inside 6 units of
+// padding a side.
+const LEGEND_SIZE = 21, LEGEND_ADVANCE = 0.55, LEGEND_PAD = 6;
+/** @param {string} label @param {number} width the key's width in board units */
+export const legendFits = (label, width) => [...label].length * LEGEND_SIZE * LEGEND_ADVANCE <= width - 2 * LEGEND_PAD;
 
 export const PICKER_BOARD = {
   width: 1563.3125,
   height: 466.2,
-  keys: [
+  keys: /** @type {[number, number, number, number, string, string | string[]][]} */ ([
     [24.658, 24.929, 61.203, 61.203, "KC_ESC", "Esc"],
     [159.658, 24.929, 61.203, 61.203, "KC_F1", "F1"],
     [227.161, 24.929, 61.203, 61.203, "KC_F2", "F2"],
@@ -59,7 +79,7 @@ export const PICKER_BOARD = {
     [751.075, 245.069, 61.203, 61.203, "KC_SCLN", [";", ":"]],
     [818.578, 245.069, 61.203, 61.203, "KC_QUOT", ["'", "\""]],
     [886.081, 245.069, 144.813, 61.203, "KC_ENT", ["Enter", "↵"]],
-    [24.658, 312.569, 146.343, 61.203, "KC_LSFT", ["Shift", "⇧"]],
+    [24.658, 312.569, 146.343, 61.203, "KC_LSFT", ""],
     [177.298, 312.569, 61.203, 61.203, "KC_Z", "Z"],
     [244.801, 312.569, 61.203, 61.203, "KC_X", "X"],
     [312.304, 312.569, 61.203, 61.203, "KC_C", "C"],
@@ -70,15 +90,15 @@ export const PICKER_BOARD = {
     [649.819, 312.569, 61.203, 61.203, "KC_COMM", [",", "<"]],
     [717.322, 312.569, 61.203, 61.203, "KC_DOT", [".", ">"]],
     [784.825, 312.569, 61.203, 61.203, "KC_SLSH", ["/", "?"]],
-    [852.328, 312.569, 178.563, 61.203, "KC_RSFT", ["Shift", "⇧"]],
-    [24.658, 380.069, 74.703, 61.203, "KC_LCTL", "Ctrl"],
-    [105.661, 380.069, 74.703, 61.203, "KC_LGUI", "Cmd"],
-    [186.664, 380.069, 74.703, 61.203, "KC_LALT", "Alt"],
+    [852.328, 312.569, 178.563, 61.203, "KC_RSFT", ""],
+    [24.658, 380.069, 74.703, 61.203, "KC_LCTL", ""],
+    [105.661, 380.069, 74.703, 61.203, "KC_LGUI", ""],
+    [186.664, 380.069, 74.703, 61.203, "KC_LALT", ""],
     [267.667, 380.069, 439.203, 61.203, "KC_SPC", "Space"],
-    [713.158, 380.069, 74.703, 61.203, "KC_RALT", "AltGr"],
+    [713.158, 380.069, 74.703, 61.203, "KC_RALT", ""],
     [794.161, 380.069, 74.703, 61.203, "KC_APP", "Menu"],
-    [875.164, 380.069, 74.703, 61.203, "KC_RCTL", "Ctrl"],
-    [956.164, 380.069, 74.703, 61.203, "KC_RGUI", "Cmd"],
+    [875.164, 380.069, 74.703, 61.203, "KC_RCTL", ""],
+    [956.164, 380.069, 74.703, 61.203, "KC_RGUI", ""],
     [1054.64, 24.939, 61.452, 61.359, "KC_PSCR", "PrtSc"],
     [1122.14, 24.896, 61.452, 61.402, "KC_SCRL", "ScrLk"],
     [1189.64, 24.896, 61.452, 61.402, "KC_PAUS", "Pause"],
@@ -109,5 +129,5 @@ export const PICKER_BOARD = {
     [1477.28, 312.524, 61.452, 129.032, "KC_PENT", "Enter"],
     [1274.643, 380.058, 129.227, 61.359, "KC_P0", ["0", "Ins"]],
     [1409.78, 380.058, 61.452, 61.359, "KC_PDOT", [".", "Del"]],
-  ].map(([x, y, w, h, value, label]) => ({x, y, w, h, value, labels: Array.isArray(label) ? label : [label]})),
+  ]).map(([x, y, w, h, value, label]) => ({x, y, w, h, value, labels: Array.isArray(label) ? label : [label]})),
 };

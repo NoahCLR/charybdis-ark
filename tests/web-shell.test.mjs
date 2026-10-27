@@ -1,0 +1,127 @@
+// The web shell's pieces that need no browser: the panel channel, the worker's sleep, and the shell's small decisions. The page
+// itself, over a fake WebHID keyboard, is browser-tests/web-page.spec.js's.
+
+import assert from "node:assert/strict";
+import test from "node:test";
+import {connectPanel} from "../web/panel-channel.mjs";
+import {workerSleep} from "../web/sleep.mjs";
+import {BLOCKED, COMPILED_DEFAULTS_KEY, PROFILE_FILE_LIMIT, compiledDefaultsStore, initialTheme, leaving, readProfileFile} from "../web/web-shell.mjs";
+import {listed} from "../web/recoveries.mjs";
+
+// A MessageChannel delivers on a later task, but not within any fixed time: a
+// loaded runner can take longer than a few milliseconds. Wait for the delivery
+// itself, giving up only after a generous bound.
+async function delivered(list, count = 1) {
+    for (const end = Date.now() + 2000; list.length < count && Date.now() < end;) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+}
+
+test("the stand-in delivers both ways later and as copies, and shows the click its message at once", async () => {
+    const received = [], gestures = [], target = new EventTarget(), shown = [];
+    target.addEventListener("message", (event) => shown.push(event.data));
+    const panel = connectPanel({receive: (message) => received.push(message), gesture: (message) => gestures.push(message), target});
+    try {
+        const sent = {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]};
+        panel.api.postMessage(sent);
+        assert.equal(gestures.length, 1, "the shell sees the message inside the click");
+        assert.deepEqual(gestures[0], sent);
+        assert.notEqual(gestures[0], sent, "as a copy");
+        assert.deepEqual(received, [], "the message itself arrives later, as across a real channel");
+        sent.changes[0].keycode = "KC_B";
+        await delivered(received);
+        assert.equal(received.length, 1);
+        assert.equal(received[0].changes[0].keycode, "KC_A", "the panel cannot change what the shell was sent");
+
+        const model = {type: "model", model: {draft: {dirty: false}}};
+        await panel.post(model);
+        assert.deepEqual(shown, [], "the model arrives later too");
+        await delivered(shown);
+        assert.deepEqual(shown, [model]);
+        shown[0].model.draft.dirty = true;
+        assert.equal(model.model.draft.dirty, false, "nor the shell's model by touching what it was sent");
+
+        panel.api.setState({screen: "keys"});
+        assert.deepEqual(panel.api.getState(), {screen: "keys"});
+    } finally {
+        panel.close();
+    }
+});
+
+test("the worker's sleep waits for the worker's answer", async () => {
+    const asked = [];
+    const worker = {postMessage: (message) => asked.push(message)};
+    const sleep = workerSleep(worker);
+    let woke = false;
+    const waiting = sleep(20).then(() => {woke = true;});
+    assert.deepEqual(asked, [{id: 1, ms: 20}]);
+    await Promise.resolve();
+    assert.equal(woke, false);
+    worker.onmessage({data: 1});
+    await waiting;
+    assert.equal(woke, true);
+    // Without a worker it is the page's own timer.
+    await workerSleep(undefined)(1);
+});
+
+test("the theme starts from a saved choice, then the system's", () => {
+    assert.equal(initialTheme("light", false), "light");
+    assert.equal(initialTheme("dark", true), "dark");
+    assert.equal(initialTheme(null, true), "light");
+    assert.equal(initialTheme("sepia", false), "dark");
+});
+
+test("the compiled defaults are kept in the page's storage, and a refusing storage keeps nothing", () => {
+    const saved = new Map();
+    const store = compiledDefaultsStore({getItem: key => saved.get(key) ?? null, setItem: (key, value) => {saved.set(key, value);}});
+    assert.equal(store.get(), undefined);
+    store.set("copy");
+    assert.equal(saved.get(COMPILED_DEFAULTS_KEY), "copy");
+    assert.equal(store.get(), "copy");
+    const full = compiledDefaultsStore({getItem: () => {throw new Error("denied");}, setItem: () => {throw new Error("quota");}});
+    assert.doesNotThrow(() => full.set("copy"));
+    assert.equal(full.get(), undefined);
+    assert.equal(compiledDefaultsStore(undefined).get(), undefined);
+});
+
+test("leaving asks first with unapplied edits or an Apply running", () => {
+    assert.equal(leaving({}), false);
+    assert.equal(leaving({draft: {dirty: false}}), false);
+    assert.equal(leaving({draft: {dirty: true}}), true);
+    assert.equal(leaving({applyRunning: true}), true);
+    assert.equal(leaving({service: {phase: "restore-complete"}}), true);
+    assert.equal(leaving({service: {phase: "read-layout"}}), false);
+});
+
+test("in the demo, leaving asks only about edits not exported", () => {
+    const draft = (print) => ({dirty: true, current: {fingerprint: print}});
+    assert.equal(leaving({demo: {exported: null}, draft: draft(1)}), true);
+    assert.equal(leaving({demo: {exported: 1}, draft: draft(1)}), false, "exported as they are");
+    assert.equal(leaving({demo: {exported: 1}, draft: draft(2)}), true, "edited since");
+    assert.equal(leaving({demo: {exported: null}, draft: {dirty: false}}), false);
+});
+
+test("a chosen profile file has the portable document's size limit", async () => {
+    assert.equal(await readProfileFile(undefined), undefined);
+    const file = (size) => ({size, name: "mine.charybdis.json", text: async () => "{}"});
+    assert.deepEqual(await readProfileFile(file(PROFILE_FILE_LIMIT)), {text: "{}", name: "mine.charybdis.json"});
+    await assert.rejects(readProfileFile(file(PROFILE_FILE_LIMIT + 1)), /too large/);
+});
+
+test("a stored recovery copy lists with what made it and its keyboard, an older one without", () => {
+    const savedAt = "2026-10-06T09:14:03.512Z";
+    assert.deepEqual(listed({id: 2, name: "recovery-x-before-save-home.charybdis.json", savedAt, cause: "save", keyboard: "Home", text: "{}"}),
+        {id: 2, name: "recovery-x-before-save-home.charybdis.json", savedAt, cause: "save", keyboard: "Home"});
+    assert.deepEqual(listed({id: 1, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt, text: "{}"}),
+        {id: 1, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt});
+});
+
+test("the page says why a tab cannot reach a keyboard", () => {
+    assert.match(BLOCKED.unsupported.title, /Chrome or Edge/);
+    assert.match(BLOCKED.unsupported.detail, /HTTPS/);
+    assert.match(BLOCKED.otherTab.title, /another tab/);
+    // The demo needs no keyboard, so a browser without WebHID still offers it;
+    // a tab waiting on another does not, since it takes the keyboard over.
+    assert.equal(BLOCKED.unsupported.demo, true);
+    assert.equal(BLOCKED.otherTab.demo, undefined);
+});

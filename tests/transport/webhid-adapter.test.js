@@ -183,9 +183,7 @@ test("listDevices returns only allowed Raw HID interfaces, with stable ids", asy
     assert.equal(hid.requests.length, 0, "listing never opens the picker");
 
     // Chrome returns the same HIDDevice while it stays plugged in; so does the id.
-    const second = new FakeHidDevice();
-    hid.allowed = [second, raw];
-    assert.deepEqual((await adapter.listDevices()).map((device) => device.id), ["webhid:2", "webhid:1"]);
+    assert.deepEqual((await adapter.listDevices()).map((device) => device.id), ["webhid:1"]);
 
     hid.getDevices = async () => {
         throw new Error("denied");
@@ -375,4 +373,36 @@ test("the request coordinator runs a full request and response over WebHID", asy
     await coordinator.close();
     assert.equal(device.closeCalls, 1);
     assert.equal(hid.listeners.get("disconnect"), 0);
+});
+
+test("every allowed keyboard is listed, the one last chosen first", async () => {
+    const first = new FakeHidDevice(), second = new FakeHidDevice();
+    const hid = new FakeHid([first, second]);
+    const adapter = new WebHidDeviceAdapter({hid});
+    assert.deepEqual((await adapter.listDevices()).map((device) => device.id), ["webhid:1", "webhid:2"]);
+
+    hid.pick = [second];
+    assert.equal((await adapter.requestDevice())[0].id, "webhid:2");
+    assert.deepEqual((await adapter.listDevices()).map((device) => device.id), ["webhid:2", "webhid:1"], "the chosen one leads");
+
+    hid.allowed = [first];
+    assert.deepEqual((await adapter.listDevices()).map((device) => device.id), ["webhid:1"]);
+    hid.allowed = [first, second];
+    assert.deepEqual((await adapter.listDevices()).map((device) => device.id), ["webhid:1", "webhid:2"], "a choice that left is not kept");
+});
+
+test("forget closes the keyboard last opened and takes back the page's permission", async () => {
+    const first = new FakeHidDevice(), second = new FakeHidDevice();
+    let forgotten = 0;
+    second.forget = async () => {forgotten += 1; hid.allowed = [first];};
+    const hid = new FakeHid([first, second]);
+    const adapter = new WebHidDeviceAdapter({hid});
+    await adapter.listDevices();
+    const connection = await adapter.connect("webhid:2");
+    await connection.close();
+    await adapter.forget();
+    assert.equal(forgotten, 1);
+    assert.deepEqual((await adapter.listDevices()).map((device) => device.id), ["webhid:1"]);
+    await adapter.forget();
+    assert.equal(forgotten, 1, "nothing left to forget");
 });

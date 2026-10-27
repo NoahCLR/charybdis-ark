@@ -1,17 +1,21 @@
 #!/bin/sh
-# Installs the Chrome the browser tests use (CI only), retrying a stalled install.
+# Installs the Chrome the browser tests use (CI only), retrying a stalled download.
 #
-# A normal install takes 25-40 seconds. On GitHub's runners one has hung for over
-# an hour, and with no limit a hung install holds the web page's publish queue or
-# a release's browser check for up to six hours. Each attempt is stopped after
-# ARK_CHROME_INSTALL_SECONDS (default 60) and retried, up to three attempts.
+# Only the browser is downloaded, from Playwright's CDN: GitHub's Ubuntu runners
+# already have Google Chrome and the system libraries it needs. Installing them
+# again with apt (--with-deps) depended on Ubuntu's package mirror, which on the
+# runners has hung for over an hour and downloaded at 0.5 MB/s.
+#
+# A normal download takes well under a minute. Each attempt is stopped after
+# ARK_CHROME_INSTALL_SECONDS (default 90) and retried, up to three attempts.
+# timeout stops the attempt's whole process group, and nothing runs as root.
 set -u
 
-limit="${ARK_CHROME_INSTALL_SECONDS:-60}"
+limit="${ARK_CHROME_INSTALL_SECONDS:-90}"
 attempts=3
 attempt=1
 while :; do
-    if timeout --kill-after=10 "$limit" npx playwright install --with-deps chromium; then
+    if timeout --kill-after=10 "$limit" npx playwright install chromium; then
         exit 0
     fi
     if [ "$attempt" -ge "$attempts" ]; then
@@ -19,7 +23,5 @@ while :; do
         exit 1
     fi
     echo "Chrome install attempt $attempt failed or took over ${limit}s; retrying" >&2
-    # A stopped attempt can leave apt's package database half configured.
-    sudo dpkg --configure -a >/dev/null 2>&1 || true
     attempt=$((attempt + 1))
 done

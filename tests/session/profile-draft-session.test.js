@@ -1,40 +1,106 @@
 "use strict";
+const {profileLayers, profileMacros, editLayers, editMacros} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
-const {document, legacyDocument} = require("../fixtures/portable-profile");
+const {document} = require("../fixtures/portable-profile");
 const {options} = require("../fixtures/keyboard-options");
 const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
+const {macroEditorView} = require("../../core/model/macro-editor");
 const {settingsEditorView} = require("../../core/model/settings-editor");
-const {behaviorRowsForView} = require("../../core/session/device-profile-view");
+const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 function fixture() {
     const value = document(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}, options:options()};
-    const caps = {compiledLayerCount:8,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest};
+    const caps = {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest};
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, "board", caps)};
 }
 function settings(draft, id, updates) {
-    const section = settingsEditorView(draft.current).sections.find(row => row.id === id);
+    const section = settingsEditorView(draft.current, draft.capabilities).sections.find(row => row.id === id);
     return {type:"updateConfigDefaults", sectionId:id, expectedFingerprint:draft.current.fingerprint,
         fields:section.fields.map(field => field.kind === "toggle" ? {macro:field.macro, enabled:updates[field.macro] ?? field.enabled} : {macro:field.macro,value:updates[field.macro] ?? field.value})};
 }
 function stage(draft, edit) {return draft.stage({...edit,draftRevision:draft.revision});}
 
+test("Host changes review automatic protection with Host rather than inventing a macro edit", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["é"]);
+    capabilities.featureFlags |= 1 << 23;
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    stage(draft, settings(draft, "host", {hostLayout: "3"}));
+    assert.ok(!draft.changes().some(row => row.unit === "macro:0"));
+    const effect = draft.changes().find(row => row.area === "Macros");
+    assert.equal(effect.unit, "settings:host");
+    assert.deepEqual(effect.fields.find(field => field.label === "Uninterruptible playback"),
+        {label: "Uninterruptible playback", status: "changed", before: "Automatic · off", after: "Automatic · on"});
+    draft.discard(draft.revision, effect.group);
+    assert.equal(draft.dirty, false);
+});
+
+test("layout playback effects follow Host through Review, history, undo, redo and discard", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["café", "{+KC_A}é{-KC_A}"]);
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    stage(draft, {type: "updateMacro", keycode: "MACRO_0", payload: "café!", name: "Greeting"});
+    const authored = draft.current.fingerprint;
+    stage(draft, settings(draft, "host", {hostLayout: "3"}));
+    const rows = draft.changes(), host = rows.find(row => row.area === "Settings" && row.unit === "settings:host");
+    const effects = rows.filter(row => row.area === "Macros" && row.unit === "settings:host");
+    assert.equal(effects.length, 2);
+    assert.ok(effects.every(row => row.group === host.group));
+    assert.notEqual(rows.find(row => row.unit === "macro:0").group, host.group);
+    assert.equal(draft.checks().find(check => check.place?.index === 1)?.status, "new");
+    assert.equal(draft.checks().find(check => check.place?.index === 1)?.level, "warning");
+    assert.equal(draft.hasBlockers(), false, "an accepted but inert macro is a warning");
+    assert.equal(draft.steps().at(-1).changes.filter(row => row.area === "Macros").length, 2);
+    draft.undo(draft.revision);
+    assert.equal(draft.current.fingerprint, authored);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[1].playable, true);
+    draft.redo(draft.revision);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[1].playable, false);
+    draft.discard(draft.revision, draft.changes().find(row => row.unit === "settings:host").group);
+    assert.equal(draft.current.fingerprint, authored, "discard restores Host and preserves the authored macro edit");
+    assert.deepEqual(draft.changes().map(row => row.unit), ["macro:0"]);
+});
+
+test("switching to a native layout fixes stored text without rewriting it", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(1, ["café"]);
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[0].playable, false);
+    stage(draft, settings(draft, "host", {hostLayout: "2"}));
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[0].playable, true);
+    assert.deepEqual(profileMacros(draft.document), profileMacros(snapshot.document));
+    assert.equal(draft.checks().find(row => row.kind === "unplayableMacro").status, "fixed");
+    assert.equal(draft.changes().find(row => row.area === "Macros").fields.find(field => field.label === "Playback").after, "Ready to play");
+});
+
+test("stored playback warnings refresh when Auto loses its detected host", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(0x100, ["🙂"]);
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    assert.ok(!draft.checks().some(row => row.kind === "unplayableMacro"));
+    draft.observe({...snapshot, hostOs: {detected: 0}}, "board");
+    assert.equal(draft.checks().find(row => row.kind === "unplayableMacro").status, "existing");
+    draft.observe(snapshot, "board");
+    assert.ok(!draft.checks().some(row => row.kind === "unplayableMacro"));
+});
+
 test("default timing edits move matching behaviours, report inherited effects, and discard atomically", () => {
     const {draft: seed, caps} = fixture();
     const defaults = validateSnapshot(seed.document).settings.values;
-    for (const [keycode, tapHoldTerm, longerHoldTerm] of [
+    for (const [keycode, tapHoldTerm, longHoldTerm] of [
         ["KC_Q", 0, 0], ["KC_W", defaults[1], defaults[2]],
         ["KC_E", 333, 633], ["LT(3,KC_F)", defaults[0], defaults[2]],
-    ]) stage(seed, {type: "saveBehavior", behavior: {keycode, tapHoldTerm, longerHoldTerm, multiTapTerm: defaults[3], steps: []}});
+    ]) stage(seed, {type: "saveBehavior", behavior: {keycode, tapHoldTerm, longHoldTerm, multiTapTerm: defaults[3], steps: []}});
     const draft = new ProfileDraftSession(seed.current, "board", caps);
     const baseline = draft.current.fingerprint;
     const row = keycode => behaviorRowsForView(validateSnapshot(draft.document).behaviors).find(entry => entry.keycode === keycode);
     stage(draft, {type: "saveBehavior", behavior: {...row("KC_Q"), keepsAutoMouseAnchored: true}});
     const anchored = draft.current.fingerprint;
-    stage(draft, settings(draft, "keyTiming", {longerHoldTerm: "500"}));
-    assert.equal(row("KC_Q").longerHoldTerm, "0");
-    assert.equal(row("KC_W").longerHoldTerm, "0", "an explicit old-default match adopts inheritance");
-    assert.equal(row("KC_E").longerHoldTerm, "633", "custom timing stays fixed");
-    assert.equal(row("LT(3,KC_F)").longerHoldTerm, "0");
+    stage(draft, settings(draft, "keyTiming", {longHoldTerm: "500"}));
+    assert.equal(row("KC_Q").longHoldTerm, "0");
+    assert.equal(row("KC_W").longHoldTerm, "0", "an explicit old-default match adopts inheritance");
+    assert.equal(row("KC_E").longHoldTerm, "633", "custom timing stays fixed");
+    assert.equal(row("LT(3,KC_F)").longHoldTerm, "0");
     const changes = draft.changes(), setting = changes.find(entry => entry.unit === "settings:keyTiming");
     const effect = setting.fields.find(field => field.label === "Q · Long hold threshold");
     assert.deepEqual([effect.before, effect.after], [`default · ${defaults[2]} ms`, "default · 500 ms"]);
@@ -46,8 +112,8 @@ test("default timing edits move matching behaviours, report inherited effects, a
     draft.undo(draft.revision);
     assert.equal(draft.current.fingerprint, anchored);
     draft.redo(draft.revision);
-    stage(draft, settings(draft, "keyTiming", {longerHoldTerm: "550"}));
-    assert.equal(row("KC_W").longerHoldTerm, "0", "it continues following subsequent defaults");
+    stage(draft, settings(draft, "keyTiming", {longHoldTerm: "550"}));
+    assert.equal(row("KC_W").longHoldTerm, "0", "it continues following subsequent defaults");
     draft.discard(draft.revision, draft.changes().find(entry => entry.unit === "settings:keyTiming").group);
     assert.equal(draft.current.fingerprint, anchored, "discard restores defaults and explicit matching bytes, keeping the anchor edit");
     draft.discard(draft.revision, draft.changes()[0].group);
@@ -62,14 +128,16 @@ test("default timing edits move matching behaviours, report inherited effects, a
     assert.equal(row("KC_E").multiTapTerm, "0");
 });
 test("a draft opens only on firmware whose key numbering the app knows", () => {
-    const value = legacyDocument(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}};
-    assert.throws(() => new ProfileDraftSession(snapshot, "board", {compiledLayerCount:8, supportedDomainMask:15, actionAbiDigest:value.actionAbiDigest}), /numbers its keys differently/);
+    const {snapshot, caps} = fixture();
+    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732, 0x12345678]) {
+        assert.throws(() => new ProfileDraftSession(snapshot, "board", {...caps, actionAbiDigest}), /numbers its keys differently/);
+    }
 });
 test("review blockers stop Apply before a recovery copy or device write", async () => {
     const {snapshot, caps} = fixture();
     snapshot.limits.brightnessMax = 100;
     const draft = new ProfileDraftSession(snapshot, "board", caps);
-    stage(draft, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello"});
+    stage(draft, {type: "updateMacro", keycode: "MACRO_0", payload: "hello"});
     draft.review(draft.revision);
     assert.equal(draft.hasBlockers(), true);
     assert.equal(draft.checks().find(row => row.kind === "brightnessBlocker")?.level, "blocker");
@@ -80,17 +148,17 @@ test("review blockers stop Apply before a recovery copy or device write", async 
 });
 test("one draft composes every editor without changing its device snapshot", () => {
     const {draft,snapshot} = fixture(), original = JSON.stringify(snapshot);
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]}]});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"hello"});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_1",payload:"{KC_LGUI,KC_N}"});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"hello"});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_1",payload:"{KC_LGUI,KC_N}"});
     stage(draft,settings(draft,"keyTiming",{tapHoldTerm:"175"}));
     const row = behaviorRowsForView(validateSnapshot(draft.document).behaviors)[0];
     stage(draft,{type:"saveBehavior",behavior:{...row,tapHoldTerm:"210"},expectedBase:draft.identity()});
     stage(draft,{type:"updateLayerColor",layer:"Layer 0",h:"23",s:"255",v:"100",mode:"KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
     stage(draft,{type:"saveCombo",id:0,inputs:["KC_A","KC_B"],output:"G(KC_N)",termMs:"60",holdTermMs:"200"});
     const view = draft.view({connected:true,selectedDeviceId:"board"});
-    assert.deepEqual(new Set(view.changes.map(c=>c.area)),new Set(["Layout","Macros","Settings","Behaviours","Lighting","Combos"]));
-    assert.match(view.changes.find(c=>c.area==="Combos").fields.find(f=>f.label==="Sends").after,/Cmd\+N/);
+    assert.deepEqual(new Set(view.changes.map(c=>c.area)),new Set(["Keys","Macros","Settings","Behaviours","Lighting","Combos"]));
+    assert.match(view.changes.find(c=>c.area==="Combos").fields.find(f=>f.label==="Sends").after,/GUI\+N/);
     assert.equal(JSON.stringify(snapshot),original);
     assert.equal(draft.base.fingerprint,snapshot.fingerprint);
     assert.equal(validateSnapshot(draft.document).settings.values[1],175);
@@ -98,25 +166,25 @@ test("one draft composes every editor without changing its device snapshot", () 
 });
 test("undo, redo, branching and no-op edits maintain one bounded history", () => {
     const {draft,snapshot} = fixture();
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"one"});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"one"});
     const first = draft.current.fingerprint;
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"two"});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"two"});
     draft.undo(draft.revision); assert.equal(draft.current.fingerprint,first);
     draft.undo(draft.revision); assert.equal(draft.dirty,false); assert.equal(draft.current.fingerprint,snapshot.fingerprint);
     draft.redo(draft.revision); assert.equal(draft.current.fingerprint,first);
     const revision = draft.revision;
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"one"}); assert.equal(draft.revision,revision);
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"branch"}); assert.equal(draft.view({}).canRedo,false);
-    for (let i=0;i<105;i++) stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:String(i)});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"one"}); assert.equal(draft.revision,revision);
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"branch"}); assert.equal(draft.view({}).canRedo,false);
+    for (let i=0;i<105;i++) stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:String(i)});
     assert.equal(draft.history.length,101); assert.equal(draft.base.fingerprint,snapshot.fingerprint);
 });
 test("the history lists every step, when it was made, and what it changed from the step before", () => {
     const {draft,snapshot} = fixture();
     let clock = 1000; draft.now = () => clock;
-    clock = 2000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"one"});
+    clock = 2000; stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"one"});
     const first = draft.current.fingerprint;
     clock = 3000; stage(draft,settings(draft,"keyTiming",{tapHoldTerm:"175"}));
-    clock = 4000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"two"});
+    clock = 4000; stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"two"});
     const steps = draft.steps();
     assert.deepEqual(steps.map(entry=>entry.label),["Read from the keyboard","Edited a macro","Saved a settings section","Edited a macro"]);
     assert.deepEqual(steps.slice(1).map(entry=>entry.at),[2000,3000,4000]);
@@ -140,20 +208,70 @@ test("the history lists every step, when it was made, and what it changed from t
     assert.throws(()=>draft.jump(draft.revision,4),/no longer in the draft history/);
     assert.throws(()=>draft.jump(draft.revision,"1"),/no longer in the draft history/);
     assert.throws(()=>draft.jump(0,1),/draft changed/);
-    clock = 5000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_1",payload:"x"});
-    draft.jump(draft.revision,1); clock = 6000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"y"});
+    clock = 5000; stage(draft,{type:"updateMacro",keycode:"MACRO_1",payload:"x"});
+    draft.jump(draft.revision,1); clock = 6000; stage(draft,{type:"updateMacro",keycode:"MACRO_2",payload:"y"});
     assert.deepEqual(draft.steps().map(entry=>entry.at).slice(1),[2000,6000],"a new edit after going back drops the undone steps and their times");
+});
+test("bounded history and a new branch retain each step's time, label, document and layer order", () => {
+    const {draft, snapshot} = fixture();
+    const {encodeMacroPayload} = require("../../core/schema/macro-payload");
+    const order = [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    draft.editLayers(reorderLayers(draft.document, order), draft.revision, order);
+    let clock = 0;
+    draft.now = () => clock;
+    const replaceMacro = (text, label) => {
+        const next = draft.document;
+        editMacros(next, macros => macros[0] = encodeMacroPayload(text).toString("base64"));
+        draft.replace(next, draft.revision, "edit", label);
+    };
+    let oldestDecode;
+    for (clock = 1; clock <= 105; clock++) {
+        replaceMacro(`value ${clock}`, `Macro ${clock}`);
+        if (clock === 5) oldestDecode = draft.current.decoded;
+    }
+    const steps = draft.steps();
+    assert.equal(steps.length, 101);
+    assert.deepEqual(steps.map(step => [step.at, step.label]), Array.from({length: 101}, (_, i) => [i + 5, `Macro ${i + 5}`]));
+    assert.equal(steps[0].changes, null, "the oldest retained step has no preceding comparison");
+    assert.deepEqual(steps[1].changes.map(row => row.unit), ["macro:0"]);
+    assert.equal(draft.base.fingerprint, snapshot.fingerprint, "trimming does not move the saved keyboard baseline");
+    draft.jump(draft.revision, 0);
+    assert.equal(draft.current.decoded, oldestDecode, "moving an entry preserves its cached decode");
+    assert.deepEqual(draft.order, order);
+    assert.equal(draft.view({}).redoLabel, "Macro 6");
+    clock = 200;
+    replaceMacro("branch", "New branch");
+    assert.deepEqual(draft.steps().map(step => [step.at, step.label]), [[5, "Macro 5"], [200, "New branch"]]);
+    assert.equal(draft.view({}).canRedo, false);
+    assert.deepEqual(draft.order, order, "a new branch carries the retained entry's order");
+    draft.undo(draft.revision);
+    assert.equal(draft.current.decoded, oldestDecode);
+    draft.redo(draft.revision);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).macros[0].payload, "branch");
+});
+
+test("draft staging takes owned layer keys and QMK functions in a behaviour", () => {
+    const {snapshot, caps} = fixture();
+    for (const [name, code] of [["TG(2)", 0x5262], ["DPI_MOD", 0x7e00]]) {
+        const edit = {type: "saveBehavior", behavior: {keycode: "KC_F24", steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: name}}]}};
+        const allowed = new ProfileDraftSession(snapshot, "board", caps);
+        stage(allowed, edit);
+        const row = allowed.current.decoded.behaviors.rows.find(row => row.target.operand === 0x73);
+        assert.ok(row, "the authored KC_F24 row is stored");
+        assert.equal(row.steps[0].tap.kind, 1);
+        assert.equal(row.steps[0].tap.operand, code);
+    }
 });
 test("invalid edits and obsolete revisions cannot partially change the draft", () => {
     const {draft,snapshot} = fixture();
-    assert.throws(()=>stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"NOT_A_KEY"}]}]}));
+    assert.throws(()=>stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"NOT_A_KEY"}]}));
     assert.equal(draft.current.fingerprint,snapshot.fingerprint);
-    assert.throws(()=>draft.stage({type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"text",draftRevision:0}),/draft changed/);
+    assert.throws(()=>draft.stage({type:"updateMacro",keycode:"MACRO_0",payload:"text",draftRevision:0}),/draft changed/);
     assert.equal(draft.history.length,1);
 });
 test("external reads retain the draft and require an explicit new comparison", () => {
     const {draft,snapshot,caps} = fixture();
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"mine"});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"mine"});
     const target = draft.current.fingerprint, external = new ProfileDraftSession(snapshot,"board",caps);
     stage(external,settings(external,"keyTiming",{tapHoldTerm:"190"}));
     draft.observe(external.current,"different-board"); assert.equal(draft.stale,false);
@@ -168,7 +286,7 @@ test("external reads retain the draft and require an explicit new comparison", (
 test("a reconnect requires review even when the HID path and profile are unchanged", async () => {
     const {snapshot, caps} = fixture();
     const draft = new ProfileDraftSession(snapshot, "board", caps, 1);
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"mine"});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"mine"});
     draft.observe(snapshot, "board", 2);
     assert.equal(draft.connectionChanged, true);
     assert.equal(draft.stale, true);
@@ -182,7 +300,7 @@ test("a reconnect requires review even when the HID path and profile are unchang
 });
 test("apply requires the reviewed revision and original device, uses one verified restore, then clears history", async () => {
     const {draft,snapshot} = fixture(), calls=[];
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"text"});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"text"});
     const saveRecovery=()=>"recovery", service={snapshot:()=>({connected:true,selectedDeviceId:"board"}),restorePortableProfile:async(document,options)=>{calls.push({document,options});return {...draft.current};}};
     await assert.rejects(draft.apply(service,draft.revision,saveRecovery),/Review/);
     draft.review(draft.revision);
@@ -192,7 +310,7 @@ test("apply requires the reviewed revision and original device, uses one verifie
     assert.equal(draft.dirty,false); assert.equal(draft.cursor,0);
 });
 test("interrupted apply retains the full target and can review against an incomplete recovery capture", async () => {
-    const {draft} = fixture(); stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"retained"}); draft.review(draft.revision);
+    const {draft} = fixture(); stage(draft,{type:"updateMacro",keycode:"MACRO_2",payload:"retained"}); draft.review(draft.revision);
     const target = draft.current.fingerprint;
     const service={snapshot:()=>({connected:true,selectedDeviceId:"board"}),restorePortableProfile:async()=>{throw Object.assign(Error("interrupted"),{code:"RESTORE_INCOMPLETE"});}};
     await assert.rejects(draft.apply(service,draft.revision,()=>"recovery"),/interrupted/);
@@ -204,49 +322,57 @@ test("interrupted apply retains the full target and can review against an incomp
     await draft.apply({...service,restorePortableProfile:async(document,options)=>{assert.equal(options.expectedFingerprint,"incomplete:device");return draft.current;}},draft.revision,()=>"recovery");
     assert.equal(draft.dirty,false);
 });
+test("comparing against an incomplete recovery base fails with the draft's stable error", () => {
+    const {draft} = fixture(); stage(draft,{type:"updateMacro",keycode:"MACRO_2",payload:"retained"});
+    draft.observe({incomplete:true,fingerprint:"incomplete:device",document:{format:"charybdis-recovery-capture"}},"board");
+    draft.rebase(draft.revision);
+    const refused = {code:"PROFILE_DRAFT_CONFLICT", message:/Read a complete profile before comparing/};
+    assert.throws(() => draft.referenceFor(draft.order), refused);
+    assert.throws(() => draft.describe(draft.document, draft.order), refused);
+});
 test("layer reordering is undoable and updates layout and settings references together", () => {
     const {draft,snapshot} = fixture();
-    draft.replace(reorderLayers(draft.document,[0,2,1,3,4,5,6,7],["Base","Symbols","Numbers","Navigation","Pointer","Extra 1","Extra 2","Extra 3"]),draft.revision);
+    draft.replace(reorderLayers(draft.document,[0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15],["Base","Symbols","Numbers","Navigation","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")]),draft.revision);
     assert.equal(draft.current.summary.names[1],"Symbols");
-    assert.equal(draft.document.layers[0][0],0x5222);
+    assert.equal(profileLayers(draft.document)[0][0],0x5222);
     draft.undo(draft.revision); assert.equal(draft.current.fingerprint,snapshot.fingerprint);
 });
 
 // ── discarding from the review ──────────────────────────────────────────
 
-const key = (layoutIndex, keycode, layer = "Layer 0") => ({type:"updateLayoutKeys",layers:[{layer,changes:[{layoutIndex,keycode}]}]});
+const key = (layoutIndex, keycode, layer = "Layer 0") => ({type:"updateLayoutKeys",layer,changes:[{layoutIndex,keycode}]});
 const groupOf = (draft, unit) => draft.changes().find(row => row.unit === unit)?.group;
 const unitsOf = (draft, group) => draft.changes().filter(row => row.group === group).map(row => row.unit).sort();
 test("rows are grouped by the edit that made them, and by any later edit that joins them", () => {
     const {draft} = fixture();
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,key(2,"KC_C","Layer 1"));
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"alone"});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"alone"});
     assert.deepEqual(unitsOf(draft,groupOf(draft,"layout:1:0")),["layout:1:0","layout:1:1"],"one message is one group");
     assert.notEqual(groupOf(draft,"layout:1:2"),groupOf(draft,"layout:1:0"),"a separate edit stays apart");
     assert.notEqual(groupOf(draft,"macro:0"),groupOf(draft,"layout:1:0"));
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_D"},{layoutIndex:2,keycode:"KC_E"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_D"},{layoutIndex:2,keycode:"KC_E"}]});
     assert.deepEqual(unitsOf(draft,groupOf(draft,"layout:1:0")),["layout:1:0","layout:1:1","layout:1:2"],"a later edit touching both joins them");
 });
 test("a unit edited back to the keyboard's value no longer ties anything together", () => {
     const {draft,snapshot} = fixture();
-    const original = snapshot.document.layers[1][1];
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_Z"},{layoutIndex:2,keycode:"KC_C"}]}]});
+    const original = profileLayers(snapshot.document)[1][1];
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_Z"},{layoutIndex:2,keycode:"KC_C"}]});
     assert.equal(unitsOf(draft,groupOf(draft,"layout:1:0")).length,3);
-    draft.replace({...draft.document,layers:draft.document.layers.map((keys,l)=>l===1?keys.map((code,p)=>p===1?original:code):keys)},draft.revision);
+    draft.replace(editLayers(draft.document, layers => layers[1][1] = original),draft.revision);
     assert.equal(groupOf(draft,"layout:1:1"),undefined,"the key is back");
     assert.notEqual(groupOf(draft,"layout:1:0"),groupOf(draft,"layout:1:2"),"and the keys it linked are apart again");
 });
 test("discarding a group puts every row of it back, as one undoable step, and leaves the rest", () => {
     const {draft,snapshot} = fixture();
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
-    const kept = draft.document.macros[0];
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"kept"});
+    const kept = profileMacros(draft.document)[0];
     draft.discard(draft.revision,groupOf(draft,"layout:1:1"));
     assert.deepEqual(draft.changes().map(row => row.unit),["macro:0"]);
-    assert.deepEqual(draft.document.layers,snapshot.document.layers);
-    assert.equal(draft.document.macros[0],kept);
+    assert.deepEqual(profileLayers(draft.document),profileLayers(snapshot.document));
+    assert.equal(profileMacros(draft.document)[0],kept);
     draft.undo(draft.revision);
     assert.deepEqual(draft.changes().map(row => row.unit).sort(),["layout:1:0","layout:1:1","macro:0"],"undo brings the group back");
     assert.throws(()=>draft.discard(draft.revision,99),/no longer in the draft/);
@@ -266,23 +392,23 @@ test("a discard from a current review keeps it current, and discarding the last 
 });
 test("a macro name discarded back leaves no indescribable settings difference", () => {
     const value = require("../fixtures/pd-profile").document();
-    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:8,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
+    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
     draft.discard(draft.revision,groupOf(draft,"macro:3"));
-    assert.equal(draft.dirty,false,"the settings format the name upgraded goes back too");
+    assert.equal(draft.dirty,false,"discard restores the original settings bytes too");
 });
 test("a rebase does not tie together everything it carried over", () => {
     const {draft,snapshot,caps} = fixture();
     stage(draft,key(0,"KC_A")); stage(draft,key(1,"KC_B"));
     const external = new ProfileDraftSession(snapshot,"board",caps);
-    stage(external,{type:"updateViaMacro",keycode:"VIA_MACRO_9",payload:"elsewhere"});
+    stage(external,{type:"updateMacro",keycode:"MACRO_9",payload:"elsewhere"});
     draft.observe(external.current,"board"); draft.rebase(draft.revision);
     assert.notEqual(groupOf(draft,"layout:0:0"),groupOf(draft,"layout:0:1"));
 });
 test("discarding the whole draft is a step undo takes back, and undo says what it undoes", () => {
     const {draft,snapshot} = fixture();
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
-    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
+    stage(draft,{type:"updateMacro",keycode:"MACRO_0",payload:"kept"});
     assert.equal(draft.view({}).undoLabel,"Edited a macro");
     const target = draft.current.fingerprint;
     draft.discardAll(draft.revision);
@@ -296,10 +422,10 @@ test("discarding the whole draft is a step undo takes back, and undo says what i
 });
 test("a revision is decoded once and its history entry cannot be edited in place", () => {
     const {draft} = fixture();
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]});
     assert.equal(draft.current.decoded, draft.current.decoded, "the same decode serves every read of this revision");
     assert.equal(draft.current.document, draft.current.decoded.document, "and belongs to the document it is handed with");
-    assert.throws(() => { "use strict"; draft.current.document.layers[0][0] = 5; }, TypeError, "history is frozen");
+    assert.throws(() => { "use strict"; editLayers(draft.current.document, layers => layers[0][0] = 5); }, TypeError, "history is frozen");
     const copyOf = {...draft.current, document: structuredClone(draft.current.document)};
     const {decodedOf} = require("../../core/model/portable-profile");
     assert.notEqual(decodedOf(copyOf), draft.current.decoded, "a snapshot with another document is decoded afresh, never with a stale decode");
@@ -307,7 +433,7 @@ test("a revision is decoded once and its history entry cannot be edited in place
 
 // ── layers compared by identity ─────────────────────────────────────────
 
-const SWAP = [0,1,3,2,4,5,6,7];
+const SWAP = [0,1,3,2,4,5,6,7,8,9,10,11,12,13,14,15];
 // A Rename & Reorder save: the step it rearranges the draft by, every layer
 // keeping its name unless `names` (by new slot) says otherwise.
 function layers(draft, step = SWAP, {names, keysFollow = true} = {}) {
@@ -344,7 +470,7 @@ test("a key edited on a swapped layer is its own item, and each discard keeps th
 });
 test("a swap and a rename are two items, and discarding one keeps the other", () => {
     const {draft,snapshot} = fixture();
-    layers(draft,SWAP,{names:["Base","Numbers","Nav","Symbols","Pointer","Extra 1","Extra 2","Extra 3"]});
+    layers(draft,SWAP,{names:["Base","Numbers","Nav","Symbols","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")]});
     assert.deepEqual(units(draft),["layerName:2","layerOrder"]);
     assert.equal(draft.view({}).undoLabel,"Swapped Symbols and Navigation, renamed Navigation to Nav");
     assert.notEqual(groupOf(draft,"layerOrder"),groupOf(draft,"layerName:2"),"one save, two decisions");
@@ -361,11 +487,11 @@ test("a swap and a rename are two items, and discarding one keeps the other", ()
 });
 test("several swaps are one priority change: the net move of every layer they touched", () => {
     const {draft} = fixture();
-    layers(draft); layers(draft,[0,1,2,4,3,5,6,7]);
+    layers(draft); layers(draft,[0,1,2,4,3,5,6,7,8,9,10,11,12,13,14,15]);
     const chained = draft.changes().find(row => row.unit === "layerOrder");
     assert.deepEqual(chained.fields.map(field => [field.label,field.before,field.after]),
         [["Symbols","2","4 · higher"],["Pointer","4","3 · lower"],["Navigation","3","2 · lower"]],"two swaps sharing a layer move three");
-    layers(draft,[0,1,2,3,4,6,5,7]);
+    layers(draft,[0,1,2,3,4,6,5,7,8,9,10,11,12,13,14,15]);
     assert.deepEqual(draft.changes().filter(row => row.unit === "layerOrder").length,1,"a separate swap joins the same item");
     assert.deepEqual(draft.changes()[0].fields.map(field => field.label),["Extra 1","Extra 2","Symbols","Pointer","Navigation"]);
 });
@@ -384,13 +510,13 @@ test("swapping back leaves no layer order, and names alone never make one", () =
     assert.equal(draft.dirty,false);
     assert.deepEqual(draft.changes(),[]);
     // The contents move, the names are swapped over: on names alone nothing changed.
-    layers(draft,SWAP,{names:["Base","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3"]});
+    layers(draft,SWAP,{names:["Base","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")]});
     assert.deepEqual(units(draft),["layerName:2","layerName:3","layerOrder"]);
 });
 test("keys that keep their numbers through a reorder are listed as the changes they are", () => {
     const {draft,snapshot} = fixture();
-    layers(draft,[0,2,1,3,4,5,6,7],{keysFollow:false});
-    assert.equal(draft.document.layers[0][0],snapshot.document.layers[0][0],"the key kept its number");
+    layers(draft,[0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15],{keysFollow:false});
+    assert.equal(profileLayers(draft.document)[0][0],profileLayers(snapshot.document)[0][0],"the key kept its number");
     assert.ok(units(draft).includes("layerOrder"));
     assert.ok(units(draft).includes("layout:0:0"),"and now reaches another layer, which the review says");
 });
@@ -401,18 +527,18 @@ test("undo and redo carry the order; a rebase keeps it; an import and a whole di
     draft.undo(draft.revision); assert.deepEqual(units(draft),[]);
     draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(units(draft),["layerOrder","layout:2:0"]);
     const external = new ProfileDraftSession(snapshot,"board",caps);
-    stage(external,{type:"updateViaMacro",keycode:"VIA_MACRO_9",payload:"elsewhere"});
+    stage(external,{type:"updateMacro",keycode:"MACRO_9",payload:"elsewhere"});
     draft.observe(external.current,"board"); draft.rebase(draft.revision);
     assert.deepEqual(units(draft),["layerOrder","layout:2:0","macro:9"]);
     const imported = reorderLayers(snapshot.document,SWAP,SWAP.map(slot => snapshot.summary.names[slot]));
-    draft.replace(imported,draft.revision,"edit","Imported a profile",[0,1,2,3,4,5,6,7]);
+    draft.replace(imported,draft.revision,"edit","Imported a profile",[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
     assert.deepEqual(units(draft).filter(unit => unit.startsWith("layer")),["layerName:2","layerName:3"],"an import is compared slot by slot");
     draft.undo(draft.revision); draft.discardAll(draft.revision);
-    assert.equal(draft.dirty,false); assert.deepEqual(draft.order,[0,1,2,3,4,5,6,7]);
+    assert.equal(draft.dirty,false); assert.deepEqual(draft.order,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
 });
 test("edits link by the layer they touched, so a reorder between them ties nothing new", () => {
     const {draft} = fixture();
-    const both = layer => ({type:"updateLayoutKeys",layers:[{layer,changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    const both = layer => ({type:"updateLayoutKeys",layer,changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,both("Layer 2"));
     layers(draft);
     stage(draft,both("Layer 2"));
@@ -421,13 +547,93 @@ test("edits link by the layer they touched, so a reorder between them ties nothi
     assert.notEqual(groupOf(draft,"layout:3:0"),groupOf(draft,"layout:2:0"),"Navigation's keys are another edit");
 });
 
-test("draft checks use the connected firmware's physical gesture capability", () => {
+function unicodeDraft(detected = 1) {
     const {snapshot, caps} = fixture();
-    const row = behaviorRowsForView(validateSnapshot(snapshot.document).behaviors).find(row => row.keycode.startsWith("LT("));
-    assert.ok(row, "fixture includes an authored layer-tap");
-    for (const fixed of [false, true]) {
-        const draft = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: fixed ? 1 << 17 : 0});
-        stage(draft, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: row.keycode}]}]});
-        assert.equal(draft.checks().some(check => check.kind === "gestureTiming" && check.place.keycode === row.keycode), !fixed);
+    snapshot.hostOs = {detected};
+    return {snapshot, caps, draft:new ProfileDraftSession(snapshot, 'board', caps)};
+}
+test("Unicode survives real draft Review, history, undo/redo and an unrelated edit", () => {
+    // Windows, where Unicode playback is a switch: WinCompose enters what US cannot type.
+    const {draft,caps} = unicodeDraft(2);
+    stage(draft,settings(draft,'host',{hostOs:'0',unicodeEnabled:true}));
+    const text = ' café “hello” 🙂 e\u0301 👩‍💻 ';
+    stage(draft,{type:'updateMacro',keycode:'MACRO_0',payload:text});
+    assert.ok(draft.changes().some(row=>row.unit==='macro:0'));
+    assert.ok(draft.steps().at(-1).changes.some(row=>row.unit==='macro:0'));
+    const encoded = profileMacros(draft.document)[0];
+    const {macroEditorView} = require('../../core/model/macro-editor');
+    assert.equal(macroEditorView(draft.current,caps).macros[0].payload,text);
+    draft.undo(draft.revision); assert.notEqual(profileMacros(draft.document)[0],encoded);
+    assert.doesNotThrow(()=>draft.steps());
+    draft.redo(draft.revision); assert.equal(profileMacros(draft.document)[0],encoded);
+    const next = new ProfileDraftSession(draft.current,'board',caps);
+    stage(next,settings(next,'keyTiming',{tapHoldTerm:'175'}));
+    assert.doesNotThrow(()=>next.changes()); assert.doesNotThrow(()=>next.steps());
+    const {profileReview} = require('../../core/model/profile-review');
+    assert.doesNotThrow(()=>profileReview(next.baseSnapshot,next.current));
+    assert.equal(profileMacros(validateSnapshot(next.document).document)[0],encoded);
+});
+test("new detection refreshes dirty draft labels and Unicode gates without altering history or edits", () => {
+    const {draft,snapshot,caps} = unicodeDraft(0);
+    stage(draft,settings(draft,'host',{hostOs:'0',unicodeEnabled:true}));
+    stage(draft,{type:'updateLayoutKeys',layer:'Layer 0',changes:[{layoutIndex:0,keycode:'KC_LGUI'}]});
+    const document = draft.document, revision = draft.revision, history = draft.history.slice();
+    const {macroEditorView} = require('../../core/model/macro-editor');
+    const guiWord = () => draft.steps().at(-1).changes[0].fields[0].after;
+    assert.match(guiWord(),/GUI/); // Populate presentation cache before fresh reads.
+    assert.throws(()=>stage(draft,{type:'updateMacro',keycode:'MACRO_0',payload:'café'}),/setup|Select|host/i);
+    for(const [detected,label] of [[1,'Command'],[2,'Windows'],[3,'Super'],[0,'GUI']]) {
+        draft.observe({...snapshot,hostOs:{detected}},'board');
+        assert.equal(draft.current.hostOs.detected,detected);
+        assert.equal(draft.stale,false);
+        assert.equal(draft.revision,revision);
+        assert.deepEqual(draft.document,document);
+        assert.deepEqual(draft.history,history);
+        assert.equal(macroEditorView(draft.current,caps).unicode.mode,detected);
+        assert.match(guiWord(),new RegExp(label));
+        assert.doesNotThrow(()=>draft.changes());
     }
+    draft.observe({...snapshot,hostOs:{detected:1}},'board');
+    stage(draft,{type:'updateMacro',keycode:'MACRO_0',payload:'café'});
+    stage(draft,settings(draft,'host',{hostOs:'3',unicodeEnabled:true}));
+    draft.observe({...snapshot,hostOs:{detected:2}},'board');
+    assert.equal(macroEditorView(draft.current,caps).unicode.mode,3,'manual override wins');
+    draft.undo(draft.revision);
+    assert.equal(macroEditorView(draft.current,caps).unicode.mode,2,'undo keeps latest detection');
+    draft.redo(draft.revision);
+    assert.equal(macroEditorView(draft.current,caps).unicode.mode,3);
+});
+
+test("clean drafts also use latest detection, including loss of a known host", () => {
+    const {draft,snapshot} = unicodeDraft(1);
+    for(const detected of [2,0,3]) {
+        draft.observe({...snapshot,hostOs:{detected}},'board');
+        assert.equal(draft.current.hostOs.detected,detected);
+        assert.equal(settingsEditorView(draft.current).host.effective,detected);
+        assert.equal(draft.dirty,false);
+        assert.equal(draft.history.length,1);
+    }
+});
+test("undoing and redoing a reorder brings a custom key's shortcut layers back exactly", () => {
+    const {settings, compiled} = require("../fixtures/portable-profile");
+    const policy = settings();
+    policy.customKeyShortcuts[0] = {mods: 0x08, keys: [], layers: (1 << 3) | (1 << 5), layerKind: 2};
+    policy.customKeyShortcuts[1] = {mods: 0, keys: [], layers: 0xfffe, layerKind: 1};
+    const value = compiled({policy});
+    const snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}, options: options()};
+    const draft = new ProfileDraftSession(snapshot, "board", {compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest});
+    const shortcuts = () => validateSnapshot(draft.document).settings.customKeyShortcuts.slice(0, 2);
+    const start = shortcuts();
+    layers(draft, [0, 3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    const moved = shortcuts();
+    assert.equal(moved[0].layers, (1 << 1) | (1 << 5), "Navigation moved to slot 1, and the shortcut with it");
+    assert.deepEqual(units(draft), ["layerOrder"], "the shortcut is not a change of its own");
+    layers(draft, [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    draft.undo(draft.revision);
+    assert.deepEqual(shortcuts(), moved);
+    draft.undo(draft.revision);
+    assert.deepEqual(shortcuts(), start);
+    assert.equal(draft.current.fingerprint, snapshot.fingerprint);
+    draft.redo(draft.revision);
+    assert.deepEqual(shortcuts(), moved);
 });

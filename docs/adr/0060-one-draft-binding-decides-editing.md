@@ -1,0 +1,5 @@
+# One draft binding decides editing
+
+Cited as D-L60.
+
+Whether the open draft takes an edit now is one rule, `draftBinding` in `core/session/panel-session-state.js`: the draft is the selected keyboard's, over the connection it was read through, on current firmware, current with the keyboard, and nothing is running, answered as `{editable, reason}` with the reasons in a fixed order. Core refuses by it and publishes it as `draft.editable` and `draft.reason`, and the interface's `writable()` reads that value instead of recomputing it, so what is offered is what is accepted and a new connection is refused before any model marks the draft stale. The demo's draft is bound to the demo device, so the rule holds there unchanged (D-L53). For the same reason each panel control's route, binding, demo policy and phase is registered once in `core/session/panel-control-registry.js`, and device phase IDs live in `PHASE` in `core/model/vocabulary.js`, so changing presentation words cannot change routing or which operation writes.

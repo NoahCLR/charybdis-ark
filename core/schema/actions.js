@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Profile actions: their names, their native keycodes, and the limits that
@@ -9,90 +10,70 @@
 // ask here rather than each doing it their own way.
 
 const keycodes = require("../data/keycode-catalog");
-const {PD_SLOT_BINDINGS, pdBindingOfCode} = require("../data/pd-bindings");
-const {customKeyOfCode} = require("../data/user-keycodes");
+const {PD_MODE_KEYS, pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
-const {PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
-const {pdSlotCountOfVersion} = require("./pd-mode-domain-v1");
 
-// The native action ABIs whose semantic actions map onto VIA keycodes: the
-// ones with the userspace keycode blocks (Profile Wire feature bit 16). Older
-// vocabularies number those keys differently; only an imported backup is
-// translated from them (model/portable-profile.js).
-//
-// ACTION_ABI is the eight-slot firmware's vocabulary. The 32-slot firmware
-// numbers its keys the same way but accepts pointing slots 0..31, so it has a
-// vocabulary of its own; a backup of the first restores onto the second
-// through model/portable-profile.js upgradePdSlots.
-const ACTION_ABI = 0x1d3fcacc;
-// The 32-slot firmware's action-ABI digest (firmware D-F09).
-const ACTION_ABI_32_SLOTS = 0xf79c6151;
-const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI, ACTION_ABI_32_SLOTS]);
+// The native action ABI whose semantic actions map onto VIA keycodes: the
+// 32-slot firmware's, with the userspace keycode blocks and pointing slots
+// 0..31 (firmware D-F09), under schema 4.3. The firmware folds the schema's
+// major and minor into the digest, so schema 4 moved it from schema 3's
+// 0x837cf479 (firmware D-F28), schema 4.1 from 4.0's 0x6fd70b90 (firmware
+// D-F62), schema 4.2 from 4.1's 0x7fecec81 and schema 4.3 from 4.2's
+// 0xb4a15f12 (firmware D-F26), with no keycode changed. A keyboard advertising another vocabulary
+// numbers its keys differently, so Ark reads it but neither names its keys
+// nor edits it.
+const ACTION_ABI = 0x67df11b3;
+const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
+/** @param {number} value */
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
 
-// How many pointing slots a firmware has, from its action vocabulary: the one
-// place the app decides it. Schema 1 had six fixed modes; the configurable
-// slots came with schema 2 and the PD domain (supported-domain bit 16), eight
-// of them, and 32 with ACTION_ABI_32_SLOTS. Codecs and editors are handed the
-// count; nothing else infers it.
-const pdSlotCountOfVocabulary = (actionAbiDigest, schemaMajor = 2) =>
-    schemaMajor !== 2 ? 6 : actionAbiDigest === ACTION_ABI_32_SLOTS ? 32 : 8;
-const pdSlotCountFor = capabilities =>
-    pdSlotCountOfVocabulary(capabilities?.actionAbiDigest, capabilities?.supportedDomainMask & 16 ? 2 : 1);
-
 // An action's name, the one every edit message and row lookup uses.
+/** @param {import("./types.js").SemanticAction} action */
 function actionName(action) {
     switch (action.kind) {
         case ACTION.NONE: return "KC_NO";
         case ACTION.QMK_KEYCODE: return keycodes.resolve(action.operand).name;
         case ACTION.LAYER_MOMENTARY: return `MO(${action.operand})`;
         case ACTION.LAYER_LOCK: return `LOCK_LAYER(${action.operand})`;
-        case ACTION.VIA_MACRO: return `VIA_MACRO_${action.operand}`;
+        case ACTION.MACRO: return `MACRO_${action.operand}`;
         case ACTION.CUSTOM_KEY: return `CUSTOM_KEY_${action.operand}`;
-        case ACTION.PD_MODE_MOMENTARY:
-        case ACTION.PD_MODE_LOCK: {
-            const binding = PD_SLOT_BINDINGS[action.operand];
-            if (!binding) throw new Error(`Unsupported pointing slot ${action.operand}.`);
-            return action.kind === ACTION.PD_MODE_LOCK ? binding.lock : binding.hold;
+        case ACTION.POINTING_MODE_MOMENTARY:
+        case ACTION.POINTING_MODE_LOCK: {
+            const keys = PD_MODE_KEYS[action.operand];
+            if (!keys) throw new Error(`Unsupported pointing slot ${action.operand}.`);
+            return action.kind === ACTION.POINTING_MODE_LOCK ? keys.lock : keys.hold;
         }
         default: throw new Error(`Unsupported device action kind ${action.kind}.`);
     }
 }
 
 // The native keycode an action is stored as on a VIA layer, when it has one.
+/** @param {import("./types.js").SemanticAction} action */
 const nativeCode = action => action.kind === ACTION.QMK_KEYCODE ? action.operand : resolveNativeQmkExpression(actionName(action), {});
 // A native keycode as the action a profile stores for it.
+/** @param {number} operand @returns {import("./types.js").SemanticAction} */
 const keycodeAction = operand => ({kind: ACTION.QMK_KEYCODE, operand});
 
-// The pointing slot a native keycode binds, if it is a pointing-mode key on a
-// keyboard with this many slots.
-const pdSlotOfCode = (code, slotCount) => pdBindingOfCode(code, slotCount)?.slot;
-
-// The action limits a profile decodes with: actions may reach its pointing
-// slots. Without a count, the first firmware of the schema: schema 2 has eight
-// pointing slots, schema 1 six.
-const actionLimitsFor = (version, pdSlots = pdSlotCountOfVocabulary(undefined, version)) => ({actionLimits: {maxPdModes: pdSlots}});
-// The action limits of a decoded profile blob, from the slots its own PD
-// domain stores (its version says how many).
-function actionLimitsOfBlob(profile) {
-    const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.PD_MODES);
-    return actionLimitsFor(profile.schema.major, domain ? pdSlotCountOfVersion(domain.version) : undefined);
-}
+// The pointing slot a native keycode binds, if it is a pointing-mode key.
+/** @param {number} code */
+const pointingSlotOfCode = code => pdModeKeyOfCode(code)?.slot;
 
 // A layer as edit messages and group rows name it, and back.
+/** @param {number} index @returns {import("../../contracts/edits.js").LayerReference} */
 const layerRef = index => `Layer ${index}`;
+/** @param {unknown} text */
 const layerOfRef = text => {
     const match = /^Layer ([0-9]+)$/.exec(String(text ?? ""));
     return match ? Number(match[1]) : undefined;
 };
 
 // TG(n), TO(n), TT(n) and OSL(n) on a layer the keyboard has: the QMK layer
-// keycodes a keyboard reporting Profile Wire feature bit 14 runs through its
-// own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold
+// keycodes the keyboard runs through its own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold
 // whose fifth tap locks, OSL as a one-shot). Where each may go is
 // placementProblem's to say.
 const OWNED_LAYER_BASES = Object.freeze([0x5200, 0x5260, 0x5280, 0x52c0]); // TO, TG, OSL, TT
+/** @param {number} code @param {number} layerCount */
 const isOwnedLayerCode = (code, layerCount) =>
     OWNED_LAYER_BASES.includes(code & ~0x1f) && (code & 0x1f) < layerCount;
 
@@ -102,11 +83,15 @@ const isOwnedLayerCode = (code, layerCount) =>
 // key, a press-and-hold branch or a combo (a combo holds its output); OSL() is
 // a key, a tap or a combo; LM() is a key or a combo; LT() is only a key; TG(),
 // TO() and LOCK_LAYER() go anywhere; DF() and PDF(), which the keyboard does not
-// own, go nowhere. A custom key does what its own behaviour says, so it is a
-// key or a combo output, never a step. Returns what is wrong, or undefined.
+// own, go nowhere. A custom key goes anywhere: as a step it sends its shortcut
+// only, never its own behaviour (firmware D-F26). Returns what is wrong, or
+// undefined.
+/** @typedef {'key' | 'tap' | 'holdPress' | 'holdOther' | 'comboOutput'} Placement */
 const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress", HOLD_OTHER: "holdOther", COMBO_OUTPUT: "comboOutput"});
 
+/** @param {number} code @param {number} layerCount @returns {{kind: string, places: Placement[]} | undefined} */
 function layerRuleOf(code, layerCount) {
+    /** @param {number} base @param {number} [span] */
     const range = (base, span = 0x20) => code >= base && code < base + span;
     const layer = code & 0x1f;
     if (range(0x4000, 0x1000)) return ((code >> 8) & 0x0f) < layerCount ? {kind: "layerTap", places: [PLACEMENT.KEY]} : {kind: "unowned", places: []};
@@ -119,11 +104,8 @@ function layerRuleOf(code, layerCount) {
     return undefined;
 }
 
-function placementProblem(action, placement, {layerCount = 8} = {}) {
-    if (action.kind === ACTION.CUSTOM_KEY || (action.kind === ACTION.QMK_KEYCODE && customKeyOfCode(action.operand) !== undefined)) {
-        return [PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT].includes(placement) ? undefined
-            : `${actionName(action)} is a custom key: it does what its own behaviour says, so it works as a key or a combo output, not inside a behaviour.`;
-    }
+/** @param {import("./types.js").SemanticAction} action @param {Placement} placement @param {{layerCount?: number}} [options] */
+function placementProblem(action, placement, {layerCount = 16} = {}) {
     const code = action.kind === ACTION.LAYER_MOMENTARY ? 0x5220 | action.operand : nativeCode(action);
     const rule = code === undefined ? undefined : layerRuleOf(code, layerCount);
     if (!rule || rule.places.includes(placement)) return undefined;
@@ -138,18 +120,4 @@ function placementProblem(action, placement, {layerCount = 8} = {}) {
     }
 }
 
-// Whether a behaviour can send an action. QMK and keyboard functions past the
-// layer keycodes and below the user range (the Charybdis DPI and sniping keys,
-// RGB Matrix, Magic, QK_BOOT…) run only through QMK's key processing. A
-// keyboard reporting Profile Wire feature bit 15 sends them from a behaviour as
-// a synthetic QMK record, so they work there as on a key. An older one sends
-// them through tap_code16(), which keeps only the low byte (DRGSCRL, 0x7E06,
-// types C), so there they belong on a key or a combo only.
-const isQmkFunction = code => code > 0x52ff && code < 0x7e40 && !(code >= 0x7700 && code < 0x7780);
-function behaviorEmitProblem(action, {behaviorQmkFunctions = false} = {}) {
-    const code = nativeCode(action);
-    if (behaviorQmkFunctions || code === undefined || !isQmkFunction(code)) return undefined;
-    return `${actionName(action)} runs in QMK's own key handling, which this keyboard's behaviours do not reach yet, so it only works as a key or a combo here. A firmware update lets behaviours send it.`;
-}
-
-module.exports = {PLACEMENT, placementProblem, behaviorEmitProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, ACTION_ABI_32_SLOTS, knownActionAbi, pdSlotCountFor, pdSlotCountOfVocabulary, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, actionLimitsOfBlob, layerRef, layerOfRef};
+module.exports = {PLACEMENT, placementProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef};

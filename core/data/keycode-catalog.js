@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Resolves the numeric keycodes a device reports into something a person
@@ -11,8 +12,10 @@
 // truthful rather than as a hex number.
 
 const catalog = require("./keycode-catalog.json");
+const legacy = require("./keycode-legacy");
 
 const BY_VALUE = new Map(catalog.entries.map((entry) => [entry.value, entry]));
+/** @type {Map<string, typeof catalog.entries[number]>} */
 const BY_NAME = new Map();
 for (const entry of catalog.entries) {
     BY_NAME.set(entry.name, entry);
@@ -53,6 +56,7 @@ const MODIFIER_WRAPPERS = new Map(Object.entries({
     RCSG: 0x1b, RCAG: 0x1d, RSAG: 0x1e,
 }));
 
+/** @param {number} bits */
 function modifiers(bits) {
     const side = bits & 0x10 ? "R" : "L";
     return MODIFIERS.filter(mod => bits & mod.bit).map(mod => ({
@@ -60,6 +64,7 @@ function modifiers(bits) {
     }));
 }
 
+/** @param {number} value @returns {import("./types.js").ResolvedKeycode} */
 function resolve(value) {
     if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
         return unknown(value);
@@ -119,6 +124,7 @@ function resolve(value) {
 }
 
 // MO/TG/OSL/TO carry the layer in the low bits of a fixed base.
+/** @param {number} value @returns {import("./types.js").ResolvedKeycode | undefined} */
 function resolveLayerKeycode(value) {
     for (const form of LAYER_FORMS) {
         const layer = value - form.base;
@@ -139,6 +145,7 @@ function resolveLayerKeycode(value) {
 
 // LT(layer, kc) and mod-tap share a shape: a behaviour in the high nibble, a
 // basic keycode in the low byte.
+/** @param {number} value @returns {import("./types.js").ResolvedKeycode | undefined} */
 function resolveTapHold(value) {
     const tapped = BY_VALUE.get(value & 0xff);
     if (!tapped) return undefined;
@@ -169,6 +176,7 @@ function resolveTapHold(value) {
     };
 }
 
+/** @param {number} value @returns {import("./types.js").ResolvedKeycode} */
 function unknown(value) {
     const hex = Number.isInteger(value) ? `0x${(value >>> 0).toString(16).toUpperCase().padStart(4, "0")}` : String(value);
     return {value, name: hex, label: hex, group: "unknown", kind: "unknown", known: false};
@@ -177,6 +185,7 @@ function unknown(value) {
 // The inverse of resolve(): turn an authored expression back into the uint16
 // the device stores. Returns undefined rather than guessing, so a caller can
 // refuse the write instead of sending a wrong keycode to the keyboard.
+/** @param {unknown} expression @returns {number | undefined} */
 function encode(expression) {
     const text = String(expression || "").trim();
     if (!text) {
@@ -187,24 +196,34 @@ function encode(expression) {
     if (direct) {
         return direct.value;
     }
+    // QMK's other spellings: a name QMK compiles to an expression, a
+    // mod-tap shorthand, a deprecated wrapper (keycode-legacy.js).
+    if (Object.hasOwn(legacy.NAMES, text)) return encode(legacy.NAMES[text]);
+    const shorthand = text.match(/^([A-Z_]+)\(\s*(.+?)\s*\)$/);
+    if (shorthand && Object.hasOwn(legacy.MOD_TAP_SHORTHANDS, shorthand[1])) return encode(`MT(${legacy.MOD_TAP_SHORTHANDS[shorthand[1]]}, ${shorthand[2]})`);
+    if (shorthand && Object.hasOwn(legacy.WRAPPER_ALIASES, shorthand[1])) return encode(`${legacy.WRAPPER_ALIASES[shorthand[1]]}(${shorthand[2]})`);
 
     const layerForm = text.match(/^(MO|TG|OSL|TO|DF|TT|PDF)\(\s*(\d+)\s*\)$/);
     if (layerForm) {
         const layer = Number(layerForm[2]);
-        return layer < 32 ? LAYER_FORMS.find(form => form.name === layerForm[1]).base + layer : undefined;
+        const form = LAYER_FORMS.find(form => form.name === layerForm[1]);
+        return layer < 32 && form ? form.base + layer : undefined;
     }
 
     const wrapper = text.match(/^([A-Z]+)\(\s*(.+)\s*\)$/);
-    if (wrapper && MODIFIER_WRAPPERS.has(wrapper[1])) {
+    const modifier = wrapper ? MODIFIER_WRAPPERS.get(wrapper[1]) : undefined;
+    if (wrapper && modifier !== undefined) {
         const key = encode(wrapper[2]);
         if (key === undefined || key > 0x1fff) return undefined;
-        return key | (MODIFIER_WRAPPERS.get(wrapper[1]) << 8);
+        const bits = combineModifiers((key >> 8) & 0x1f, modifier);
+        return bits === undefined ? undefined : (key & 0xff) | (bits << 8);
     }
+    // A mod-tap or layer-tap taps a plain key (0x00-0xFF), by any name.
     const modTap = text.match(/^MT\(\s*([^,]+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
     if (modTap) {
         const bits = encodeModifiers(modTap[1]);
-        const tapped = BY_NAME.get(modTap[2]);
-        return bits !== undefined && tapped && tapped.value <= 0xff ? 0x2000 | (bits << 8) | tapped.value : undefined;
+        const tapped = plainKey(modTap[2]);
+        return bits !== undefined && tapped !== undefined ? 0x2000 | (bits << 8) | tapped : undefined;
     }
     const oneshot = text.match(/^OSM\(\s*(.+)\s*\)$/);
     if (oneshot) {
@@ -222,9 +241,9 @@ function encode(expression) {
     const layerTap = text.match(/^LT\(\s*(\d+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
     if (layerTap) {
         const layer = Number(layerTap[1]);
-        const tapped = BY_NAME.get(layerTap[2]);
-        if (layer < 16 && tapped && tapped.value <= 0xff) {
-            return 0x4000 | (layer << 8) | tapped.value;
+        const tapped = plainKey(layerTap[2]);
+        if (layer < 16 && tapped !== undefined) {
+            return 0x4000 | (layer << 8) | tapped;
         }
         return undefined;
     }
@@ -237,16 +256,36 @@ function encode(expression) {
     return undefined;
 }
 
+/** @param {string} name */
+function plainKey(name) {
+    const value = BY_NAME.get(name)?.value ?? (Object.hasOwn(legacy.NAMES, name) ? encode(legacy.NAMES[name]) : undefined);
+    return value !== undefined && value <= 0xff ? value : undefined;
+}
+
+/** @param {string} expression */
 function encodeModifiers(expression) {
     let bits = 0;
     for (const part of expression.split("|")) {
         const match = part.trim().match(/^MOD_([LR])(CTL|SFT|ALT|GUI)$/);
         if (!match) return undefined;
-        bits |= MODIFIERS.find(mod => mod.name === match[2]).bit | (match[1] === "R" ? 0x10 : 0);
+        const modifier = MODIFIERS.find(mod => mod.name === match[2]);
+        if (!modifier) return undefined;
+        const combined = combineModifiers(bits, modifier.bit | (match[1] === "R" ? 0x10 : 0));
+        if (combined === undefined) return undefined;
+        bits = combined;
     }
     return bits;
 }
 
+// QMK has one side flag for every modifier in a compact keycode. Combining
+// left and right masks would silently move all of them to the right.
+/** @param {number} before @param {number} added @returns {number | undefined} */
+function combineModifiers(before, added) {
+    return (before & 0x0f) && (added & 0x0f) && ((before ^ added) & 0x10)
+        ? undefined : before | added;
+}
+
+/** @param {string} name */
 function lookup(name) {
     return BY_NAME.get(name);
 }
@@ -254,6 +293,7 @@ function lookup(name) {
 // QMK's alias table: every name and alias mapping to its canonical keycode
 // name, built from the vendored catalog.
 function aliasTable() {
+    /** @type {Record<string, string>} */
     const aliases = {};
     for (const entry of catalog.entries) {
         aliases[entry.name] = entry.name;
@@ -264,6 +304,11 @@ function aliasTable() {
                 aliases[alias] = entry.name;
             }
         }
+    }
+    // QMK's other names for a catalogued key (KC_BTN1 is MS_BTN1).
+    for (const [alias, target] of Object.entries(legacy.NAMES)) {
+        const entry = BY_NAME.get(target);
+        if (entry && !aliases[alias]) aliases[alias] = entry.name;
     }
     aliases._______ = "_______";
     aliases.XXXXXXX = "XXXXXXX";
@@ -282,4 +327,4 @@ function metadata() {
     };
 }
 
-module.exports = {aliasTable, encode, entries, lookup, metadata, resolve};
+module.exports = {aliasTable, combineModifiers, encode, entries, lookup, metadata, resolve};

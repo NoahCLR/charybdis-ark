@@ -1,4 +1,13 @@
+// @ts-check
 "use strict";
+const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
+const {LAYERS} = require("../data/charybdis-layout");
+const {u8: assertU8, u16: assertU16, asBytes: copyBytes, canonical} = require("./bytes");
+
+/**
+ * @typedef {{tapIndex: number, tap?: ReturnType<typeof normalizeAction>, hold?: ReturnType<typeof normalizeHold>, longHold?: ReturnType<typeof normalizeHold>}} NormalizedStep
+ */
+const {MAX_TAP_DEPTH} = require("./profile-depth");
 
 const {
     PROFILE_ACTION_KINDS,
@@ -12,22 +21,26 @@ const {
     readSemanticAction,
 } = require("./profile-blob-v1");
 
+// Domain 0x20 version 2 (firmware D-F14): up to 128 rows and the advertised
+// tap depth (five by default), a u16 step count, and per row an enabled flag and the layers it may
+// act on (participation-policy.md).
 const KEY_BEHAVIOR_DOMAIN_V1 = Object.freeze({
-    VERSION: 1,
+    VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.KEY_BEHAVIORS],
     HEADER_SIZE: 4,
     ROW_LENGTH_SIZE: 2,
-    ROW_FIXED_SIZE: 12,
+    ROW_FIXED_SIZE: 16,
     STEP_HEADER_SIZE: 2,
     HOLD_SIZE: 6,
     ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED: 1 << 0,
-    KNOWN_ROW_FLAGS: 1 << 0,
+    ROW_FLAG_DISABLED: 1 << 1,
+    KNOWN_ROW_FLAGS: (1 << 0) | (1 << 1),
     STEP_HAS_TAP: 1 << 0,
     STEP_HAS_HOLD: 1 << 1,
     STEP_HAS_LONG_HOLD: 1 << 2,
     KNOWN_STEP_MASK: 0x07,
 });
 
-const KEY_BEHAVIOR_HOLD_MODES = Object.freeze({
+const KEY_BEHAVIOR_HOLD_STYLES = Object.freeze({
     PRESS_AND_HOLD_UNTIL_RELEASE: 1,
     TAP_AT_HOLD_THRESHOLD: 2,
     REPEAT_WHILE_HELD: 3,
@@ -35,13 +48,17 @@ const KEY_BEHAVIOR_HOLD_MODES = Object.freeze({
 });
 
 const KEY_BEHAVIOR_LIMITS = Object.freeze({
-    maxRows: 64,
-    maxPopulatedSteps: 128,
+    maxRows: 128,
+    maxPopulatedSteps: 640,
     maxTapStepsPerBehavior: 5,
+    maxLayers: LAYERS,
     maxRepeatHz: 100,
-    maxPayloadSize: PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE,
+    // The domain's own offsets are 16 bits (unchanged by schema 4, firmware
+    // D-F28), so its payload stays within 65,535 bytes whatever the blob's.
+    maxPayloadSize: Math.min(PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE, 0xffff),
 });
 
+/** @param {{rows?: import("./types.js").BehaviorRowInput[]}} [value] @param {import("./types.js").BehaviorOptions} [options] */
 function encodeKeyBehaviorDomain(value = {}, options = {}) {
     const limits = normalizeLimits(options.limits || options);
     if (!value || typeof value !== "object" || !Array.isArray(value.rows)) {
@@ -60,7 +77,7 @@ function encodeKeyBehaviorDomain(value = {}, options = {}) {
     }
 
     const populatedStepCount = rows.reduce((total, row) => total + row.steps.length, 0);
-    if (populatedStepCount > limits.maxPopulatedSteps || populatedStepCount > 0xff) {
+    if (populatedStepCount > limits.maxPopulatedSteps) {
         throw behaviorError("CAPACITY_EXCEEDED", `Populated key-behavior step count exceeds ${limits.maxPopulatedSteps}.`);
     }
     const encodedRows = rows.map((row) => encodeRow(row));
@@ -71,7 +88,8 @@ function encodeKeyBehaviorDomain(value = {}, options = {}) {
 
     const output = Buffer.alloc(size);
     output[0] = rows.length;
-    output[1] = populatedStepCount;
+    output.writeUInt16LE(populatedStepCount, 2);
+    /** @type {number} */
     let offset = KEY_BEHAVIOR_DOMAIN_V1.HEADER_SIZE;
     for (const row of encodedRows) {
         row.copy(output, offset);
@@ -80,6 +98,7 @@ function encodeKeyBehaviorDomain(value = {}, options = {}) {
     return output;
 }
 
+/** @param {unknown} value @param {import("./types.js").BehaviorOptions} [options] */
 function decodeKeyBehaviorDomain(value, options = {}) {
     const bytes = copyBytes(value, "Key-behavior payload");
     const limits = normalizeLimits(options.limits || options);
@@ -90,8 +109,8 @@ function decodeKeyBehaviorDomain(value, options = {}) {
         throw behaviorError("CAPACITY_EXCEEDED", `Key-behavior payload is ${bytes.length} bytes; maximum is ${limits.maxPayloadSize}.`);
     }
     const rowCount = bytes[0];
-    const declaredStepCount = bytes[1];
-    if (bytes[2] !== 0 || bytes[3] !== 0) {
+    const declaredStepCount = bytes.readUInt16LE(2);
+    if (bytes[1] !== 0) {
         throw behaviorError("RESERVED_FIELDS", "Key-behavior header reserved bytes must be zero.");
     }
     if (rowCount > limits.maxRows || declaredStepCount > limits.maxPopulatedSteps) {
@@ -99,8 +118,10 @@ function decodeKeyBehaviorDomain(value, options = {}) {
     }
 
     const rows = [];
+    /** @type {number} */
     let offset = KEY_BEHAVIOR_DOMAIN_V1.HEADER_SIZE;
     let actualStepCount = 0;
+    /** @type {Buffer | undefined} */
     let previousTargetBytes;
     for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
         if (bytes.length - offset < KEY_BEHAVIOR_DOMAIN_V1.ROW_LENGTH_SIZE) {
@@ -129,12 +150,16 @@ function decodeKeyBehaviorDomain(value, options = {}) {
         }
 
         const tapHoldTerm = bytes.readUInt16LE(bodyStart + 4);
-        const longerHoldTerm = bytes.readUInt16LE(bodyStart + 6);
+        const longHoldTerm = bytes.readUInt16LE(bodyStart + 6);
         const multiTapTerm = bytes.readUInt16LE(bodyStart + 8);
         const flags = bytes[bodyStart + 10];
         const stepCount = bytes[bodyStart + 11];
+        const allowedLayers = bytes.readUInt32LE(bodyStart + 12);
         if ((flags & ~KEY_BEHAVIOR_DOMAIN_V1.KNOWN_ROW_FLAGS) !== 0) {
             throw behaviorError("RESERVED_FLAGS", "Key-behavior row contains unknown flags.", {row: rowIndex});
+        }
+        if (allowedLayers >= 2 ** limits.maxLayers) {
+            throw behaviorError("INVALID_LAYERS", "Key-behavior row allows a layer outside the layer bank.", {row: rowIndex});
         }
         if (stepCount > limits.maxTapStepsPerBehavior) {
             throw behaviorError("CAPACITY_EXCEEDED", "Key-behavior row exceeds the tap-step capacity.", {row: rowIndex});
@@ -166,9 +191,11 @@ function decodeKeyBehaviorDomain(value, options = {}) {
         rows.push({
             target,
             tapHoldTerm,
-            longerHoldTerm,
+            longHoldTerm,
             multiTapTerm,
             keepsAutoMouseAnchored: (flags & KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED) !== 0,
+            enabled: (flags & KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_DISABLED) === 0,
+            allowedLayers,
             steps,
         });
         previousTargetBytes = targetBytes;
@@ -180,9 +207,11 @@ function decodeKeyBehaviorDomain(value, options = {}) {
     if (actualStepCount !== declaredStepCount) {
         throw behaviorError("COUNT_MISMATCH", "Key-behavior populated-step count does not match its rows.");
     }
-    return {rows, rowCount, populatedStepCount: actualStepCount, byteLength: bytes.length};
+    return canonical(bytes, {rows, rowCount, populatedStepCount: actualStepCount, byteLength: bytes.length}, table => encodeKeyBehaviorDomain(table, options),
+        () => behaviorError("NONCANONICAL", "Key-behavior domain does not use its canonical representation."));
 }
 
+/** @param {{rows: import("./types.js").BehaviorRowInput[]}} value @param {import("./types.js").BehaviorOptions} [options] */
 function encodeKeyBehaviorDomainEnvelope(value, options = {}) {
     return encodeDomainEnvelope({
         id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS,
@@ -191,14 +220,16 @@ function encodeKeyBehaviorDomainEnvelope(value, options = {}) {
     });
 }
 
+/** @param {unknown} value @param {import("./types.js").BehaviorOptions} [options] */
 function decodeKeyBehaviorDomainEnvelope(value, options = {}) {
     const envelope = decodeDomainEnvelope(value);
     if (envelope.id !== PROFILE_DOMAIN_IDS.KEY_BEHAVIORS || envelope.version !== KEY_BEHAVIOR_DOMAIN_V1.VERSION) {
-        throw behaviorError("WRONG_DOMAIN", "Expected a key-behavior domain v1 envelope.");
+        throw behaviorError("WRONG_DOMAIN", "Expected a key-behavior domain v2 envelope.");
     }
     return decodeKeyBehaviorDomain(envelope.payload, options);
 }
 
+/** @param {import("./types.js").BehaviorRowInput} row @param {import("./types.js").BehaviorLimits} limits @param {Partial<import("./types.js").ActionLimits> | undefined} actionLimits @param {number} rowIndex */
 function normalizeRow(row, limits, actionLimits, rowIndex) {
     if (!row || typeof row !== "object" || !Array.isArray(row.steps)) {
         throw new TypeError(`Key-behavior row ${rowIndex} must provide a steps array.`);
@@ -222,13 +253,16 @@ function normalizeRow(row, limits, actionLimits, rowIndex) {
         target,
         targetBytes,
         tapHoldTerm: assertU16(row.tapHoldTerm ?? 0, "tapHoldTerm"),
-        longerHoldTerm: assertU16(row.longerHoldTerm ?? 0, "longerHoldTerm"),
+        longHoldTerm: assertU16(row.longHoldTerm ?? 0, "longHoldTerm"),
         multiTapTerm: assertU16(row.multiTapTerm ?? 0, "multiTapTerm"),
         keepsAutoMouseAnchored: assertBoolean(row.keepsAutoMouseAnchored ?? false, "keepsAutoMouseAnchored"),
+        enabled: assertBoolean(row.enabled ?? true, "enabled"),
+        allowedLayers: assertLayerMask(row.allowedLayers ?? allLayers(limits), limits, rowIndex),
         steps,
     };
 }
 
+/** @param {ReturnType<typeof normalizeRow>} row */
 function encodeRow(row) {
     const encodedSteps = row.steps.map(encodeStep);
     const bodyLength = KEY_BEHAVIOR_DOMAIN_V1.ROW_FIXED_SIZE + encodedSteps.reduce((total, step) => total + step.length, 0);
@@ -236,11 +270,12 @@ function encodeRow(row) {
     output.writeUInt16LE(bodyLength, 0);
     row.targetBytes.copy(output, 2);
     output.writeUInt16LE(row.tapHoldTerm, 6);
-    output.writeUInt16LE(row.longerHoldTerm, 8);
+    output.writeUInt16LE(row.longHoldTerm, 8);
     output.writeUInt16LE(row.multiTapTerm, 10);
-    output[12] = row.keepsAutoMouseAnchored ? KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED : 0;
+    output[12] = (row.keepsAutoMouseAnchored ? KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED : 0) | (row.enabled ? 0 : KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_DISABLED);
     output[13] = row.steps.length;
-    let offset = 14;
+    output.writeUInt32LE(row.allowedLayers, 14);
+    let offset = 18;
     for (const step of encodedSteps) {
         step.copy(output, offset);
         offset += step.length;
@@ -248,6 +283,7 @@ function encodeRow(row) {
     return output;
 }
 
+/** @param {import("./types.js").BehaviorStepInput} step @param {import("./types.js").BehaviorLimits} limits @param {Partial<import("./types.js").ActionLimits> | undefined} actionLimits @param {number} rowIndex @param {number} stepIndex */
 function normalizeStep(step, limits, actionLimits, rowIndex, stepIndex) {
     if (!step || typeof step !== "object") {
         throw new TypeError(`Key-behavior row ${rowIndex} step ${stepIndex} must be an object.`);
@@ -256,6 +292,7 @@ function normalizeStep(step, limits, actionLimits, rowIndex, stepIndex) {
     if (tapIndex >= limits.maxTapStepsPerBehavior) {
         throw behaviorError("INVALID_TAP_INDEX", `Tap index must be below ${limits.maxTapStepsPerBehavior}.`, {row: rowIndex, step: stepIndex});
     }
+    /** @type {NormalizedStep} */
     const normalized = {tapIndex};
     if (step.tap !== undefined) normalized.tap = normalizeAction(step.tap, actionLimits, rowIndex, stepIndex, "tap");
     if (step.hold !== undefined) normalized.hold = normalizeHold(step.hold, limits, actionLimits, rowIndex, stepIndex, "hold");
@@ -266,6 +303,7 @@ function normalizeStep(step, limits, actionLimits, rowIndex, stepIndex) {
     return normalized;
 }
 
+/** @param {NormalizedStep} step */
 function encodeStep(step) {
     let mask = 0;
     const parts = [];
@@ -284,6 +322,7 @@ function encodeStep(step) {
     return Buffer.concat([Buffer.from([step.tapIndex, mask]), ...parts]);
 }
 
+/** @param {Buffer} bytes @param {number} offset @param {number} rowEnd @param {import("./types.js").BehaviorLimits} limits @param {Partial<import("./types.js").ActionLimits> | undefined} actionLimits @param {number} rowIndex @param {number} stepIndex */
 function decodeStep(bytes, offset, rowEnd, limits, actionLimits, rowIndex, stepIndex) {
     if (rowEnd - offset < KEY_BEHAVIOR_DOMAIN_V1.STEP_HEADER_SIZE) {
         throw behaviorError("TRUNCATED", "Key-behavior step is missing its header.", {row: rowIndex, step: stepIndex});
@@ -296,6 +335,7 @@ function decodeStep(bytes, offset, rowEnd, limits, actionLimits, rowIndex, stepI
     if (mask === 0 || (mask & ~KEY_BEHAVIOR_DOMAIN_V1.KNOWN_STEP_MASK) !== 0) {
         throw behaviorError(mask === 0 ? "EMPTY_STEP" : "RESERVED_FLAGS", "Key-behavior step presence mask is invalid.", {row: rowIndex, step: stepIndex});
     }
+    /** @type {import("./types.js").BehaviorStep} */
     const step = {tapIndex};
     let nextOffset = offset + KEY_BEHAVIOR_DOMAIN_V1.STEP_HEADER_SIZE;
     if ((mask & KEY_BEHAVIOR_DOMAIN_V1.STEP_HAS_TAP) !== 0) {
@@ -316,35 +356,39 @@ function decodeStep(bytes, offset, rowEnd, limits, actionLimits, rowIndex, stepI
     return {step, nextOffset};
 }
 
+/** @param {import("./types.js").HoldInput} hold @param {import("./types.js").BehaviorLimits} limits @param {Partial<import("./types.js").ActionLimits> | undefined} actionLimits @param {number} rowIndex @param {number} stepIndex @param {string} field */
 function normalizeHold(hold, limits, actionLimits, rowIndex, stepIndex, field) {
     if (!hold || typeof hold !== "object") {
         throw new TypeError(`${field} must be an object.`);
     }
-    const mode = assertU8(hold.mode, `${field}.mode`);
-    if (!Object.values(KEY_BEHAVIOR_HOLD_MODES).includes(mode)) {
-        throw behaviorError("INVALID_HOLD_MODE", `Unsupported ${field} mode ${mode}.`, {row: rowIndex, step: stepIndex});
+    const style = assertU8(hold.style, `${field}.style`);
+    if (!/** @type {number[]} */ (Object.values(KEY_BEHAVIOR_HOLD_STYLES)).includes(style)) {
+        throw behaviorError("INVALID_HOLD_MODE", `Unsupported ${field} style ${style}.`, {row: rowIndex, step: stepIndex});
     }
     const repeatHz = assertU8(hold.repeatHz ?? 0, `${field}.repeatHz`);
-    if (mode === KEY_BEHAVIOR_HOLD_MODES.REPEAT_WHILE_HELD) {
+    if (style === KEY_BEHAVIOR_HOLD_STYLES.REPEAT_WHILE_HELD) {
         if (repeatHz < 1 || repeatHz > limits.maxRepeatHz) {
             throw behaviorError("INVALID_REPEAT_RATE", `Repeat frequency must be 1 through ${limits.maxRepeatHz} Hz.`, {row: rowIndex, step: stepIndex});
         }
     } else if (repeatHz !== 0) {
-        throw behaviorError("INVALID_REPEAT_RATE", "Non-repeat hold modes require repeat frequency zero.", {row: rowIndex, step: stepIndex});
+        throw behaviorError("INVALID_REPEAT_RATE", "Non-repeat hold styles require repeat frequency zero.", {row: rowIndex, step: stepIndex});
     }
-    return {mode, repeatHz, ...normalizeAction(hold.action, actionLimits, rowIndex, stepIndex, field)};
+    return {style, repeatHz, ...normalizeAction(hold.action, actionLimits, rowIndex, stepIndex, field)};
 }
 
+/** @param {ReturnType<typeof normalizeHold>} hold */
 function encodeHold(hold) {
-    return Buffer.concat([Buffer.from([hold.mode, hold.repeatHz]), hold.bytes]);
+    return Buffer.concat([Buffer.from([hold.style, hold.repeatHz]), hold.bytes]);
 }
 
+/** @param {Buffer} bytes @param {number} offset @param {number} rowEnd @param {import("./types.js").BehaviorLimits} limits @param {Partial<import("./types.js").ActionLimits> | undefined} actionLimits @param {number} rowIndex @param {number} stepIndex @param {string} field */
 function decodeHold(bytes, offset, rowEnd, limits, actionLimits, rowIndex, stepIndex, field) {
     if (rowEnd - offset < KEY_BEHAVIOR_DOMAIN_V1.HOLD_SIZE) {
         throw behaviorError("TRUNCATED", `Key-behavior ${field} branch is truncated.`, {row: rowIndex, step: stepIndex});
     }
+    /** @type {import("./types.js").HoldBranch & {bytes?: Buffer}} */
     const normalized = normalizeHold({
-        mode: bytes[offset],
+        style: bytes[offset],
         repeatHz: bytes[offset + 1],
         action: readBoundedAction(bytes, offset + 2, rowEnd, actionLimits, rowIndex, stepIndex).action,
     }, limits, actionLimits, rowIndex, stepIndex, field);
@@ -352,6 +396,7 @@ function decodeHold(bytes, offset, rowEnd, limits, actionLimits, rowIndex, stepI
     return {hold: normalized, nextOffset: offset + KEY_BEHAVIOR_DOMAIN_V1.HOLD_SIZE};
 }
 
+/** @param {import("./types.js").ActionInput} action @param {Partial<import("./types.js").ActionLimits> | undefined} actionLimits @param {number} rowIndex @param {number} stepIndex @param {string} field */
 function normalizeAction(action, actionLimits, rowIndex, stepIndex, field) {
     const bytes = encodeSemanticAction(action, {actionLimits});
     const normalized = decodeSemanticAction(bytes, {actionLimits});
@@ -361,6 +406,7 @@ function normalizeAction(action, actionLimits, rowIndex, stepIndex, field) {
     return {action: normalized, bytes};
 }
 
+/** @param {Buffer} bytes @param {number} offset @param {number} rowEnd @param {Partial<import("./types.js").ActionLimits> | undefined} actionLimits @param {number} rowIndex @param {number} stepIndex */
 function readBoundedAction(bytes, offset, rowEnd, actionLimits, rowIndex, stepIndex) {
     if (rowEnd - offset < PROFILE_BLOB_V1.ACTION_SIZE) {
         throw behaviorError("TRUNCATED", "Key-behavior semantic action is truncated.", {row: rowIndex, step: stepIndex});
@@ -372,47 +418,47 @@ function readBoundedAction(bytes, offset, rowEnd, actionLimits, rowIndex, stepIn
     return decoded;
 }
 
+/** @param {Partial<import("./types.js").BehaviorLimits>} [value] */
 function normalizeLimits(value) {
-    const limits = {};
-    for (const [field, fallback] of Object.entries(KEY_BEHAVIOR_LIMITS)) {
-        const candidate = value?.[field] ?? fallback;
-        if (!Number.isInteger(candidate) || candidate < 1 || candidate > fallback) {
-            throw new RangeError(`${field} must be a positive integer no greater than the frozen v1 ceiling ${fallback}.`);
+    /** @type {import("./types.js").BehaviorLimits} */
+    const limits = {...KEY_BEHAVIOR_LIMITS};
+    for (const field of /** @type {(keyof import("./types.js").BehaviorLimits)[]} */ (Object.keys(KEY_BEHAVIOR_LIMITS))) {
+        const fallback = KEY_BEHAVIOR_LIMITS[field];
+        const ceiling = field === "maxTapStepsPerBehavior" ? MAX_TAP_DEPTH : field === "maxPopulatedSteps" ? KEY_BEHAVIOR_LIMITS.maxRows * MAX_TAP_DEPTH : fallback;
+        const candidate = value?.[field] ?? (field === "maxPopulatedSteps" ? (value?.maxRows ?? KEY_BEHAVIOR_LIMITS.maxRows) * (value?.maxTapStepsPerBehavior ?? KEY_BEHAVIOR_LIMITS.maxTapStepsPerBehavior) : fallback);
+        if (!Number.isInteger(candidate) || candidate < 1 || candidate > ceiling) {
+            throw new RangeError(`${field} must be a positive integer no greater than the wire ceiling ${ceiling}.`);
         }
         limits[field] = candidate;
     }
     return limits;
 }
 
-function assertU8(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xff) throw new RangeError(`${label} must be an 8-bit integer.`);
-    return number;
+// Every layer of the bank: what a row allows unless it says otherwise.
+/** @param {import("./types.js").BehaviorLimits} limits */
+const allLayers = limits => 2 ** limits.maxLayers - 1;
+/** @param {number} value @param {import("./types.js").BehaviorLimits} limits @param {number} rowIndex */
+function assertLayerMask(value, limits, rowIndex) {
+    if (!Number.isInteger(value) || value < 0 || value > allLayers(limits)) {
+        throw behaviorError("INVALID_LAYERS", "Key-behavior row allows a layer outside the layer bank.", {row: rowIndex});
+    }
+    return value;
 }
 
-function assertU16(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xffff) throw new RangeError(`${label} must be a 16-bit integer.`);
-    return number;
-}
-
+/** @param {unknown} value @param {string} label */
 function assertBoolean(value, label) {
     if (typeof value !== "boolean") throw new TypeError(`${label} must be boolean.`);
     return value;
 }
 
-function copyBytes(value, label) {
-    if (!(value instanceof Uint8Array)) throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-}
-
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function behaviorError(code, message, details = {}) {
     return new ProfileBlobProtocolError(code, message, details);
 }
 
 module.exports = {
     KEY_BEHAVIOR_DOMAIN_V1,
-    KEY_BEHAVIOR_HOLD_MODES,
+    KEY_BEHAVIOR_HOLD_STYLES,
     KEY_BEHAVIOR_LIMITS,
     decodeKeyBehaviorDomain,
     decodeKeyBehaviorDomainEnvelope,

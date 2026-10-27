@@ -263,3 +263,57 @@ test("every resolved uint16 can be written back without changing its value", () 
         assert.equal(encode(decoded.name), value, `${value}: ${decoded.name}`);
     }
 });
+
+
+test("compact keycodes refuse mixed modifier sides without changing valid masks", () => {
+    for (const expression of ["RSFT(C(KC_A))", "C(RSFT(KC_A))", "RALT(KC_EXLM)",
+        "MT(MOD_LCTL|MOD_RSFT, KC_A)", "OSM(MOD_RSFT|MOD_LCTL)", "LM(1, MOD_LCTL|MOD_RSFT)"]) {
+        assert.equal(encode(expression), undefined, expression);
+    }
+    assert.equal(encode("S(C(KC_A))"), 0x0304);
+    assert.equal(encode("RSFT(RCTL(KC_A))"), 0x1304);
+    assert.equal(encode("RSFT(KC_RALT)"), 0x12e6, "a basic modifier key can be the key itself");
+    assert.equal(encode("MT(MOD_RCTL|MOD_RSFT, KC_A)"), 0x3304);
+    assert.equal(encode("OSM(MOD_RCTL|MOD_RSFT)"), 0x52b3);
+    assert.equal(encode("LM(1, MOD_RCTL|MOD_RSFT)"), 0x5033);
+    assert.equal(encode("0x1304"), 0x1304, "stored numeric keycodes remain accepted");
+});
+
+test("QMK's other spellings encode to the keycode QMK compiles them to", () => {
+    const {aliasTable} = require("../../core/data/keycode-catalog");
+    const legacy = require("../../core/data/keycode-legacy");
+    // Mod-tap shorthands are MT() with their modifiers.
+    assert.equal(encode("LCTL_T(KC_A)"), encode("MT(MOD_LCTL, KC_A)"));
+    assert.equal(encode("LCTL_T(KC_A)"), 0x2104);
+    assert.equal(encode("SFT_T(KC_SPC)"), encode("MT(MOD_LSFT, KC_SPC)"));
+    assert.equal(encode("RGUI_T(KC_ESC)"), 0x3829);
+    assert.equal(encode("MEH_T(KC_F)"), 0x2709);
+    assert.equal(encode("HYPR_T(KC_F)"), 0x2f09);
+    assert.equal(encode("ALL_T(KC_F)"), encode("HYPR_T(KC_F)"));
+    assert.equal(encode("SGUI_T(KC_F)"), encode("LSG_T(KC_F)"));
+    // Deprecated wrappers are the wrapper they stand for.
+    assert.equal(encode("SGUI(KC_4)"), encode("LSG(KC_4)"));
+    assert.equal(encode("SCMD(KC_4)"), 0x0a21);
+    assert.equal(encode("SAGR(KC_A)"), encode("RSA(KC_A)"));
+    // Older names.
+    for (let n = 1; n <= 8; n += 1) assert.equal(encode(`KC_BTN${n}`), encode(`MS_BTN${n}`), `KC_BTN${n}`);
+    assert.equal(encode("KC_MS_U"), encode("MS_UP"));
+    assert.equal(encode("KC_WH_D"), encode("MS_WHLD"));
+    assert.equal(encode("RESET"), encode("QK_BOOT"));
+    assert.equal(encode("KC_LCTRL"), encode("KC_LCTL"));
+    assert.equal(encode("OS_LSFT"), encode("OSM(MOD_LSFT)"));
+    assert.equal(encode("KC_HYPR"), 0x0f00);
+    // Every legacy name names something.
+    for (const [name, target] of Object.entries(legacy.NAMES)) assert.notEqual(encode(name), undefined, `${name} → ${target}`);
+    // A tap may be named any way QMK names a plain key, and must be one.
+    assert.equal(encode("LT(2, KC_LCTRL)"), 0x42e0);
+    assert.equal(encode("LCTL_T(KC_BTN1)"), encode("MT(MOD_LCTL, MS_BTN1)"));
+    assert.equal(encode("LCTL_T(QK_BOOT)"), undefined, "a quantum key is not a plain key");
+    assert.equal(encode("LCTL_T(KC_EXLM)"), undefined, "a shifted symbol is not a plain key");
+    assert.equal(encode("LCTL_T(S(KC_1))"), undefined);
+    assert.equal(encode("LCTL_T(LT(1, KC_A))"), undefined);
+    assert.equal(encode("UNKNOWN_T(KC_A)"), undefined);
+    // The alias table canonicalises older names for the interface.
+    assert.equal(aliasTable().KC_BTN1, aliasTable().MS_BTN1);
+    assert.equal(aliasTable().RESET, "QK_BOOTLOADER");
+});

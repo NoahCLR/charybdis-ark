@@ -7,23 +7,25 @@ Tests, fixture previews and catalog maintenance use the files here.
 
 For ongoing firmware development, inspect the real checkout, `charybdis-4x6`
 beside this one in Noah's workspace, not these snapshots. The
-[workspace map](../docs/REPOSITORY.md#local-development-workspace) explains how
+[workspace map](../docs/development.md#local-development-workspace) explains how
 to locate task worktrees and distinguish current source from this pinned baseline.
 
 | Directory | Purpose | Owner |
 | --- | --- | --- |
-| `firmware/tests/fixtures/` | Golden wire bytes and stored profiles, including historical formats used to test migration | Firmware project |
-| `firmware/docs/architecture/` | Profile Wire, domain, transaction, ownership and resource specifications used when developing the client | Firmware project |
+| `firmware/tests/fixtures/` | Golden wire bytes and current-format profiles that the firmware's own tests check | Firmware project |
+| `firmware/docs/spec/` | Firmware's specs, all of them: Profile Wire (`profile-wire-v1/`), domains, split, transaction, storage and resource policy | Firmware project |
+| `firmware/GLOSSARY.md` | Firmware's words for the keyboard, its halves and the wire | Firmware project |
 | `qmk/data/constants/keycodes/` | Numeric keycode definitions and US aliases used by the catalog generator | QMK fork |
 | `qmk/keyboards/bastardkb/charybdis/` | Keyboard keycode declarations and the 4×6 matrix layout contract | QMK fork |
 | `qmk/version.txt` | Catalog's original QMK version stamp, synthesized for reproducible generation without a QMK Git checkout | Import metadata |
 
 [`manifest.json`](manifest.json) records the repository URL, full commit ID,
 original path, original SHA-256 and local SHA-256 for each imported file.
-The firmware source is the committed source of this extraction; QMK's source
-is the commit identified by the existing catalog. These pins describe source
-provenance, not proof that every firmware/QMK combination passed hardware
-acceptance.
+The firmware pin is a commit on firmware's trunk, and the QMK pin is normally
+the BK commit that firmware's own `qmk-pin.json` names at that commit, so the
+inputs are the ones the firmware is built with ([below](#updating-a-contract)). These
+pins describe source provenance, not proof that every firmware/QMK combination
+passed hardware acceptance.
 
 Fixtures and QMK inputs are byte-for-byte copies. Documentation links are
 adjusted to local copies when available and revision-pinned upstream URLs
@@ -42,7 +44,7 @@ Node dependencies have been installed.
 ## Updating a contract
 
 1. Select a committed firmware or QMK revision. Inspect the relevant protocol,
-   schema, capability and migration changes before copying files. Use committed
+   schema and capability changes before copying files. Use committed
    blobs, not an unreviewed working-tree snapshot. Locally, any committed
    revision will do, landed or not. A pin change lands only once its revision
    is on the source's published trunk (firmware `dev`; QMK
@@ -65,7 +67,15 @@ Node dependencies have been installed.
    stay as written; every other relative link is pinned to the source commit.
    Never edit fixture bytes simply to match the app.
 3. To add a file, list it in the manifest (`path`, `source`, `sourcePath`), then
-   refresh. Historical fixtures still needed for compatibility stay listed.
+   refresh; to move or drop one, change or remove its entry, and the refresh
+   deletes every file here the manifest no longer lists (`--check` fails on
+   one). Documentation mirrors the source layout, so a moved firmware spec
+   moves here too. Import format samples only: never a fixture the firmware
+   regenerates from its keymap or authored defaults. Agreement requires every
+   imported fixture to equal the firmware's, so such a file would block a
+   firmware release on an ordinary keymap edit, which agreement deliberately
+   never compares ([agreement](../docs/development.md#agreement-with-a-firmware-contract)). Ark builds
+   older-format inputs for its refusal tests itself.
 4. Review the diff, then run `npm run check`, `npm run keycodes -- --check` and
    `npm run upstream -- --check --firmware PATH --qmk PATH`, which rebuilds every
    file from the commit its entry pins and fails on any difference; CI's
@@ -76,10 +86,10 @@ Node dependencies have been installed.
    arrange compatibility testing with the firmware project. App tests prove
    behavior against these vectors; they do not compile or run current firmware.
 
-Ark owns five cross-language runners under `tests/integration/`. They compile
-probes from the selected firmware and compare readers, writers and macro sizing
-with Ark's current implementation. Use the separate
-[compatibility bridge](../docs/COMPATIBILITY.md); it also fails when a pinned
+Ark owns cross-language runners under `tests/integration/`. They compile
+probes from the selected firmware and compare readers, writers, candidate
+transfers and sparse macro reads with Ark's current implementation. Use the separate
+[compatibility bridge](../docs/development.md#the-compatibility-bridge); it also fails when a pinned
 fixture differs from the selected firmware and lists specs that lag it. Firmware itself does not require
 Ark; it keeps independent regression fixtures and C tests. The imported
 snapshots here remain unchanged and do not replace integration or physical

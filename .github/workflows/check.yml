@@ -1,7 +1,9 @@
 name: Check Charybdis Ark
 
-# Development is verified locally (the work-queue vault's verify), so nothing
-# runs on dev pushes or pull requests into dev. A release's dev → main pull
+# Development is verified locally (the work-queue vault's verify), so these
+# GitHub Actions jobs do not run on dev pushes or pull requests into dev.
+# Cloudflare separately builds and publishes Pages deployments and PR previews.
+# A release's dev → main pull
 # request runs everything main requires. Nightly runs check dev, warn early
 # about firmware dev, and raise an alarm if the published mains disagree; they
 # never block. Scheduled runs start from the default branch (main), so they

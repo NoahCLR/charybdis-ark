@@ -1,20 +1,64 @@
 "use strict";
+const {profileMacros, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {profileReview} = require("../../core/model/profile-review");
 const {document} = require("../fixtures/portable-profile");
 const {fingerprint,reorderLayers} = require("../../core/model/portable-profile");
 const snapshot = document => ({document,fingerprint:fingerprint(document)});
+
+test("idle timeout review uses human units while comparing stored milliseconds", () => {
+    const {settingsEditorView, editSettings} = require("../../core/model/settings-editor");
+    let before = snapshot(document());
+    for (const [value, expected] of [["60000", "1 minute"], ["90000", "90 seconds"], ["777", "0.777 seconds"], ["1000", "1 second"], ["0", "Always on"], ["86400000", "1440 minutes"]]) {
+        const section = settingsEditorView(before).sections.find(row => row.id === "lightingPower");
+        const after = snapshot(editSettings(before, {sectionId: section.id, expectedFingerprint: before.fingerprint,
+            fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: field.enabled} : {macro: field.macro, value: field.macro === "lightingTimeout" ? value : field.value})}));
+        const change = profileReview(before, after).find(row => row.unit === "settings:lightingPower");
+        assert.equal(change.fields.find(field => field.label === "Idle timeout").after, expected);
+        before = after;
+    }
+});
+
+test("Host changes review affected text macros while leaving key steps and identical typing routes out", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const payloads = ["café", "hello", "{KC_A}{120}", "{+KC_A}é{-KC_A}"];
+    const before = hostMacros(1 | (2 << 16), payloads).snapshot;
+    const after = hostMacros(1 | (3 << 16), payloads).snapshot;
+    const effects = profileReview(before, after).filter(row => row.area === "Macros");
+    assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
+    for (const row of effects) {
+        assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
+        assert.match(row.note, /because of Host → Your computer\. Discard it together with that change\./);
+        const typing = row.fields.find(field => field.label === "Text entry");
+        assert.match(typing.before, /layout keys: "é"/);
+        assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
+    }
+    assert.match(effects[1].fields.find(field => field.label === "Playback").after, /Release ordinary keys/);
+    assert.equal(effects[1].fields.find(field => field.label === "Playback").before, "Ready to play");
+    assert.deepEqual(profileMacros(after.document), profileMacros(before.document));
+    assert.equal(profileReview(after, before).filter(row => row.area === "Macros").at(-1).fields.find(field => field.label === "Playback").after, "Ready to play");
+});
+
+test("Review detects native key changes, ISO swaps and loss of Unicode setup", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const review = (oldHost, nextHost, payload) => profileReview(hostMacros(oldHost, [payload]).snapshot, hostMacros(nextHost, [payload]).snapshot).find(row => row.area === "Macros");
+    assert.match(review(2, 2 | (9 << 16), "z").fields[0].after, /German/);
+    const iso = review(1 | (2 << 16), 1 | (2 << 16) | (1 << 24), "~");
+    assert.match(iso.fields[0].before, /ANSI/); assert.match(iso.fields[0].after, /ISO/);
+    assert.match(review(1 | (3 << 16), 1 | (2 << 16), "🙂").fields.find(field => field.label === "Playback").after, /cannot type/);
+    assert.equal(review(1 | (2 << 16), 1 | (2 << 16) | (1 << 24), "hello"), undefined);
+});
 test("unchanged snapshots have no review entries and layer renaming does not invent policy changes", () => {
     const before=snapshot(document()); assert.deepEqual(profileReview(before,before),[]);
-    const names=["Base","Numbers","Symbols","Navigation","Mouse","Extra 1","Extra 2","Extra 3"];
-    const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names));
+    const names=["Base","Numbers","Symbols","Navigation","Mouse","Extra 1","Extra 2","Extra 3",...Array(8).fill("")];
+    const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],names));
     assert.deepEqual(profileReview(before,after),[{area:"Layers",unit:"layerName:4",title:"Layer 4",status:"changed",
         fields:[{label:"Name",status:"changed",before:"Pointer",after:"Mouse"}],place:{kind:"layers"},titleMark:{kind:"layer",layer:4}}]);
 });
 test("review preserves untrusted names as text data", () => {
     const before=snapshot(document());
-    const names=["<img src=x>","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3"];
-    const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names));
+    const names=["<img src=x>","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")];
+    const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],names));
     assert.equal(profileReview(before,after)[0].fields[0].after,names[0]);
 });
 test("a combo's keys read as the screens read them, with no stored name where nothing reads alike", () => {
@@ -27,14 +71,34 @@ test("a combo's keys read as the screens read them, with no stored name where no
 });
 test("a key changed for another with the same label is still a visible change", () => {
     const before=snapshot(document()), changed=structuredClone(before.document);
-    changed.layers[1][7]=0x1e; const base=snapshot(changed);
-    const after=structuredClone(changed); after.layers[1][7]=0x59; // KC_1 → KC_KP_1, both labelled "1"
+    editLayers(changed, layers => layers[1][7]=0x1e); const base=snapshot(changed);
+    const after=structuredClone(changed); editLayers(after, layers => layers[1][7]=0x59); // KC_1 → KC_KP_1, both labelled "1"
     const rows=profileReview(base,snapshot(after));
     assert.equal(rows.length,1);
-    assert.equal(rows[0].area,"Layout");
+    assert.equal(rows[0].area,"Keys");
     const [field]=rows[0].fields;
     assert.notEqual(field.before,field.after);
     assert.match(field.before,/KC_1\b/); assert.match(field.after,/KC_KP_1/);
+});
+
+test("a key changed to a layer key carries that layer's mark, and one changed to a pointing mode its slot", () => {
+    const before=snapshot(document()), after=structuredClone(before.document);
+    editLayers(after, layers => layers[0][7]=0x5225); editLayers(after, layers => layers[0][8]=0x4338); editLayers(after, layers => layers[0][9]=0x7e80); editLayers(after, layers => layers[0][10]=0x04); // MO(5), LT(3,KC_SLASH), PD_MODE_0, KC_A
+    const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Keys").map(row=>row.fields[0].afterMark);
+    assert.deepEqual(marks,[{kind:"layer",layer:5},{kind:"layer",layer:3},{kind:"pointing",slot:0},undefined]);
+});
+
+test("a key's participation is named where the key sits, as its layout change is", () => {
+    const {editDeviceProfile}=require("../../core/model/device-profile-edits");
+    const {matrixPosition}=require("../../core/data/charybdis-layout");
+    const before=snapshot(document()), after=structuredClone(before.document);
+    editLayers(after, layers => layers[0][matrixPosition(7)]=0x05); // KC_B
+    after.profile=editDeviceProfile(Buffer.from(after.profile,"base64"),{type:"updatePlacementPolicy",layer:0,layoutIndex:7,useBehavior:false,joinCombos:true}).toString("base64");
+    const rows=profileReview(before,snapshot(after));
+    const key=rows.find(row=>row.unit.startsWith("layout:")), placement=rows.find(row=>row.unit.startsWith("placement:"));
+    assert.equal(key.title,"Base · Right · row 1, column 5");
+    assert.equal(placement.title,"Participation · Base · Right · row 1, column 5");
+    assert.deepEqual([key.area,placement.area],["Keys","Keys"],"both sit under the screen they are made on");
 });
 
 // ── items ───────────────────────────────────────────────────────────────
@@ -53,7 +117,7 @@ function withDomain(value, id, decode, encode, change) {
 }
 const behaviours = (value, change) => withDomain(value,32,payload=>decodeKeyBehaviorDomain(payload,{actionLimits:{maxPdModes:8}}).rows,rows=>encodeKeyBehaviorDomain({rows},{actionLimits:{maxPdModes:8}}),change);
 // The rows of the stored table, with its default window and hold threshold kept.
-const combos = (value, change, timing = {}) => withDomain(value,48,payload=>decodeComboDomain(payload,2),table=>encodeComboDomain({...table,...timing}),table=>({...table,rows:change(table.rows)}));
+const combos = (value, change, timing = {}) => withDomain(value,48,payload=>decodeComboDomain(payload),table=>encodeComboDomain({...table,...timing}),table=>({...table,rows:change(table.rows)}));
 const comboRows = () => Array.from({length:7}, (_, id) => ({inputs:[{kind:1,flags:0,operand:4+id},{kind:1,flags:0,operand:30+id}],
     output:{kind:1,flags:0,operand:40+id},termMs:50,mustHold:false,mustTap:false,ordered:false}));
 test("a changed default window is one Combo timing change, and the combos that follow it do not change", () => {
@@ -94,6 +158,18 @@ test("a behaviour lists only the fields that changed, in the editor's words", ()
     assert.deepEqual(item.fields,[{label:"Tap / hold threshold",status:"changed",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
         labelMark:{kind:"tier",tier:"hold"}}], "the tiers that did not change are not repeated, and the timing is marked with the tier it decides");
 });
+test("a behaviour's allowed layers are named as every screen names them, never blank", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const target=validateSnapshot(base).behaviors.rows[0].target, names=validateSnapshot(base).settings.names;
+    const after=snapshot(behaviours(base,rows=>rows.map(row=>JSON.stringify(row.target)===JSON.stringify(target)?{...row,allowedLayers:0b1000000000010011}:row)));
+    const [item]=profileReview(before,after);
+    const field=item.fields.find(entry=>entry.label==="Allowed layers");
+    const called=index=>names[index]||(index?`Layer ${index}`:"Base");
+    assert.equal(field.after,[0,1,4,15].map(called).join(", "));
+    assert.ok(field.after.split(", ").every(Boolean),"no layer is a blank name");
+    assert.ok(!names[15],"the fixture leaves layer 15 unnamed"); assert.match(field.after,/Layer 15$/);
+    assert.deepEqual(field.afterMark,{kind:"layers",layers:[0,1,4,15].map(layer=>({layer,name:called(layer)}))},"each layer is marked");
+});
 test("a removed behaviour is marked removed and lists what it held, without its defaults", () => {
     const base=pdDocument(), before=snapshot(base), row=validateSnapshot(base).behaviors.rows[0];
     const [item]=profileReview(before,snapshot(behaviours(base,rows=>rows.slice(1))));
@@ -128,7 +204,7 @@ test("changing a default lists inherited effective times under its settings item
 test("renaming a layer does not read as a change to the settings that name it", () => {
     const before=snapshot(pdDocument());
     const names=validateSnapshot(before.document).settings.names.map((name,i)=>i===4?"Mouse":name);
-    const units=profileReview(before,snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names))).map(entry=>entry.unit);
+    const units=profileReview(before,snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],names))).map(entry=>entry.unit);
     assert.deepEqual(units,["layerName:4"]);
 });
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
@@ -177,7 +253,7 @@ test("a setting is marked with what it governs, as the Settings screen marks it"
     const items=profileReview(before,after);
     const timing=items.find(entry=>entry.unit==="settings:keyTiming").fields;
     assert.deepEqual(timing.filter(field=>field.labelMark).map(field=>field.labelMark),[{kind:"tier",tier:"hold"},{kind:"tier",tier:"long"}]);
-    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Auto-mouse layer");
+    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Pointer layer");
     assert.deepEqual(layer.afterMark,{kind:"layer",layer:3},"a layer value carries the layer's colour");
 });
 test("a settings section is listed under the screen it is edited on", () => {
@@ -189,7 +265,7 @@ test("a settings section is listed under the screen it is edited on", () => {
     const timing=items.find(entry=>entry.unit==="settings:keyTiming"), mouse=items.find(entry=>entry.unit==="settings:autoMouse");
     assert.equal(timing.area,"Settings");
     assert.deepEqual(timing.place,{kind:"settings",section:"keyTiming",area:"Settings"});
-    assert.equal(mouse.area,"Mouse","auto-mouse is edited on the Mouse screen");
+    assert.equal(mouse.area,"Mouse","auto-mouse is listed under Mouse");
     assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Mouse"});
 });
 test("clearing a pointing mode is a change to the slot, not to every behaviour that reaches it", () => {
@@ -244,11 +320,77 @@ test("a scrolling mode limited to one axis says so in the review", () => {
 
 test("a reorder that makes a new base names it first, and says which layer left the base", () => {
     const {layerOrderReview} = require("../../core/model/profile-review");
-    const order = [3, 1, 2, 0, 4, 5, 6, 7];
+    const order = [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     const item = layerOrderReview(snapshot(reorderLayers(document(), order)), order);
     assert.deepEqual(item.fields.map((field) => [field.label, field.before, field.after]), [
         ["Base layer", "Base", "Navigation"],
         ["Base", "0", "3 · no longer the base"],
         ["Navigation", "3", "0 · the base"],
     ]);
+});
+
+test("layer-mod labels use each Review side's host vocabulary and profile layer name", () => {
+    for(const [detected,alt,gui] of [[0,'Alt','GUI'],[1,'Option','Command'],[2,'Alt','Windows'],[3,'Alt','Super']]) {
+        const before=snapshot(document()), after=snapshot(document());
+        before.hostOs=after.hostOs={detected};
+        editLayers(after.document, layers => layers[0][0]=0x502c);
+        const rows=profileReview(before,after);
+        const field=rows.find(row=>row.unit==='layout:0:0').fields[0];
+        assert.equal(field.after,`${validateSnapshot(after.document).settings.names[1]} + ${alt}+${gui}`);
+    }
+});
+
+test("Space Cadet modifiers use current host names on the board and in Review", () => {
+    const {buildDeviceModel}=require('../../core/session/device-model');
+    const {resolve,lookup}=require('../../core/data/keycode-catalog');
+    for(const [detected,alt] of [[0,'Alt'],[1,'Option'],[2,'Alt'],[3,'Alt']]) {
+        const before=snapshot(document()), after=snapshot(document());
+        before.hostOs=after.hostOs={detected};
+        const keys=['SC_LAPO','SC_RAPC'].map(key=>lookup(key).value);
+        editLayers(after.document, layers => layers[0][0]=keys[0]);
+        assert.equal(profileReview(before,after).find(r=>r.unit==='layout:0:0').fields[0].after,`Left ${alt}/(`);
+        const model=buildDeviceModel({settingsView:{host:{effective:detected}},layout:{state:'read',layers:[{layer:0,keys:keys.map((keycode,layoutIndex)=>({keycode,layoutIndex,resolved:resolve(keycode)}))}]}});
+        assert.deepEqual(model.layers[0].positions.map(p=>p.editLabel),[`Left ${alt}/(`,`Right ${alt}/)`]);
+        assert.deepEqual(model.layers[0].positions.map(p=>p.value),keys);
+    }
+});
+
+test("layout and Review labels follow the host layout on each side, including macOS ISO", () => {
+    const settings = require("../../core/schema/settings-domain-v1");
+    const {buildDeviceModel} = require("../../core/session/device-model");
+    const {resolve} = require("../../core/data/keycode-catalog");
+    const withHost = (word) => withDomain(document(), 64, settings.decodeSettings, settings.encodeSettings,
+        value => ({...value, values: value.values.map((v, i) => i === 27 ? word : v)}));
+    for (const [host, word, code, label] of [
+        [{effective: 2, layout: 9}, 2 | (9 << 16), 0x1c, "Z"],
+        [{effective: 2, layout: 9}, 2 | (9 << 16), 0x233, "Ö"],
+        [{effective: 1, layout: 2, macosIso: true}, 1 | (2 << 16) | (1 << 24), 0x35, "§"],
+    ]) {
+        const before = snapshot(withHost(word)), after = snapshot(structuredClone(before.document));
+        editLayers(after.document, layers => layers[0][0] = code);
+        assert.equal(profileReview(before, after).find(row => row.unit === "layout:0:0").fields[0].after, label);
+        const model = buildDeviceModel({settingsView: {host}, layout: {state: "read", layers: [{layer: 0, keys: [{keycode: code, layoutIndex: 0, resolved: resolve(code)}]}]}});
+        assert.equal(model.layers[0].positions[0].editLabel, label);
+        assert.equal(model.layers[0].positions[0].value, code);
+    }
+});
+test("a shortcut kind that makes its key dual-role lists the threshold its behaviour now follows under the key", () => {
+    const settingsDomain = require("../../core/schema/settings-domain-v1");
+    const settings = (value, change) => withDomain(value,64,payload=>settingsDomain.decodeSettings(payload),value=>settingsDomain.encodeSettings(value),change);
+    const shortcut = layerKind => s => ({...s, customKeyShortcuts: s.customKeyShortcuts.map((row, slot) => slot === 5 ? {mods: 0, keys: [], layers: 1 << 3, layerKind} : row)});
+    const withRow = behaviours(pdDocument(), rows => {
+        const row = {...rows[0], target: {kind: 7, flags: 0, operand: 5}, tapHoldTerm: 0};
+        return [...rows, row].sort((a, b) => a.target.kind - b.target.kind || a.target.operand - b.target.operand);
+    });
+    const values = validateSnapshot(withRow).settings.values;
+    assert.notEqual(values[0], values[1], "the dual-role and behaviour terms differ here");
+    const before = snapshot(settings(withRow, shortcut(0))), after = snapshot(settings(withRow, shortcut(4)));
+    const items = profileReview(before, after);
+    assert.deepEqual(items.map(row => row.unit), ["customKey:5"]);
+    const follows = items[0].fields.find(field => field.label.endsWith(" · Tap / hold threshold"));
+    assert.deepEqual([follows?.before, follows?.after], [`default · ${values[1]} ms`, `default · ${values[0]} ms`]);
+    assert.match(items[0].note || "", /dual-role/);
+    // A kind change that keeps the key's threshold lists nothing more.
+    const lock = snapshot(settings(withRow, shortcut(1)));
+    assert.ok(!profileReview(before, lock)[0].fields.some(field => field.label.endsWith(" · Tap / hold threshold")));
 });

@@ -23,61 +23,57 @@ noah_host_export_qmk_cpath "$ROOT"
     printf '#include "%s/config.h"\n' "$KEYMAP_PATH"
 } >"$CONFIG"
 
-node - "$ROOT" "$BUILD_DIR/portable.bin" <<'JS'
+# A profile from before the current format (eight pointing slots, schema 2)
+# is refused by current firmware.
+cp "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/old.bin"
+
+node - "$BUILD_DIR/current.bin" "$BUILD_DIR/maximum.bin" "$BUILD_DIR/combo-permissions" <<'JS'
 const fs = require("node:fs");
-// Profiles the retired v1 app wrote (stored settings v2), frozen as hex.
-const frozen = Object.fromEntries(fs.readFileSync(process.argv[2] + "/tests/fixtures/stored_profile_live_v1.fixture", "utf8")
-    .split("\n").filter(line => line && !line.startsWith("#")).map(line => line.split("=")));
-fs.writeFileSync(process.argv[3], Buffer.from(frozen["profile.hex"], "hex"));
-fs.writeFileSync(process.argv[3] + '.pd', Buffer.from(frozen["pd_profile.hex"], "hex"));
-// Settings v4 as Ark writes it, at its worst case: all 64 macro names
-// at 20 characters. The frozen v1 import above stays the stored-v2
-// compatibility check; .pd3 is a stored v3 domain with a UTF-8 name, which v4
-// firmware still reads.
 const app = process.env.CHARYBDIS_ARK_ROOT;
 const {fingerprint, validateSnapshot} = require(app + "/core/model/portable-profile");
 const {editMacro} = require(app + "/core/model/macro-editor");
-const {decodeProfileBlob, encodeProfileBlob} = require(app + "/core/schema/profile-blob-v1");
-const {encodeSettings} = require(app + "/core/schema/settings-domain-v1");
-let named = require(app + "/tests/fixtures/pd-profile").document();
-for (let slot = 0; slot < 64; slot++) named = editMacro({document: named, fingerprint: fingerprint(named)}, {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(20, "!"), expectedFingerprint: fingerprint(named)});
-fs.writeFileSync(process.argv[3] + '.pd4', validateSnapshot(named).profile);
-// Settings v5 at its worst case: every macro and every custom key named at 20
-// characters, as Ark writes it.
 const {editCustomKey} = require(app + "/core/model/custom-key-editor");
-const keyboard = {actionAbiDigest: named.actionAbiDigest, compiledLayerCount: 8, supportedDomainMask: 31};
-for (let slot = 0; slot < 64; slot++) named = editCustomKey({document: named, fingerprint: fingerprint(named)}, {keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(20, "?"), expectedFingerprint: fingerprint(named)}, keyboard);
-fs.writeFileSync(process.argv[3] + '.pd5', validateSnapshot(named).profile);
-const stored = validateSnapshot(require(app + "/tests/fixtures/pd-profile").document());
-const {macros, ...rest} = stored.settings;
-const v3 = encodeSettings({...rest, formatVersion: 3, macroNames: Array.from({length: 64}, (_, i) => i === 63 ? "Édition ⌘" : i === 0 ? "Sign-off" : "")});
-const blob = decodeProfileBlob(stored.profile);
-fs.writeFileSync(process.argv[3] + '.pd3', encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(d => d.id === 0x40 ? {...d, version: 3, payload: v3} : d)}));
-// Those four carry eight pointing slots (RGB v2, PD v1). The 32-slot firmware
-// refuses them as they are and takes Ark's import translation (upgradePdSlots),
-// written beside each as portable32.bin.*. A profile Ark writes for 32 slots
-// itself, its compiled profile with slot 12 configured and every name at its
-// worst case, is .pd6.
-const {upgradePdSlots} = require(app + "/core/model/portable-profile");
-const {ACTION_ABI} = require(app + "/core/schema/actions");
-const wrap = bytes => ({format: "charybdis-profile", version: 2, keyboard: "charybdis-4x6", actionAbiDigest: ACTION_ABI,
-    layers: Array.from({length: 8}, () => Array(60).fill(1)), profile: bytes.toString("base64"), macros: Array(64).fill("")});
-for (const suffix of [".pd", ".pd3", ".pd4", ".pd5"]) {
-    const eight = fs.readFileSync(process.argv[3] + suffix);
-    fs.writeFileSync(process.argv[3].replace(/portable\.bin$/, "portable32.bin") + suffix, Buffer.from(upgradePdSlots(wrap(eight)).profile, "base64"));
+const {CAPABILITIES_32, document32} = require(app + "/tests/fixtures/pointing-slots-32");
+// Current schema 3.0 with slot 12 configured, all 128 macro/custom-key names
+// at their 32-byte maximum and four custom-key shortcuts, plus the maximum
+// profile.
+let current = document32();
+current = editMacro({document: current, fingerprint: fingerprint(current)},
+    {keycode: "MACRO_0", payload: "hello{KC_A}", expectedFingerprint: fingerprint(current)});
+for (let slot = 0; slot < 128; slot++) current = editMacro({document: current, fingerprint: fingerprint(current)},
+    {keycode: `MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(32, "!"), expectedFingerprint: fingerprint(current)});
+for (let slot = 0; slot < 128; slot++) current = editCustomKey({document: current, fingerprint: fingerprint(current)},
+    {keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(32, "?"), expectedFingerprint: fingerprint(current)}, CAPABILITIES_32);
+// Shortcuts Ark writes (firmware D-F26): mixed sides with a key, modifiers
+// alone, a mouse button alone, and every modifier with six keys, the last
+// keyboard, media and mouse keys among them.
+for (const [slot, mods, keys] of [[0, 0x41, [0x0e]], [63, 0x0f, []], [64, 0, [0xd1]], [127, 0xff, [0x04, 0x52, 0xa7, 0xa4, 0xc2, 0xdc]]]) current = editCustomKey({document: current, fingerprint: fingerprint(current)},
+    {keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods, keys, layers: 0, layerKind: 0}, expectedFingerprint: fingerprint(current)}, CAPABILITIES_32);
+fs.writeFileSync(process.argv[2], validateSnapshot(current, CAPABILITIES_32).candidate);
+const fixture = fs.readFileSync(app + "/upstream/firmware/tests/fixtures/maximum_profile_v4.fixture", "utf8");
+const maximum = Buffer.from(fixture.match(/^profile\.hex=(.*)$/m)[1], "hex");
+const {decodeProfileBlob, encodeProfileBlob} = require(app + "/core/schema/profile-blob-v1");
+if (!encodeProfileBlob(decodeProfileBlob(maximum)).equals(maximum)) throw new Error("Maximum profile does not round-trip through Ark");
+fs.writeFileSync(process.argv[3], maximum);
+// The unchanged domain versions admit both output permission bits. Exercise
+// Ark-produced bytes through the firmware validator, normally and sanitized.
+const {decodeSettings, encodeSettings} = require(app + "/core/schema/settings-domain-v1");
+const {decodeComboDomain, encodeComboDomain} = require(app + "/core/schema/combo-domain-v1");
+const comboVector = Buffer.from(fs.readFileSync(app + "/upstream/firmware/tests/fixtures/combo_output_behaviors_v1.fixture", "utf8").trim(), "hex");
+for (const [name, global, perCombo] of [["global", false, true], ["row", true, false], ["both", false, false]]) {
+    const blob = decodeProfileBlob(validateSnapshot(current).profile);
+    const settingsDomain = blob.domains.find(domain => domain.id === 0x40);
+    settingsDomain.payload = encodeSettings({...decodeSettings(settingsDomain.payload), comboOutputBehaviors: global});
+    const combos = decodeComboDomain(comboVector);
+    combos.rows[1].useOutputBehavior = perCombo;
+    blob.domains.find(domain => domain.id === 0x30).payload = encodeComboDomain(combos);
+    const document = {...current, profile: encodeProfileBlob(blob).toString("base64")};
+    const checked = validateSnapshot(document, CAPABILITIES_32);
+    if (checked.settings.comboOutputBehaviors !== global || checked.combos.rows[1].useOutputBehavior !== perCombo) throw new Error("Permission lost before firmware validation");
+    fs.writeFileSync(`${process.argv[4]}.${name}.bin`, checked.candidate);
 }
-const {CAPABILITIES_32, document32} = require(app + "/tests/fixtures/pd-slots-32");
-let wide = document32();
-for (let slot = 0; slot < 64; slot++) wide = editMacro({document: wide, fingerprint: fingerprint(wide)}, {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(20, "!"), expectedFingerprint: fingerprint(wide)});
-for (let slot = 0; slot < 64; slot++) wide = editCustomKey({document: wide, fingerprint: fingerprint(wide)}, {keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(20, "?"), expectedFingerprint: fingerprint(wide)}, CAPABILITIES_32);
-fs.writeFileSync(process.argv[3] + '.pd6', validateSnapshot(wide, CAPABILITIES_32).profile);
-JS
 
-# Ark's translation is the firmware's documented one, byte for byte.
-for suffix in .pd .pd3 .pd4 .pd5; do
-    python3 "$ROOT/tests/host/translate_eight_slot_profile.py" "$BUILD_DIR/portable.bin$suffix" "$BUILD_DIR/reference32.bin$suffix"
-    cmp "$BUILD_DIR/reference32.bin$suffix" "$BUILD_DIR/portable32.bin$suffix"
-done
+JS
 
 build_and_run() {
     name="$1"
@@ -89,10 +85,10 @@ build_and_run() {
         -DPOINTING_DEVICE_ENABLE \
         -DRGB_MATRIX_ENABLE \
         -DRGB_MATRIX_WS2812 \
-        -DVIA_ENABLE \
+        \
         -DMCU_RP \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
-        -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
+        -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
@@ -102,48 +98,62 @@ build_and_run() {
         "$KEYMAP_PATH/keymap.c" \
         "$KEYMAP_PATH/pd_config.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_pd_runtime.c" \
         "$KEYMAP_PATH/rgb_config.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_placement_v1.c" \
         "$ROOT/users/noah/lib/action/action_kind.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$bin"
     if [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture"
-        for suffix in .pd .pd3 .pd4 .pd5; do
-            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/portable.bin$suffix"
-            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable32.bin$suffix"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/old.bin"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/current.bin"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/maximum.bin"
+        for permission in global row both; do
+            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/combo-permissions.$permission.bin"
         done
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd6"
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi
     elif [ "$name" = empty ]; then
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/portable32.bin.pd"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/current.bin"
     fi
 }
 
-build_and_run configured -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
-build_and_run configured_sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
-build_and_run empty -DNOAH_PD_PROFILE_ENABLE -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -DNOAH_KEYMAP_EMPTY_COMBOS -DNOAH_PORTABLE_PROFILE_ENABLE
+build_and_run configured -DNOAH_PORTABLE_PROFILE_ENABLE
+build_and_run configured_sanitized -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
+build_and_run empty -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -DNOAH_KEYMAP_EMPTY_COMBOS -DNOAH_PORTABLE_PROFILE_ENABLE
 
 # Keep the materializer available when RGB is compiled out: that variant emits
 # the canonical key-behavior domain alone and must remain warning-clean.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-    -DNOAH_PD_PROFILE_ENABLE \
-    -DVIA_ENABLE \
+    \
+    \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
-    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
+    -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
@@ -151,4 +161,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -include "$CONFIG" \
     -fsyntax-only \
     "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c"
