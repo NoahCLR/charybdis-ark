@@ -102,7 +102,7 @@ export function tabPointing(body, right) {
     const node = reachTable("pointing", groups, [["Slot", "24%"], ["Mode", "14%"], [words.linkLabels.startedBy, "10%"], [words.linkLabels.endsWhen, "8%"], [words.linkLabels.keyTurnsOnShort, "9%"], ["Reached by", "29%"], ["", "6%"]]);
     attachReachRows(node, "pointing");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editpd]")).forEach((button) => button.addEventListener("click", () => {
-        state.pdSlot = Number(button.dataset.editpd);
+        state.pointingSlot = Number(button.dataset.editpd);
         state.pdKind = null;
         state.screen = "pointing";
         render();

@@ -47,7 +47,7 @@ function shortcutlessCustomKeySteps(decoded) {
 function profileFindings(decoded, destination = {}) {
     /** @type {import("../../contracts/model.js").Finding[]} */
     const findings = [...layerReach(decoded), ...gestureTimingFindings(decoded), ...shortcutlessCustomKeySteps(decoded), ...inertBehaviorFindings(decoded)];
-    for (const [slot, count] of Object.entries(decoded.danglingPdBindings || {})) {
+    for (const [slot, count] of Object.entries(decoded.danglingPointingKeys || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,
             title: `${count} action${count === 1 ? "" : "s"} reach empty pointing slot ${Number(slot) + 1}`,

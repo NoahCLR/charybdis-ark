@@ -83,7 +83,7 @@ test("a key changed for another with the same label is still a visible change", 
 
 test("a key changed to a layer key carries that layer's mark, and one changed to a pointing mode its slot", () => {
     const before=snapshot(document()), after=structuredClone(before.document);
-    editLayers(after, layers => layers[0][7]=0x5225); editLayers(after, layers => layers[0][8]=0x4338); editLayers(after, layers => layers[0][9]=0x7e80); editLayers(after, layers => layers[0][10]=0x04); // MO(5), LT(3,KC_SLASH), PD slot 0, KC_A
+    editLayers(after, layers => layers[0][7]=0x5225); editLayers(after, layers => layers[0][8]=0x4338); editLayers(after, layers => layers[0][9]=0x7e80); editLayers(after, layers => layers[0][10]=0x04); // MO(5), LT(3,KC_SLASH), PD_MODE_0, KC_A
     const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Keys").map(row=>row.fields[0].afterMark);
     assert.deepEqual(marks,[{kind:"layer",layer:5},{kind:"layer",layer:3},{kind:"pointing",slot:0},undefined]);
 });

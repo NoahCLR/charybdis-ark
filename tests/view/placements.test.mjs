@@ -4,7 +4,7 @@ import {keycodePlacements, reachLine} from "../../webview/view/placements.mjs";
 
 const model = {
     layers: [{index: 0, name: "Base", positions: [{keycode: "SNIPING", value: 32260}]},
-        {index: 3, name: "Navigation", displayName: "Navigation", positions: [{keycode: "QK_KB_5", value: 32261}, {keycode: "PD_SLOT_4", value: 32388}]}],
+        {index: 3, name: "Navigation", displayName: "Navigation", positions: [{keycode: "QK_KB_5", value: 32261}, {keycode: "PD_MODE_4", value: 32388}]}],
     qmkKeycodes: [{value: "SNIPING", keycode: 32260}, {value: "SNP_TOG", keycode: 32261}],
     keyBehaviors: [{keycode: "KC_RIGHT_ALT", steps: [{hold: {action: "SNP_TOG"}}]}],
     combos: [{output: "SNIPING"}],

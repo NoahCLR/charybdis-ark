@@ -4,9 +4,9 @@
 /** @typedef {{qmkKeycodeValues?: Record<string, number>, layers?: {name: string}[]}} ExpressionModel */
 
 // Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
-// PD_SLOT_0, MACRO_3 — resolved to profile actions and native keycodes.
+// PD_MODE_0, MACRO_3 — resolved to profile actions and native keycodes.
 
-const {PD_SLOT_BINDINGS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
+const {PD_MODE_KEYS, formerNames, pdModeKeyOfName} = require("../data/pd-mode-keys");
 const {combineModifiers} = require("../data/keycode-catalog");
 const {customKeyCode, customKeyOfName, layerLockCode, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
@@ -33,17 +33,18 @@ const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
     DRG_TOG: 0x7e07,
 });
 
-// Every pointing-mode binding as the action a behaviour or combo stores.
+// Every pointing key's name, former names included, as the action a
+// behaviour or combo stores.
 /** @type {Readonly<Record<string, import("./types.js").SemanticAction>>} */
-const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_SLOT_BINDINGS.flatMap(({slot, hold, lock}) => {
+const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_MODE_KEYS.flatMap(({slot, hold, lock}) => {
     /** @type {[string, import("./types.js").SemanticAction][]} */
     const entries = [
-        [hold, {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
-        [lock, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
+        [hold, {kind: PROFILE_ACTION_KINDS.POINTING_MODE_MOMENTARY, operand: slot}],
+        [lock, {kind: PROFILE_ACTION_KINDS.POINTING_MODE_LOCK, operand: slot}],
     ];
-    if (FORMER_NAMES[slot]) entries.push(
-        [FORMER_NAMES[slot], {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
-        [`${FORMER_NAMES[slot]}_LOCK`, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
+    for (const former of formerNames(slot)) entries.push(
+        [former.hold, {kind: PROFILE_ACTION_KINDS.POINTING_MODE_MOMENTARY, operand: slot}],
+        [former.lock, {kind: PROFILE_ACTION_KINDS.POINTING_MODE_LOCK, operand: slot}],
     );
     return entries;
 })));
@@ -120,8 +121,8 @@ function resolveNativeQmkExpression(value, model) {
     const custom = customKeyOfName(expression);
     if (custom !== undefined) return customKeyCode(custom);
 
-    const pd = pdBindingOfName(expression);
-    if (pd) return pd.locked ? PD_SLOT_BINDINGS[pd.slot].lockCode : PD_SLOT_BINDINGS[pd.slot].holdCode;
+    const pd = pdModeKeyOfName(expression);
+    if (pd) return pd.locked ? PD_MODE_KEYS[pd.slot].lockCode : PD_MODE_KEYS[pd.slot].holdCode;
 
     const call = parseCall(expression);
     if (!call) return undefined;

@@ -46,7 +46,7 @@ const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
     "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "flashPausesAsked", "keyDetailsOpen", "stackOpen", "cellHow", "placement",
-    "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
+    "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pointingSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "settingsSearch", "overlay", "leaveDemo", "modeAsk", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",
@@ -67,9 +67,9 @@ test("a draft change resets the existing forms and preserves historically kept p
     const standing = {
         screen: "macros", layer: 2, layersOn: [1], selected: 7, tab: "behaviours", cell: "0-hold", cellRow: "QK_USER_16",
         cellHow: {cell: "0-hold", keycode: "QK_USER_16", style: "REPEAT_WHILE_HELD", repeatHz: "20"},
-        placement: {keycode: "MACRO_1"}, keyClipboard: {keycode: "KC_A", label: "A"}, pdSlot: 2, macroSlot: "MACRO_0",
+        placement: {keycode: "MACRO_1"}, keyClipboard: {keycode: "KC_A", label: "A"}, pointingSlot: 2, macroSlot: "MACRO_0",
         macroSearch: "hello", ledPicks: [1, 4], trackball: true, rowColour: {h: "10", s: "20", v: "30"},
-        ledRow: {target: "pdMode", owner: "PD_SLOT_0", source: "Thumbs"}, recordPreserveHoldTiming: true, overlay: "history",
+        ledRow: {target: "pdMode", owner: "PD_MODE_0", source: "Thumbs"}, recordPreserveHoldTiming: true, overlay: "history",
         notice: "Saved.", recording: null,
     };
     Object.assign(state, standing, {

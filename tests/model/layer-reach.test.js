@@ -557,11 +557,11 @@ test("bypassed normal combo outputs retain their native layer escape", () => {
     assert.deepEqual(traps(p), []);
 });
 
-// Pointing links (firmware D-F62). PD_SLOT_n holds slot n's mode, and
-// PD_SLOT_n_LOCK toggles its lock; a mode its key runs turns on the layers its
+// Pointing links (firmware D-F62). PD_MODE_n holds slot n's mode, and
+// PD_MODE_n_LOCK toggles its lock; a mode its key runs turns on the layers its
 // link names for its key, and a layer that starts its mode keeps a separate
 // pointer layer off unless what ends the mode is on.
-const PD_SLOT = (n) => 0x7e80 + n, PD_SLOT_LOCK = (n) => 0x7ea0 + n;
+const PD_MODE = (n) => 0x7e80 + n, PD_MODE_LOCK = (n) => 0x7ea0 + n;
 const linked = (extra = {}) => ({id: 1, kind: 1, name: "Volume", linkedLayers: 0, linkTurnsOn: 0, linkEnds: 0, ...extra});
 const mask = (layers) => layers.reduce((bits, layer) => bits | (1 << layer), 0);
 // The key turns layers on; the layers start the mode; the same layers both ways.
@@ -570,7 +570,7 @@ const startedBy = (layers, extra = {}) => linked({linkedLayers: mask(layers), ..
 const bothWays = (layers, extra = {}) => startedBy(layers, {linkTurnsOn: mask(layers), ...extra});
 
 test("a mode whose key turns layers on reaches them through its hold and lock keys", () => {
-    const keys = {"0:0": PD_SLOT(1), "5:3": KC_B};
+    const keys = {"0:0": PD_MODE(1), "5:3": KC_B};
     assert.deepEqual(kinds(profile({keys})), ["unreachable"], "a mode key alone reaches nothing");
     assert.deepEqual(kinds(profile({keys, pdModes: [turnsOn(5)]})), [], "the key turns Extra 1 on");
     assert.deepEqual(kinds(profile({keys, pdModes: [bothWays([5])]})), [], "every linked layer");
@@ -581,7 +581,7 @@ test("a mode whose key turns layers on reaches them through its hold and lock ke
     assert.deepEqual(kinds(profile({keys, pdModes: [turnsOn(5)], settings: {5: 5}})), ["unreachable"], "the keyboard never turns on the pointer layer for a link");
     assert.deepEqual(kinds(profile({keys, pdModes: [turnsOn(5)], settings: {23: 1 | (1 << 5)}})).includes("unreachable"), false,
         "a default layer is always on, so it is reached without the link");
-    assert.deepEqual(kinds(profile({keys: {"0:0": PD_SLOT_LOCK(1), "5:3": KC_B}, pdModes: [turnsOn(5)]})), [], "the lock key too");
+    assert.deepEqual(kinds(profile({keys: {"0:0": PD_MODE_LOCK(1), "5:3": KC_B}, pdModes: [turnsOn(5)]})), [], "the lock key too");
     // A behaviour branch held until release, or a combo output, that runs the
     // mode reaches it as well.
     const row = {target: code(KC_ESC), allowedLayers: 1, steps: [{tapIndex: 0, hold: {action: {kind: 4, flags: 0, operand: 1}, style: 1}}]};
@@ -592,11 +592,11 @@ test("a mode whose key turns layers on reaches them through its hold and lock ke
 
 test("a locked mode keeps its layer on like a layer lock, and is a trap when the layer covers its lock key", () => {
     const pdModes = [turnsOn(5)];
-    assert.deepEqual(traps(profile({keys: {"0:0": PD_SLOT_LOCK(1), "5:3": KC_B}, pdModes})), [], "the lock key still answers on Extra 1");
-    const [trap] = traps(profile({keys: {"0:0": PD_SLOT_LOCK(1), "5:0": KC_B}, pdModes}));
+    assert.deepEqual(traps(profile({keys: {"0:0": PD_MODE_LOCK(1), "5:3": KC_B}, pdModes})), [], "the lock key still answers on Extra 1");
+    const [trap] = traps(profile({keys: {"0:0": PD_MODE_LOCK(1), "5:0": KC_B}, pdModes}));
     assert.deepEqual(trap.layers, [5]);
-    assert.deepEqual(trap.path, ["Tap PD_SLOT_1_LOCK on Base (which runs Volume, whose key turns layers on)"]);
-    assert.deepEqual(traps(profile({keys: {"0:0": PD_SLOT_LOCK(1), "5:0": KC_B, "5:1": TO(0)}, pdModes})), [], "with a way home on it");
+    assert.deepEqual(trap.path, ["Tap PD_MODE_1_LOCK on Base (which runs Volume, whose key turns layers on)"]);
+    assert.deepEqual(traps(profile({keys: {"0:0": PD_MODE_LOCK(1), "5:0": KC_B, "5:1": TO(0)}, pdModes})), [], "with a way home on it");
 });
 
 test("a layer that starts its mode keeps the pointer layer off, so a way back only there does not count", () => {
@@ -642,7 +642,7 @@ test("a link any other layer ends keeps the pointer layer off only while no laye
 const CUSTOM_KEY = (n) => 0x7f00 + n;
 for (const [name, key, extra] of [
     ["a custom key whose shortcut turns on", CUSTOM_KEY(9), {shortcuts: {9: {layers: (1 << 5) | (1 << 6)}}}],
-    ["a pointing mode whose key turns on", PD_SLOT(1), {pdModes: [linked({linkTurnsOn: (1 << 5) | (1 << 6)})]}],
+    ["a pointing mode whose key turns on", PD_MODE(1), {pdModes: [linked({linkTurnsOn: (1 << 5) | (1 << 6)})]}],
 ]) {
     test(`${name} several layers reaches them only together`, () => {
         const combo = {inputs: [code(KC_A), code(KC_B)], output: code(KC_ESC), allowedLayers: 0xffff};
@@ -761,7 +761,7 @@ test("the layers a keycode turns on, as the keyboard runs it", () => {
     const decoded = {settings: settings(), pdModes: [{id: 5, kind: 1, name: "Zoom", linkedLayers: 0, linkTurnsOn: (1 << 3) | (1 << 4), linkEnds: 0}]};
     decoded.settings.customKeyShortcuts = Array.from({length: 128}, (_, slot) => (slot === 2 ? {mods: 0, keys: [], layers: (1 << 3) | (1 << 6), layerKind: 1} : {mods: 0, keys: [], layers: 0, layerKind: 0}));
     const turnsOn = keycodeLayersOn(decoded);
-    const {PD_SLOT_BINDINGS} = require("../../core/data/pd-bindings");
+    const {PD_MODE_KEYS} = require("../../core/data/pd-mode-keys");
     const {customKeyCode} = require("../../core/data/user-keycodes");
     assert.equal(turnsOn(0x5223), 1 << 3, "MO(3)");
     assert.equal(turnsOn(0x5263), 1 << 3, "TG(3)");
@@ -772,8 +772,8 @@ test("the layers a keycode turns on, as the keyboard runs it", () => {
     assert.equal(turnsOn(0x5243), 0, "DF(3)");
     assert.equal(turnsOn(0x52e3), 0, "PDF(3)");
     assert.equal(turnsOn(0x0004), 0, "KC_A");
-    assert.equal(turnsOn(PD_SLOT_BINDINGS[5].holdCode), 1 << 3, "a pointing-mode key: its linked layers, less the pointer layer the keyboard ignores");
-    assert.equal(turnsOn(PD_SLOT_BINDINGS[5].lockCode), 1 << 3);
+    assert.equal(turnsOn(PD_MODE_KEYS[5].holdCode), 1 << 3, "a pointing-mode key: its linked layers, less the pointer layer the keyboard ignores");
+    assert.equal(turnsOn(PD_MODE_KEYS[5].lockCode), 1 << 3);
     assert.equal(turnsOn(customKeyCode(2)), (1 << 3) | (1 << 6), "a custom key's shortcut layers");
     assert.equal(turnsOn(customKeyCode(3)), 0);
 });

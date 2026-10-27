@@ -11,7 +11,7 @@ const catalogue = [
     {value: "KC_F12", group: "basic"},
     {value: "KC_MUTE", group: "media"},
     {value: "QK_RGB_MATRIX_TOGGLE", group: "rgb_matrix"},
-    {value: "PD_SLOT_0", group: "Pointing modes"},
+    {value: "PD_MODE_0", group: "Pointing modes"},
     {value: "CUSTOM_KEY_0", group: "Custom keys"},
     {value: "QK_USER_20", group: "user"},
     {value: "QK_MACRO_9", group: "macro"},
@@ -45,7 +45,7 @@ test("curated picker sections route representative keycodes", () => {
     assert.equal(pickable({value: "QK_MACRO_9", group: "macro"}), false);
 });
 
-test("Charybdis's own drag scroll is offered nowhere; the PD_SLOT_0 pointing mode is drag scroll", () => {
+test("Charybdis's own drag scroll is offered nowhere; the PD_MODE_0 pointing mode is drag scroll", () => {
     for (const section of pickerSections()) {
         const offered = entriesForPickerSection(catalogue, section).map((entry) => entry.value);
         assert.ok(!offered.includes("DRGSCRL") && !offered.includes("DRG_TOG"), section.id);

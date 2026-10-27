@@ -28,7 +28,7 @@ const PROFILE_DOMAINS = Object.freeze([
         /** @param {Buffer} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["settings"]} */
         decode: (bytes, _options = {}) => require("./settings-domain-v1").decodeSettings(bytes)}),
     Object.freeze({name: "PD_MODES", id: 0x50, key: "pdModes", readKey: "pdModes", version: 4, wireBit: 1 << 4, area: "pointing", document: "profile",
-        /** @param {import("./types.js").PdSlot[]} value @returns {Buffer} */
+        /** @param {import("./types.js").PointingSlot[]} value @returns {Buffer} */
         encode: value => require("./pd-mode-domain-v1").encodePdDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["pdModes"]} */
         decode: (bytes, _options = {}) => require("./pd-mode-domain-v1").decodePdDomain(bytes)}),

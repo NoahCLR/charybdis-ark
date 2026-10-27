@@ -33,7 +33,7 @@
 //
 // Some keys hold from the press rather than at Tap / hold (`fromPress`): MO()
 // turns its layer on, LM() its layer and modifiers, and a pointing-mode key
-// (PD_SLOT_n) runs its mode, all as soon as the key goes down
+// (PD_MODE_n) runs its mode, all as soon as the key goes down
 // (handled_key_defaults.c, handled_key_hold_behavior). A pointing-mode key
 // whose later tap counts enter another mode waits for Tap / hold instead; that
 // depends on the row, so the grid decides it (webview/view/keyface.mjs).
@@ -65,7 +65,7 @@ function builtInActions(target, {customKeyShortcuts = []} = {}) {
     }
     if (target?.kind === ACTION.MACRO) return {releaseTaps: true};
     if (target?.kind === ACTION.LAYER_MOMENTARY) return {hold: target, fromPress: true};
-    if (target?.kind === ACTION.PD_MODE_MOMENTARY) return {hold: target, fromPress: true};
+    if (target?.kind === ACTION.POINTING_MODE_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
     if (within(code, 0x7700, 0x777f)) return {releaseTaps: true};

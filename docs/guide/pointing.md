@@ -40,7 +40,7 @@ Sniping slows directional pointing modes too; scrolling modes ignore it.
 
 ## Pointing modes
 
-There are 32 pointing mode slots. The screen lists the modes you have as
+There are 32 pointing slots. The screen lists the modes you have as
 cards, with the empty slots as numbered chips beneath them. An empty chip in
 amber still has keys pointing at it.
 

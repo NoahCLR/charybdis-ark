@@ -217,7 +217,7 @@ A name the catalog gives a key is what the key does wherever it is placed
   (firmware D-F46).
 - The picker offers only what does something on this keyboard: not
   `QK_USER_0`–`QK_USER_31`, `DRGSCRL`/`DRG_TOG` (drag scroll is the
-  `PD_SLOT_0` pointing mode), unnamed `QK_KB` slots, features the build lacks,
+  `PD_MODE_0` pointing mode), unnamed `QK_KB` slots, features the build lacks,
   or the `QK_MACRO_n` duplicates of `MACRO_n`. A key that holds one still
   reads back by name (`tests/view/picker-sections.test.mjs`,
   `browser-tests/retired-user-keys.spec.js`).

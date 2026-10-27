@@ -10,7 +10,7 @@
 // An empty RGB tab is truthful; a tab populated from the authored source would
 // be a lie about what the keyboard is running.
 
-const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
+const {PD_MODE_KEYS, formerNames, pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {PHASE, VOCABULARY, HALVES_WORDS, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
 const keycodeLegacy = require("../data/keycode-legacy");
@@ -138,10 +138,13 @@ function configurationModel(content, capabilities, editing) {
         entry.search += ` ${entry.label.toLowerCase()}`;
         entry.searchCompact += entry.label.toLowerCase().replaceAll(" ", "");
     }
-    // A pointing-mode keycode is offered in the picker under its slot.
+    // A pointing-mode keycode is offered in the picker under its slot, and
+    // its former names (PD_SLOT_n, a preset's) still reach it when typed.
     for (const {name, native, code, label} of names.pointing) {
         const entry = catalog.entries.find(entry => entry.keycode === code);
-        const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
+        const key = /** @type {{slot: number, locked: boolean}} */ (pdModeKeyOfCode(code));
+        const former = formerNames(key.slot).map(names => (key.locked ? names.lock : names.hold));
+        const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native, ...former], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
         if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
     }
     // So is each custom key, under its name, its tip saying what its shortcut
@@ -176,8 +179,8 @@ function configurationModel(content, capabilities, editing) {
     const turnsOn = keycodeLayersOn(linkSettings ? {settings: linkSettings, pdModes: content.domains.pdModes || []} : {settings: {values: [], names: [], customKeyShortcuts: []}, pdModes: []});
     /** @type {Record<string, number>} */
     const keyTurnsOn = {};
-    const bindings = Object.values(PD_SLOT_BINDINGS).flatMap((binding) => [binding.holdCode, binding.lockCode]);
-    for (const value of new Set([...profileKeycodes(content, capabilities), ...bindings, ...customKeys.map((key) => key.code)])) {
+    const pointingKeys = PD_MODE_KEYS.flatMap((keys) => [keys.holdCode, keys.lockCode]);
+    for (const value of new Set([...profileKeycodes(content, capabilities), ...pointingKeys, ...customKeys.map((key) => key.code)])) {
         const mask = turnsOn(value), name = keycodeCatalog.resolve(value).name;
         if (mask) for (const spelled of [name, catalog.aliases[name]]) if (spelled) keyTurnsOn[spelled] = mask;
     }
@@ -191,13 +194,13 @@ function configurationModel(content, capabilities, editing) {
         hostLayoutLegends: names.legends,
 
         // Each slot with the name a person reads for it, one rule for every
-        // surface (model/vocabulary.js slotName), the keycodes that bind it
-        // (data/pd-bindings.js), so the interface names and finds a
+        // surface (model/vocabulary.js slotName), the keys that run its mode
+        // (data/pd-mode-keys.js), so the interface names and finds a
         // pointing-mode key without a registry of its own, and the layers its
         // key turns on that the pointer layer covers (model/pointing-links.js),
         // and the layers that start its mode, each with the layers that end a
         // start from it (model/pointing-links.js linkStarts).
-        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id],
+        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), keys: PD_MODE_KEYS[slot.id],
             pointerCovers: linkSettings ? pointerCoveredLayers(linkSettings, slot) : 0, linkStarts: linkSettings ? linkStarts(linkSettings, slot) : []})),
         pdModeEditing: {writable: editing.pointing,
             dpiChoices: dpiChoices({normalSpeed: true}),

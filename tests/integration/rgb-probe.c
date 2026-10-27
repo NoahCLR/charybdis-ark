@@ -7,7 +7,7 @@ int main(int argc, char **argv) {
     assert(argc == 2);
     FILE *file = fopen(argv[1], "rb");
     assert(file != NULL);
-    // Four single-byte limits, then the PD slot mask, 32 bits little-endian.
+    // Four single-byte limits, then the pointing slot mask, 32 bits little-endian.
     uint8_t config[8];
     assert(fread(config, 1, sizeof(config), file) == sizeof(config));
     noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();

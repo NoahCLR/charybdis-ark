@@ -19,7 +19,7 @@ const RGB_DOMAIN_V1 = Object.freeze({
     // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14).
     DOMAIN_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
     FORMAT_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
-    PD_SLOTS: 32,
+    POINTING_SLOTS: 32,
     HEADER_SIZE: 16,
     PHYSICAL_LED_COUNT: 58,
     LED_BITMAP_SIZE: 8,
@@ -36,7 +36,7 @@ const RGB_DOMAIN_V1 = Object.freeze({
 const RGB_STAGE_BITS = Object.freeze({
     LAYER: 1 << 0,
     AUTOMOUSE: 1 << 1,
-    PD_MODE: 1 << 2,
+    POINTING_MODE: 1 << 2,
     COMBO: 1 << 3,
     KEY_BEHAVIOR: 1 << 4,
 });
@@ -70,17 +70,17 @@ const RGB_KEY_SEMANTICS = Object.freeze({
     KEY_FEEDBACK_GROUP_ALL: RGB_DOMAIN_V1.SELECTOR_ALL,
 });
 /** @type {Readonly<Record<string, number>>} */
-const RGB_PD_MODE_IDS = Object.freeze({
-    PD_MODE_DRAGSCROLL: 0,
-    PD_MODE_VOLUME: 1,
-    PD_MODE_BRIGHTNESS: 2,
-    PD_MODE_ZOOM: 3,
-    PD_MODE_ARROW: 4,
-    PD_MODE_PINCH: 5,
-    PD_MODE_SLOT_6: 6,
-    PD_MODE_SLOT_7: 7,
+const RGB_POINTING_MODE_IDS = Object.freeze({
+    POINTING_MODE_DRAGSCROLL: 0,
+    POINTING_MODE_VOLUME: 1,
+    POINTING_MODE_BRIGHTNESS: 2,
+    POINTING_MODE_ZOOM: 3,
+    POINTING_MODE_ARROW: 4,
+    POINTING_MODE_PINCH: 5,
+    POINTING_MODE_6: 6,
+    POINTING_MODE_7: 7,
     // The 32-slot firmware's further slots (format 3).
-    ...Object.fromEntries(Array.from({length: 24}, (_, index) => [`PD_MODE_SLOT_${index + 8}`, index + 8])),
+    ...Object.fromEntries(Array.from({length: 24}, (_, index) => [`POINTING_MODE_${index + 8}`, index + 8])),
 });
 
 const RgbDomainProtocolError = protocolError("RgbDomainProtocolError");
@@ -231,7 +231,7 @@ function decodeRgbDomainV1(value, options = {}) {
         const pdModeId = reader.u8("pdModeColors", index, "pdModeId");
         assertSupportedPdId(pdModeId, limits, "pdModeColors", index, "pdModeId");
         if (pdModeId <= priorPdId) {
-            throw rgbError("NONCANONICAL_ORDER", "PD-mode color ids must be unique and strictly ascending.", {table: "pdModeColors", row: index, field: "pdModeId"});
+            throw rgbError("NONCANONICAL_ORDER", "Pointing mode color ids must be unique and strictly ascending.", {table: "pdModeColors", row: index, field: "pdModeId"});
         }
         pdModeColors.push({pdModeId, color: reader.hsv(limits, "pdModeColors", index, "color"), locality: reader.enumValue(4, "pdModeColors", index, "locality")});
         priorPdId = pdModeId;
@@ -358,7 +358,7 @@ function normalizeProfile(profile, limits) {
 
 /** @param {import("./types.js").RgbOptions} [options] */
 function normalizeOptions(options = {}) {
-    const maxPdModes = RGB_DOMAIN_V1.PD_SLOTS;
+    const maxPdModes = RGB_DOMAIN_V1.POINTING_SLOTS;
     const maxLogicalLayers = options.maxLogicalLayers === undefined ? RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS : assertU8(options.maxLogicalLayers, "maxLogicalLayers");
     if (maxLogicalLayers > RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS) {
         throw new RangeError(`maxLogicalLayers cannot exceed ${RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS}.`);
@@ -368,15 +368,15 @@ function normalizeOptions(options = {}) {
         throw new RangeError("logicalLayerCount must be between one and maxLogicalLayers.");
     }
     const supportedPdModeIds = options.supportedPdModeIds === undefined
-        ? Object.values(RGB_PD_MODE_IDS).filter(id => id < maxPdModes)
+        ? Object.values(RGB_POINTING_MODE_IDS).filter(id => id < maxPdModes)
         : Array.from(options.supportedPdModeIds, (value) => assertU8(value, "supportedPdModeIds entry"));
     supportedPdModeIds.sort((left, right) => left - right);
     if (supportedPdModeIds.length > maxPdModes || new Set(supportedPdModeIds).size !== supportedPdModeIds.length) {
         throw new RangeError(`supportedPdModeIds must contain at most ${maxPdModes} unique ids.`);
     }
-    const knownPdModeIds = new Set(Object.values(RGB_PD_MODE_IDS).filter(id => id < maxPdModes));
+    const knownPdModeIds = new Set(Object.values(RGB_POINTING_MODE_IDS).filter(id => id < maxPdModes));
     if (supportedPdModeIds.some((id) => !knownPdModeIds.has(id))) {
-        throw new RangeError("supportedPdModeIds contains an id outside the Profile Wire v1 PD-mode registry.");
+        throw new RangeError("supportedPdModeIds contains an id outside the Profile Wire v1 pointing mode registry.");
     }
     return {
         maxPdModes,
@@ -474,12 +474,12 @@ function assertCompiledSurfaces(profile, limits) {
     if ((compiled & RGB_STAGE_BITS.AUTOMOUSE) === 0 && (profile.automouseFade.mode !== 0 || !isBlack(profile.automouseFade.endColor))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Auto-mouse RGB data must be canonical zero when the stage is not compiled.");
     }
-    if ((compiled & RGB_STAGE_BITS.PD_MODE) !== 0) {
+    if ((compiled & RGB_STAGE_BITS.POINTING_MODE) !== 0) {
         if (!sameNumbers(profile.pdModeColors.map((row) => row.pdModeId), limits.supportedPdModeIds)) {
-            throw rgbError("INCOMPLETE_SURFACE", "PD-mode colors must contain each supported stable PD id exactly once.", {table: "pdModeColors"});
+            throw rgbError("INCOMPLETE_SURFACE", "Pointing mode colors must contain each supported pointing slot exactly once.", {table: "pdModeColors"});
         }
     } else if (profile.pdModeColors.length || profile.pdModeGroupRows.length) {
-        throw rgbError("UNSUPPORTED_STAGE_DATA", "PD-mode RGB data is present but the stage is not compiled.");
+        throw rgbError("UNSUPPORTED_STAGE_DATA", "Pointing mode RGB data is present but the stage is not compiled.");
     }
     if ((compiled & RGB_STAGE_BITS.COMBO) === 0 && (profile.comboGroupRows.length || profile.comboFeedback.locality !== 0 || !isBlack(profile.comboFeedback.color))) {
         throw rgbError("UNSUPPORTED_STAGE_DATA", "Combo RGB data must be canonical zero when the stage is not compiled.");
@@ -710,7 +710,7 @@ module.exports = {
     RGB_KEY_SEMANTICS,
     RGB_LAYER_MODES,
     RGB_LOCALITIES,
-    RGB_PD_MODE_IDS,
+    RGB_POINTING_MODE_IDS,
     RGB_STAGE_BITS,
     RGB_STAGE_MASK_ALL,
     RGB_TAP_COMMIT_MODES,

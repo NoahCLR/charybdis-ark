@@ -16,7 +16,7 @@ async function advanced(page) {
 }
 
 test("every scrolling tuning field posts the visible value once, retaining the rest of the record", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 0});
+    await openControls(page, "pointing", {pointingSlot: 0});
     await advanced(page);
     const fields = [
         ["Movement per wheel step ↔", "divisorH"], ["Movement per wheel step ↕", "divisorV"],
@@ -43,7 +43,7 @@ for (const [label, value, expected] of [
     ["After this mode ends", "1", {pointerLayer: 1}],
 ]) {
     test(`scrolling ${label} posts its record`, async ({page}) => {
-        await openControls(page, "pointing", {pdSlot: 0});
+        await openControls(page, "pointing", {pointingSlot: 0});
         if (label === "After this mode ends") await advanced(page);
         if (label === "Name") await change(field(page, label), value);
         else await field(page, label).selectOption(value);
@@ -52,7 +52,7 @@ for (const [label, value, expected] of [
 }
 
 test("each modifier checkbox in scrolling contributes its own bit", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 0});
+    await openControls(page, "pointing", {pointingSlot: 0});
     const modifiers = editor(page).locator('.pd-mods [data-bit]');
     await expect(modifiers).toHaveCount(8);
     let mask = 0;
@@ -67,7 +67,7 @@ test("each modifier checkbox in scrolling contributes its own bit", async ({page
 });
 
 test("directional shortcuts, axes, empty directions, output and thresholds all post", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     const directions = {};
     for (const direction of ["up", "left", "right", "down"]) {
         await clearPosts(page);
@@ -99,7 +99,7 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
 });
 
 test("eight directions draw and post every diagonal shortcut and modifier policy", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     await field(page, "Reads").selectOption("3");
     await configPost(page, 4, {axis: 3});
     // The core accepts the axis change before the four new fields are drawn.
@@ -128,7 +128,7 @@ test("eight directions draw and post every diagonal shortcut and modifier policy
 });
 
 test("a direction's Ignore mask posts each checkbox", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     await advanced(page);
     for (const [label, initial, expected] of [
         ["Up leaves out", 68, mask => ({directions: expect.objectContaining({up: expect.objectContaining({modifierPolicy: 1, mask})})})],
@@ -152,7 +152,7 @@ test("a direction's Ignore mask posts each checkbox", async ({page}) => {
 // Version 4 retired the mouse button overrides (firmware D-F22): Advanced has
 // no table for them, and saving a mode posts no button fields.
 test("Advanced has no mouse button overrides, and a saved mode posts no button fields", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     await advanced(page);
     await expect(editor(page).locator(".pd-buttons")).toHaveCount(0);
     await expect(editor(page)).not.toContainText("Mouse button overrides");
@@ -163,7 +163,7 @@ test("Advanced has no mouse button overrides, and a saved mode posts no button f
 });
 
 test("movement changes its form locally, and the first edit posts the new kind", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 0});
+    await openControls(page, "pointing", {pointingSlot: 0});
     await field(page, "Movement").selectOption("1");
     expect(await posted(page)).toEqual([]);
     await expect(editor(page).locator(".pd-cross")).toBeVisible();
@@ -172,7 +172,7 @@ test("movement changes its form locally, and the first edit posts the new kind",
 });
 
 test("shortcut picker, duplicate, clear and empty-slot creation post their commands", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     await editor(page).locator(".pd-cross .arm.up [data-pick]").click();
     await page.locator('.pkb-key[data-pick="KC_A"]').click();
     await page.locator('.picker [data-act="use"]').click();
@@ -197,7 +197,7 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
 });
 
 test("pointing navigation reaches placement and lighting without an edit", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     await editor(page).locator('[data-act="place"]').click();
     await expect(page.locator('.main h1')).toHaveText("Keys");
     expect(await posted(page)).toEqual([]);
@@ -208,7 +208,7 @@ test("pointing navigation reaches placement and lighting without an edit", async
 });
 
 test("the reach row places the hold key on a key, and an empty slot names what still reaches it", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     const place = editor(page).locator('[data-act="place"]');
     await expect(place).toHaveText("Place on a key…");
     await expect(place).toHaveAttribute("data-tip", /hold key/);
@@ -216,11 +216,11 @@ test("the reach row places the hold key on a key, and an empty slot names what s
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
         const slot = model.pdModes.find(row => !row.kind);
-        model.keyBehaviors = [...(model.keyBehaviors || []), {keycode: "KC_F13", steps: [{tapIndex: 0, tap: {action: slot.binding.hold}}]}];
+        model.keyBehaviors = [...(model.keyBehaviors || []), {keycode: "KC_F13", steps: [{tapIndex: 0, tap: {action: slot.keys.hold}}]}];
         store.setModel(model);
-        store.state.pdSlot = slot.id;
+        store.state.pointingSlot = slot.id;
         store.render();
-        return slot.binding.hold;
+        return slot.keys.hold;
     });
     const warning = editor(page).locator(".unavailable");
     await expect(warning).toContainText("1 behaviour (F13) still reach this slot");
@@ -229,7 +229,7 @@ test("the reach row places the hold key on a key, and an empty slot names what s
 });
 
 test("a pointing mode name counts bytes and flags one past the limit instead of cutting it off", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pointingSlot: 4});
     const name = field(page, "Name");
     const count = editor(page).locator("[data-name-count]");
     await name.fill("é".repeat(17));
@@ -256,7 +256,7 @@ async function publishSlot(page, id, link) {
 }
 
 test("the How it starts card posts the layers that start the mode, the layers its key turns on and what ends it", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 1});
+    await openControls(page, "pointing", {pointingSlot: 1});
     const card = editor(page).locator(".pd-starts");
     // One card for how the mode starts: its keys, then the layers, then what ends it.
     await expect(card.locator(".card-h h3")).toHaveText("How it starts");
@@ -315,7 +315,7 @@ test("the How it starts card posts the layers that start the mode, the layers it
 });
 
 test("a layer that starts another mode cannot start this one and says so in its row, while its key switch stays usable", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 2});
+    await openControls(page, "pointing", {pointingSlot: 2});
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());

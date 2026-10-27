@@ -11,7 +11,7 @@ const stages = [
     {id: "auto", offTip: /ends on black/, bit: 2, path: ["rgb", "automouseFade", "end_color"], colour: [167, 255, 199],
         message: colour => ({type: "updateAutomouseFade", mode: "END_COLOR_ON_ALL_KEYS", ...colour})},
     {id: "pd", offTip: /locality black.*Stage on/, bit: 4, path: ["rgb", "pdModeColors", 0, "color"], colour: [21, 255, 200],
-        message: colour => ({type: "updatePdModeColor", pointingMode: "PD_MODE_DRAGSCROLL", locality: "RGB_RIGHT_HALF", ...colour})},
+        message: colour => ({type: "updatePdModeColor", pointingMode: "POINTING_MODE_DRAGSCROLL", locality: "RGB_RIGHT_HALF", ...colour})},
     {id: "combo", offTip: /locality black.*Stage on/, bit: 8, path: ["rgb", "comboFeedback", "color"], colour: [191, 255, 200],
         message: colour => ({type: "updateComboFeedback", locality: "RGB_KEY_HALF", ...colour})},
     {id: "key", offTip: /flashes black.*Stage on/, bit: 16, path: ["rgb", "keyBehaviorFeedback", "holdActiveColor"], colour: [18, 255, 200],
@@ -20,7 +20,7 @@ const stages = [
 ];
 
 async function openStage(page, stage, theme = "dark") {
-    await openControls(page, "lighting", {stage, layer: 1, pdSlot: 0, feedbackRow: "holdActiveColor"}, theme);
+    await openControls(page, "lighting", {stage, layer: 1, pointingSlot: 0, feedbackRow: "holdActiveColor"}, theme);
     if (stage === "auto") {
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
@@ -92,7 +92,7 @@ test("all Lighting policy selects post the chosen policy and retained colour", a
     for (const [stage, label, value, message] of [
         ["layers", "Which keys light up", "ALL_KEYS", {type: "updateLayerColor", layer: "Layer 1", mode: "ALL_KEYS", h: 85, s: 255, v: 200}],
         ["auto", "Fade mode", "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", {type: "updateAutomouseFade", mode: "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", h: 167, s: 255, v: 199}],
-        ["pd", "Locality", "RGB_LEFT_HALF", {type: "updatePdModeColor", pointingMode: "PD_MODE_DRAGSCROLL", locality: "RGB_LEFT_HALF", h: 21, s: 255, v: 200}],
+        ["pd", "Locality", "RGB_LEFT_HALF", {type: "updatePdModeColor", pointingMode: "POINTING_MODE_DRAGSCROLL", locality: "RGB_LEFT_HALF", h: 21, s: 255, v: 200}],
         ["combo", "Locality", "RGB_BOTH_HALVES", {type: "updateComboFeedback", locality: "RGB_BOTH_HALVES", h: 191, s: 255, v: 200}],
         ["key", "Tap commit", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
         ["key", "Locality", "RGB_LEFT_HALF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({locality: "RGB_LEFT_HALF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
@@ -174,7 +174,7 @@ test("LED groups stage every table/owner/source/colour control and remove rows/g
     await page.locator('[data-act="trackball"]').click();
     await expect(builder.locator(".sect-h .tag")).toHaveText("2 LEDs");
     const reusable = body(page).locator("table.t").first();
-    await expect(reusable).not.toContainText(/RGB_|KEY_FEEDBACK_|PD_MODE_|pdMode|keyBehavior/);
+    await expect(reusable).not.toContainText(/RGB_|KEY_FEEDBACK_|POINTING_MODE_|PD_MODE_|pdMode|keyBehavior/);
     await expect(reusable).toContainText("Pointing-mode LED groups: All pointing modes");
     await expect(reusable).toContainText("Key feedback LED groups: Every feedback state");
     await expect(body(page).locator(".sect-h .tag")).toHaveText(["2 LEDs", "0 rows", "1 row", "1 row", "1 row"]);
@@ -186,7 +186,7 @@ test("LED groups stage every table/owner/source/colour control and remove rows/g
     expect(await posted(page)).toEqual([]);
     const cases = [
         ["layer", "Layer 2", {target: "layer", owner: "Layer 2"}],
-        ["pdMode", "PD_MODE_VOLUME", {target: "pdMode", owner: "PD_MODE_VOLUME"}],
+        ["pdMode", "POINTING_MODE_VOLUME", {target: "pdMode", owner: "POINTING_MODE_VOLUME"}],
         ["combo", null, {target: "combo"}],
         ["keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", {target: "keyBehavior", owner: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"}],
     ];

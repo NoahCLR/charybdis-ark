@@ -1,11 +1,10 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {bindingsForSlot} from "../../view/reach.mjs";
+import {holdKeyName, whatReachesSlot} from "../../view/reach.mjs";
 import {stageEnabled} from "../../view/lighting.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
 import {render, state} from "../../store.mjs";
 import {slotLight} from "../marks.mjs";
-import {bindingName} from "./common.mjs";
 
 // The keys that start the mode, held or locked, where they sit, and a way
 // to place its hold key: the first row of the How it starts card.
@@ -14,14 +13,14 @@ export function keysRow(model, slot, canEdit) {
     const row = el(`<div class="pd-lines">
         <span class="lbl">Keys</span>
         <div class="val">
-            <span class="act"><span class="k">${esc(bindingName(slot))}</span><span class="how">hold</span></span>
-            <span class="act"><span class="k">${esc(slot.binding?.lock || "")}</span><span class="how">lock</span></span>
+            <span class="act"><span class="k">${esc(holdKeyName(slot))}</span><span class="how">hold</span></span>
+            <span class="act"><span class="k">${esc(slot.keys?.lock || "")}</span><span class="how">lock</span></span>
             <span class="note">${esc(placedOn(model, slot))}</span></div>
         <button class="btn tiny ghost" data-act="place" ${canEdit ? "" : "disabled"}
             data-tip="Put this mode's hold key on a key you pick on the board.">Place on a key…</button>
     </div>`);
     /** @type {HTMLButtonElement} */ (row.querySelector('[data-act="place"]')).addEventListener("click", () => {
-        state.placement = {keycode: bindingName(slot)};
+        state.placement = {keycode: holdKeyName(slot)};
         state.screen = "keys";
         state.tab = "key";
         render();
@@ -56,7 +55,7 @@ export function lightRow(model, slot) {
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot */
 function placedOn(model, slot) {
     const counts = new Map();
-    for (const {layer} of bindingsForSlot(model, slot).keys) {
+    for (const {layer} of whatReachesSlot(model, slot).keys) {
         const name = layer.displayName || layer.name;
         counts.set(name, (counts.get(name) || 0) + 1);
     }

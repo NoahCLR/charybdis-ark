@@ -8,7 +8,7 @@
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel} Model
- * @typedef {import("../../contracts/edits.js").PdSlot} PdSlot
+ * @typedef {import("../../contracts/edits.js").PointingSlot} PointingSlot
  * @typedef {{layer: number, name: string, starts: boolean, key: boolean, unusable: boolean, why: string, tip: string,
  *   startLocked: boolean, keyLocked: boolean, startsOther: string, startTip: string}} LinkRow
  */
@@ -25,7 +25,7 @@ const nameOf = (model, index) => {
 // cannot start this one and names that mode, while its key switch stays
 // usable. A switch that is on stays usable, so a layer stored before it became
 // unusable can still be switched off (linkIgnored says it is ignored).
-/** @param {Model | null} model @param {PdSlot} slot @returns {LinkRow[]} */
+/** @param {Model | null} model @param {PointingSlot} slot @returns {LinkRow[]} */
 export function linkRows(model, slot) {
     const targets = model?.pdModeEditing?.linkTargets || [];
     const words = model?.vocabulary?.pointing?.linkInert, already = model?.vocabulary?.pointing?.linkLabels?.startsOther || "";
@@ -43,7 +43,7 @@ export function linkRows(model, slot) {
 
 // Why the keyboard ignores layers the slot's link stores ("" when it ignores
 // none): the pointer or default layers can move under a link after it was made.
-/** @param {Model | null} model @param {PdSlot} slot */
+/** @param {Model | null} model @param {PointingSlot} slot */
 export function linkIgnored(model, slot) {
     const named = slot.linkedLayers | slot.linkTurnsOn;
     return (model?.pdModeEditing?.linkTargets || []).filter((entry) => named & 2 ** entry.layer && entry.refusal).map((entry) => entry.refusal).join(" ");

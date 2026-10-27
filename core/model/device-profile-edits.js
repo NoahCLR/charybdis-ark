@@ -3,7 +3,7 @@
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 const {encodePdDomain, decodePdDomain, pdTapProblem, isPdMacro, PD_DOMAIN} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
-const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_PD_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
+const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_POINTING_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
 
 const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
@@ -145,7 +145,7 @@ function editDeviceProfile(bytes, message, context = {}) {
         return encodeProfileBlob(profile);
     }
     if (inDomain(message, "pointing")) {
-        if (!((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.PD_MODES)) throw invalid("PD editing needs firmware with configurable pointing slots.");
+        if (!((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.PD_MODES)) throw invalid("Pointing mode editing needs firmware with configurable pointing slots.");
         const profile = decodeProfileBlob(bytes);
         const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.PD_MODES, "Pointing modes");
         /** @type {EditablePointing[]} */
@@ -191,7 +191,7 @@ function editDeviceProfile(bytes, message, context = {}) {
             if (isPdMacro(code) && (Number(tap?.modifierPolicy || 0) !== 0 || Number(tap?.mask || 0) !== 0)) throw invalid(`${label}: A macro must inherit held modifiers, with no mask, because playback continues across scans.`);
         }
         // Every textual shortcut was resolved above; the encoder validates the remaining fields.
-        domain.payload = encodePdDomain(/** @type {import("../schema/types.js").PdSlotInput[]} */ (slots));
+        domain.payload = encodePdDomain(/** @type {import("../schema/types.js").PointingSlotInput[]} */ (slots));
         return encodeProfileBlob(profile);
     }
     if (inDomain(message, "combos")) return editCombos(bytes, message, context);
@@ -215,7 +215,7 @@ function editDeviceProfile(bytes, message, context = {}) {
             row.color = editColor(message); row.mode = enumValue(message.mode, RGB_LAYER_MODES, "layer policy"); break;
         }
         case "updatePdModeColor": {
-            const id = enumValue(message.pointingMode, RGB_PD_MODE_IDS, "pointing mode");
+            const id = enumValue(message.pointingMode, RGB_POINTING_MODE_IDS, "pointing mode");
             const row = existing(rgb.pdModeColors, row => row.pdModeId === id, "Pointing mode");
             row.color = editColor(message); row.locality = enumValue(message.locality, RGB_LOCALITIES, "locality"); break;
         }
@@ -259,7 +259,7 @@ function editDeviceProfile(bytes, message, context = {}) {
             else groupId = groupFor(rgb, (/** @type {number[]} */ (group.ledIndices)).map(value => integer(value, 57, "LED index")));
             const row = {color: editColor(group), groupId};
             if (group.target === "layer") rgb.layerGroupRows.push({...row, selector: group.owner === "RGB_LAYER_GROUP_ALL" ? 255 : namedId(group.owner, "Layer")});
-            else if (group.target === "pdMode") rgb.pdModeGroupRows.push({...row, selector: group.owner === "RGB_PD_MODE_GROUP_ALL" ? 255 : enumValue(group.owner, RGB_PD_MODE_IDS, "pointing mode")});
+            else if (group.target === "pdMode") rgb.pdModeGroupRows.push({...row, selector: group.owner === "RGB_POINTING_MODE_GROUP_ALL" ? 255 : enumValue(group.owner, RGB_POINTING_MODE_IDS, "pointing mode")});
             else if (group.target === "keyBehavior") rgb.keyGroupRows.push({...row, semantic: enumValue(group.owner, RGB_KEY_SEMANTICS, "key feedback type")});
             else {groupRows(rgb, group.target); rgb.comboGroupRows.push(row);} break;
         }

@@ -17,7 +17,7 @@ const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/data/charybdis-layout");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
-const {document32} = require("../tests/fixtures/pd-slots-32");
+const {document32} = require("../tests/fixtures/pointing-slots-32");
 const {ACTION_ABI} = require("../core/schema/actions");
 
 // A readable keymap for the preview only. The fixture profile ships an empty
@@ -37,16 +37,16 @@ const PREVIEW_BASE = [
 // preview carries them because they are the values whose stored name and
 // semantic name differ.
 /** @type {Record<number, number>} */
-const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7f00, 53: 0x7e8c, 54: 0x7eb4};
+const PREVIEW_PLACED_KEYS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7f00, 53: 0x7e8c, 54: 0x7eb4};
 
 /** @param {import("../core/model/types.js").PortableDocument} document */
 function fillPreviewLayer(document) {
-    for (const [layoutIndex, code] of Object.entries(PREVIEW_PD_BINDINGS)) {
+    for (const [layoutIndex, code] of Object.entries(PREVIEW_PLACED_KEYS)) {
         const position = CHARYBDIS_4X6_LAYOUT_MATRIX[Number(layoutIndex)];
         if (position) editLayers(document, layers => layers[0][position[0] * 6 + position[1]] = code);
     }
     PREVIEW_BASE.forEach((name, layoutIndex) => {
-        if (PREVIEW_PD_BINDINGS[layoutIndex] !== undefined) return;
+        if (PREVIEW_PLACED_KEYS[layoutIndex] !== undefined) return;
         const position = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex];
         const code = keycodes.encode(name);
         if (position && typeof code === "number" && Number.isInteger(code)) editLayers(document, layers => layers[0][position[0] * 6 + position[1]] = code);
@@ -344,7 +344,7 @@ fs.writeFileSync(path.join(__dirname, "..", "preview", "index.html"), page);
 console.log("layers", model.layers.length,
     "· behaviours", model.keyBehaviors.length,
     "· combos", model.combos.length,
-    "· pd slots", model.pdModes.length,
+    "· pointing slots", model.pdModes.length,
     "· macros", model.macros.length,
     "· settings sections", model.configDefaults.length,
     "· rgb layer rows", model.rgb.layerColors?.length);

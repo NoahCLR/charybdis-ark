@@ -6,7 +6,7 @@ import {macroOfName} from "./keycode-expression.mjs";
 
 // Numeric keycodes, named.
 //
-// Pointing-mode slots store their shortcuts as bare numbers, and the profile
+// Pointing slots store their shortcuts as bare numbers, and the profile
 // writer takes them back as names. This turns one into the other using the
 // catalogue the keyboard itself reported, and falls back to the hex value
 // rather than inventing a name it cannot prove.

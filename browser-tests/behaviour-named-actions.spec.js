@@ -21,7 +21,7 @@ async function openWithKeys(page) {
         Object.assign(model.layers[0].positions[46], {keycode: "LT(3,KC_SLASH)", semantic: "LT(3,KC_SLASH)", display: "/",
             editLabel: "/ / Navigation", layerLabel: "Navigation", value: 0x4338});
         model.keyBehaviors.find((row) => row.keycode === "KC_RIGHT_ALT").steps.push(
-            {tapCount: 1, tapCountName: "Double tap", hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_SLOT_3"}});
+            {tapCount: 1, tapCountName: "Double tap", hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_MODE_3"}});
         model.draft.revision++;
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
     });

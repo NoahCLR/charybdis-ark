@@ -33,7 +33,7 @@ const app = process.env.CHARYBDIS_ARK_ROOT;
 const {fingerprint, validateSnapshot} = require(app + "/core/model/portable-profile");
 const {editMacro} = require(app + "/core/model/macro-editor");
 const {editCustomKey} = require(app + "/core/model/custom-key-editor");
-const {CAPABILITIES_32, document32} = require(app + "/tests/fixtures/pd-slots-32");
+const {CAPABILITIES_32, document32} = require(app + "/tests/fixtures/pointing-slots-32");
 // Current schema 3.0 with slot 12 configured, all 128 macro/custom-key names
 // at their 32-byte maximum and four custom-key shortcuts, plus the maximum
 // profile.

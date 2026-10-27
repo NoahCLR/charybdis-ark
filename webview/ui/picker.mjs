@@ -206,8 +206,8 @@ function sectionBody(model) {
             <div class="pk-layer ${slot.kind ? "" : "empty"}">
                 <span class="ix">${esc(slot.id)}</span>
                 <span class="nm"><span>${esc(slot.displayName)}</span><span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
-                ${button(slot.binding.hold, "Hold", "On while the key is down.")}
-                ${button(slot.binding.lock, "Lock", "Turns the mode on until pressed again.")}
+                ${button(slot.keys.hold, "Hold", "On while the key is down.")}
+                ${button(slot.keys.lock, "Lock", "Turns the mode on until pressed again.")}
             </div>`).join("")}</div>
             <p class="note pk-note">Hold re-reads the trackball while the key is down. Lock keeps the mode on until the key is pressed again. A key for an empty slot does nothing until the slot is configured.</p></div>`;
     }

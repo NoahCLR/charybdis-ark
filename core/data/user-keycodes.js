@@ -6,8 +6,8 @@
 // Profile Wire feature bit 16).
 //
 //   0x7e40–0x7e7f  retired: custom keys 0–63 before firmware D-F14, now inert
-//   0x7e80–0x7e9f  PD_SLOT_n         hold pointing slot n
-//   0x7ea0–0x7ebf  PD_SLOT_n_LOCK    lock pointing slot n
+//   0x7e80–0x7e9f  PD_MODE_n         hold pointing slot n
+//   0x7ea0–0x7ebf  PD_MODE_n_LOCK    lock pointing slot n
 //   0x7ec0–0x7edf  LOCK_LAYER(n)     toggle layer n's lock
 //   0x7f00–0x7f7f  CUSTOM_KEY_0–127  named keys that do what their behaviour says
 

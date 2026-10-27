@@ -69,8 +69,8 @@ test("layer holds and pointing-mode keys hold from the press, with no tap of the
     assert.deepEqual(builtInActions({kind: ACTION.LAYER_MOMENTARY, operand: 3}), {hold: {kind: ACTION.LAYER_MOMENTARY, operand: 3}, fromPress: true});
     // LM(2, MOD_LSFT): its layer and its modifiers, from the press.
     assert.deepEqual(builtInActions(key(0x5042)), {hold: key(0x5042), fromPress: true});
-    // PD_SLOT_0 and PD_SLOT_31 run their mode while held.
+    // PD_MODE_0 and PD_MODE_31 run their mode while held.
     assert.deepEqual(builtInActions(key(0x7e80)), {hold: key(0x7e80), fromPress: true});
     assert.deepEqual(builtInActions(key(0x7e9f)), {hold: key(0x7e9f), fromPress: true});
-    assert.deepEqual(builtInActions({kind: ACTION.PD_MODE_MOMENTARY, operand: 0}), {hold: {kind: ACTION.PD_MODE_MOMENTARY, operand: 0}, fromPress: true});
+    assert.deepEqual(builtInActions({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}), {hold: {kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}, fromPress: true});
 });

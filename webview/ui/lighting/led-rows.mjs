@@ -54,7 +54,7 @@ export function groupRowsTable(rows, target) {
 export function rowOwners(model, target) {
     if (target === "layer") return [...layers().map((layer) => /** @type {[string, string]} */ ([`Layer ${layer.index}`, layerName(layer)])), ["RGB_LAYER_GROUP_ALL", "All layers"]];
     if (target === "pdMode") return [...(model?.rgb.pdModeColors || []).map((row, index) =>
-        /** @type {[string, string]} */ ([row.pointingMode, slotCalled(model, index)])), ["RGB_PD_MODE_GROUP_ALL", "All pointing modes"]];
+        /** @type {[string, string]} */ ([row.pointingMode, slotCalled(model, index)])), ["RGB_POINTING_MODE_GROUP_ALL", "All pointing modes"]];
     if (target === "keyBehavior") return vocabulary(model).feedbackOwners;
     return [];
 }

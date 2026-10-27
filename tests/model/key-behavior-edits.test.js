@@ -66,11 +66,11 @@ test("native aliases update existing semantic targets without duplicating or ren
     // 0x7E80 is pointing slot 0 in the firmware's keycode blocks; the bridge
     // fixture's own firmware numbered it differently.
     const current = {...capabilities, actionAbiDigest: ACTION_ABI};
-    const row = views.find(row => row.keycode === "PD_SLOT_0");
+    const row = views.find(row => row.keycode === "PD_MODE_0");
     const result = edit({type: "saveBehavior", behavior: {...row, keycode: "0x7E80", tapHoldTerm: "125"}}, current);
     assert.equal(decodeKeyBehaviorDomain(result).rowCount, original.rowCount);
-    assert.equal(rowFor(result, "PD_SLOT_0").target.kind, 4);
-    assert.equal(rowFor(result, "PD_SLOT_0").tapHoldTerm, 125);
+    assert.equal(rowFor(result, "PD_MODE_0").target.kind, 4);
+    assert.equal(rowFor(result, "PD_MODE_0").tapHoldTerm, 125);
     const anchored = views.find(row => row.keepsAutoMouseAnchored);
     const {keepsAutoMouseAnchored, ...withoutFlag} = anchored;
     assert.deepEqual(edit({type: "saveBehavior", behavior: withoutFlag}), payload);

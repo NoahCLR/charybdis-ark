@@ -23,7 +23,7 @@ test("pointing picker names and aliases follow the tap allowlist", () => {
         assert.ok(!keys.modified.includes(name), name);
     }
     assert.ok(keys.modified.includes("KC_A"));
-    for (const name of ["KC_VOLU", "MS_UP", "MS_WHLD", "PD_SLOT_0", "QK_BOOTLOADER"]) assert.ok(!keys.modified.includes(name), name);
+    for (const name of ["KC_VOLU", "MS_UP", "MS_WHLD", "PD_MODE_0", "QK_BOOTLOADER"]) assert.ok(!keys.modified.includes(name), name);
 });
 
 test("macro outputs keep their place, and are offered alone", () => {

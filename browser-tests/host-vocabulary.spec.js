@@ -54,7 +54,7 @@ for(const theme of ["dark","light"]) {
         }
         await page.locator('.picker [data-act="use"]').click();
         expect(await page.evaluate(()=>window.__picked)).toBe('RGUI(KC_A)');
-        await page.evaluate(async()=>{const s=await import('/webview/store.mjs');s.state.screen='pointing';s.state.pdSlot=4;s.state.pdAdvanced=true;s.render();});
+        await page.evaluate(async()=>{const s=await import('/webview/store.mjs');s.state.screen='pointing';s.state.pointingSlot=4;s.state.pdAdvanced=true;s.render();});
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
             await expect(page.getByRole('checkbox',{name:hostKeyLabel('Right GUI',host),exact:true}).first()).toHaveAttribute('aria-label',hostKeyLabel('Right GUI',host));

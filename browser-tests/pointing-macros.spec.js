@@ -30,7 +30,7 @@ for (const theme of ["dark", "light"]) {
             await publish();
             return messages[0];
         };
-        await openControls(page, "pointing", {pdSlot: 4, pdAdvanced: true}, theme);
+        await openControls(page, "pointing", {pointingSlot: 4, pdAdvanced: true}, theme);
         await publish();
         await clearPosts(page);
         await page.locator('[data-f="pointing:4:axis"]').selectOption("3");

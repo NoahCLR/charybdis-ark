@@ -10,7 +10,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
 import {KIND} from "../view/pointing-config.mjs";
-import {bindingsForSlot} from "../view/reach.mjs";
+import {whatReachesSlot} from "../view/reach.mjs";
 import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
 import {mark} from "./marks.mjs";
 import {word} from "../view/vocabulary.mjs";
@@ -45,15 +45,15 @@ export function screenPointing() {
     }
 
     const compact = slots.length > FULL_CARD_SLOTS;
-    const list = el(`<nav class="pd-slots ${compact ? "many" : ""}" aria-label="Pointing slots"></nav>`);
+    const list = el(`<nav class="pointing-slots ${compact ? "many" : ""}" aria-label="Pointing slots"></nav>`);
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
     /** @param {import("./surface-types.js").PresentedSlot} slot */
-    const pick = (slot) => { state.pdSlot = slot.id; state.pdKind = null; state.pdTaps = null; render(); };
+    const pick = (slot) => { state.pointingSlot = slot.id; state.pdKind = null; state.pdTaps = null; render(); };
     for (const slot of slots) {
         if (compact && !slot.kind) continue;
-        const bindings = !slot.kind ? bindingsForSlot(model, slot) : null;
-        const inert = bindings ? bindings.keys.length + bindings.behaviours.length + bindings.combos.length : 0;
-        const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${esc(slot.id)}" aria-current="${state.pdSlot === slot.id}">
+        const reaching = !slot.kind ? whatReachesSlot(model, slot) : null;
+        const inert = reaching ? reaching.keys.length + reaching.behaviours.length + reaching.combos.length : 0;
+        const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${esc(slot.id)}" aria-current="${state.pointingSlot === slot.id}">
             ${mark(model, {kind: "pointing", slot: slot.id})}
             <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${esc(slot.id)}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? `Scrolling${slot.axis ? ` · ${esc(word(words(model).scrollAxes, slot.axis))}` : ""}` : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
@@ -64,7 +64,7 @@ export function screenPointing() {
     if (compact) list.append(emptyChips(model, slots.filter((slot) => !slot.kind), changedSlots, pick));
     pad.appendChild(list);
 
-    const slot = slots.find((row) => row.id === state.pdSlot) || slots[0];
+    const slot = slots.find((row) => row.id === state.pointingSlot) || slots[0];
     pad.appendChild(slot.kind ? editor(model, slot, canEdit, slots) : emptySlot(model, slot, canEdit, slots));
     main.appendChild(content);
     return main;
@@ -78,10 +78,10 @@ function emptyChips(model, empties, changedSlots, pick) {
     const node = el(`<div class="pd-empties"><div class="pd-empties-h">Empty slots · ${empties.length}</div><div class="pd-chips"></div></div>`);
     const grid = /** @type {HTMLElement} */ (node.querySelector(".pd-chips"));
     for (const slot of empties) {
-        const {keys, behaviours, combos} = bindingsForSlot(model, slot);
+        const {keys, behaviours, combos} = whatReachesSlot(model, slot);
         const inert = keys.length + behaviours.length + combos.length;
         const tip = `Slot ${slot.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
-        const chip = el(`<button class="slotchip ${inert ? "warn" : ""}" data-slot="${esc(slot.id)}" aria-current="${state.pdSlot === slot.id}"
+        const chip = el(`<button class="slotchip ${inert ? "warn" : ""}" data-slot="${esc(slot.id)}" aria-current="${state.pointingSlot === slot.id}"
             aria-label="${esc(tip)}" data-tip="${esc(tip)}">${esc(slot.id)}${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "corner") : ""}</button>`);
         chip.addEventListener("click", () => pick(slot));
         grid.append(chip);
@@ -89,5 +89,5 @@ function emptyChips(model, empties, changedSlots, pick) {
     return node;
 }
 
-// A binding for an empty slot is allowed by the keyboard, so the interface
+// A key for an empty slot is allowed by the keyboard, so the interface
 // explains the consequence instead of the app refusing the edit.

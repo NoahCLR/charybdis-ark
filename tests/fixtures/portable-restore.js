@@ -2,7 +2,7 @@
 "use strict";
 const {editLayers, editMacros} = require("./profile-document");
 const assert = require("node:assert/strict");
-const {document32: document} = require("./pd-slots-32");
+const {document32: document} = require("./pointing-slots-32");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {snapshotProfile, restoreProfile} = require("../../core/session/portable-profile-session");
 const {writableKeyboard} = require("./writable-keyboard");

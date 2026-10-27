@@ -9,8 +9,8 @@ const keycodes = require("../../core/data/keycode-catalog");
 
 test("every v1 semantic action has an explicit display, including unknown numeric keycodes", () => {
     const cases = [[0, 0, "KC_NO"], [1, 4, "KC_A"], [1, 0xfffe, "0xFFFE"], [2, 0, "MO(0)"],
-        [3, 4, "LOCK_LAYER(4)"], [4, 0, "PD_SLOT_0"], [4, 5, "PD_SLOT_5"],
-        [5, 0, "PD_SLOT_0_LOCK"], [5, 2, "PD_SLOT_2_LOCK"], [6, 0, "MACRO_0"], [7, 15, "CUSTOM_KEY_15"]];
+        [3, 4, "LOCK_LAYER(4)"], [4, 0, "PD_MODE_0"], [4, 5, "PD_MODE_5"],
+        [5, 0, "PD_MODE_0_LOCK"], [5, 2, "PD_MODE_2_LOCK"], [6, 0, "MACRO_0"], [7, 15, "CUSTOM_KEY_15"]];
     for (const [kind, operand, name] of cases) assert.equal(actionName({kind, flags: 0, operand}), name);
     assert.throws(() => actionName({kind: 8, operand: 0}), /Unsupported/);
 });
@@ -78,7 +78,7 @@ test("real device RGB retains every value and reference through the presentation
     const view = rgbForView(rgb);
     assert.deepEqual(view.layerColors[0], {layer: "Layer 0", layerId: 0, color: {h: "0", s: "0", v: "0"}, mode: "ALL_KEYS"});
     assert.equal(view.layerColors[1].mode, "KEYS_MAPPED_ON_THIS_LAYER_ONLY");
-    assert.equal(view.pdModeColors[0].pointingMode, "PD_MODE_DRAGSCROLL");
+    assert.equal(view.pdModeColors[0].pointingMode, "POINTING_MODE_DRAGSCROLL");
     assert.equal(view.pdModeColors[0].locality, "RGB_RIGHT_HALF");
     assert.equal(view.automouseFade.mode, "FOLLOW_REAL_DESTINATION");
     assert.deepEqual(view.automouseFade.end_color, {h: "167", s: "255", v: "199"});
@@ -86,7 +86,7 @@ test("real device RGB retains every value and reference through the presentation
     assert.equal(view.keyBehaviorFeedback.tapBranchColors.length, 4);
     assert.deepEqual(view.ledGroups[1].ledIndices, [24, 25, 26, 27, 28, 53, 54, 55]);
     assert.equal(view.ledGroups[1].usageCount, 3);
-    assert.equal(view.pdModeLedGroups[0].owner, "RGB_PD_MODE_GROUP_ALL");
+    assert.equal(view.pdModeLedGroups[0].owner, "RGB_POINTING_MODE_GROUP_ALL");
     assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_ALL");
     assert.equal(JSON.stringify(rgb), original, "converting a snapshot cannot mutate it");
 });
@@ -100,7 +100,7 @@ test("RGB selectors and disabled stages are displayed without inventing enabled 
     const view = rgbForView(rgb);
     assert.ok(view.stages.every(stage => !stage.enabled));
     assert.deepEqual(view.layerLedGroups.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
-    assert.equal(view.pdModeLedGroups[0].owner, "PD_MODE_DRAGSCROLL");
+    assert.equal(view.pdModeLedGroups[0].owner, "POINTING_MODE_DRAGSCROLL");
     assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
 });
 

@@ -45,7 +45,7 @@ function fixtures() {
 function representative() {
     return {rows: [
         {
-            target: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: 2},
+            target: {kind: PROFILE_ACTION_KINDS.POINTING_MODE_MOMENTARY, operand: 2},
             // Disabled, and allowed on layers 0 and 2 only: both kept as stored.
             enabled: false,
             allowedLayers: 0x0005,
@@ -115,7 +115,7 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
                 ],
             },
             {
-                target: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, flags: 0, operand: 2},
+                target: {kind: PROFILE_ACTION_KINDS.POINTING_MODE_MOMENTARY, flags: 0, operand: 2},
                 tapHoldTerm: 0,
                 longHoldTerm: 0,
                 multiTapTerm: 0,

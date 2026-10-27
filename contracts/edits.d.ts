@@ -125,7 +125,7 @@ export type PanelEdit = {[K in keyof EditPayloads]: EditOf<K>}[keyof EditPayload
 export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateMacro'>;
 
 /** A dense decoded slot has values even for inactive fields. */
-export interface PdSlot extends PdConfig {
+export interface PointingSlot extends PdConfig {
     axis: number;
     heldModifiers: number;
     thresholdX: number;

@@ -46,14 +46,14 @@ export function screenLighting() {
     // card, as on Keys; on LED groups the board is the LED selector instead.
     const card = el(`<div class="board-card"></div>`);
     const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
-        ? pdColourRow(model, state.pdSlot) : null;
+        ? pdColourRow(model, state.pointingSlot) : null;
     card.appendChild(board(model, layer, {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
         held: onGroups ? [] : heldLayers(),
         picks: state.ledPicks,
         trackball: state.trackball,
-        pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: pdTrigger(model, layer, state.pdSlot)?.layoutIndex} : null,
+        pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: pdTrigger(model, layer, state.pointingSlot)?.layoutIndex} : null,
         onKey: onGroups ? (index) => {
             state.ledPicks = state.ledPicks.includes(index)
                 ? state.ledPicks.filter((value) => value !== index) : [...state.ledPicks, index];
@@ -68,7 +68,7 @@ export function screenLighting() {
             : `${esc(layerName(layer))}${heldLayers().some((at) => at > 0) && !onGroups
                 ? ` with ${esc(heldLayers().filter((at) => at > 0).reverse().map((at) => layerName(layers()[at])).join(", "))} on`
                 : ""} over the background effect${preview
-                ? ` · ${esc(slotName(model, state.pdSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
+                ? ` · ${esc(slotName(model, state.pointingSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
                 : ""}`}</span>
         ${onGroups ? `<span class="right">
             <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
@@ -173,7 +173,7 @@ function stageColour(model, id) {
         base: () => baseColour(model),
         layers: () => layerColourRow(model, currentLayer()?.index)?.color,
         auto: () => model.rgb.automouseFade?.end_color,
-        pd: () => pdColourRow(model, state.pdSlot)?.color,
+        pd: () => pdColourRow(model, state.pointingSlot)?.color,
         combo: () => model.rgb.comboFeedback?.color,
         key: () => feedbackColours(model).hold,
     })[id]?.();

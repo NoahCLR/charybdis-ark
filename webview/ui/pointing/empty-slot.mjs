@@ -1,16 +1,15 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {KIND, newMode, scrollStarter} from "../../view/pointing-config.mjs";
-import {bindingsForSlot} from "../../view/reach.mjs";
+import {holdKeyName, whatReachesSlot} from "../../view/reach.mjs";
 import {post} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {unavailable} from "../frame.mjs";
 import {actionMarked, mark} from "../marks.mjs";
-import {bindingName} from "./common.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot */
 function inertNote(model, slot) {
-    const {keys, behaviours, combos, layers} = bindingsForSlot(model, slot);
+    const {keys, behaviours, combos, layers} = whatReachesSlot(model, slot);
     if (!keys.length && !behaviours.length && !combos.length) return "";
     const parts = [];
     if (keys.length) parts.push(`${keys.length} key${keys.length === 1 ? "" : "s"} on ${esc(layers.join(", "))}`);
@@ -24,9 +23,9 @@ export function emptySlot(model, slot, canEdit, slots) {
     const sources = slots.filter((row) => row.kind);
     const node = el(`<div class="pd-editor stack"><div class="card">
         <div class="card-h"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span><h3>Slot ${esc(slot.id)} is empty</h3>
-            <span class="tag">${esc(bindingName(slot))}</span></div>
+            <span class="tag">${esc(holdKeyName(slot))}</span></div>
         <div class="card-b stack">
-        <p class="note pd-empty-note">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(slot.binding?.lock || "")}</code> locks it on.</p>
+        <p class="note pd-empty-note">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its hold key is <code>${esc(holdKeyName(slot))}</code>, and <code>${esc(slot.keys?.lock || "")}</code> locks it on.</p>
         ${inertNote(model, slot)}
         <div class="row gap-8">
             <button class="btn primary" data-new="${KIND.DIRECTIONAL}" ${canEdit ? "" : "disabled"}

@@ -20,12 +20,12 @@ const OFF = {h: "0", s: "0", v: "0"};
 
 
 // A pointing slot's lighting row by the name the RGB enum gives its id; the
-// 32-slot firmware's slots past seven are PD_MODE_SLOT_n. A keyboard reports
+// 32-slot firmware's slots past seven are POINTING_MODE_n. A keyboard reports
 // rows only for the slots it has.
-export const PD_MODE_IDS = [
-    "PD_MODE_DRAGSCROLL", "PD_MODE_VOLUME", "PD_MODE_BRIGHTNESS", "PD_MODE_ZOOM",
-    "PD_MODE_ARROW", "PD_MODE_PINCH", "PD_MODE_SLOT_6", "PD_MODE_SLOT_7",
-    ...Array.from({length: 24}, (_, index) => `PD_MODE_SLOT_${index + 8}`),
+export const POINTING_MODE_IDS = [
+    "POINTING_MODE_DRAGSCROLL", "POINTING_MODE_VOLUME", "POINTING_MODE_BRIGHTNESS", "POINTING_MODE_ZOOM",
+    "POINTING_MODE_ARROW", "POINTING_MODE_PINCH", "POINTING_MODE_6", "POINTING_MODE_7",
+    ...Array.from({length: 24}, (_, index) => `POINTING_MODE_${index + 8}`),
 ];
 
 /** @param {Model} model @param {string} id */
@@ -123,7 +123,7 @@ export const layerColourRow = (model, layerId) =>
 
 /** @param {Model} model @param {number} slotId */
 export const pdColourRow = (model, slotId) =>
-    (model?.rgb?.pdModeColors || []).find((row) => row.pointingMode === PD_MODE_IDS[slotId]);
+    (model?.rgb?.pdModeColors || []).find((row) => row.pointingMode === POINTING_MODE_IDS[slotId]);
 
 /** @param {Model} model */
 export function feedbackColours(model) {
@@ -267,7 +267,7 @@ function ledLight(model, layer, led, position, options = {}) {
         if (reaches) paint(preview.color, "pointing");
         for (const group of model?.rgb?.pdModeLedGroups || []) {
             if (!(group.ledIndices || []).includes(led ?? -1)) continue;
-            if (group.owner !== "RGB_PD_MODE_GROUP_ALL" && group.owner !== preview.mode) continue;
+            if (group.owner !== "RGB_POINTING_MODE_GROUP_ALL" && group.owner !== preview.mode) continue;
             paint(inheritsStageColour(group.color) ? preview.color : group.color, "pointing");
         }
     }

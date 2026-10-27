@@ -34,9 +34,9 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     assert.equal(config.directions.left.keycode, "LALT(KC_LEFT)", "shortcut resolution must not mutate the submitted form");
     const created = draft.current.fingerprint;
     assert.equal(validateSnapshot(draft.document).pdModes[7].directions.left.keycode, 0x450);
-    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]});
+    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_MODE_7"}]});
 
-    stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_7", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
+    stage({type: "updatePdModeColor", pointingMode: "POINTING_MODE_7", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
     stage({type: "updateMacro", keycode: "MACRO_0", payload: "hello", name: "Greeting"});
     const reordered = reorderLayers(draft.document, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.deepEqual(validateSnapshot(reordered).pdModes, validateSnapshot(draft.document).pdModes);
@@ -49,10 +49,10 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     assert.match(field("Left"), /Inherit modifiers/);
     const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
     assert.equal(model.pdModes[7].name, "History");
-    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7" && key.keycode === 0x7e87 && key.label === "History · hold"));
-    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7_LOCK" && key.keycode === 0x7ea7 && key.label === "History · lock"));
+    assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_7" && key.keycode === 0x7e87 && key.label === "History · hold"));
+    assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_7_LOCK" && key.keycode === 0x7ea7 && key.label === "History · lock"));
     assert(!model.qmkKeycodes.some(key => key.value === "SLOT_7_MODE"));
-    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_6" && key.keycode === 0x7e86 && key.label === "Slot 6 · hold (empty)"),
+    assert(model.qmkKeycodes.some(key => key.value === "PD_MODE_6" && key.keycode === 0x7e86 && key.label === "Slot 6 · hold (empty)"),
         "an unconfigured slot still offers its keycodes, so a button can be placed before the mode exists");
     assert(!settingsEditorView(draft.current).sections.some(section => section.fields.some(field => field.id >= 10 && field.id <= 14)));
     draft.undo(draft.revision); draft.undo(draft.revision); draft.undo(draft.revision);
@@ -65,7 +65,7 @@ test("duplicate and clear are atomic, and unsupported outputs cannot enter a dra
     assert.deepEqual(validateSnapshot(draft.document).pdModes[6].directions, validateSnapshot(draft.document).pdModes[4].directions);
     const before = draft.current.fingerprint;
     assert.throws(() => stage({type: "duplicatePdMode", slot: 6, source: 5}), /empty destination/);
-    assert.throws(() => stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "Recursive", thresholdY: 40, directions: {up: {keycode: "PD_SLOT_6"}}}}));
+    assert.throws(() => stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "Recursive", thresholdY: 40, directions: {up: {keycode: "PD_MODE_6"}}}}));
     assert.equal(draft.current.fingerprint, before);
     // Clearing empties the record again; the colour the copy took stays,
     // as a cleared slot keeps its colour row.
@@ -101,21 +101,21 @@ test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes
     const modelNow = () => buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
     stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30,
         directions: {left: {keycode: "LALT(KC_LEFT)"}, right: {keycode: "LALT(KC_RIGHT)"}}}});
-    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]});
+    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_MODE_7"}]});
 
     stage({type: "clearPdMode", slot: 7});
     const cleared = validateSnapshot(draft.document);
     assert.equal(cleared.pdModes[7].kind, 0, "the slot is empty");
-    assert.equal(cleared.danglingPdBindings[7], 1, "and the key that still reaches it is counted, not refused");
+    assert.equal(cleared.danglingPointingKeys[7], 1, "and the key that still reaches it is counted, not refused");
     assert.equal(profileLayers(cleared.document)[0][0] !== 0, true, "the button stays on the board");
-    assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_SLOT_7").label, "Slot 7 · hold (empty)",
+    assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_MODE_7").label, "Slot 7 · hold (empty)",
         "and the keycode stays in the catalogue, described as empty rather than by a name that is gone");
 
     stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30,
         directions: {left: {keycode: "LALT(KC_LEFT)"}, right: {keycode: "LALT(KC_RIGHT)"}}}});
-    assert.equal(validateSnapshot(draft.document).danglingPdBindings[7], undefined,
+    assert.equal(validateSnapshot(draft.document).danglingPointingKeys[7], undefined,
         "configuring the slot again makes the same button live");
-    assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_SLOT_7").label, "History · hold");
+    assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_MODE_7").label, "History · hold");
 });
 
 test("a layout key the keyboard would not own is refused at the edit", () => {
@@ -267,7 +267,7 @@ test("the model publishes the layers that start each mode and what each keycode 
     const {draft, stage, caps} = fixture();
     stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30, linkedLayers: 1 << 3, linkTurnsOn: 1 << 5, linkEnds: 1,
         directions: {left: {keycode: "KC_LEFT"}, right: {keycode: "KC_RIGHT"}}}});
-    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}, {layoutIndex: 1, keycode: "MO(3)"},
+    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_MODE_7"}, {layoutIndex: 1, keycode: "MO(3)"},
         {layoutIndex: 2, keycode: "LT(3,KC_B)"}, {layoutIndex: 3, keycode: "CUSTOM_KEY_2"}, {layoutIndex: 4, keycode: "KC_A"}]});
     stage({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", shortcut: {mods: 0, keys: [], layers: (1 << 3) | (1 << 6), layerKind: 1}});
     const state = {capabilities: caps, phase: "idle", committed: {state: "unavailable"}, combos: {state: "unavailable"}};
@@ -279,8 +279,8 @@ test("the model publishes the layers that start each mode and what each keycode 
     assert.equal(start.ends & 0b1111, 0, "no layer at or below it does");
     assert.deepEqual(model.pdModes[0].linkStarts, [], "an unlinked mode starts from no layer");
     assert.equal(model.qmkKeyTurnsOn["MO(3)"], 1 << 3);
-    assert.equal(model.qmkKeyTurnsOn["PD_SLOT_7"], 1 << 5, "a pointing-mode key, by the name the profile gives it");
-    assert.equal(model.qmkKeyTurnsOn["PD_SLOT_7_LOCK"], 1 << 5);
+    assert.equal(model.qmkKeyTurnsOn["PD_MODE_7"], 1 << 5, "a pointing-mode key, by the name the profile gives it");
+    assert.equal(model.qmkKeyTurnsOn["PD_MODE_7_LOCK"], 1 << 5);
     assert.equal(model.qmkKeyTurnsOn["CUSTOM_KEY_2"], (1 << 3) | (1 << 6));
     assert.equal(model.qmkKeyTurnsOn["LT(3,KC_B)"], 1 << 3, "a layer-tap's hold");
     assert.equal(model.qmkKeyTurnsOn["KC_A"], undefined);

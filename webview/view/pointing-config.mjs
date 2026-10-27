@@ -6,7 +6,7 @@
 
 /**
  * @typedef {import("../../contracts/edits.js").PdConfig} PdConfig
- * @typedef {import("../../contracts/edits.js").PdSlot} PdSlot
+ * @typedef {import("../../contracts/edits.js").PointingSlot} PointingSlot
  * @typedef {import("../../contracts/edits.js").PdTap} PdTap
  * @typedef {import("../../contracts/edits.js").Scalar} Scalar
  */
@@ -85,14 +85,14 @@ export const SHIPPED_SCROLL = Object.freeze({dpi: SCROLL_STARTER_DPI, scroll: Ob
 // What a new scrolling mode copies: this keyboard's own Dragscroll (slot 0
 // when it scrolls, else its first scrolling mode), so a new mode scrolls
 // the way the one already in use does; the shipped tuning when there is none.
-/** @param {readonly PdSlot[] | null | undefined} slots @returns {ScrollStarter} */
+/** @param {readonly PointingSlot[] | null | undefined} slots @returns {ScrollStarter} */
 export function scrollStarter(slots) {
     const list = slots || [];
     const source = [list[0], ...list].find((slot) => slot?.kind === KIND.SCROLLING && SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key])));
     if (!source) return SHIPPED_SCROLL;
     return {dpi: Number(source.dpi) || 0, scroll: {...Object.fromEntries(SCROLL_FIELDS.map(([key]) => [key, Number(source.scroll?.[key] ?? 0)])), invert: Number(source.scroll?.invert ?? 0)}};
 }
-/** @param {PdSlot} slot @param {number} kind @param {ScrollStarter} [starter] */
+/** @param {PointingSlot} slot @param {number} kind @param {ScrollStarter} [starter] */
 export function startingRecord(slot, kind, starter = SHIPPED_SCROLL) {
     if (kind === KIND.SCROLLING && !SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key]))) return {...slot, dpi: starter.dpi, scroll: {...starter.scroll}};
     if (kind === KIND.DIRECTIONAL && !Number(slot.thresholdX) && !Number(slot.thresholdY)) return {...slot, axis: AXIS.VERTICAL, thresholdX: 0, thresholdY: DIRECTIONAL_STARTER_THRESHOLD};
@@ -103,7 +103,7 @@ export function startingRecord(slot, kind, starter = SHIPPED_SCROLL) {
 // shortcuts yet, a scrolling mode copies Dragscroll's record and speed. It is
 // named after its slot and posted like any edit, so the keyboard stores a
 // valid mode straight away and every field can then be changed.
-/** @param {PdSlot} slot @param {number} kind @param {ScrollStarter} [starter] */
+/** @param {PointingSlot} slot @param {number} kind @param {ScrollStarter} [starter] */
 export function newMode(slot, kind, starter = SHIPPED_SCROLL) {
     const scrolling = kind === KIND.SCROLLING;
     const starting = scrolling
@@ -119,7 +119,7 @@ export const DIRECTIONAL_STARTER_THRESHOLD = 60;
 // form owns replaced — the firmware stores one record, so half a record is
 // never sent. `form` maps each drawn field to a reader; a field that is not
 // drawn keeps the value the slot was read with.
-/** @param {PdSlot} slot @param {import("../../contracts/edits.js").PdForm} form @returns {PdConfig} */
+/** @param {PointingSlot} slot @param {import("../../contracts/edits.js").PdForm} form @returns {PdConfig} */
 export function readConfig(slot, form) {
     /** @param {Scalar | null | undefined} value @param {number} fallback */
     const number = (value, fallback) => {
@@ -178,7 +178,7 @@ export function readConfig(slot, form) {
 // A slot's link as the keyboard stores it, from the How it starts card. What ends
 // the mode goes back to Never with the last layer that starts it, which it
 // needs.
-/** @param {PdSlot} slot @param {import("../../contracts/edits.js").PdForm} form @returns {Pick<PdConfig, "linkedLayers" | "linkTurnsOn" | "linkEnds">} */
+/** @param {PointingSlot} slot @param {import("../../contracts/edits.js").PdForm} form @returns {Pick<PdConfig, "linkedLayers" | "linkTurnsOn" | "linkEnds">} */
 function linkRecord(slot, form) {
     const layers = form.linkedLayers ? form.linkedLayers() : slot.linkedLayers;
     const turnsOn = form.linkTurnsOn ? form.linkTurnsOn() : slot.linkTurnsOn;
@@ -206,7 +206,7 @@ export const TAP_ROWS = [...DIRECTIONS.map(([name, label]) => ({key: `dir:${name
 // "Ignore" is stored only with the modifiers it leaves out, and they are
 // chosen after it, so until then the direction posts as the slot stored it
 // and the editor holds the choice.
-/** @param {PdSlot} slot @param {PdConfig} config */
+/** @param {PointingSlot} slot @param {PdConfig} config */
 export function settleTaps(slot, config) {
     /** @type {Record<string, PdTap>} */
     const pending = {};

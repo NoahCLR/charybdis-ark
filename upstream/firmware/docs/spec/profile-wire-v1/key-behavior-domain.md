@@ -12,7 +12,7 @@ Refusal codes are named in [errors](errors.md).
 
 The build's tap depth `d` (five unless the build sets `KEY_BEHAVIOR_MAX_TAP_COUNT`;
 the capability pages in [the HID channel](hid-channel.md) report it) sets the
-ceilings (D-F14, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0014-bigger-profiles.md)):
+ceilings (D-F14, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0014-bigger-profiles.md)):
 
 | Limit | Value |
 | --- | --- |
@@ -63,7 +63,7 @@ unsigned bytes; a repeated target is `DUPLICATE_TARGET`, a target out of order
 A threshold of zero follows the keyboard-wide setting in the
 [settings domain](settings-domain.md): the tap / hold threshold follows
 scalar 1, or scalar 0 (the tapping term, D-F47,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0047-dual-role-setting-is-the-tapping-term.md)) when the target
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0047-dual-role-setting-is-the-tapping-term.md)) when the target
 is a dual-role keycode; the long hold threshold follows scalar 2 and the multi
 tap window scalar 3.
 
@@ -122,7 +122,7 @@ the action-kind table behind `noah_action_supported_at`
 (`users/noah/lib/action/action_kind.c`) answers, the same table that checks
 the authored profile at compile time. A step may send a custom key; it sends
 that key's shortcut, never its behaviour (D-F26,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/e0d1d3f6e23b21cc92b6f628daef61ea88dfeaf9/docs/adr/0026-custom-key-carries-a-shortcut.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0026-custom-key-carries-a-shortcut.md)).
 
 A structural fault is reported first. The first action that names something
 missing or sits where it may not is recorded and reported as

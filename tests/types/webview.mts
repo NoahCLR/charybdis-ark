@@ -7,9 +7,9 @@ import * as edits from '../../webview/view/edits.mjs';
 import {newMode, readConfig} from '../../webview/view/pointing-config.mjs';
 import {kept, resets, resetsTo} from '../../webview/view/state-fields.mjs';
 import type {StateFields} from '../../webview/view/state-fields.mjs';
-import type {PanelEdit, PdSlot, BaseIdentity} from '../../contracts/edits.js';
+import type {PanelEdit, PointingSlot, BaseIdentity} from '../../contracts/edits.js';
 
-function contracts(slot: PdSlot, identity: BaseIdentity) {
+function contracts(slot: PointingSlot, identity: BaseIdentity) {
     const messages: PanelEdit[] = [
         edits.setKey('Layer 0', 1, 'KC_A'),
         edits.placementPolicy(0, 1, true, false),
@@ -135,7 +135,7 @@ function rendererViews(model: PublishedModel, position: Position) {
     // @ts-expect-error The empty combo-map branch still stores typed combos.
     combosOnLayer(null, [], 0).set(0, ['KC_A']);
     const routeName: string = macroPlacements(model, model.layers, 'MACRO_0')[0].routes[0].entry.name;
-    const action = namedAction(model, 'PD_SLOT_0');
+    const action = namedAction(model, 'PD_MODE_0');
     if (action?.kind === 'pointing') {
         const slot: number = action.slot.id;
         void slot;

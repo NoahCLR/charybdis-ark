@@ -1,7 +1,7 @@
 import {profileLayers, profileMacros, editLayers, editMacros} from "../fixtures/profile-document.js";
 // The picker's validity check has to agree with the draft: every expression
 // it calls storable the draft stores as the same keycode, and every one the
-// draft refuses it refuses too (B10: S(MO(2)), G(PD_SLOT_0), LT(2, LT(…))).
+// draft refuses it refuses too (B10: S(MO(2)), G(PD_MODE_0), LT(2, LT(…))).
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
@@ -39,8 +39,8 @@ const EXPRESSIONS = [
     "MT(MOD_LCTL, KC_A)", "MT(MOD_LCTL|MOD_RSFT, KC_A)", "MT(MOD_LCTL, S(KC_1))", "MT(MOD_LCTL, KC_EXLM)",
     "LT(3, KC_F)", "LT(3,KC_F)", "LT(2, LT(3, KC_F))", "LT(16, KC_A)", "LT(3, CUSTOM_KEY_1)", "LT(1, KC_LCTRL)",
     "MO(2)", "MO(15)", "MO(16)", "TG(1)", "TO(0)", "TT(3)", "OSL(4)", "DF(1)", "PDF(1)", "LOCK_LAYER(1)", "LOCK_LAYER(16)",
-    "S(MO(2))", "G(PD_SLOT_0)", "S(MACRO_0)", "G(A(S(C(LT(3,KC_F)))))", "C(PD_SLOT_0)",
-    "PD_SLOT_0", "PD_SLOT_0_LOCK", "MACRO_0", "MACRO_127", "MACRO_128", "CUSTOM_KEY_5",
+    "S(MO(2))", "G(PD_MODE_0)", "S(MACRO_0)", "G(A(S(C(LT(3,KC_F)))))", "C(PD_MODE_0)",
+    "PD_MODE_0", "PD_MODE_0_LOCK", "PD_SLOT_0", "PD_SLOT_0_LOCK", "PD_SLOT_32", "MACRO_0", "MACRO_127", "MACRO_128", "CUSTOM_KEY_5",
     "OSM(MOD_LSFT)", "LM(1, MOD_LSFT)", "LM(16, MOD_LSFT)", "0x0004", "0x5240", "4", "NOT_A_KEY", "", "LT(3,", "KC_A)",
 ];
 
@@ -64,6 +64,18 @@ test("every name for a macro slot stores the same keycode, which reads as MACRO_
     assert.equal(drafted("VIA_MACRO_127"), 0x777f);
     assert.equal(keyProblem(model, "VIA_MACRO_128"), "VIA_MACRO_128 is not a key this keyboard can store.");
     assert.equal(drafted("VIA_MACRO_128"), undefined);
+});
+
+// PD_SLOT_n was the pointing keys' name before PD_MODE_n: typed, it still
+// reaches its slot, and the key then reads by today's name.
+test("a pointing key typed by its former name stores its slot's keycode, which reads as PD_MODE_n", () => {
+    for (const [expression, code] of [["PD_SLOT_3", 0x7e83], ["PD_SLOT_3_LOCK", 0x7ea3], ["PD_MODE_3", 0x7e83]]) {
+        assert.equal(keyProblem(model, expression), "", expression);
+        assert.equal(keycodeValue(model, expression), code, expression);
+        assert.equal(drafted(expression), code, expression);
+    }
+    assert.equal(keyName(model, 0x7e83), "PD_MODE_3");
+    assert.equal(keyName(model, 0x7ea3), "PD_MODE_3_LOCK");
 });
 
 // What the draft stores as a new combo's output, or undefined if it refuses it.
@@ -96,5 +108,5 @@ test("a tap with a hold is a plain key; modifiers wrap only basic or modified ke
     assert.equal(isPlainKey(model, "KC_EXLM"), false);
     assert.equal(isPlainKey(model, "MO(1)"), false);
     assert.equal(takesModifiers(model, "KC_EXLM"), true);
-    for (const key of ["MO(2)", "PD_SLOT_0", "MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(takesModifiers(model, key), false, key);
+    for (const key of ["MO(2)", "PD_MODE_0", "MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(takesModifiers(model, key), false, key);
 });

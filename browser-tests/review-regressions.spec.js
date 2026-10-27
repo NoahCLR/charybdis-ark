@@ -116,12 +116,12 @@ test("the picker offers each pointing slot's Hold and Lock keys and picks the lo
     });
     const picker = page.getByRole("dialog", {name: "Pick a keycode"});
     await picker.locator('[data-sec="modes"]').click();
-    const lock = picker.locator('[data-pick="PD_SLOT_0_LOCK"]');
-    await expect(picker.locator('[data-pick="PD_SLOT_0"] .l')).toHaveText("Hold");
+    const lock = picker.locator('[data-pick="PD_MODE_0_LOCK"]');
+    await expect(picker.locator('[data-pick="PD_MODE_0"] .l')).toHaveText("Hold");
     await expect(lock.locator(".l")).toHaveText("Lock");
     await expect(picker.locator(".pk-note")).toContainText("Lock keeps the mode on");
     await expect(picker).not.toContainText(/toggle/i);
     await lock.click();
     await picker.locator('[data-act="use"]').click();
-    await expect.poll(() => page.evaluate(() => JSON.stringify(window.__posted))).toContain('"keycode":"PD_SLOT_0_LOCK"');
+    await expect.poll(() => page.evaluate(() => JSON.stringify(window.__posted))).toContain('"keycode":"PD_MODE_0_LOCK"');
 });

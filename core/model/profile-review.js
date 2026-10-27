@@ -2,7 +2,7 @@
 "use strict";
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
-const {layerOfRef, nativeCode, pdSlotOfCode} = require("../schema/actions");
+const {layerOfRef, nativeCode, pointingSlotOfCode} = require("../schema/actions");
 const {hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, profileKeyNames, shortcutLabel} = require("./key-names");
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
 const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings-domain-v1");
@@ -69,7 +69,7 @@ const allowedLayers = (mask, names) => layerSet(mask, names, "none");
 // keyLayer, as the screens mark it), or the pointing mode it runs.
 /** @param {number} code @returns {Mark | undefined} */
 const keyMark = code => {
-    const slot = pdSlotOfCode(code);
+    const slot = pointingSlotOfCode(code);
     if (slot !== undefined) return {kind: "pointing", slot};
     const layer = keyLayer(code);
     return layer === undefined ? undefined : {kind: "layer", layer};
@@ -85,7 +85,7 @@ const actionMark = value => {
     return code === undefined ? undefined : keyMark(code);
 };
 // A pointing slot as fields, in the Pointing modes editor's words.
-/** @param {import("../schema/types.js").PdSlot | undefined} slot @param {Names} names @returns {Fields} */
+/** @param {import("../schema/types.js").PointingSlot | undefined} slot @param {Names} names @returns {Fields} */
 function pointingFields(slot, names) {
     const P = VOCABULARY.pointing;
     /** @type {Fields} */

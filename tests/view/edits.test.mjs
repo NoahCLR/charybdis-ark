@@ -114,7 +114,7 @@ test("a modifier around a macro or pointing key is refused, not stored as anothe
     // the picker builds Cmd + macro 3 as G(MACRO_3)
     const picked = edits.pickerExpression({keys: ["MACRO_3"], mods: ["G"]});
     assert.equal(picked, "G(MACRO_3)");
-    for (const keycode of [picked, "C(PD_SLOT_0)", "LOCK_LAYER(16)", "LT(60, 0x00)"]) {
+    for (const keycode of [picked, "C(PD_MODE_0)", "LOCK_LAYER(16)", "LT(60, 0x00)"]) {
         assert.throws(() => stage(draft, edits.setKey("Layer 0", 3, keycode)), /Cannot represent/, keycode);
     }
     assert.deepEqual(profileLayers(draft.document)[0], before);
@@ -256,7 +256,7 @@ test("the editor removes exactly the rows the core's review notes as changing no
     const {resolveNativeQmkExpression} = require("../../core/schema/compiled-profile-v1");
     const model = buildSnapshotModel(session().current, capabilities, {editable: true, reason: ""});
     // Keys this profile holds, which the core publishes defaults for.
-    for (const keycode of ["KC_ENTER", "LGUI(KC_C)", "MACRO_10", "LT(3,KC_SLASH)", "OSM(MOD_LSFT)", "MO(3)", "LOCK_LAYER(3)", "PD_SLOT_0", "PD_SLOT_0_LOCK", "CUSTOM_KEY_0"]) {
+    for (const keycode of ["KC_ENTER", "LGUI(KC_C)", "MACRO_10", "LT(3,KC_SLASH)", "OSM(MOD_LSFT)", "MO(3)", "LOCK_LAYER(3)", "PD_MODE_0", "PD_MODE_0_LOCK", "CUSTOM_KEY_0"]) {
         const row = behaviourEditorRow(model, keycode);
         assert.ok(row, keycode);
         for (const fields of [{}, {terms: {tapHoldTerm: "120"}}, {terms: {multiTapTerm: "90"}}, {anchored: true}, {enabled: false}]) {
@@ -424,7 +424,7 @@ test("switching a stage off is a mask edit that lands as that mask", () => {
 
 test("a pointing-mode colour keeps the locality posted beside it", () => {
     const draft = session();
-    stage(draft, edits.pdModeColour("PD_MODE_DRAGSCROLL", "RGB_BOTH_HALVES", {h: 21, s: 255, v: 180}));
+    stage(draft, edits.pdModeColour("POINTING_MODE_DRAGSCROLL", "RGB_BOTH_HALVES", {h: 21, s: 255, v: 180}));
     const row = decoded(draft).rgb.pdModeColors.find((entry) => entry.pdModeId === 0);
     assert.equal(row.locality, RGB_LOCALITIES.RGB_BOTH_HALVES);
     assert.deepEqual(row.color, {h: 21, s: 255, v: 180});
@@ -462,7 +462,7 @@ test("LED group rows land in every table, and groups renumber when one is delete
     const ledsOf = (id) => rgb().groups.find((group) => group.id === id).leds;
     const startCount = rgb().groups.length;
     const colour = {h: 10, s: 255, v: 100};
-    for (const [target, owner] of [["layer", "Layer 2"], ["pdMode", "PD_MODE_VOLUME"], ["combo", "ignored"], ["keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"]]) {
+    for (const [target, owner] of [["layer", "Layer 2"], ["pdMode", "POINTING_MODE_VOLUME"], ["combo", "ignored"], ["keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"]]) {
         stage(draft, edits.ledRow({target, owner, source: ""}, [1, 2], colour));
     }
     assert.equal(rgb().groups.length, startCount + 1, "rows with the same LEDs share one group");
@@ -907,7 +907,7 @@ test("pointing text entry refuses unsupported mouse/control outputs without chan
     const slot = decoded(draft).pdModes[4];
     const before = draft.current.fingerprint;
     const set = key => edits.pdMode(4, readConfig(slot, formOf({kind: slot.kind, name: slot.name, dpi: slot.dpi, "dir:left": key})), draft.identity());
-    for (const key of ["MS_UP", "MS_WHLD", "MS_ACL0", "C(MS_BTN3)", "PD_SLOT_0", "MO(1)", "QK_BOOTLOADER"]) {
+    for (const key of ["MS_UP", "MS_WHLD", "MS_ACL0", "C(MS_BTN3)", "PD_MODE_0", "MO(1)", "QK_BOOTLOADER"]) {
         assert.throws(() => stage(draft, set(key)), /Left:.*(pointing mode|keyboard keys|mouse-button click)/, key);
         assert.equal(draft.current.fingerprint, before);
     }
@@ -957,7 +957,7 @@ test("clearing a slot leaves its button on the board, inert until it is configur
     stage(draft, edits.clearPdMode(5, draft.identity()));
     const value = decoded(draft);
     assert.equal(value.pdModes[5].kind, 0, "the slot is empty");
-    assert.ok(value.danglingPdBindings[5] > 0, "and what still reaches it is counted, not refused");
+    assert.ok(value.danglingPointingKeys[5] > 0, "and what still reaches it is counted, not refused");
 });
 
 test("an empty slot can start a new mode of either kind, which the draft accepts as posted", () => {
@@ -1135,7 +1135,7 @@ test("the combo hold threshold is the one the keyboard stores, else its tapping 
 // ── the 32-slot firmware ────────────────────────────────────────────────
 
 test("on the 32-slot firmware, the same builders reach slots past seven", () => {
-    const {CAPABILITIES_32, document32} = require(path.join(here, "..", "fixtures", "pd-slots-32"));
+    const {CAPABILITIES_32, document32} = require(path.join(here, "..", "fixtures", "pointing-slots-32"));
     const doc = document32();
     const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc)}, "test-device", CAPABILITIES_32);
     const wide = () => portable.validateSnapshot(draft.document, CAPABILITIES_32);
@@ -1144,9 +1144,9 @@ test("on the 32-slot firmware, the same builders reach slots past seven", () => 
     stage(draft, edits.duplicatePdMode(30, 12, draft.identity()));
     assert.equal(wide().pdModes[30].name, "Tabs copy");
     assert.deepEqual(wide().rgb.pdModeColors[30].color, {h: 200, s: 255, v: 200}, "with slot 12's colour");
-    stage(draft, edits.pdModeColour("PD_MODE_SLOT_25", "RGB_LEFT_HALF", {h: 1, s: 2, v: 3}));
+    stage(draft, edits.pdModeColour("POINTING_MODE_25", "RGB_LEFT_HALF", {h: 1, s: 2, v: 3}));
     assert.deepEqual(wide().rgb.pdModeColors[25], {pdModeId: 25, color: {h: 1, s: 2, v: 3}, locality: RGB_LOCALITIES.RGB_LEFT_HALF});
-    stage(draft, edits.setKey("Layer 1", 27, "PD_SLOT_31_LOCK"));
+    stage(draft, edits.setKey("Layer 1", 27, "PD_MODE_31_LOCK"));
     assert.equal(profileLayers(draft.document)[1][slotOf(27)], 0x7ebf);
     stage(draft, edits.clearPdMode(12, draft.identity()));
     assert.equal(wide().pdModes[12].kind, 0);

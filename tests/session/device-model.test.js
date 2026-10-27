@@ -85,7 +85,7 @@ test("device shortcut labels stay complete and semantic names require the advert
         committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x67df11b3},
     };
     const model = buildDeviceModel(state);
-    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["GUI+C", "Shift+GUI+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
+    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["GUI+C", "Shift+GUI+Z", "Slot 0 · hold", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
         "a layer lock and a custom key are user slots under the native ABI, named by what they are");
     assert.equal(model.layers[0].positions[5].keycode, "0x7F02", "the editable identity still encodes to the original numeric value");
     assert.doesNotMatch(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[5].display, /Custom key/, "an unknown ABI names no custom key");
@@ -105,7 +105,7 @@ test("a position carries what its value means, not only what the keyboard calls 
         customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7f00, name: "Right Thumb", hasBehavior: true}]},
     });
     assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.semantic]), [
-        ["0x7E80", "PD_SLOT_0"], ["QK_MACRO_0", "MACRO_0"], ["KC_A", "KC_A"], ["0x7F00", "CUSTOM_KEY_0"]]);
+        ["0x7E80", "PD_MODE_0"], ["QK_MACRO_0", "MACRO_0"], ["KC_A", "KC_A"], ["0x7F00", "CUSTOM_KEY_0"]]);
     assert.equal(model.qmkKeyLabels["0x7F00"], "Right Thumb", "a named custom key is labelled by its name");
     for (const [slot, keycode] of [[63, 0x7f3f], [64, 0x7f40], [127, 0x7f7f]]) {
         assert.ok(model.qmkKeycodes.some(key => key.value === `CUSTOM_KEY_${slot}` && key.keycode === keycode && key.group === "Custom keys"), `custom key ${slot} is offered`);
@@ -534,7 +534,7 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     const capabilities = {...CURRENT_CAPABILITIES, featureFlags: (1 << 17) | (1 << 18)};
     const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}}, "board", capabilities);
     draft.stage({type: "updateLayoutKeys", draftRevision: draft.revision, layer: "Layer 0", changes: [
-        {layoutIndex: 0, keycode: "PD_SLOT_0"}, {layoutIndex: 1, keycode: "MACRO_0"},
+        {layoutIndex: 0, keycode: "PD_MODE_0"}, {layoutIndex: 1, keycode: "MACRO_0"},
         {layoutIndex: 2, keycode: "CUSTOM_KEY_0"}, {layoutIndex: 3, keycode: "LT(3,KC_F)"},
         {layoutIndex: 4, keycode: "MT(MOD_LSFT,KC_A)"}, {layoutIndex: 5, keycode: "MO(2)"},
     ]});
@@ -543,7 +543,7 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     const state = {capabilities, phase: "reading", error: {message: "Read unavailable"}, committed: {state: "unavailable"},
         combos: {state: "unavailable", error: {message: "Combo read unavailable"}}};
     const model = buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""}, state);
-    assert.deepEqual(model.layers[0].positions.slice(0, 3).map(key => key.semantic), ["PD_SLOT_0", "MACRO_0", "CUSTOM_KEY_0"]);
+    assert.deepEqual(model.layers[0].positions.slice(0, 3).map(key => key.semantic), ["PD_MODE_0", "MACRO_0", "CUSTOM_KEY_0"]);
     assert.equal(model.layers[0].positions[1].display, "Sign-off");
     assert.equal(model.layers[0].positions[2].display, "Right Thumb");
     assert.equal(model.layers[0].displayName, "Base");

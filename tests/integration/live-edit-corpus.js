@@ -21,7 +21,7 @@ const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_FLAGS, EDIT_PHASE, 
     buildEditAbortRequest, buildSaveRequest, buildEditModeRequest, buildRestartRequest, sendEditRequest, readEditStatus, readEditProgress, readEditMode, readRuntime,
     readActiveProfile} = require("../../core/protocol/profile-edit-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const {document32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
+const {document32, CAPABILITIES_32} = require("../fixtures/pointing-slots-32");
 const {editLayers} = require("../fixtures/profile-document");
 const {MATRIX_ROWS, MATRIX_COLUMNS} = require("../../core/data/charybdis-layout");
 
