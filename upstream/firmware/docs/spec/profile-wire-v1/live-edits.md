@@ -4,8 +4,8 @@ How a client changes the working copy over Profile Wire so an edit runs on
 both halves at once without a save, then saves it, reverts it, or has the
 keyboard save it in Live edit; the edit mode stored beside the profile; keyboard
 adjustments; and how a stopped keyboard says so and is restarted
-([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0032-live-edits-working-copy-and-save.md),
-[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
+([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0032-live-edits-working-copy-and-save.md),
+[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
 Raw HID framing and read envelope are in [the HID channel](hid-channel.md);
 every result code is in [errors](errors.md); Save writes through
 [candidate transfer](candidate-transfer.md). How the slave half follows the
@@ -244,7 +244,7 @@ was; its result (`VALIDATION_REJECTED`, or `PUBLICATION_FAILED` with the
 candidate's error id) and transaction are on page 1, and a working copy
 replaced before the save began writing ends it `ABORTED`. A save waits for
 a quiet keyboard before each flash erase
-([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
+([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
 wait counts toward no timeout on either half.
 
 An Apply still works and replaces the working copy: unsaved edits are gone
