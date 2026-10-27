@@ -27,6 +27,15 @@ test("each Settings screen draws its own sections open, with nothing to fold and
     await expect(page.locator('[data-section="startupLayers"], [data-f^="setting:startupLayer"]')).toHaveCount(0);
 });
 
+test("the sniping keys sit under Sniping DPI, in the pointer speed card", async ({page}) => {
+    await openControls(page, "pointer");
+    await expect(page.locator('[data-section="normalPointerSpeed"] .sniping-keys')).toHaveCount(1);
+    await expect(page.locator('[data-section="sniping"] .sniping-keys')).toHaveCount(0);
+    // Nothing comes between the Sniping DPI field and the keys that turn it on.
+    expect(await page.locator('[data-section="normalPointerSpeed"] .sniping-keys').evaluate((node) =>
+        node.previousElementSibling?.textContent?.includes("Sniping DPI"))).toBe(true);
+});
+
 test("the default combo window and the combo hold threshold are editable on current firmware, even without combos", async ({page}) => {
     await openControls(page, "combos");
     await page.evaluate(async () => {

@@ -66,7 +66,8 @@ function settingsScreen(screen, title, subtitle) {
         else if (section.id === "comboReferences") pad.appendChild(referenceCard(model, section, canEdit));
         else {
             const card = sectionCard(model, section, canEdit);
-            if (section.id === "sniping") card.appendChild(snipingKeys(model, canEdit));
+            // The sniping keys sit under Sniping DPI, the speed they turn on.
+            if (section.id === "normalPointerSpeed") card.appendChild(snipingKeys(model, canEdit));
             pad.appendChild(card);
         }
     }
