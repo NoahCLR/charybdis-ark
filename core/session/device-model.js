@@ -22,7 +22,8 @@ const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
 const {pointingTapKeys} = require("../model/pointing-taps");
-const {linkTargets, pointerCoveredLayers} = require("../model/pointing-links");
+const {linkStarts, linkTargets, pointerCoveredLayers} = require("../model/pointing-links");
+const {keycodeLayersOn} = require("../model/layer-reach");
 const {decodedOf} = require("../model/portable-profile");
 const {baseLighting, settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
@@ -168,6 +169,18 @@ function configurationModel(content, capabilities, editing) {
     const hostVocabulary = hostKeyVocabulary(names.hostOs);
     // The settings a pointing slot's link is judged against, once read.
     const linkSettings = content.domains.settings?.values ? content.domains.settings : null;
+    // The layers each keycode the profile holds turns on, and each mode's
+    // and custom key's, by every name the interface reads it under, so the
+    // interface says which keys reach a mode its layers start without
+    // working out what a keycode does (layer-reach.js keycodeLayersOn).
+    const turnsOn = keycodeLayersOn(linkSettings ? {settings: linkSettings, pdModes: content.domains.pdModes || []} : {settings: {values: [], names: [], customKeyShortcuts: []}, pdModes: []});
+    /** @type {Record<string, number>} */
+    const keyTurnsOn = {};
+    const bindings = Object.values(PD_SLOT_BINDINGS).flatMap((binding) => [binding.holdCode, binding.lockCode]);
+    for (const value of new Set([...profileKeycodes(content, capabilities), ...bindings, ...customKeys.map((key) => key.code)])) {
+        const mask = turnsOn(value), name = keycodeCatalog.resolve(value).name;
+        if (mask) for (const spelled of [name, catalog.aliases[name]]) if (spelled) keyTurnsOn[spelled] = mask;
+    }
     return {
         // The words for every value the keyboard stores, so the interface
         // names things as the review does (model/vocabulary.js).
@@ -181,9 +194,11 @@ function configurationModel(content, capabilities, editing) {
         // surface (model/vocabulary.js slotName), the keycodes that bind it
         // (data/pd-bindings.js), so the interface names and finds a
         // pointing-mode key without a registry of its own, and the layers its
-        // key turns on that the pointer layer covers (model/pointing-links.js).
+        // key turns on that the pointer layer covers (model/pointing-links.js),
+        // and the layers that start its mode, each with the layers that end a
+        // start from it (model/pointing-links.js linkStarts).
         pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id],
-            pointerCovers: linkSettings ? pointerCoveredLayers(linkSettings, slot) : 0})),
+            pointerCovers: linkSettings ? pointerCoveredLayers(linkSettings, slot) : 0, linkStarts: linkSettings ? linkStarts(linkSettings, slot) : []})),
         pdModeEditing: {writable: editing.pointing,
             dpiChoices: dpiChoices({normalSpeed: true}),
             // Which layers a slot's link may name, and why not
@@ -242,6 +257,7 @@ function configurationModel(content, capabilities, editing) {
         qmkKeycodes: catalog.entries,
         qmkKeyLabels: catalog.labels,
         qmkKeyLayers: keyLayers,
+        qmkKeyTurnsOn: keyTurnsOn,
         qmkKeyShortLabels: compactKeyLabels(catalog.labels),
         qmkKeycodeAliases: catalog.aliases,
         qmkKeycodeSource: CATALOG_SOURCE,

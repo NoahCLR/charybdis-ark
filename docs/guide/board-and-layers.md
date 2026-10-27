@@ -143,7 +143,22 @@ Under the board, the workbench works on the selected key. Its tabs are:
   behaviour's key and then the branch that sends it, as the behaviour grid
   heads it: "from Right Option · 1× tap". When that key is already in the
   row, the branch follows it: "Dragscroll hold · 2× hold sends Dragscroll
-  lock". **Edit** opens one on its own screen.
+  lock". A pointing mode's row also has its link
+  ([How it starts](pointing.md#how-it-starts)) in three columns: **Started
+  by**, the layers that start it (one the keyboard ignores, such as the
+  pointer layer, is marked ignored), **Ends when**, and **Its key turns on**.
+  Turning on a layer that starts a mode starts it, so the mode is listed on
+  that layer, reached by "turning on Navigation", and on every layer with a
+  key that turns that layer on: a layer key, a custom key's layers, another
+  mode's key, or a behaviour or combo sending a layer key. A route that would
+  turn it on with a layer already on that ends it (a higher layer, say) is
+  not listed. Its **Reached by** puts each route on a line of its own, said
+  as everywhere else: a layer key as the board names it ("Navigation
+  `HOLD`"), a custom key with the layers of its shortcut that start the mode
+  ("Custom key 0 · sends Navigation `LOCK`"), and a branch or combo with
+  what it sends. The slot is tagged **Started** for these routes, beside
+  **Hold** or **Lock** for routes that send its own keys.
+  **Edit** opens one on its own screen.
 
 Each tab counts what it holds for this layer, and a dot marks a draft change.
 

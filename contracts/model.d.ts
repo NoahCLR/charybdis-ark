@@ -112,7 +112,7 @@ export interface Vocabulary {
         invert: WordList<number>;
         scrollAxes: WordList<number>;
         pointerLayer: WordList<number>;
-        linkLabels: {starts: string; keyTurnsOn: string; startsOther: string; linkedLayers: string; linkTurnsOn: string; linkEnds: string};
+        linkLabels: {starts: string; keyTurnsOn: string; startsOther: string; linkedLayers: string; linkTurnsOn: string; linkEnds: string; startedBy: string; endsWhen: string; keyTurnsOnShort: string; ignored: string; started: string};
         linkInert: {default: string; pointer: string};
         linkEnds: WordList<number>;
         emptyDirection: WordList<number>;

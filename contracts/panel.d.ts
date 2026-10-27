@@ -48,6 +48,8 @@ export interface ShortcutLayerTarget {layer: number; refusal: string; alwaysOn: 
  * A layer as a pointing slot's link target: `refusal` is why the keyboard would ignore a link to it, "" when it would not;
  * `inert` names the kind of layer the keyboard ignores in a link, for the editor's row; `linkedBy` is the slot whose mode the layer starts.
  */
+/** A layer that starts a slot's mode as the keyboard runs its link, and the layers whose being on ends a start from it, bit n layer n (0: nothing does; core/model/pointing-links.js linkStarts). */
+export interface PdLinkStart {layer: number; ends: number}
 export interface PdLinkTarget {layer: number; refusal: string; inert: 'default' | 'pointer' | ''; linkedBy: number | null; linkedByName: string}
 /** `shortcutLabel` names the shortcut in the host's words ("Left Ctrl + Right Alt + K"), empty for none. */
 export interface CustomKey {
@@ -120,7 +122,7 @@ export interface PublishedModel {
     layers: Layer[];
     hostLayoutLegends: Record<string, string[]> | null;
     /** `pointerCovers`: the layers the slot's key turns on that the pointer layer covers while the mode keeps it, bit n layer n (core/model/pointing-links.js). */
-    pdModes: (PdSlot & {displayName: string; binding: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}; pointerCovers: number})[];
+    pdModes: (PdSlot & {displayName: string; binding: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}; pointerCovers: number; linkStarts: PdLinkStart[]})[];
     pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; tapKeys: {plain: string[]; modified: string[]};
         /** Every layer as a link target (core/model/pointing-links.js): why the keyboard would ignore it in a link ("" when it would not), and the slot whose link names it. */
         linkTargets: PdLinkTarget[];
@@ -158,6 +160,8 @@ export interface PublishedModel {
     qmkKeyLabels: Record<string, string>;
     /** Keycode name → the layer it acts on, beside its label in qmkKeyLabels (model/key-names.js keyLayer). */
     qmkKeyLayers: Record<string, number>;
+    /** The layers each keycode turns on as the key pressed, bit n layer n, by every name it is read under; a keycode that turns none on is absent (core/model/layer-reach.js keycodeLayersOn). */
+    qmkKeyTurnsOn: Record<string, number>;
     qmkKeyShortLabels: Record<string, string>;
     qmkKeycodeAliases: Record<string, string>;
     qmkKeycodeSource: string;

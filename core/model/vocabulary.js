@@ -252,9 +252,13 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // any layer outside both sets, neither the pointer layer nor a default
         // layer. The editor's two columns of switches, and Review's fields.
         // Each column title describes the layer in its row; "already starts"
-        // names the other mode a layer starts.
+        // names the other mode a layer starts. The Keys workbench's Pointing
+        // modes tab heads a column for each part of the link (`startedBy`,
+        // `endsWhen`, `keyTurnsOnShort`), marks a layer the keyboard ignores in
+        // it (`ignored`), and tags a mode its link starts (`started`).
         linkLabels: {starts: "Starts this pointing mode", keyTurnsOn: "Turned on by this pointing mode's key", startsOther: "already starts",
-            linkedLayers: "Layers that start this pointing mode", linkTurnsOn: "Layers turned on by this pointing mode's key", linkEnds: "Ends when another layer turns on"},
+            linkedLayers: "Layers that start this pointing mode", linkTurnsOn: "Layers turned on by this pointing mode's key", linkEnds: "Ends when another layer turns on",
+            startedBy: "Started by", endsWhen: "Ends when", keyTurnsOnShort: "Its key turns on", ignored: "ignored", started: "started"},
         linkEnds: [[0, "Never"], [1, "A higher layer"], [2, "Any layer"]],
         // Why a layer cannot be in a link, said in its row.
         linkInert: {default: "default layer, always on", pointer: "pointer layer, follows the trackball"},

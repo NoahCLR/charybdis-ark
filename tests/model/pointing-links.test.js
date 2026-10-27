@@ -3,7 +3,7 @@
 // be turned on by its key, and why not, as the editor offers them and a staged
 // edit is judged.
 const test = require("node:test"), assert = require("node:assert/strict");
-const {inertLinkLayers, inertLinkReason, linkTargets, linkRefusal, pointerCoveredLayers, reorderLinkRefusal, settingsLinkRefusal} = require("../../core/model/pointing-links");
+const {inertLinkLayers, inertLinkReason, linkStarts, linkTargets, linkRefusal, pointerCoveredLayers, reorderLinkRefusal, settingsLinkRefusal} = require("../../core/model/pointing-links");
 const {settings} = require("../fixtures/portable-profile");
 
 // The test profile's settings: Base the one default layer, Pointer (4) the
@@ -123,4 +123,25 @@ test("a reorder that would leave a link ignored, or one layer starting two modes
     const merged = slots().map((slot) => ({...slot, linkedLayers: merge(slot.linkedLayers), linkTurnsOn: merge(slot.linkTurnsOn)}));
     assert.equal(reorderLinkRefusal(value, value, slots(), merged, merge, false),
         "This move would put Navigation and Extra 1 of Brightness's link on one layer, Navigation. Turn on Keys follow their layers, or change the link first.");
+});
+
+test("a link's starting layers, each with the layers that end a start from it", () => {
+    // As the keyboard runs the link (pointing_mode_link_ended): a higher layer
+    // ends a start from any layer above it, any layer ends one from every
+    // layer outside both of the link's sets. Base, the default layers and the
+    // pointer layer never end it, and a layer the keyboard ignores in a link
+    // starts nothing.
+    const value = settings();
+    const slot = (fields) => ({id: 1, kind: 1, name: "Volume", ...unlinked, ...fields});
+    const above = (layer) => (0xffff << (layer + 1)) & 0xffff & ~(1 << 4);
+    assert.deepEqual(linkStarts(value, slot({linkedLayers: (1 << 5) | (1 << 6)})), [{layer: 5, ends: 0}, {layer: 6, ends: 0}], "Never");
+    assert.deepEqual(linkStarts(value, slot({linkedLayers: (1 << 3) | (1 << 6), linkEnds: 1})),
+        [{layer: 3, ends: above(3)}, {layer: 6, ends: above(6)}], "a higher layer, never the pointer layer");
+    const link = (1 << 5) | (1 << 2) | (1 << 7);
+    assert.deepEqual(linkStarts(value, slot({linkedLayers: 1 << 5, linkTurnsOn: (1 << 2) | (1 << 7), linkEnds: 2})),
+        [{layer: 5, ends: 0xffff & ~link & ~1 & ~(1 << 4)}], "any layer outside the link, never Base or the pointer layer");
+    assert.deepEqual(linkStarts(value, slot({linkedLayers: (1 << 0) | (1 << 4) | (1 << 5)})), [{layer: 5, ends: 0}], "Base and the pointer layer start nothing");
+    assert.deepEqual(linkStarts(value, slot({kind: 0, linkedLayers: 1 << 5})), [], "an empty slot starts nothing");
+    value.values[23] = (1 << 0) | (1 << 2);
+    assert.deepEqual(linkStarts(value, slot({linkedLayers: 1 << 1, linkEnds: 1})), [{layer: 1, ends: above(1) & ~(1 << 2)}], "a default layer never ends it");
 });

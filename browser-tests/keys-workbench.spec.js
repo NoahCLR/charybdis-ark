@@ -158,3 +158,99 @@ test("the Custom keys tab lists the custom keys a layer reaches, and opens one o
     await expect(page.locator('.bench-pane tr[data-reach="here:CUSTOM_KEY_0"]')).toHaveAttribute("data-picked", "true");
     expect(await page.evaluate(() => window.__posted.filter((message) => message.type !== "ready")), "looking edits nothing").toEqual([]);
 });
+
+// A pointing mode's link (firmware D-F62) shows on the Pointing modes tab: its
+// Mode says which layers start it and which its key turns on, and a layer that
+// starts it reaches it On this layer, named as the route.
+test("the Pointing modes tab says a mode's link, and the layer that starts it reaches it", async ({page}) => {
+    if (process.env.ARK_SHOT) await page.setViewportSize({width: 1900, height: 1200});
+    await openPreview(page);
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        // Arrow starts from Navigation until a higher layer turns on, names the
+        // pointer layer too (which the keyboard ignores in a link, so the core
+        // leaves it out of linkStarts), and its key turns on Extra 1.
+        Object.assign(model.pdModes.find((slot) => slot.id === 4), {linkedLayers: (1 << 3) | (1 << 4), linkTurnsOn: 1 << 5, linkEnds: 1,
+            linkStarts: [{layer: 3, ends: (0xffff << 4) & 0xffff & ~(1 << 4)}]});
+        // Base gets two keys that turn Navigation on: MO(3) in the "/" key's
+        // place, and CUSTOM_KEY_0 (on Base already) locking Navigation.
+        Object.assign(model.layers[0].positions[46], {keycode: "MO(3)", semantic: "MO(3)", display: "Navigation", editLabel: "Hold Navigation", value: 0x5223});
+        Object.assign(model.customKeys.find((key) => key.keycode === "CUSTOM_KEY_0"),
+            {shortcut: {mods: 0, key: 0, layers: 1 << 3, layerKind: 1}, shortcutLabel: "Lock Navigation", shortcutKeys: [], shortcutLayerNames: ["Navigation"]});
+        model.qmkKeyTurnsOn = {...model.qmkKeyTurnsOn, "MO(3)": 1 << 3, "CUSTOM_KEY_0": 1 << 3};
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+        store.state.layer = 3; store.render();
+    });
+    await tab(page, "pointing").click();
+    const group = page.locator('.bench-pane [data-group="here"]');
+    if (await group.getAttribute("aria-expanded") !== "true") await group.click();
+    await expect(group).toContainText("1");
+    const here = pane(page).locator('tr[data-reach="here:4"]');
+    const cell = (row, at) => row.locator("td").nth(at);
+    // Mode, then a column for each part of the link, headed in the words the
+    // vocabulary gives them.
+    await expect(pane(page).locator("thead th")).toHaveText(["Slot", "Mode", "Started by", "Ends when", "Its key turns on", "Reached by", ""]);
+    await expect(cell(here, 1)).toHaveText("Directional · 400 DPI");
+    // The pointer layer is in the link but ignored, said with the card's reason.
+    await expect(cell(here, 2)).toHaveText(/^Navigation, Pointer ignored$/);
+    await expect(cell(here, 2).locator(".kind-icon.layer")).toHaveCount(2);
+    await expect(cell(here, 2).locator("[data-tip]")).toHaveAttribute("data-tip", /pointer layer/);
+    await expect(cell(here, 3)).toHaveText("A higher layer");
+    await expect(cell(here, 4)).toHaveText(/^Extra/);
+    await expect(cell(here, 5).locator(".reach-line")).toHaveText(["turning on Navigation"]);
+    // Only its link starts it here, which sends neither keycode: the row says "started".
+    await expect(cell(here, 0).locator(".sends-tag")).toHaveText(["started"]);
+    await expect(cell(here, 0).locator("code")).toHaveCount(0);
+
+    if (process.env.ARK_SHOT) await page.locator(".bench").screenshot({path: `${process.env.ARK_SHOT}/pointing-tab-layer.png`});
+
+    // From Base, Base starts nothing, but a key turning Navigation on starts
+    // the mode: the board rings it and Reached by says so after the key.
+    await page.evaluate(async () => { const store = await import("/webview/store.mjs"); store.state.layer = 0; store.render(); });
+    const fromKey = pane(page).locator('tr[data-reach="here:4"]');
+    // A route a line, each as every reach tab says it: MO(3) as the board
+    // names it, with its tag, and Custom key 0 with the shortcut layer that
+    // starts the mode, tagged with its kind as its hover card does.
+    const lines = cell(fromKey, 5).locator(".reach-line");
+    await expect(lines).toHaveText([/^Navigation ?Hold$/, /^Custom key 0 · sends Navigation ?lock$/]);
+    await expect(lines.nth(0).locator(".sends-tag")).toHaveText(["Hold"]);
+    await expect(lines.nth(1).locator(".sends-tag")).toHaveText(["lock"]);
+    await expect(cell(fromKey, 0).locator(".sends-tag")).toHaveText(["started"]);
+    await fromKey.click();
+    // On this view, Custom key 0's own behaviour also turns Navigation on,
+    // which adds nothing to the key's own shortcut and is left out. The Right
+    // Option tap locks Arrow, so the row is named by its lock keycode and that
+    // line says only where it comes from; the others started it.
+    const viewRow = pane(page).locator('tr[data-reach="view:4"]');
+    await expect(cell(viewRow, 5).locator(".reach-line"))
+        .toHaveText([/^Navigation ?Hold$/, /^Custom key 0 · sends Navigation ?lock$/, /^from Right Option KC_RIGHT_ALT · 1× ?tap$/]);
+    await expect(cell(viewRow, 0).locator(".sends-tag")).toHaveText(["lock", "started"]);
+    if (process.env.ARK_SHOT) {
+        await page.locator(".board").first().screenshot({path: `${process.env.ARK_SHOT}/pointing-tab-board.png`});
+        await page.locator(".bench").screenshot({path: `${process.env.ARK_SHOT}/pointing-tab-key.png`});
+    }
+
+    // From Extra 1, above Navigation, a key turning Navigation on would start
+    // it with a higher layer already on, which ends it: Arrow is not reached
+    // that way.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.layers[5].positions[46], {keycode: "MO(3)", semantic: "MO(3)", display: "Navigation", editLabel: "Hold Navigation", value: 0x5223});
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+        store.state.layer = 5; store.render();
+    });
+    await expect(pane(page).locator('tr[data-reach="here:4"]')).toHaveCount(0);
+    // With nothing ending it, the same key starts it.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.pdModes.find((slot) => slot.id === 4), {linkEnds: 0, linkStarts: [{layer: 3, ends: 0}]});
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    });
+    await expect(cell(pane(page).locator('tr[data-reach="here:4"]'), 5).locator(".reach-line")).toHaveText([/^Navigation ?Hold$/]);
+});
