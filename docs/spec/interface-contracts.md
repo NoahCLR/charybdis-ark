@@ -172,6 +172,7 @@ below.
 | Number entry: whole numbers author `inputmode="numeric"`, durations `"decimal"`; typing, pasting or dropping keeps only digits (and a duration's first point) with the caret in place; range limits stay with the edit | `webview/lib/number-entry.mjs` | `tests/view/number-entry.test.mjs`, `browser-tests/number-entry.spec.js` |
 | Screens: IDs, labels, rail groups, availability, rendering and redraw; `PanelState.screen` takes its IDs from here; an unknown ID shows an unavailable screen | `webview/view/screens.mjs` | `tests/view/screens.test.mjs`, `browser-tests/screens-registry.spec.js` |
 | Words, sent as `model.vocabulary`; stages are found by id, never by label | `core/model/vocabulary.js` | `tests/model/vocabulary.test.js`, `tests/view/enum-drift.test.mjs` |
+| Edit modes: their words, and the order the switch offers them (`editMode.offered`): Live edit, Live preview + save, then Review and save. The keyboard's Apply and Save both read as Save ([D-L72](../adr/0072-users-see-save-for-both-keyboard-operations.md)) | `core/model/vocabulary.js`, `core/session/panel-session.js` | `tests/model/vocabulary.test.js`, `tests/session/live-watch.test.js`, `tests/view/edit-mode.test.mjs`, `browser-tests/live-edits.spec.js` |
 | Actions, native keycodes, decode limits, layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
 | Custom-key shortcut keys (firmware D-F26): which keys a shortcut holds (`customKeyShortcutKeys`, by catalogue name) and the caps on them, as data the codec itself checks: at most six, each once, at most one media and one system key, each cap with its keycodes and the codec's words when broken, and the limits in words, published as `customKeyShortcutKeyLimits` (`SHORTCUT_KEY_LIMITS`). The picker reads the caps against the keycodes it would post and says the first one broken (`shortcutPickProblem`), with no limit, category or name matching of its own; every other refusal (a byte that is no such key, an old single-key message) is the codec's words too (`shortcutStoreRefusal`, `SHORTCUT_KEY_REFUSALS`) | `core/schema/settings-domain-v1.js` (`SHORTCUT_KEY_CAPS`, `shortcutKeysRefusal`), `core/model/custom-key-editor.js` | `tests/schema/settings-domain-v1.test.js`, `tests/model/custom-key-editor.test.js`, `tests/view/custom-key.test.mjs`, `browser-tests/custom-key-shortcut.spec.js` |
 | Decoding once: a snapshot's `decoded` form is taken with `decodedOf` (`core/model/portable-profile.js`), which decodes afresh only when the document changed; draft history entries are frozen and decoded once each | `core/model/portable-profile.js`, `core/session/profile-draft-session.js` | `tests/session/profile-draft-session.test.js` |
@@ -345,9 +346,9 @@ only an operation stands in the way. The demo's draft is bound to the demo
 - Device operation phases have stable IDs (`PHASE`) with their words and write
   fact beside them; progress compares IDs, so words never change routing
   (`tests/model/vocabulary.test.js`).
-- Closing the web page asks first only when it would lose edits (an unapplied
-  draft, unsaved Live + review edits, a Live edit on its way, the demo's
-  unexported edits) or while an Apply, a Save or a restore writes the profile
+- Closing the web page asks first only when it would lose edits (an unsaved
+  draft in Review and save, unsaved edits in Live preview + save, an edit on
+  its way in Live edit, the demo's unexported edits) or while an Apply, a Save or a restore writes the profile
   (`leaving` in `web/web-shell.mjs`; `tests/web-shell.test.mjs`, live cases: no
   test).
 
@@ -376,11 +377,11 @@ snapshot and leaves the editor's alone
   what it changed from the step before; Undo and Redo name the step they move
   (`tests/session/profile-draft-session.test.js`). Core sends the steps only
   while the sheet is open (`tests/session/panel-session.test.js`).
-- In Apply the bar offers **Review and apply** (**Review changes** in the
-  demo) beside **Discard all**, and adds added, changed and removed counts
+- In Review and save the bar offers **Review and save** (**Review changes** in
+  the demo) beside **Discard all**, and adds added, changed and removed counts
   only when they say more than the total (`statusBesideCount`;
   `tests/view/review.test.mjs`). In the live modes it counts unsaved changes
-  and offers Revert, and in Live + review **Review and save**
+  and offers Revert, and in Live preview + save **Review and save**
   (`browser-tests/live-edits.spec.js`).
 
 ## Review changes and Discard
@@ -424,11 +425,10 @@ how the review shows them (D-L36).
   draft's with the keyboard's in the draft's layer order
   (`tests/model/layer-reach.test.js`).
 - Every warning or trap the draft keeps, made by it or not, asks for
-  confirmation: **Apply anyway** / **Go back** (**Save anyway** in Live +
-  review); notices and fixed checks do not (`checksToConfirm`;
-  `tests/view/checks.test.mjs`). Core refuses an Apply, a Live + review Save or
-  sending live without it, and it holds only for the reviewed revision
-  (`tests/session/panel-controls.test.js`, `tests/session/live-edits.test.js`,
+  confirmation: **Save anyway** / **Go back**; notices and fixed checks do not
+  (`checksToConfirm`; `tests/view/checks.test.mjs`). Core refuses an Apply, a
+  Save in Live preview + save or sending live without it, and it holds only
+  for the reviewed revision (`tests/session/panel-controls.test.js`, `tests/session/live-edits.test.js`,
   `tests/session/profile-draft-session.test.js`).
 - A new check names a draft edit group only when its source is unambiguous
   (`checkSourceGroup`; `tests/view/checks.test.mjs`).
@@ -473,7 +473,7 @@ Import checks one, under the capabilities current firmware reports
   (`tests/view/demo-view.test.mjs`).
 - Core refuses Apply and reviewing against a keyboard; Export saves the draft.
   Leaving the demo with unexported edits needs `discardDemo`. The demo is
-  offered only with no keyboard connected and no unapplied keyboard draft
+  offered only with no keyboard connected and no unsaved keyboard draft
   (`tests/session/demo-session.test.js`).
 
 ## Lighting preview
@@ -670,8 +670,8 @@ Ark expects it (`core/session/keyboard-reconnect.js`;
   keyboard, so the draft follows it with its history
   (`tests/session/live-edits.test.js`).
 - A read that is not ready after the keyboard is back is said as a failure,
-  never as "back". When a live keyboard moved under that read (in Live, its
-  own save after the rename), the live watch takes over: the keyboard whose
+  never as "back". When a live keyboard moved under that read (in Live edit,
+  its own save after the rename), the live watch takes over: the keyboard whose
   status names the draft's edit session is followed and read again, within
   the watch's bound of three failed reads per draft
   (`tests/session/live-edits.test.js`).

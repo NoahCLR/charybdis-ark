@@ -218,7 +218,7 @@ const liveOr = (name, local) => async (context) => {
         if (["undo", "redo", "jump", "discardChanges", "putBack"].includes(name)) context.session.resetDraftForms = true;
         return;
     }
-    if (!local) throw new Error("Save, Revert and live edits are for a keyboard in Live + review.");
+    if (!local) throw new Error("Save, Revert and live edits are for a keyboard in a live edit mode.");
     await local(context);
 };
 /** @type {Readonly<Record<string, (context: DraftContext) => void | Promise<void>>>} */
@@ -273,22 +273,22 @@ const DRAFT_ACTIONS = Object.freeze({
         observePortable(session, service.snapshot(), snapshot);
         draft.rebase(revision);
         session.resetDraftForms = true;
-        session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";
+        session.notice = "Review now compares your draft with the latest keyboard state. Save will replace the differences shown.";
         return;
     }),
     // The success state's way back: the copy saved before the last Apply
     // becomes the draft, one undoable step, reviewed and applied as any edit.
     putBack: liveOr("putBack", ({draft, revision, session}) => {
         const before = session.beforeApply;
-        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before an Apply on this keyboard to put back.");
-        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before Apply", IDENTITY);
+        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before a save on this keyboard to put back.");
+        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before the save", IDENTITY);
         session.resetDraftForms = true;
     }),
     apply: async ({draft, revision, message, session, service, shell}) => {
         // The interface asks about active traps and warnings; the shell
         // enforces that decision before writing a recovery copy or HID.
-        if (draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before applying this profile.");
-        if (draft.hasChecksToConfirm() && /** @type {Extract<DraftMessage, {type: 'applyProfileDraft'}>} */ (message).confirmChecks !== true) throw new Error("This draft has warnings or traps. Confirm them in the review before applying.");
+        if (draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before saving this profile.");
+        if (draft.hasChecksToConfirm() && /** @type {Extract<DraftMessage, {type: 'applyProfileDraft'}>} */ (message).confirmChecks !== true) throw new Error("This draft has warnings or traps. Confirm them in the review before saving.");
         // A finished Apply is shown only while this control still runs:
         // a later read or export is not its readback.
         await whileApplying(session, async (readStep) => {
@@ -297,7 +297,7 @@ const DRAFT_ACTIONS = Object.freeze({
             /** @type {import("../model/types.js").PortableDocument | undefined} */
             let saved;
             const before = draft.base;
-            const result = await run(shell, "Applying the complete profile to both halves",
+            const result = await run(shell, "Saving the complete profile to both halves",
                 () => draft.apply(service, revision, async (document) => {if (document.format === "charybdis-profile") saved = /** @type {import("../model/types.js").PortableDocument} */ (document); return (recovery = await recoveryFor(shell, session, "apply")(document));}));
             session.resetDraftForms = true;
             // What the keyboard held before, for "Put back what it had".
@@ -308,7 +308,7 @@ const DRAFT_ACTIONS = Object.freeze({
                 readStep(step);
                 service.emitChange?.();
             }).catch((error) => {reread = rereadOutcome(session, expected, error);});
-            session.notice = reconnectNotice(expected, `${savedNotice(result, "applied to")} ${reread}Recovery copy: ${recovery}`);
+            session.notice = reconnectNotice(expected, `${savedNotice(result, "saved to")} ${reread}Recovery copy: ${recovery}`);
         });
         return;
     },

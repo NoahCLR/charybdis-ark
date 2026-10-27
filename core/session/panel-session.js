@@ -140,17 +140,19 @@ function buildPanelModel(session, state) {
         if (draft.matching) {
             model.profileIdentity = session.draft.identity();
         }
-        // Live's words say the quiet interval the keyboard reports.
+        // Live edit's words say the quiet interval the keyboard reports.
         const quietMs = (draft.live?.keyboard || draft.keyboard)?.quietMs;
         if (quietMs && model.vocabulary) model.vocabulary = {...model.vocabulary, editModes: editModeWords(quietMs)};
         if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === 1
             ? `The keyboard runs these edits now · it saves them by itself after ${quietWords(quietMs)} without typing`
             : "The keyboard runs these edits now · Save makes them permanent; unplugging it puts back what is saved";
-        else if (draft.dirty && draft.matching && !draft.live) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
+        else if (draft.dirty && draft.matching && !draft.live) model.device.subtitle = "Showing your local draft · the keyboard still runs its saved profile";
     }
     // How edits reach this keyboard, and an edit waiting on its trap check.
+    // The modes are offered as the switch lists them: Live edit, Live
+    // preview + save, then Review and save.
     const mode = state.editMode;
-    const editMode = mode && state.connected && !session.demo ? {mode: mode.mode, conflict: mode.conflict, offered: [0, 1, 2], notStored: Boolean(mode.notStored)} : null;
+    const editMode = mode && state.connected && !session.demo ? {mode: mode.mode, conflict: mode.conflict, offered: [1, 2, 0], notStored: Boolean(mode.notStored)} : null;
     // Ark's own edit or Revert the keyboard holds until no key is held, and
     // whether Cancel edit can end it (a held Revert cannot be aborted).
     const waiting = state.liveWaiting && state.connected && !session.demo ? state.liveWaiting : null;
@@ -329,8 +331,8 @@ function routeMessage(session, message, state) {
     // as an edit; the draft checks its revision, review and keyboard again as
     // it writes (ProfileDraftSession.apply).
     if (control?.binding === "apply" && session.draft) {
-        assertBound(session, state, (reason) => reason === "connection-changed" ? "Review this draft against the connected keyboard before applying it."
-            : "Reconnect the keyboard this draft belongs to and wait for its current operation before applying it.");
+        assertBound(session, state, (reason) => reason === "connection-changed" ? "Review this draft against the connected keyboard before saving it."
+            : "Reconnect the keyboard this draft belongs to and wait for its current operation before saving it.");
     }
     if (control?.route === "draft") return "draft";
     if (control?.binding === "import") boundDraft(session, state, message, "Read the keyboard and wait for its current operation before importing a profile.");

@@ -58,7 +58,7 @@ const supportsCompleteProfile = canEdit;
 /** @param {Partial<Caps> | null | undefined} capabilities @param {boolean} [writing] @returns {asserts capabilities is Partial<Caps>} */
 function requireReady(capabilities, writing = false) {
     if (!(writing ? canApply(capabilities) : canEdit(capabilities))) {
-        throw Object.assign(new Error("Complete profile backup and Apply need current firmware on both halves. Your current keyboard configuration has not been changed."), {code: "FIRMWARE_UPDATE_REQUIRED"});
+        throw Object.assign(new Error("Complete profile backups and saving need current firmware on both halves. Your current keyboard configuration has not been changed."), {code: "FIRMWARE_UPDATE_REQUIRED"});
     }
 }
 
@@ -147,7 +147,7 @@ function maskCheck(label, actual, expected) {
 /** @param {Partial<Caps> | null | undefined} capabilities @param {Pick<ReturnType<typeof evaluateProfileCompatibility>, "compatible" | "reasons"> | null | undefined} compatibility @param {boolean} [connected] @param {Partial<Status> | null | undefined} [status] */
 function evaluateLiveMutationCompatibility(capabilities, compatibility, connected = true, status) {
     const reasons = [];
-    if (!connected) reasons.push("Connect to the keyboard before applying a live profile.");
+    if (!connected) reasons.push("Connect to the keyboard before sending it edits.");
     if (!compatibility?.compatible) reasons.push(...(compatibility?.reasons || ["Read compatibility has not been established."]));
     const flags = Number(capabilities?.featureFlags) || 0;
     if (!hasAll(flags, REQUIRED_LIVE_MUTATION_FEATURES)) {

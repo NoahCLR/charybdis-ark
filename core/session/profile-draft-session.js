@@ -691,14 +691,14 @@ class ProfileDraftSession {
     async apply(service, revision, saveRecovery) {
         if (this.live) throw fail("This keyboard already runs these edits; Save makes them permanent.");
         this.assertRevision(revision);
-        if (!this.dirty || this.reviewedRevision !== revision) throw fail("Review the current draft before applying it.");
-        if (this.hasBlockers()) throw fail("Resolve the review's blockers before applying this profile.");
+        if (!this.dirty || this.reviewedRevision !== revision) throw fail("Review the current draft before saving it.");
+        if (this.hasBlockers()) throw fail("Resolve the review's blockers before saving this profile.");
         const bound = this.bindingTo(service.snapshot());
-        if (bound === "connection-changed") throw fail("Review this draft against the connected keyboard before applying it.");
+        if (bound === "connection-changed") throw fail("Review this draft against the connected keyboard before saving it.");
         if (bound) throw fail("Reconnect the keyboard this draft belongs to.");
         // A keyboard that stopped saving (firmware D-F34) refuses the copy as
         // not ready; said as what it is, before a recovery copy or a write.
-        if (this.keyboardStatus?.stopped || this.keyboardStatus?.slaveStopped) throw Object.assign(new Error(`Apply refused: ${LIVE_RESULT_WORDS.STOPPED}`), {code: "LIVE_KEYBOARD_STOPPED"});
+        if (this.keyboardStatus?.stopped || this.keyboardStatus?.slaveStopped) throw Object.assign(new Error(`Save refused: ${LIVE_RESULT_WORDS.STOPPED}`), {code: "LIVE_KEYBOARD_STOPPED"});
         try {
             const result = await service.restorePortableProfile(this.document, {expectedFingerprint: this.base.fingerprint, saveRecovery});
             if (result.fingerprint !== this.current.fingerprint) {this.needsRead = true; throw fail("The saved profile did not match the draft. Keep the recovery copy and read the keyboard again.");}

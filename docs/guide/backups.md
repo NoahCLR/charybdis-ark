@@ -15,7 +15,8 @@ changes nothing on the keyboard or in your draft. The file goes to your
 downloads, named like
 `charybdis-2026-10-23.charybdis.json`.
 
-In Live + review it exports what the keyboard runs, unsaved changes included.
+In Live preview + save it exports what the keyboard runs, unsaved changes
+included.
 
 Keep one somewhere safe before you try something big.
 
@@ -32,9 +33,9 @@ changes. The sheet says:
   behaviours, lighting, macros and so on.
 
 **Use as draft** makes the file your draft. Undo brings back the draft you
-had. In Apply, the keyboard changes only once you review and apply it; in
-Live + review the file is sent to the keyboard as unsaved edits, for you to
-review and save.
+had. In Review and save, the keyboard changes only once you review and save
+it; in Live preview + save the file is sent to the keyboard as unsaved edits,
+for you to review and save.
 
 A file that holds exactly what the keyboard runs changes nothing, so it can't
 be used, unless your draft has edits: then using it puts the draft back to
@@ -45,7 +46,7 @@ from older firmware. It never replaces your draft with a file it refused.
 
 ## Recovery copies
 
-Before every Apply or Save, before leaving Live and before restoring a
+Before every save, before leaving Live edit and before restoring a
 backup, Ark saves a recovery copy of what the keyboard held, and it doesn't
 write anything if it can't save one. A restart with unsaved edits keeps a
 copy of those edits the same way.

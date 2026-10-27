@@ -161,7 +161,7 @@ test("the mode question lists the checks Save confirms, and Save anyway confirms
     await withModel(page, model => {model.draft.checks = [{id: "w", kind: "unowned", level: "warning", status: "existing", title: "Layer 3 has no way back", detail: "", place: null}];});
     await page.locator('[data-f="rail:edit-mode"]').selectOption("0");
     const ask = page.locator(".sheet.edit-mode-ask");
-    await expect(ask).toContainText("In Apply");
+    await expect(ask).toContainText("In Review and save");
     await expect(ask.locator(".live-ask-checks")).toContainText("Layer 3 has no way back");
     await ask.locator('[data-pending="save"]').click();
     await expectPost(page, {type: "setEditMode", mode: 0, pending: "save", confirmChecks: true});
@@ -226,10 +226,11 @@ test("custom keys: a name posts", async ({page}) => {
 test("switching into Live from Live + review asks Save or Revert; from Apply with nothing pending it switches at once", async ({page}) => {
     await openLive(page, "keys");
     const mode = page.locator('[data-f="rail:edit-mode"]');
-    await expect(mode.locator("option")).toHaveText(["Apply", "Live", "Live + review"]);
+    await expect(mode.locator("option")).toHaveText(["Live edit", "Live preview + save", "Review and save"]);
+    expect(await mode.locator("option").evaluateAll(options => options.map(option => /** @type {HTMLOptionElement} */ (option).value))).toEqual(["1", "2", "0"]);
     await mode.selectOption("1");
     const ask = page.locator(".sheet.edit-mode-ask");
-    await expect(ask).toContainText("In Live the keyboard saves edits by itself");
+    await expect(ask).toContainText("In Live edit the keyboard saves edits by itself");
     await ask.locator('[data-pending="save"]').click();
     await expectPost(page, {type: "setEditMode", mode: 1, pending: "save"});
     await page.goto("/preview/index.html");
@@ -350,7 +351,7 @@ test("a keyboard that stopped saving says so, for either half, and Restart posts
 });
 
 // The same under an Apply draft: the look between edits reads the same flags,
-// and Restart is the one action, not Review and apply.
+// and Restart is the one action, not Review and save.
 test("an Apply draft's keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
     await page.goto("/preview/index.html?shell=apply-stopped");
     const bar = page.locator(".commit.stopped");
@@ -380,5 +381,5 @@ test("an Apply draft's keyboard that stopped saving says so, for either half, an
         store.setModel(model); store.render();
     });
     await expect(page.locator(".commit.stopped")).toHaveCount(0);
-    await expect(page.locator('.commit [data-act="review"]')).toHaveText("Review and apply");
+    await expect(page.locator('.commit [data-act="review"]')).toHaveText("Review and save");
 });

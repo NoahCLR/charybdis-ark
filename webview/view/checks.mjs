@@ -56,7 +56,8 @@ export function checkSourceGroup(check, changes = []) {
     return matches.length === 1 && Number.isInteger(matches[0].group) ? matches[0].group : null;
 }
 
-// What the confirmation says before Apply (or Save, or a live edit) goes ahead.
+// What the confirmation says before a save (or a live edit) goes ahead. The
+// keyboard's Apply and Save both read as Save (D-L72).
 /** @param {readonly import("../../contracts/model.js").Check[]} checks @param {'apply' | 'save' | 'send' | 'sendDraft'} [action] `send` is one live edit; `sendDraft` the whole draft, sent on switching to a live mode */
 export function confirmText(checks, action = "apply") {
     if (!checks.length) return "";
@@ -66,7 +67,7 @@ export function confirmText(checks, action = "apply") {
     const count = (number, word) => `${number} ${word}${number === 1 ? "" : "s"}`;
     const trapCount = traps.reduce((total, check) => total + (check.kind === "trapOverflow" ? /** @type {number} */ (check.count) : 1), 0);
     const lead = checks.length === 1 ? checks[0].title : [traps.length && count(trapCount, "trap"), warnings.length && count(warnings.length, "warning")].filter(Boolean).join(" and ");
-    const ask = {apply: "Apply this profile", save: "Save these edits", send: "Send this edit", sendDraft: "Send your draft"}[action];
+    const ask = {apply: "Save this profile", save: "Save these edits", send: "Send this edit", sendDraft: "Send your draft"}[action];
     return traps.length ? `${lead}. A trapped layer can leave no way back to Base until you unplug the keyboard. ${ask} anyway?`
         : `${lead}. ${ask} with ${warnings.length === 1 ? "this warning" : "these warnings"}?`;
 }

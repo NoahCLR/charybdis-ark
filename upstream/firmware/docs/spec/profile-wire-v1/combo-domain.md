@@ -103,7 +103,7 @@ Held by: `tests/host/run_active_profile_combo_runtime_tests.sh` (`active_profile
 ## Combo output behaviour permission encoding
 
 Two stored switches decide whether a combo's output uses its keycode's
-behaviour (D-F24, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0024-combo-output-behaviour-permission.md)).
+behaviour (D-F24, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0024-combo-output-behaviour-permission.md)).
 Both are stored inverted, so zero, the compiled default, means the output uses
 its behaviour:
 
@@ -123,7 +123,7 @@ Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`), `test
 ## Native combo readback — GET `0x06`
 
 A read-only value reporting the connected half's native combo table, readout
-version 3 (D-F36, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/cedcce1461c11855dc28ce4314452298da946f0b/docs/adr/0036-combo-readback-is-device-data.md)): the
+version 3 (D-F36, [ADR](https://github.com/NoahCLR/charybdis-4x6/blob/952bbd864707c30ae250089da2f7daf219fdaee8/docs/adr/0036-combo-readback-is-device-data.md)): the
 active profile's combos, otherwise the compiled table. There is no SET or
 save for it. The request takes a 16-bit page, low byte at request byte 4 and
 high byte at byte 5; bytes 6 onward are zero. Every successful page carries

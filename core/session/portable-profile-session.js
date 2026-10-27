@@ -209,7 +209,7 @@ function slaveOf(error) {
 function recoveryAdvice(incomplete, recovery, ifOld) {
     if (incomplete) return [ifOld ? "If it still shows the old profile then, restore your original complete backup again." : "Restore your original complete backup again.",
         `Interrupted data was saved for diagnosis at ${recovery}.`];
-    return [ifOld ? `If it still shows the old profile then, use the copy saved before Apply (${recovery}) on Backups.` : `The copy saved before Apply is on Backups (${recovery}).`];
+    return [ifOld ? `If it still shows the old profile then, use the copy kept before the save (${recovery}) on Backups.` : `The copy kept before the save is on Backups (${recovery}).`];
 }
 
 /** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {unknown} input @param {import("./types.js").RestoreOptions} [options] */
@@ -235,7 +235,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         const target = validateSnapshot(input, capabilities);
         const document = target.document;
         const saveCopy = saveRecovery;
-        if (typeof saveCopy !== "function") throw fail("RECOVERY_REQUIRED", "Save a copy of what the keyboard has before applying.");
+        if (typeof saveCopy !== "function") throw fail("RECOVERY_REQUIRED", "Save a copy of what the keyboard has before saving over it.");
         /** @type {ReadSnapshot} */
         let before;
         // Reuse a reviewed snapshot only after checking its live identity.
@@ -256,7 +256,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         const beforeIdentity = before.identity;
         if (!beforeIdentity) throw fail("PROFILE_IDENTITY_UNAVAILABLE", "The keyboard read did not include a stable save identity.");
         const candidate = await readCandidateStatus(connection, options);
-        if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Read the keyboard again and wait for it to finish before applying.");
+        if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Read the keyboard again and wait for it to finish before saving.");
         const coordinator = new CandidateUploadCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, sleep,
             readEditProgress: () => readEditProgress(connection, options),
             readSlaveStatus: readCandidateSlaveStatus,
@@ -269,7 +269,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             prepared = await coordinator.upload(target.candidate, {baseSource: candidateBaseSource(before),
                 metadata: candidateMetadataForBlob(target.candidate, {capabilities, actionAbiDigest: capabilities.actionAbiDigest}), verifyBase: async () => {
                 const identity = await readIdentity(connection, ids, {allowCandidate: true, sleep});
-                if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before Apply could start.");
+                if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
             }});
             mutated = true;
             applyProgress.report("slave", slaveReport(null));
@@ -312,7 +312,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             if (authority) {
                 // Only a restart ends it, so the advice is to restart even when
                 // the master half may still be typing.
-                throw Object.assign(fail("RESTORE_INCOMPLETE", "Apply was cut short after the keyboard decided to save."), {cause: error, deviceError: authority.deviceError, outcome: "unknown", keepConnected: true,
+                throw Object.assign(fail("RESTORE_INCOMPLETE", "The save was cut short after the keyboard decided to go ahead."), {cause: error, deviceError: authority.deviceError, outcome: "unknown", keepConnected: true,
                     advice: ["The keyboard had already decided to save it, but the halves then stopped agreeing on the saved profile, so it cannot finish by itself.",
                         "The keyboard keeps running a complete profile until it restarts.",
                         "Unplug the USB cable from the master half (not the cable between the halves), wait a few seconds and plug it back in, then read the keyboard again.",
@@ -320,7 +320,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             }
             // After the decision firmware owns commit recovery and activation:
             // the keyboard finishes the new profile by itself ("decided").
-            throw Object.assign(fail("RESTORE_INCOMPLETE", "Apply was cut short."), {cause: error, outcome: decisionObserved ? "decided" : "unknown", keepConnected: true,
+            throw Object.assign(fail("RESTORE_INCOMPLETE", "The save was cut short."), {cause: error, outcome: decisionObserved ? "decided" : "unknown", keepConnected: true,
                 advice: [...recoveryAdvice(before.incomplete, recovery, decisionObserved), ...restart]});
         }
     }

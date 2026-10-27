@@ -164,6 +164,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     // saved — and the copy is listed, ready to download.
     await page.locator('[data-act="review"]').click();
     const apply = page.locator('.sheet [data-act="apply"]');
+    await expect(apply).toHaveText("Save to keyboard");
     await expect(apply).toBeEnabled();
     await apply.click();
     const anyway = page.locator('[data-act="apply-anyway"]');
@@ -179,7 +180,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     await page.locator('[data-screen="profile"]').click();
     const copies = page.locator(".card.recoveries .recovery-row");
     await expect(copies).toHaveCount(1);
-    await expect(copies.first().locator(".recovery-name")).toHaveText(/^Before Apply · .+ · \d{1,2} \w{3} \d{4}, \d\d:\d\d$/);
+    await expect(copies.first().locator(".recovery-name")).toHaveText(/^Before Save · .+ · \d{1,2} \w{3} \d{4}, \d\d:\d\d$/);
     await expect(copies.first().locator(".recovery-name")).toHaveAttribute("title", /^recovery-.+\.charybdis\.json$/);
     const [recovery] = await Promise.all([page.waitForEvent("download"), copies.first().locator("[data-recovery]").click()]);
     expect(recovery.suggestedFilename()).toMatch(/^recovery-.+\.charybdis\.json$/);
@@ -286,12 +287,12 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await macroName.dispatchEvent("change");
     await expect(page.locator(".rail-status")).toContainText("3 changes in draft");
 
-    // The review shows them, says Apply needs a keyboard and offers Export.
+    // The review shows them, says saving needs a keyboard and offers Export.
     await page.locator('.commit [data-act="review"]').click();
     const sheet = page.locator(".sheet");
     await expect(sheet.locator("h2")).toHaveText("Review 3 changes");
     for (const area of ["Mouse", "Custom keys", "Macros"]) await expect(sheet.locator(".rv-sect h4", {hasText: area})).toHaveCount(1);
-    await expect(sheet).toContainText("Apply needs a keyboard");
+    await expect(sheet).toContainText("Saving needs a keyboard");
     await expect(sheet.locator('[data-act="apply"], [data-act="apply-anyway"]')).toHaveCount(0);
     const [exported] = await Promise.all([page.waitForEvent("download"), sheet.locator('[data-act="export"]').click()]);
     expect(exported.suggestedFilename()).toMatch(/^charybdis-demo-\d{4}-\d\d-\d\d\.charybdis\.json$/);
@@ -612,7 +613,7 @@ test("in Live the keyboard saves an edit by itself and the page says so, without
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
     await page.locator('[data-f="rail:edit-mode"]').selectOption("1");
-    await expect(page.locator(".rail-message")).toContainText("Edits now reach the keyboard by Live", {timeout: 20000});
+    await expect(page.locator(".rail-message")).toContainText("Now in Live edit:", {timeout: 20000});
     expect(keyboard.mode).toBe(1);
 
     await page.locator('[data-screen="mouse"]').click();
@@ -656,7 +657,7 @@ test("in Live a held-open menu pauses the looks, and answers held back never dro
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
     await page.locator('[data-f="rail:edit-mode"]').selectOption("1");
-    await expect(page.locator(".rail-message")).toContainText("Edits now reach the keyboard by Live", {timeout: 20000});
+    await expect(page.locator(".rail-message")).toContainText("Now in Live edit:", {timeout: 20000});
     await expect.poll(() => page.evaluate(() => window.__fakeHidSent), {timeout: 5000}).toBeGreaterThan(0);
 
     // The menu opens: no look goes out while it may be open. A real press

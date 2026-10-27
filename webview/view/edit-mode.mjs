@@ -55,18 +55,18 @@ export function questionWords(question, changes, {mode = question === "saveOrRev
     const confirm = checks.length ? ` ${confirmText(checks, question === "saveOrRevert" ? "save" : "sendDraft")}` : "";
     if (question === "saveOrRevert") {
         const why = mode === from ? "Choosing the mode again settles halves that stored different ones, and the keyboard does that only with nothing unsaved"
-            : mode === APPLY ? "In Apply, edits wait in Ark until you apply them, so the keyboard can switch only with nothing unsaved"
-                : mode === LIVE ? "In Live the keyboard saves edits by itself, so it can switch only with nothing unsaved"
+            : mode === APPLY ? "In Review and save, edits wait in Ark until you save them, so the keyboard can switch only with nothing unsaved"
+                : mode === LIVE ? "In Live edit the keyboard saves edits by itself, so it can switch only with nothing unsaved"
                     : `The keyboard switches to ${label} only with nothing unsaved`;
         return {title: "Save or revert first?", checks,
             detail: `The keyboard runs ${changes === 1 ? "a change that is" : `${count} that are`} not saved. ${why}: save them on the keyboard, or revert to what is saved.${confirm}`,
             answers: [{pending: /** @type {const} */ ("revert"), label: "Revert"}, {pending: /** @type {const} */ ("save"), label: checks.length ? "Save anyway" : "Save on keyboard", primary: true}]};
     }
     const how = mode === LIVE
-        ? "In Live every edit takes effect on the keyboard at once, and the keyboard saves it by itself a moment later. Send the draft to the keyboard now, or discard it."
-        : "In Live + review every edit takes effect on the keyboard at once. Send the draft to the keyboard now (it runs unsaved until you save it), or discard it.";
+        ? "In Live edit every edit takes effect on the keyboard at once, and the keyboard saves it by itself a moment later. Send the draft to the keyboard now, or discard it."
+        : "In Live preview + save every edit takes effect on the keyboard at once. Send the draft to the keyboard now (it runs unsaved until you save it), or discard it.";
     return {title: "Send your draft live?", checks,
-        detail: `Your draft holds ${count}. ${how} If the keyboard refuses it, Ark stays in Apply with your draft.${confirm}`,
+        detail: `Your draft holds ${count}. ${how} If the keyboard refuses it, Ark stays in Review and save with your draft.${confirm}`,
         answers: [{pending: /** @type {const} */ ("discard"), label: "Discard draft"}, {pending: /** @type {const} */ ("send"), label: checks.length ? "Send anyway" : "Send live", primary: true}]};
 }
 
@@ -161,14 +161,14 @@ const unsavedEdits = (mode) => mode === LIVE ? "as unsaved edits, which the keyb
 /** @param {Draft | null | undefined} draft */
 export function historyFooter(draft) {
     const mode = liveMode(draft);
-    if (mode === null) return "Going to a step changes only the draft. The keyboard is not touched until you apply.";
+    if (mode === null) return "Going to a step changes only the draft. The keyboard is not touched until you save.";
     return mode === LIVE ? "Going to a step sends it to the keyboard at once, as an edit the keyboard then saves by itself."
         : "Going to a step sends it to the keyboard at once, as an unsaved edit.";
 }
 
 /** @param {Draft | null | undefined} draft */
 export const renameNote = (draft) => liveMode(draft) === null
-    ? "Your computer and Chrome show this name after Apply; the keyboard reconnects for a moment to take it."
+    ? "Your computer and Chrome show this name once you save; the keyboard reconnects for a moment to take it."
     : "The keyboard reconnects for a moment to take it right after the edit; your computer and Chrome then show this name.";
 
 // The Import card's note, outside the demo (which says its own).
@@ -176,7 +176,7 @@ export const renameNote = (draft) => liveMode(draft) === null
 export function importNote(draft) {
     const mode = liveMode(draft);
     return `Choose or drop a complete backup here and review its differences first. ${mode === null
-        ? "Import replaces the local draft; nothing is written to the keyboard until you review and apply it."
+        ? "Import replaces the local draft; nothing is written to the keyboard until you review and save it."
         : `Use as draft sends it to the keyboard at once ${unsavedEdits(mode)}`}`;
 }
 
@@ -184,6 +184,6 @@ export function importNote(draft) {
 /** @param {Draft | null | undefined} draft */
 export function importCallout(draft) {
     const mode = liveMode(draft);
-    return mode === null ? "Nothing is written to the keyboard until you review and apply; the review shows every change field by field."
+    return mode === null ? "Nothing is written to the keyboard until you review and save; the review shows every change field by field."
         : `Use as draft sends it to the keyboard at once ${unsavedEdits(mode)}`;
 }

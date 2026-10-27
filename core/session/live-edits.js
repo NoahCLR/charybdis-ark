@@ -256,8 +256,8 @@ const LIVE_ACTIONS = Object.freeze({
     putBack: ({draft, revision, session}) => {
         draft.assertRevision(revision);
         const before = session.beforeApply;
-        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before an Apply on this keyboard to put back.");
-        return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before Apply", origin: "edit", order: IDENTITY}, {replaceWhenLarge: true});
+        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before a save on this keyboard to put back.");
+        return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before the save", origin: "edit", order: IDENTITY}, {replaceWhenLarge: true});
     },
     // Discard all is Revert: the keyboard runs its saved profile again, and
     // the history keeps a step for it, so undo sends the edits back.
@@ -277,7 +277,7 @@ const LIVE_ACTIONS = Object.freeze({
         draft.assertRevision(revision);
         const live = /** @type {import("./types.js").LiveState} */ (draft.live);
         const keyboardSaves = live.mode === EDIT_MODE.LIVE;
-        if (keyboardSaves && !live.keyboard?.saveFailed && live.unsaved) throw new Error(`In Live the keyboard saves by itself after ${quietWords(live.keyboard?.quietMs)} with no edit and no key held.`);
+        if (keyboardSaves && !live.keyboard?.saveFailed && live.unsaved) throw new Error(`In Live edit the keyboard saves by itself after ${quietWords(live.keyboard?.quietMs)} with no edit and no key held.`);
         if (!keyboardSaves && draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before saving.");
         if (!keyboardSaves && draft.reviewedRevision !== revision) throw new Error("Review the keyboard's unsaved edits before saving them.");
         if (!live.unsaved) {session.notice = "Nothing to save: the keyboard runs its saved profile."; return;}
@@ -329,7 +329,7 @@ async function setEditMode(session, message, recoveryFor, shell) {
     const draft = session.draft, service = session.service;
     if (!draft) throw new Error("Read the keyboard before changing how edits reach it.");
     const mode = message.mode;
-    if (!(/** @type {number[]} */ (Object.values(EDIT_MODE))).includes(mode)) throw new Error("Ark offers Apply, Live and Live + review.");
+    if (!(/** @type {number[]} */ (Object.values(EDIT_MODE))).includes(mode)) throw new Error(`Ark offers ${[EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW, EDIT_MODE.APPLY].map(value => EDIT_MODE_WORDS[value].label).join(", ")}.`);
     draft.assertRevision(message.draftRevision);
     const known = service.snapshot().editMode;
     if (known?.mode === mode && !known.conflict && Boolean(draft.live) === (mode !== EDIT_MODE.APPLY)) return;
@@ -363,11 +363,11 @@ async function setEditMode(session, message, recoveryFor, shell) {
     session.observedPortable = read;
     session.liveProposal = undefined;
     const words = {
-        [EDIT_MODE.APPLY]: "Apply: edits wait in Ark's draft until you review and apply them.",
-        [EDIT_MODE.LIVE]: `Live: edits take effect on the keyboard at once, and it saves them by itself after ${quietWords(session.draft?.live?.keyboard?.quietMs)} with no edit and no key held.`,
-        [EDIT_MODE.LIVE_REVIEW]: "Live + review: edits take effect on the keyboard at once; review and Save make them permanent.",
+        [EDIT_MODE.APPLY]: "edits wait in Ark's draft until you review and save them.",
+        [EDIT_MODE.LIVE]: `edits take effect on the keyboard at once, and it saves them by itself after ${quietWords(session.draft?.live?.keyboard?.quietMs)} with no edit and no key held.`,
+        [EDIT_MODE.LIVE_REVIEW]: "edits take effect on the keyboard at once; review and Save make them permanent.",
     }[mode];
-    let notice = known?.mode === mode ? "Both halves now store the same edit mode." : `Edits now reach the keyboard by ${words}`;
+    let notice = known?.mode === mode ? "Both halves now store the same edit mode." : `Now in ${EDIT_MODE_WORDS[mode].label}: ${words}`;
     if (state.editMode?.notStored) notice += " The keyboard has not stored the new mode yet; a replug now may lose it.";
     // Sending publishes the model on its way, which takes any notice set
     // before it: the draft's words are said with the mode's, once it is sent.
@@ -382,7 +382,7 @@ async function setEditMode(session, message, recoveryFor, shell) {
 async function sendApplyDraft(session, kept, mode, notice) {
     const draft = /** @type {Draft} */ (session.draft), service = session.service;
     try {
-        const published = await proposeLive(session, {document: kept.document, label: "Sent the Apply draft live", origin: "edit", order: draft.order}, {confirmed: true, replaceWhenLarge: true});
+        const published = await proposeLive(session, {document: kept.document, label: "Sent the draft live", origin: "edit", order: draft.order}, {confirmed: true, replaceWhenLarge: true});
         if (!published) throw refusal("The keyboard changed before it took the draft. Read it again before sending.", "LIVE_EDIT_STALE");
         session.notice = `${notice} ${mode === EDIT_MODE.LIVE ? "Your draft is running on the keyboard, which saves it in a moment." : "Your draft is running on the keyboard, unsaved."}`;
     } catch (error) {
@@ -401,9 +401,10 @@ async function sendApplyDraft(session, kept, mode, notice) {
             session.observedPortable = read;
             back = true;
         } catch {}
+        const review = EDIT_MODE_WORDS[EDIT_MODE.APPLY].label;
         throw Object.assign(new Error(`Your draft was not sent: ${error instanceof Error ? error.message : String(error)} ${back
-            ? "Edits reach the keyboard by Apply again, and your draft is kept."
-            : "Ark could not switch back to Apply; your draft is kept. Return the keyboard to Apply before continuing."}`), {code: codeOf(error) || "LIVE_EDIT_REFUSED"});
+            ? `The keyboard is back in ${review}, and your draft is kept.`
+            : `Ark could not switch back to ${review}; your draft is kept. Return the keyboard to ${review} before continuing.`}`), {code: codeOf(error) || "LIVE_EDIT_REFUSED"});
     }
 }
 

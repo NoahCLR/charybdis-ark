@@ -44,7 +44,7 @@ async function open(t, options = {}) {
 test("in Live an edit runs at once, and Ark shows it saved once the keyboard says it saved it", async t => {
     const {keyboard, shell, session, key, look, send} = await open(t);
     assert.equal(session.draft.live.mode, EDIT_MODE.LIVE);
-    assert.deepEqual(model(shell).model.editMode.offered, [0, 1, 2], "all three modes are offered");
+    assert.deepEqual(model(shell).model.editMode.offered, [EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW, EDIT_MODE.APPLY], "all three modes are offered: Live edit, Live preview + save, Review and save");
     await key(0, 10, "KC_X");
     assert.ok(keyboard.working, "the keyboard runs the edit");
     assert.equal(model(shell).model.draft.live.unsaved, true);

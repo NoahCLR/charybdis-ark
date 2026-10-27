@@ -18,8 +18,8 @@ page for whatever you want to change.
    and the 32 pointing modes.
 8. [Lighting](lighting.md): the background effect, layer and mode colours,
    feedback and the idle timeout.
-9. [Review and Apply](review-and-apply.md): the edit modes (Apply, Live and
-   Live + review), Review and its checks, and what happens while the keyboard
-   saves.
+9. [Review and save](review-and-save.md): the edit modes (Live edit, Live
+   preview + save and Review and save), Review and its checks, and what
+   happens while the keyboard saves.
 10. [Backups](backups.md): exporting and importing profiles, and the recovery
     copies Ark keeps.

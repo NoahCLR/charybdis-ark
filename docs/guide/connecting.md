@@ -50,8 +50,9 @@ The column on the left is the rail. From the top:
 
   The dot pulses while Ark is reading or busy. Hover it for what it means and
   what to do.
-- **Edits**: how your edits reach the keyboard: **Apply**, **Live** or
-  **Live + review**. See [Review and Apply](review-and-apply.md#edit-modes).
+- **Edits**: how your edits reach the keyboard: **Live edit**, **Live
+  preview + save** or **Review and save**. See
+  [Review and save](review-and-save.md#edit-modes).
 - **Choose keyboard** and **Disconnect**. Disconnect lets go of
   the keyboard and takes back the page's permission to open it, until you
   choose it again.
@@ -69,14 +70,14 @@ stays read-only until you switch back or discard the draft.
 
 Only one Ark tab holds the keyboard. A second tab says Ark is open
 in another tab, and takes over when that one closes. If closing or reloading
-the tab would lose something (edits not applied or saved, or a save still
+the tab would lose something (edits not saved, or a save still
 running), the browser asks first.
 
 ## The demo
 
 No keyboard to hand? **Explore a demo** opens Ark on a complete setup with
 nothing connected: 16 layers, 32 pointing modes, 128 macros and 128 custom
-keys. Every screen works, and every edit shows up in Review. Only Apply needs
+keys. Every screen works, and every edit shows up in Review. Only saving needs
 a keyboard.
 
 A strip across the top says **Demo · no keyboard**. It has two buttons:
@@ -102,7 +103,7 @@ firmware's built-in name. A name is up to 32 bytes: letters take one,
 accented letters two. The name is part of the profile, so it goes through
 Review like any edit, and backups carry it. Once the keyboard has it, your
 computer, Chrome and Ark all call it by that name. To take it, the keyboard
-drops off USB for a moment and comes back, and Ark follows it. In Live the
+drops off USB for a moment and comes back, and Ark follows it. In Live edit the
 keyboard is often saving the new name just then; Ark waits for the save and
 reads it again rather than asking you to.
 

@@ -237,7 +237,7 @@ async function portableMessage(session, message, shell) {
                 const where = await shell.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
                 if (where) {
                     saved();
-                    session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and apply it.`;
+                    session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and save it.`;
                 }
             } else if (panelControl(message.type)?.action === "export") {
                 const file = exportedProfile(await session.service.readPortableProfile());

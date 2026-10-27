@@ -124,7 +124,7 @@ test("a replugged keyboard is read once it has started: the back words, no healt
     await send({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 10, keycode: "KC_X"}]});
     await send({type: "reviewProfileDraft"});
     await send({type: "applyProfileDraft", confirmChecks: true});
-    assert.match(notices().at(-1), /^Complete profile (applied to|saved on) both halves and verified\./);
+    assert.match(notices().at(-1), /^Complete profile (saved to|saved on) both halves and verified\./);
     assert.doesNotMatch(notices().join("\n"), /slave half is not connected/);
 });
 

@@ -79,7 +79,7 @@ export function reviewOverlay() {
         const change = draft.changes.find((entry) => entry.group === group);
         if (!change) return "";
         return `<button class="ck-source" data-check-source="${esc(group)}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↓</button>`;
-    }, draft.live ? "Save" : "Apply", demo.active);
+    }, demo.active);
     // Ask about active warnings and traps for this revision before writing.
     const confirmChecks = checksToConfirm(draft.checks);
     const confirming = confirmChecks.length && state.confirmChecks === draft.revision;
@@ -96,20 +96,20 @@ export function reviewOverlay() {
             <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
                 : keyboardSaves ? `The keyboard already runs these changes and saves them by itself after ${esc(quietWords(draft.live?.keyboard))} without typing. Revert puts back what is saved.`
                 : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then writes them as its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
-                : "Apply saves a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts Apply, the recovery copy restores it."}</div></div>
+                : "Save keeps a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts the save, the recovery copy restores it."}</div></div>
         </div>
         ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>
             <span class="right"><button class="btn primary" data-act="export">Export…</button></span></div>`
         : confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm profile checks">
             <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks, live ? "save" : "apply"))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
-                <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>${live ? "Save anyway" : "Apply anyway"}</button></span></div>`
+                <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Save anyway</button></span></div>`
         : `<div class="sheet-f"><span class="note" data-tip="${esc(model?.device?.summary || "")}">${esc(model?.device?.label || "")} · ${esc(model?.device?.savedProfile || "")}</span>
             <span class="right">${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc(`Put back what is saved. Nothing is written; Undo (${shortcut("Z")}) sends the edits again.`)}">Revert</button>` : ""}
                 ${keyboardSaves ? draft.live?.keyboard?.saveFailed ? `<button class="btn primary" data-act="save-again" ${draft.connected && !draft.stale ? "" : "disabled"}
                     data-tip="${esc("The keyboard's own save failed. Ask it to save these edits again, after a recovery copy of what is saved now.")}">Save again</button>` : ""
                 : `<button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
-                    ${blockers.length ? `data-tip="${esc(`Resolve the blockers in Checks before ${live ? "saving" : "applying"}.`)}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>${live ? "Save on keyboard" : "Apply to keyboard"}</button>`}</span></div>`}
+                    ${blockers.length ? `data-tip="Resolve the blockers in Checks before saving."` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>${live ? "Save on keyboard" : "Save to keyboard"}</button>`}</span></div>`}
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.

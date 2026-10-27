@@ -62,7 +62,7 @@ for (const screen of ["macros", "keys", "device"]) {
         expect(result.applyAfterEnd).toBeNull();
         expect(result.posts).toBe(0);
         expect(result.staleIgnored).toBe(true);
-        expect(result.readback).toContain("Applied — reading back");
+        expect(result.readback).toContain("Saved — reading back");
         expect(result.localText).toBe(' {{"key": "{{KC_A}}"}}\ncafé “hello” 🙂. ');
         await expect(page.locator(".commit.applying")).toHaveCount(0);
     });

@@ -64,7 +64,7 @@ test("complete Apply adds a split build that saves and keeps its refusal stable"
     assert.doesNotThrow(() => support.requireReady({...complete, featureFlags: 0}));
     assert.throws(() => support.requireReady({...complete, featureFlags: 0}, true), {
         code: "FIRMWARE_UPDATE_REQUIRED",
-        message: "Complete profile backup and Apply need current firmware on both halves. Your current keyboard configuration has not been changed.",
+        message: "Complete profile backups and saving need current firmware on both halves. Your current keyboard configuration has not been changed.",
     });
     assert.throws(() => support.requireReady({...complete, supportedDomainMask: DOMAINS.RGB}), {code: "FIRMWARE_UPDATE_REQUIRED"});
     assert.throws(() => support.requireReady({...complete, ...otherBases[0]}), {code: "FIRMWARE_UPDATE_REQUIRED"});
@@ -139,7 +139,7 @@ test("live mutation readiness keeps its additional transfer and slave-half diagn
         assert.equal(support.evaluateLiveMutationCompatibility({...caps, featureFlags: caps.featureFlags & ~feature}, compatible, true, status).available, false);
     }
     assert.deepEqual(support.evaluateLiveMutationCompatibility({featureFlags: 0, candidateChunkMax: 0}, {compatible: false, reasons: ["earlier read failure"]}, false).reasons, [
-        "Connect to the keyboard before applying a live profile.", "earlier read failure",
+        "Connect to the keyboard before sending it edits.", "earlier read failure",
         `Firmware features 0x0 do not include a split build that saves (0x${MUTATION.toString(16)}).`,
         "Firmware does not advertise a candidate upload chunk size.",
     ]);

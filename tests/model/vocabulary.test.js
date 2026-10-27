@@ -94,7 +94,9 @@ test("every edit mode the keyboard stores has words, and the result words finish
         const words = VOCABULARY.editModes[mode];
         assert.ok(words?.label && words.detail && words.id, String(mode));
     }
-    assert.equal(VOCABULARY.editModes[EDIT_MODE.LIVE_REVIEW].label, "Live + review");
+    assert.equal(VOCABULARY.editModes[EDIT_MODE.LIVE].label, "Live edit");
+    assert.equal(VOCABULARY.editModes[EDIT_MODE.LIVE_REVIEW].label, "Live preview + save");
+    assert.equal(VOCABULARY.editModes[EDIT_MODE.APPLY].label, "Review and save");
     assert.match(VOCABULARY.editModes[EDIT_MODE.LIVE_REVIEW].detail, /unplugging/);
     for (const name of Object.keys(EDIT_RESULT).filter(name => !["OK", "QUEUED"].includes(name))) assert.match(LIVE_RESULT_WORDS[name] || "", /^[a-z].*\.$/, name);
 });

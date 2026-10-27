@@ -34,7 +34,7 @@ test("the build and a copy's time read as words", () => {
 
 test("a recovery copy is named by what made it and the keyboard it came from", () => {
     const savedAt = "2026-10-18T07:12:00Z";
-    const titles = {apply: "Before Apply", restore: "Before restoring a backup", save: "Before Save", restart: "Before Restart", "leave-live": "Before leaving Live"};
+    const titles = {apply: "Before Save", restore: "Before restoring a backup", save: "Before Save", restart: "Before Restart", "leave-live": "Before leaving Live edit"};
     for (const [cause, words] of Object.entries(titles)) {
         assert.match(copyTitle({cause, keyboard: "Charybdis - Home", savedAt}), new RegExp(`^${words} · Charybdis - Home · 18 Oct 2026, \\d\\d:\\d\\d$`), cause);
     }

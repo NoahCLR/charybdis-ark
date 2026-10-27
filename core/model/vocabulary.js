@@ -89,7 +89,7 @@ const LIVE_RESULT_WORDS = Object.freeze({
     VALIDATION_REJECTED: "the keyboard's checks refused the result.",
     NOT_CLEAN: "the keyboard has unsaved edits. Save or Revert them first.",
     READ_ERROR: "the keyboard could not read or store it.",
-    ABORTED: "a save, an Apply or the slave half's newer profile replaced the profile meanwhile, or the edit was left unfinished (a Revert, or nothing arrived for 15 seconds).",
+    ABORTED: "a save or the slave half's newer profile replaced the profile meanwhile, or the edit was left unfinished (a Revert, or nothing arrived for 15 seconds).",
     PUBLICATION_FAILED: "the keyboard could not switch to the result.",
     // Not a result: the keyboard's flags say its profile storage stopped.
     STOPPED: "the keyboard stopped saving. Restart it to continue.",
@@ -126,12 +126,13 @@ function quietWords(quietMs) {
 
 // How edits reach a keyboard (stored on it, firmware D-F32), all three
 // offered: what each does and what a replug does to edits not saved yet.
-// Live's words carry the keyboard's quiet interval.
+// The keyboard's Apply and Save are both Save to a person (D-L72). Live
+// edit's words carry the keyboard's quiet interval.
 /** @param {number | null | undefined} [quietMs] @returns {Readonly<Record<number, Readonly<{id: import('../../contracts/model.js').EditModeId, label: string, detail: string}>>>} */
 const editModeWords = (quietMs) => Object.freeze({
-    0: Object.freeze({id: "apply", label: "Apply", detail: "Edits stay in Ark's draft until you review and apply them. The keyboard runs its saved profile until then."}),
-    1: Object.freeze({id: "live", label: "Live", detail: `Edits take effect on the keyboard at once. With or without Ark, the keyboard starts saving after ${quietWords(quietMs)} with no edit and no key held; holding a key postpones it. Unplugging loses every edit since the last successful save. A failed automatic save leaves that revision unsaved.`}),
-    2: Object.freeze({id: "liveReview", label: "Live + review", detail: "Edits take effect on the keyboard at once. Nothing is permanent until you review and save; unplugging the keyboard puts back what was saved."}),
+    0: Object.freeze({id: "apply", label: "Review and save", detail: "Edits stay in Ark's draft until you review and save them. The keyboard runs its saved profile until then."}),
+    1: Object.freeze({id: "live", label: "Live edit", detail: `Edits take effect on the keyboard at once. With or without Ark, the keyboard starts saving after ${quietWords(quietMs)} with no edit and no key held; holding a key postpones it. Unplugging loses every edit since the last successful save. A failed automatic save leaves that revision unsaved.`}),
+    2: Object.freeze({id: "liveReview", label: "Live preview + save", detail: "Edits take effect on the keyboard at once. Nothing is permanent until you review and save; unplugging the keyboard puts back what was saved."}),
 });
 const EDIT_MODE_WORDS = editModeWords();
 

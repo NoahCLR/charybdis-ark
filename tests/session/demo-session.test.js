@@ -139,9 +139,9 @@ test("in the demo an edit stages, checks and shows in the review; Apply is refus
         assert.equal(last(shell).model.draft.reviewed, true);
         await send(loop, shell, {type: "applyProfileDraft", confirmChecks: true});
         ({notice} = last(shell));
-        assert.match(notice, /^Failed: Apply needs a keyboard/);
+        assert.match(notice, /^Failed: Saving needs a keyboard/);
         await send(loop, shell, {type: "rebaseProfileDraft"});
-        assert.match(last(shell).notice, /^Failed: Apply needs a keyboard/, "refused as Apply is");
+        assert.match(last(shell).notice, /^Failed: Saving needs a keyboard/, "refused as saving is");
         assert.equal(last(shell).model.draft.dirty, true, "the draft is kept");
 
         // Undo and Discard all work on the demo's draft as on a keyboard's.

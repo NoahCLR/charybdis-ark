@@ -52,7 +52,7 @@ export function savedWhen(savedAt) {
 
 // What made a recovery copy, as its title says it.
 /** @type {Readonly<Record<import("../../contracts/model.js").RecoveryCause, string>>} */
-const MADE_BY = Object.freeze({apply: "Before Apply", restore: "Before restoring a backup", save: "Before Save", restart: "Before Restart", "leave-live": "Before leaving Live"});
+const MADE_BY = Object.freeze({apply: "Before Save", restore: "Before restoring a backup", save: "Before Save", restart: "Before Restart", "leave-live": "Before leaving Live edit"});
 
 // A recovery copy named by what made it, the keyboard it came from and when.
 // A copy stored before those were recorded is named only by when, rather

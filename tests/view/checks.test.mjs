@@ -49,9 +49,9 @@ test("an unowned layer key points to its changed key even with other edit groups
 test("the confirmation names one finding or counts traps and warnings together", () => {
     assert.equal(confirmText([]), "");
     assert.equal(confirmText([check("trap", "new", "Numbers can lock with no way back to Base")]),
-        "Numbers can lock with no way back to Base. A trapped layer can leave no way back to Base until you unplug the keyboard. Apply this profile anyway?");
+        "Numbers can lock with no way back to Base. A trapped layer can leave no way back to Base until you unplug the keyboard. Save this profile anyway?");
     assert.equal(confirmText([check("warning", "new", "Nothing reaches Number")]),
-        "Nothing reaches Number. Apply this profile with this warning?");
+        "Nothing reaches Number. Save this profile with this warning?");
     assert.match(confirmText([check("trap", "new"), check("warning", "existing")]), /^1 trap and 1 warning\./);
     assert.match(confirmText([check("trap", "new"), {...check("trap", "new"), kind: "trapOverflow", count: 6}]), /^7 traps\./);
 });
