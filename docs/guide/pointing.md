@@ -13,6 +13,10 @@ Hover any label on Pointer settings for what it does.
 
 - **Normal pointer DPI**: the everyday speed, 400 to 3400 DPI.
 - **Sniping DPI**: a slower speed for precise work, 100 to 400 DPI.
+- **Sniping keys**, under it, shows where the **Sniping (hold)** and
+  **Sniping toggle** keys are placed, with **Place on a key…** for each.
+  Sniping is on while one of them is held or toggled, or one of the
+  auto-sniping layers is on.
 
 The DPI keys on the keyboard change these too, and Ark shows the new value.
 
@@ -23,9 +27,6 @@ The DPI keys on the keyboard change these too, and Ark shows the new value.
   settings do. Turning **Auto-sniping** off keeps the layers you chose.
 - While one of those layers is on, moving the ball doesn't turn on a separate
   pointer layer, so the layer's own keys stay under your hand.
-- **Sniping keys** shows where the **Sniping (hold)** and **Sniping toggle**
-  keys are placed, with **Place on a key…** for each. Sniping is on while one
-  of them is held or toggled, or one of the auto-sniping layers is on.
 
 Sniping slows directional pointing modes too; scrolling modes ignore it.
 
