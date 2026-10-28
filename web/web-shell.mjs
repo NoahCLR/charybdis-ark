@@ -5,7 +5,7 @@
 // chooser, downloads, and the page itself for progress and errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {closingLoses, demoUnsaved, FILE_MAX_BYTES, openPanelLoop, WebHidDeviceAdapter, writingProfile} from "./core.mjs";
+import {closingLoses, demoUnsaved, FILE_MAX_BYTES, FILE_TOO_LARGE, openPanelLoop, WebHidDeviceAdapter, writingProfile} from "./core.mjs";
 import {connectPanel} from "./panel-channel.mjs";
 import {nativePopups} from "./native-popups.mjs";
 import {openRecoveries} from "./recoveries.mjs";
@@ -49,7 +49,7 @@ export function leaving(session) {
 /** @param {Pick<File, "size" | "text" | "name"> | undefined} file */
 export async function readProfileFile(file) {
     if (!file) return undefined;
-    if (file.size > PROFILE_FILE_LIMIT) throw new Error("This profile file is too large.");
+    if (file.size > PROFILE_FILE_LIMIT) throw new Error(FILE_TOO_LARGE);
     return {text: await file.text(), name: file.name};
 }
 

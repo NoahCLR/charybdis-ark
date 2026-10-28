@@ -31,13 +31,13 @@ const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDr
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
 const {LOST_WORDS, RECONNECT_WORDS, RESTART_WORDS} = require("./keyboard-reconnect");
+const {BUSY_REFUSAL} = require("./profile-device-service");
 // Retained exports for shells that inspect the routes; never hand-maintained.
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
 const DEMO_MESSAGES = controlsOn("demo");
 // The routes that start work, which wait for the current operation.
 const WORK_ROUTES = new Set(["draft", "portable", "demo", "read"]);
-const BUSY_REFUSAL = "Wait for the current operation to finish before starting another.";
 
 // What the panel says and offers that depends on its shell, published as
 // `model.shell`. The web page is the one shell (D-L71); these defaults are

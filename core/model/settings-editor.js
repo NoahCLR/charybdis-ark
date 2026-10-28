@@ -6,8 +6,8 @@ const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains")
 const {effectiveTimings} = require("./gesture-timing");
 const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
-const {SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
-const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
+const {LED_FLAGS, SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
+const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_ISO, OS_OF} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
@@ -199,8 +199,9 @@ function settingsSections(snapshot, settings) {
     const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/\bcolor\b/g, "colour").replace(/^./, c => c.toUpperCase())})) || [];
     if (!effects.some(effect => effect.value === currentEffect)) effects.push({value: currentEffect, label: `Current effect (${currentEffect})`});
     /** @type {[number, string][]} */
-    const ledNames = [[1, "Modifiers"], [2, "Underlighting"], [4, "Keys"], [8, "Indicators"]];
-    const flags = [{value: 255, label: "All LEDs"}, {value: 0, label: "No LEDs"}];
+    const ledNames = [[LED_FLAGS.MODIFIER, "Modifiers"], [LED_FLAGS.UNDERGLOW, "Underlighting"], [LED_FLAGS.KEY, "Keys"], [LED_FLAGS.INDICATOR, "Indicators"]];
+    /** @type {{value: number, label: string}[]} */
+    const flags = [{value: LED_FLAGS.ALL, label: "All LEDs"}, {value: LED_FLAGS.NONE, label: "No LEDs"}];
     if (options) for (let mask = 1; mask < 16; mask++) if (!(mask & ~options.ledFlags)) flags.push({value: mask, label: ledNames.filter(([bit]) => mask & bit).map(([, name]) => name).join(" + ")});
     if (!flags.some(choice => choice.value === currentFlags)) flags.push({value: currentFlags, label: "Current custom LED selection"});
     rgb.fields.splice(0, 0,
@@ -247,12 +248,12 @@ function settingsSections(snapshot, settings) {
         options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
-    const macos = host.effective === 1;
+    const macos = host.effective === MACOS;
     const setup = ["Choose the operating system yourself if detection is unknown.",
         "For emoji and other characters your layout cannot type, choose the Unicode Hex Input layout and make it your active input source.",
         "Install and run WinCompose with Right Alt as Compose.", "Use an input method/application accepting Ctrl+Shift+U, hex digits and Space. Some Linux applications do not support it."][host.effective];
     // The effective OS's layouts first, then US; with no known OS, all of them.
-    const osName = [null, "macos", "windows", "linux"][host.effective];
+    const osName = OS_OF[host.effective];
     const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
     /** @param {number} id */
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];

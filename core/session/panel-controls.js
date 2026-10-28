@@ -24,7 +24,7 @@
  */
 const {panelControl} = require("./panel-control-registry");
 const {canEdit, hasCurrentLayers} = require("./firmware-support");
-const {validateSnapshot, FILE_MAX_BYTES} = require("../model/portable-profile");
+const {validateSnapshot, FILE_MAX_BYTES, FILE_TOO_LARGE} = require("../model/portable-profile");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
@@ -345,7 +345,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         if (chosen === undefined) return;
         const text = typeof chosen === "string" ? chosen : chosen.text;
         if (typeof text !== "string") throw new Error("This profile file could not be read.");
-        if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error("This profile file is too large.");
+        if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error(FILE_TOO_LARGE);
         const value = validateSnapshot(text, panelCapabilities(session) || undefined);
         session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
             before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,

@@ -47,6 +47,8 @@ const {EDIT_MODE, readActiveProfile, readEditMode, readEditProgress, readEditSta
 // misses in a row mean the keyboard is lost.
 const WATCH_TIMEOUT_MS = 3000;
 const WATCH_MISSES = 3;
+// What an operation started while another runs is told, here and by the panel.
+const BUSY_REFUSAL = "Wait for the current operation to finish before starting another.";
 const {snapshotLive} = require("./live-profile-session");
 const {STARTING, STARTING_CODE, STARTING_WORDS, hasStarted, stillStarting} = require("./keyboard-starting");
 const {LiveEditCoordinator, TransactionIds} = require("./live-edit-coordinator");
@@ -1150,7 +1152,7 @@ class ProfileDeviceService {
 
     /** @param {boolean} [preserveError] @returns {never} */
     refuseBusy(preserveError = false) {
-        const error = Object.assign(new Error("Wait for the current operation to finish before starting another."), {code: "SERVICE_BUSY"});
+        const error = Object.assign(new Error(BUSY_REFUSAL), {code: "SERVICE_BUSY"});
         if (preserveError) this.addDiagnostic(`${error.code}: ${error.message}`);
         else this.setError(error);
         this.emitChange();
@@ -1469,6 +1471,7 @@ function candidateStateName(state) {
 }
 
 module.exports = {
+    BUSY_REFUSAL,
     WATCH_MISSES,
     WATCH_TIMEOUT_MS,
     PROFILE_DOMAIN_FLAGS,

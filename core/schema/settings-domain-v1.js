@@ -78,6 +78,9 @@ const STORED = /** @type {const} */ ([
     // then one bit per layer for its behaviours and for its combos.
     ["BEHAVIORS_ENABLED", SWITCH], ["LAYER_BEHAVIORS", LAYER_MASK], ["LAYER_COMBOS", LAYER_MASK],
 ]);
+// RGB_MODE's LED flags byte: QMK's LED classes. The background effect lights
+// an LED whose class is in the flags; ALL lights every one.
+const LED_FLAGS = Object.freeze({NONE: 0, MODIFIER: 1, UNDERGLOW: 2, KEY: 4, INDICATOR: 8, ALL: 255});
 // Geometry follows the field table: adding a scalar moves the records and
 // names without updating parallel byte offsets.
 const SCALARS_OFFSET = 8, PLACEMENT_BYTES = 8, LAYER_RECORD_SIZE = 1 + 2 * PLACEMENT_BYTES;
@@ -333,4 +336,4 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, customKeyShortcuts, keyboardName, formatVersion: SETTINGS.VERSION};
     return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
 }
-module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, shortcutKeysRefusal, shortcutStoreRefusal, SHORTCUT_KEY_REFUSALS, SHORTCUT_KEY_CAPS, SHORTCUT_KEY_LIMITS, validShortcut, shortcutSends, shortcutPresent, shortcutIdentity, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, LED_FLAGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, shortcutKeysRefusal, shortcutStoreRefusal, SHORTCUT_KEY_REFUSALS, SHORTCUT_KEY_CAPS, SHORTCUT_KEY_LIMITS, validShortcut, shortcutSends, shortcutPresent, shortcutIdentity, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};

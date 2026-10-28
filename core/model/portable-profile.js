@@ -26,6 +26,8 @@ const {profileDepthOptions} = require("../schema/profile-depth");
 // Document version 5 refuses the former separate layers/macros format (D-L64).
 // Base64 for 130,048 bytes plus the small JSON envelope fits in 192 KiB.
 const FILE_MAX_BYTES = 196608;
+// What a file over FILE_MAX_BYTES is told, wherever it is refused.
+const FILE_TOO_LARGE = "This profile file is too large.";
 const DOCUMENT_VERSION = 5;
 const {DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, encodeProfileDomains} = require("../schema/profile-domains");
 /** @type {readonly number[]} */
@@ -132,7 +134,7 @@ function createSnapshot({profile, actionAbiDigest}) {
 /** @param {unknown} value @param {ProfileDestination} [capabilities] @returns {DecodedProfile} */
 function validateSnapshot(value, capabilities) {
     if (typeof value === "string") {
-        if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail("This profile file is too large.");
+        if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail(FILE_TOO_LARGE);
         try {value = JSON.parse(value);} catch {throw fail("This is not a valid profile file.");}
     }
     // Inspect the unvalidated object; its complete shape is established below.
@@ -353,4 +355,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {LAYERS, FILE_MAX_BYTES, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {LAYERS, FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
