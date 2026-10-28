@@ -14,7 +14,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, canEdit as canEditArea} from "../store.mjs";
 import {topbar} from "./frame.mjs";
 import {categorySummary, statusBesideCount} from "../view/review.mjs";
-import {stageOrder} from "../view/vocabulary.mjs";
+import {stageOrder, vocabulary} from "../view/vocabulary.mjs";
 import {copyTitle, deleteRecovery, downloadRecovery, shellOf, useRecovery} from "../view/shell-panel.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {reviewPortableProfile} from "../view/edits.mjs";
@@ -156,11 +156,12 @@ function wireProfileDrop(card) {
 // same comparison as a backup file), downloadable as a file, or deletable.
 /** @param {import("../../contracts/model.js").RecoveryCopy[]} recoveries */
 function recoveriesCard(recoveries) {
+    const model = getModel();
     const canImport = canEditArea("import");
     const node = el(`<div class="card recoveries">
         <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
         ${recoveries.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
-            <span class="recovery-name" title="${esc(copy.name)}">${esc(copyTitle(copy))}</span>
+            <span class="recovery-name" title="${esc(copy.name)}">${esc(copyTitle(model, copy))}</span>
             <span class="right row gap-4">
                 <button class="btn compact" data-use="${esc(copy.id)}" ${canImport ? "" : "disabled"}>Use as draft</button>
                 <button class="btn text" data-recovery="${esc(copy.id)}">Download</button>
@@ -190,7 +191,7 @@ function reviewSheet(model, portable, busy) {
     // A file that matches the keyboard still replaces a draft's edits.
     const changesNothing = same && !pending;
     const holds = demoOf(model).active ? "the demo setup holds" : "the keyboard runs";
-    const summary = differences ? categorySummary(differences, {names: incoming.names, stages: stageOrder(model)}) : [];
+    const summary = differences ? categorySummary(differences, {names: incoming.names, stages: stageOrder(model), sections: vocabulary(model).fileSections}) : [];
     const counted = differences?.length
         ? `${differences.length} difference${differences.length === 1 ? "" : "s"} from ${demoOf(model).active ? "the demo setup" : "the keyboard"}${statusBesideCount(differences) ? ` · ${statusBesideCount(differences)}` : ""}` : "";
     const callout = !current

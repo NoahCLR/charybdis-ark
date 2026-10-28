@@ -13,6 +13,7 @@ const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES, KEY_BEHAVIOR_TIER_FIELDS} = require("../schema/key-behavior-domain-v1");
+const {PD_AXIS, PD_KIND} = require("../schema/pd-mode-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
 const {VOCABULARY, word, layerName: layerCalled, slotName, modifierNames} = require("./vocabulary");
 
@@ -104,12 +105,12 @@ function pointingFields(slot, names) {
     result.set(L.linkedLayers, layerSet(slot.linkedLayers, names, "None"));
     result.set(L.linkTurnsOn, layerSet(slot.linkTurnsOn, names, "None"));
     if (slot.linkedLayers) result.set(L.linkEnds, word(P.linkEnds, slot.linkEnds));
-    if (slot.kind === 1) {
+    if (slot.kind === PD_KIND.DIRECTIONAL) {
         result.set("Axes", word(P.axes, slot.axis));
         result.set("Horizontal movement per tap", slot.thresholdX);
         result.set("Vertical movement per tap", slot.thresholdY);
-        for (const direction of ["left", "right", "up", "down"]) result.set(direction[0].toUpperCase() + direction.slice(1), tap(slot.directions[direction]));
-        if (slot.axis === 3) for (const [diagonal, name] of [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]]) {
+        for (const [direction, name] of P.directions) result.set(name, tap(slot.directions[direction]));
+        if (slot.axis === PD_AXIS.EIGHT) for (const [diagonal, name] of P.diagonals) {
             result.set(name, tap(slot.diagonals?.[diagonal]));
         }
         result.set("When a direction is empty", word(P.emptyDirection, slot.emptyDirection ?? 0));

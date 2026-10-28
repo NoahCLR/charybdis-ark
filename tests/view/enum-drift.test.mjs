@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {AXIS, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES} from "../../webview/view/pointing-config.mjs";
+import {AXIS, DIAGONALS, DIRECTIONS, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES, tapPlaceWord} from "../../webview/view/pointing-config.mjs";
 import {modifierBits, modifierNames} from "../../webview/view/keyvalues.mjs";
 import {TIER_FIELDS, TIERS} from "../../webview/view/edits.mjs";
 import {APPLY, EDIT_MODE, LIVE, LIVE_REVIEW} from "../../webview/view/edit-mode.mjs";
@@ -26,6 +26,14 @@ test("the webview's pointing numbers are the schema's", () => {
     assert.deepEqual(SCROLL_AXES, {...pd.PD_SCROLL_AXES});
     assert.deepEqual(MODIFIER_POLICY, {...pd.PD_MODIFIERS});
     assert.deepEqual(LINK_ENDS, {...pd.PD_LINK_ENDS});
+});
+
+test("the webview's shortcut places are the record's, named in the vocabulary's words", () => {
+    assert.deepEqual([...DIRECTIONS].sort(), [...pd.DIRECTIONS].sort());
+    assert.deepEqual([...DIAGONALS].sort(), [...pd.DIAGONALS].sort());
+    const model = {vocabulary: VOCABULARY};
+    assert.deepEqual(DIRECTIONS.map((name) => tapPlaceWord(model, "directions", name)), ["Up", "Left", "Right", "Down"], "in the order the editor draws them");
+    assert.deepEqual(DIAGONALS.map((name) => tapPlaceWord(model, "diagonals", name)), ["Up-left", "Up-right", "Down-left", "Down-right"]);
 });
 
 test("the webview's name limit is the schema's", () => {

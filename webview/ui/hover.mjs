@@ -216,7 +216,7 @@ function reachSections(model, layer, position, index,
         const count = behaviour.steps.length;
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
             <div class="hc-sub">${[count ? `${count} branch${count === 1 ? "" : "es"}` : "No branches yet",
-                ...terms.used.map((name) => `${TERM_WORDS[name]} ${threshold(terms[name])}`),
+                ...terms.used.map((name) => `${vocabulary(model).thresholds[name]} ${threshold(terms[name])}`),
                 ...(behaviour.keepsAutoMouseAnchored ? ["keeps auto-mouse anchored"] : [])].map(esc).join(" · ")}</div>
             ${branches}
             ${count && foot ? `<div class="hc-sub hc-foot">${lit
@@ -306,8 +306,6 @@ const helperAt = (kind, branch, terms) => {
     const detail = styleDetail(kind, branch, terms);
     return detail ? `${styleText(kind, branch.style)} (${detail})` : styleText(kind, branch.style);
 };
-// The Behaviours editor's own words for each threshold.
-const TERM_WORDS = {tapHoldTerm: "tap / hold", longHoldTerm: "long hold", multiTapTerm: "multi tap window"};
 // A threshold as the keyboard runs it: its own time or the keyboard's default.
 /** @param {{ms: string}} term */
 const threshold = (term) => term.ms === "" ? "keyboard default" : `${term.ms} ms`;

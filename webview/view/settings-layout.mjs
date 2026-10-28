@@ -3,6 +3,8 @@
 // order, and which screen a section is edited on.
 // Pure: it reads the published sections and returns them and ids.
 
+import {screenDefinition} from "./screens.mjs";
+
 /** @typedef {import("../../contracts/panel.js").PresentedSection} Section */
 /** @typedef {import("../../contracts/panel.js").PresentedField} Field */
 
@@ -41,6 +43,15 @@ export function screenOfSection(id) {
         if (id && SETTINGS_SCREENS[screen].includes(id)) return screen;
     }
     return null;
+}
+
+// Where a person finds a section, as a note names it: the rail's group, the
+// screen and the section, each in its owner's words ("Settings · Behaviours ·
+// Tap & hold timing"). A part not known is left out.
+/** @param {readonly Section[] | null | undefined} sections @param {string} id */
+export function sectionPath(sections, id) {
+    const screen = screenDefinition(screenOfSection(id));
+    return [screen?.group, screen?.label, sections?.find((section) => section.id === id)?.label].filter(Boolean).join(" · ");
 }
 
 // A section's one-per-layer switches are one setting to a person, drawn as

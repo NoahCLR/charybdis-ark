@@ -66,19 +66,27 @@ export const statusBesideCount = (changes) => changes.every((change) => change.s
 // its screen is, and the Settings sections filed with what they tune (Key
 // Timing with keys, Lighting Feedback with lighting). A section edited on a
 // lighting stage counts with that stage. `names` are the file's layer names;
-// `stages` the lighting stages in paint order, as the vocabulary words them.
+// `stages` the lighting stages in paint order and `sections` the settings
+// sections' words, as the vocabulary words them (`fileSections`).
 export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
 // A custom key's name is counted with the keys, where its behaviour is too.
-/** @type {Readonly<Record<string, [string, string, number]>>} */
-const SECTIONS = {
-    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Default layers", 22], behaviorSettings: ["Keys", "Behaviour settings", 32], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
-    keyboardOptions: ["Keys", "Key swaps & typing", 50], lightingPower: ["Lighting", "All lighting", -1], rgbAppearance: ["Lighting", "Background effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
-    normalPointerSpeed: ["Mouse", "Pointer speed", 1], sniping: ["Mouse", "Auto-sniping", 2], autoMouse: ["Mouse", "Auto-mouse", 3],
+// Each settings section's category and its row's place there; its words are
+// the vocabulary's (tests/view/review.test.mjs holds the two to one set).
+/** @type {Readonly<Record<string, [string, number]>>} */
+export const SECTION_ROWS = {
+    keyTiming: ["Keys", 31], startupLayers: ["Keys", 22], behaviorSettings: ["Keys", 32], comboSettings: ["Keys", 40], comboReferences: ["Keys", 41],
+    keyboardOptions: ["Keys", 50], lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15],
+    normalPointerSpeed: ["Mouse", 1], sniping: ["Mouse", 2], autoMouse: ["Mouse", 3],
 };
+/** @param {string} id @param {Readonly<Record<string, string>>} sections @returns {[string, string, number] | undefined} */
+function sectionRow(id, sections) {
+    const row = Object.hasOwn(SECTION_ROWS, id) ? SECTION_ROWS[id] : undefined;
+    return row && [row[0], sections[id] || id, row[1]];
+}
 // Where one difference is counted: its category, its row's words, and the
 // row's place within the category.
-/** @param {import("../../contracts/model.js").ReviewSummary} item @param {readonly string[]} names @param {readonly {id: string, label: string}[]} stages @returns {[string, string, number]} */
-function categoryOf(item, names, stages) {
+/** @param {import("../../contracts/model.js").ReviewSummary} item @param {readonly string[]} names @param {readonly {id: string, label: string}[]} stages @param {Readonly<Record<string, string>>} sections @returns {[string, string, number]} */
+function categoryOf(item, names, stages, sections) {
     const place = item.place;
     switch (place?.kind) {
         case "key": return ["Keys", `Keys on ${names[place.layer] || `Layer ${place.layer}`}`, place.layer];
@@ -93,7 +101,8 @@ function categoryOf(item, names, stages) {
             if (place.stage === "groups") return ["Lighting", "LED groups", 20];
             return stageRow(place.stage, stages);
         }
-        case "settings": return place.stage ? stageRow(place.stage, stages) : SECTIONS[place.section || ""] || (item.unit === "settings:otherKeyOptions" ? SECTIONS.keyboardOptions : ["Other", item.title, 0]);
+        case "settings": return place.stage ? stageRow(place.stage, stages) : sectionRow(place.section || "", sections)
+            || (item.unit === "settings:otherKeyOptions" ? sectionRow("keyboardOptions", sections) : undefined) || ["Other", item.title, 0];
         default: return ["Other", item.title, 0];
     }
 }
@@ -102,12 +111,12 @@ function stageRow(id, stages) {
     const index = stages.findIndex((stage) => stage.id === id);
     return ["Lighting", stages[index]?.label || id, 10 + Math.max(index, 0)];
 }
-/** @param {readonly import("../../contracts/model.js").ReviewSummary[]} items @param {{names?: readonly string[], stages?: readonly {id: string, label: string}[]}} [options] */
-export function categorySummary(items, {names = [], stages = []} = {}) {
+/** @param {readonly import("../../contracts/model.js").ReviewSummary[]} items @param {{names?: readonly string[], stages?: readonly {id: string, label: string}[], sections?: Readonly<Record<string, string>>}} [options] */
+export function categorySummary(items, {names = [], stages = [], sections = {}} = {}) {
     /** @type {Map<string, {items: import("../../contracts/model.js").ReviewSummary[], rows: Map<string, {label: string, order: number, count: number}>}>} */
     const categories = new Map();
     for (const item of items) {
-        const [category, label, order] = categoryOf(item, names, stages);
+        const [category, label, order] = categoryOf(item, names, stages, sections);
         if (!categories.has(category)) categories.set(category, {items: [], rows: new Map()});
         const entry = /** @type {NonNullable<ReturnType<typeof categories.get>>} */ (categories.get(category));
         entry.items.push(item);

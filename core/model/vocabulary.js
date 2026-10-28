@@ -201,6 +201,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // The setting a timing default comes from, as a behaviour's timing
     // placeholders name it ("200 · dual-role").
     timingSources: {tappingTerm: "dual-role", tapHoldTerm: "behaviour default", longHoldTerm: "default", multiTapTerm: "default"},
+    // A behaviour's thresholds, as its hover card lists the ones it runs on
+    // ("tap / hold 200 ms").
+    thresholds: {tapHoldTerm: "tap / hold", longHoldTerm: "long hold", multiTapTerm: "multi tap window"},
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
     // A behaviour's branch by how many taps start it.
     branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],
@@ -242,8 +245,32 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // reads by ("Lock Navigation").
     customKeys: {alwaysOn: {base: "base layer, always on", default: "default layer, always on"},
         layerKinds: [[0, "Hold"], [1, "Lock"], [2, "Move to"], [3, "Tap-toggle"], [4, "One-shot"]]},
+    // A layer key's second line on its cap, by its QMK function: what it does
+    // to the layer the cap names. A layer key's name reads by other words
+    // (key-names.js: "Hold", "Lock", "Move to"), as layerKinds above do.
+    keyCapLayerVerbs: {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"},
+    // Review's checks: each level's word, and where a check that is not new
+    // in the draft comes from.
+    checkLevels: {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"},
+    checkStatuses: {new: "new", existing: "on the keyboard", fixed: "fixed"},
+    // What made a recovery copy, as its title says it. Both keyboard saves
+    // read as Save (D-L72), so a title tells them apart by what was saved: a
+    // whole draft (the keyboard's Apply) or the live modes' unsaved edits.
+    recoveryCauses: {apply: "Before saving a draft", restore: "Before restoring a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"},
+    // A profile file's settings sections, as Import's summary counts the
+    // file's differences. Three read otherwise than their Settings sections
+    // (settings-editor.js): Behaviours, Combos and Key feedback flash.
+    fileSections: {
+        keyTiming: "Tap & hold timing", startupLayers: "Default layers", behaviorSettings: "Behaviour settings", comboSettings: "Combo settings",
+        comboReferences: "Combo layer matching", keyboardOptions: "Key swaps & typing", lightingPower: "All lighting", rgbAppearance: "Background effect",
+        lightingFeedback: "Key feedback", normalPointerSpeed: "Pointer speed", sniping: "Auto-sniping", autoMouse: "Auto-mouse",
+    },
     pointing: {
         kinds: [[0, "Empty"], [1, "Directional keys / shortcuts"], [2, "Scrolling"]],
+        // A directional mode's shortcuts, by where the record keeps each: the
+        // straight directions, and the diagonals eight directions add.
+        directions: [["left", "Left"], ["right", "Right"], ["up", "Up"], ["down", "Down"]],
+        diagonals: [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]],
         axes: [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]],
         invert: [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]],
         // Which axes a scrolling mode scrolls.

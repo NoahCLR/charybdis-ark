@@ -10,8 +10,10 @@
 /** @typedef {{vocabulary?: Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
 
 /** @type {Vocabulary} */
-const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), editModes: /** @type {Vocabulary["editModes"]} */ ({}), halves: /** @type {Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: /** @type {Vocabulary["tiers"]} */ ({}), branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
-    feedbackOwners: [], ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []}, pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], linkLabels: {starts: "", keyTurnsOn: "", startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
+const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), editModes: /** @type {Vocabulary["editModes"]} */ ({}), halves: /** @type {Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, thresholds: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: /** @type {Vocabulary["tiers"]} */ ({}), branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+    feedbackOwners: [], ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []},
+    keyCapLayerVerbs: {}, checkLevels: /** @type {Vocabulary["checkLevels"]} */ ({}), checkStatuses: /** @type {Vocabulary["checkStatuses"]} */ ({}), recoveryCauses: /** @type {Vocabulary["recoveryCauses"]} */ ({}), fileSections: {},
+    pointing: {kinds: [], directions: [], diagonals: [], axes: [], invert: [], pointerLayer: [], linkLabels: {starts: "", keyTurnsOn: "", startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
 /** @param {VocabularyModel | null | undefined} model */

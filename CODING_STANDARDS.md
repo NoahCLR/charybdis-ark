@@ -27,6 +27,11 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   else recomputes it.
 - Types are strict at the existing seams (D-L59). Internal types sit beside
   their owning layer; `contracts/` holds only what crosses the panel.
+- A union in `contracts/` that a runtime value also lists is tied to it: a
+  table keyed by the union is typed `Record<Union, …>`, so a missing member
+  fails the type check, and a list is compared with the union by a test
+  (see **Checked**). A webview copy of a core list is named once and pinned
+  in `tests/view/enum-drift.test.mjs`.
 
 ### Data from the keyboard
 
@@ -108,6 +113,7 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | Every stored enum value has a word | `tests/model/vocabulary.test.js` |
 | A draft edit type agrees across `core/model/draft-edits.js`, `contracts/edits.d.ts` and `webview/view/edits.mjs` | `tests/model/draft-edits.test.js` |
 | A webview number that is also a wire number equals the schema's | `tests/view/enum-drift.test.mjs` |
+| A runtime list holds exactly its contract union's members: `PhaseId`, `ApplyStep`, `EditMode` (read by `tests/fixtures/contract-unions.js`) | `tests/model/vocabulary.test.js`, `tests/session/apply-progress.test.js`, `tests/protocol/profile-edit-v1.test.js` |
 | Every form control has a `data-f` identity, unique on screen | `tests/view/form-identities.test.mjs`, `browser-tests/focus-identities.spec.js` |
 | No screen names a key or action as plain text | `tests/view/key-names-marked.test.mjs` |
 | Every value interpolated into webview markup, or handed to `el()` or an HTML setter, is escaped, a number by construction or markup a checked template made; the exceptions say why | `tests/view/markup-escaped.test.mjs` |

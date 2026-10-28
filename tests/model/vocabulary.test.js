@@ -29,9 +29,34 @@ test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.pointing.directionOutput, pd.PD_DIRECTION_OUTPUT, "directional output");
     coversNumbers(VOCABULARY.pointing.scrollAxes, pd.PD_SCROLL_AXES, "scroll axes");
     coversNumbers(VOCABULARY.pointing.modifierPolicy, pd.PD_MODIFIERS, "modifier policy");
+    coversNumbers(VOCABULARY.customKeys.layerKinds, require("../../core/schema/settings-domain-v1").SHORTCUT_LAYER_KINDS, "how a custom key's shortcut turns its layers on");
+    assert.deepEqual(VOCABULARY.pointing.directions.map(([id]) => id), pd.DIRECTIONS, "directions, in the record's order");
+    assert.deepEqual(VOCABULARY.pointing.diagonals.map(([id]) => id), pd.DIAGONALS, "diagonals, in the record's order");
     coversNumbers(VOCABULARY.physicalHalves, require("../../core/protocol/flash-pauses-v1").FLASH_PAUSES_V1.PHYSICAL_HALVES, "physical halves");
     assert.deepEqual(VOCABULARY.hostLayouts.map(([id]) => id), require("../../core/data/host-layouts").hostLayouts().map((layout) => layout.id), "host layouts");
     assert.ok(VOCABULARY.hostLayouts.some(([, name]) => name === "German (Windows)") && VOCABULARY.hostLayouts[0][1] === "US");
+});
+
+// Words that moved here from the screens that show them, as those screens
+// showed them: a change here is a change on screen.
+test("checks, recovery copies, thresholds, key caps and pointing shortcuts keep their words", () => {
+    assert.deepEqual(VOCABULARY.checkLevels, {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"});
+    assert.deepEqual(VOCABULARY.checkStatuses, {new: "new", existing: "on the keyboard", fixed: "fixed"});
+    assert.deepEqual(VOCABULARY.recoveryCauses, {apply: "Before saving a draft", restore: "Before restoring a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"});
+    assert.deepEqual(VOCABULARY.thresholds, {tapHoldTerm: "tap / hold", longHoldTerm: "long hold", multiTapTerm: "multi tap window"});
+    assert.deepEqual(VOCABULARY.keyCapLayerVerbs, {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"});
+    assert.deepEqual(VOCABULARY.pointing.directions.map(([, words]) => words), ["Left", "Right", "Up", "Down"]);
+    assert.deepEqual(VOCABULARY.pointing.diagonals.map(([, words]) => words), ["Up-left", "Up-right", "Down-left", "Down-right"]);
+});
+
+test("Import's summary names only settings sections the keyboard's model publishes", () => {
+    const portable = require("../../core/model/portable-profile");
+    const {buildSnapshotModel} = require("../../core/session/device-model");
+    const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
+    const doc = require("../fixtures/pd-profile").document();
+    const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS};
+    const sections = buildSnapshotModel(snapshot, DEMO_CAPABILITIES, {editable: true, reason: null}).configDefaults.map(section => section.id);
+    assert.deepEqual(Object.keys(VOCABULARY.fileSections).filter(id => !sections.includes(id)), []);
 });
 
 test("every LED group row table has a word, by the target its edits name", () => {

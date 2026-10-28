@@ -99,6 +99,7 @@ export interface Vocabulary {
     tapSends: string;
     holdFromPress: string;
     timingSources: Record<string, string>;
+    thresholds: Readonly<Record<'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm', string>>;
     tiers: Readonly<Record<Tier, string>>;
     branches: readonly string[];
     localities: WordList<string>;
@@ -109,8 +110,17 @@ export interface Vocabulary {
     ledTables: WordList<string>;
     stages: readonly {id: string; label: string; bit?: number}[];
     customKeys: {alwaysOn: {base: string; default: string}; layerKinds: WordList<number>};
+    /** A layer key's second line on its cap, by its QMK function (MO, TG…). */
+    keyCapLayerVerbs: Readonly<Record<string, string>>;
+    checkLevels: Readonly<Record<FindingLevel, string>>;
+    checkStatuses: Readonly<Record<Check['status'], string>>;
+    recoveryCauses: Readonly<Record<RecoveryCause, string>>;
+    /** A profile file's settings sections as Import's summary names them, by section id. */
+    fileSections: Readonly<Record<string, string>>;
     pointing: {
         kinds: WordList<number>;
+        directions: WordList<string>;
+        diagonals: WordList<string>;
         axes: WordList<number>;
         invert: WordList<number>;
         scrollAxes: WordList<number>;

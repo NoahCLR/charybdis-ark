@@ -49,7 +49,7 @@ export function board(model, layer, options = {}) {
         const answer = answering?.get(index);
         const shown = answer?.position || position;
         const from = answer?.fellThrough ? answer.layer : null;
-        const face = keyFace(shown);
+        const face = keyFace(shown, model);
         const glass = face.kind === "transparent" || Boolean(from);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
         const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";

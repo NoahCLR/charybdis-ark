@@ -7,11 +7,15 @@
 // The model already resolved each position to a display label; this adds the
 // layer-tap hint, the behaviour tiers and the combo badges, and nothing else.
 
+import {vocabulary} from "./vocabulary.mjs";
+
 const TRANSPARENT = new Set(["KC_TRANSPARENT", "KC_TRNS", "_______"]);
 const DISABLED = new Set(["KC_NO", "XXXXXXX"]);
 
-/** @returns {import("./keyface-types.js").KeyFace} */
-export function keyFace(/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position) {
+// A layer key's second line is in the vocabulary's words (keyCapLayerVerbs),
+// so a face that shows one needs the model.
+/** @param {ViewModel} [model] @returns {import("./keyface-types.js").KeyFace} */
+export function keyFace(/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position, model) {
     if (!position) return {main: "", sub: "", kind: "none"};
     const keycode = position.keycode || "";
     if (TRANSPARENT.has(keycode)) return {main: "▽", sub: "", kind: "transparent"};
@@ -30,7 +34,7 @@ export function keyFace(/** @type {import("../../contracts/panel.js").Position |
     // plain A, or MO(1) and TG(1), would be indistinguishable on the board.
     return {
         main: position.display || keycode,
-        sub: layerTap ? position.layerLabel || shortLayer(layerTap[1]) : layerKey ? LAYER_VERBS[layerKey[1]] : modTap ? position.modifierLabel || modTap[1] : "",
+        sub: layerTap ? position.layerLabel || shortLayer(layerTap[1]) : layerKey ? vocabulary(model).keyCapLayerVerbs[layerKey[1]] : modTap ? position.modifierLabel || modTap[1] : "",
         kind: layerTap || layerKey ? "layer" : "key",
     };
 }
@@ -72,8 +76,6 @@ export function keyName(position) {
     return position?.editLabel || face.main || position?.keycode || "";
 }
 
-/** @type {Record<string, string>} */
-const LAYER_VERBS = {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"};
 // Only for a position the core has not named: the layer the keycode holds.
 /** @param {string} name */
 const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();

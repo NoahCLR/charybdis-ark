@@ -12,6 +12,7 @@
  */
 
 import {macroIndex} from "./keyvalues.mjs";
+import {vocabulary, word} from "./vocabulary.mjs";
 
 export const KIND = {DIRECTIONAL: 1, SCROLLING: 2};
 // A slot's link (firmware D-F62): two layer masks, the layers that start the
@@ -22,7 +23,9 @@ export const LINK_ENDS = {NOTHING: 0, HIGHER_LAYER: 1, OTHER_LAYER: 2};
 // What a direction's shortcut does with modifiers held while it sends: they
 // apply, the chosen ones are left out, or the shortcut is sent exactly.
 export const MODIFIER_POLICY = {INHERIT: 0, MASK: 1, EXACT: 2};
-export const DIRECTIONS = [["up", "Up"], ["left", "Left"], ["right", "Right"], ["down", "Down"]];
+// The straight directions in the order the editor draws them; their words
+// are the vocabulary's (tapPlaceWord).
+export const DIRECTIONS = ["up", "left", "right", "down"];
 export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3};
 // A scrolling mode keeps which axes it scrolls in the same stored byte.
 export const SCROLL_AXES = {BOTH: 0, HORIZONTAL: 1, VERTICAL: 2};
@@ -31,7 +34,10 @@ export const SCROLL_AXES = {BOTH: 0, HORIZONTAL: 1, VERTICAL: 2};
 /** @param {{kind: number, axis?: number}} slot */
 export const scrollAxesOf = (slot) => slot.kind === KIND.SCROLLING ? slot.axis ?? SCROLL_AXES.BOTH : SCROLL_AXES.BOTH;
 // Eight directions add the diagonals, stored beside the straight directions.
-export const DIAGONALS = [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]];
+export const DIAGONALS = ["upLeft", "upRight", "downLeft", "downRight"];
+// A shortcut's place in words: "Up", "Down-left".
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {"directions" | "diagonals"} group @param {string} name */
+export const tapPlaceWord = (model, group, name) => word(vocabulary(model).pointing[group], name);
 // The directions each axis setting reads. The keyboard refuses a mode that
 // keeps a shortcut or a threshold on an axis it does not read, so the form
 // draws only these and the record carries the others as zero.
@@ -150,7 +156,7 @@ export function readConfig(slot, form) {
         config.thresholdX = threshold(readsHorizontal(axis), readsHorizontal(slot.axis), number(form.thresholdX?.(), slot.thresholdX));
         config.thresholdY = threshold(readsVertical(axis), readsVertical(slot.axis), number(form.thresholdY?.(), slot.thresholdY));
         const reads = axisReads(axis);
-        config.directions = Object.fromEntries(DIRECTIONS.map(([direction]) => [direction, reads.includes(direction) ? tapRecord({
+        config.directions = Object.fromEntries(DIRECTIONS.map((direction) => [direction, reads.includes(direction) ? tapRecord({
             keycode: (form[`dir:${direction}`]?.() ?? String(slot.directions?.[direction]?.keycode ?? 0)) || "0",
             modifierPolicy: form[`dirPolicy:${direction}`]?.() ?? slot.directions?.[direction]?.modifierPolicy ?? 0,
             mask: form[`dirMask:${direction}`]?.() ?? slot.directions?.[direction]?.mask ?? 0,
@@ -158,7 +164,7 @@ export function readConfig(slot, form) {
         // Diagonals exist only in eight-direction mode; any other axis
         // carries them as zero, which the keyboard requires.
         const eight = axis === AXIS.EIGHT;
-        config.diagonals = Object.fromEntries(DIAGONALS.map(([diagonal]) => [diagonal, eight ? tapRecord({
+        config.diagonals = Object.fromEntries(DIAGONALS.map((diagonal) => [diagonal, eight ? tapRecord({
             keycode: (form[`diag:${diagonal}`]?.() ?? String(slot.diagonals?.[diagonal]?.keycode ?? 0)) || "0",
             modifierPolicy: form[`diagPolicy:${diagonal}`]?.() ?? slot.diagonals?.[diagonal]?.modifierPolicy ?? 0,
             mask: form[`diagMask:${diagonal}`]?.() ?? slot.diagonals?.[diagonal]?.mask ?? 0,
@@ -200,9 +206,9 @@ export function tapRecord({keycode, modifierPolicy, mask}) {
 }
 // Every direction and diagonal shortcut of a directional record, by its form
 // key's suffix and where it sits in the record.
-/** @type {{key: string, group: 'directions' | 'diagonals', name: string, label: string}[]} */
-export const TAP_ROWS = [...DIRECTIONS.map(([name, label]) => ({key: `dir:${name}`, group: /** @type {const} */ ("directions"), name, label})),
-    ...DIAGONALS.map(([name, label]) => ({key: `diag:${name}`, group: /** @type {const} */ ("diagonals"), name, label}))];
+/** @type {{key: string, group: 'directions' | 'diagonals', name: string}[]} */
+export const TAP_ROWS = [...DIRECTIONS.map((name) => ({key: `dir:${name}`, group: /** @type {const} */ ("directions"), name})),
+    ...DIAGONALS.map((name) => ({key: `diag:${name}`, group: /** @type {const} */ ("diagonals"), name}))];
 // "Ignore" is stored only with the modifiers it leaves out, and they are
 // chosen after it, so until then the direction posts as the slot stored it
 // and the editor holds the choice.

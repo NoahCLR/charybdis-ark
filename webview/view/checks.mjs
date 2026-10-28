@@ -10,13 +10,9 @@
 // already has them.
 
 import {DEMO_WORDS} from "./demo.mjs";
+import {vocabulary} from "./vocabulary.mjs";
 
 const LEVEL_RANK = {blocker: 0, trap: 1, warning: 2, notice: 3};
-export const LEVEL_WORD = {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"};
-export const STATUS_WORD = {new: "new", existing: "on the keyboard", fixed: "fixed"};
-// In the demo nothing is on a keyboard: what the draft started from is the
-// demo setup.
-const DEMO_STATUS_WORD = {...STATUS_WORD, existing: DEMO_WORDS.existingCheck};
 
 /** @param {import("../../contracts/model.js").Check} a @param {import("../../contracts/model.js").Check} b */
 const byLevel = (a, b) => (LEVEL_RANK[a.level] ?? 3) - (LEVEL_RANK[b.level] ?? 3);
@@ -73,11 +69,13 @@ export function confirmText(checks, action = "apply") {
 }
 
 // The line a check's header shows beside its title: its level, and where it
-// comes from unless it is new.
-/** @param {import("../../contracts/model.js").Check} check @param {{demo?: boolean}} [options] */
-export function checkTags(check, {demo = false} = {}) {
-    const words = demo ? DEMO_STATUS_WORD : STATUS_WORD;
-    return [LEVEL_WORD[check.level] || check.level, ...(check.status === "new" ? [] : [words[check.status] || check.status])];
+// comes from unless it is new, in the vocabulary's words. In the demo nothing
+// is on a keyboard: what the draft started from is the demo setup.
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {import("../../contracts/model.js").Check} check @param {{demo?: boolean}} [options] */
+export function checkTags(model, check, {demo = false} = {}) {
+    const {checkLevels, checkStatuses} = vocabulary(model);
+    const words = demo ? {...checkStatuses, existing: DEMO_WORDS.existingCheck} : checkStatuses;
+    return [checkLevels[check.level] || check.level, ...(check.status === "new" ? [] : [words[check.status] || check.status])];
 }
 
 // Findings already use the behaviour's semantic keycode in their edit target.

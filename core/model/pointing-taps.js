@@ -6,15 +6,16 @@
 
 const {PD_KIND, isPdTapKey, pdTapProblem, isPdMacro, PD_MACROS} = require("../schema/pd-mode-domain-v1");
 const catalog = require("../data/keycode-catalog");
+const {VOCABULARY} = require("./vocabulary");
 
 /** @typedef {{keycode?: unknown, modifierPolicy?: unknown, mask?: unknown}} TapLike */
 /** @typedef {{directions?: Record<string, TapLike | undefined>, diagonals?: Record<string, TapLike | undefined>}} SlotLike */
 
+// Every place a directional record keeps a shortcut, in its order, with the
+// vocabulary's words for it.
 /** @type {readonly (readonly ["directions" | "diagonals", string, string])[]} */
-const PLACES = Object.freeze([
-    ["directions", "left", "Left"], ["directions", "right", "Right"], ["directions", "up", "Up"], ["directions", "down", "Down"],
-    ["diagonals", "upLeft", "Up-left"], ["diagonals", "upRight", "Up-right"], ["diagonals", "downLeft", "Down-left"], ["diagonals", "downRight", "Down-right"],
-]);
+const PLACES = Object.freeze(/** @type {const} */ (["directions", "diagonals"]).flatMap(group =>
+    VOCABULARY.pointing[group].map(([name, label]) => /** @type {const} */ ([group, name, label]))));
 
 // Every shortcut place of a slot, with the tap it holds there and the tap a
 // second slot, the stored one, holds in the same place.

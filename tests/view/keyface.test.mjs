@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import keyNames from "../../core/model/key-names.js";
+import vocabularyModule from "../../core/model/vocabulary.js";
+
+// A key cap's second line for a layer key is in the vocabulary's words.
+const words = {vocabulary: vocabularyModule.VOCABULARY};
 
 test("visible macro keycodes use the MACRO_n name for both QMK's named and unnamed values", () => {
     const model = {qmkKeycodeAliases: {QK_MACRO_9: "MACRO_9", "0x773F": "MACRO_63", QK_USER_16: "PD_MODE_0"}};
@@ -31,7 +35,7 @@ test("a key face uses the model's own resolution, and names the layer a dual-rol
     assert.deepEqual(keyFace({keycode: "KC_NO", display: ""}), {main: "", sub: "", kind: "disabled"});
     assert.deepEqual(keyFace({keycode: "KC_A", display: "A"}), {main: "A", sub: "", kind: "key"});
     assert.deepEqual(keyFace({keycode: "LT(LAYER_NAV,KC_F)", display: "F"}), {main: "F", sub: "nav", kind: "layer"});
-    assert.deepEqual(keyFace({keycode: "MO(LAYER_SYM)", display: "L2"}), {main: "L2", sub: "momentary", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "MO(LAYER_SYM)", display: "L2"}, words), {main: "L2", sub: "momentary", kind: "layer"});
     assert.equal(keyFace(undefined).kind, "none");
 });
 
@@ -103,7 +107,7 @@ test("a layer key knows the layer the core says it acts on, however the keyboard
 
 test("a layer-tap cap names its layer on the second line, as the core names it", () => {
     assert.deepEqual(keyFace({keycode: "LT(3,KC_SLASH)", display: "/", layerLabel: "Navigation"}), {main: "/", sub: "Navigation", kind: "layer"});
-    assert.deepEqual(keyFace({keycode: "MO(3)", display: "Navigation", layerLabel: "Navigation"}), {main: "Navigation", sub: "momentary", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "MO(3)", display: "Navigation", layerLabel: "Navigation"}, words), {main: "Navigation", sub: "momentary", kind: "layer"});
 });
 
 test("a picked key matches its behaviour row however its modifiers are spelled", () => {
@@ -117,13 +121,14 @@ test("a picked key matches its behaviour row however its modifiers are spelled",
 });
 
 test("a key cap tells layer keys and mod-taps apart from plain keys", () => {
-    const face = (keycode, display) => keyFace({keycode, display});
+    const face = (keycode, display) => keyFace({keycode, display}, words);
     assert.deepEqual(face("MO(1)", "L1"), {main: "L1", sub: "momentary", kind: "layer"});
     assert.equal(face("TG(1)", "L1").sub, "toggle");
     assert.equal(face("TO(2)", "L2").sub, "move");
     assert.equal(face("OSL(3)", "L3").sub, "one-shot");
     assert.equal(face("TT(1)", "L1").sub, "tap-toggle");
     assert.equal(face("DF(0)", "L0").sub, "default");
+    assert.equal(face("PDF(0)", "L0").sub, "default");
     assert.deepEqual(face("MT(MOD_LSFT,KC_A)", "A"), {main: "A", sub: "MOD_LSFT", kind: "key"});
     assert.equal(face("MT(MOD_LCTL|MOD_LSFT|MOD_LGUI,KC_A)", "A").sub, "MOD_LCTL|MOD_LSFT|MOD_LGUI");
     assert.equal(face("MT(MOD_RALT,KC_B)", "B").sub, "MOD_RALT");

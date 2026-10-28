@@ -15,6 +15,7 @@ import {behaviourChangesNothing, behaviourHasTiming, behaviourTimingEdit, behavi
 import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, styleWord, tierName, vocabulary, word} from "../../view/vocabulary.mjs";
 import {cellEditor} from "./cell-editor.mjs";
+import {sectionPath} from "../../view/settings-layout.mjs";
 import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
 import {saveBehaviour} from "./save-behaviour.mjs";
 
@@ -25,16 +26,17 @@ const {TIER_FIELDS, TIERS} = edits;
 const styleLabel = (kind, style) => styleWord(getModel(), kind, style || "");
 
 // An empty timing field falls back to the keyboard's own default, which it
-// reports and Settings · Behaviours · Tap & hold timing edits — so the note names both.
-/** @param {EditorBehavior} behaviour */
-function timingDefaultsNote(behaviour) {
+// reports and Settings · Behaviours · Tap & hold timing edits — so the note
+// names both, the path in its owners' words.
+/** @param {EditorBehavior} behaviour @param {string} where */
+function timingDefaultsNote(behaviour, where) {
     const defaults = behaviour.timingDefaults;
     const values = [["multi tap window", defaults.multiTapTerm], ["tap / hold threshold", defaults.tapHoldTerm], ["long hold threshold", defaults.longHoldTerm]]
         .filter(([, value]) => String(value ?? "").trim() !== "")
         .map(([name, value]) => `${name} ${value} ms`);
     return values.length
-        ? `Keyboard defaults from Settings · Behaviours · Tap & hold timing: ${values.join(", ")}. Clear an override to follow its default.`
-        : "Clear a timing override to follow the keyboard default from Settings · Behaviours · Tap & hold timing.";
+        ? `Keyboard defaults from ${where}: ${values.join(", ")}. Clear an override to follow its default.`
+        : `Clear a timing override to follow the keyboard default from ${where}.`;
 }
 
 // The cell open in this behaviour's grid: one opened in another behaviour's
@@ -137,7 +139,7 @@ export function behaviourEditor(behaviour) {
             <div>
                 <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
                     ${actionLabel(model, behaviour.keycode) === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
-                <p class="note">${esc(timingDefaultsNote(behaviour))}</p>
+                <p class="note">${esc(timingDefaultsNote(behaviour, sectionPath(model?.configDefaults, "keyTiming")))}</p>
                 ${storageNotes(behaviour).map((note) => `<p class="note">${esc(note)}</p>`).join("")}
             </div>
             ${behaviour.stored ? `<div class="right row beh-actions">

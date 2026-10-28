@@ -71,7 +71,7 @@ export function reviewOverlay() {
     // Checks that point at a key or a combo open it as review items do.
     /** @type {import("../../contracts/model.js").Check[]} */
     const checked = [];
-    const checks = checksSection(draft.checks, (check) => check.status !== "fixed" && placeState(check.place, model.layers)
+    const checks = checksSection(model, draft.checks, (check) => check.status !== "fixed" && placeState(check.place, model.layers)
         ? `<button class="btn tiny ghost" data-show-check="${checked.push(check) - 1}" data-tip="Close the review and open this where it is edited.">Show</button>` : "",
     (check) => {
         const group = sourceByCheck.get(check);
