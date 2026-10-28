@@ -7,7 +7,7 @@ const {u8: assertU8, u16: assertU16, asBytes: copyBytes, canonical} = require(".
 /**
  * @typedef {{tapIndex: number, tap?: ReturnType<typeof normalizeAction>, hold?: ReturnType<typeof normalizeHold>, longHold?: ReturnType<typeof normalizeHold>}} NormalizedStep
  */
-const {MAX_TAP_DEPTH} = require("./profile-depth");
+const {DEFAULT_TAP_DEPTH, MAX_TAP_DEPTH} = require("./profile-depth");
 
 const {
     PROFILE_ACTION_KINDS,
@@ -47,10 +47,11 @@ const KEY_BEHAVIOR_HOLD_STYLES = Object.freeze({
     TAP_ON_RELEASE_AFTER_HOLD: 4,
 });
 
+const BEHAVIOR_ROWS = 128;
 const KEY_BEHAVIOR_LIMITS = Object.freeze({
-    maxRows: 128,
-    maxPopulatedSteps: 640,
-    maxTapStepsPerBehavior: 5,
+    maxRows: BEHAVIOR_ROWS,
+    maxPopulatedSteps: BEHAVIOR_ROWS * DEFAULT_TAP_DEPTH,
+    maxTapStepsPerBehavior: DEFAULT_TAP_DEPTH,
     maxLayers: LAYERS,
     maxRepeatHz: 100,
     // The domain's own offsets are 16 bits (unchanged by schema 4, firmware

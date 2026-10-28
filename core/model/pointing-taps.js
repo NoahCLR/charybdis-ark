@@ -6,6 +6,7 @@
 
 const {PD_KIND, isPdTapKey, pdTapProblem, isPdMacro, PD_MACROS} = require("../schema/pd-mode-domain-v1");
 const catalog = require("../data/keycode-catalog");
+const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 
 /** @typedef {{keycode?: unknown, modifierPolicy?: unknown, mask?: unknown}} TapLike */
 /** @typedef {{directions?: Record<string, TapLike | undefined>, diagonals?: Record<string, TapLike | undefined>}} SlotLike */
@@ -38,7 +39,7 @@ function pointingMacros(slots) {
 function pointingTapKeys() {
     /** @param {(code: number) => boolean} keep */
     const names = keep => catalog.entries().filter(entry => keep(entry.value)).flatMap(entry => [entry.name, ...entry.aliases]);
-    return {plain: [...names(code => code > 0 && !pdTapProblem(code)), ...Array.from({length: 128}, (_, index) => `MACRO_${index}`)], modified: names(code => code > 0 && code <= 0x1fff && isPdTapKey(code | 0x100))};
+    return {plain: [...names(code => code > 0 && !pdTapProblem(code)), ...Array.from({length: MACRO_DOMAIN_V1.SLOTS}, (_, index) => `MACRO_${index}`)], modified: names(code => code > 0 && code <= 0x1fff && isPdTapKey(code | 0x100))};
 }
 
 module.exports = {pointingTaps, pointingTapKeys, pointingMacros};

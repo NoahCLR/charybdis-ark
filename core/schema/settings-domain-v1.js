@@ -2,6 +2,8 @@
 "use strict";
 const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
+const {CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
+const {MACRO_DOMAIN_V1} = require("./macro-domain-v1");
 const {validHostSetting} = require("./host-settings");
 const {canonical} = require("./bytes");
 // Settings domain 0x40, version 11, the only one the keyboard stores (firmware
@@ -80,8 +82,8 @@ const STORED = /** @type {const} */ ([
 // names without updating parallel byte offsets.
 const SCALARS_OFFSET = 8, PLACEMENT_BYTES = 8, LAYER_RECORD_SIZE = 1 + 2 * PLACEMENT_BYTES;
 const LAYER_RECORDS_OFFSET = SCALARS_OFFSET + STORED.length * 4;
-const MACRO_NAMES = 128, CUSTOM_KEY_NAMES = 128, KEYBOARD_NAMES = 1, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES + KEYBOARD_NAMES;
-const CUSTOM_KEY_SHORTCUTS = 128, SHORTCUT_KEY_COUNT = 6, SHORTCUT_SIZE = 4 + SHORTCUT_KEY_COUNT;
+const MACRO_NAMES = MACRO_DOMAIN_V1.SLOTS, CUSTOM_KEY_NAMES = CUSTOM_KEY_SLOTS, KEYBOARD_NAMES = 1, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES + KEYBOARD_NAMES;
+const CUSTOM_KEY_SHORTCUTS = CUSTOM_KEY_SLOTS, SHORTCUT_KEY_COUNT = 6, SHORTCUT_SIZE = 4 + SHORTCUT_KEY_COUNT;
 const SHORTCUTS_OFFSET = LAYER_RECORDS_OFFSET + LAYERS * LAYER_RECORD_SIZE;
 const FIXED_SIZE = SHORTCUTS_OFFSET + CUSTOM_KEY_SHORTCUTS * SHORTCUT_SIZE;
 const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS], COUNT: STORED.length, LAYERS, MACRO_NAMES, CUSTOM_KEY_NAMES, CUSTOM_KEY_SHORTCUTS,

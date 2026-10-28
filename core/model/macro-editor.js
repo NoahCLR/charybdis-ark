@@ -2,7 +2,8 @@
 "use strict";
 const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 
-const {MACRO_BANK_BYTES, MACRO_SLOTS, decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
+const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
+const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProtectionOf} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
@@ -82,7 +83,7 @@ function macroInputStatus(snapshot, message, capabilities) {
 function macroIndex(keycode) {
     const match = /^MACRO_(\d+)$/.exec(keycode || "");
     const index = match ? Number(match[1]) : -1;
-    if (!match || index >= MACRO_SLOTS || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");
+    if (!match || index >= MACRO_DOMAIN_V1.SLOTS || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");
     return index;
 }
 
@@ -131,7 +132,7 @@ function profileMacroBudget(decoded, capabilities) {
     // edits retain those exact bytes, so ordinary profile usage includes them.
     const reclaimed = Math.max(0, (storedDomain?.payload.length ?? canonicalSize) - canonicalSize);
     const sharedFree = (capabilities?.maxProfilePayload ?? PROFILE_BLOB_V1.MAX_SIZE) - decoded.candidate.length + reclaimed;
-    return macroBudget(slots, capabilities?.macroBytes ?? MACRO_BANK_BYTES, sharedFree);
+    return macroBudget(slots, capabilities?.macroBytes ?? MACRO_DOMAIN_V1.MAX_SIZE, sharedFree);
 }
 
 module.exports = {profileMacroBudget, macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS};

@@ -16,14 +16,14 @@ const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
 const {reorderLinkRefusal} = require("./pointing-links");
 const {reorderShortcutRefusal} = require("./shortcut-layers");
-const {decodeMacroPayload} = require("../schema/macro-payload");
+const {MACRO_LIMITS, decodeMacroPayload} = require("../schema/macro-payload");
+const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {hostSettings} = require("../schema/host-settings");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A current-format file contains one complete canonical schema-4 blob.
 // Keymap and macro streams are decoded editor views, never extra authorities.
 // Document version 5 refuses the former separate layers/macros format (D-L64).
-const MACRO_SLOTS = 128;
 // Base64 for 130,048 bytes plus the small JSON envelope fits in 192 KiB.
 const FILE_MAX_BYTES = 196608;
 const DOCUMENT_VERSION = 5;
@@ -44,6 +44,8 @@ function base64(value, max, label) {
     if (bytes.length > max || bytes.toString("base64") !== value) throw fail(`Invalid ${label}.`);
     return bytes;
 }
+// The most digits a stored delay may have.
+const DELAY_DIGITS = String(MACRO_LIMITS.maxDelayMs).length;
 /** @param {Buffer} bytes @param {import("../schema/types.js").MacroOptions} [options] */
 function validateMacro(bytes, {textEntry = false, layout} = {}) {
     decodeMacroPayload(bytes, {textEntry, layout});
@@ -57,20 +59,18 @@ function validateMacro(bytes, {textEntry = false, layout} = {}) {
         if (type === 5) {index++; continue;}
         if (type === 4) {
             let digits = "";
-            while (index < bytes.length && bytes[index] >= 48 && bytes[index] <= 57 && digits.length < 5) digits += String.fromCharCode(bytes[index++]);
-            if (!digits || Number(digits) > 65535 || bytes[index++] !== 124) throw fail("Invalid macro delay.");
+            while (index < bytes.length && bytes[index] >= 48 && bytes[index] <= 57 && digits.length < DELAY_DIGITS) digits += String.fromCharCode(bytes[index++]);
+            if (!digits || Number(digits) > MACRO_LIMITS.maxDelayMs || bytes[index++] !== 124) throw fail("Invalid macro delay.");
         } else {
             const k = bytes[index++];
             if (![1, 2, 3].includes(type) || !key(k)) throw fail("Unsupported macro key instruction.");
             if (type === 1 && held.has(k)) throw fail("A macro taps a key it already holds.");
-            if (type === 2) {if (held.has(k) || held.size >= 16) throw fail("Unbalanced macro keys."); held.add(k);}
+            if (type === 2) {if (held.has(k) || held.size >= MACRO_LIMITS.maxHeldKeys) throw fail("Unbalanced macro keys."); held.add(k);}
             if (type === 3 && !held.delete(k)) throw fail("Unbalanced macro keys.");
         }
     }
     if (held.size) throw fail("A macro leaves keys pressed.");
 }
-// Firmware's macro domain capacity, including all slot terminators.
-const MACRO_BANK_BYTES = 34903;
 // The whole profile the keyboard runs, every domain: each domain its active
 // profile holds, otherwise the compiled default the firmware falls back to
 // (a profile saved without the keymap or macros types the authored ones), and
@@ -188,7 +188,7 @@ function validateSnapshot(value, capabilities) {
     // The macro domain includes any optional unused tail. A destination
     // validates its advertised limit without constructing another storage bank.
     const stored = payload("macros").length;
-    const macroCapacity = capabilities?.macroBytes ?? MACRO_BANK_BYTES;
+    const macroCapacity = capabilities?.macroBytes ?? MACRO_DOMAIN_V1.MAX_SIZE;
     if (stored > macroCapacity) throw fail(`Macros need ${stored} bytes; this keyboard holds ${macroCapacity}.`);
     // This same complete blob is both the portable profile and the candidate.
     const candidateBytes = profile;
@@ -353,4 +353,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, FILE_MAX_BYTES, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {LAYERS, FILE_MAX_BYTES, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

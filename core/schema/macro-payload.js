@@ -4,6 +4,9 @@
 const catalog = require("../data/keycode-catalog");
 const {layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
 const MACRO_PROTECTION = Object.freeze({AUTO: "auto", ON: "on", OFF: "off"});
+// What one macro may ask of the keyboard: keys held at once, a chord's keys
+// included, and a delay in milliseconds.
+const MACRO_LIMITS = Object.freeze({maxHeldKeys: 16, maxDelayMs: 65535});
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
 /** @param {unknown} key @returns {key is number} */
@@ -54,17 +57,17 @@ function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT} = {}
         const command = payload.slice(index, end).trim(); index = end + 1;
         if (/^\d+$/.test(command)) {
             const delay = Number(command);
-            if (delay > 65535) throw fail("A macro delay must be between 0 and 65,535 milliseconds.");
+            if (delay > MACRO_LIMITS.maxDelayMs) throw fail(`A macro delay must be between 0 and ${MACRO_LIMITS.maxDelayMs.toLocaleString("en-US")} milliseconds.`);
             steps.push({kind: "delay", delay}); continue;
         }
         const kind = command[0] === "+" ? "down" : command[0] === "-" ? "up" : "tap";
         const names = (kind === "tap" ? command : command.slice(1)).split(",").map(name => name.trim());
         const keys = names.map(name => catalog.encode(name));
-        if (!keys.length || keys.length > 16 || !keys.every(validKey) || new Set(keys).size !== keys.length || (kind !== "tap" && keys.length !== 1)) throw fail("Choose up to 16 distinct basic keys for a chord, or one key for a press or release.");
+        if (!keys.length || keys.length > MACRO_LIMITS.maxHeldKeys || !keys.every(validKey) || new Set(keys).size !== keys.length || (kind !== "tap" && keys.length !== 1)) throw fail(`Choose up to ${MACRO_LIMITS.maxHeldKeys} distinct basic keys for a chord, or one key for a press or release.`);
         if (kind === "up") {
             if (!held.delete(keys[0])) throw fail("A macro releases a key that is not held.");
         } else {
-            if (keys.some(key => held.has(key)) || held.size + keys.length > 16) throw fail("A macro presses a held key or holds more than 16 keys.");
+            if (keys.some(key => held.has(key)) || held.size + keys.length > MACRO_LIMITS.maxHeldKeys) throw fail(`A macro presses a held key or holds more than ${MACRO_LIMITS.maxHeldKeys} keys.`);
             if (kind === "down") held.add(keys[0]);
         }
         steps.push({kind, keys});
@@ -118,7 +121,7 @@ function chordAt(commands, at) {
     const keyOf = /** @param {number} index */ index => /** @type {{key: number}} */ (commands[index]).key;
     for (let start = at; start < end; start++) {
         const held = end - start, total = held + (tap === undefined ? 0 : 1);
-        if (total < 2 || total > 16) continue;
+        if (total < 2 || total > MACRO_LIMITS.maxHeldKeys) continue;
         let matched = true;
         for (let index = 0; index < held && matched; index++) {
             const up = commands[ups + index];
@@ -192,4 +195,4 @@ function macroProtectionOf(bytes) {
     return bytes[2] === 1 ? "on" : "off";
 }
 
-module.exports = {macroModifierKeycodes, MACRO_PROTECTION, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload};
+module.exports = {macroModifierKeycodes, MACRO_LIMITS, MACRO_PROTECTION, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload};

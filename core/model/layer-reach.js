@@ -38,7 +38,7 @@
 const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
 const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
-const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
+const {CUSTOM_KEY_SLOTS, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdModeKeyOfCode, PD_MODE_KEYS} = require("../data/pd-mode-keys");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
@@ -131,7 +131,7 @@ function shortcutEffects(slot, owners, own) {
 
 // The shortcuts by slot, for the timing a custom key follows.
 /** @param {LayerOwners | undefined} owners */
-const shortcutsBySlot = (owners) => Array.from({length: 128}, (_, slot) => owners?.shortcuts.get(slot));
+const shortcutsBySlot = (owners) => Array.from({length: CUSTOM_KEY_SLOTS}, (_, slot) => owners?.shortcuts.get(slot));
 
 // What a native keycode does to the layers, if anything: as the key pressed
 // (`own`), or sent by a behaviour step or a combo. `unowned` is a layer
