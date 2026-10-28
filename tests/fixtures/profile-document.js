@@ -30,4 +30,10 @@ function editMacros(document, change) {
     document.profile = replaceDomain(Buffer.from(document.profile, "base64"), 0x70, () => domainCodec("macros").encode(macros.map(value => Buffer.from(value, "base64")))).toString("base64");
     return document;
 }
-module.exports = {profileLayers, profileMacros, editLayers, editMacros};
+/** @param {import('../../core/model/types.js').PortableDocument} document @param {(settings: import('../../core/schema/types.js').SettingsDomain) => unknown} change */
+function editSettings(document, change) {
+    const settings = domainCodec("settings").decode(payload(document, 0x40)); change(settings);
+    document.profile = replaceDomain(Buffer.from(document.profile, "base64"), 0x40, () => domainCodec("settings").encode(settings)).toString("base64");
+    return document;
+}
+module.exports = {profileLayers, profileMacros, editLayers, editMacros, editSettings};

@@ -9,8 +9,14 @@
 // keycode VIA stores, and decode a domain with the right action limits; they
 // ask here rather than each doing it their own way.
 
-const keycodes = require("../data/keycode-catalog");
+const keycodes = require("./keycodes");
+const {LAYER_FORMS, layerFormBase, layerFormLayer} = require("../../rules/qmk-keycodes.mjs");
+const {layerRuleOf} = require("../../rules/layer-placement.mjs");
+const {callParts} = require("../../rules/keycode-expression.mjs");
+const {LAYER_LOCK_BLOCK} = require("../data/user-keycodes");
+// The keyboard's layer-lock block, LOCK_LAYER(n).
 const {PD_MODE_KEYS, pdModeKeyOfCode} = require("../data/pd-mode-keys");
+const {LAYERS} = require("../data/charybdis-layout");
 const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 
@@ -72,46 +78,23 @@ const layerOfRef = text => {
 // keycodes the keyboard runs through its own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold
 // whose fifth tap locks, OSL as a one-shot). Where each may go is
 // placementProblem's to say.
-const OWNED_LAYER_BASES = Object.freeze([0x5200, 0x5260, 0x5280, 0x52c0]); // TO, TG, OSL, TT
+const OWNED_LAYER_BASES = Object.freeze([LAYER_FORMS.TO, LAYER_FORMS.TG, LAYER_FORMS.OSL, LAYER_FORMS.TT]);
 /** @param {number} code @param {number} layerCount */
 const isOwnedLayerCode = (code, layerCount) =>
-    OWNED_LAYER_BASES.includes(code & ~0x1f) && (code & 0x1f) < layerCount;
+    OWNED_LAYER_BASES.includes(layerFormBase(code)) && layerFormLayer(code) < layerCount;
 
-// Where a stored action may be placed, as the keyboard checks a profile it is
-// asked to save (noah_action_supported_at in users/noah/lib/action). Only
-// layer keycodes are restricted: a layer hold needs a key held down, so it is a
-// key, a press-and-hold branch or a combo (a combo holds its output); OSL() is
-// a key, a tap or a combo; LM() is a key or a combo; LT() is only a key; TG(),
-// TO() and LOCK_LAYER() go anywhere; DF() and PDF(), which the keyboard does not
-// own, go nowhere. A custom key goes anywhere: as a step it sends its shortcut
-// only, never its own behaviour (firmware D-F26). Returns what is wrong, or
+// Where a stored action may be placed is the shared layer placement rule
+// (rules/layer-placement.mjs); this says in words what is wrong, or returns
 // undefined.
-/** @typedef {'key' | 'tap' | 'holdPress' | 'holdOther' | 'comboOutput'} Placement */
-const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress", HOLD_OTHER: "holdOther", COMBO_OUTPUT: "comboOutput"});
-
-/** @param {number} code @param {number} layerCount @returns {{kind: string, places: Placement[]} | undefined} */
-function layerRuleOf(code, layerCount) {
-    /** @param {number} base @param {number} [span] */
-    const range = (base, span = 0x20) => code >= base && code < base + span;
-    const layer = code & 0x1f;
-    if (range(0x4000, 0x1000)) return ((code >> 8) & 0x0f) < layerCount ? {kind: "layerTap", places: [PLACEMENT.KEY]} : {kind: "unowned", places: []};
-    if (range(0x5000, 0x200)) return ((code >> 5) & 0x0f) < layerCount ? {kind: "layerMod", places: [PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT]} : {kind: "unowned", places: []};
-    if (range(0x5240) || range(0x52e0)) return {kind: "unowned", places: []};
-    if (!(range(0x5200) || range(0x5220) || range(0x5260) || range(0x5280) || range(0x52c0))) return undefined;
-    if (layer >= layerCount) return {kind: "unowned", places: []};
-    if (range(0x5220) || range(0x52c0)) return {kind: "hold", places: [PLACEMENT.KEY, PLACEMENT.HOLD_PRESS, PLACEMENT.COMBO_OUTPUT]};
-    if (range(0x5280)) return {kind: "oneShot", places: [PLACEMENT.KEY, PLACEMENT.TAP, PLACEMENT.COMBO_OUTPUT]};
-    return undefined;
-}
-
-/** @param {import("./types.js").SemanticAction} action @param {Placement} placement @param {{layerCount?: number}} [options] */
-function placementProblem(action, placement, {layerCount = 16} = {}) {
-    const code = action.kind === ACTION.LAYER_MOMENTARY ? 0x5220 | action.operand : nativeCode(action);
-    const rule = code === undefined ? undefined : layerRuleOf(code, layerCount);
+/** @param {import("./types.js").SemanticAction} action @param {import("../../rules/layer-placement.mjs").Placement} placement @param {{layerCount?: number}} [options] */
+function placementProblem(action, placement, {layerCount = LAYERS} = {}) {
+    const code = action.kind === ACTION.LAYER_MOMENTARY ? LAYER_FORMS.MO | action.operand : nativeCode(action);
+    const rule = code === undefined ? undefined : layerRuleOf(code, layerCount, LAYER_LOCK_BLOCK);
     if (!rule || rule.places.includes(placement)) return undefined;
     const name = actionName(action);
     switch (rule.kind) {
         case "unowned": return `${name} is a layer keycode this keyboard does not run through its layer tracking, so it cannot be saved here.`;
+        case "missing": return `${name} locks a layer this keyboard does not have.`;
         case "hold": return `${name} holds a layer, so it only works as a key, a combo or a "Press and hold until release" branch.`;
         case "layerTap": return `${name} makes its own tap/hold decision, so it only works as a key, not in a behaviour or a combo.`;
         case "oneShot": return `${name} works as a key, a tap or a combo, not as a hold.`;
@@ -120,4 +103,10 @@ function placementProblem(action, placement, {layerCount = 16} = {}) {
     }
 }
 
-module.exports = {PLACEMENT, placementProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef};
+// Whether an expression is an MO() call, which a behaviour or combo stores as
+// a layer action of its own (ACTION.LAYER_MOMENTARY) rather than as the
+// keycode, so a layer reorder moves it with its layer.
+/** @param {string} expression */
+const momentaryCall = expression => callParts(expression.replace(/\s+(?=\()/, ""))?.name === "MO";
+
+module.exports = {placementProblem, momentaryCall, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pointingSlotOfCode, layerRef, layerOfRef};

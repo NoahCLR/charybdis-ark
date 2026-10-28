@@ -18,6 +18,7 @@
   "include": [
     "core/**/*.js",
     "core/**/*.d.ts",
+    "rules/**/*.mjs",
     "contracts/**/*.d.ts",
     "tests/types/core.ts"
   ]

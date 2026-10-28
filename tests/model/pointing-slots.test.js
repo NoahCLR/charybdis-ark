@@ -41,5 +41,5 @@ test("the profile meter counts a sparse PD domain by its stored bytes, and its s
     const value = validateSnapshot(wide);
     assert.equal(usage.used, value.candidate.length, "the stored blob, empty slots left out");
     assert.deepEqual(usage.counts.find(count => count.id === "pointingModes"),
-        {id: "pointingModes", used: value.pdModes.filter(slot => slot.kind).length, limit: 32}, "slots that hold a mode, out of all 32");
+        {id: "pointingModes", used: value.pdModes.filter(slot => slot.kind).length, limit: 32, fixed: true}, "slots that hold a mode, out of all 32");
 });

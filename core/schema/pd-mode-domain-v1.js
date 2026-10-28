@@ -14,7 +14,10 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 // 9..10 and 16..31 are zero.
 const {NAME_MAX_BYTES, validName, nameOfBytes} = require("./profile-name");
 const {canonical} = require("./bytes");
-const PD_DOMAIN = Object.freeze({ID: PROFILE_DOMAIN_IDS.PD_MODES, VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.PD_MODES], SLOTS: 32, HEADER_SIZE: 8, RECORD_SIZE: 128, NAME_OFFSET: 96, NAME_MAX_BYTES, MAX_SIZE: 8 + 32 * 128});
+const {QK, modsOf} = require("../../rules/qmk-keycodes.mjs");
+const {LAYERS} = require("../data/charybdis-layout");
+const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
+const PD_DOMAIN = Object.freeze({ID: PROFILE_DOMAIN_IDS.PD_MODES, VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.PD_MODES], SLOTS: POINTING_SLOT_COUNT, HEADER_SIZE: 8, RECORD_SIZE: 128, NAME_OFFSET: 96, NAME_MAX_BYTES, MAX_SIZE: 8 + POINTING_SLOT_COUNT * 128});
 const PD_KIND = Object.freeze({DISABLED: 0, DIRECTIONAL: 1, SCROLLING: 2});
 const PD_AXIS = Object.freeze({VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3});
 // Which axes a scrolling mode scrolls, in the same byte (firmware D-F08).
@@ -30,7 +33,8 @@ const PD_MODIFIERS = Object.freeze({INHERIT: 0, MASK: 1, EXACT: 2});
 // both sets, may end a mode its layers started. Every link byte zero is no
 // link. No layer starts two modes; the layers keys turn on may repeat.
 const PD_LINK_ENDS = Object.freeze({NOTHING: 0, HIGHER_LAYER: 1, OTHER_LAYER: 2});
-const PD_LINK_LAYERS = 16;
+// A link names layers of the bank; its 16-bit masks hold every one.
+const PD_LINK_LAYERS = LAYERS;
 const DIRECTIONS = ["left", "right", "up", "down"];
 // Eight directions keep their diagonals in bytes 70..85, which any other
 // directional record leaves zero. Byte 86 is what every directional mode does
@@ -47,7 +51,7 @@ function fail(code, offset, message) {
 /** @param {Uint8Array} bytes */
 function zero(bytes) { return bytes.every(byte => byte === 0); }
 // A tap may click a plain mouse button 1–8 (firmware D-F22) or run a macro.
-const PD_MACROS = Object.freeze({FIRST: 0x7700, LAST: 0x777f});
+const PD_MACROS = Object.freeze({FIRST: QK.MACRO.first, LAST: QK.MACRO.last});
 /** @param {number} keycode */
 const isPdMacro = keycode => Number.isInteger(keycode) && keycode >= PD_MACROS.FIRST && keycode <= PD_MACROS.LAST;
 const PD_CLICKS = Object.freeze({FIRST: 0xd1, LAST: 0xd8});
@@ -57,8 +61,8 @@ const isPdClick = keycode => Number.isInteger(keycode) && keycode >= PD_CLICKS.F
 function isPdTapKey(keycode) {
     if (!Number.isInteger(keycode) || keycode < 0 || keycode > 0xffff) return false;
     if ((keycode >= 4 && keycode <= 0xc2) || isPdClick(keycode) || isPdMacro(keycode)) return true;
-    const mods = keycode >>> 8, key = keycode & 255;
-    return mods <= 0x1f && (mods & 15) !== 0 && key >= 4 && key <= 0xa4;
+    const key = keycode & 255;
+    return keycode <= QK.MODS.last && (modsOf(keycode) & 15) !== 0 && key >= 4 && key <= 0xa4;
 }
 // Why a keycode cannot be a pointing-mode tap, or "" when it can. The words
 // name what a person would have picked.
@@ -66,11 +70,11 @@ function isPdTapKey(keycode) {
 function pdTapProblem(keycode) {
     if (isPdTapKey(keycode)) return "";
     const key = keycode & 255, modified = keycode > 0xff;
-    if (keycode <= 0x1fff && key >= 0xcd && key <= 0xdf) {
+    if (keycode <= QK.MODS.last && key >= 0xcd && key <= 0xdf) {
         return modified && isPdClick(key) ? "A mouse-button click cannot carry modifiers in its keycode. Choose the button alone."
             : "A pointing mode can click mouse buttons 1–8, but not move the pointer, scroll or change mouse acceleration.";
     }
-    if (modified && keycode <= 0x1fff && key > 0xa4 && key <= 0xc2) return "Only keyboard keys take modifiers in a pointing mode; send a media or system key on its own.";
+    if (modified && keycode <= QK.MODS.last && key > 0xa4 && key <= 0xc2) return "Only keyboard keys take modifiers in a pointing mode; send a media or system key on its own.";
     return "A pointing mode sends keys, shortcuts, media and system keys, mouse buttons 1–8 and supported macros, not layer, pointing-mode or keyboard controls.";
 }
 /** @param {Buffer} bytes */
@@ -286,4 +290,4 @@ function validatePdRecord(bytes, id, offset = 0) {
     validateRecord(bytes, id, offset);
 }
 
-module.exports = {PD_DOMAIN, PD_KIND, PD_LINK_ENDS, PD_LINK_LAYERS, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, DIAGONALS, PD_CLICKS, isPdClick, PD_MACROS, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};
+module.exports = {PD_DOMAIN, PD_KIND, PD_LINK_ENDS, PD_LINK_LAYERS, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, DIRECTIONS, DIAGONALS, PD_CLICKS, isPdClick, PD_MACROS, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};

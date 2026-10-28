@@ -36,19 +36,22 @@
 // absence claims about the part they could not establish.
 
 const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
-const keycodes = require("../data/keycode-catalog");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
-const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
+const keycodes = require("../schema/keycodes");
+const {ALL_LAYERS, CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, LAYER_IDENTITY, layersAbove, layersOfMask, matrixPosition} = require("../data/charybdis-layout");
+const {CUSTOM_KEY_SLOTS, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
+const {QK, inBlock, LAYER_FORMS, TAPPING_TOGGLE, layerFormBase, layerFormLayer, layerModLayer, layerTapLayer} = require("../../rules/qmk-keycodes.mjs");
 const {pdModeKeyOfCode, PD_MODE_KEYS} = require("../data/pd-mode-keys");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {SETTING, SHORTCUT_LAYER_KINDS, alwaysOnLayers} = require("../schema/settings-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
-const {layerName, slotName} = require("./vocabulary");
+const {VOCABULARY, layerName, slotName} = require("./vocabulary");
 const {inertLinkLayers, linkStarts} = require("./pointing-links");
 const {PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
 const {analyzeLayerStates, maskOf: layersOf, lowest} = require("./layer-state-graph");
 const {compileLayerAnswers, answeringLayer} = require("./layer-resolution");
+const {participation} = require("./participation");
+const {linkStartHolds} = require("../../rules/pointing-link-starts.mjs");
 
 /**
  * @typedef {import("./types.js").LayerEffect} LayerEffect
@@ -65,8 +68,6 @@ const {compileLayerAnswers, answeringLayer} = require("./layer-resolution");
  */
 const TRANSPARENT = 0x0001;
 const NOTHING = 0x0000;
-// QMK's TAPPING_TOGGLE default (compat/qmk_tapping_contract.h).
-const TAPPING_TOGGLE = 5;
 const LEVELS = Object.freeze(/** @type {const} */ ({TRAP: "trap", WARNING: "warning", NOTICE: "notice"}));
 // Enough to name a way in without listing every superset of one trap.
 const MAX_TRAPS = 4;
@@ -78,8 +79,6 @@ const GRAPH_FINDINGS = new Set(["trap", "trapOverflow", "unreachable", "unreacha
 
 /** @param {number} layer */
 const bit = (layer) => 1 << layer;
-/** @param {number} mask */
-const layersIn = (mask) => Array.from({length: LAYERS}, (_, layer) => layer).filter((layer) => mask & bit(layer));
 /** @param {number} code */
 // All semantic actions in a validated current-ABI profile have native keycodes.
 const codeName = (code) => {
@@ -131,7 +130,7 @@ function shortcutEffects(slot, owners, own) {
 
 // The shortcuts by slot, for the timing a custom key follows.
 /** @param {LayerOwners | undefined} owners */
-const shortcutsBySlot = (owners) => Array.from({length: 128}, (_, slot) => owners?.shortcuts.get(slot));
+const shortcutsBySlot = (owners) => Array.from({length: CUSTOM_KEY_SLOTS}, (_, slot) => owners?.shortcuts.get(slot));
 
 // What a native keycode does to the layers, if anything: as the key pressed
 // (`own`), or sent by a behaviour step or a combo. `unowned` is a layer
@@ -144,18 +143,18 @@ function layerEffects(code, links, own = true) {
     if (key) return modeEffects(key.slot, key.locked, links);
     const custom = customKeyOfCode(code);
     if (custom !== undefined) return shortcutEffects(custom, links, own);
-    if (code >= 0x4000 && code <= 0x4fff) return within((code >> 8) & 15, [{kind: "hold", layer: (code >> 8) & 15}]);
-    if (code >= 0x5000 && code <= 0x51ff) return within((code >> 5) & 15, [{kind: "hold", layer: (code >> 5) & 15}]);
+    if (inBlock(code, QK.LAYER_TAP)) return within(layerTapLayer(code), [{kind: "hold", layer: layerTapLayer(code)}]);
+    if (inBlock(code, QK.LAYER_MOD)) return within(layerModLayer(code), [{kind: "hold", layer: layerModLayer(code)}]);
     if (layerLockOfCode(code) !== undefined) return [{kind: "lock", layer: /** @type {number} */ (layerLockOfCode(code))}];
-    if (code < 0x5200 || code >= 0x5300) return [];
-    const layer = code & 31;
-    switch (code & ~31) {
-        case 0x5200: return within(layer, [{kind: "move", layer}]);
-        case 0x5220: return within(layer, [{kind: "hold", layer}]);
-        case 0x5260: return within(layer, [{kind: "lock", layer}]);
-        case 0x5280: return within(layer, [{kind: "hold", layer, oneShot: true}]);
-        case 0x52c0: return within(layer, [{kind: "hold", layer}, {kind: "lock", layer, taps: TAPPING_TOGGLE}]);
-        case 0x5240: case 0x52e0: return [{kind: "unowned", layer}];
+    if (code < QK.TO.first || code > QK.PERSISTENT_DEF_LAYER.last) return [];
+    const layer = layerFormLayer(code);
+    switch (layerFormBase(code)) {
+        case LAYER_FORMS.TO: return within(layer, [{kind: "move", layer}]);
+        case LAYER_FORMS.MO: return within(layer, [{kind: "hold", layer}]);
+        case LAYER_FORMS.TG: return within(layer, [{kind: "lock", layer}]);
+        case LAYER_FORMS.OSL: return within(layer, [{kind: "hold", layer, oneShot: true}]);
+        case LAYER_FORMS.TT: return within(layer, [{kind: "hold", layer}, {kind: "lock", layer, taps: TAPPING_TOGGLE}]);
+        case LAYER_FORMS.DF: case LAYER_FORMS.PDF: return [{kind: "unowned", layer}];
         default: return [];
     }
 }
@@ -255,7 +254,7 @@ function linkFacts(decoded) {
     /** @type {{layer: number, ends: number}[]} */
     const endedStarts = [];
     /** @param {number} mask */
-    const live = (mask) => layersIn(mask & ((1 << PD_LINK_LAYERS) - 1) & ~inertLinkLayers(decoded.settings, mask));
+    const live = (mask) => layersOfMask(mask & ((1 << PD_LINK_LAYERS) - 1) & ~inertLinkLayers(decoded.settings, mask));
     for (const slot of decoded.pdModes || []) {
         if (!slot.kind) continue;
         const turnsOn = live(slot.linkTurnsOn);
@@ -269,7 +268,7 @@ function linkFacts(decoded) {
     // how; the layers always on never are among them.
     /** @type {LayerOwners["shortcuts"]} */
     const shortcuts = new Map();
-    (decoded.settings.customKeyShortcuts || []).forEach((shortcut, slot) => {if (shortcut.layers) shortcuts.set(slot, {layers: shortcut.layers & 0xffff, layerKind: shortcut.layerKind ?? SHORTCUT_LAYER_KINDS.HOLD});});
+    (decoded.settings.customKeyShortcuts || []).forEach((shortcut, slot) => {if (shortcut.layers) shortcuts.set(slot, {layers: shortcut.layers & ALL_LAYERS, layerKind: shortcut.layerKind ?? SHORTCUT_LAYER_KINDS.HOLD});});
     /** @type {LayerOwners} */
     const modeLinks = {modes, shortcuts};
     return {modeLinks, layerStarted: layerStarted >>> 0, endedStarts};
@@ -301,24 +300,14 @@ function profileFacts(decoded) {
     const records = decoded.settings.layers;
     const combos = values[SETTING.COMBOS_ENABLED] ? (decoded.combos?.rows || []).map((combo, index) => ({index,
         inputs: combo.inputs.map((input) => (input.kind === ACTION.QMK_KEYCODE ? input.operand : /** @type {number} */ (nativeCode(input)))),
-        output: combo.output, useOutputBehavior: combo.useOutputBehavior !== false && decoded.settings.comboOutputBehaviors !== false, enabled: combo.enabled !== false, allowedLayers: combo.allowedLayers ?? 0xffff})).filter((combo) => combo.enabled) : [];
+        output: combo.output, useOutputBehavior: combo.useOutputBehavior !== false && decoded.settings.comboOutputBehaviors !== false, enabled: combo.enabled !== false, allowedLayers: combo.allowedLayers ?? ALL_LAYERS})).filter((combo) => combo.enabled) : [];
     // Participation (participation-policy.md), judged by the layer a key came
     // from and its matrix position.
-    /** @param {number} layoutIndex */
-    const matrixOf = matrixPosition;
-    /** @param {BehaviorRow | undefined} row @param {number} layer @param {number} layoutIndex */
-    const behaviorUsed = (row, layer, layoutIndex) => Boolean(row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && Boolean(values[SETTING.LAYER_BEHAVIORS] & bit(layer))
-        && row.enabled !== false && Boolean((row.allowedLayers ?? 0xffff) & bit(layer)) && !records?.[layer]?.bypass.includes(matrixOf(layoutIndex)));
-    /** @param {number} layer @param {number} layoutIndex */
-    const comboPress = (layer, layoutIndex) => Boolean(values[SETTING.LAYER_COMBOS] & bit(layer)) && !records?.[layer]?.exclude.includes(matrixOf(layoutIndex));
-    // Generated outputs have no physical placement and do not consult the
-    // source-layer behaviour switch. Their row uses the declared owner's origin.
-    /** @param {BehaviorRow | undefined} row @param {{useOutputBehavior: boolean}} combo */
-    const generatedLayers = (row, combo) => combo.useOutputBehavior && row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && row.enabled !== false ? (row.allowedLayers ?? 0xffff) : 0;
+    const {behaviorUsed, comboPress, generatedLayers} = participation(decoded.settings);
     const pointer = values[SETTING.AUTO_MOUSE_ENABLED] ? values[SETTING.AUTO_MOUSE_LAYER] : undefined;
     // The auto-sniping layers, none with its master switch off. Any of them
     // that is on keeps a separate pointer layer off (pointer_layer_policy_apply).
-    const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? (values[SETTING.AUTO_SNIPING_LAYERS] & 0xffff) >>> 0 : 0;
+    const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? (values[SETTING.AUTO_SNIPING_LAYERS] & ALL_LAYERS) >>> 0 : 0;
     const {modeLinks, layerStarted, endedStarts} = linkFacts(decoded);
     const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
     return {names, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, modeLinks, layerStarted, endedStarts, values, behaviorUsed, comboPress, generatedLayers,
@@ -410,7 +399,7 @@ function offers(facts, active, cache) {
     // Moving the trackball wakes the pointer layer, unless a sniping layer or
     // a layer that starts its mode is on and keeps it off
     // (pointer_layer_policy_apply).
-    const endedStrips = facts.endedStarts.some(({layer, ends}) => (active & bit(layer)) && !(active & ends));
+    const endedStrips = facts.endedStarts.some((start) => linkStartHolds(start, active));
     if (facts.pointer !== undefined && facts.pointer < LAYERS && !(active & pointerStrip(facts)) && !endedStrips) {
         found.push({kind: "hold", layer: facts.pointer, from: {trackball: true}, how: `Move the trackball, which turns on ${layerName(facts.names, facts.pointer)}`});
     }
@@ -445,7 +434,7 @@ function compactWalk(facts) {
             }
         }
     });
-    const tops = Array.from({length: LAYERS}, (_, layer) => ({layer, when: {on: bit(layer), off: (0xffff << (layer + 1)) & 0xffff}}));
+    const tops = Array.from({length: LAYERS}, (_, layer) => ({layer, when: {on: bit(layer), off: layersAbove(layer)}}));
     const selfReferences = tops.every(({layer}) => facts.comboLayer(layer) === layer);
     /** @type {Map<number | undefined, Map<number, Condition[]>>} */
     const present = new Map();
@@ -495,13 +484,13 @@ function compactWalk(facts) {
         cache: new Map([...result.witnesses].map(active => [active, offers(facts, active, new Map())]))};
 }
 
-// A state is its locks and the layers held on top, sixteen bits each.
+// A state is its locks and the layers held on top, a layer set each.
 /** @param {number} locks @param {number} held */
-const stateOf = (locks, held) => (locks | (held << 16)) >>> 0;
+const stateOf = (locks, held) => (locks | (held << LAYERS)) >>> 0;
 /** @param {number} state */
-const locksOf = (state) => state & 0xffff;
+const locksOf = (state) => state & ALL_LAYERS;
 /** @param {number} state */
-const heldOf = (state) => state >>> 16;
+const heldOf = (state) => state >>> LAYERS;
 
 /** @param {number} state @param {WalkEffect} effect */
 function step(state, effect) {
@@ -595,7 +584,7 @@ function pathTo(parent, state) {
 }
 
 /** @param {Facts} facts @param {number} mask */
-const namesOf = (facts, mask) => layersIn(mask).map((layer) => layerName(facts.names, layer));
+const namesOf = (facts, mask) => layersOfMask(mask).map((layer) => layerName(facts.names, layer));
 /** @param {readonly string[]} words */
 const listed = (words) => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
 // Where a finding is edited, in the review's place shapes (profile-review.js):
@@ -632,7 +621,7 @@ function traps(facts, walked) {
     }
     /** @type {[number, {from: number, effect: WalkEffect}][]} */
     const sorted = [];
-    for (const entry of [...found].sort(([a], [b]) => layersIn(a).length - layersIn(b).length || a - b)) {
+    for (const entry of [...found].sort(([a], [b]) => layersOfMask(a).length - layersOfMask(b).length || a - b)) {
         if (!sorted.some(([mask]) => (entry[0] & mask) === mask)) sorted.push(entry);
     }
     const entries = walked.symbolic ? walked.traps : sorted.slice(0, MAX_TRAPS).map(([locks, entry]) => ({locks,
@@ -640,7 +629,7 @@ function traps(facts, walked) {
     const named = entries.map(/** @returns {Finding} */ ({locks, effect, path}) => {
         const top = highest(locks);
         const names = namesOf(facts, locks);
-        return {kind: "trap", level: LEVELS.TRAP, layers: layersIn(locks),
+        return {kind: "trap", level: LEVELS.TRAP, layers: layersOfMask(locks),
             title: `${listed(names)} can lock with no way back to ${layerName(facts.names, 0)}`,
             detail: `Once ${listed(names)} ${names.length === 1 ? "is" : "are"} locked, no key, behaviour or combo left on the board turns ${names.length === 1 ? "it" : "them"} off or moves back to ${layerName(facts.names, 0)}. Unplugging the keyboard clears it.`,
             path: path.map((effect) => effect.kind === "release" ? `Release the hold on ${listed(namesOf(facts, layersOf(effect)))}` : effect.how),
@@ -659,7 +648,7 @@ function traps(facts, walked) {
 function findings(facts, walked) {
     const reachabilityComplete = walked.reachabilityComplete ?? walked.complete;
     const uncertain = walked.uncertainty ?? walked;
-    const involved = layersIn(uncertain.affectedLayers ?? 0).filter(layer => layer !== 0);
+    const involved = layersOfMask(uncertain.affectedLayers ?? 0).filter(layer => layer !== 0);
     const names = involved.map(layer => layerName(facts.names, layer));
     const shortNames = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} other layers` : listed(names);
     /** @type {Finding[]} */
@@ -690,7 +679,7 @@ function findings(facts, walked) {
     const empty = new Map();
     for (const effect of walked.effects ?? [...walked.cache.values()].flat()) {
         if (effect.kind === "unowned" || effect.from.trackball) continue;
-        for (const layer of layersIn(layersOf(effect))) if (layer !== 0 && !hasKeys(layer) && !empty.has(layer)) empty.set(layer, effect);
+        for (const layer of layersOfMask(layersOf(effect))) if (layer !== 0 && !hasKeys(layer) && !empty.has(layer)) empty.set(layer, effect);
     }
     for (const [layer, effect] of empty) {
         results.push({kind: "emptyTarget", level: LEVELS.NOTICE, layers: [layer],
@@ -767,7 +756,7 @@ function findings(facts, walked) {
             results.push({kind: "pointerLayer", level: LEVELS.WARNING, layers: [facts.pointer],
                 title: `The trackball turns on ${layerName(facts.names, facts.pointer)}, which is always on`,
                 detail: "Moving the trackball changes nothing on the board, so the pointer layer's keys are never there when you mouse.",
-                fix: "Choose the pointer layer under Pointer settings → Auto-mouse.", place: {kind: "settings", area: "Mouse", section: "autoMouse"}});
+                fix: `Choose the pointer layer under ${VOCABULARY.settingsScreens.pointer} → Auto-mouse.`, place: {kind: "settings", area: "Mouse", section: "autoMouse"}});
         } else if (!hasKeys(facts.pointer)) {
             results.push({kind: "pointerLayer", level: LEVELS.NOTICE, layers: [facts.pointer],
                 title: `The trackball turns on ${layerName(facts.names, facts.pointer)}, which has no keys of its own`,
@@ -789,9 +778,8 @@ function findings(facts, walked) {
 // A finding's identity across two profiles: what kind it is and which layers it
 // is about, named by the keyboard layer each slot holds (`order[slot]`, as
 // model/layer-order.js keeps it).
-const IDENTITY = Object.freeze(Array.from({length: LAYERS}, (_, layer) => layer));
 /** @param {Finding} finding @param {readonly number[]} [order] */
-const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}${finding.identity === undefined ? "" : `:${finding.identity}`}`;
+const findingKey = (finding, order = LAYER_IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}${finding.identity === undefined ? "" : `:${finding.identity}`}`;
 
 // The findings for a validated profile.
 /** @param {import("./types.js").DecodedProfile} decoded @returns {Finding[]} */
@@ -811,7 +799,7 @@ function layerReach(decoded) {
 // holds, so the two are matched layer with layer. Traps always ask to be
 // confirmed.
 /** @param {readonly Finding[]} before @param {readonly Finding[]} after @param {readonly number[]} [order] @returns {import("../../contracts/model.js").Check[]} */
-function compareFindings(before, after, order = IDENTITY) {
+function compareFindings(before, after, order = LAYER_IDENTITY) {
     const known = new Set(before.map((finding) => findingKey(finding))), still = new Set(after.map((finding) => findingKey(finding, order)));
     const incomplete = after.find(finding => finding.kind === "reachabilityIncomplete");
     const uncertainKinds = incomplete?.scope === "escapes" ? new Set(["trap", "trapOverflow"]) : GRAPH_FINDINGS;
@@ -823,7 +811,7 @@ function compareFindings(before, after, order = IDENTITY) {
 }
 
 /** @param {import("./types.js").DecodedProfile | null} keyboard @param {import("./types.js").DecodedProfile} draft @param {readonly number[]} [order] */
-function draftChecks(keyboard, draft, order = IDENTITY) {
+function draftChecks(keyboard, draft, order = LAYER_IDENTITY) {
     return compareFindings(keyboard ? layerReach(keyboard) : [], layerReach(draft), order);
 }
 

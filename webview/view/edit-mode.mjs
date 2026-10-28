@@ -10,9 +10,11 @@ import {shortcut} from "./shortcuts.mjs";
 import {RESTART_NEEDED} from "./keyboard-view.mjs";
 import {demoOf} from "./demo.mjs";
 
-export const APPLY = 0;
-export const LIVE = 1;
-export const LIVE_REVIEW = 2;
+// The edit modes as the keyboard stores them; they are the keyboard's numbers
+// (core/protocol/profile-edit-v1.js EDIT_MODE, pinned by
+// tests/view/enum-drift.test.mjs).
+export const EDIT_MODE = Object.freeze({APPLY: 0, LIVE: 1, LIVE_REVIEW: 2});
+export const {APPLY, LIVE, LIVE_REVIEW} = EDIT_MODE;
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {NonNullable<Model["draft"]>} Draft */

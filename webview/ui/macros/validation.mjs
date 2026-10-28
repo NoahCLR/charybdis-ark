@@ -6,6 +6,7 @@ import {el, esc} from "../../lib/dom.mjs";
 import {macroLocalState, samePayload, unreleased} from "../../view/macro.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {actionLabel} from "../../view/keyface.mjs";
+import {vocabulary} from "../../view/vocabulary.mjs";
 import {canEdit as canEditArea, getModel, macroForm, post, setMacroForm, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 // Input remains local until the core has inspected this exact payload under
@@ -88,7 +89,7 @@ export function paintFeedback(card, model, slot) {
     /** @type {import("../../../contracts/messages.js").MacroValidation | null | undefined} */
     const inspection = matchingValidation(form, model, slot) ? form.validation?.validation : null;
     const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
-    const note = error ? (local ? "Fix this edit before it can be kept in your draft." : "Change Host → Your computer or fix the macro before playing it.") : local && !inspection ? "Checking this edit…" : "";
+    const note = error ? (local ? "Fix this edit before it can be kept in your draft." : `Change ${vocabulary(model).settingsScreens.host} → Your computer or fix the macro before playing it.`) : local && !inspection ? "Checking this edit…" : "";
     const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
     feedback.hidden = !error && !note;
     feedback.replaceChildren(el(`<div class="stack">

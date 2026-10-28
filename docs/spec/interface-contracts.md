@@ -55,23 +55,37 @@ layers in view reach:
   tabs, and the view's groups lead (`tests/view/reach-groups.test.mjs`).
   **On this view** is the selected layer plus exactly the lower layers
   previewed on: an activation, not a storage place, so it may overlap the
-  other groups. Base is on in it only once layers are previewed together, as
-  the layer bar shows it on; a layer shown alone is the view by itself, and
-  its transparent keys answer nothing there (what they fall through to is
-  under **Through a transparent key**). The view is `viewPositions`; what the
-  keyboard does, with base always on, stays `resolvedPositions`: the hover
+  other groups. Base, and every default layer the keyboard keeps, is on in it
+  only once layers are previewed together, as the layer bar shows base on; a
+  layer shown alone is the view by itself, and its transparent keys answer
+  nothing there (what they fall through to is under **Through a transparent
+  key**). The view is `viewPositions`; what the keyboard does, with base and
+  its default layers always on (each published layer's `alwaysOn`), stays
+  `resolvedPositions`, and a key they answer needs nothing held: the hover
   card's fall-through, a selected transparent key opening the behaviour from
   below, and picking a combo input on the board. A combo is in the view only
   when that activation holds all its inputs, matched on the Combo layer
-  matching reference when one is set (`tests/view/layer-resolution.test.mjs`,
-  `tests/view/reach.test.mjs`, `tests/view/combo-reach.test.mjs`).
+  matching reference when one is set, as core publishes it per layer
+  (`comboReferenceLayers`: the draft's settings, else the keyboard's combo
+  readback; `tests/session/device-model.test.js`,
+  `tests/view/layer-resolution.test.mjs`, `tests/view/reach.test.mjs`,
+  `tests/view/combo-reach.test.mjs`).
 - On the board, a transparent key answered from below wears that key's
   behaviour dots and the badges of the combos it fires in the view
   (`combosInPreview`); under Combo layer matching nothing from below adds a
   badge (`tests/view/combo-reach.test.mjs`).
-- Combo grouping enumerates only lower layers that can answer a transparent
-  top-layer position, including disabled keys that block an input below
-  (`tests/view/combo-reach.test.mjs`, `tests/view/layer-resolution.test.mjs`).
+- Which combos fire from each layer, under which smallest hold and on which
+  keys, is core's (`core/model/combo-reach.js`), published per layer as
+  `comboReach` and kept until the keys, combos, their matching or the
+  default layers change; the interface turns it back into the keys it draws
+  and groups it. For each combo, core holds only the lower layers whose keys
+  under a transparent top-layer key press one of its inputs, since holding
+  any other layer can only hide one, and tries either those holds, smallest
+  first, or the sets of answers its keys can give, whichever are fewer; it
+  finds the same hold trying every hold would, which a seeded test holds it
+  to, and a disabled key still blocks an input below
+  (`tests/model/combo-reach.test.js`, `tests/session/device-model.test.js`,
+  `tests/view/combo-reach.test.mjs`).
 - Reach sections keep one open state per section across the Keymap tabs, and
   opening one closes none (`tests/view/reach-groups.test.mjs`).
 
@@ -95,7 +109,7 @@ The same kind of control looks and sits the same on every screen.
   `titleName`: Enter commits, Escape restores the stored name, and the byte
   count shows on focus or when over the limit
   (`browser-tests/macro-ux.spec.js`, `browser-tests/custom-key-behaviour.spec.js`).
-- A Settings screen (Behaviours, Combos, Pointer settings, Host) draws its
+- A Settings screen (Behaviours, Combos, Pointer, Host) draws its
   sections as open cards, none folding, and offers no search
   (`tests/view/settings-layout.test.mjs`,
   `browser-tests/settings-screens.spec.js`).
@@ -144,8 +158,16 @@ Each thing with a colour of its own has exactly one mark, drawn by
   the same (`valueMarked`; `browser-tests/marks.spec.js`). Any other name
   carries the mark of the layer it acts on before the layer's name ("/ / ▦
   Navigation" for a layer-tap). Which layer a keycode acts on is
-  `keyLayer` in `core/model/key-names.js`, published as `qmkKeyLayers`
-  (`tests/session/device-model.test.js`).
+  `keyLayer` in `core/model/key-names.js`, published as `qmkKeyLayers`, and
+  what it does to that layer is `keyLayerForm`, published as
+  `qmkKeyLayerForms`. A key cap (`keyFace` in `webview/view/keyface.mjs`)
+  draws a line only for a layer-tap, a mod-tap and a dual-role layer key
+  (`OSL()`, `TT()`): its tap above, its hold below. A dual-role layer key's
+  cap names its layer, and below the line what it does to it
+  (`vocabulary.keyCapLayerVerbs`, which lists exactly the layer forms core's
+  `dualRole` counts); any other key reads on one line by core's name for it
+  (`tests/session/device-model.test.js`, `tests/view/keyface.test.mjs`,
+  `tests/model/vocabulary.test.js`).
 - In the behaviour grid and the hover card, a branch or combo action that
   acts on a layer, runs a pointing mode or plays a macro reads as that thing
   (`sends`): its mark (a macro has none), then its name and its tags
@@ -165,35 +187,186 @@ Each thing with a colour of its own has exactly one mark, drawn by
 ## Shared rule ownership
 
 A rule more than one place needs has one owning module, and core publishes its
-meaning to the interface (D-L33). Owners with rules of their own have a section
-below.
+meaning to the interface (D-L33). Each row says what the rule is, its owners
+and the tests that hold it; a rule with more to say has a subsection after the
+table, and owners with rules of their own have a section below. A fact, such
+as QMK's keycode layout, a limit or the words for a stored value, is not a row
+here: its home and tests are in
+[Facts and their homes](../architecture/README.md#facts-and-their-homes).
 
 | Rule | Owner | Held by |
 | --- | --- | --- |
 | Settings help: `hint` stays visible, `tooltip` adds to it, read-only reasons join them in `data-tip`, shown by `webview/ui/hover.mjs` | `core/model/settings-editor.js` | `browser-tests/settings-tooltips.spec.js` |
-| Number entry: whole numbers author `inputmode="numeric"`, durations `"decimal"`; typing, pasting or dropping keeps only digits (and a duration's first point) with the caret in place; range limits stay with the edit | `webview/lib/number-entry.mjs` | `tests/view/number-entry.test.mjs`, `browser-tests/number-entry.spec.js` |
+| Number entry: the input mode a field asks for, what typing keeps, and where range limits sit ([more](#number-entry)) | `webview/lib/number-entry.mjs` | `tests/view/number-entry.test.mjs`, `browser-tests/number-entry.spec.js` |
 | Screens: IDs, labels, rail groups, availability, rendering and redraw; `PanelState.screen` takes its IDs from here; an unknown ID shows an unavailable screen | `webview/view/screens.mjs` | `tests/view/screens.test.mjs`, `browser-tests/screens-registry.spec.js` |
-| Which settings sections each Settings screen draws, in order (`SETTINGS_SCREENS`), and the screen a section is edited on (`screenOfSection`), where the review's Show goes; Lighting's Auto-mouse links open Pointer settings and the macro editor's Your computer link opens Host. Default layers is on none: core still publishes it, so the review lists and reverts a stored difference, and its checks, pointing links and layer reorder read the stored value | `webview/view/settings-layout.mjs` | `tests/view/settings-layout.test.mjs`, `tests/view/review.test.mjs`, `browser-tests/settings-screens.spec.js` |
-| Words, sent as `model.vocabulary`; stages are found by id, never by label | `core/model/vocabulary.js` | `tests/model/vocabulary.test.js`, `tests/view/enum-drift.test.mjs` |
-| Edit modes: their words, and the order the switch offers them (`editMode.offered`): Live edit, Live preview + save, then Review and save. The keyboard's Apply and Save both read as Save ([D-L72](../adr/0072-users-see-save-for-both-keyboard-operations.md)) | `core/model/vocabulary.js`, `core/session/panel-session.js` | `tests/model/vocabulary.test.js`, `tests/session/live-watch.test.js`, `tests/view/edit-mode.test.mjs`, `browser-tests/live-edits.spec.js` |
+| Which settings sections each Settings screen draws, and where a section is edited ([more](#settings-screens-and-sections)) | `webview/view/settings-layout.mjs` | `tests/view/settings-layout.test.mjs`, `tests/view/review.test.mjs`, `browser-tests/settings-screens.spec.js` |
+| Edit modes: their words and the order the switch offers them ([more](#edit-modes)) | `core/model/vocabulary.js`, `core/session/panel-session.js` | `tests/model/vocabulary.test.js`, `tests/protocol/profile-edit-v1.test.js`, `tests/session/live-watch.test.js`, `tests/view/edit-mode.test.mjs`, `tests/view/enum-drift.test.mjs`, `browser-tests/live-edits.spec.js` |
 | Actions, native keycodes, decode limits, layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
-| Custom-key shortcut keys (firmware D-F26): which keys a shortcut holds (`customKeyShortcutKeys`, by catalogue name) and the caps on them, as data the codec itself checks: at most six, each once, at most one media and one system key, each cap with its keycodes and the codec's words when broken, and the limits in words, published as `customKeyShortcutKeyLimits` (`SHORTCUT_KEY_LIMITS`). The picker reads the caps against the keycodes it would post and says the first one broken (`shortcutPickProblem`), with no limit, category or name matching of its own; every other refusal (a byte that is no such key, an old single-key message) is the codec's words too (`shortcutStoreRefusal`, `SHORTCUT_KEY_REFUSALS`) | `core/schema/settings-domain-v1.js` (`SHORTCUT_KEY_CAPS`, `shortcutKeysRefusal`), `core/model/custom-key-editor.js` | `tests/schema/settings-domain-v1.test.js`, `tests/model/custom-key-editor.test.js`, `tests/view/custom-key.test.mjs`, `browser-tests/custom-key-shortcut.spec.js` |
-| Decoding once: a snapshot's `decoded` form is taken with `decodedOf` (`core/model/portable-profile.js`), which decodes afresh only when the document changed; draft history entries are frozen and decoded once each | `core/model/portable-profile.js`, `core/session/profile-draft-session.js` | `tests/session/profile-draft-session.test.js` |
+| Custom-key shortcut keys (firmware D-F26): which keys a shortcut holds, and the caps on them ([more](#custom-key-shortcut-keys)) | `core/schema/settings-domain-v1.js` (`SHORTCUT_KEY_CAPS`, `shortcutKeysRefusal`), `core/model/custom-key-editor.js` | `tests/schema/settings-domain-v1.test.js`, `tests/model/custom-key-editor.test.js`, `tests/view/custom-key.test.mjs`, `browser-tests/custom-key-shortcut.spec.js` |
+| Decoding once: a snapshot's decoded form, and draft history entries ([more](#decoding-once)) | `core/model/portable-profile.js`, `core/session/profile-draft-session.js` | `tests/session/profile-draft-session.test.js` |
 | Pure edits and presentation; the model imports no session or protocol module | `core/model/device-profile-edits.js`, `key-behavior-edits.js`, `device-profile-view.js` | `tests/model/device-profile-edits.test.js`, `tests/layering.test.js` |
-| Layer answers: which stack slots answer each position under which active layers, for reach and the published model alike; the interface never resolves transparency again | `core/model/layer-resolution.js` | `tests/model/layer-resolution.test.js`, `tests/view/layer-resolution.test.mjs` |
+| Layer answers: which stack slots answer each position under which active layers ([more](#layer-answers)) | `core/model/layer-resolution.js` compiles and publishes each position's answers; `rules/layer-answers.mjs` says which one answers under the layers that are on | `tests/model/layer-resolution.test.js`, `tests/rules/layer-answers.test.mjs`, `tests/view/layer-resolution.test.mjs` |
+| Combo inputs: which keys press a combo's inputs (by the input positions the keyboard reports, otherwise by keycode or what the key means) and whether they cover every input, so its chord forms (D-L73) | `rules/combo-inputs.mjs`, read by `core/model/combo-reach.js` (`comboReach`) and `webview/view/combo-reach.mjs` (the view of the layers turned on, and which key is a combo's input number n) | `tests/rules/combo-inputs.test.mjs`, `tests/model/combo-reach.test.js`, `tests/view/combo-reach.test.mjs` |
+| A definition's own switches: why a behaviour or combo's Use switch or its layers keep it off a layer (D-L73) | `rules/definition-switches.mjs`, read by `core/model/participation.js` and `webview/view/participation.mjs` | `tests/rules/definition-switches.test.mjs`, `tests/model/participation.test.js`, `tests/view/participation-oracle.test.mjs` |
+| Layer keycode placement: where a layer keycode may be stored (a key, a tap, a press-and-hold branch, a combo's output), and that DF(), PDF(), a layer past the keyboard's and a lock of a layer it lacks go nowhere; each side says it in its own words (D-L73) | `rules/layer-placement.mjs`, said by `core/schema/actions.js` (`placementProblem`) and `webview/view/keycode-expression.mjs` (`keyProblem`, `comboOutputProblem`) | `tests/rules/layer-placement.test.mjs`, `tests/schema/actions.test.js`, `tests/view/keycode-expression.test.mjs` |
+| QMK key expressions: how a name, a call (LCTL(KC_A), MT(), LT(), MO(n)…) or a number reads as the keycode it stores, in one grammar with two dialects whose differences are one table (`DIALECTS`): QMK's own, which core's encoder reads, and the keyboard's, with its own names and whitespace anywhere, which the draft stores by and the picker checks by, so the two accept the same keys (D-L73) | `rules/keycode-expression.mjs`, read by `core/schema/keycodes.js` (`encode`), `core/schema/compiled-profile-v1.js` (`resolveNativeQmkExpression`) and `webview/view/keycode-expression.mjs` (`keycodeValue`) | `tests/rules/keycode-expression.test.mjs`, `tests/schema/keycodes.test.js`, `tests/schema/compiled-profile-v1.test.js`, `tests/view/keycode-expression.test.mjs` |
+| Macro text: how text, `{key}`, `{key,key}`, `{+key}`, `{-key}` and `{milliseconds}` read as steps, the limits on them, and why one does not read, as a reason code (D-L73). Core reads it by keycode, sending only the key names the step editor offers, and refuses a macro that leaves a key held, which the step editor names key by key; the step editor reads it by key name, as a person types. Both word each reason from `vocabulary.macroProblems` (core through `wordedMacroError`, wherever it reads a macro), and both skip an empty name between commas | `rules/macro-payload.mjs`, read by `core/schema/macro-payload.js` (`parsePayload`) and `webview/view/macro.mjs` (`parseMacro`) | `tests/rules/macro-payload.test.mjs`, `tests/schema/macro-payload.test.js`, `tests/view/macro.test.mjs`, `tests/view/macro-cache.test.mjs` |
+| The lighting colour compositor: the order the stages paint in and the two "no colour" rules, a firmware rule (D-L73) ([more](#lighting-preview)) | `rules/led-light.mjs`, read by `webview/view/lighting.mjs` | `tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs` |
 | Idle lighting timeout: staged in milliseconds, edited in seconds or minutes; changing the unit stages nothing; zero means always on | `webview/view/duration.mjs` | `tests/view/duration.test.mjs`, `browser-tests/preview.spec.js` |
 | Shortcut words: ⌘ and ⇧⌘ on a Mac, Ctrl and Ctrl+Shift elsewhere, in text, tips and `aria-keyshortcuts`; no screen writes ⌘ itself | `webview/view/shortcuts.mjs` | `tests/view/shortcuts.test.mjs`, `browser-tests/shortcut-glyphs.spec.js` |
 | Panel sequencing; the page's shell supplies the file chooser, downloads, recovery storage and progress; a failure's notice is its sentence, never its code, and the reply marks it `failed` | `core/session/panel-controls.js`, `panel-loop.js` | `tests/session/panel-controls.test.js`, `tests/session/panel-loop.test.js`, `tests/view/messages.test.mjs` |
-| What the page offers (`model.shell`, D-L71): its words, Choose keyboard unless the tab is blocked, a light or dark theme, the Backups list, its build and progress; without a shell (the preview, tests) the page's defaults | `core/session/panel-session.js`, `webview/view/shell-panel.mjs` | `tests/session/panel-session.test.js`, `tests/view/shell-panel.test.mjs`, `browser-tests/preview.spec.js` |
+| What the page offers (`model.shell`, D-L71) ([more](#what-the-page-offers)) | `core/session/panel-session.js`, `webview/view/shell-panel.mjs` | `tests/session/panel-session.test.js`, `tests/view/shell-panel.test.mjs`, `browser-tests/preview.spec.js` |
 | The device service talks only through the adapter its caller passes (WebHID in the page, node-hid in a Node script); there is no default, and the web build refuses node-hid | `core/session/profile-device-service.js`, `scripts/build-web.js` | `tests/session/profile-device-service.test.js`, `tests/scripts/web-build.test.js` |
-| An Apply or Save cut short: the Apply verdicts (sent as `apply.failure.verdict`, which the bar draws), the sentence every such notice starts with, plain reasons for a lost connection, and the result a read shows after a Save cut short; no device path, code or developer word reaches a person | `core/session/interruption.js` | `tests/session/interruption.test.js`, `tests/session/portable-profile-session.test.js`, `tests/session/live-edits.test.js` |
+| An Apply or Save cut short: its verdicts and the words a person reads ([more](#an-apply-or-save-cut-short)) | `core/session/interruption.js` | `tests/session/interruption.test.js`, `tests/session/portable-profile-session.test.js`, `tests/session/live-edits.test.js` |
 | Panel state fields declare their initial value and draft-replacement policy together | `webview/store.mjs`, `webview/view/state-fields.mjs` | `tests/view/state-fields.test.mjs` |
 | Lighting: one `webview/ui/lighting/` module per stage, posting the shared edit builders | `webview/ui/lighting.mjs` | `browser-tests/lighting-controls.spec.js` |
 | Pointing: the slot editor holds a direction set to Ignore until its modifiers are chosen, and posts the complete record | `webview/ui/pointing.mjs`, `webview/ui/pointing/` | `browser-tests/pointing-controls.spec.js` |
-| Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key, and why not, published as `pdModeEditing.linkTargets`. The How it starts card (the mode's keys, then its layers, then what ends it; the slot's light sits in its identity card) draws the layers with the shared per-layer switches (`webview/ui/layer-switches.mjs`, whose grid Settings' layer groups use), as a table: a row per layer, a "Starts this pointing mode" and a "Turned on by this pointing mode's key" switch, each titled for the layer in its row. A default layer or the pointer layer is a dimmed row saying why in it, both switches disabled; a layer that starts another mode has its "Starts" switch disabled and says "already starts" that mode in the row, its key switch usable. A changed link naming one is refused when staged, and so is a settings change that makes a layer a link names the pointer layer or a default layer (`settingsLinkRefusal`, staged by `core/model/settings-editor.js`); a layer reorder renumbers a link as it renumbers layer keys (the base swap and Keys follow their layers included) and refuses, in words, a move that would still leave a link ignored, have one layer start two modes, or put two of a link's layers on one (`reorderLinkRefusal`, `core/model/portable-profile.js`); a stored layer the keyboard ignores (in an imported profile, say) stays switchable off, said beside it and as a Review warning. Review names each layer of a link, and of a behaviour's or combo's allowed layers, after its mark (a `layers` review mark). What ends the mode is a segmented radio group shown only beside starting layers; the posted record resets it to Never with the last of them. A copied mode keeps the layers its key turns on, not those that start it. Whether the pointer layer covers a layer the mode's key turns on is core's, published per slot as `pdModes[].pointerCovers`. So are the layers that start a mode as the keyboard runs the link, each with the layers that end a start from it (`linkStarts`, which layer reach walks too), published as `pdModes[].linkStarts`, and the layers each keycode turns on as the key pressed (`keycodeLayersOn` in `core/model/layer-reach.js`: a layer key's, a mode key's link, a custom key's shortcut layers; never DF or PDF), published as `qmkKeyTurnsOn`. The Keys workbench's Pointing modes tab reads only these: a starting layer reaches its mode by itself, and a key, behaviour cell or combo reaches it by turning such a layer on with no layer ending that start on, the layer it is pressed on included (`webview/view/reach.mjs` `pointingReach`). Its columns say the link (the layers that start it, an ignored one marked with the card's reason, what ends it, the layers its key turns on), a route that starts it says what it sends, and the slot is tagged started beside hold or lock | `core/model/pointing-links.js`, `core/model/layer-reach.js` (`keycodeLayersOn`), `webview/view/pointing-link.mjs`, `webview/view/reach.mjs` | `tests/model/pointing-links.test.js`, `tests/model/layer-reach.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `tests/view/reach.test.mjs`, `browser-tests/pointing-controls.spec.js`, `browser-tests/keys-workbench.spec.js` |
-| Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on, and why not (the base layer and the default layers are always on), published as `customKeyShortcutLayers`; staging a shortcut, a settings change and a layer reorder are each refused in words where the keyboard would refuse the profile, and a reorder that would merge two of a shortcut's layers is refused too (`reorderShortcutRefusal`). A refused reorder in Rename & Reorder is not kept: the panel stays as it was (`core/session/panel-session.js`, `applyLayerEdit`) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
-| The rail's keyboard button and its menu: the name, the edit mode under it and the dot's tone and hover words (what the keyboard is doing, its halves and a restart it needs, which the bar also offers; and a save it is finishing, a key adjustment pending, Live edit's saved by the keyboard and the slave half catching up, which the bar and notices do not say); the menu offers the modes in the keyboard's order with the vocabulary's `hint` and `detail`, Settle and the not-stored mark, the keyboards when there are several, Choose keyboard and Disconnect when the page offers them, and nothing while the keyboard is busy. Choosing a mode runs the same switch and questions as before (`webview/ui/edit-mode.mjs`); the menu is a menu button by keyboard (arrows, Home, End, Enter, Esc and Tab back to the button) | `webview/view/keyboard-menu.mjs`, `webview/ui/keyboard-menu.mjs` | `tests/view/keyboard-menu.test.mjs`, `browser-tests/preview.spec.js`, `browser-tests/live-edits.spec.js` |
+| Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key ([more](#pointing-links)) | `core/model/pointing-links.js`, `core/model/layer-reach.js` (`keycodeLayersOn`), `rules/pointing-link-starts.mjs` (whether a published start holds under the layers on), `webview/view/pointing-link.mjs`, `webview/view/reach.mjs` | `tests/model/pointing-links.test.js`, `tests/rules/pointing-link-starts.test.mjs`, `tests/model/layer-reach.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `tests/view/reach.test.mjs`, `browser-tests/pointing-controls.spec.js`, `browser-tests/keys-workbench.spec.js` |
+| Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on ([more](#shortcut-layers)) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
+| The rail's keyboard button and its menu ([more](#the-rails-keyboard-menu)) | `webview/view/keyboard-menu.mjs`, `webview/ui/keyboard-menu.mjs` | `tests/view/keyboard-menu.test.mjs`, `browser-tests/preview.spec.js`, `browser-tests/live-edits.spec.js` |
 | Device facts, the review sheet, the unsaved-demo dialog; the app keeps routing, rendering, focus and scroll, and window keys | `webview/ui/device.mjs`, `ui/review-overlay.mjs`, `ui/leave-demo.mjs` | (no test) |
+
+### Number entry
+
+Whole numbers author `inputmode="numeric"`, durations `"decimal"`. Typing,
+pasting or dropping keeps only digits (and a duration's first point) with the
+caret in place. Range limits stay with the edit.
+
+### Settings screens and sections
+
+Which settings sections each Settings screen draws, in order, is
+`SETTINGS_SCREENS`, and the screen a section is edited on, where the review's
+Show goes, is `screenOfSection`; a note names it as the rail's group, the
+screen and the section ("Settings · Behaviours · Tap & hold timing",
+`sectionPath`). Lighting's Auto-mouse links open Pointer settings and the
+macro editor's Your computer link opens Host settings. Outside the rail, a
+Settings screen is named as `vocabulary.settingsScreens` names it ("Pointer
+settings"), since nothing around a link says it is a setting. Default layers
+is on none: core still publishes it, so the review lists and reverts a stored
+difference, and its checks, pointing links and layer reorder read the stored
+value.
+
+### Edit modes
+
+The edit modes have their words, and the order the switch offers them
+(`editMode.offered`): Live edit, Live preview + save, then Review and save.
+The keyboard's Apply and Save both read as Save
+([D-L72](../adr/0072-users-see-save-for-both-keyboard-operations.md)).
+
+### Custom-key shortcut keys
+
+Firmware D-F26. Which keys a shortcut holds (`customKeyShortcutKeys`, by
+catalog name) and the caps on them are data the codec itself checks: at
+most six, each once, at most one media and one system key, each cap with its
+keycodes and the codec's words when broken, and the limits in words,
+published as `customKeyShortcutKeyLimits` (`SHORTCUT_KEY_LIMITS`). The picker
+reads the caps against the keycodes it would post and says the first one
+broken (`shortcutPickProblem`), with no limit, category or name matching of
+its own; every other refusal (a byte that is no such key, an old single-key
+message) is the codec's words too (`shortcutStoreRefusal`,
+`SHORTCUT_KEY_REFUSALS`).
+
+### Decoding once
+
+A snapshot's `decoded` form is taken with `decodedOf`
+(`core/model/portable-profile.js`), which decodes afresh only when the
+document changed; draft history entries are frozen and decoded once each.
+
+### Layer answers
+
+Which stack slots answer each position under which active layers is
+compiled once by core and published. Whether a compiled answer answers under
+the layers that are on is one shared rule, which core's layer walk and the
+interface's board both run (D-L73); the interface never resolves
+transparency again.
+
+### What the page offers
+
+What the page offers is `model.shell` (D-L71): its words, Choose keyboard
+unless the tab is blocked, a light or dark theme, the Backups list, its build
+and progress. Without a shell (the preview, tests) it offers the page's
+defaults.
+
+### An Apply or Save cut short
+
+An Apply or Save cut short has the Apply verdicts (sent as
+`apply.failure.verdict`, which the bar draws), the sentence every such notice
+starts with, plain reasons for a lost connection, and the result a read shows
+after a Save cut short. No device path, code or developer word reaches a
+person.
+
+### Pointing links
+
+Firmware D-F62. Which layers may start a slot's mode or be turned on by its
+key, and why not, are published as `pdModeEditing.linkTargets`.
+
+The How it starts card (the mode's keys, then its layers, then what ends it;
+the slot's light sits in its identity card) draws the layers with the shared
+per-layer switches (`webview/ui/layer-switches.mjs`, whose grid Settings'
+layer groups use), as a table: a row per layer, a "Starts this pointing mode"
+and a "Turned on by this pointing mode's key" switch, each titled for the
+layer in its row. A default layer or the pointer layer is a dimmed row saying
+why in it, both switches disabled; a layer that starts another mode has its
+"Starts" switch disabled and says "already starts" that mode in the row, its
+key switch usable.
+
+A changed link naming one is refused when staged, and so is a settings change
+that makes a layer a link names the pointer layer or a default layer
+(`settingsLinkRefusal`, staged by `core/model/settings-editor.js`); a layer
+reorder renumbers a link as it renumbers layer keys (the base swap and Keys
+follow their layers included) and refuses, in words, a move that would still
+leave a link ignored, have one layer start two modes, or put two of a link's
+layers on one (`reorderLinkRefusal`, `core/model/portable-profile.js`); a
+stored layer the keyboard ignores (in an imported profile, say) stays
+switchable off, said beside it and as a Review warning.
+
+Review names each layer of a link, and of a behaviour's or combo's allowed
+layers, after its mark (a `layers` review mark). What ends the mode is a
+segmented radio group shown only beside starting layers; the posted record
+resets it to Never with the last of them. A copied mode keeps the layers its
+key turns on, not those that start it.
+
+Whether the pointer layer covers a layer the mode's key turns on is core's,
+published per slot as `pdModes[].pointerCovers`. So are the layers that start
+a mode as the keyboard runs the link, each with the layers that end a start
+from it (`linkStarts`, which layer reach walks too), published as
+`pdModes[].linkStarts`, and the layers each keycode turns on as the key
+pressed (`keycodeLayersOn` in `core/model/layer-reach.js`: a layer key's, a
+mode key's link, a custom key's shortcut layers; never DF or PDF), published
+as `qmkKeyTurnsOn`.
+
+The Keys workbench's Pointing modes tab reads only these: a starting layer
+reaches its mode by itself, and a key, behaviour cell or combo reaches it by
+turning such a layer on with no layer ending that start on, the layer it is
+pressed on included (`webview/view/reach.mjs` `pointingReach`). Its columns
+say the link (the layers that start it, an ignored one marked with the card's
+reason, what ends it, the layers its key turns on), a route that starts it
+says what it sends, and the slot is tagged started beside hold or lock.
+
+### Shortcut layers
+
+Firmware D-F26. Which layers a custom key's shortcut may turn on, and why not
+(the base layer and the default layers are always on), are published as
+`customKeyShortcutLayers`. Staging a shortcut, a settings change and a layer
+reorder are each refused in words where the keyboard would refuse the
+profile, and a reorder that would merge two of a shortcut's layers is refused
+too (`reorderShortcutRefusal`). A refused reorder in Rename & Reorder is not
+kept: the panel stays as it was (`core/session/panel-session.js`,
+`applyLayerEdit`).
+
+### The rail's keyboard menu
+
+The rail's keyboard button shows the name, the edit mode under it and the
+dot's tone and hover words (what the keyboard is doing, its halves and a
+restart it needs, which the bar also offers; and a save it is finishing, a key
+adjustment pending, Live edit's saved by the keyboard and the slave half
+catching up, which the bar and notices do not say). Its menu offers the modes
+in the keyboard's order with the vocabulary's `hint` and `detail`, Settle and
+the not-stored mark, the keyboards when there are several, Choose keyboard
+and Disconnect when the page offers them, and nothing while the keyboard is
+busy. Choosing a mode runs the same switch and questions as before
+(`webview/ui/edit-mode.mjs`); the menu is a menu button by keyboard (arrows,
+Home, End, Enter, Esc and Tab back to the button).
 
 ## Key names and the picker
 
@@ -491,9 +664,13 @@ Import checks one, under the capabilities current firmware reports
 
 The board is a selected-layer preview, not LED telemetry (D-L12): base
 lighting plus the selected layer (with layer preview, every layer on, lowest
-first), then their LED groups, following the firmware's membership,
-pass-through and inheritance rules (`webview/view/lighting.mjs`;
-`tests/view/lighting.test.mjs`).
+first; never the other default layers, which the keyboard's lighting does
+not read), then their LED groups, a layer's own by the layer core publishes
+it for (`ownerLayer`), following the firmware's membership, pass-through and
+inheritance rules. The order the stages paint in, and the
+two "no colour" rules, are the shared compositor (`rules/led-light.mjs`,
+D-L73); `webview/view/lighting.mjs` gathers what each stage paints from the
+model (`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`).
 
 Brightness is absolute HSV; the reported limit constrains editing and never
 rescales a read (`tests/session/base-rgb.test.js`). Pass-through is zero
@@ -589,9 +766,9 @@ Automatic's effect with Host and an explicit choice with its macro (no test).
 Ark exposes the firmware's participation contract at every scope (D-L55),
 whose rules are in
 [participation-policy.md](../../upstream/firmware/docs/spec/participation-policy.md):
-switches on the Behaviours and Combos screens, enabled and allowed layers on shared behaviours and
-combos, and **Use behaviour** / **Join combos** on placements
-(`browser-tests/participation.spec.js`).
+switches on Behaviour settings and Combo settings, enabled and allowed layers
+on shared behaviours and combos, and **Use behaviour** / **Join combos** on
+placements (`browser-tests/participation.spec.js`).
 
 The Key tab explains each blocked scope, and a transparent key leads to the
 placement that supplies it (`tests/view/participation.test.mjs`). The board, the
@@ -607,12 +784,31 @@ are ordinary draft edits; switching off keeps definitions and timing, and a
 reorder moves masks and placement bits with their layers
 (`tests/view/edits.test.mjs`).
 
+Core decides participation in `core/model/participation.js`, which layer
+reach walks, and publishes it as `model.participation`: for each layer, why
+no behaviour or no combo runs on it at all (the master switch, the layer's),
+and the keys whose Use behaviour or Join combos is off there, by layout
+index. A definition's own switches are the shared rule in
+`rules/definition-switches.mjs`, which core and the interface both run
+(`tests/rules/definition-switches.test.mjs`); the interface words each reason
+code from `vocabulary.participationReasons`. Its reading of what core
+publishes is checked against core's answer from the settings, and its layer
+answers against a scan of the stored keymap, on seeded profiles, every layer,
+key and definition (`tests/view/participation-oracle.test.mjs`).
+
 ## Combo output behaviour permissions
 
-The Combos screen has **Combo outputs use behaviours** and each combo builder
+Combo settings has **Combo outputs use behaviours** and each combo builder
 **Use output behaviour**. Both default on and veto behaviour use by a combo's
 output, independently of chord participation
-(`browser-tests/combo-output-behaviors.spec.js`).
+(`browser-tests/combo-output-behaviors.spec.js`). Core decides on which layers
+each combo's output runs its behaviour, judged from its last input's layer,
+with those switches, the behaviours switch and the behaviour's own
+(`comboOutputBehaviorLayers` in `core/model/participation.js`, which layer
+reach walks too), and publishes it per combo as `outputBehaviorLayers`; the
+board, hover card and reach lists read it, finding which layer supplies that
+input's key under the layers in view (`tests/model/participation.test.js`,
+`tests/view/combo-reach.test.mjs`, `tests/view/reach.test.mjs`).
 
 - The global value is a flag in the Settings header, not a scalar
   (`tests/schema/settings-domain-v1.test.js`). Review, Discard, Undo/Redo,

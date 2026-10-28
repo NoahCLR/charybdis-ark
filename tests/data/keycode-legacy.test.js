@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {encode} = require("../../core/data/keycode-catalog");
+const {encode} = require("../../core/schema/keycodes");
 const {MOD_TAP_SHORTHANDS, WRAPPER_ALIASES, NAMES} = require("../../core/data/keycode-legacy");
 
 test("every legacy name, shorthand and wrapper alias encodes", () => {

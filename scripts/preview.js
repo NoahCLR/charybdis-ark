@@ -12,9 +12,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {PHASE} = require("../core/model/vocabulary");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildPanelModel, observeService, startLayerEdit} = require("../core/session/panel-session");
+const {buildPanelModel, observeService, portableLayersView, startLayerEdit} = require("../core/session/panel-session");
 const portable = require("../core/model/portable-profile");
-const keycodes = require("../core/data/keycode-catalog");
+const keycodes = require("../core/schema/keycodes");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/data/charybdis-layout");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {document32} = require("../tests/fixtures/pointing-slots-32");
@@ -267,7 +267,7 @@ async function deviceModel() {
         observeService(panel, service.snapshot());
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
-        model.portable.layers = panel.portableLayers ? {key: panel.portableLayers.before.fingerprint, order: panel.portableLayers.order, names: panel.portableLayers.names, keysFollow: panel.portableLayers.keysFollow !== false} : null;
+        model.portable.layers = portableLayersView(panel.portableLayers);
         return model;
     } finally {
         await service.close();

@@ -58,7 +58,7 @@ export const SCREENS = Object.freeze({
         available: configureReady, render: renderers => renderers.screenCombos(),
     }),
     pointer: screen({
-        label: "Pointer settings", group: "Settings", title: "Keyboard", keepOnPublish: true,
+        label: "Pointer", group: "Settings", title: "Keyboard", keepOnPublish: true,
         icon: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
         available: configureReady, render: renderers => renderers.screenPointer(),
     }),

@@ -569,7 +569,7 @@ test("older firmware keeps independent readback while a dirty current draft is r
     session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_Z"}]});
     const keycode = 4;
     const older = connected({capabilities: {...capabilities, compiledLayerCount: 5}, phase: "connected",
-        layout: {state: "read", layers: [{layer: 0, keys: [{layoutIndex: 0, row: 0, column: 0, keycode, resolved: require("../../core/data/keycode-catalog").resolve(keycode)}]}]},
+        layout: {state: "read", layers: [{layer: 0, keys: [{layoutIndex: 0, row: 0, column: 0, keycode, resolved: require("../../core/schema/keycodes").resolve(keycode)}]}]},
         committed: {state: "read", source: "compiled", byteLength: 321, domains: {}, failures: [{domainId: 0x10, message: "Earlier RGB format"}]},
         combos: {state: "unavailable", error: {message: "Earlier combo format"}}});
     const actual = buildDeviceModel({...older, device});
@@ -583,4 +583,26 @@ test("older firmware keeps independent readback while a dirty current draft is r
     assert.deepEqual(model.device, actual.device);
     assert.deepEqual(model.diagnostics, actual.diagnostics);
     assert.match(model.diagnostics.join(" "), /Earlier RGB format/);
+});
+
+// The interface reads its words from model.vocabulary (webview/view/
+// vocabulary.mjs): a key cap's layer verb, a check's tags, a shortcut's place,
+// a section's heading and Import's summary. Every model the panel publishes
+// carries all of it, keyboard or none, read or not, so no screen falls back
+// to an id.
+test("every model the panel publishes carries the vocabulary the screens read their words from", () => {
+    const {VOCABULARY} = require("../../core/model/vocabulary");
+    const models = {
+        "no keyboard": projectPanelModel({service: {}}, {connected: false, devices: []}),
+        "a keyboard not read yet": projectPanelModel({service: {}}, connected()),
+        "a draft": buildPanelModel(panelWithDraft(), connected()),
+    };
+    for (const [when, model] of Object.entries(models)) {
+        for (const part of ["settingsSections", "fileSections", "keyCapLayerVerbs", "checkLevels", "checkStatuses", "thresholds", "thresholdNames", "thresholdTips", "usageCounts", "stages"]) {
+            assert.deepEqual(model.vocabulary?.[part], VOCABULARY[part], `${when}: ${part}`);
+        }
+        assert.deepEqual(model.vocabulary.pointing.directions, VOCABULARY.pointing.directions, `${when}: the shortcut places`);
+        const {KEY_LEDS, TRACKBALL_LED} = require("../../core/data/charybdis-layout");
+        assert.deepEqual(model.leds, {keys: [...KEY_LEDS], trackball: TRACKBALL_LED}, `${when}: the LED map`);
+    }
 });

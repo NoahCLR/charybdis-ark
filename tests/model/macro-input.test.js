@@ -51,7 +51,7 @@ test("the shared memory is the only size limit, and counts the replaced slot's b
 test("inspection refuses setup and syntax errors without throwing or mutating context", () => {
     assert.equal(inspectMacroInput("café", {...context, mode: 0}).code, "UNICODE_SETUP_REQUIRED");
     // The advice names the screen and card as they are titled.
-    assert.match(inspectMacroInput("café", {...context, mode: 0}).error, /Host → Your computer/);
+    assert.match(inspectMacroInput("café", {...context, mode: 0}).error, /Host settings → Your computer/);
     assert.equal(inspectMacroInput("hello", {...context, enabled: false, mode: 0}).error, "");
     // ASCII is typed with ordinary keys, so a held key may span it.
     assert.equal(inspectMacroInput("{+KC_A}text{-KC_A}", context).error, "");
@@ -59,4 +59,15 @@ test("inspection refuses setup and syntax errors without throwing or mutating co
         assert.ok(inspectMacroInput(payload, context).error, String(payload));
     }
     assert.deepEqual(context, {enabled: true, mode: 1, bankFree: 34903});
+});
+
+// Core's refusal and the step editor say a macro does not read in the same
+// words: the vocabulary's, by the grammar's reason.
+test("a macro that does not read says why in the vocabulary's words", () => {
+    const {VOCABULARY} = require("../../core/model/vocabulary");
+    assert.equal(inspectMacroInput("{KC_A").error, VOCABULARY.macroProblems.missingClose);
+    assert.equal(inspectMacroInput("{-KC_A}").error, `KC_A ${VOCABULARY.macroProblems.notHeld}`);
+    assert.equal(inspectMacroInput("{+KC_A}").error, VOCABULARY.macroProblems.stillHeld);
+    assert.equal(inspectMacroInput("{KC_A,KC_A}").error, VOCABULARY.macroProblems.chord);
+    assert.equal(inspectMacroInput("{KC_A}", {bankFree: 100}).error, "");
 });

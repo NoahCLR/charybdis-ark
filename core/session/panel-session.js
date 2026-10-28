@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {PHASE, editModeWords, heldWords, quietWords} = require("../model/vocabulary");
+const {PHASE, editModeWords, heldWords, layerName, quietWords} = require("../model/vocabulary");
 
 // The panel's side of a session.
 //
@@ -20,6 +20,7 @@ const {PHASE, editModeWords, heldWords, quietWords} = require("../model/vocabula
  * @typedef {import("./types.js").LayerEditState} LayerEdit
  * @typedef {import("../model/types.js").CompleteSnapshot} Snapshot
  */
+const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
@@ -31,13 +32,13 @@ const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDr
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
 const {LOST_WORDS, RECONNECT_WORDS, RESTART_WORDS} = require("./keyboard-reconnect");
+const {BUSY_REFUSAL} = require("./profile-device-service");
 // Retained exports for shells that inspect the routes; never hand-maintained.
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
 const DEMO_MESSAGES = controlsOn("demo");
 // The routes that start work, which wait for the current operation.
 const WORK_ROUTES = new Set(["draft", "portable", "demo", "read"]);
-const BUSY_REFUSAL = "Wait for the current operation to finish before starting another.";
 
 // What the panel says and offers that depends on its shell, published as
 // `model.shell`. The web page is the one shell (D-L71); these defaults are
@@ -143,7 +144,7 @@ function buildPanelModel(session, state) {
         // Live edit's words say the quiet interval the keyboard reports.
         const quietMs = (draft.live?.keyboard || draft.keyboard)?.quietMs;
         if (quietMs && model.vocabulary) model.vocabulary = {...model.vocabulary, editModes: editModeWords(quietMs)};
-        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === 1
+        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === EDIT_MODE.LIVE
             ? `The keyboard runs these edits now · it saves them by itself after ${quietWords(quietMs)} without typing`
             : "The keyboard runs these edits now · Save makes them permanent; unplugging it puts back what is saved";
         else if (draft.dirty && draft.matching && !draft.live) model.device.subtitle = "Showing your local draft · the keyboard still runs its saved profile";
@@ -187,7 +188,7 @@ function buildPanelModel(session, state) {
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
             fileName: session.portableReview.fileName || null, differences: importDifferences({...session, portableReview: session.portableReview}),
             fits: fileFits(session.portableReview.document, state.capabilities)} : null,
-        layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
+        layers: portableLayersView(session.portableLayers),
         usage: usageOf(session, state, draft),
         putBack: session.beforeApply && session.beforeApply.deviceId === state.selectedDeviceId ? session.beforeApply.savedAt : null,
     };
@@ -443,4 +444,12 @@ function applyLayerEdit(edit, message) {
 /** @param {LayerEdit} edit */
 const layerEditDocument = (edit) => rewriteLayers(edit, edit.names);
 
-module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, shellModel, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};
+// The Layers screen's edit as the model posts it: each layer's name as typed,
+// and as a person reads it (core's words for an unnamed one).
+/** @param {Session["portableLayers"]} edit */
+function portableLayersView(edit) {
+    return edit ? {key: edit.before.fingerprint, order: edit.order, names: edit.names,
+        titles: edit.names.map((/** @type {string} */ _, /** @type {number} */ index) => layerName(edit.names, index)), keysFollow: edit.keysFollow !== false} : null;
+}
+
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, portableLayersView, shellModel, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};

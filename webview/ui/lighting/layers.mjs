@@ -34,7 +34,7 @@ export function stageLayers(model) {
     const colour = section(`${layerName(layer)} colour`);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${layerName(layer)} layer`,
-        ...offWording("layers"),
+        ...offWording(model, "layers"),
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));
     const where = section("Where it paints");

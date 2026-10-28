@@ -11,6 +11,7 @@
 
 const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
 const {hostLayouts} = require("../data/host-layouts");
+const {MACRO_LIMITS, macroProblemWords: wordedProblem} = require("../../rules/macro-payload.mjs");
 
 // Device phases are identities, never their presentation labels. The same
 // words serve progress, status and the browser's active-write warning.
@@ -130,7 +131,7 @@ function quietWords(quietMs) {
 // a hint short enough for one line of the rail's menu. The keyboard's Apply
 // and Save are both Save to a person (D-L72). Live edit's words carry the
 // keyboard's quiet interval.
-/** @param {number | null | undefined} [quietMs] @returns {Readonly<Record<number, Readonly<{id: import('../../contracts/model.js').EditModeId, label: string, hint: string, detail: string}>>>} */
+/** @param {number | null | undefined} [quietMs] @returns {import('../../contracts/model.js').Vocabulary['editModes']} */
 const editModeWords = (quietMs) => Object.freeze({
     0: Object.freeze({id: "apply", label: "Review and save", hint: "Waits in Ark until you review it", detail: "Edits stay in Ark's draft until you review and save them. The keyboard runs its saved profile until then."}),
     1: Object.freeze({id: "live", label: "Live edit", hint: "Runs at once and saves itself", detail: `Edits take effect on the keyboard at once. With or without Ark, the keyboard starts saving after ${quietWords(quietMs)} with no edit and no key held; holding a key postpones it. Unplugging loses every edit since the last successful save. A failed automatic save leaves that revision unsaved.`}),
@@ -154,12 +155,38 @@ const HALVES_WORDS = Object.freeze({
         detail: "Ark hasn't read this keyboard yet."}),
 });
 
+// What the bar says while the keyboard is read back after a Save, by the read
+// step (`model.postApplyRead.step`).
+/** @type {Readonly<Record<import('../../contracts/messages.js').ReadStep, string>>} */
+const READ_STEP_WORDS = Object.freeze({
+    layout: "Reading keys and layers",
+    profile: "Reading saved lighting, behaviours and settings",
+    combos: "Checking active combos",
+    baseRgb: "Checking base lighting",
+});
+
 /** @type {Readonly<Record<string, string>>} */
 const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
+
+// Each settings section's heading, by its id in settings-editor.js, which
+// draws it; a note says where a section is in these words too.
+const SETTINGS_SECTIONS = Object.freeze({
+    keyTiming: "Tap & hold timing", normalPointerSpeed: "Pointer speed", sniping: "Auto-sniping", autoMouse: "Auto-mouse",
+    automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Key feedback flash",
+    startupLayers: "Default layers", behaviorSettings: "Behaviours", comboSettings: "Combos", comboReferences: "Combo layer matching",
+    keyboardOptions: "Key swaps & typing", host: "Your computer",
+});
+
+// A behaviour's thresholds: as its hover card lists the ones it runs on ("tap
+// / hold 200 ms"), and as a field or a note names one ("tap / hold
+// threshold"); the multi tap window is a window, not a threshold.
+/** @type {Readonly<Record<import("../../contracts/edits.js").TimingTerm, string>>} */
+const THRESHOLDS = Object.freeze({tapHoldTerm: "tap / hold", longHoldTerm: "long hold", multiTapTerm: "multi tap window"});
 
 /** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
     phases: PHASE_WORDS,
+    readSteps: READ_STEP_WORDS,
     halves: HALVES_WORDS,
     editModes: EDIT_MODE_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
@@ -167,6 +194,29 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     physicalHalves: [[0, "left"], [1, "right"], [0xff, "side not set"]],
     macroPlayback: {setup: "setup", blocked: "blocked", unavailable: "unavailable"},
     macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
+    // Why a macro does not read, by the macro grammar's reason
+    // (rules/macro-payload.mjs), as the step editor and core's refusals both
+    // say it; a key the reason names leads the words of unknown and notHeld
+    // (macroProblemWords).
+    macroProblems: {
+        unexpectedClose: "Unexpected } — use }} for a literal closing brace.",
+        unprintable: "Use valid Unicode text, tabs or newlines; control characters and unpaired surrogates are unsupported.",
+        missingClose: "A macro command is missing its }.",
+        delay: `A macro delay must be between 0 and ${MACRO_LIMITS.maxDelayMs.toLocaleString("en-US")} milliseconds.`,
+        empty: "An empty {} is not a macro command.",
+        noKeys: "A macro command needs at least one key.",
+        pressOne: "A press or release names one key; use a tap for a chord.",
+        chord: `A chord is up to ${MACRO_LIMITS.maxHeldKeys} distinct keys.`,
+        unknown: "is not a key a macro can send.",
+        notHeld: "is released but was never pressed.",
+        heldAgain: "A macro presses a key that is already held.",
+        tooManyHeld: `A macro holds at most ${MACRO_LIMITS.maxHeldKeys} keys at once.`,
+        textHold: "Release ordinary keys before text your keyboard layout cannot type, which needs Unicode entry; modifier holds are supported.",
+        stillHeld: "Release every held key before the macro ends.",
+    },
+    // Each kind of macro step by its one name (glossary "Macro step"): the
+    // add buttons, the step editor and the picker it opens all say it so.
+    macroSteps: [["text", "Text"], ["tap", "Key or chord"], ["delay", "Delay"], ["press", "Press"], ["release", "Release"]],
     // A host layout names its OS, since German on macOS and on Windows differ.
     hostLayouts: hostLayouts().map(/** @returns {[number, string]} */ layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
     // How a hold tier runs once its threshold passes, in that tier's words: a
@@ -201,6 +251,14 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // The setting a timing default comes from, as a behaviour's timing
     // placeholders name it ("200 · dual-role").
     timingSources: {tappingTerm: "dual-role", tapHoldTerm: "behaviour default", longHoldTerm: "default", multiTapTerm: "default"},
+    thresholds: THRESHOLDS,
+    thresholdNames: {tapHoldTerm: `${THRESHOLDS.tapHoldTerm} threshold`, longHoldTerm: `${THRESHOLDS.longHoldTerm} threshold`, multiTapTerm: THRESHOLDS.multiTapTerm},
+    // What each threshold means, said where a behaviour sets its own.
+    thresholdTips: {
+        tapHoldTerm: "How long a press must last to count as a hold rather than a tap.",
+        longHoldTerm: "How long a press must last to count as a long hold.",
+        multiTapTerm: "The time allowed from releasing the key to pressing it again for another tap. A Double tap Hold is press, release, then press and keep holding.",
+    },
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
     // A behaviour's branch by how many taps start it.
     branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],
@@ -216,6 +274,36 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["END_COLOR_ON_ALL_KEYS", "End colour on all keys"],
     ],
     tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Double taps and more"]],
+    // What the colour editor says about HSV(0, 0, 0) in each stage: the tip on
+    // Turn off and the note shown once it is stored. Outside a layer colour
+    // and a group row black is literal black (firmware RGB domain spec,
+    // "Black"), so there only the Stage on switch paints nothing. The
+    // background effect offers no Turn off.
+    colourOff: {
+        layers: {
+            offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
+            offNote: "No colour is stored for this layer, so the background effect shows through wherever it would paint.",
+        },
+        groups: {
+            offTip: "Store HSV(0, 0, 0): this row then takes its stage's colour.",
+            offNote: "A row stored as HSV(0, 0, 0) inherits its stage colour instead of painting its own.",
+        },
+        auto: {
+            offTip: "Store HSV(0, 0, 0): the fade then ends on black.",
+        },
+        pd: {
+            offTip: "Store HSV(0, 0, 0): this mode then paints its locality black while it runs. To paint nothing, switch Stage on off.",
+            offNote: "The colour is black, so this mode paints its locality black while it runs. To paint nothing, switch Stage on off; that turns off every pointing mode's colour.",
+        },
+        combo: {
+            offTip: "Store HSV(0, 0, 0): combo feedback then paints its locality black while a combo's inputs are held. To paint nothing, switch Stage on off.",
+            offNote: "The colour is black, so combo feedback paints its locality black while a combo's inputs are held. To paint nothing, switch Stage on off.",
+        },
+        key: {
+            offTip: "Store HSV(0, 0, 0): this state then flashes black. To flash nothing, switch Stage on off.",
+            offNote: "The colour is black, so the keyboard flashes black for this state. To flash nothing, switch Stage on off; that turns off every feedback colour.",
+        },
+    },
     feedbackOwners: [
         ["KEY_FEEDBACK_GROUP_ALL", "Every feedback state"],
         ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Tap branch pending"],
@@ -242,8 +330,67 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // reads by ("Lock Navigation").
     customKeys: {alwaysOn: {base: "base layer, always on", default: "default layer, always on"},
         layerKinds: [[0, "Hold"], [1, "Lock"], [2, "Move to"], [3, "Tap-toggle"], [4, "One-shot"]]},
+    // The line across a key cap marks a dual-role key: what it taps above,
+    // what it holds below. A dual-role layer key's cap (OSL(), TT()) names its
+    // layer above and, below, what it does to it, by its QMK function. Any
+    // other layer key reads by its whole name on one line (LAYER_KEY_VERBS:
+    // "Hold Navigation", "Lock Navigation"), as layerKinds above do.
+    keyCapLayerVerbs: {OSL: "one-shot", TT: "tap-toggle"},
+    // Review's checks: each level's word, and where a check that is not new
+    // in the draft comes from.
+    checkLevels: {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"},
+    checkStatuses: {new: "new", existing: "on the keyboard", fixed: "fixed"},
+    // What made a recovery copy, as its title says it. Both keyboard saves
+    // read as Save (D-L72), so a title tells them apart by what was saved: a
+    // whole draft (the keyboard's Apply) or the live modes' unsaved edits.
+    recoveryCauses: {apply: "Before saving a draft", restore: "Before restoring a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"},
+    settingsSections: SETTINGS_SECTIONS,
+    // A profile file's settings sections, as Import's summary counts the
+    // file's differences: by their headings, but for three. The summary
+    // already names behaviour and combo rows "Behaviours" and "Combos", so
+    // their sections say "settings"; Key feedback flash is counted with the
+    // Key feedback lighting stage, so it takes the stage's name.
+    fileSections: {
+        keyTiming: SETTINGS_SECTIONS.keyTiming, startupLayers: SETTINGS_SECTIONS.startupLayers, behaviorSettings: "Behaviour settings", comboSettings: "Combo settings",
+        comboReferences: SETTINGS_SECTIONS.comboReferences, keyboardOptions: SETTINGS_SECTIONS.keyboardOptions, lightingPower: SETTINGS_SECTIONS.lightingPower, rgbAppearance: SETTINGS_SECTIONS.rgbAppearance,
+        lightingFeedback: "Key feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
+    },
+    // Why a behaviour, or a key toward a combo, does not take part
+    // (participation.js), in the words of the switch that says no; a layer's
+    // or a key's name follows the words of layer, layers and placement.
+    participationReasons: {
+        behavior: {master: "behaviours are off in Settings", layer: "Settings has behaviours off on", definition: "Use this behaviour is off",
+            layers: "Layers it runs on leaves out", placement: "Use behaviour is off for"},
+        combo: {master: "combos are off in Settings", layer: "Settings has combos off on", definition: "Use this combo is off",
+            layers: "Layers it runs on leaves out", placement: "Join combos is off for"},
+    },
+    // A Settings screen as anything but the rail names it. The rail lists
+    // "Pointer" under Settings; a link, a tip or a fix that sends a person
+    // there has no rail around it, so it says "Pointer settings".
+    settingsScreens: {behaviours: "Behaviour settings", combos: "Combo settings", pointer: "Pointer settings", host: "Host settings"},
+    // Where a switch says no, by the place it switches: one key on one layer
+    // (a placement, firmware's participation policy), or a layer. The layer's
+    // name follows in brackets; a key read through from another layer is
+    // "this key on" that layer.
+    participationPlaces: {key: "this key on this layer", layer: "this layer", keyOn: "this key on"},
+    // What a profile holds that the keyboard counts against a limit
+    // (profile-usage.js), as the keyboard's usage table names each.
+    usageCounts: {
+        behaviours: {label: "Behaviours", what: "Keys with a behaviour."},
+        behaviourSteps: {label: "Behaviour tap counts", what: "Each behaviour's tap counts, up to the deepest one it sets, added up across all behaviours."},
+        combos: {label: "Combos", what: "Combos on any layer."},
+        lightingGroups: {label: "LED groups", what: "Named LED groups on Lighting."},
+        lightingGroupRows: {label: "LED overrides", what: "LED override rows on layers, pointing modes, combo feedback and key feedback."},
+        macros: {label: "Macros", what: "Macro slots with steps."},
+        customKeys: {label: "Custom keys", what: "Custom keys with a name, a shortcut or a behaviour."},
+        pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
+    },
     pointing: {
         kinds: [[0, "Empty"], [1, "Directional keys / shortcuts"], [2, "Scrolling"]],
+        // A directional mode's shortcuts, by where the record keeps each: the
+        // straight directions, and the diagonals eight directions add.
+        directions: [["left", "Left"], ["right", "Right"], ["up", "Up"], ["down", "Down"]],
+        diagonals: [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]],
         axes: [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]],
         invert: [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]],
         // Which axes a scrolling mode scrolls.
@@ -299,11 +446,31 @@ const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key 
 // their own. Layer 0 is the base layer.
 /** @param {readonly string[] | null | undefined} names @param {number} index */
 const layerName = (names, index) => names?.[index] || (index ? `Layer ${index}` : "Base");
+// A macro slot's name when it has none of its own.
+/** @param {number} index */
+const macroDefaultName = (index) => `Macro ${index}`;
 /** @param {{id: number, kind: number, name: string} | null | undefined} slot @param {number} [id] */
 const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Slot ${id}`;
 /** @param {number} count */
 const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
+// Why a macro does not read, in words (rules/macro-payload.mjs).
+/** @param {{code: string, key?: string}} problem */
+const macroProblemWords = (problem) => wordedProblem(problem, VOCABULARY.macroProblems);
+// What a layer key does to its layer, in the words its name reads by ("Lock
+// Navigation"), as the picker says them: core names keys with them
+// (key-names.js), so they are not posted. TG is a lock on this firmware
+// (firmware D-F46).
+/** @type {Readonly<Record<string, string>>} */
+const LAYER_KEY_VERBS = Object.freeze({MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"});
+
+// A refusal from the macro grammar (core/schema/macro-payload.js), in words:
+// the schema names the grammar's reason (`problem`), and every reader of a
+// macro words it here. Any other refusal already says itself.
+/** @param {unknown} error @returns {unknown} */
+const wordedMacroError = (error) => error instanceof Error && "problem" in error
+    ? Object.assign(new Error(macroProblemWords(/** @type {{code: string, key?: string}} */ (error.problem))), {code: /** @type {{code?: unknown}} */ (error).code, problem: error.problem})
+    : error;
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
-module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, slotName, branchName, modifierNames};
+module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, LAYER_KEY_VERBS, wordedMacroError, modifierNames};

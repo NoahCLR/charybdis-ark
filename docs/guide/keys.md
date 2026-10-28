@@ -8,8 +8,15 @@ does on this layer and lets you change it.
 **This key on this layer** (the layer's name follows, as in *This key on
 this layer (Number)*) shows the key's **Keycode** and what it **Does**. Change it
 by typing a keycode or with **Pick…**. The field takes QMK's spellings, such
-as `LCTL_T(KC_A)` or `SGUI(KC_S)`. A keycode the keyboard can't store stays in
-the field with the reason under it, and nothing changes.
+as `LCTL_T(KC_A)`, `SGUI(KC_S)` or `OSM(MOD_MEH)`, the keyboard's own names,
+such as `MACRO_3`, `LOCK_LAYER(2)` or `CUSTOM_KEY_5`, a layer by its number,
+as in `MO(2)`, and a keycode as up to four hex digits, `0x0004`. A number in
+decimal isn't a keycode, inside a call or on its own, and neither are
+spellings QMK doesn't have, such as `LAS()`, or a slot written with a
+leading zero, such as `MACRO_03`. The field
+and the picker take exactly the same keycodes. A keycode the keyboard can't
+store stays in the field with the reason under it, and nothing changes; so
+does a lock of a layer this keyboard doesn't have.
 
 **Where it is stored** unfolds the key's matrix row and column, layout index
 and LED index. Once open, it stays open as you select other keys.
@@ -40,8 +47,8 @@ the Key tab says so. A keycode you set here goes on the top layer and wins.
 
 **Pick…**, or double-clicking a key, opens the keycode picker. It starts with
 a board labelled for your computer's keyboard layout (set in
-[Settings → Host](macros.md#your-computer)), with Shift above each
-legend and Option or AltGr on the right. Below it are sections by task:
+[Host settings](macros.md#your-computer)), with Shift above each legend and
+Option or AltGr on the right. Below it are sections by task:
 **Symbols**, **Navigation**, **Numpad**, **Layers**, **Pointing modes**,
 **Macros**, **Mouse**, **Media**, **Lighting**, **Magic** and **Custom keys**,
 then **More keys**, **Other QMK** and **All keycodes**. **Search every
@@ -165,7 +172,7 @@ as the key's own do.
 
 ## Key swaps & typing
 
-**Key swaps & typing**, on **Settings → Host** below Your computer, holds
+**Key swaps & typing**, on **Host settings** below Your computer, holds
 keyboard-wide options that apply on every layer:
 
 - **Modifiers**: swap left Ctrl and Caps Lock, use Caps Lock as left Ctrl,

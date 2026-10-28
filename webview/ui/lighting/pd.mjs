@@ -32,7 +32,7 @@ export function stagePointing(model) {
     const colour = section(`${slotName(model, state.pointingSlot)} colour`);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${slotName(model, state.pointingSlot)} while active`,
-        ...offWording("pd"),
+        ...offWording(model, "pd"),
         onChange: (next) => { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], row.locality, next)); },
     }));
     const where = section("Where it paints");

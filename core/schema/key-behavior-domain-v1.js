@@ -7,7 +7,7 @@ const {u8: assertU8, u16: assertU16, asBytes: copyBytes, canonical} = require(".
 /**
  * @typedef {{tapIndex: number, tap?: ReturnType<typeof normalizeAction>, hold?: ReturnType<typeof normalizeHold>, longHold?: ReturnType<typeof normalizeHold>}} NormalizedStep
  */
-const {MAX_TAP_DEPTH} = require("./profile-depth");
+const {DEFAULT_TAP_DEPTH, MAX_TAP_DEPTH} = require("./profile-depth");
 
 const {
     PROFILE_ACTION_KINDS,
@@ -46,11 +46,16 @@ const KEY_BEHAVIOR_HOLD_STYLES = Object.freeze({
     REPEAT_WHILE_HELD: 3,
     TAP_ON_RELEASE_AFTER_HOLD: 4,
 });
+// A step's tiers in the grid's order, by the field that stores each; every
+// tier the contract names has one.
+/** @type {Readonly<Record<import("../../contracts/edits.js").Tier, "tap" | "hold" | "longHold">>} */
+const KEY_BEHAVIOR_TIER_FIELDS = Object.freeze({tap: "tap", hold: "hold", long: "longHold"});
 
+const BEHAVIOR_ROWS = 128;
 const KEY_BEHAVIOR_LIMITS = Object.freeze({
-    maxRows: 128,
-    maxPopulatedSteps: 640,
-    maxTapStepsPerBehavior: 5,
+    maxRows: BEHAVIOR_ROWS,
+    maxPopulatedSteps: BEHAVIOR_ROWS * DEFAULT_TAP_DEPTH,
+    maxTapStepsPerBehavior: DEFAULT_TAP_DEPTH,
     maxLayers: LAYERS,
     maxRepeatHz: 100,
     // The domain's own offsets are 16 bits (unchanged by schema 4, firmware
@@ -460,6 +465,7 @@ module.exports = {
     KEY_BEHAVIOR_DOMAIN_V1,
     KEY_BEHAVIOR_HOLD_STYLES,
     KEY_BEHAVIOR_LIMITS,
+    KEY_BEHAVIOR_TIER_FIELDS,
     decodeKeyBehaviorDomain,
     decodeKeyBehaviorDomainEnvelope,
     encodeKeyBehaviorDomain,

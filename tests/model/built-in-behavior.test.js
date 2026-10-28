@@ -67,10 +67,25 @@ test("layer holds and pointing-mode keys hold from the press, with no tap of the
     // MO(3): the layer is on as soon as the key goes down.
     assert.deepEqual(builtInActions(key(0x5223)), {hold: {kind: ACTION.LAYER_MOMENTARY, operand: 3}, fromPress: true});
     assert.deepEqual(builtInActions({kind: ACTION.LAYER_MOMENTARY, operand: 3}), {hold: {kind: ACTION.LAYER_MOMENTARY, operand: 3}, fromPress: true});
+    // MO(15): the layer field's top layer, read as the layer forms read it.
+    assert.deepEqual(builtInActions(key(0x522f)), {hold: {kind: ACTION.LAYER_MOMENTARY, operand: 15}, fromPress: true});
     // LM(2, MOD_LSFT): its layer and its modifiers, from the press.
     assert.deepEqual(builtInActions(key(0x5042)), {hold: key(0x5042), fromPress: true});
     // PD_MODE_0 and PD_MODE_31 run their mode while held.
     assert.deepEqual(builtInActions(key(0x7e80)), {hold: key(0x7e80), fromPress: true});
     assert.deepEqual(builtInActions(key(0x7e9f)), {hold: key(0x7e9f), fromPress: true});
     assert.deepEqual(builtInActions({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}), {hold: {kind: ACTION.POINTING_MODE_MOMENTARY, operand: 0}, fromPress: true});
+});
+
+test("a pointing-mode key holds its mode from the press, unless its row holds another mode on a later tap count", () => {
+    const mode = (slot, lock = false) => ({kind: lock ? ACTION.POINTING_MODE_LOCK : ACTION.POINTING_MODE_MOMENTARY, operand: slot});
+    const hold = (action) => ({style: 0, repeatHz: 0, action});
+    const own = mode(0);
+    assert.equal(builtInActions(own, {}, []).fromPress, true);
+    assert.equal(builtInActions(own, {}, [{tapIndex: 1, hold: hold(mode(0, true))}]).fromPress, true, "its own mode does not defer it");
+    assert.equal(builtInActions(own, {}, [{tapIndex: 0, hold: hold(mode(3))}]).fromPress, true, "only a later tap count does");
+    assert.deepEqual(builtInActions(own, {}, [{tapIndex: 1, longHold: hold(mode(3))}]), {hold: own}, "another mode waits for Tap / hold");
+    assert.equal(builtInActions(key(0x7e80), {}, [{tapIndex: 2, hold: hold(mode(5))}]).fromPress, undefined, "PD_MODE_0 stored by its keycode too");
+    assert.equal(builtInActions(key(0x7e80), {}, [{tapIndex: 2, hold: hold(key(0x7e80))}]).fromPress, true, "and its own keycode is its own mode");
+    assert.equal(builtInActions({kind: ACTION.LAYER_MOMENTARY, operand: 2}, {}, [{tapIndex: 1, hold: hold(mode(3))}]).fromPress, true, "a layer hold is no mode");
 });

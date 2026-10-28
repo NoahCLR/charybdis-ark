@@ -62,7 +62,12 @@ that use the macro; click one to see it there.
 
 The **Raw payload** switch shows the macro as text: `{KC_A}` taps a key,
 `{+KC_A}` presses it, `{-KC_A}` lets it go and `{120}` waits 120 ms. Literal
-braces are doubled, `{{` and `}}`. Text steps do that for you.
+braces are doubled, `{{` and `}}`. Text steps do that for you. A key is
+named by a keycode the step editor offers, such as `KC_A`, never by a number
+such as `{0x04}`, and an empty name between commas is left out, so `{KC_A,}`
+is stored as `{KC_A}`. A macro that
+doesn't read says why in the same words wherever Ark reads it: as you type,
+when you save, and when a backup brings it.
 
 ## Recording
 
@@ -99,7 +104,7 @@ trackball and other keyboards are not held back.
 ## Your computer
 
 Text is typed through your computer's keyboard layout, so Ark needs to know
-which one you use. Set it under **Your computer** on **Settings → Host**; the
+which one you use. Set it under **Your computer** on **Host settings**; the
 button at the foot of the macro editor takes you there.
 
 - **Operating system**: **Auto** (what the keyboard detects over USB),

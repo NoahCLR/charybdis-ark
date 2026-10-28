@@ -45,7 +45,7 @@ for (const theme of ["dark", "light"]) {
             store.state.overlay = "review"; store.render();
         });
         const review = page.getByRole("dialog", {name: "Review changes"});
-        await expect(review).toContainText("Playback changes because of Host → Your computer");
+        await expect(review).toContainText("Playback changes because of Host settings → Your computer");
         await expect(review).toContainText('layout keys: "é"');
         await expect(review).toContainText('Unicode entry (macOS): "é"');
         await expect(review).toContainText("Macro 1 cannot play with the settings in Your computer");

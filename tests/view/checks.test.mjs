@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {createRequire} from "node:module";
 import {behaviourTimingChecks, checkGroups, checkSourceGroup, checkTags, checksToConfirm, confirmText} from "../../webview/view/checks.mjs";
+
+const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
+const model = {vocabulary: VOCABULARY};
 
 const check = (level, status, title = `${level} ${status}`) => ({level, status, title, key: title});
 
@@ -57,16 +61,16 @@ test("the confirmation names one finding or counts traps and warnings together",
 });
 
 test("a check's tags say its level, and where it comes from unless it is new", () => {
-    assert.deepEqual(checkTags(check("blocker", "new")), ["Blocker"]);
-    assert.deepEqual(checkTags(check("trap", "new")), ["Trap"]);
-    assert.deepEqual(checkTags(check("notice", "existing")), ["Notice", "on the keyboard"]);
-    assert.deepEqual(checkTags(check("warning", "fixed")), ["Warning", "fixed"]);
+    assert.deepEqual(checkTags(model, check("blocker", "new")), ["Blocker"]);
+    assert.deepEqual(checkTags(model, check("trap", "new")), ["Trap"]);
+    assert.deepEqual(checkTags(model, check("notice", "existing")), ["Notice", "on the keyboard"]);
+    assert.deepEqual(checkTags(model, check("warning", "fixed")), ["Warning", "fixed"]);
 });
 
 test("in the demo, what the draft started from is the demo setup, not a keyboard", () => {
     assert.equal(checkGroups([check("warning", "existing")])[0].title, "Already on the keyboard");
     assert.equal(checkGroups([check("warning", "existing")], {demo: true})[0].title, "Already in the demo setup");
-    assert.deepEqual(checkTags(check("notice", "existing"), {demo: true}), ["Notice", "in the demo setup"]);
+    assert.deepEqual(checkTags(model, check("notice", "existing"), {demo: true}), ["Notice", "in the demo setup"]);
     for (const group of checkGroups([check("trap", "new"), check("warning", "existing"), check("notice", "fixed")], {demo: true})) {
         assert.doesNotMatch(group.title, /keyboard/, group.id);
     }

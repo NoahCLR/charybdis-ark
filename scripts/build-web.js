@@ -2,8 +2,8 @@
 "use strict";
 
 // The web build: the web version of Ark as a complete static site in
-// dist/web/, ready to publish as it is. core/ and webview/ stay the sources
-// it bundles as they are.
+// dist/web/, ready to publish as it is. core/, webview/ and the rules/ both
+// run stay the sources it bundles as they are.
 //
 //     index.html                the page (web/index.html, with the names below)
 //     _headers                  what Cloudflare Pages sends with it (web/_headers)

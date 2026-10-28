@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import keyNames from "../../core/model/key-names.js";
+import vocabularyModule from "../../core/model/vocabulary.js";
+
+// A key cap's second line for a layer key is in the vocabulary's words, and
+// which keys act on a layer, and how, is the core's (qmkKeyLayerForms).
+const words = {vocabulary: vocabularyModule.VOCABULARY, qmkKeyLayerForms: /** @type {Record<string, any>} */ ({
+    "LT(2,KC_F)": "LT", "LT(3,KC_SLASH)": "LT", "MO(1)": "MO", "MO(2)": "MO", "MO(3)": "MO", "TG(1)": "TG", "TO(2)": "TO", "OSL(3)": "OSL", "TT(1)": "TT",
+    "DF(0)": "DF", "PDF(0)": "PDF", "LOCK_LAYER(3)": "LOCK_LAYER", "LM(1,MOD_LSFT)": "LM"})};
 
 test("visible macro keycodes use the MACRO_n name for both QMK's named and unnamed values", () => {
     const model = {qmkKeycodeAliases: {QK_MACRO_9: "MACRO_9", "0x773F": "MACRO_63", QK_USER_16: "PD_MODE_0"}};
@@ -27,12 +34,14 @@ test("an action is named by its words, with the stored keycode only where it add
 });
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
-    assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
-    assert.deepEqual(keyFace({keycode: "KC_NO", display: ""}), {main: "", sub: "", kind: "disabled"});
-    assert.deepEqual(keyFace({keycode: "KC_A", display: "A"}), {main: "A", sub: "", kind: "key"});
-    assert.deepEqual(keyFace({keycode: "LT(LAYER_NAV,KC_F)", display: "F"}), {main: "F", sub: "nav", kind: "layer"});
-    assert.deepEqual(keyFace({keycode: "MO(LAYER_SYM)", display: "L2"}), {main: "L2", sub: "momentary", kind: "layer"});
-    assert.equal(keyFace(undefined).kind, "none");
+    assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}, null), {main: "▽", sub: "", kind: "transparent"});
+    assert.deepEqual(keyFace({keycode: "KC_NO", display: ""}, null), {main: "", sub: "", kind: "disabled"});
+    assert.deepEqual(keyFace({keycode: "KC_A", display: "A"}, null), {main: "A", sub: "", kind: "key"});
+    assert.deepEqual(keyFace({keycode: "LT(2,KC_F)", display: "F", layerLabel: "Navigation"}, words), {main: "F", sub: "Navigation", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "MO(2)", display: "Hold L2"}, words), {main: "Hold L2", sub: "", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "LT(2,KC_F)", display: "F", layerLabel: "Navigation"}, null), {main: "F", sub: "", kind: "key"},
+        "a caller reading only kind or main passes no model, and the interface never reads a layer out of a keycode's name");
+    assert.equal(keyFace(undefined, null).kind, "none");
 });
 
 test("tiers count the branches that use them, so a key shows what it can do", () => {
@@ -60,12 +69,12 @@ test("the behaviour editor keeps every supported tap column visible", () => {
     assert.equal(behaviourGridSteps(behaviour, 3).length, 3, "a lower advertised device limit is respected");
 });
 
-test("a key for an empty pointing slot says so on its second line", () => {
-    // The catalogue label carries "(empty)" so the picker can tell the two
-    // apart; on the cap that belongs under the name, not inside it.
-    assert.deepEqual(keyFace({keycode: "0x7EF0", display: "Slot 6 · hold (empty)"}),
-        {main: "Slot 6 · hold", sub: "empty", kind: "key"});
-    assert.equal(keyFace({keycode: "QK_USER_16", display: "Dragscroll · hold"}).sub, "");
+test("a key for an empty pointing slot says so on one line, as core names it", () => {
+    // The line across a cap is a dual-role key's; this key holds or locks a
+    // slot that holds nothing, which its name already says.
+    assert.deepEqual(keyFace({keycode: "0x7EF0", display: "Slot 6 · hold (empty)"}, null),
+        {main: "Slot 6 · hold (empty)", sub: "", kind: "key"});
+    assert.equal(keyFace({keycode: "QK_USER_16", display: "Dragscroll · hold"}, null).sub, "");
 });
 
 test("a picked key finds the behaviour it would collide with, whatever its spelling", () => {
@@ -102,8 +111,8 @@ test("a layer key knows the layer the core says it acts on, however the keyboard
 });
 
 test("a layer-tap cap names its layer on the second line, as the core names it", () => {
-    assert.deepEqual(keyFace({keycode: "LT(3,KC_SLASH)", display: "/", layerLabel: "Navigation"}), {main: "/", sub: "Navigation", kind: "layer"});
-    assert.deepEqual(keyFace({keycode: "MO(3)", display: "Navigation", layerLabel: "Navigation"}), {main: "Navigation", sub: "momentary", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "LT(3,KC_SLASH)", display: "/", layerLabel: "Navigation"}, words), {main: "/", sub: "Navigation", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "OSL(3)", display: "Navigation", layerLabel: "Navigation"}, words), {main: "Navigation", sub: "one-shot", kind: "layer"});
 });
 
 test("a picked key matches its behaviour row however its modifiers are spelled", () => {
@@ -116,17 +125,18 @@ test("a picked key matches its behaviour row however its modifiers are spelled",
     assert.equal(behaviourListeningTo(model, "C(KC_C)"), undefined, "a different modifier is a different key");
 });
 
-test("a key cap tells layer keys and mod-taps apart from plain keys", () => {
-    const face = (keycode, display) => keyFace({keycode, display});
-    assert.deepEqual(face("MO(1)", "L1"), {main: "L1", sub: "momentary", kind: "layer"});
-    assert.equal(face("TG(1)", "L1").sub, "toggle");
-    assert.equal(face("TO(2)", "L2").sub, "move");
-    assert.equal(face("OSL(3)", "L3").sub, "one-shot");
-    assert.equal(face("TT(1)", "L1").sub, "tap-toggle");
-    assert.equal(face("DF(0)", "L0").sub, "default");
-    assert.deepEqual(face("MT(MOD_LSFT,KC_A)", "A"), {main: "A", sub: "MOD_LSFT", kind: "key"});
-    assert.equal(face("MT(MOD_LCTL|MOD_LSFT|MOD_LGUI,KC_A)", "A").sub, "MOD_LCTL|MOD_LSFT|MOD_LGUI");
-    assert.equal(face("MT(MOD_RALT,KC_B)", "B").sub, "MOD_RALT");
+test("the line across a cap marks a dual-role key: tap above, hold below", () => {
+    const face = (keycode, display) => keyFace({keycode, display}, words);
+    // A dual-role layer key names its layer, and below what it does to it.
+    assert.deepEqual(face("OSL(3)", "L3"), {main: "L3", sub: "one-shot", kind: "layer"});
+    assert.deepEqual(face("TT(1)", "L1"), {main: "L1", sub: "tap-toggle", kind: "layer"});
+    // Any other layer key reads by its whole name on one line, as core names it.
+    for (const [keycode, display] of [["MO(1)", "Hold L1"], ["TG(1)", "Lock L1"], ["TO(2)", "Move to L2"], ["DF(0)", "Default Base"], ["PDF(0)", "Default Base"],
+        ["LOCK_LAYER(3)", "Lock L3"], ["LM(1,MOD_LSFT)", "L1 + Shift"]]) assert.deepEqual(face(keycode, display), {main: display, sub: "", kind: "layer"}, keycode);
+    assert.deepEqual(keyFace({keycode: "QK_USER_31", semantic: "LOCK_LAYER(3)", display: "Lock L3"}, words), {main: "Lock L3", sub: "", kind: "layer"}, "however it is stored");
+    // A mod-tap's second line is the modifier core names for its hold.
+    assert.deepEqual(keyFace({keycode: "MT(MOD_LSFT,KC_A)", display: "A", modifierLabel: "Shift"}, words), {main: "A", sub: "Shift", kind: "key"});
+    assert.equal(keyFace({keycode: "MT(MOD_LCTL|MOD_LSFT|MOD_LGUI,KC_A)", display: "A", modifierLabel: "Ctrl+Shift+GUI"}, words).sub, "Ctrl+Shift+GUI");
     assert.deepEqual(face("KC_A", "A"), {main: "A", sub: "", kind: "key"}, "a plain A has no second line");
 });
 
@@ -225,7 +235,7 @@ test("with only a Long hold set, a release before it sends the press's tap on ke
 });
 
 test("a dual-role key names what its tap sends and what its hold does", () => {
-    assert.deepEqual(dualRole({qmkKeyLayers: {"LT(3,KC_F)": 3}}, {keycode: "LT(3,KC_F)", display: "F", layerLabel: "Navigation"}), {tap: "F", hold: {layer: 3, name: "Navigation"}},
+    assert.deepEqual(dualRole({qmkKeyLayers: {"LT(3,KC_F)": 3}, qmkKeyLayerForms: {"LT(3,KC_F)": "LT"}}, {keycode: "LT(3,KC_F)", display: "F", layerLabel: "Navigation"}), {tap: "F", hold: {layer: 3, name: "Navigation"}},
         "the layer its hold reaches is the one the core names");
     assert.deepEqual(dualRole({}, {keycode: "MT(MOD_LSFT,KC_A)", display: "A", modifierLabel: "Shift"}), {tap: "A", hold: {modifier: "Shift"}});
     assert.equal(dualRole({}, {keycode: "MO(3)", display: "Hold Navigation"}), null, "a layer key has no tap half");
@@ -248,16 +258,4 @@ test("the grid shows the tap counts in use and the next, or every one, and says 
     const counting = behaviourGridLayout({keycode: "KC_DELETE", steps: [{tapCount: 1, hold: {action: "KC_K"}}]}, 5, true);
     assert.deepEqual(counting.typing, {taps: 3}, "a row of holds types from the third tap too");
     assert.deepEqual(counting.rows.map((row) => row.like), [null, null, null, 0, 0], "so a fourth press holds like a single tap");
-});
-
-test("a pointing-mode key holds its mode from the press, unless a later tap count holds another mode", () => {
-    const hold = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_MODE_0", fromPress: true};
-    const behaviour = {keycode: "PD_MODE_0", builtIn: {hold}, steps: []};
-    assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
-    const same = {...behaviour, steps: [{tapCount: 1, hold: {action: "PD_MODE_0_LOCK"}}]};
-    assert.equal(inheritedBranch(same, {tapCount: 0}, "hold").fromPress, true, "its own mode does not defer it");
-    const other = {...behaviour, steps: [{tapCount: 1, longHold: {action: "PD_MODE_3"}}]};
-    assert.deepEqual(inheritedBranch(other, {tapCount: 0}, "hold"), {...hold, fromPress: false}, "another mode waits for Tap / hold");
-    const layer = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(2)", fromPress: true};
-    assert.equal(inheritedBranch({keycode: "MO(2)", builtIn: {hold: layer}, steps: [{tapCount: 1, hold: {action: "PD_MODE_3"}}]}, {tapCount: 0}, "hold"), layer);
 });

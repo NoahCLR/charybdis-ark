@@ -3,7 +3,8 @@ import type {BehaviorView, Branch, ComboView, Layer, Position, PublishedModel} f
 export type ViewModel = Partial<PublishedModel> | null | undefined;
 export type PointingSlot = PublishedModel['pdModes'][number];
 export type BehaviorStep = BehaviorView['steps'][number];
-export type Tier = 'tap' | 'hold' | 'long';
+import type {Tier} from '../../contracts/edits.js';
+export type {Tier};
 export type BehaviorRoute = 'view' | 'here' | 'through' | 'combos' | 'belowCombos';
 export interface ResolvedKey {position: Position; layer: Layer; fellThrough: boolean; whileHeld: boolean; reference?: boolean}
 export interface ComboRoute {combo: ComboView; keys: ResolvedKey[]}

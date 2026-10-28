@@ -269,7 +269,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await expect(page.locator(".rail-keyboard")).not.toContainText(/Connected|halves|Recovery/);
     await expect(page.locator(".rail-keyboard > .dot")).toHaveAttribute("data-tip", /^Nothing is connected\. The demo/);
 
-    // Pointer settings: a pointer speed.
+    // Pointer: a pointer speed.
     await page.locator('[data-screen="pointer"]').click();
     const dpi = page.locator('select[data-macro="normalDpi"]');
     await expect(dpi).toBeEnabled();

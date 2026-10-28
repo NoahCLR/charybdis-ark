@@ -1,9 +1,9 @@
 # Pointing
 
-Two screens set up the trackball. **Pointer settings**, under Settings in
-the rail, is how it moves the pointer. **Pointing modes**, under Configure,
-make it do something else while a key is held or locked, or while a layer is
-on: scroll, or send arrows and shortcuts as it moves.
+Two screens set up the trackball. **Pointer settings** (**Pointer** under
+Settings in the rail) is how it moves the pointer. **Pointing modes**, under
+Configure, make it do something else while a key is held or locked, or while
+a layer is on: scroll, or send arrows and shortcuts as it moves.
 
 Hover any label on Pointer settings for what it does.
 
@@ -55,9 +55,9 @@ An empty slot offers **New directional mode**, **New scrolling mode**, or
 **Copy from** another slot with **Duplicate into this slot**.
 
 A key can point at an empty slot. It just does nothing until the slot holds a
-mode, and the board marks it **empty**. So you can lay out the keys first and
-fill in the modes later, and clearing a slot doesn't break the keys that use
-it.
+mode, and its key on the board reads by the slot's number, such as **Slot 6 ·
+hold (empty)**. So you can lay out the keys first and fill in the modes later,
+and clearing a slot doesn't break the keys that use it.
 
 ### Every mode
 
@@ -65,7 +65,7 @@ it.
   accented letter takes two.
 - **Movement**: **Directional keys / shortcuts** or **Scrolling**.
 - **Pointer speed while active**: the mode's own DPI, or **Normal pointer
-  speed** to keep the one set in Pointer settings.
+  speed** to keep the one set on Pointer settings.
 - **Light**: its colour and where it paints, with **Edit in Lighting**.
 - **Duplicate** copies the mode into the first empty slot. **Clear slot**
   empties it.
@@ -143,7 +143,8 @@ Moving the ball sends a key or shortcut for each direction.
   **Vertical only** or **Horizontal only**.
 - Each direction takes a key or shortcut, chosen with **Pick…** or typed as a
   QMK keycode name. The field shows it as the picker does: "Mouse Button 3",
-  a macro by its name.
+  a macro by its name. A stored keycode QMK has no name for shows as its hex
+  value, such as `0x1004`, and saves back unchanged.
 - **When a direction is empty**: its neighbours take over, send both
   neighbours (eight directions only), or nothing.
 - **How often it sends**: **Every step** sends again each time the ball moves

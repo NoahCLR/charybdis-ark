@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionsOn} from "../../webview/view/settings-layout.mjs";
+import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsOn} from "../../webview/view/settings-layout.mjs";
 
 const require = createRequire(import.meta.url);
 const portable = require("../../core/model/portable-profile");
@@ -48,4 +48,13 @@ test("a section is edited on the screen that draws it", () => {
 test("Key swaps & typing lists its fields under what they change", () => {
     assert.deepEqual(fieldParts(byId("keyboardOptions").fields).map(({part, fields}) => [part, fields.length]), [["Modifiers", 7], ["Keys", 3], ["Typing", 3]]);
     assert.deepEqual(fieldParts(byId("keyTiming").fields).map(({part}) => part), [""], "a section without parts is one");
+});
+
+// The behaviour editor's timing note names where the defaults are edited,
+// from the rail's group, the screen's label and the section's.
+test("a section's path is the rail's group, its screen and its label", () => {
+    assert.equal(sectionPath(model, "keyTiming"), "Settings · Behaviours · Tap & hold timing");
+    assert.equal(sectionPath(model, "comboReferences"), "Settings · Combos · Combo layer matching");
+    assert.equal(sectionPath({vocabulary: model.vocabulary}, "keyTiming"), "Settings · Behaviours · Tap & hold timing", "whole before any setting is read");
+    for (const section of sections) assert.equal(model.vocabulary.settingsSections[section.id], section.label, `${section.id}'s heading is the vocabulary's`);
 });

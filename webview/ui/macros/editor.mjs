@@ -42,7 +42,7 @@ export function editor(model, slot, canEdit) {
                 ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label></div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
-                ${STEP_KINDS.map(([value]) => `<button class="btn" data-insert-kind="${esc(value)}" data-act="macro-insert:${esc(slot.keycode)}:${esc(value)}" ${editable ? "" : "disabled"}>${esc(addStepLabel(value))}</button>`).join("")}
+                ${STEP_KINDS.map((value) => `<button class="btn" data-insert-kind="${esc(value)}" data-act="macro-insert:${esc(slot.keycode)}:${esc(value)}" ${editable ? "" : "disabled"}>${esc(addStepLabel(model, value))}</button>`).join("")}
                 <label class="sw macro-raw-toggle"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:raw-toggle" data-raw-toggle aria-controls="macro-raw-${esc(slot.keycode)}" ${rawOpen ? "checked" : ""}><span class="track"></span><span>Raw payload</span></label>
             </div>
             <details class="macro-raw" id="macro-raw-${esc(slot.keycode)}" data-raw ${rawOpen ? "open" : ""}>
@@ -134,9 +134,8 @@ export function editor(model, slot, canEdit) {
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */
 function nameField(model, slot, canEdit) {
     const space = model?.macroNameSpace;
-    const number = slot.keycode.split("_").at(-1);
-    if (!space) return `<h3>${esc(slot.name || `Macro ${number}`)}</h3>`;
-    return titleName({f: `macro:${slot.keycode}:name`, value: slot.name || "", placeholder: `Macro ${number}`,
+    if (!space) return `<h3>${esc(slot.name || slot.defaultName)}</h3>`;
+    return titleName({f: `macro:${slot.keycode}:name`, value: slot.name || "", placeholder: slot.defaultName,
         label: "Macro name", perName: space.perName, canEdit});
 }
 
@@ -178,8 +177,8 @@ function showOnLayer(keycode, at) {
 function unicodeSetup(model, slot) {
     const {mode, os, layout, layoutFits, layoutName} = model?.macroUnicode || {mode: 0};
     const typed = layoutFits === false
-        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Host → Your computer, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
-        : `Text types through the ${layoutName} layout chosen in Host → Your computer, accented letters included; keep that layout active on the computer.`;
+        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in ${vocabulary(model).settingsScreens.host} → Your computer, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
+        : `Text types through the ${layoutName} layout chosen in ${vocabulary(model).settingsScreens.host} → Your computer, accented letters included; keep that layout active on the computer.`;
     const entry = mode
         ? ["", "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source.",
             "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",

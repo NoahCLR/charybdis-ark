@@ -1,7 +1,9 @@
 // @ts-check
 "use strict";
 const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
-const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
+const {ALL_LAYERS, LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
+const {CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
+const {MACRO_DOMAIN_V1} = require("./macro-domain-v1");
 const {validHostSetting} = require("./host-settings");
 const {canonical} = require("./bytes");
 // Settings domain 0x40, version 11, the only one the keyboard stores (firmware
@@ -76,12 +78,15 @@ const STORED = /** @type {const} */ ([
     // then one bit per layer for its behaviours and for its combos.
     ["BEHAVIORS_ENABLED", SWITCH], ["LAYER_BEHAVIORS", LAYER_MASK], ["LAYER_COMBOS", LAYER_MASK],
 ]);
+// RGB_MODE's LED flags byte: QMK's LED classes. The background effect lights
+// an LED whose class is in the flags; ALL lights every one.
+const LED_FLAGS = Object.freeze({NONE: 0, MODIFIER: 1, UNDERGLOW: 2, KEY: 4, INDICATOR: 8, ALL: 255});
 // Geometry follows the field table: adding a scalar moves the records and
 // names without updating parallel byte offsets.
 const SCALARS_OFFSET = 8, PLACEMENT_BYTES = 8, LAYER_RECORD_SIZE = 1 + 2 * PLACEMENT_BYTES;
 const LAYER_RECORDS_OFFSET = SCALARS_OFFSET + STORED.length * 4;
-const MACRO_NAMES = 128, CUSTOM_KEY_NAMES = 128, KEYBOARD_NAMES = 1, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES + KEYBOARD_NAMES;
-const CUSTOM_KEY_SHORTCUTS = 128, SHORTCUT_KEY_COUNT = 6, SHORTCUT_SIZE = 4 + SHORTCUT_KEY_COUNT;
+const MACRO_NAMES = MACRO_DOMAIN_V1.SLOTS, CUSTOM_KEY_NAMES = CUSTOM_KEY_SLOTS, KEYBOARD_NAMES = 1, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES + KEYBOARD_NAMES;
+const CUSTOM_KEY_SHORTCUTS = CUSTOM_KEY_SLOTS, SHORTCUT_KEY_COUNT = 6, SHORTCUT_SIZE = 4 + SHORTCUT_KEY_COUNT;
 const SHORTCUTS_OFFSET = LAYER_RECORDS_OFFSET + LAYERS * LAYER_RECORD_SIZE;
 const FIXED_SIZE = SHORTCUTS_OFFSET + CUSTOM_KEY_SHORTCUTS * SHORTCUT_SIZE;
 const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS], COUNT: STORED.length, LAYERS, MACRO_NAMES, CUSTOM_KEY_NAMES, CUSTOM_KEY_SHORTCUTS,
@@ -176,12 +181,15 @@ function shortcutKeysRefusal(keys) {
 const SHORTCUT_LAYER_KINDS = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
 /** @param {unknown} kind @param {number} layers */
 const validLayerKind = (kind, layers) => Number.isInteger(kind) && /** @type {number} */ (kind) >= SHORTCUT_LAYER_KINDS.HOLD && /** @type {number} */ (kind) <= SHORTCUT_LAYER_KINDS.ONESHOT && (layers !== 0 || kind === SHORTCUT_LAYER_KINDS.HOLD);
+/** @param {unknown} value @param {number} max @returns {value is number} */
+const wholeUpTo = (value, max) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= max;
 /** @param {unknown} shortcut @returns {shortcut is import("./types.js").CustomKeyShortcut} */
-const validShortcut = shortcut => typeof shortcut === "object" && shortcut !== null
-    && Number.isInteger(/** @type {any} */ (shortcut).mods) && /** @type {any} */ (shortcut).mods >= 0 && /** @type {any} */ (shortcut).mods <= 0xff
-    && !shortcutKeysRefusal(/** @type {any} */ (shortcut).keys)
-    && Number.isInteger(/** @type {any} */ (shortcut).layers) && /** @type {any} */ (shortcut).layers >= 0 && /** @type {any} */ (shortcut).layers <= 0xffff && !(/** @type {any} */ (shortcut).layers & 1)
-    && validLayerKind(/** @type {any} */ (shortcut).layerKind, /** @type {any} */ (shortcut).layers);
+function validShortcut(shortcut) {
+    if (typeof shortcut !== "object" || shortcut === null) return false;
+    const {mods, keys, layers, layerKind} = /** @type {{mods?: unknown, keys?: unknown, layers?: unknown, layerKind?: unknown}} */ (shortcut);
+    return wholeUpTo(mods, 0xff) && !shortcutKeysRefusal(keys)
+        && wholeUpTo(layers, ALL_LAYERS) && !(layers & 1) && validLayerKind(layerKind, layers);
+}
 // Why a shortcut is not one the keyboard stores, in words, or "" when it is:
 // its keys' refusal when they are what is wrong, else the shape it has.
 /** @param {unknown} shortcut */
@@ -204,7 +212,7 @@ const shortcutIdentity = shortcut => `${shortcut.mods}:${shortcut.keys.join(",")
 // The layers always on, which no shortcut may name: the base layer and the
 // default layers (scalar 23).
 /** @param {readonly number[]} values */
-const alwaysOnLayers = values => ((values[SETTING.DEFAULT_LAYERS] | 1) & 0xffff) >>> 0;
+const alwaysOnLayers = values => ((values[SETTING.DEFAULT_LAYERS] | 1) & ALL_LAYERS) >>> 0;
 const MATRIX_POSITIONS = MATRIX_KEYS;
 const SETTINGS_HEADER_FLAGS = Object.freeze({OFFSET: 5, COMBO_OUTPUT_BYPASS: 1, KNOWN: 1});
 const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, SETTINGS.CUSTOM_KEY_SHORTCUTS, 0]);
@@ -331,4 +339,4 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, customKeyShortcuts, keyboardName, formatVersion: SETTINGS.VERSION};
     return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
 }
-module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, shortcutKeysRefusal, shortcutStoreRefusal, SHORTCUT_KEY_REFUSALS, SHORTCUT_KEY_CAPS, SHORTCUT_KEY_LIMITS, validShortcut, shortcutSends, shortcutPresent, shortcutIdentity, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, LED_FLAGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, shortcutKeysRefusal, shortcutStoreRefusal, SHORTCUT_KEY_REFUSALS, SHORTCUT_KEY_CAPS, SHORTCUT_KEY_LIMITS, validShortcut, shortcutSends, shortcutPresent, shortcutIdentity, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};

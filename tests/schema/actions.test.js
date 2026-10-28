@@ -38,7 +38,8 @@ test("one action vocabulary is known, and a layer reference reads back", () => {
 });
 
 test("placement follows the keyboard's rule: only layer keycodes are restricted", () => {
-    const {PLACEMENT, placementProblem} = require("../../core/schema/actions");
+    const {placementProblem} = require("../../core/schema/actions");
+    const {PLACEMENT} = require("../../rules/layer-placement.mjs");
     const order = [PLACEMENT.KEY, PLACEMENT.TAP, PLACEMENT.HOLD_PRESS, PLACEMENT.HOLD_OTHER, PLACEMENT.COMBO_OUTPUT];
     const places = (action) => order.map(placement => placementProblem(action, placement, {layerCount: 8}) ? "-" : "ok").join(" ");
     const code = operand => ({kind: 1, operand});
@@ -57,7 +58,8 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
 });
 
 test("placement covers all sixteen layers and refuses a layer past the bank", () => {
-    const {PLACEMENT, placementProblem} = require("../../core/schema/actions");
+    const {placementProblem} = require("../../core/schema/actions");
+    const {PLACEMENT} = require("../../rules/layer-placement.mjs");
     const order = [PLACEMENT.KEY, PLACEMENT.TAP, PLACEMENT.HOLD_PRESS, PLACEMENT.HOLD_OTHER, PLACEMENT.COMBO_OUTPUT];
     const places = (action, options) => order.map(placement => placementProblem(action, placement, options) ? "-" : "ok").join(" ");
     const code = operand => ({kind: 1, operand});
@@ -83,4 +85,12 @@ test("the keyboard has the 32 pointing slots of the keycode blocks", () => {
     assert.equal(pointingSlotOfCode(0x7e94), 20);
     assert.equal(pointingSlotOfCode(0x7ebf), 31);
     assert.equal(pointingSlotOfCode(0x7ec0), undefined, "the layer-lock block");
+});
+
+test("a lock of a layer the keyboard lacks is refused wherever it is placed", () => {
+    const {placementProblem} = require("../../core/schema/actions");
+    const {PLACEMENT} = require("../../rules/layer-placement.mjs");
+    const {PROFILE_ACTION_KINDS: ACTION} = require("../../core/schema/profile-blob-v1");
+    assert.equal(placementProblem({kind: ACTION.LAYER_LOCK, operand: 10}, PLACEMENT.KEY, {layerCount: 8}), "LOCK_LAYER(10) locks a layer this keyboard does not have.");
+    assert.equal(placementProblem({kind: ACTION.LAYER_LOCK, operand: 5}, PLACEMENT.TAP, {layerCount: 8}), undefined);
 });

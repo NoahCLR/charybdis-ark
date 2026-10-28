@@ -43,11 +43,12 @@ test("rail screens follow the read and the capability each screen needs", () => 
 });
 
 test("post-Apply readback names the current data instead of a generic operation", () => {
-    assert.equal(postApplyReadText(null), "Confirming the completed save");
-    assert.equal(postApplyReadText({step: "layout", progress: {done: 12, total: 56}}), "Reading keys and layers · 12 of 56");
-    assert.equal(postApplyReadText({step: "profile"}), "Reading saved lighting, behaviours and settings");
-    assert.equal(postApplyReadText({step: "combos"}), "Checking active combos");
-    assert.equal(postApplyReadText({step: "baseRgb"}), "Checking base lighting");
+    const model = {vocabulary: VOCABULARY};
+    assert.equal(postApplyReadText(model, null), "Confirming the completed save");
+    assert.equal(postApplyReadText(model, {step: "layout", progress: {done: 12, total: 56}}), "Reading keys and layers · 12 of 56");
+    assert.equal(postApplyReadText(model, {step: "profile"}), "Reading saved lighting, behaviours and settings");
+    assert.equal(postApplyReadText(model, {step: "combos"}), "Checking active combos");
+    assert.equal(postApplyReadText(model, {step: "baseRgb"}), "Checking base lighting");
 });
 
 test("a read or export names what it reads and claims nothing about saving", () => {

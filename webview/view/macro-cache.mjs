@@ -3,6 +3,7 @@
 // each slot and reading purpose on that model; editing does not retain an
 // unbounded history, and a new model cannot reuse the core's old parsing options.
 import {parseMacro} from "./macro.mjs";
+import {vocabulary} from "./vocabulary.mjs";
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {'grid' | 'peek' | 'editor' | 'feedback'} Purpose */
@@ -28,8 +29,9 @@ export function createMacroReader(parse = parseMacro) {
 /** @param {Model} model @param {Purpose} purpose @returns {import("./types.js").MacroOptions} */
 function readingOptions(model, purpose) {
     if (purpose === "peek") return {};
-    if (purpose === "editor") return {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases};
-    return {textEntry: Boolean(model?.macroUnicode?.mode),
+    const problems = vocabulary(model).macroProblems;
+    if (purpose === "editor") return {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases, problems};
+    return {problems, textEntry: Boolean(model?.macroUnicode?.mode),
         layoutChars: model?.macroUnicode?.layoutChars, modifierKeys: model?.macroPayloadModifierKeycodes,
         ...(purpose === "feedback" ? {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases} : {})};
 }

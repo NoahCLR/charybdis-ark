@@ -1,7 +1,9 @@
 // @ts-check
-import {actionLabel, behaviourFor, canonicalKeycode, keyMeaning, layerOfKeycode} from "./keyface.mjs";
-import {reachablePositions, viewPositions, downTheStack} from "./layer-resolution.mjs";
-import {comboGroups, comboOutput, combosInView, comboInputOn} from "./combo-reach.mjs";
+import {actionLabel, behaviourFor, canonicalKeycode, keyMeaning, layerFormOf, layerOfKeycode} from "./keyface.mjs";
+import {reachablePositions, viewLayers, viewPositions, downTheStack} from "./layer-resolution.mjs";
+import {comboGroups, comboOutput, combosInView} from "./combo-reach.mjs";
+import {inputOn} from "../../rules/combo-inputs.mjs";
+import {linkStartHolds} from "../../rules/pointing-link-starts.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("./keyface-types.js").PointingSlot} PointingSlot */
@@ -12,20 +14,21 @@ import {comboGroups, comboOutput, combosInView, comboInputOn} from "./combo-reac
 /** @typedef {import("./keyface-types.js").BranchCell} BranchCell */
 /** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
-// Generated outputs use the last declared input's physical source, even
-// when matching uses another reference layer. Physical bypass/layer switches
-// never veto a generated output. Several owner placements remain alternatives.
+// The behaviour a combo's output runs, judged from the layer its last
+// declared input's key comes from, even when matching uses another reference
+// layer, against the layers core publishes for it (outputBehaviorLayers).
+// Several owner placements remain alternatives.
 /** @param {ViewModel} model @param {import("../../contracts/panel.js").ComboView} combo @param {ResolvedKey[]} keys @param {Layer[]} stack @param {number} at @param {number[]} [held] */
 function comboBehaviourFor(model, combo, keys, stack, at, held = []) {
-    if (combo.useOutputBehavior === false || model?.participation?.comboOutputBehaviors === false || model?.participation?.behaviorsEnabled === false) return undefined;
-    const row = behaviourFor(model, comboOutput(model, combo));
-    if (!row || row.enabled === false) return undefined;
+    const layers = combo.outputBehaviorLayers ?? 0;
+    const row = layers ? behaviourFor(model, comboOutput(model, combo)) : undefined;
+    if (!row) return undefined;
     const owner = combo.inputs?.at(-1);
-    const placements = keys.filter(({position}) => owner !== undefined && comboInputOn(owner, position));
+    const placements = keys.filter(({position}) => owner !== undefined && inputOn(owner, position));
     const physical = placements.some(key => key.reference) ? viewPositions(stack, at, held) : [];
     const permitted = placements.some(key => {
         const source = key.reference ? physical.find(entry => entry.position.layoutIndex === key.position.layoutIndex)?.layer : key.layer;
-        return source && ((row.allowedLayers ?? 0xffff) & (2 ** source.index));
+        return source && (layers & (2 ** source.index));
     });
     return permitted ? row : undefined;
 }
@@ -412,11 +415,11 @@ export const pointingReach = (model, stack, at) => {
  * The pointing modes reached by the layers on in the view the board shows:
  * the routes reachInView finds that reach a mode with those layers on, and
  * every mode a layer in view starts. A layer shown alone is the view by
- * itself; base joins once layers are held, as in viewPositions.
+ * itself; the layers always on join once layers are held, as in viewPositions.
  */
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held */
 export function pointingReachInView(model, stack, at, held) {
-    const view = held.length ? [0, at, ...held] : [at];
+    const view = viewLayers(stack, at, held);
     const on = view.reduce((mask, layer) => mask | 2 ** layer, 0);
     return withLinkStarts(model, stack, view, startedRoutes(model, reachInView(model, stack, at, held, pointingNamesOf(model)), on));
 }
@@ -453,7 +456,7 @@ function layersTurnedOn(model, keycode) {
 function pointingStartsVia(model, slot, keycode, on) {
     const turnsOn = layersTurnedOn(model, keycode), active = on | turnsOn;
     return (slot.linkStarts || []).reduce((mask, start) =>
-        turnsOn & 2 ** start.layer && !(start.ends & active) ? mask | 2 ** start.layer : mask, 0) >>> 0;
+        turnsOn & 2 ** start.layer && linkStartHolds(start, active) ? mask | 2 ** start.layer : mask, 0) >>> 0;
 }
 
 // Of each entry, the routes that reach its mode as the keyboard runs it: those
@@ -496,7 +499,7 @@ function withLinkStarts(model, stack, on, entries) {
     const active = on.reduce((mask, layer) => mask | 2 ** layer, 0);
     const result = entries.map((entry) => ({...entry}));
     for (const slot of model?.pdModes || []) {
-        const starts = (slot.linkStarts || []).filter((start) => active & 2 ** start.layer && !(start.ends & active))
+        const starts = (slot.linkStarts || []).filter((start) => linkStartHolds(start, active))
             .map((start) => stack.find((layer) => layer.index === start.layer)).filter((layer) => layer !== undefined);
         if (!starts.length) continue;
         const entry = result.find((item) => item.name === String(slot.id));
@@ -559,7 +562,7 @@ export function macroAction(model, action) {
     const [keycode] = macroKeycodes(action);
     if (!keycode || keycode !== String(action).trim()) return null;
     const slot = (model?.macros || []).find((row) => row.keycode === keycode);
-    return {slot, keycode, name: slot?.name || `Macro ${keycode.split("_").at(-1)}`, empty: Boolean(slot?.empty)};
+    return {slot, keycode, name: slot?.name || slot?.defaultName || keycode, empty: Boolean(slot?.empty)};
 }
 
 // A branch or combo action read as the layer it acts on: the layer, the name
@@ -570,7 +573,7 @@ export function macroAction(model, action) {
 /** @param {ViewModel} model @param {string} action */
 export function layerAction(model, action) {
     const at = layerOfKeycode(model, action);
-    if (at === null || /^LT\(/.test(canonicalKeycode(model, action))) return null;
+    if (at === null || layerFormOf(model, action) === "LT") return null;
     const layer = model?.layers?.[at];
     const name = layer ? layer.displayName || layer.name : "";
     const label = actionLabel(model, action);

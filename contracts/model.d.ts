@@ -1,8 +1,17 @@
-import type {Scalar} from './edits.js';
+import type {Scalar, Tier, TimingTerm} from './edits.js';
+
+/** The setting a behaviour timing's default comes from: the dual-role tapping term or a behaviour default. */
+export type TimingSource = 'tappingTerm' | TimingTerm;
+/** A macro step's kind (glossary "Macro step"). */
+export type MacroStepKind = 'text' | 'tap' | 'delay' | 'press' | 'release';
+/** What a profile holds that the keyboard counts against a limit (core/model/profile-usage.js). */
+export type UsageCountId = 'behaviours' | 'behaviourSteps' | 'combos' | 'lightingGroups' | 'lightingGroupRows' | 'macros' | 'customKeys' | 'pointingModes';
 
 /** Device operation identity is stable when presentation words change. */
 export type PhaseId = 'idle' | 'available' | 'empty' | 'connected' | 'demo' | 'enumerate' | 'connect' | 'refresh' | 'starting' | 'read-layout' | 'read-profile' | 'read-complete' | 'restore-complete' | 'disconnect' | 'read-combos' | 'read-base-rgb' | 'live-edit' | 'live-save' | 'live-revert' | 'edit-mode' | 'restart';
 export type EditModeId = 'apply' | 'live' | 'liveReview';
+/** How edits reach the keyboard, as it stores it (core/protocol/profile-edit-v1.js EDIT_MODE): 0 Review and save, 1 Live edit, 2 Live preview + save. */
+export type EditMode = 0 | 1 | 2;
 export interface PhaseWords {label: string; read?: string; busy?: string; writes: boolean}
 
 export interface CountedProgress {done: number; total: number}
@@ -48,6 +57,7 @@ export interface StatusModel {
     draft?: {changes?: readonly unknown[]; live?: unknown};
 }
 
+/** The steps of one Apply, in order (core/session/apply-progress.js APPLY_STEPS). */
 export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'slave' | 'commit' | 'converge' | 'verify';
 /** `saved`: "none" nothing was saved; "decided" the keyboard decided to save and finishes by itself; "unknown". */
 /** `verdict` is the sentence for `saved` (core/session/interruption.js APPLY_VERDICTS) that every notice about this Apply starts with. */
@@ -83,31 +93,60 @@ export type WordList<T = Scalar> = readonly (readonly [T, string])[];
 export type HalvesId = 'agree' | 'alone' | 'apart' | 'unread';
 export interface Vocabulary {
     phases: Readonly<Record<PhaseId, Readonly<PhaseWords>>>;
-    editModes: Readonly<Record<number, Readonly<{id: EditModeId; label: string; hint: string; detail: string}>>>;
+    readSteps: Readonly<Record<import('./messages.js').ReadStep, string>>;
+    editModes: Readonly<Record<EditMode, Readonly<{id: EditModeId; label: string; hint: string; detail: string}>>>;
     halves: Readonly<Record<HalvesId, Readonly<{label: string; detail: string}>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];
     hostOs: WordList<number>;
     physicalHalves: WordList<number>;
     macroPlayback?: Readonly<Record<string, string>>;
     macroProtection: WordList<'auto' | 'on' | 'off'>;
+    macroSteps: WordList<MacroStepKind>;
+    /** Why a macro does not read in the step editor, by the macro grammar's reason code (rules/macro-payload.mjs). */
+    macroProblems: Readonly<Record<string, string>>;
     hostLayouts: WordList<number>;
     holdStyles: {hold: WordList<string>; long: WordList<string>};
     holdWithoutLongHold: WordList<string>;
     tapSends: string;
     holdFromPress: string;
-    timingSources: Record<string, string>;
-    tiers: Readonly<Record<string, string>>;
+    timingSources: Readonly<Record<TimingSource, string>>;
+    thresholds: Readonly<Record<TimingTerm, string>>;
+    /** A threshold as a field or a note names it ("tap / hold threshold"). */
+    thresholdNames: Readonly<Record<TimingTerm, string>>;
+    /** What a threshold means, as its field's hover help says. */
+    thresholdTips: Readonly<Record<TimingTerm, string>>;
+    tiers: Readonly<Record<Tier, string>>;
     branches: readonly string[];
     localities: WordList<string>;
     paintModes: WordList<string>;
     fadeModes: WordList<string>;
     tapCommit: WordList<string>;
+    /** What storing HSV(0, 0, 0) does, by lighting stage (or `groups`, a group row): Turn off's tip and the note once stored. */
+    colourOff: Readonly<Record<string, {offTip: string; offNote?: string}>>;
     feedbackOwners: WordList<string>;
     ledTables: WordList<string>;
     stages: readonly {id: string; label: string; bit?: number}[];
     customKeys: {alwaysOn: {base: string; default: string}; layerKinds: WordList<number>};
+    /** A layer key's second line on its cap, by its QMK function (MO, TG…). */
+    keyCapLayerVerbs: Readonly<Record<string, string>>;
+    checkLevels: Readonly<Record<FindingLevel, string>>;
+    checkStatuses: Readonly<Record<Check['status'], string>>;
+    recoveryCauses: Readonly<Record<RecoveryCause, string>>;
+    /** Each settings section's heading, by section id. */
+    settingsSections: Readonly<Record<string, string>>;
+    /** A profile file's settings sections as Import's summary names them, by section id. */
+    fileSections: Readonly<Record<string, string>>;
+    /** Why a behaviour or a key toward a combo does not take part, by reason; a layer's or a key's name follows the words of `layer`, `layers` and `placement`. */
+    participationReasons: Readonly<Record<'behavior' | 'combo', Readonly<Record<ParticipationReason, string>>>>;
+    participationPlaces: Readonly<{key: string; layer: string; keyOn: string}>;
+    /** A Settings screen as a link or a pointer to it names it, by screen id. */
+    settingsScreens: Readonly<Record<'behaviours' | 'combos' | 'pointer' | 'host', string>>;
+    /** Each usage count's name and what it counts. */
+    usageCounts: Readonly<Record<UsageCountId, {label: string; what: string}>>;
     pointing: {
         kinds: WordList<number>;
+        directions: WordList<string>;
+        diagonals: WordList<string>;
         axes: WordList<number>;
         invert: WordList<number>;
         scrollAxes: WordList<number>;
@@ -161,8 +200,8 @@ export interface Check extends Finding {key: string; status: 'new' | 'existing' 
 export interface ProfileUsage {
     used: number;
     capacity: number;
-    /** `unavailable`: free slots the keyboard cannot use right now (macro slots macro memory has no room for). */
-    counts: {id: string; used: number; limit: number; unavailable?: number}[];
+    /** `unavailable`: free slots the keyboard cannot use right now (macro slots macro memory has no room for); `fixed`: a set of slots the keyboard always has all of. */
+    counts: {id: UsageCountId; used: number; limit: number; unavailable?: number; /** A fixed set of slots, always all there. */ fixed?: true}[];
     source?: 'draft' | 'keyboard' | 'demo';
 }
 
@@ -177,7 +216,11 @@ export interface ProfileKeyNames {
     layers: string[];
     /** Keycode name → the layer it acts on, for every layer key named here. */
     keyLayers: Record<string, number>;
+    /** Keycode name → what it does to that layer, by QMK's function. */
+    keyLayerForms: Record<string, LayerForm>;
 }
+/** What a layer key does to its layer, by QMK's function (and LOCK_LAYER, this keyboard's lock). */
+export type LayerForm = 'MO' | 'TG' | 'TO' | 'TT' | 'OSL' | 'DF' | 'PDF' | 'LT' | 'LM' | 'LOCK_LAYER';
 export interface NamedKey {name: string; native: string; code: number; label: string}
 
 export type ReviewPlace = FindingPlace
@@ -228,13 +271,13 @@ export interface HistoryStep {
     undone: boolean;
     changes: ReviewChange[] | null;
 }
+/** Why a behaviour, or a key toward a combo, does not take part: the master switch, the layer's switch, the definition's own switch, the layers it runs on, the placement's switch (core/model/participation.js). */
+export type ParticipationReason = 'master' | 'layer' | 'definition' | 'layers' | 'placement';
 export interface Participation {
     comboOutputBehaviors?: boolean;
     behaviorsEnabled: boolean;
-    combosEnabled: boolean;
-    behaviorLayers: number;
-    comboLayers: number;
-    layers: {bypass: number[]; exclude: number[]}[];
+    /** Per layer: why no behaviour, or no combo, runs on it at all, and the keys whose Use behaviour or Join combos is off there, by layout index. */
+    layers: {behaviors: ParticipationReason[]; combos: ParticipationReason[]; bypass: number[]; exclude: number[]}[];
 }
 
 export interface SettingBits {bitMask?: number; shift?: number; width?: number; kind?: string}

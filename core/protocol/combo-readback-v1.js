@@ -1,11 +1,11 @@
 // @ts-check
 "use strict";
-const {LAYERS} = require("../data/charybdis-layout");
 const {isUnhandledEcho, orUnhandled} = require("./raw-hid-unhandled");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {fnv1a32} = require("../schema/profile-blob-v1");
+const {COMBO_LIMITS} = require("../schema/combo-domain-v1");
 
-const COMBO_READBACK_V1 = Object.freeze({VALUE: 0x06, VERSION: 3, MAX_ROWS: 128, MAX_INPUTS: 16, MAX_LAYERS: LAYERS, PAGES_PER_ROW: 2});
+const COMBO_READBACK_V1 = Object.freeze({VALUE: 0x06, VERSION: 3, MAX_ROWS: COMBO_LIMITS.maxRows, MAX_INPUTS: COMBO_LIMITS.maxInputs, MAX_LAYERS: COMBO_LIMITS.maxLayers, PAGES_PER_ROW: 2});
 /** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
 

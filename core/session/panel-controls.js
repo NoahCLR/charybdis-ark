@@ -24,11 +24,12 @@
  */
 const {panelControl} = require("./panel-control-registry");
 const {canEdit, hasCurrentLayers} = require("./firmware-support");
-const {validateSnapshot, FILE_MAX_BYTES} = require("../model/portable-profile");
+const {validateSnapshot, FILE_MAX_BYTES, FILE_TOO_LARGE} = require("../model/portable-profile");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
-const {IDENTITY, compose} = require("../model/layer-order");
+const {compose} = require("../model/layer-order");
+const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, retryRead, saveCutShortResult, setEditMode} = require("./live-edits");
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
@@ -281,7 +282,7 @@ const DRAFT_ACTIONS = Object.freeze({
     putBack: liveOr("putBack", ({draft, revision, session}) => {
         const before = session.beforeApply;
         if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before a save on this keyboard to put back.");
-        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before the save", IDENTITY);
+        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before the save", LAYER_IDENTITY);
         session.resetDraftForms = true;
     }),
     apply: async ({draft, revision, message, session, service, shell}) => {
@@ -345,7 +346,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         if (chosen === undefined) return;
         const text = typeof chosen === "string" ? chosen : chosen.text;
         if (typeof text !== "string") throw new Error("This profile file could not be read.");
-        if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error("This profile file is too large.");
+        if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error(FILE_TOO_LARGE);
         const value = validateSnapshot(text, panelCapabilities(session) || undefined);
         session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
             before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
@@ -388,14 +389,14 @@ const PORTABLE_ACTIONS = Object.freeze({
             const draft = session.draft;
             closeEditors(session, {resetForms: true});
             if (entry.kind === "layers") await proposeLive(session, {document, origin: "layers", label: "Edited layers", order: compose(draft.order, entry.editor.order)});
-            else await proposeLive(session, {document, origin: "edit", label: "Imported a profile", order: IDENTITY}, {replaceWhenLarge: true});
+            else await proposeLive(session, {document, origin: "edit", label: "Imported a profile", order: LAYER_IDENTITY}, {replaceWhenLarge: true});
             return;
         }
         if (session.draft) {
             // An import has no layer order to keep: its layers are
             // compared slot by slot with the keyboard's.
             if (entry.kind === "layers") session.draft.editLayers(document, session.draft.revision, entry.editor.order);
-            else session.draft.replace(document, session.draft.revision, "edit", "Imported a profile", IDENTITY);
+            else session.draft.replace(document, session.draft.revision, "edit", "Imported a profile", LAYER_IDENTITY);
             closeEditors(session, {resetForms: true});
             return;
         }

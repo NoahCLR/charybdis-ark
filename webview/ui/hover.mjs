@@ -172,7 +172,7 @@ function reachSections(model, layer, position, index,
     // (firmware D-F27), so the card says only whether this key's row runs
     // here, and why not.
     const use = "row" in position
-        ? behaviourRuns(model, layer?.index ?? 0, /** @type {{row: number, column: number}} */ (/** @type {unknown} */ (position)), behaviour)
+        ? behaviourRuns(model, layer?.index ?? 0, /** @type {{layoutIndex?: number}} */ (/** @type {unknown} */ (position)), behaviour)
         : {runs: Boolean(behaviour), reasons: []};
     const runs = use.runs;
     if (custom && hasShortcut(custom)) sections.push(shortcutSection(model, custom));
@@ -216,7 +216,7 @@ function reachSections(model, layer, position, index,
         const count = behaviour.steps.length;
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
             <div class="hc-sub">${[count ? `${count} branch${count === 1 ? "" : "es"}` : "No branches yet",
-                ...terms.used.map((name) => `${TERM_WORDS[name]} ${threshold(terms[name])}`),
+                ...terms.used.map((name) => `${vocabulary(model).thresholds[name]} ${threshold(terms[name])}`),
                 ...(behaviour.keepsAutoMouseAnchored ? ["keeps auto-mouse anchored"] : [])].map(esc).join(" · ")}</div>
             ${branches}
             ${count && foot ? `<div class="hc-sub hc-foot">${lit
@@ -275,7 +275,7 @@ function shortcutSection(model, custom) {
     if (keys.length) rows.push(`<div class="hc-act"><span class="hc-stage">Sends</span>
         <span class="hc-keys">${keys.map((part) => `<span class="hc-key">${esc(part)}</span>`).join('<span class="hc-life">+</span>')}</span></div>`);
     if (layers.length) rows.push(`<div class="hc-act"><span class="hc-stage">Layers</span>
-        <span class="hc-layers">${layers.map((at) => layerTagged(model, at, layerName(model?.layers?.[at]) || `Layer ${at}`, [shortcutLayerTag(model, custom)])).join("")}
+        <span class="hc-layers">${layers.map((at) => layerTagged(model, at, layerName(model?.layers?.[at]), [shortcutLayerTag(model, custom)])).join("")}
         ${under(shortcutLayerUnder(custom))}</span></div>`);
     return `<div class="hc-sect"><div class="hc-h">Shortcut</div><div class="hc-sub">${esc(shortcutWhen(custom))}</div>${rows.join("")}</div>`;
 }
@@ -306,8 +306,6 @@ const helperAt = (kind, branch, terms) => {
     const detail = styleDetail(kind, branch, terms);
     return detail ? `${styleText(kind, branch.style)} (${detail})` : styleText(kind, branch.style);
 };
-// The Behaviours editor's own words for each threshold.
-const TERM_WORDS = {tapHoldTerm: "tap / hold", longHoldTerm: "long hold", multiTapTerm: "multi tap window"};
 // A threshold as the keyboard runs it: its own time or the keyboard's default.
 /** @param {{ms: string}} term */
 const threshold = (term) => term.ms === "" ? "keyboard default" : `${term.ms} ms`;

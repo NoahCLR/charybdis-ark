@@ -331,7 +331,7 @@ test("a layer that starts another mode cannot start this one and says so in its 
     await configPost(page, 2, {linkTurnsOn: 1 << 5});
 });
 
-test("Pointer settings: auto-sniping's layers post one switch each, beside its master switch", async ({page}) => {
+test("Pointer: auto-sniping's layers post one switch each, beside its master switch", async ({page}) => {
     await openControls(page, "pointer");
     await page.locator('label:has([data-f="setting:snipingOnLayer2"])').click();
     await expectPost(page, {type: "updateConfigDefaults", sectionId: "sniping", expectedFingerprint: expect.any(String), fields: expect.arrayContaining([

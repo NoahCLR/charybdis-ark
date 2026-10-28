@@ -1,7 +1,21 @@
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
-import {comboBadgesAt, comboBehaviours, comboUseAt, combosInView, combosForKey, comboReferenceLayer, comboGroups, combosAt, combosInPreview, combosShownAt, comboAnswers, comboInputIsKey, comboInputKeys, comboInputShown, combosOnKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
+import {comboBehaviours, combosInView, combosForKey, comboReferenceLayer, comboInputIsKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
+import * as combo_reachViews from "../../webview/view/combo-reach.mjs";
+import {VOCABULARY, publishedParticipation} from "../fixtures/participation.mjs";
+import {publishedFor} from "../fixtures/combo-reach.mjs";
+// The combo views read the reach core publishes for the stack they are given.
+const comboBadgesAt = publishedFor(combo_reachViews.comboBadgesAt);
+const comboUseAt = publishedFor(combo_reachViews.comboUseAt);
+const comboGroups = publishedFor(combo_reachViews.comboGroups);
+const combosAt = publishedFor(combo_reachViews.combosAt);
+const combosInPreview = publishedFor(combo_reachViews.combosInPreview);
+const combosShownAt = publishedFor(combo_reachViews.combosShownAt);
+const comboAnswers = publishedFor(combo_reachViews.comboAnswers);
+const comboInputKeys = publishedFor(combo_reachViews.comboInputKeys);
+const comboInputShown = publishedFor(combo_reachViews.comboInputShown);
+const combosOnKey = publishedFor(combo_reachViews.combosOnKey);
 
 test("combos follow the device's own input positions before falling back to keycodes", () => {
     const model = {combos: [
@@ -66,7 +80,7 @@ test("view combos follow the keyboard's reference layer", () => {
         {index: 1, name: "Numbers", positions: [at(0, "KC_C"), at(1, "KC_D")]},
     ]);
     const model = {
-        comboReadback: {layerReferences: [0, 0]},
+        comboReferenceLayers: [0, 0],
         combos: [{id: 7, inputs: ["KC_A", "KC_B"], output: "KC_TAB"}],
     };
     const inView = combosInView(model, stack, 1, []);
@@ -205,13 +219,13 @@ test("combos follow the keyboard's combo layer matching", () => {
     assert.equal(own.elsewhere.length, 1, "matched on its own keys, Numbers cannot fire a Q+W combo");
 
     // "Combos on Numbers → Base": the keyboard matches Base's keycodes while Numbers is on top.
-    const settings = {configDefaults: [{id: "comboReferences", fields: [{macro: "comboReference1", value: "Layer 0"}]}]};
+    const settings = {comboReferenceLayers: Object.assign(Array.from({length: 16}, (_, layer) => layer), {1: 0})};
     const referenced = comboGroups({...settings, combos: [combo]}, stack, 1);
     assert.equal(referenced.onKeys.length, 1);
     assert.deepEqual(referenced.onKeys[0].keys.map((key) => key.position.layoutIndex), [13, 14]);
     assert.ok(referenced.onKeys[0].keys.every((key) => key.reference && key.layer.name === "Base"));
-    assert.equal(comboReferenceLayer({comboReadback: {layerReferences: [0, 0]}}, 1), 0, "the readback answers without settings");
-    assert.equal(comboReferenceLayer({}, 1), 1, "and each layer matches itself by default");
+    assert.equal(comboReferenceLayer(settings, 1), 0, "as core publishes it");
+    assert.equal(comboReferenceLayer({}, 1), 1, "and each layer matches itself without it");
 
     assert.deepEqual(comboInputKeys({...settings}, stack, 1, [], combo.inputs), [13, 14], "the builder rings the keys the keyboard matches");
     assert.equal(comboAnswers({...settings}, stack, 1).get(13).keycode, "KC_Q", "and picks the keycode it matches, not Numbers' own");
@@ -232,7 +246,7 @@ test("a key carries the badges of combos its own keycode fires on this layer, li
     assert.equal(comboGroups(model, stack, 1).throughKeys.length, 1, "the Combos tab still lists it as reached through");
     assert.deepEqual(badges(2, 1), [], "KC_D is here, but KC_F is not, so C1 never fires and marks nothing");
 
-    const referenced = {...model, configDefaults: [{id: "comboReferences", fields: [{macro: "comboReference2", value: "Layer 0"}]}]};
+    const referenced = {...model, comboReferenceLayers: Object.assign(Array.from({length: 16}, (_, layer) => layer), {2: 0})};
     assert.deepEqual(combosAt(referenced, stack, 2, 2).map((row) => row.badge), ["C1"],
         "under Combo Layer Matching the keys Base supplies are marked");
     assert.equal(combosAt(model, stack, 0, 1), combosAt(model, stack, 0, 1), "one grouping per model and layer");
@@ -269,7 +283,7 @@ test("in a layer preview, a key answered from below wears the badges of combos i
     assert.deepEqual(shown([0, 1], 3), ["C6"], "Base's key through two transparent layers fires C6");
     assert.deepEqual(shown([1], 3), ["C6"], "Base is always on, so it answers key 3 under Numbers too");
 
-    const referenced = {...model, configDefaults: [{id: "comboReferences", fields: [{macro: "comboReference2", value: "Layer 0"}]}]};
+    const referenced = {...model, comboReferenceLayers: Object.assign(Array.from({length: 16}, (_, layer) => layer), {2: 0})};
     assert.equal(combosInPreview(referenced, stack, 2, [0]), combosInPreview(referenced, stack, 2, []),
         "under Combo Layer Matching the reference layer's keys are matched, never an answer from below");
     assert.equal(combosInPreview(model, stack, 2, [0]), combosInPreview(model, stack, 2, [0]), "one grouping per model and preview");
@@ -282,14 +296,13 @@ test("a key wears a combo's badge only where every switch lets the combo fire", 
         {index: 0, name: "Base", positions: [at(1, "KC_D"), at(2, "KC_F")]},
         {index: 1, name: "Numbers", positions: [at(1, "KC_TRANSPARENT"), at(2, "KC_TRANSPARENT")]},
     ]);
-    const participation = {behaviorsEnabled: true, combosEnabled: true, behaviorLayers: 65535, comboLayers: 65535,
-        layers: Array.from({length: 16}, () => ({bypass: [], exclude: []}))};
-    const model = {combos: [combo], layers: stack, participation};
+    const participation = publishedParticipation();
+    const model = {combos: [combo], layers: stack, participation, vocabulary: VOCABULARY};
     const badges = (m, layer, held, key) => comboBadgesAt(m, stack, layer, held, key).map((row) => row.badge);
     assert.deepEqual(badges(model, 0, [], 1), ["C1"], "every switch on, the badge shows");
     assert.deepEqual(comboUseAt(model, stack, 0, [], 1, combo), {fires: true, reasons: []});
 
-    const excluded = {...model, participation: {...participation, layers: participation.layers.map((layer, index) => index ? layer : {...layer, exclude: [2]})}};
+    const excluded = {...model, participation: publishedParticipation({exclude: {0: [2]}})};
     assert.deepEqual(badges(excluded, 0, [], 2), [], "the excluded key wears no badge");
     assert.deepEqual(comboUseAt(excluded, stack, 0, [], 2, combo).reasons, ["Join combos is off for this key on this layer (Base)"]);
     assert.deepEqual(badges(excluded, 0, [], 1), [], "nor does its partner, since the chord cannot form");
@@ -304,8 +317,8 @@ test("a key wears a combo's badge only where every switch lets the combo fire", 
         {index: 1, name: "Symbols", positions: [at(1, "KC_1"), at(2, "KC_2")]},
         {index: 2, name: "Numbers", positions: [at(1, "KC_TRANSPARENT"), at(2, "KC_TRANSPARENT")]},
     ]);
-    const matched = {combos: [combo], layers: matchedStack, participation: {...participation, layers: participation.layers.map((layer, index) => index === 1 ? {...layer, exclude: [1]} : layer)},
-        configDefaults: [{id: "comboReferences", fields: [{macro: "comboReference2", value: "Layer 0"}]}]};
+    const matched = {combos: [combo], layers: matchedStack, participation: publishedParticipation({exclude: {1: [1]}}), vocabulary: VOCABULARY,
+        comboReferenceLayers: Object.assign(Array.from({length: 16}, (_, layer) => layer), {2: 0})};
     const matchedBadges = (held, key) => comboBadgesAt(matched, matchedStack, 2, held, key).map((row) => row.badge);
     assert.deepEqual(matchedBadges([], 1), ["C1"], "Base supplies both keys, and Base lets them join");
     assert.deepEqual(matchedBadges([1], 1), [], "with Symbols held under Numbers, Symbols supplies the key, and excludes it");
@@ -314,21 +327,21 @@ test("a key wears a combo's badge only where every switch lets the combo fire", 
     // An input on two keys needs only one of them: a key that cannot join
     // but whose input another key covers is not why the chord fails.
     const doubled = withAnswers([{index: 0, name: "Base", positions: [at(1, "KC_D"), at(2, "KC_F"), at(3, "KC_D")]}]);
-    const both = {combos: [combo], layers: doubled, participation: {...participation, layers: participation.layers.map((layer, index) => index ? layer : {...layer, exclude: [1, 2]})}};
+    const both = {combos: [combo], layers: doubled, participation: publishedParticipation({exclude: {0: [1, 2]}}), vocabulary: VOCABULARY};
     assert.deepEqual(comboUseAt(both, doubled, 0, [], 3, combo).reasons, ["its other key KC_F on Base cannot join it, so it never forms"]);
-    const fine = {...both, participation: {...participation, layers: participation.layers.map((layer, index) => index ? layer : {...layer, exclude: [1]})}};
+    const fine = {...both, participation: publishedParticipation({exclude: {0: [1]}})};
     assert.deepEqual(comboBadgesAt(fine, doubled, 0, [], 3).map((row) => row.badge), ["C1"], "the other KC_D still covers its input");
 
     const disabled = {...model, combos: [{...combo, enabled: false}]};
     assert.deepEqual(badges(disabled, 0, [], 1), []);
     assert.deepEqual(comboUseAt(disabled, stack, 0, [], 1, disabled.combos[0]).reasons, ["Use this combo is off"]);
-    const layerOff = {...model, participation: {...participation, comboLayers: 65535 ^ 1}};
+    const layerOff = {...model, participation: publishedParticipation({comboLayers: 65535 ^ 1})};
     assert.deepEqual(badges(layerOff, 0, [], 1), []);
     const notHere = {...model, combos: [{...combo, allowedLayers: 2}]};
     assert.deepEqual(badges(notHere, 0, [], 1), [], "a combo kept off this layer marks nothing on it");
-    const masterOff = {...model, participation: {...participation, combosEnabled: false}};
+    const masterOff = {...model, participation: publishedParticipation({combosEnabled: false})};
     assert.deepEqual(badges(masterOff, 0, [], 1), []);
-    const bypassed = {...model, participation: {...participation, layers: participation.layers.map((layer, index) => index ? layer : {...layer, bypass: [1, 2]})}};
+    const bypassed = {...model, participation: publishedParticipation({bypass: {0: [1, 2]}})};
     assert.deepEqual(badges(bypassed, 0, [], 1), ["C1"], "a behaviour bypass leaves combos alone");
 });
 
@@ -356,23 +369,19 @@ test("a combo marks the input the key itself presses, by the same rule as its ba
     assert.equal(comboInputIsKey(named, 0, null), false);
 });
 
-test("a combo runs the behaviour of the key it sends only while every switch for it is on", () => {
+test("a combo runs the behaviour of the key it sends on the layers core publishes for it", () => {
+    // Core publishes no layers for a key with no behaviour or a bypassed
+    // output (tests/model/participation.test.js says when).
     const combos = [
-        {badge: "C2", output: "KC_LEFT_GUI", outputDisplay: "Left Command", useOutputBehavior: true},
-        {badge: "C3", output: "LGUI(KC_N)", outputDisplay: "Command+N", useOutputBehavior: true},
-        {badge: "C5", output: "KC_LEFT_GUI", outputDisplay: "Left Command", useOutputBehavior: true},
-        {badge: "C14", output: "0x7F04", outputDisplay: "VoiceInk", useOutputBehavior: false},
+        {badge: "C2", output: "KC_LEFT_GUI", outputDisplay: "Left Command", outputBehaviorLayers: 0xffff},
+        {badge: "C3", output: "LGUI(KC_N)", outputDisplay: "Command+N", outputBehaviorLayers: 0},
+        {badge: "C5", output: "KC_LEFT_GUI", outputDisplay: "Left Command", outputBehaviorLayers: 0xffff},
+        {badge: "C14", output: "0x7F04", outputDisplay: "VoiceInk", outputBehaviorLayers: 0},
     ];
-    const model = {keyBehaviors: [{keycode: "KC_LEFT_GUI", steps: []}, {keycode: "CUSTOM_KEY_4", steps: []}],
-        qmkKeycodeAliases: {"0x7F04": "CUSTOM_KEY_4"}, participation: {behaviorsEnabled: true, comboOutputBehaviors: true}};
+    const model = {keyBehaviors: [{keycode: "KC_LEFT_GUI", steps: []}, {keycode: "CUSTOM_KEY_4", steps: []}], qmkKeycodeAliases: {"0x7F04": "CUSTOM_KEY_4"}};
     assert.deepEqual(comboBehaviours(model, combos), [{keycode: "KC_LEFT_GUI", output: "KC_LEFT_GUI", shown: "Left Command", badges: ["C2", "C5"]}],
         "a plain shortcut runs nothing, two combos sending one key share it, and a bypassed output runs none");
-    assert.deepEqual(comboBehaviours(model, [{...combos[3], useOutputBehavior: true}]).map((row) => row.keycode), ["CUSTOM_KEY_4"], "a custom key is found by its name");
-    assert.deepEqual(comboBehaviours({...model, participation: {behaviorsEnabled: true, comboOutputBehaviors: false}}, combos), []);
-    assert.deepEqual(comboBehaviours({...model, participation: {behaviorsEnabled: false, comboOutputBehaviors: true}}, combos), []);
-    // The behaviour's own switches hold for a combo output too.
-    const gui = (/** @type {object} */ row) => ({...model, keyBehaviors: [{keycode: "KC_LEFT_GUI", steps: [], ...row}]});
-    assert.deepEqual(comboBehaviours(gui({enabled: false}), combos), [], "a disabled behaviour runs for no combo");
-    assert.deepEqual(comboBehaviours(gui({allowedLayers: 0b01}), combos, 1), [], "nor on a layer it is not allowed on");
-    assert.equal(comboBehaviours(gui({allowedLayers: 0b10}), combos, 1).length, 1, "but does on one it is");
+    assert.deepEqual(comboBehaviours(model, [{...combos[3], outputBehaviorLayers: 0xffff}]).map((row) => row.keycode), ["CUSTOM_KEY_4"], "a custom key is found by its name");
+    assert.deepEqual(comboBehaviours(model, [{...combos[0], outputBehaviorLayers: 0b01}], 1), [], "nor on a layer it does not run on");
+    assert.equal(comboBehaviours(model, [{...combos[0], outputBehaviorLayers: 0b10}], 1).length, 1, "but does on one it does");
 });

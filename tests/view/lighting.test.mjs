@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {createRequire} from "node:module";
 import {isOff} from "../../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, inheritsStageColour, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, inheritsStageColour, keyLed, layerPaints, keyLight, mappedKeyCount, offWording, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLed, trackballLight} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -14,8 +15,11 @@ test("mapped-key count follows the selected layer, excluding transparent and dis
     assert.equal(mappedKeyCount(null), 0);
 });
 
+// The LED map as core publishes it (model.leds).
+const {KEY_LEDS, TRACKBALL_LED} = createRequire(import.meta.url)("../../core/data/charybdis-layout");
 function model(overrides = {}) {
     return {
+        leds: {keys: [...KEY_LEDS], trackball: TRACKBALL_LED},
         rgb: {
             baseEffect: {state: "read", enabled: true, effectId: 1, previewColor: colour(140, 210, 180)},
             stages: [
@@ -114,7 +118,7 @@ test("the trackball LED says which layer painted it, so the board can tell its o
     assert.deepEqual(trackballLight(m, {index: 3}), {colour: colour(140, 210, 180), source: "base", layer: null},
         "a mapped-keys-only layer never reaches it, so the base effect shows");
     assert.equal(trackballLight(m, {index: 3}, {held: [4]}).layer, 4, "a lower layer on in a preview paints it from underneath");
-    const grouped = model({rgb: {...model().rgb, layerLedGroups: [{owner: "Layer 3", ledIndices: [56], color: colour(0, 0, 0)}]}});
+    const grouped = model({rgb: {...model().rgb, layerLedGroups: [{owner: "Layer 3", ownerLayer: 3, ledIndices: [56], color: colour(0, 0, 0)}]}});
     const light = trackballLight(grouped, {index: 3});
     assert.equal(light.source, "layer");
     assert.equal(light.layer, 3, "a layer's LED group containing LED 56 paints it as that layer");
@@ -227,9 +231,9 @@ test("LED group rows paint their LEDs, inheriting their stage colour when stored
         layerColors: [{layer: "Layer 3", layerId: 3, color: colour(180, 255, 200), mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"}],
         // LED 6 is key 13; LED 9 is key 14; LED 56 is the trackball
         layerLedGroups: [
-            {owner: "Layer 3", color: colour(0, 0, 0), ledIndices: [9]},
+            {owner: "Layer 3", ownerLayer: 3, color: colour(0, 0, 0), ledIndices: [9]},
             {owner: "RGB_LAYER_GROUP_ALL", color: colour(40, 255, 120), ledIndices: [56]},
-            {owner: "Layer 5", color: colour(10, 255, 255), ledIndices: [6]},
+            {owner: "Layer 5", ownerLayer: 5, color: colour(10, 255, 255), ledIndices: [6]},
         ],
         pdModeLedGroups: [{owner: "RGB_POINTING_MODE_GROUP_ALL", color: colour(0, 0, 0), ledIndices: [6]}],
     });
@@ -290,19 +294,38 @@ test("a trackball mode previews from its first placed key, and black paints dark
     assert.ok(isOff(light.colour), "the right half goes dark");
 });
 
+const words = {vocabulary: createRequire(import.meta.url)("../../core/model/vocabulary").VOCABULARY};
+
 test("Turn off says what black does: literal black for modes and feedback, nothing for a layer, the stage colour for a row", () => {
     for (const stage of ["pd", "combo", "key"]) {
-        const {offTip, offNote} = offWording(stage);
+        const {offTip, offNote} = offWording(words, stage);
         for (const words of [offTip, offNote]) {
             assert.match(words, /black/);
             assert.match(words, /Stage on/);
             assert.doesNotMatch(words, /paints nothing|underneath|not repainted|flashes nothing/);
         }
     }
-    assert.match(offWording("auto").offTip, /black/);
-    assert.match(offWording("layers").offTip, /paints nothing/);
-    assert.match(offWording("layers").offNote, /shows through/);
-    assert.match(offWording("groups").offTip, /stage's colour/);
-    assert.match(offWording("groups").offNote, /inherits its stage colour/);
-    assert.deepEqual(offWording("base"), {});
+    assert.match(offWording(words, "auto").offTip, /black/);
+    assert.match(offWording(words, "layers").offTip, /paints nothing/);
+    assert.match(offWording(words, "layers").offNote, /shows through/);
+    assert.match(offWording(words, "groups").offTip, /stage's colour/);
+    assert.match(offWording(words, "groups").offNote, /inherits its stage colour/);
+    assert.deepEqual(offWording(words, "base"), {});
+});
+
+test("a key's LED and the trackball's are the ones core publishes", () => {
+    const m = model();
+    assert.equal(keyLed(m, 0), 0);
+    assert.equal(keyLed(m, 51), 53, "right thumb keys carry right-half LEDs");
+    assert.equal(new Set(KEY_LEDS.map((_, index) => keyLed(m, index))).size, 56, "every position has its own LED");
+    assert.equal(trackballLed(m), 56);
+    assert.equal(keyLed(m, undefined), undefined);
+});
+
+test("a default layer the keyboard keeps on paints nothing unless it is shown or previewed, as on the keyboard", () => {
+    const m = withRgb({layerColors: [{layer: "Layer 2", layerId: 2, color: colour(170, 255, 200), mode: "ALL_KEYS"}]});
+    m.layers = [{index: 0}, {index: 1}, {index: 2, alwaysOn: true}, {index: 3}];
+    assert.notDeepEqual(keyLight(m, {index: 3}, position(13, "KC_TRANSPARENT")).colour, colour(170, 255, 200),
+        "the keyboard's lighting reads the layers that are on, not its default layers");
+    assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_TRANSPARENT"), {held: [2]}).colour, colour(170, 255, 200), "previewed on, it paints");
 });

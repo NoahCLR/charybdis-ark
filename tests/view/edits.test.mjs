@@ -267,7 +267,7 @@ test("the editor removes exactly the rows the core's review notes as changing no
             stage(draft, {type: "saveBehavior", behavior: {keycode: row.keycode, steps: [], ...terms,
                 keepsAutoMouseAnchored: Boolean(fields.anchored), enabled: fields.enabled ?? true, allowedLayers: 0xffff}});
             const value = decoded(draft);
-            const code = require("../../core/data/keycode-catalog").encode(row.keycode) ?? resolveNativeQmkExpression(row.keycode, {});
+            const code = require("../../core/schema/keycodes").encode(row.keycode) ?? resolveNativeQmkExpression(row.keycode, {});
             const saved = value.behaviors.rows.find(entry => nativeCode(entry.target) === code);
             assert.ok(saved, `${keycode} is stored`);
             assert.equal(posted?.type === "deleteBehavior", changesNothing(saved, value.settings.customKeyShortcuts), `${keycode} ${JSON.stringify(fields)}`);

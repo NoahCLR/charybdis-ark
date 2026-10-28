@@ -6,11 +6,14 @@
 // hover card and the review never call one value two things. A value the
 // table does not know reads as itself rather than disappearing.
 
-/** @typedef {{vocabulary?: import("../../contracts/model.js").Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
+/** @typedef {import("../../contracts/model.js").Vocabulary} Vocabulary */
+/** @typedef {{vocabulary?: Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
 
-/** @type {import("../../contracts/model.js").Vocabulary} */
-const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), editModes: {}, halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
-    feedbackOwners: [], ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []}, pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], linkLabels: {starts: "", keyTurnsOn: "", startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
+/** @type {Vocabulary} */
+const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), readSteps: /** @type {Vocabulary["readSteps"]} */ ({}), editModes: /** @type {Vocabulary["editModes"]} */ ({}), halves: /** @type {Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], macroSteps: [], macroProblems: {}, hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {tappingTerm: "", tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholds: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdNames: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdTips: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: /** @type {Vocabulary["tiers"]} */ ({}), branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+    colourOff: {}, feedbackOwners: [], ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []},
+    keyCapLayerVerbs: {}, checkLevels: /** @type {Vocabulary["checkLevels"]} */ ({}), checkStatuses: /** @type {Vocabulary["checkStatuses"]} */ ({}), recoveryCauses: /** @type {Vocabulary["recoveryCauses"]} */ ({}), settingsSections: {}, fileSections: {}, usageCounts: /** @type {Vocabulary["usageCounts"]} */ ({}), participationReasons: /** @type {Vocabulary["participationReasons"]} */ ({}), participationPlaces: {key: "", layer: "", keyOn: ""}, settingsScreens: {behaviours: "", combos: "", pointer: "", host: ""},
+    pointing: {kinds: [], directions: [], diagonals: [], axes: [], invert: [], pointerLayer: [], linkLabels: {starts: "", keyTurnsOn: "", startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
 /** @param {VocabularyModel | null | undefined} model */
@@ -27,9 +30,10 @@ export const branchName = (model, count) => vocabulary(model).branches[count - 1
 /** @param {VocabularyModel | null | undefined} model */
 export const stageOrder = (model) => vocabulary(model).stages;
 
-// A pointing slot's name as the core gives it.
+// A pointing slot's name as the core gives it: its own, or core's words for
+// one that holds nothing ("Slot 6").
 /** @param {VocabularyModel | null | undefined} model @param {number} id */
-export const slotCalled = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.displayName || `Slot ${id}`;
+export const slotCalled = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.displayName || "";
 
 // How a tier runs, in the editor's words: a tap tier only sends, and a hold
 // style names its own tier's threshold.
@@ -43,6 +47,10 @@ export const styleWord = (model, kind, style) => kind === "tap"
 /** @param {VocabularyModel | null | undefined} model @param {import("../../contracts/edits.js").Tier} kind */
 export const tierName = (model, kind) => vocabulary(model).tiers[kind] || kind;
 
+// What the bar says while a Save is read back, by read step, in core's words.
+/** @param {{vocabulary?: Partial<Pick<Vocabulary, 'readSteps'>>} | null | undefined} model @param {string} step */
+export const readStepWords = (model, step) => /** @type {Readonly<Record<string, string>> | undefined} */ (model?.vocabulary?.readSteps)?.[step];
+
 // Device progress is matched by id. Labels and write facts come from core.
 /** @param {{vocabulary?: Pick<import('../../contracts/model.js').Vocabulary, 'phases'>} | null | undefined} model @param {import("../../contracts/model.js").PhaseId | undefined} phase */
 export const phaseWords = (model, phase) => phase ? model?.vocabulary?.phases?.[/** @type {import('../../contracts/model.js').PhaseId} */ (phase)] : undefined;
@@ -53,10 +61,11 @@ export const phaseWords = (model, phase) => phase ? model?.vocabulary?.phases?.[
 export const halvesWords = (model, halves) => (halves && model?.vocabulary?.halves?.[halves]) || {label: String(halves ?? ""), detail: ""};
 
 // How edits reach the keyboard, in the words core chose: 0 Review and save,
-// 1 Live edit, 2 Live preview + save. A mode the table does not know reads as
-// its number.
+// 1 Live edit, 2 Live preview + save. A mode the table does not know (the
+// keyboard may report one) reads as its number.
 /** @param {VocabularyModel | null | undefined} model @param {number} mode @returns {{id: string, label: string, hint: string, detail: string}} */
-export const editModeWords = (model, mode) => vocabulary(model).editModes?.[mode] || {id: String(mode), label: `Mode ${mode}`, hint: "", detail: ""};
+export const editModeWords = (model, mode) => /** @type {Readonly<Partial<Record<number, Vocabulary["editModes"][import("../../contracts/model.js").EditMode]>>>} */ (vocabulary(model).editModes)?.[mode]
+    || {id: String(mode), label: `Mode ${mode}`, hint: "", detail: ""};
 
 // Words written mid-sentence, starting one: the first letter capitalised.
 /** @param {string} text */

@@ -1,7 +1,7 @@
 // @ts-check
 // Captured events stay separate from the macro text. Compact capture can then
 // revise a pending tap into a chord when another key overlaps it.
-import {samePayload, serializeMacroStep} from "./macro.mjs";
+import {MAX_DELAY, samePayload, serializeMacroStep} from "./macro.mjs";
 
 /** @typedef {{keycode: string, type: 'keydown' | 'keyup', time: number}} RecordedKey */
 /** @typedef {{step: import('./types.js').MacroStep, time: number, end: number}} TimedStep */
@@ -35,7 +35,9 @@ export const recordedKeycode = code => EVENT_CODES[code]
     || (/^Numpad(\d)$/.test(code) ? `KC_P${code.slice(6)}` : "")
     || (/^F([1-9]|1\d|2[0-4])$/.test(code) ? `KC_${code}` : "");
 
-const modifier = (/** @type {string} */ key) => /^KC_(LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI)$/.test(key);
+// The modifier keys the recorder records, by the names it records them as.
+const MODIFIERS = new Set(["ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"].map((code) => EVENT_CODES[code]));
+const modifier = (/** @type {string} */ key) => MODIFIERS.has(key);
 
 // A take may end before a physical release. Balance only keys this take
 // actually pressed; releases from before Record and repeated downs add nothing.
@@ -116,7 +118,7 @@ function compactGroup(events, modifiers = []) {
 function delayPayload(duration) {
     let result = "";
     while (duration > 0) {
-        const part = Math.min(65535, duration);
+        const part = Math.min(MAX_DELAY, duration);
         result += `{${part}}`; duration -= part;
     }
     return result;

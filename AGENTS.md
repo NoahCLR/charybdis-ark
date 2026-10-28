@@ -69,6 +69,8 @@ skipped; [Developing Ark](docs/development.md) has the rest.
   and its words in [`upstream/firmware/GLOSSARY.md`](upstream/firmware/GLOSSARY.md).
 - [`docs/architecture/`](docs/architecture/README.md): the layers, where new
   work goes, and the flows that cross them.
+- [Facts and their homes](docs/architecture/README.md#facts-and-their-homes):
+  check it before writing a constant, word table or shared rule.
 - [`CODING_STANDARDS.md`](CODING_STANDARDS.md): what review holds a change to.
 - [`docs/development.md`](docs/development.md): setup, commands, the web
   build, trying a branch, pins, the compatibility bridge, CI and publishing.

@@ -5,7 +5,7 @@ const {u8: assertU8, u16: assertU16, u32: assertU32, asBytes: copyBytes, protoco
 const {profileDomain, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 const {requestHandled} = require("./raw-hid-unhandled");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
-const {crc32, decodeProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
+const {PROFILE_BLOB_V1, crc32, decodeProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {
     PROFILE_WIRE_V1,
     buildProfileGetRequest,
@@ -27,11 +27,11 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     REUSE_MAX: 1024,
     VALUE_REUSE: 0x1b,
     VALUE_STREAM_CHUNK: 0x1c,
-    MIN_BLOB_SIZE: 8,
+    MIN_BLOB_SIZE: PROFILE_BLOB_V1.HEADER_SIZE,
     // A 128 KiB flash slot less its 1 KiB record (firmware D-F29). Lengths and
     // offsets on the wire are 32 bits (Profile Wire 2, firmware D-F28); this
     // is the slot's ceiling, not the frame's.
-    MAX_BLOB_SIZE: 130048,
+    MAX_BLOB_SIZE: PROFILE_BLOB_V1.MAX_SIZE,
     // Status page 0 (layout 2) is the candidate's progress, page 3 (layout 1)
     // where its error is; pages 1 and 2 (layout 2) the copy to the slave half.
     STATUS_LAYOUT_VERSION: 2,

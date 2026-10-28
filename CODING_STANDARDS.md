@@ -18,15 +18,33 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   device policy, layer resolution or editability is a second home for that
   rule. The owners are listed in the
   [interface contracts](docs/spec/interface-contracts.md#shared-rule-ownership).
+- A firmware decision that depends only on the profile is computed in core
+  and published; the interface interprets what is posted (D-L73). A firmware
+  rule the page has to run as a person clicks lives once in `rules/`, takes
+  primitives, and is imported by whichever of core and `webview/view/` runs
+  it.
+- A fact is imported from its home, which
+  [Facts and their homes](docs/architecture/README.md#facts-and-their-homes)
+  names: a limit, a keycode or keycode range, the layer count and a layer
+  mask are never written as literals (see **Checked**).
+- The interface may copy a constant, because it may not import core: the copy
+  is named once and pinned to its home by a drift test
+  (`tests/view/enum-drift.test.mjs`). It never copies a rule; a rule both
+  sides run goes in `rules/` (D-L73), and so does what such a rule reads,
+  such as QMK's keycode layout.
 - The words for a value the keyboard stores live in `core/model/vocabulary.js`
   and reach the interface as `model.vocabulary`; a screen holds no
-  enum-to-words table of its own.
+  enum-to-words table of its own (see **Checked**).
 - Whether an area can be edited is `canEdit(area)` in `webview/store.mjs`,
   which reads the published `draft.editable` (no other module reads it; see
   **Checked**). Core decides it once, with `draftBinding` (D-L60); nothing
   else recomputes it.
 - Types are strict at the existing seams (D-L59). Internal types sit beside
   their owning layer; `contracts/` holds only what crosses the panel.
+- A union in `contracts/` that a runtime value also lists is tied to it: a
+  table keyed by the union is typed `Record<Union, …>`, so a missing member
+  fails the type check, and a list is compared with the union by a test
+  (see **Checked**).
 
 ### Data from the keyboard
 
@@ -96,18 +114,23 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | Rule | Check |
 | --- | --- |
 | `core/` layers import one way, type imports included; `contracts/` is inert and imports only itself | `tests/layering.test.js` |
+| `rules/` imports only `rules/`, uses no DOM or Node, and loads with `require()`; core runs it only from `schema/` up, the interface only from `webview/view/`, the shell never | `tests/layering.test.js`, `tsconfig.rules.json` |
 | The interface imports nothing from `core/`, types included, and cannot touch the filesystem | `tests/layering.test.js` |
-| The runtime never reads the firmware repository: no `keymap.c`, `config.h`, `rgb_config.c` or QMK paths in `core/`, `webview/` or `web/` | `tests/layering.test.js` |
+| The runtime never reads the firmware repository: no `keymap.c`, `config.h`, `rgb_config.c` or QMK paths in `core/`, `rules/`, `webview/` or `web/` | `tests/layering.test.js` |
 | The device service takes its adapter from its caller, with no default; the web build refuses node-hid and its adapter | `tests/session/profile-device-service.test.js`, `tests/scripts/web-build.test.js` |
-| Every `core/` module has a test in the matching `tests/` layer | `tests/layering.test.js` |
+| Every `core/` module has a test in the matching `tests/` layer, and every `rules/` module one in `tests/rules/` | `tests/layering.test.js` |
 | Every source module starts with `// @ts-check`; the strict type checks pass | `tests/scripts/conventions.test.js`, `npm run typecheck` |
 | Screens author no colour literals | `tests/scripts/conventions.test.js` |
+| A QMK keycode number from `0x2000` to `0x7fff` is written only in `rules/qmk-keycodes.mjs`, `core/data/user-keycodes.js` and the interface's pinned copy of the layer-lock block | `tests/scripts/conventions.test.js` |
+| No layer mask is written as `0xffff` or `(1 << 16) - 1`, and no layer count as `16` (`{length: 16}`, `new Array(16)`, a comparison or default), outside their homes and pinned copies; the exceptions say why | `tests/scripts/conventions.test.js` |
+| The interface keeps no table of words of its own, of three or more entries: phrases by key, `{label, what}` records by key, or `[id, phrase]` pairs; the exceptions say why | `tests/scripts/conventions.test.js` |
 | Semantic lookups never use a position's stored keycode name | `tests/scripts/conventions.test.js` |
 | Only `webview/store.mjs` reads the draft's `editable`; every other webview module asks `canEdit(area)` or `writable()` | `tests/scripts/conventions.test.js` |
 | No webview module posts an object literal: `post()` and `postLeavingDemo()` take a builder's output or a message the store hands back | `tests/scripts/conventions.test.js` |
 | Every stored enum value has a word | `tests/model/vocabulary.test.js` |
 | A draft edit type agrees across `core/model/draft-edits.js`, `contracts/edits.d.ts` and `webview/view/edits.mjs` | `tests/model/draft-edits.test.js` |
 | A webview number that is also a wire number equals the schema's | `tests/view/enum-drift.test.mjs` |
+| A runtime list holds exactly its contract union's members: `PhaseId`, `ApplyStep`, `EditMode` (read by `tests/fixtures/contract-unions.js`) | `tests/model/vocabulary.test.js`, `tests/session/apply-progress.test.js`, `tests/protocol/profile-edit-v1.test.js` |
 | Every form control has a `data-f` identity, unique on screen | `tests/view/form-identities.test.mjs`, `browser-tests/focus-identities.spec.js` |
 | No screen names a key or action as plain text | `tests/view/key-names-marked.test.mjs` |
 | Every value interpolated into webview markup, or handed to `el()` or an HTML setter, is escaped, a number by construction or markup a checked template made; the exceptions say why | `tests/view/markup-escaped.test.mjs` |

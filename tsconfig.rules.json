@@ -1,0 +1,11 @@
+// The shared rules alone (D-L73), with neither Node's types nor the page's:
+// a rule runs in core and in the interface, so it may lean on neither.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": [
+    "rules/**/*.mjs"
+  ]
+}

@@ -85,9 +85,10 @@ test("pointing macro identities use the stored slot and current profile name", (
     assert.equal(macroIndex("MACRO_127"), 127);
     assert.equal(macroIndex("VIA_MACRO_127"), 127, "the former name reaches every slot");
     for (const code of [0x7780, "MACRO_128", "VIA_MACRO_128", "QK_MACRO_32", "C(MACRO_0)", "KC_A", ""]) assert.equal(macroIndex(code), null);
-    const model = {macros: [{keycode: "MACRO_0", name: "Greeting <&>", empty: true}]};
+    const model = {macros: [{keycode: "MACRO_0", name: "Greeting <&>", defaultName: "Macro 0", empty: true}, {keycode: "MACRO_126", name: "", defaultName: "Macro 126", empty: false}]};
     assert.deepEqual(pointingMacro(model, 0x7700), {index: 0, name: "Greeting <&>", empty: true});
-    assert.deepEqual(pointingMacro(model, "MACRO_127"), {index: 127, name: "Macro 127", empty: false});
+    assert.deepEqual(pointingMacro(model, "MACRO_126"), {index: 126, name: "Macro 126", empty: false}, "an unnamed slot by the name core gives it");
+    assert.deepEqual(pointingMacro(model, "MACRO_127"), {index: 127, name: "MACRO_127", empty: false}, "a slot the model lists none for, by its keycode");
     assert.equal(keyName(model, 0x777f), "MACRO_127");
 });
 

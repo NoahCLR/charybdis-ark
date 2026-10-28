@@ -335,3 +335,17 @@ test("a custom key's shortcut layers follow their layers through a reorder, Make
     assert.doesNotThrow(() => reorderLayers(merging, [1, 2, 3, 0, ...rest]));
     assert.doesNotThrow(() => reorderLayers(numbersDefault, [1, 2, 3, 0, ...rest]));
 });
+
+// The macro codecs read a delay's digits up to its '|'; the model's walk reads
+// as many digits as 65,535 has. A zero-padded delay longer than that is a
+// macro the codecs keep and the model refuses. This pins today's behaviour so
+// a change to either side is a choice, not drift.
+test("a delay with more digits than the longest delay is refused by the model alone", () => {
+    const {validateMacro} = require("../../core/model/portable-profile");
+    const {decodeMacroPayload} = require("../../core/schema/macro-payload");
+    const {MACRO_LIMITS} = require("../../rules/macro-payload.mjs");
+    const padded = Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${"0".repeat(String(MACRO_LIMITS.maxDelayMs).length)}1|`)]);
+    assert.equal(decodeMacroPayload(padded), "{000001}");
+    assert.throws(() => validateMacro(padded), {code: "INVALID_PORTABLE_PROFILE", message: "Invalid macro delay."});
+    assert.doesNotThrow(() => validateMacro(Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${MACRO_LIMITS.maxDelayMs}|`)])));
+});

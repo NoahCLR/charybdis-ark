@@ -50,9 +50,10 @@ A combo can send a custom key. With its output behaviour off, or with no
 behaviour, it sends that key's shortcut, or nothing if it has none; the
 builder says which.
 
-## Settings → Combos
+## Combo settings
 
-**Settings → Combos** in the rail shows two cards, both open. **Combos**:
+**Combo settings** (**Combos** under Settings in the rail) shows two cards,
+both open. **Combos**:
 
 - **Enabled**: every combo on or off. A key on the keyboard can change it
   too.
@@ -71,16 +72,17 @@ against. Pick the layer itself to keep its combos independent.
 ## Where combos run
 
 Like behaviours, a combo fires only where every switch allows it: **Enabled**
-and **On these layers** on the Combos settings screen, the combo's own **Use this combo** and
-**Layers it runs on**, and **Join combos** on each of its keys in the Key tab.
+and **On these layers** on Combo settings, the combo's own **Use this combo**
+and **Layers it runs on**, and **Join combos** on each of its keys in the Key
+tab.
 Every key in the combo must be allowed to take part. A combo that can't fire
 from a key has no badge on it, and the Key tab and the hover card list it as
 **not used**, with the switch that keeps it off.
 
-Whether the output's behaviour runs depends on the behaviours switch on the
-Behaviours settings screen, **Combo outputs use behaviours**, the combo's **Use output
-behaviour**, and the behaviour's own switches. The output takes the layer of
-the combo's last listed key.
+Whether the output's behaviour runs depends on **Enabled** on Behaviour
+settings, **Combo outputs use behaviours** on Combo settings, the combo's
+**Use output behaviour**, and the behaviour's own switches. The output takes
+the layer of the combo's last listed key.
 
 Review warns about a combo that can't fire, for example when its keys never
 sit on the same layers at once.

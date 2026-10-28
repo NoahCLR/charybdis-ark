@@ -1,7 +1,8 @@
 // @ts-check
-// The physical keyboard: where each of the 56 positions sits, which LED it
-// carries, and which half it belongs to. Lifted from the app's own board so a
-// second interface cannot teach a different keyboard.
+// The physical keyboard: where each of the 56 positions sits, and which half
+// it belongs to (which LED it carries is published, model.leds). Lifted from
+// the app's own board so a second interface cannot teach a different
+// keyboard.
 
 // The trackball is a 34mm sphere among 19.05mm key pitches, so it is nearly
 // two keys across — drawn at its own size rather than as a marker, and sitting
@@ -20,21 +21,6 @@ export const GEO = {
     },
     trackball: {x: 776, y: 480, r: 58},
 };
-
-/** @type {Readonly<Record<number, number>>} */
-export const LED_INDEX = {
-    0: 0, 1: 7, 2: 8, 3: 15, 4: 16, 5: 20,
-    12: 1, 13: 6, 14: 9, 15: 14, 16: 17, 17: 21,
-    24: 2, 25: 5, 26: 10, 27: 13, 28: 18, 29: 22,
-    36: 3, 37: 4, 38: 11, 39: 12, 40: 19, 41: 23,
-    6: 49, 7: 45, 8: 44, 9: 37, 10: 36, 11: 29,
-    18: 50, 19: 46, 20: 43, 21: 38, 22: 35, 23: 30,
-    30: 51, 31: 47, 32: 42, 33: 39, 34: 34, 35: 31,
-    42: 52, 43: 48, 44: 41, 45: 40, 46: 33, 47: 32,
-    48: 26, 49: 27, 50: 28, 51: 53, 52: 54, 53: 25, 54: 24, 55: 55,
-};
-
-export const TRACKBALL_LED = 56;
 
 const RIGHT_THUMBS = new Set([51, 52, 55]);
 

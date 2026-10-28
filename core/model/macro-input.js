@@ -1,15 +1,17 @@
 // @ts-check
 "use strict";
 
-const {parsePayload, encodeMacroPayload} = require("../schema/macro-payload");
+const {parsePayload, encodeMacroPayload, decodeMacroPayload} = require("../schema/macro-payload");
 const {hostLayout, layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
+const {VOCABULARY, wordedMacroError} = require("./vocabulary");
 
 // What to do when the host layout cannot type a character, by effective OS.
+const HOST = VOCABULARY.settingsScreens.host;
 const ENTRY_SETUP = [
-    "Choose a host OS and enable Unicode playback in Host → Your computer to type it with Unicode entry.",
-    "Choose the Unicode Hex Input layout in Host → Your computer to type it with Unicode entry.",
-    "Enable Unicode playback in Host → Your computer to type it with Unicode entry.",
-    "Enable Unicode playback in Host → Your computer to type it with Unicode entry.",
+    `Choose a host OS and enable Unicode playback in ${HOST} → Your computer to type it with Unicode entry.`,
+    `Choose the Unicode Hex Input layout in ${HOST} → Your computer to type it with Unicode entry.`,
+    `Enable Unicode playback in ${HOST} → Your computer to type it with Unicode entry.`,
+    `Enable Unicode playback in ${HOST} → Your computer to type it with Unicode entry.`,
 ];
 
 // Inspection and staging use the same codec and limits. A partial or oversized
@@ -42,8 +44,9 @@ function inspectMacroInput(payload, {mode = 0, enabled = false, layout = US_HOST
             result.code = "MACRO_BANK_FULL";
         }
     } catch (error) {
-        result.error = error instanceof Error ? error.message : String(error);
-        result.code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "INVALID_MACRO";
+        const worded = wordedMacroError(error);
+        result.error = worded instanceof Error ? worded.message : String(worded);
+        result.code = worded instanceof Error && "code" in worded && typeof worded.code === "string" ? worded.code : "INVALID_MACRO";
     }
     return result;
 }
@@ -57,4 +60,15 @@ function inspectMacroPlayback(payload, host) {
     return {error, code, typing};
 }
 
-module.exports = {inspectMacroInput, inspectMacroPlayback};
+// A stored macro as text, refused in words when it does not read: every
+// model reader of a stored macro reads it here.
+/** @param {Buffer} bytes @param {import("../schema/types.js").MacroOptions} [options] */
+function readStoredMacro(bytes, options) {
+    try {
+        return decodeMacroPayload(bytes, options);
+    } catch (error) {
+        throw wordedMacroError(error);
+    }
+}
+
+module.exports = {inspectMacroInput, inspectMacroPlayback, readStoredMacro};

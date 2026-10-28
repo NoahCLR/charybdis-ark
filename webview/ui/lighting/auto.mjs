@@ -14,7 +14,7 @@ import {colourControl, section, stack} from "./common.mjs";
 // How long the auto-mouse colour holds before it fades, as a share of the
 // timeout. The keyboard stores milliseconds and keeps them with its global
 // policy, so this is a settings section, saved whole; a share cannot outlast
-// the timeout, and a new timeout in Pointer settings carries it along.
+// the timeout, and a new timeout on Pointer settings carries it along.
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {string | null} idle */
 function fadeTiming(model, idle) {
     const section = sectionsIn(model, "Lighting").find((entry) => entry.stage === "auto");
@@ -39,11 +39,11 @@ function fadeTiming(model, idle) {
         range.style.setProperty("--share", `${percent}%`);
         range.setAttribute("aria-valuetext", `${percent}%, ${hold} ms`);
         /** @type {HTMLElement} */ (control.querySelector("[data-readout]")).textContent = `${percent}%`;
-        note.textContent = `Of the ${whole} ms timeout, the colour holds for ${hold} ms, then fades over the last ${whole - hold} ms. The timeout is set in Pointer settings; changing it keeps this share.`;
+        note.textContent = `Of the ${whole} ms timeout, the colour holds for ${hold} ms, then fades over the last ${whole - hold} ms. The timeout is set in ${vocabulary(model).settingsScreens.pointer} → Auto-mouse; changing it keeps this share.`;
     };
     preview();
     range.addEventListener("input", preview);
-    const open = el(`<button class="btn tiny self-start">Open Pointer settings → Auto-mouse</button>`);
+    const open = el(`<button class="btn tiny self-start">Open ${esc(vocabulary(model).settingsScreens.pointer)} → Auto-mouse</button>`);
     open.addEventListener("click", () => { state.screen = "pointer"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
     range.addEventListener("change", () => post(edits.settingsSection(section, () => range.value, model.settingsEditing?.identity)));
     const box = el(`<div class="stack gap-12"></div>`);
@@ -70,7 +70,7 @@ export function stageAuto(model) {
     if (idle) {
         node.classList.add("idle");
         const notice = el(`<div class="unavailable span"><span>${esc(idle)} A pointer layer turned on by hand shows its own layer lighting. The fade settings below are kept for when auto-mouse is back on.</span>
-            <button class="btn tiny self-start">Open Pointer settings → Auto-mouse</button></div>`);
+            <button class="btn tiny self-start">Open ${esc(vocabulary(model).settingsScreens.pointer)} → Auto-mouse</button></div>`);
         /** @type {HTMLButtonElement} */ (notice.querySelector("button")).addEventListener("click", () => { state.screen = "pointer"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
         node.append(notice);
     }
@@ -85,7 +85,7 @@ export function stageAuto(model) {
     endColour.append(unused
         ? el(`<div class="row colour-head unused"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
             <div><div class="colour-title">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
-        : colourControl(model, {colour: fade.end_color, canEdit: editFade, title: "Fade destination", ...offWording("auto"),
+        : colourControl(model, {colour: fade.end_color, canEdit: editFade, title: "Fade destination", ...offWording(model, "auto"),
             onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
     if (unused) endColour.append(el(`<p class="note">Follow-the-real-destination lands on whatever the board would show once auto-mouse turns the pointer layer off, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
     node.append(policy, endColour, fadeTiming(model, idle));

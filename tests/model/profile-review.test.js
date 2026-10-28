@@ -28,7 +28,7 @@ test("Host changes review affected text macros while leaving key steps and ident
     assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
     for (const row of effects) {
         assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
-        assert.match(row.note, /because of Host → Your computer\. Discard it together with that change\./);
+        assert.match(row.note, /because of Host settings → Your computer\. Discard it together with that change\./);
         const typing = row.fields.find(field => field.label === "Text entry");
         assert.match(typing.before, /layout keys: "é"/);
         assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
@@ -342,7 +342,8 @@ test("layer-mod labels use each Review side's host vocabulary and profile layer 
 
 test("Space Cadet modifiers use current host names on the board and in Review", () => {
     const {buildDeviceModel}=require('../../core/session/device-model');
-    const {resolve,lookup}=require('../../core/data/keycode-catalog');
+    const {lookup}=require('../../core/data/keycode-catalog');
+    const {resolve}=require('../../core/schema/keycodes');
     for(const [detected,alt] of [[0,'Alt'],[1,'Option'],[2,'Alt'],[3,'Alt']]) {
         const before=snapshot(document()), after=snapshot(document());
         before.hostOs=after.hostOs={detected};
@@ -358,7 +359,7 @@ test("Space Cadet modifiers use current host names on the board and in Review", 
 test("layout and Review labels follow the host layout on each side, including macOS ISO", () => {
     const settings = require("../../core/schema/settings-domain-v1");
     const {buildDeviceModel} = require("../../core/session/device-model");
-    const {resolve} = require("../../core/data/keycode-catalog");
+    const {resolve} = require("../../core/schema/keycodes");
     const withHost = (word) => withDomain(document(), 64, settings.decodeSettings, settings.encodeSettings,
         value => ({...value, values: value.values.map((v, i) => i === 27 ? word : v)}));
     for (const [host, word, code, label] of [

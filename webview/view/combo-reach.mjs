@@ -1,7 +1,8 @@
 // @ts-check
-import {behaviourFor, keyFace, keyMeaning} from "./keyface.mjs";
-import {comboActivations, downTheStack, resolvedPositions, viewPositions} from "./layer-resolution.mjs";
+import {behaviourFor, keyFace} from "./keyface.mjs";
+import {downTheStack, resolvedPositions, viewPositions} from "./layer-resolution.mjs";
 import {comboJoins} from "./participation.mjs";
+import {comboInputIsKey as inputIsKey, comboKeysAmong, comboTouches, inputOn, inputPressed} from "../../rules/combo-inputs.mjs";
 /** @typedef {import("../../contracts/panel.js").ComboView} ComboView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("../../contracts/panel.js").Position} Position */
@@ -32,54 +33,35 @@ export function combosInView(model, stack, at, held = []) {
     const answering = new Map(resolved.map((entry) => [entry.position, entry]));
     return (model?.combos || []).flatMap((combo) => {
         const found = comboKeysAmong(resolved.map((entry) => entry.position), combo);
-        return (combo.inputs || []).length && found.covered >= combo.inputs.length
-            ? [{combo, keys: found.keys.map((position) => /** @type {ResolvedKey} */ (answering.get(position)))}] : [];
+        return found.forms ? [{combo, keys: found.keys.map((position) => /** @type {ResolvedKey} */ (answering.get(position)))}] : [];
     });
 }
 
-// Whether this key is one of a combo's inputs. The keyboard reports per-layer
-// input references only when its firmware tracks them, so this falls back to
-// the keycodes themselves — and everything that answers "is this combo on this
-// layer" goes through here, or the board's badges and the combo table disagree.
-/** @param {ComboView} combo @param {Position} position */
-const comboTouches = (combo, position) => Array.isArray(combo?.inputPositions) && combo.inputPositions.length
-    ? combo.inputPositions.includes(position.layoutIndex)
-    : (combo?.inputs || []).some((input) => inputOn(input, position));
-// Whether a key presses the input a combo stores by this name: by the keycode
-// it stores, or by what that keycode means.
-/** @param {string} name @param {Position} position */
-const inputOn = (name, position) => name === position.keycode || name === keyMeaning(position);
-export const comboInputOn = inputOn;
+// Which keys press a combo's inputs, and whether they form its chord, is the
+// shared rule in rules/combo-inputs.mjs: everything that answers "is this combo
+// on this layer" goes through it, or the board's badges and the combo table
+// disagree.
 
-// Whether a combo's input number `at` is the key at this position, by the same
-// rule as comboTouches: the device's input positions when it reports them,
-// otherwise the keycode.
+// Whether a combo's input number `at` is the key at this position
+// (rules/combo-inputs.mjs).
 /** @param {ComboView} combo @param {number} at @param {Position | null | undefined} position */
-export function comboInputIsKey(combo, at, position) {
-    if (!position) return false;
-    return Array.isArray(combo?.inputPositions) && combo.inputPositions.length
-        ? combo.inputPositions[at] === position.layoutIndex
-        : inputOn(combo?.inputs?.[at] ?? "", position);
-}
+export const comboInputIsKey = (combo, at, position) => Boolean(position) && inputIsKey(combo, at, /** @type {Position} */ (position));
 
 // The behaviours these combos run when they fire: one per key they send, in
 // combo order, with the badges of the combos that send it. A combo runs the
-// behaviour of the key it sends only while its own output behaviour, the
-// keyboard's behaviours and "combo outputs use behaviours" are all on, and the
-// behaviour itself is enabled and allowed on the combo's source layer, when
-// that is given.
+// behaviour of the key it sends on the layers core publishes for it
+// (outputBehaviorLayers): its own output behaviour, the keyboard's behaviours,
+// "combo outputs use behaviours" and the behaviour's own switches decide them.
+// `layer`, when given, is the combo's source layer.
 /** @param {ViewModel} model @param {ComboView[]} combos @param {number} [layer] */
 export function comboBehaviours(model, combos, layer) {
-    const participation = model?.participation;
-    if (participation?.behaviorsEnabled === false || participation?.comboOutputBehaviors === false) return [];
     /** @type {Map<string, {keycode: string, output: string, shown: string, badges: string[]}>} */
     const found = new Map();
     for (const combo of combos) {
-        if (combo.useOutputBehavior === false) continue;
+        const layers = combo.outputBehaviorLayers ?? 0;
+        if (!layers || (layer !== undefined && !(layers & (1 << layer)))) continue;
         const keycode = model?.qmkKeycodeAliases?.[combo.output] || combo.output;
-        const behaviour = behaviourFor(model, keycode);
-        if (!behaviour || behaviour.enabled === false) continue;
-        if (layer !== undefined && behaviour.allowedLayers !== undefined && !(Number(behaviour.allowedLayers) & (1 << layer))) continue;
+        if (!behaviourFor(model, keycode)) continue;
         const entry = found.get(keycode) ?? {keycode, output: combo.output, shown: combo.outputDisplay || combo.output, badges: []};
         entry.badges.push(combo.badge);
         found.set(keycode, entry);
@@ -94,28 +76,6 @@ export function combosForKey(model, position) {
     if (!position) return [];
     return (model?.combos || []).filter((combo) => comboTouches(combo, position));
 }
-
-// Every position among these that carries one of a combo's inputs, and how
-// many distinct inputs they cover. A combo fires from the keycodes the active
-// layer produces, so all of its inputs have to be covered; an input placed on
-// two keys can be pressed on either, so both are its keys.
-/** @param {Position[]} positions @param {ComboView} combo */
-function comboKeysAmong(positions, combo) {
-    const inputs = combo?.inputs || [];
-    const keys = [];
-    /** @type {Set<string>} */
-    const covered = new Set();
-    for (const position of positions) {
-        if (!comboTouches(combo, position)) continue;
-        keys.push(position);
-        covered.add(inputPressed(combo, position));
-    }
-    return {keys, covered: covered.size};
-}
-
-// The input of a combo a key presses, by the name the combo stores.
-/** @param {ComboView} combo @param {Position} position */
-const inputPressed = (combo, position) => (combo?.inputs || []).find((name) => inputOn(name, position)) ?? position.keycode;
 
 // Whether a combo fires from each of the keys that press it in one view, and
 // why not: every key has to be allowed to join it on the layer that supplies
@@ -145,7 +105,7 @@ function comboUses(model, stack, at, held, combo, keys) {
     /** @param {typeof judged[number]} row */
     const keyOnLayer = ({input, layer}) => {
         const supplier = stack.find((candidate) => candidate.index === layer);
-        return `${combo.inputDisplays?.[(combo.inputs || []).indexOf(input)] || input} on ${supplier?.displayName || supplier?.name || `Layer ${layer}`}`;
+        return `${combo.inputDisplays?.[(combo.inputs || []).indexOf(input)] || input} on ${supplier?.displayName || supplier?.name || ""}`;
     };
     const blockedWords = `its other key${blocking.length === 1 ? "" : "s"} ${blocking.map(keyOnLayer).join(", ")} cannot join it, so it never forms`;
     return new Map(judged.map(({key, joins, reasons}) => [key.position.layoutIndex,
@@ -160,37 +120,16 @@ const recordUses = (uses, combo, byKey) => {
     }
 };
 
-/**
- * Combos, grouped the way everything else is — but a combo is the one thing a
- * union cannot answer.
- *
- * A combo needs every input present at the same time, under one activation. Its
- * inputs could each be reachable under some hold and still never be reachable
- * together: one answered only while Numbers is held, another only while it is
- * not. So every activation this layer can top is tried, and the combo fires if
- * any single one carries all of its inputs — preferring the one that holds the
- * fewest extra layers, because that is the easiest way to press it.
- *
- * It has no branch case either: a behaviour fires a keycode, never a chord.
- */
 // Which layer's key assignments combos are matched against while `at` is the
-// top layer — the keyboard's Combo Layer Matching setting. The draft's settings
-// section is read first, so an edit there shows here before it is applied;
-// the combo readback is the keyboard's own answer when settings are absent.
+// top layer, the keyboard's Combo Layer Matching, as core publishes it
+// (comboReferenceLayers); a layer matches itself without it.
 /** @param {ViewModel} model @param {number} at */
-export function comboReferenceLayer(model, at) {
-    const section = (model?.configDefaults || []).find((row) => row.id === "comboReferences");
-    const field = section?.fields?.find((row) => row.macro === `comboReference${at}`);
-    const written = /^Layer (\d+)$/.exec(String(field?.value ?? ""));
-    if (written) return Number(written[1]);
-    const read = model?.comboReadback?.layerReferences?.[at];
-    return typeof read === "number" && Number.isInteger(read) ? read : at;
-}
+export const comboReferenceLayer = (model, at) => model?.comboReferenceLayers?.[at] ?? at;
 
 // Every reach list asks for the combos — the Combos tab, the board's badges,
 // and the macros and pointing modes a combo sends — and the Macros screen asks
-// for every layer at once. Enumerating activations is the costly part, so each
-// (model, stack, layer) is grouped once. The model is replaced, never mutated.
+// for every layer at once, so each (model, stack, layer) is grouped once. The
+// model is replaced, never mutated.
 /** @type {WeakMap<Partial<import("../../contracts/panel.js").PublishedModel>, Map<number, {stack: Layer[]; groups: ComboGroups}>>} */
 const comboGroupsByModel = new WeakMap();
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {ComboGroups} */
@@ -205,49 +144,28 @@ export function comboGroups(model, stack, at) {
     return groups;
 }
 
+// Which combos fire from this layer, and on which keys, as core publishes it
+// (comboReach, core/model/combo-reach.js): turned back into the keys the board
+// draws, grouped as everything else is.
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {ComboGroups} */
 function groupCombos(model, stack, at) {
     if (!model?.combos?.length) return {onKeys: [], throughKeys: [], fromBranches: [], fromBranchesBelow: [], elsewhere: []};
-    // QMK matches combos against the reference layer's raw keycodes whenever
-    // that layer is not the top one (process_combo.c: keymap_key_to_keycode on
-    // ref_layer, no transparency). Then there is exactly one way to press the
-    // combo, whatever else is held.
-    const reference = comboReferenceLayer(model, at);
-    const referenced = reference !== at && stack[reference] ? stack[reference] : null;
-    // The activations do not depend on the combo, so each is resolved once and
-    // every combo is tried against it. Resolving per combo instead re-walks the
-    // whole board 64 times over, on every render.
-    const tries = referenced
-        ? [(() => {
-            const resolved = (referenced.positions || []).map((position) =>
-                ({position, layer: referenced, fellThrough: false, whileHeld: false, reference: true}));
-            return {held: [], resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
-        })()]
-        : comboActivations(stack, at).map((held) => {
-            const resolved = resolvedPositions(stack, at, held);
-            return {held, resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
-        });
-
+    const facts = model.comboReach?.[at] || [];
+    /** @param {import("../../contracts/panel.js").ComboReachKey} key @returns {ResolvedKey} */
+    const keyOf = (key) => ({position: /** @type {Position} */ ((stack[key.layer]?.positions || []).find((position) => position.layoutIndex === key.layoutIndex)),
+        layer: stack[key.layer], fellThrough: key.fellThrough, whileHeld: key.whileHeld, ...(key.reference ? {reference: true} : {})});
     /** @type {ComboGroupEntry[]} */
     const onKeys = [];
     /** @type {ComboGroupEntry[]} */
     const throughKeys = [];
     /** @type {ComboGroupEntry[]} */
     const elsewhere = [];
-    for (const combo of model?.combos || []) {
-        const inputs = (combo.inputs || []).length;
-        let fires = null, most = null;
-        for (const {held, resolved, answering} of tries) {
-            const found = comboKeysAmong(resolved.map((entry) => entry.position), combo);
-            // Every found position belongs to resolved, which built answering.
-            const keys = found.keys.map((position) => /** @type {ResolvedKey} */ (answering.get(position)));
-            if (!most || found.covered > most.covered) most = {keys, held, covered: found.covered};
-            if (inputs && found.covered >= inputs && (!fires || held.length < fires.held.length)) fires = {keys, held, covered: found.covered};
-        }
-        if (!fires) { elsewhere.push({combo, inputs, covered: most?.covered || 0, keys: most?.keys || [], held: []}); continue; }
-        const entry = {combo, inputs, covered: fires.covered, keys: fires.keys, held: fires.held.map((index) => stack[index])};
-        (entry.keys.every((key) => !key.fellThrough) ? onKeys : throughKeys).push(entry);
-    }
+    model.combos.forEach((combo, index) => {
+        const fact = facts[index];
+        const entry = {combo, inputs: (combo.inputs || []).length, covered: fact?.covered || 0, keys: (fact?.keys || []).map(keyOf), held: (fact?.held || []).map((layer) => stack[layer])};
+        if (!fact?.fires) elsewhere.push(entry);
+        else (entry.keys.every((key) => !key.fellThrough) ? onKeys : throughKeys).push(entry);
+    });
     return {onKeys, throughKeys: downTheStack(throughKeys), fromBranches: [], fromBranchesBelow: [], elsewhere};
 }
 
@@ -411,7 +329,7 @@ export function combosOnKey(model, stack, at, held, layoutIndex) {
 // keyboard's combo input limit.
 /** @param {string[]} inputs @param {Position | null | undefined} position @param {number | null} [limit] */
 export function toggleComboInput(inputs, position, limit = null) {
-    if (!position || keyFace(position).kind === "disabled") return inputs;
+    if (!position || keyFace(position, null).kind === "disabled") return inputs;
     if (inputs.some((name) => inputOn(name, position))) return inputs.filter((name) => !inputOn(name, position));
     return limit && inputs.length >= limit ? inputs : [...inputs, position.keycode];
 }

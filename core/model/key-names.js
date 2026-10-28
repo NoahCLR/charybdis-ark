@@ -16,20 +16,17 @@
 const {VOCABULARY} = require("./vocabulary");
 const {PD_MODE_KEYS, pdModeKeyOfName} = require("../data/pd-mode-keys");
 const {CUSTOM_KEY_SLOTS, customKeyCode, layerLockOfCode} = require("../data/user-keycodes");
-const keycodes = require("../data/keycode-catalog");
+const catalog = require("../data/keycode-catalog");
+const keycodes = require("../schema/keycodes");
+const {LAYER_FORMS, MODS, layerFormBase, wrapperOf} = require("../../rules/qmk-keycodes.mjs");
 const {actionName} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {layerName, slotName} = require("./vocabulary");
+const {LAYER_KEY_VERBS: LAYER_VERBS, layerName, macroDefaultName, slotName} = require("./vocabulary");
 const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 const {LAYERS} = require("../data/charybdis-layout");
 const {shortcutPresent, shortcutSends} = require("../schema/settings-domain-v1");
 
-// What a layer key does to its layer, in the picker's words. TG is a lock on
-// this firmware (firmware D-F46).
-/** @type {Readonly<Record<string, string>>} */
-const LAYER_VERBS = {MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"};
-const LAYER_KEY = /^(MO|TG|TT|OSL|TO|DF|PDF|LOCK_LAYER)\((\d+)\)$/;
 
 // A pointing key by its slot: "Dragscroll · hold", "Slot 6 · lock (empty)",
 // or "Slot 0 · hold" where the keyboard reported no slots.
@@ -56,6 +53,8 @@ function semanticLabel(semantic) {
  *   keyLayers keycode name → the layer it acts on, for every layer key named
  *             here (keyLayer), so a screen marks the layer a name ends in
  *             without working it out again
+ *   keyLayerForms keycode name → what it does to that layer, by QMK's
+ *             function (keyLayerForm)
  *
  * `layers` holds the layer names, which every layer key reads by. Only a
  * keyboard whose action ABI is known gets the rest from its profile: the
@@ -85,7 +84,7 @@ function hostLayoutNames(layoutId, macosIso) {
     const text = cell => cell && typeof cell === "object" ? `${cell.dead} ◌` : cell || "";
     /** @param {import("../data/types.js").ResolvedKeycode} resolved @param {string} label */
     const name = (resolved, label) => {
-        const entry = keycodes.lookup(resolved.name) || resolved;
+        const entry = catalog.lookup(resolved.name) || resolved;
         labels[entry.name] = label;
         for (const alias of ("aliases" in entry ? entry.aliases : [])) labels[alias] = label;
     };
@@ -113,6 +112,8 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     const labels = {...typed.labels};
     /** @type {Record<string, number>} */
     const keyLayers = {};
+    /** @type {Record<string, import("../../contracts/model.js").LayerForm>} */
+    const keyLayerForms = {};
     /** @type {Record<string, string>} */
     const aliases = {};
     /** @type {import("../../contracts/model.js").NamedKey[]} */
@@ -120,7 +121,7 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     /** @type {import("../../contracts/model.js").NamedKey[]} */
     const custom = [];
     const modifiers = hostKeyVocabulary(hostOs).modifiers;
-    for (const entry of keycodes.entries()) if (carriesModifiers(entry)) {
+    for (const entry of catalog.entries()) if (carriesModifiers(entry)) {
         let label = entry.value >= 0xe0 && entry.value <= 0xe7 ? modifiers[entry.value - 0xe0][1] : hostKeyLabel(entry.label, hostOs);
         const base = typed.labels[keycodes.resolve(entry.value & 0xff).name];
         if ("kind" in entry && entry.kind === "modified" && base !== undefined) label = label.replace(/\+[^+]+$/, () => `+${base}`);
@@ -131,22 +132,24 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     for (let layer = 0; layer < count; layer++) for (const form of Object.keys(LAYER_VERBS)) {
         const name = `${form}(${layer})`;
         if (form !== "LOCK_LAYER") {
-            labels[name] = /** @type {string} */ (layerKeyLabel(name, layers));
+            labels[name] = layerKeyLabel(form, layer, layers);
             keyLayers[name] = layer;
+            keyLayerForms[name] = /** @type {import("../../contracts/model.js").LayerForm} */ (form);
         } else if (actionsKnown) {
             const value = resolveNativeQmkExpression(name, {});
             if (value === undefined) continue;
             const native = keycodes.resolve(value).name;
             aliases[native] = name;
-            labels[native] = labels[name] = /** @type {string} */ (layerKeyLabel(name, layers));
+            labels[native] = labels[name] = layerKeyLabel(form, layer, layers);
             keyLayers[native] = keyLayers[name] = layer;
+            keyLayerForms[native] = keyLayerForms[name] = "LOCK_LAYER";
         }
     }
-    const layered = {labels, aliases, pointing, custom, hostOs, legends: typed.legends, layers: layers || [], keyLayers};
+    const layered = {labels, aliases, pointing, custom, hostOs, legends: typed.legends, layers: layers || [], keyLayers, keyLayerForms};
     if (!actionsKnown) return layered;
     for (const slot of macros) {
         const native = keycodes.resolve(/** @type {number} */ (resolveNativeQmkExpression(slot.keycode, {}))).name;
-        const label = slot.name || `Macro ${slot.keycode.split("_").at(-1)}`;
+        const label = slot.name || macroDefaultName(Number(slot.keycode.split("_").at(-1)));
         aliases[native] = slot.keycode;
         labels[native] = label;
         labels[slot.keycode] = label;
@@ -203,11 +206,24 @@ function keyLayer(value) {
     return layerLockOfCode(value) ?? keycodes.resolve(value).layer;
 }
 
+// What a stored keycode does to the layer it acts on, by QMK's function: a
+// layer key's (MO … PDF), a layer-tap's (LT), a layer-mod's (LM), a layer
+// lock's (LOCK_LAYER). Undefined for any other key.
+/** @param {number} value @returns {import("../../contracts/model.js").LayerForm | undefined} */
+function keyLayerForm(value) {
+    if (layerLockOfCode(value) !== undefined) return "LOCK_LAYER";
+    const {kind} = keycodes.resolve(value);
+    if (kind === "layer-tap") return "LT";
+    if (kind === "layer-mod") return "LM";
+    if (kind !== "layer") return undefined;
+    const base = layerFormBase(value);
+    return /** @type {import("../../contracts/model.js").LayerForm | undefined} */ (Object.keys(LAYER_FORMS).find((form) => LAYER_FORMS[/** @type {keyof typeof LAYER_FORMS} */ (form)] === base));
+}
+
 // A layer key by what it does and the name of its layer.
-/** @param {string} name @param {readonly string[]} [layers] */
-function layerKeyLabel(name, layers) {
-    const [, form, layer] = LAYER_KEY.exec(name) || [];
-    return form ? `${LAYER_VERBS[form]} ${layerName(layers, Number(layer))}` : undefined;
+/** @param {string} form @param {number} layer @param {readonly string[]} [layers] */
+function layerKeyLabel(form, layer, layers) {
+    return `${LAYER_VERBS[form]} ${layerName(layers, layer)}`;
 }
 
 /** @param {string} label @param {number} [hostOs] */
@@ -231,7 +247,7 @@ function compactKeyLabel(label) {
 function compactKeyLabels(labels) {
     /** @type {Record<string, string>} */
     const short = {};
-    for (const entry of keycodes.entries()) {
+    for (const entry of catalog.entries()) {
         if (entry.value > 0xff) continue;
         for (const name of [entry.name, ...entry.aliases]) short[name] = compactKeyLabel(labels[name] || entry.label);
     }
@@ -244,7 +260,8 @@ function compactKeyLabels(labels) {
 /** @param {number} [hostOs] */
 function hostKeyVocabulary(hostOs = 0) {
     const modifiers = VOCABULARY.modifiers.map(/** @returns {[number, string]} */ ([bit, label]) => [bit, hostKeyLabel(label, hostOs)]);
-    const wrappers = ["C", "S", "A", "G", "RCTL", "RSFT", "RALT", "RGUI"];
+    // The modifiers' QMK bits, in the vocabulary's order: left, then right.
+    const wrappers = Object.values(MODS).map(mods => /** @type {string} */ (wrapperOf(mods)));
     const pickerModifiers = modifiers.map(([bit, label], i) => ({bit, value: wrappers[i], label: i < 4 ? label.replace(/^Left /, "") : label}));
     return {modifiers, pickerModifiers};
 }
@@ -260,7 +277,7 @@ function keyLabel(names, value) {
     if (named !== undefined) return named;
     // A layer-tap is a tap key and a layer, both named: "/ / Navigation".
     if (resolved.kind === "layer-tap") {
-        const tap = keycodes.lookup(/** @type {string} */ (resolved.tap));
+        const tap = catalog.lookup(/** @type {string} */ (resolved.tap));
         return `${tap ? keyLabel(names, tap.value) : resolved.tap} / ${layerName(names?.layers, /** @type {number} */ (resolved.layer))}`;
     }
     if (resolved.kind === "layer-mod") {
@@ -268,7 +285,7 @@ function keyLabel(names, value) {
         return `${layerName(names?.layers, /** @type {number} */ (resolved.layer))} + ${hostKeyLabel(modifiers, names?.hostOs)}`;
     }
     if (resolved.kind === "mod-tap") {
-        const tap = keycodes.lookup(/** @type {string} */ (resolved.tap));
+        const tap = catalog.lookup(/** @type {string} */ (resolved.tap));
         return hostKeyLabel(resolved.label, names?.hostOs).replace(/^[^/]+ \/ /, () => `${tap ? keyLabel(names, tap.value) : resolved.tap} / `);
     }
     if (resolved.kind === "modified") {
@@ -326,4 +343,4 @@ function keyLabelWithName(names, value) {
     return label === name ? label : `${label} (${name})`;
 }
 
-module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, layerKeyLabel, profileKeyNames, semanticLabel, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames};
+module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, profileKeyNames, semanticLabel, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames};

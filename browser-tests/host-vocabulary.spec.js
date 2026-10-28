@@ -3,7 +3,7 @@
 const {test, expect} = require("@playwright/test");
 const {openPreview} = require("./shell-page");
 const {buildDeviceModel} = require("../core/session/device-model");
-const {resolve} = require("../core/data/keycode-catalog");
+const {resolve} = require("../core/schema/keycodes");
 const {hostKeyLabel} = require("../core/model/key-names");
 
 async function sendHost(page, hostOs) {

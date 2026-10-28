@@ -11,6 +11,7 @@ test("each source keeps a parser, including files outside TypeScript and Node te
     assert.equal(checker("web/sleep-worker.js"), "typescript", "the worker uses its own config");
     assert.equal(checker("scripts/preview.js"), "typescript", "the developer exclude is covered by the preview config");
     assert.equal(checker("webview/ui/board.mjs"), "typescript");
+    assert.equal(checker("rules/layer-answers.mjs"), "typescript", "the shared rules have their own config");
     assert.equal(checker("tests/scripts/syntax-coverage.test.js"), "test");
     assert.equal(checker("playwright.config.js"), "node");
     assert.equal(checker("browser-tests/preview.spec.js"), "node");

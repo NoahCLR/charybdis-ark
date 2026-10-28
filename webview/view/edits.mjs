@@ -8,6 +8,7 @@
 
 import {hsv} from "../lib/colour.mjs";
 import {behaviourChangesNothing} from "./behavior-editor.mjs";
+import {ALL_LAYERS} from "./layout.mjs";
 
 /**
  * @typedef {import("../../contracts/edits.js").BaseIdentity} BaseIdentity
@@ -51,8 +52,12 @@ export const swapKeys = (layer, from, to) => layoutKeys(layer, [
 
 // ── key behaviours ──────────────────────────────────────────────────────
 
-/** @type {Record<Tier, 'tap' | 'hold' | 'longHold'>} */
-export const TIER_FIELDS = {tap: "tap", hold: "hold", long: "longHold"};
+// A step's tiers by the field that stores each (core/schema/key-behavior-domain-v1.js
+// KEY_BEHAVIOR_TIER_FIELDS, pinned by tests/view/enum-drift.test.mjs), and the
+// tiers in the grid's order.
+/** @type {Readonly<Record<Tier, 'tap' | 'hold' | 'longHold'>>} */
+export const TIER_FIELDS = Object.freeze({tap: "tap", hold: "hold", long: "longHold"});
+export const TIERS = /** @type {readonly Tier[]} */ (Object.freeze(Object.keys(TIER_FIELDS)));
 export const DEFAULT_REPEAT_HZ = "20";
 
 /** @param {string} keycode @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteBehavior'>} */
@@ -89,9 +94,9 @@ export function cellEdit(kind, {stored, action, style, repeatHz}) {
 // `change` replaces one cell, and every other cell is carried as read. A row
 // that would change nothing is not kept: a key without a row gets none, and a
 // stored row is removed rather than saved, so Undo and Review show the removal.
-/** @param {Behavior} behaviour @param {{terms?: Partial<Record<'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm', Scalar>>, anchored?: boolean, enabled?: boolean, allowedLayers?: number, change?: {tapCount: number, kind: Tier, branch: BehaviorBranch | null}}} [fields] @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'saveBehavior'> | import("../../contracts/edits.js").EditOf<'deleteBehavior'> | null} */
+/** @param {Behavior} behaviour @param {{terms?: Partial<Record<import("../../contracts/edits.js").TimingTerm, Scalar>>, anchored?: boolean, enabled?: boolean, allowedLayers?: number, change?: {tapCount: number, kind: Tier, branch: BehaviorBranch | null}}} [fields] @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'saveBehavior'> | import("../../contracts/edits.js").EditOf<'deleteBehavior'> | null} */
 export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowedLayers, change} = {}, identity) {
-    /** @param {'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm'} name */
+    /** @param {import("../../contracts/edits.js").TimingTerm} name */
     const term = (name) => terms[name] === undefined ? String(behaviour[name] ?? "0") : String(terms[name]).trim() || "0";
     const sourceSteps = new Map((behaviour.steps || []).map((step) => [step.tapCount, step]));
     if (change && !sourceSteps.has(change.tapCount)) sourceSteps.set(change.tapCount, {tapCount: change.tapCount});
@@ -114,7 +119,7 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowed
         multiTapTerm: term("multiTapTerm"),
         keepsAutoMouseAnchored: anchored ?? behaviour.keepsAutoMouseAnchored,
         enabled: enabled ?? behaviour.enabled ?? true,
-        allowedLayers: allowedLayers ?? behaviour.allowedLayers ?? 0xffff,
+        allowedLayers: allowedLayers ?? behaviour.allowedLayers ?? ALL_LAYERS,
         steps,
     };
     if (behaviourChangesNothing({...behavior, timingAlone: behaviour.timingAlone})) return behaviour.stored ? deleteBehaviour(behaviour.keycode, identity) : null;

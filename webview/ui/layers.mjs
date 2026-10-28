@@ -125,7 +125,7 @@ function editor(model, portable, busy) {
         const layer = layers().find((entry) => entry.index === layerId);
         const mapped = mappedKeyCount(layer);
         const base = position === 0;
-        const label = names[layerId] || (layerId ? `Layer ${layerId}` : "Base");
+        const label = portable.layers?.titles[layerId] ?? "";
         const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${esc(layerId)}">
             ${base ? `<span class="lp-grip-slot" aria-hidden="true"></span>`
                 : `<button class="lp-grip" data-grip="${esc(layerId)}" ${busy ? "disabled" : ""} aria-label="Move ${esc(label)}: drag, or press the up and down arrows"

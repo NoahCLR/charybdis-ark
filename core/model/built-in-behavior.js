@@ -35,8 +35,10 @@
 // turns its layer on, LM() its layer and modifiers, and a pointing-mode key
 // (PD_MODE_n) runs its mode, all as soon as the key goes down
 // (handled_key_defaults.c, handled_key_hold_behavior). A pointing-mode key
-// whose later tap counts enter another mode waits for Tap / hold instead; that
-// depends on the row, so the grid decides it (webview/view/keyface.mjs).
+// whose row holds another mode on a later tap count waits for Tap / hold
+// instead, so the two modes never overlap (key_behavior_lookup.c,
+// key_behavior_step_references_foreign_pointing_mode); given the row's steps,
+// `fromPress` says so.
 //
 // The keyboard owns the gesture timing of authored LT(), MT() and OSM() rows
 // (physical gesture timing and runtime-owned tapping). A bare modifier key is
@@ -44,16 +46,42 @@
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
+const {pdModeKeyOfCode} = require("../data/pd-mode-keys");
+const {QK, inBlock, BASIC_KEYS, MODIFIER_KEYS, MOD_MASK, keyOf, modsOf, layerFormLayer, layerTapLayer} = require("../../rules/qmk-keycodes.mjs");
 const {SHORTCUT_LAYER_KINDS, shortcutPresent} = require("../schema/settings-domain-v1");
 
-/** @param {number} code @param {number} start @param {number} end */
-const within = (code, start, end) => code >= start && code <= end;
+// A key a tap sends: a basic key past KC_NO and KC_TRNS that is no modifier,
+// or a modified key.
 /** @param {number} code */
-const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
+const plainKey = (code) => (inBlock(code, BASIC_KEYS) && !inBlock(code, MODIFIER_KEYS)) || inBlock(code, QK.MODS);
 
 /** @typedef {{customKeyShortcuts?: readonly import("../schema/types.js").CustomKeyShortcut[]}} BuiltInFeatures */
-/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean}} */
-function builtInActions(target, {customKeyShortcuts = []} = {}) {
+// The pointing slot an action holds or locks: a pointing-mode action's, or
+// that of the pointing-mode key a keycode is.
+/** @param {import("../schema/types.js").SemanticAction | undefined} action */
+const pointingSlotNamed = (action) => {
+    if (action?.kind === ACTION.POINTING_MODE_MOMENTARY || action?.kind === ACTION.POINTING_MODE_LOCK) return action.operand;
+    if (action?.kind === ACTION.QMK_KEYCODE) return pdModeKeyOfCode(action.operand)?.slot ?? null;
+    return null;
+};
+/** @typedef {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean}} BuiltIns */
+// What a key does where its row, of `steps`, leaves a tier empty.
+/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [features] @param {readonly Pick<import("../schema/types.js").BehaviorStep, "tapIndex" | "hold" | "longHold">[]} [steps] @returns {BuiltIns} */
+function builtInActions(target, features = {}, steps = []) {
+    const actions = keyActions(target, features);
+    const own = actions.fromPress ? pointingSlotNamed(actions.hold) : null;
+    if (own === null) return actions;
+    const foreign = steps.some((step) => step.tapIndex > 0 && [step.hold, step.longHold].some((branch) => {
+        const slot = pointingSlotNamed(branch?.action);
+        return slot !== null && slot !== own;
+    }));
+    if (!foreign) return actions;
+    const {fromPress, ...rest} = actions;
+    return rest;
+}
+
+/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [options] @returns {BuiltIns} */
+function keyActions(target, {customKeyShortcuts = []} = {}) {
     const slot = target?.kind === ACTION.CUSTOM_KEY ? target.operand : target?.kind === ACTION.QMK_KEYCODE ? customKeyOfCode(target.operand) : undefined;
     if (slot !== undefined) {
         const shortcut = customKeyShortcuts[slot];
@@ -68,21 +96,21 @@ function builtInActions(target, {customKeyShortcuts = []} = {}) {
     if (target?.kind === ACTION.POINTING_MODE_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
-    if (within(code, 0x7700, 0x777f)) return {releaseTaps: true};
+    if (inBlock(code, QK.MACRO)) return {releaseTaps: true};
     if (plainKey(code)) {
         return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true, releaseTaps: true};
     }
-    if (within(code, 0x4000, 0x4fff)) {
-        return {tap: keycodeAction(code & 0xff), hold: {kind: ACTION.LAYER_MOMENTARY, operand: (code >> 8) & 0x0f}};
+    if (inBlock(code, QK.LAYER_TAP)) {
+        return {tap: keycodeAction(keyOf(code)), hold: {kind: ACTION.LAYER_MOMENTARY, operand: layerTapLayer(code)}};
     }
-    if (within(code, 0x2000, 0x3fff)) {
-        return {tap: keycodeAction(code & 0xff), hold: keycodeAction(((code >> 8) & 0x1f) << 8)};
+    if (inBlock(code, QK.MOD_TAP)) {
+        return {tap: keycodeAction(keyOf(code)), hold: keycodeAction(modsOf(code) << 8)};
     }
-    if (within(code, 0x5220, 0x523f)) return {hold: {kind: ACTION.LAYER_MOMENTARY, operand: code & 0x0f}, fromPress: true};
-    if (within(code, 0x5000, 0x51ff)) return {hold: keycodeAction(code), fromPress: true};
-    if (within(code, 0x7e80, 0x7e9f)) return {hold: keycodeAction(code), fromPress: true};
-    if (within(code, 0x52a0, 0x52bf)) {
-        return {tap: keycodeAction(code), hold: keycodeAction((code & 0x1f) << 8)};
+    if (inBlock(code, QK.MOMENTARY)) return {hold: {kind: ACTION.LAYER_MOMENTARY, operand: layerFormLayer(code)}, fromPress: true};
+    if (inBlock(code, QK.LAYER_MOD)) return {hold: keycodeAction(code), fromPress: true};
+    if (pdModeKeyOfCode(code)?.locked === false) return {hold: keycodeAction(code), fromPress: true};
+    if (inBlock(code, QK.ONE_SHOT_MOD)) {
+        return {tap: keycodeAction(code), hold: keycodeAction((code & MOD_MASK) << 8)};
     }
     return {};
 }

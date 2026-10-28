@@ -456,7 +456,7 @@ test("request id allocation wraps from 255 to 1 without emitting zero", () => {
 
 test("the layout read counts only keys the app cannot name", () => {
     const {unnamedKeyCount} = require("../../core/session/profile-device-service");
-    const keycodes = require("../../core/data/keycode-catalog");
+    const keycodes = require("../../core/schema/keycodes");
     const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
     assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x67df11b3}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
     for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");

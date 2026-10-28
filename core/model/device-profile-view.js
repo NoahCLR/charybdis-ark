@@ -6,7 +6,8 @@
 const {actionName, layerRef} = require("../schema/actions");
 const {VOCABULARY, branchName} = require("./vocabulary");
 const {keyLabel, shortcutLabel} = require("./key-names");
-const keycodes = require("../data/keycode-catalog");
+const keycodes = require("../schema/keycodes");
+const {ALL_LAYERS} = require("../data/charybdis-layout");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {builtInActions} = require("./built-in-behavior");
@@ -52,9 +53,9 @@ function builtInDisplay(action, names, features) {
 // the tiers its row leaves empty (model/built-in-behavior.js). A fallback hold
 // gives way to any authored first-press hold or long hold; `releaseTaps` says
 // a press with only a long hold still taps when released before it.
-/** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @returns {import("../../contracts/panel.js").BuiltIn} */
-function builtInForView(target, features, names) {
-    const {tap, hold, fallback, releaseTaps, fromPress} = builtInActions(target, features);
+/** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @param {Parameters<typeof builtInActions>[2]} [steps] The row's steps, when it has one. @returns {import("../../contracts/panel.js").BuiltIn} */
+function builtInForView(target, features, names, steps) {
+    const {tap, hold, fallback, releaseTaps, fromPress} = builtInActions(target, features, steps);
     return {
         ...(releaseTaps ? {releaseTaps: true} : {}),
         ...(tap ? {tap: {style: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names, features)}} : {}),
@@ -74,7 +75,7 @@ function behaviorRowsForView(domain, features = {}, names) {
     });
     return domain.rows.map((row) => ({
         keycode: actionName(row.target),
-        builtIn: builtInForView(row.target, features, names),
+        builtIn: builtInForView(row.target, features, names, row.steps),
         tapHoldTerm: String(row.tapHoldTerm),
         longHoldTerm: String(row.longHoldTerm),
         multiTapTerm: String(row.multiTapTerm),
@@ -129,7 +130,9 @@ function rgbForView(domain) {
             layer: layerName(row.layerId), layerId: row.layerId,
             color: colorForView(row.color), mode: enumName(RGB_LAYER_MODES, row.mode),
         })),
-        layerLedGroups: groupRows(domain.layerGroupRows, "layer", (row) => row.selector === all ? "RGB_LAYER_GROUP_ALL" : layerName(row.selector)),
+        // A layer's own group says which layer by number too (ownerLayer).
+        layerLedGroups: groupRows(domain.layerGroupRows, "layer", (row) => row.selector === all ? "RGB_LAYER_GROUP_ALL" : layerName(row.selector))
+            .map((group, at) => domain.layerGroupRows[at].selector === all ? group : {...group, ownerLayer: domain.layerGroupRows[at].selector}),
         automouseFade: {mode: enumName(RGB_AUTOMOUSE_MODES, domain.automouseFade.mode), end_color: colorForView(domain.automouseFade.endColor)},
         pdModeColors: domain.pdModeColors.map((row) => ({
             pointingMode: enumName(RGB_POINTING_MODE_IDS, row.pdModeId), color: colorForView(row.color), locality: enumName(RGB_LOCALITIES, row.locality),
@@ -178,7 +181,7 @@ function comboRowsForView(rows, labels) {
     };
     return rows.map(row => ({
         id: row.id, badge: `C${row.id}`,
-        useOutputBehavior: row.useOutputBehavior ?? true, enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? 0xffff,
+        useOutputBehavior: row.useOutputBehavior ?? true, enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? ALL_LAYERS,
         inputs: row.inputs.map(value => resolve(value).name),
         inputDisplays: row.inputs.map(value => resolve(value).label),
         output: resolve(row.output).name,

@@ -18,7 +18,7 @@ export function stageCombo(model) {
     const colour = section("Colour");
     colour.append(colourControl(model, {
         colour: combo.color, canEdit, title: "Combo feedback",
-        ...offWording("combo"),
+        ...offWording(model, "combo"),
         onChange: (next) => { if (combo.locality !== undefined) post(edits.comboFeedback(combo.locality, next)); },
     }));
     const where = section("Where it paints");

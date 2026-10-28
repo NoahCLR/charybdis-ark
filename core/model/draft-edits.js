@@ -13,7 +13,7 @@
 // contract's EditPayloads names the same types (tests/model/draft-edits.test.js).
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
-const keycodes = require("../data/keycode-catalog");
+const keycodes = require("../schema/keycodes");
 const {layerOfRef} = require("../schema/actions");
 const {shortcutPresent} = require("../schema/settings-domain-v1");
 

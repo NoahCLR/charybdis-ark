@@ -35,6 +35,11 @@ function rgbPayload(profile) {
     return rgb.payload;
 }
 
+// Macros, custom keys and pointing modes are fixed sets of slots, always all
+// there; the other counts go up to a limit.
+/** @type {ReadonlySet<import("../../contracts/model.js").UsageCountId>} */
+const FIXED_SETS = new Set(["macros", "customKeys", "pointingModes"]);
+
 /**
  * The profile's use of its storage and its counts, or null when there is
  * nothing true to show: no complete snapshot, or firmware that does not
@@ -61,7 +66,7 @@ function profileUsage(snapshot, capabilities) {
     // A macro slot is in use once it has steps; the rest are free unless the
     // macro memory has no room left for them.
     const macros = profileMacroBudget(decoded, capabilities);
-    const counts = /** @type {[string, number, number | undefined, number?][]} */ ([
+    const counts = /** @type {[import("../../contracts/model.js").UsageCountId, number, number | undefined, number?][]} */ ([
         ["behaviours", behaviors.rows.length, capabilities.maxBehaviorRows],
         ["behaviourSteps", behaviors.populatedStepCount, capabilities.maxPopulatedBehaviorSteps],
         ["combos", combos.rows.length, capabilities.maxCombos],
@@ -71,7 +76,7 @@ function profileUsage(snapshot, capabilities) {
         ["customKeys", customKeys, settings.customKeyNames.length],
         ["pointingModes", pdModes.filter(slot => slot.kind).length, pdModes.length],
     ]).filter(([, , limit]) => positive(limit)).map(([id, used, limit, unavailable]) =>
-        ({id, used, limit: /** @type {number} */ (limit), ...(unavailable ? {unavailable} : {})}));
+        ({id, used, limit: /** @type {number} */ (limit), ...(unavailable ? {unavailable} : {}), ...(FIXED_SETS.has(id) ? {fixed: /** @type {const} */ (true)} : {})}));
 
     const usage = {used: decoded.candidate.length, capacity: capabilities.maxProfilePayload, counts};
     cache.set(decoded, {capabilities, usage});

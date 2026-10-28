@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {comboOutputProblem, isPlainKey, keyProblem, keycodeValue, takesModifiers} from "../../webview/view/keycode-expression.mjs";
-import {keyName} from "../../webview/view/keyvalues.mjs";
+import {compactModifierMask, keyName} from "../../webview/view/keyvalues.mjs";
+import {canonicalKeycode, visibleKeycode} from "../../webview/view/keyface.mjs";
 
 const require = createRequire(import.meta.url);
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
@@ -15,6 +16,9 @@ const {buildSnapshotModel} = require("../../core/session/device-model");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
+const qmk = require("../../rules/qmk-keycodes.mjs");
+const catalog = require("../../core/data/keycode-catalog");
+const keycodes = require("../../core/schema/keycodes");
 
 const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const doc = pdDocument();
@@ -41,7 +45,8 @@ const EXPRESSIONS = [
     "MO(2)", "MO(15)", "MO(16)", "TG(1)", "TO(0)", "TT(3)", "OSL(4)", "DF(1)", "PDF(1)", "LOCK_LAYER(1)", "LOCK_LAYER(16)",
     "S(MO(2))", "G(PD_MODE_0)", "S(MACRO_0)", "G(A(S(C(LT(3,KC_F)))))", "C(PD_MODE_0)",
     "PD_MODE_0", "PD_MODE_0_LOCK", "PD_SLOT_0", "PD_SLOT_0_LOCK", "PD_SLOT_32", "MACRO_0", "MACRO_127", "MACRO_128", "CUSTOM_KEY_5",
-    "OSM(MOD_LSFT)", "LM(1, MOD_LSFT)", "LM(16, MOD_LSFT)", "0x0004", "0x5240", "4", "NOT_A_KEY", "", "LT(3,", "KC_A)",
+    "OSM(MOD_LSFT)", "OSM(MOD_RSFT)", "OSM(MOD_RCTL|MOD_RALT)", "OS_RSFT", "OS_RCS", "RCS(KC_A)", "LCSG(KC_A)", "RSAG(KC_A)", "LSA(KC_A)", "LAS(KC_A)",
+    "LM(1, MOD_LSFT)", "LM(16, MOD_LSFT)", "0x0004", "0x5240", "4", "NOT_A_KEY", "", "LT(3,", "KC_A)",
 ];
 
 test("the picker's check stores what the draft stores and refuses what it refuses", () => {
@@ -109,4 +114,45 @@ test("a tap with a hold is a plain key; modifiers wrap only basic or modified ke
     assert.equal(isPlainKey(model, "MO(1)"), false);
     assert.equal(takesModifiers(model, "KC_EXLM"), true);
     for (const key of ["MO(2)", "PD_MODE_0", "MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(takesModifiers(model, key), false, key);
+});
+
+// The interface reads QMK's keycode layout from the shared rules
+// (rules/qmk-keycodes.mjs), as core does; these hold its readers to what the
+// keyboard reads back.
+const names = {
+    qmkKeycodes: catalog.entries().map((entry) => ({value: entry.name, keycode: entry.value, aliases: entry.aliases})),
+    qmkKeycodeAliases: catalog.aliasTable(),
+};
+
+// A behaviour row is keyed by the name the keyboard reads back, one long
+// wrapper per modifier (RCTL(RSFT(KC_A))); a picked expression finds that row
+// however it is spelled.
+test("every wrapper spelling reads as the keycode the keyboard reads back", () => {
+    for (const wrapper of Object.keys(qmk.MODIFIER_WRAPPERS)) {
+        const expression = `${wrapper}(KC_A)`;
+        const readBack = keycodes.resolve(/** @type {number} */ (keycodes.encode(expression))).name;
+        assert.equal(canonicalKeycode(names, expression), canonicalKeycode(names, readBack), expression);
+        assert.equal(keycodeValue(names, expression), keycodes.encode(expression), expression);
+    }
+});
+
+test("a stored modified key is named with wrappers core encodes back to it", () => {
+    for (let code = qmk.QK.MODS.first; code <= qmk.QK.MODS.last; code++) {
+        // The side flag alone holds no modifier: no pointing tap stores it.
+        const name = keyName(names, code);
+        if (name.startsWith("0x") || !(qmk.modsOf(code) & 0x0f)) continue;
+        assert.equal(keycodes.encode(name), code, name);
+        const mods = qmk.modsOf(code);
+        assert.equal(compactModifierMask(code), mods & qmk.MOD_RIGHT ? (mods & 0x0f) << 4 : mods & 0x0f);
+    }
+});
+
+test("every macro slot in QMK's macro block reads by its macro name", () => {
+    const slots = qmk.QK.MACRO.last - qmk.QK.MACRO.first + 1;
+    for (let slot = 0; slot < slots; slot++) {
+        const stored = keycodes.resolve(qmk.QK.MACRO.first + slot).name;
+        assert.equal(visibleKeycode({qmkKeycodeAliases: {[stored]: `MACRO_${slot}`}}, stored), `MACRO_${slot}`, stored);
+        assert.equal(qmk.macroOfName(`MACRO_${slot}`), slot);
+    }
+    assert.equal(qmk.macroOfName(`MACRO_${slots}`), undefined);
 });
