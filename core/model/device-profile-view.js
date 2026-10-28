@@ -7,6 +7,7 @@ const {actionName, layerRef} = require("../schema/actions");
 const {VOCABULARY, branchName} = require("./vocabulary");
 const {keyLabel, shortcutLabel} = require("./key-names");
 const keycodes = require("../data/keycode-catalog");
+const {ALL_LAYERS} = require("../data/charybdis-layout");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {builtInActions} = require("./built-in-behavior");
@@ -178,7 +179,7 @@ function comboRowsForView(rows, labels) {
     };
     return rows.map(row => ({
         id: row.id, badge: `C${row.id}`,
-        useOutputBehavior: row.useOutputBehavior ?? true, enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? 0xffff,
+        useOutputBehavior: row.useOutputBehavior ?? true, enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? ALL_LAYERS,
         inputs: row.inputs.map(value => resolve(value).name),
         inputDisplays: row.inputs.map(value => resolve(value).label),
         output: resolve(row.output).name,

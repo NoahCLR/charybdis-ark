@@ -37,7 +37,7 @@
 
 const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
 const keycodes = require("../data/keycode-catalog");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
+const {ALL_LAYERS, CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, LAYER_IDENTITY: IDENTITY, layersAbove, layersOfMask: layersIn, matrixPosition} = require("../data/charybdis-layout");
 const {CUSTOM_KEY_SLOTS, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdModeKeyOfCode, PD_MODE_KEYS} = require("../data/pd-mode-keys");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
@@ -78,8 +78,6 @@ const GRAPH_FINDINGS = new Set(["trap", "trapOverflow", "unreachable", "unreacha
 
 /** @param {number} layer */
 const bit = (layer) => 1 << layer;
-/** @param {number} mask */
-const layersIn = (mask) => Array.from({length: LAYERS}, (_, layer) => layer).filter((layer) => mask & bit(layer));
 /** @param {number} code */
 // All semantic actions in a validated current-ABI profile have native keycodes.
 const codeName = (code) => {
@@ -269,7 +267,7 @@ function linkFacts(decoded) {
     // how; the layers always on never are among them.
     /** @type {LayerOwners["shortcuts"]} */
     const shortcuts = new Map();
-    (decoded.settings.customKeyShortcuts || []).forEach((shortcut, slot) => {if (shortcut.layers) shortcuts.set(slot, {layers: shortcut.layers & 0xffff, layerKind: shortcut.layerKind ?? SHORTCUT_LAYER_KINDS.HOLD});});
+    (decoded.settings.customKeyShortcuts || []).forEach((shortcut, slot) => {if (shortcut.layers) shortcuts.set(slot, {layers: shortcut.layers & ALL_LAYERS, layerKind: shortcut.layerKind ?? SHORTCUT_LAYER_KINDS.HOLD});});
     /** @type {LayerOwners} */
     const modeLinks = {modes, shortcuts};
     return {modeLinks, layerStarted: layerStarted >>> 0, endedStarts};
@@ -301,24 +299,24 @@ function profileFacts(decoded) {
     const records = decoded.settings.layers;
     const combos = values[SETTING.COMBOS_ENABLED] ? (decoded.combos?.rows || []).map((combo, index) => ({index,
         inputs: combo.inputs.map((input) => (input.kind === ACTION.QMK_KEYCODE ? input.operand : /** @type {number} */ (nativeCode(input)))),
-        output: combo.output, useOutputBehavior: combo.useOutputBehavior !== false && decoded.settings.comboOutputBehaviors !== false, enabled: combo.enabled !== false, allowedLayers: combo.allowedLayers ?? 0xffff})).filter((combo) => combo.enabled) : [];
+        output: combo.output, useOutputBehavior: combo.useOutputBehavior !== false && decoded.settings.comboOutputBehaviors !== false, enabled: combo.enabled !== false, allowedLayers: combo.allowedLayers ?? ALL_LAYERS})).filter((combo) => combo.enabled) : [];
     // Participation (participation-policy.md), judged by the layer a key came
     // from and its matrix position.
     /** @param {number} layoutIndex */
     const matrixOf = matrixPosition;
     /** @param {BehaviorRow | undefined} row @param {number} layer @param {number} layoutIndex */
     const behaviorUsed = (row, layer, layoutIndex) => Boolean(row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && Boolean(values[SETTING.LAYER_BEHAVIORS] & bit(layer))
-        && row.enabled !== false && Boolean((row.allowedLayers ?? 0xffff) & bit(layer)) && !records?.[layer]?.bypass.includes(matrixOf(layoutIndex)));
+        && row.enabled !== false && Boolean((row.allowedLayers ?? ALL_LAYERS) & bit(layer)) && !records?.[layer]?.bypass.includes(matrixOf(layoutIndex)));
     /** @param {number} layer @param {number} layoutIndex */
     const comboPress = (layer, layoutIndex) => Boolean(values[SETTING.LAYER_COMBOS] & bit(layer)) && !records?.[layer]?.exclude.includes(matrixOf(layoutIndex));
     // Generated outputs have no physical placement and do not consult the
     // source-layer behaviour switch. Their row uses the declared owner's origin.
     /** @param {BehaviorRow | undefined} row @param {{useOutputBehavior: boolean}} combo */
-    const generatedLayers = (row, combo) => combo.useOutputBehavior && row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && row.enabled !== false ? (row.allowedLayers ?? 0xffff) : 0;
+    const generatedLayers = (row, combo) => combo.useOutputBehavior && row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && row.enabled !== false ? (row.allowedLayers ?? ALL_LAYERS) : 0;
     const pointer = values[SETTING.AUTO_MOUSE_ENABLED] ? values[SETTING.AUTO_MOUSE_LAYER] : undefined;
     // The auto-sniping layers, none with its master switch off. Any of them
     // that is on keeps a separate pointer layer off (pointer_layer_policy_apply).
-    const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? (values[SETTING.AUTO_SNIPING_LAYERS] & 0xffff) >>> 0 : 0;
+    const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? (values[SETTING.AUTO_SNIPING_LAYERS] & ALL_LAYERS) >>> 0 : 0;
     const {modeLinks, layerStarted, endedStarts} = linkFacts(decoded);
     const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
     return {names, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, modeLinks, layerStarted, endedStarts, values, behaviorUsed, comboPress, generatedLayers,
@@ -445,7 +443,7 @@ function compactWalk(facts) {
             }
         }
     });
-    const tops = Array.from({length: LAYERS}, (_, layer) => ({layer, when: {on: bit(layer), off: (0xffff << (layer + 1)) & 0xffff}}));
+    const tops = Array.from({length: LAYERS}, (_, layer) => ({layer, when: {on: bit(layer), off: layersAbove(layer)}}));
     const selfReferences = tops.every(({layer}) => facts.comboLayer(layer) === layer);
     /** @type {Map<number | undefined, Map<number, Condition[]>>} */
     const present = new Map();
@@ -789,7 +787,6 @@ function findings(facts, walked) {
 // A finding's identity across two profiles: what kind it is and which layers it
 // is about, named by the keyboard layer each slot holds (`order[slot]`, as
 // model/layer-order.js keeps it).
-const IDENTITY = Object.freeze(Array.from({length: LAYERS}, (_, layer) => layer));
 /** @param {Finding} finding @param {readonly number[]} [order] */
 const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}${finding.identity === undefined ? "" : `:${finding.identity}`}`;
 

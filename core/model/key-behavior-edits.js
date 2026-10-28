@@ -9,6 +9,7 @@ const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLE
 const {semanticActionForExpression} = require("../schema/compiled-profile-v1");
 const {actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
 const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
+const {LAYERS} = require("../data/charybdis-layout");
 const {behaviorPlacementProblem} = require("./profile-placement");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
@@ -49,7 +50,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         || (native(left) !== undefined && native(left) === native(right));
     // The keyboard refuses a profile whose actions sit where it cannot run
     // them, so every row is checked, not only the one being edited.
-    const layerCount = capabilities.compiledLayerCount ?? 16;
+    const layerCount = capabilities.compiledLayerCount ?? LAYERS;
     /** @param {Row[]} rows */
     const checkPlacements = (rows) => {
         const problem = behaviorPlacementProblem(rows, {layerCount});

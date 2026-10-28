@@ -9,12 +9,10 @@
 
 const {SETTINGS, alwaysOnLayers} = require("../schema/settings-domain-v1");
 const {layerName} = require("./vocabulary");
+const {layersOfMask: layerList} = require("../data/charybdis-layout");
 
 /** @typedef {Pick<import("../schema/types.js").SettingsDomain, "values" | "names">} ShortcutSettings */
 /** @typedef {Pick<import("../schema/types.js").SettingsDomain, "values" | "names" | "customKeyShortcuts" | "customKeyNames">} ShortcutKeys */
-
-/** @param {number} mask */
-const layerList = mask => Array.from({length: SETTINGS.LAYERS}, (_, layer) => layer).filter(layer => mask & (1 << layer));
 
 // Which kind of layer a shortcut cannot name: the base layer, a default
 // layer, or "" for neither.

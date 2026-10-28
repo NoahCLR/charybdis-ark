@@ -4,6 +4,15 @@
 const LAYERS = 16, MATRIX_ROWS = 10, MATRIX_COLUMNS = 6;
 const MATRIX_KEYS = MATRIX_ROWS * MATRIX_COLUMNS;
 
+// A set of layers is a mask, bit n for layer n; ALL_LAYERS is the whole bank.
+const ALL_LAYERS = 2 ** LAYERS - 1;
+// Every layer in its own slot: the order no reorder has changed.
+const LAYER_IDENTITY = Object.freeze(Array.from({length: LAYERS}, (_, layer) => layer));
+/** @param {number} mask */
+const layersOfMask = mask => LAYER_IDENTITY.filter(layer => mask & (1 << layer));
+/** @param {number} layer */
+const layersAbove = layer => (ALL_LAYERS << (layer + 1)) & ALL_LAYERS;
+
 // The Charybdis 4x6 key layout: inert data every layer may read.
 //
 // QMK keyboard.json -> layouts.LAYOUT.layout, in the same order as the
@@ -29,4 +38,4 @@ function matrixPosition(layoutIndex) {
     return row * MATRIX_COLUMNS + column;
 }
 
-module.exports = {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_ROWS, MATRIX_COLUMNS, MATRIX_KEYS, matrixPosition};
+module.exports = {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, ALL_LAYERS, LAYER_IDENTITY, MATRIX_ROWS, MATRIX_COLUMNS, MATRIX_KEYS, layersAbove, layersOfMask, matrixPosition};

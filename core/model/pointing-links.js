@@ -10,12 +10,11 @@
 const {PD_LINK_ENDS, PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
 const {SETTING, SETTINGS} = require("../schema/settings-domain-v1");
 const {layerName, slotName} = require("./vocabulary");
+const {ALL_LAYERS, layersAbove, layersOfMask: layersOf} = require("../data/charybdis-layout");
 
 /** @typedef {{id: number, kind: number, name: string, linkedLayers?: number, linkTurnsOn?: number, linkEnds?: number, pointerLayer?: number}} LinkSlot */
 /** @typedef {Pick<import("../schema/types.js").SettingsDomain, "values" | "names">} LinkSettings */
 
-/** @param {number} mask */
-const layersOf = mask => Array.from({length: PD_LINK_LAYERS}, (_, layer) => layer).filter(layer => mask & (1 << layer));
 // Every layer a slot's link names: the layers that start it and those its key turns on.
 /** @param {Partial<LinkSlot>} slot */
 const linkNamed = slot => ((slot.linkedLayers ?? 0) | (slot.linkTurnsOn ?? 0)) >>> 0;
@@ -80,8 +79,8 @@ function linkStarts(settings, slot) {
     const starting = ((slot.linkedLayers ?? 0) & ((1 << PD_LINK_LAYERS) - 1)) >>> 0;
     const neverEnds = ((1 << settings.values[SETTING.AUTO_MOUSE_LAYER]) | settings.values[SETTING.DEFAULT_LAYERS] | 1) >>> 0;
     return layersOf(starting & ~inertLinkLayers(settings, starting)).map(layer => ({layer,
-        ends: (slot.linkEnds === PD_LINK_ENDS.HIGHER_LAYER ? (0xffff << (layer + 1)) & 0xffff & ~neverEnds
-            : slot.linkEnds === PD_LINK_ENDS.OTHER_LAYER ? 0xffff & ~linkNamed(slot) & ~neverEnds : 0) >>> 0}));
+        ends: (slot.linkEnds === PD_LINK_ENDS.HIGHER_LAYER ? layersAbove(layer) & ~neverEnds
+            : slot.linkEnds === PD_LINK_ENDS.OTHER_LAYER ? ALL_LAYERS & ~linkNamed(slot) & ~neverEnds : 0) >>> 0}));
 }
 
 // Why a slot cannot take this link, in words; "" when it can. A layer its

@@ -11,6 +11,7 @@
 
 const keycodes = require("../data/keycode-catalog");
 const {PD_MODE_KEYS, pdModeKeyOfCode} = require("../data/pd-mode-keys");
+const {LAYERS} = require("../data/charybdis-layout");
 const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 
@@ -105,7 +106,7 @@ function layerRuleOf(code, layerCount) {
 }
 
 /** @param {import("./types.js").SemanticAction} action @param {Placement} placement @param {{layerCount?: number}} [options] */
-function placementProblem(action, placement, {layerCount = 16} = {}) {
+function placementProblem(action, placement, {layerCount = LAYERS} = {}) {
     const code = action.kind === ACTION.LAYER_MOMENTARY ? 0x5220 | action.operand : nativeCode(action);
     const rule = code === undefined ? undefined : layerRuleOf(code, layerCount);
     if (!rule || rule.places.includes(placement)) return undefined;

@@ -7,7 +7,7 @@ const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RG
 
 const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {decodeComboDomain, encodeComboDomain, runningComboRows} = require("../schema/combo-domain-v1");
+const {COMBO_LIMITS, decodeComboDomain, encodeComboDomain, runningComboRows} = require("../schema/combo-domain-v1");
 const {keycodeAction, knownActionAbi, layerRef} = require("../schema/actions");
 const {comboPlacementProblem} = require("./profile-placement");
 const {pointingTaps} = require("./pointing-taps");
@@ -16,7 +16,7 @@ const {comboTableOf} = require("./portable-profile");
 const {editKeyBehaviors} = require("./key-behavior-edits");
 const {inDomain} = require("./draft-edits");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {profileDepthOptions} = require("../schema/profile-depth");
 /**
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: import("./draft-edits.js").InDomain<"combos">}>} ComboEdit
@@ -304,7 +304,7 @@ function editCombos(bytes, message, context) {
     } else if (message.type === "deleteCombo") {
         table.rows.splice(integer(message.id, table.rows.length - 1, "Combo index"), 1);
     } else {
-        const keysPerCombo = context.capabilities?.maxKeysPerCombo ?? 16;
+        const keysPerCombo = context.capabilities?.maxKeysPerCombo ?? COMBO_LIMITS.maxInputs;
         if (!Array.isArray(message.inputs) || message.inputs.length < 2) throw invalid("A combo needs at least two keys.");
         if (message.inputs.length > keysPerCombo) throw invalid(`A combo takes at most ${keysPerCombo} keys.`);
         const previous = message.type === "saveCombo" ? table.rows[integer(message.id, table.rows.length - 1, "Combo index")] : null;
@@ -312,7 +312,7 @@ function editCombos(bytes, message, context) {
         const useOutputBehavior = message.useOutputBehavior ?? previous?.useOutputBehavior ?? true;
         const enabled = message.enabled ?? previous?.enabled ?? true;
         if (typeof enabled !== "boolean") throw invalid("The combo must be enabled or disabled.");
-        const bank = 2 ** (context.capabilities?.compiledLayerCount ?? 16) - 1;
+        const bank = 2 ** (context.capabilities?.compiledLayerCount ?? LAYERS) - 1;
         const row = {inputs: message.inputs.map(expression), output: expression(message.output), termMs: followsDefault ? null : comboWindow(message.termMs), mustHold: message.mustHold === true, mustTap: message.mustTap === true, ordered: message.ordered === true,
             enabled, useOutputBehavior, allowedLayers: integer(message.allowedLayers ?? previous?.allowedLayers ?? bank, bank, "Allowed layers")};
         if (message.type === "saveCombo") table.rows[integer(message.id, table.rows.length - 1, "Combo index")] = row;
@@ -320,7 +320,7 @@ function editCombos(bytes, message, context) {
     }
     // The keyboard refuses a combo table with an output it cannot run, so every
     // row is checked, not only the one being edited.
-    const problem = comboPlacementProblem(table.rows, {layerCount: context.capabilities?.compiledLayerCount ?? 16});
+    const problem = comboPlacementProblem(table.rows, {layerCount: context.capabilities?.compiledLayerCount ?? LAYERS});
     if (problem) throw invalid(problem);
     const payload = encodeComboDomain(table);
     if (domain) Object.assign(domain, {version: table.version, payload});

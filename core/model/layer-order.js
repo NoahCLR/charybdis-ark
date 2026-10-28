@@ -12,8 +12,8 @@
 // and everything else is compared layer with layer.
 
 const {reorderLayers, validateSnapshot} = require("./portable-profile");
+const {LAYER_IDENTITY: IDENTITY} = require("../data/charybdis-layout");
 
-const IDENTITY = Object.freeze(Array.from({length: 16}, (_, layer) => layer));
 /** @param {readonly number[]} order */
 const isIdentity = order => order.every((layer, slot) => layer === slot);
 // `step` rearranges a document already in `order`, as reorderLayers reads it:
