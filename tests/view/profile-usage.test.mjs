@@ -1,10 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {NEARLY_FULL, profileUsageView} from "../../webview/view/profile-usage.mjs";
+import {createRequire} from "node:module";
+import {NEARLY_FULL, profileUsageView as usageView} from "../../webview/view/profile-usage.mjs";
+
+const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
+/** @param {Parameters<typeof usageView>[1]} usage @param {Parameters<typeof usageView>[2]} [macroBank] */
+const profileUsageView = (usage, macroBank) => usageView({vocabulary: VOCABULARY}, usage, macroBank);
 
 const usage = (used, extra = {}) => ({
     used, capacity: 5088, source: "keyboard",
-    counts: [{id: "behaviours", used: 64, limit: 64}, {id: "combos", used: 3, limit: 32}, {id: "customKeys", used: 5, limit: 128}],
+    counts: [{id: "behaviours", used: 64, limit: 64}, {id: "combos", used: 3, limit: 32}, {id: "customKeys", used: 5, limit: 128, fixed: true}],
     ...extra,
 });
 
@@ -24,14 +29,14 @@ test("the card names its source and counts each thing in its screen's words", ()
 });
 
 test("unavailable macro slots fill the bar's free end and say so", () => {
-    const view = profileUsageView(usage(2000, {counts: [{id: "macros", used: 18, limit: 128, unavailable: 97}, {id: "macros", used: 18, limit: 128}]}),
+    const view = profileUsageView(usage(2000, {counts: [{id: "macros", used: 18, limit: 128, unavailable: 97, fixed: true}, {id: "macros", used: 18, limit: 128, fixed: true}]}),
         {stored: 34503, capacity: 34903, reserveTaps: 10});
     const [short, open] = view.counts;
     assert.deepEqual([short.share, short.unavailableShare, short.note, short.full], [18 / 128, 97 / 128, "97 unavailable", false]);
     assert.equal(short.tip, "Macro slots with steps. Every empty slot keeps room in macro memory for 10 key taps; "
         + "when it cannot, the highest empty slots are unavailable until a macro is shortened or cleared. 97 are unavailable now, in red.");
     assert.deepEqual([open.unavailable, open.unavailableShare, open.note], [0, 0, ""], "a bank with room draws no red");
-    assert.equal(profileUsageView(usage(2000, {counts: [{id: "macros", used: 31, limit: 128, unavailable: 97}]})).counts[0].full, true,
+    assert.equal(profileUsageView(usage(2000, {counts: [{id: "macros", used: 31, limit: 128, unavailable: 97, fixed: true}]})).counts[0].full, true,
         "no free slot left once the open ones are used");
 });
 

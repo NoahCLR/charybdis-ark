@@ -13,7 +13,6 @@
 
 const {reorderLayers, validateSnapshot} = require("./portable-profile");
 
-const IDENTITY = Object.freeze(Array.from({length: 16}, (_, layer) => layer));
 /** @param {readonly number[]} order */
 const isIdentity = order => order.every((layer, slot) => layer === slot);
 // `step` rearranges a document already in `order`, as reorderLayers reads it:
@@ -51,4 +50,4 @@ function layerUnit(unit, order) {
     return unit;
 }
 
-module.exports = {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged};
+module.exports = {compose, inverse, isIdentity, layerUnit, rearranged};

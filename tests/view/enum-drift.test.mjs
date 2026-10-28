@@ -1,5 +1,5 @@
 // The webview keeps a few wire numbers of its own — pointing kinds, axes,
-// what ends a link's mode, modifier bits — because its pure modules need them at import
+// what ends a link's mode, modifier bits, limits, edit modes — because its pure modules need them at import
 // time and it may not import core/. They are the keyboard's numbers, so they
 // are pinned here to the schema that defines them: a change there fails here,
 // not on a keyboard.
@@ -7,11 +7,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {AXIS, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES} from "../../webview/view/pointing-config.mjs";
+import {AXIS, DIAGONALS, DIRECTIONS, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES, tapPlaceWord} from "../../webview/view/pointing-config.mjs";
 import {modifierBits, modifierNames} from "../../webview/view/keyvalues.mjs";
-import {TIER_FIELDS} from "../../webview/view/edits.mjs";
+import {TIER_FIELDS, TIERS} from "../../webview/view/edits.mjs";
+import {APPLY, EDIT_MODE, LIVE, LIVE_REVIEW} from "../../webview/view/edit-mode.mjs";
 import {POINTING_MODE_IDS} from "../../webview/view/lighting.mjs";
 import {NAME_MAX_BYTES} from "../../webview/view/names.mjs";
+import {LED_FLAGS} from "../../webview/view/lighting.mjs";
+import {ALL_LAYERS, LAYERS} from "../../webview/view/layout.mjs";
+import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE} from "../../webview/view/backups.mjs";
+import {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS as LOCK_SLOTS} from "../../webview/view/keycode-expression.mjs";
 
 const require = createRequire(import.meta.url);
 const pd = require("../../core/schema/pd-mode-domain-v1");
@@ -27,6 +32,14 @@ test("the webview's pointing numbers are the schema's", () => {
     assert.deepEqual(LINK_ENDS, {...pd.PD_LINK_ENDS});
 });
 
+test("the webview's shortcut places are the record's, named in the vocabulary's words", () => {
+    assert.deepEqual([...DIRECTIONS].sort(), [...pd.DIRECTIONS].sort());
+    assert.deepEqual([...DIAGONALS].sort(), [...pd.DIAGONALS].sort());
+    const model = {vocabulary: VOCABULARY};
+    assert.deepEqual(DIRECTIONS.map((name) => tapPlaceWord(model, "directions", name)), ["Up", "Left", "Right", "Down"], "in the order the editor draws them");
+    assert.deepEqual(DIAGONALS.map((name) => tapPlaceWord(model, "diagonals", name)), ["Up-left", "Up-right", "Down-left", "Down-right"]);
+});
+
 test("the webview's name limit is the schema's", () => {
     assert.equal(NAME_MAX_BYTES, require("../../core/schema/profile-name").NAME_MAX_BYTES);
 });
@@ -39,6 +52,13 @@ test("the webview's modifier bits and names are the vocabulary's", () => {
 
 test("the webview's tiers are the vocabulary's", () => {
     assert.deepEqual(Object.keys(TIER_FIELDS).sort(), Object.keys(VOCABULARY.tiers).sort());
+    assert.deepEqual(TIERS, Object.keys(VOCABULARY.tiers), "in the grid's order");
+    assert.deepEqual(TIER_FIELDS, {...require("../../core/schema/key-behavior-domain-v1").KEY_BEHAVIOR_TIER_FIELDS}, "each stored in the schema's field");
+});
+
+test("the webview's edit modes are the keyboard's", () => {
+    assert.deepEqual(EDIT_MODE, {...require("../../core/protocol/profile-edit-v1").EDIT_MODE});
+    assert.deepEqual([APPLY, LIVE, LIVE_REVIEW], [EDIT_MODE.APPLY, EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW]);
 });
 
 test("the webview names every pointing slot's lighting row as the RGB schema does", () => {
@@ -51,4 +71,24 @@ test("pointing macro identities follow the schema's complete native range", asyn
     const {macroIndex} = await import("../../webview/view/keyvalues.mjs");
     const {isPdMacro} = require("../../core/schema/pd-mode-domain-v1");
     for (let code = 0; code <= 0xffff; code++) assert.equal(macroIndex(code) !== null, isPdMacro(code), code.toString(16));
+});
+
+test("the webview's LED classes are the settings schema's", () => {
+    const core = require("../../core/schema/settings-domain-v1").LED_FLAGS;
+    assert.deepEqual(LED_FLAGS, {ALL: core.ALL, MODIFIER: core.MODIFIER, KEY: core.KEY});
+});
+
+test("the webview's layer count and every-layer set are the layer bank's", () => {
+    const layout = require("../../core/data/charybdis-layout");
+    assert.deepEqual({LAYERS, ALL_LAYERS}, {LAYERS: layout.LAYERS, ALL_LAYERS: layout.ALL_LAYERS});
+});
+
+test("the webview refuses a profile file over core's limit in core's words", () => {
+    const {FILE_MAX_BYTES, FILE_TOO_LARGE} = require("../../core/model/portable-profile");
+    assert.deepEqual([PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE], [FILE_MAX_BYTES, FILE_TOO_LARGE]);
+});
+
+test("the webview's layer-lock block is the keyboard's", () => {
+    const {LAYER_LOCK_BASE: base, LAYER_LOCK_SLOTS} = require("../../core/data/user-keycodes");
+    assert.deepEqual([LAYER_LOCK_BASE, LOCK_SLOTS], [base, LAYER_LOCK_SLOTS]);
 });

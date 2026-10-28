@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {sequenceFace} from "../../webview/view/macro-sequence.mjs";
-import {TEXT_CHIP, TEXT_TIP, describeStep, macroChips, macroMatches, macroPeek, parseMacro, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
+import {TEXT_CHIP, TEXT_TIP, describeStep, macroChips, macroMatches, macroPeek, parseMacro as parseMacroWith, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
+import {createRequire as requireFrom} from "node:module";
+// The step editor reads a macro with the vocabulary's words for what is wrong.
+const {VOCABULARY: WORDS} = requireFrom(import.meta.url)("../../core/model/vocabulary");
+/** @param {unknown} payload @param {object} [options] */
+const parseMacro = (payload, options = {}) => parseMacroWith(payload, {problems: WORDS.macroProblems, ...options});
 
 test("a payload reads back as the steps the keyboard will play", () => {
     const {steps, error} = parseMacro("noah@xomnia.com{120}{KC_ENT}");
@@ -93,7 +98,7 @@ test("with Unicode playback on, only non-ASCII text refuses a held ordinary key,
 
 test("a macro is found by its name, and by its slot when it has none", () => {
     const named = {keycode: "MACRO_3", name: "Screenshot area"};
-    const unnamed = {keycode: "MACRO_12", name: ""};
+    const unnamed = {keycode: "MACRO_12", name: "", defaultName: "Macro 12"};
     assert.equal(macroMatches(named, "screen"), true, "part of the name, case ignored");
     assert.equal(macroMatches(named, "  AREA "), true, "surrounding spaces are not part of the search");
     assert.equal(macroMatches(named, "m3"), true, "the slot label the grid shows");
@@ -119,9 +124,9 @@ test("editable text is literal, including command-looking braces, code and Unico
 
 test("incomplete steps keep their input and give a field error instead of inventing a valid edit", () => {
     for (const delay of ["", "-1", "1.5", "65536", "wat"]) {
-        const input = macroStepsInput([{kind: "delay", delay}]);
+        const input = macroStepsInput([{kind: "delay", delay}], {vocabulary: WORDS});
         assert.equal(input.payload, `{${delay}}`);
-        assert.match(input.error, /delay/i);
+        assert.equal(input.error, "A macro delay must be between 0 and 65,535 milliseconds.");
     }
     const input = macroStepsInput([{kind: "tap", keys: []}, {kind: "text", text: "after"}]);
     assert.equal(input.payload, "{}after");
@@ -193,11 +198,14 @@ test("two payloads are the same macro when their keys differ only by alias", asy
 
 test("each macro step kind has one name, on its add button and in the step editor", async () => {
     const {STEP_KINDS, addStepLabel, stepKindName} = await import("../../webview/view/macro.mjs");
-    assert.deepEqual(STEP_KINDS.map(([kind]) => kind), ["text", "tap", "delay", "press", "release"]);
-    assert.deepEqual(STEP_KINDS.map(([, name]) => name), ["Text", "Key or chord", "Delay", "Press", "Release"], "the glossary's macro steps");
-    for (const [kind, name] of STEP_KINDS) {
-        assert.equal(stepKindName(kind), name);
-        assert.equal(addStepLabel(kind), `+ ${name}`);
+    const {createRequire} = await import("node:module");
+    const model = {vocabulary: createRequire(import.meta.url)("../../core/model/vocabulary").VOCABULARY};
+    assert.deepEqual(STEP_KINDS, ["text", "tap", "delay", "press", "release"]);
+    assert.deepEqual(model.vocabulary.macroSteps.map(([kind]) => kind), STEP_KINDS, "a word for every kind, in the order the buttons offer them");
+    assert.deepEqual(STEP_KINDS.map((kind) => stepKindName(model, kind)), ["Text", "Key or chord", "Delay", "Press", "Release"], "the glossary's macro steps");
+    for (const kind of STEP_KINDS) {
+        const name = stepKindName(model, kind);
+        assert.equal(addStepLabel(model, kind), `+ ${name}`);
     }
 });
 

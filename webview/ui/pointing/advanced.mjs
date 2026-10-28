@@ -1,6 +1,6 @@
 // @ts-check
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
-import {AXIS, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, thresholdDistance} from "../../view/pointing-config.mjs";
+import {AXIS, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, tapPlaceWord, thresholdDistance} from "../../view/pointing-config.mjs";
 import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
 import {word} from "../../view/vocabulary.mjs";
 import {state} from "../../store.mjs";
@@ -48,7 +48,8 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             && Number(slot[group]?.[name]?.keycode));
         if (rows.length) {
             const table = el(`<div class="pd-taps"><span class="h">Direction</span><span class="h">While modifiers are held</span><span class="h">Left out</span></div>`);
-            for (const {key, group, name, label} of rows) {
+            for (const {key, group, name} of rows) {
+                const label = tapPlaceWord(model, group, name);
                 const tap = unfinished[key] || /** @type {import("../../../contracts/edits.js").PdTap} */ (slot[group]?.[name]);
                 const prefix = group === "diagonals" ? "diag" : "dir";
                 const macro = pointingMacro(model, tap.keycode);

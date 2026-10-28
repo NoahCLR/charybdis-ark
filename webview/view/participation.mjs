@@ -1,51 +1,53 @@
 // @ts-check
 // Permissions follow the layer supplying a key, including transparent keys.
-/** @typedef {{participation?: import("../../contracts/model.js").Participation | null, layers?: Partial<Pick<import("../../contracts/panel.js").Layer, "index" | "name" | "displayName">>[]} | null | undefined} ParticipationModel */
-// A key by its matrix position, which places its bits in a layer record. A
-// key the keyboard reported none for has no placement bit to veto it.
-/** @typedef {{row?: number, column?: number}} Placed */
+// Core decides what each layer's switches allow, and publishes it with the
+// keys whose own switch is off there, by layout index
+// (core/model/participation.js); a behaviour or combo adds its own switches,
+// the shared rule in rules/definition-switches.mjs. Why one does not take part
+// is a reason code, worded by the vocabulary.
+import {definitionReasons} from "../../rules/definition-switches.mjs";
+import {vocabulary} from "./vocabulary.mjs";
+/** @typedef {import("../../contracts/model.js").ParticipationReason} Reason */
+/** @typedef {{participation?: import("../../contracts/model.js").Participation | null, layers?: Partial<Pick<import("../../contracts/panel.js").Layer, "index" | "name" | "displayName">>[]} & import("./vocabulary.mjs").VocabularyModel | null | undefined} ParticipationModel */
+// A key by its layout index. A key the keyboard reported none for has no
+// placement switch to veto it.
+/** @typedef {{layoutIndex?: number}} Placed */
 
 // A placement is one key on one layer (firmware's participation policy), and
 // every word about one says so, naming the layer: its switches are neither the
 // layer's, which Settings holds, nor the definition's, which runs everywhere.
-/** @param {string} [name] */
-export const thisKeyOnThisLayer = (name) => `this key on this layer${name ? ` (${name})` : ""}`;
-/** @param {string} [name] */
-const thisLayer = (name) => `this layer${name ? ` (${name})` : ""}`;
+// The words are the vocabulary's (participationPlaces).
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} [name] */
+export const thisKeyOnThisLayer = (model, name) => `${vocabulary(model).participationPlaces.key}${name ? ` (${name})` : ""}`;
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} [name] */
+const thisLayer = (model, name) => `${vocabulary(model).participationPlaces.layer}${name ? ` (${name})` : ""}`;
 /** @param {ParticipationModel} model @param {number} layer */
 const nameOf = (model, layer) => {
     const found = model?.layers?.find((row) => row.index === layer);
     return found?.displayName || found?.name || "";
 };
 
-// Why a behaviour or combo's own switches keep it off this layer: its enable
-// switch and the layers it runs on. These hold whether or not the keyboard
-// reports the rest of its participation.
-/** @param {ParticipationModel} model @param {number} layer @param {{enabled?: boolean, allowedLayers?: number} | null | undefined} definition @param {"behavior" | "combo"} kind */
-function definitionReasons(model, layer, definition, kind) {
-    const reasons = [];
-    if (definition?.enabled === false) reasons.push(kind === "behavior" ? "Use this behaviour is off" : "Use this combo is off");
-    if (definition && !((definition.allowedLayers ?? 0xffff) & 2 ** layer)) reasons.push(`Layers it runs on leaves out ${thisLayer(nameOf(model, layer))}`);
-    return reasons;
+// A reason in the words of the switch that says no, naming the layer or the
+// placement where it does.
+/** @param {ParticipationModel} model @param {"behavior" | "combo"} kind @param {number} layer @param {Reason} reason */
+function reasonWords(model, kind, layer, reason) {
+    const words = vocabulary(model).participationReasons?.[kind]?.[reason] ?? reason;
+    if (reason === "layer" || reason === "layers") return `${words} ${thisLayer(model, nameOf(model, layer))}`;
+    if (reason === "placement") return `${words} ${thisKeyOnThisLayer(model, nameOf(model, layer))}`;
+    return words;
 }
 
 /** @param {ParticipationModel} model @param {number} layer @param {Placed} position @param {{enabled?: boolean, allowedLayers?: number} | null | undefined} definition @param {"behavior" | "combo"} [kind] */
 export function participationAt(model, layer, position, definition, kind = "behavior") {
     const policy = model?.participation;
     if (!policy) return null;
-    const behavior = kind === "behavior", bit = 2 ** layer;
+    const behavior = kind === "behavior";
     const record = policy.layers[layer];
     if (!record) return null;
-    const placed = position.row !== undefined && position.column !== undefined;
-    const placementOn = !placed || !(behavior ? record.bypass : record.exclude).includes(Number(position.row) * 6 + Number(position.column));
-    const name = nameOf(model, layer);
-    // Each reason names the switch that says no, in the words its control uses.
-    const reasons = [];
-    if (!(behavior ? policy.behaviorsEnabled : policy.combosEnabled)) reasons.push(behavior ? "behaviours are off in Settings" : "combos are off in Settings");
-    if (!((behavior ? policy.behaviorLayers : policy.comboLayers) & bit)) reasons.push(`Settings has ${behavior ? "behaviours" : "combos"} off on ${thisLayer(name)}`);
-    reasons.push(...definitionReasons(model, layer, definition, kind));
-    if (!placementOn) reasons.push(`${behavior ? "Use behaviour" : "Join combos"} is off for ${thisKeyOnThisLayer(name)}`);
-    return {placementOn, enabled: reasons.length === 0, reasons};
+    const placementOn = position.layoutIndex === undefined || !(behavior ? record.bypass : record.exclude).includes(position.layoutIndex);
+    /** @type {Reason[]} */
+    const reasons = [...(behavior ? record.behaviors : record.combos), ...definitionReasons(definition, layer), ...(placementOn ? [] : /** @type {Reason[]} */ (["placement"]))];
+    return {placementOn, enabled: reasons.length === 0, reasons: reasons.map((reason) => reasonWords(model, kind, layer, reason))};
 }
 
 // Whether a key's behaviour row runs on this layer: the switches, its
@@ -58,7 +60,7 @@ export function participationAt(model, layer, position, definition, kind = "beha
 export function behaviourRuns(model, layer, position, behaviour) {
     if (!behaviour) return {runs: false, reasons: []};
     const decision = participationAt(model, layer, position, behaviour);
-    const reasons = decision ? decision.reasons : definitionReasons(model, layer, behaviour, "behavior");
+    const reasons = decision ? decision.reasons : definitionReasons(behaviour, layer).map((reason) => reasonWords(model, "behavior", layer, reason));
     return {runs: reasons.length === 0, reasons};
 }
 
@@ -69,6 +71,6 @@ export function behaviourRuns(model, layer, position, behaviour) {
 /** @param {ParticipationModel} model @param {number} layer @param {Placed} position @param {{enabled?: boolean, allowedLayers?: number}} combo @returns {{joins: boolean, reasons: string[]}} */
 export function comboJoins(model, layer, position, combo) {
     const decision = participationAt(model, layer, position, combo, "combo");
-    const reasons = decision ? decision.reasons : definitionReasons(model, layer, combo, "combo");
+    const reasons = decision ? decision.reasons : definitionReasons(combo, layer).map((reason) => reasonWords(model, "combo", layer, reason));
     return {joins: reasons.length === 0, reasons};
 }

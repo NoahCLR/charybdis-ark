@@ -6,8 +6,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {TRACKBALL_LED} from "../view/geometry.mjs";
-import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
+import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect, trackballLed} from "../view/lighting.mjs";
 import {slotCalled, stageOrder} from "../view/vocabulary.mjs";
 import {canEdit as canEditArea, currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -73,7 +72,7 @@ export function screenLighting() {
         ${onGroups ? `<span class="right">
             <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
             <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
-                data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>`
+                data-tip="Add or remove the trackball LED, index ${esc(trackballLed(model))}, from this selection.">Trackball LED</button></span>`
             : ""}
     </div>`));
     /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="clearleds"]'))?.addEventListener("click", () => { state.ledPicks = []; render(); });

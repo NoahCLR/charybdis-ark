@@ -119,7 +119,7 @@ import type {ReviewSummary} from '../../contracts/model.js';
 import type {Position} from '../../contracts/panel.js';
 
 function rendererViews(model: PublishedModel, position: Position) {
-    const face = keyFace(position);
+    const face = keyFace(position, model);
     const kind: 'none' | 'transparent' | 'disabled' | 'layer' | 'key' = face.kind;
     const behaviors = macroReach(model, model.layers, 0);
     const combos = comboGroups(model, model.layers, 0);
@@ -127,7 +127,9 @@ function rendererViews(model: PublishedModel, position: Position) {
     const comboKeys: number[] = reachKeys(model.layers, 0, combos.onKeys[0]);
     const summary: ReviewSummary = {unit: 'behavior:KC_A', title: 'A', status: 'changed', place: {kind: 'behaviour'}};
     // @ts-expect-error A key face receives the stored name, not a numeric wire keycode.
-    keyFace({layoutIndex: 0, keycode: 4});
+    keyFace({layoutIndex: 0, keycode: 4}, model);
+    // @ts-expect-error A key face needs the model its layer verbs are worded from.
+    keyFace(position);
     // @ts-expect-error A key import summary must retain its layer reference.
     const missingLayer: ReviewSummary = {unit: 'key', title: 'A', status: 'changed', place: {kind: 'key'}};
     // @ts-expect-error Reached keys retain their typed position rather than an unrestricted object.

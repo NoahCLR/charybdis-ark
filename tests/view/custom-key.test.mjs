@@ -1,7 +1,11 @@
 import test from "node:test";
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
-import {customKeyInUse, customKeyReach, customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, sameShortcut, shortcutKeyCode, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickModifier, shortcutPickLabel, shortcutPickMods, shortcutPickProblem, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice, shortcutLayerRows, shortcutLayerList, shortcutWhen, shortcutLayerTag, shortcutLayerUnder, shortcutLayerKinds, LAYER_KIND} from "../../webview/view/custom-key.mjs";
+import {customKeyInUse, customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, sameShortcut, shortcutKeyCode, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickModifier, shortcutPickLabel, shortcutPickMods, shortcutPickProblem, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice, shortcutLayerRows, shortcutLayerList, shortcutWhen, shortcutLayerTag, shortcutLayerUnder, shortcutLayerKinds, LAYER_KIND} from "../../webview/view/custom-key.mjs";
+import * as custom_keyViews from "../../webview/view/custom-key.mjs";
+import {publishedFor} from "../fixtures/combo-reach.mjs";
+// The combo views read the reach core publishes for the stack they are given.
+const customKeyReach = publishedFor(custom_keyViews.customKeyReach);
 
 const key = (slot, shortcut = {mods: 0, keys: [], layers: 0, layerKind: 0}, shortcutLabel = "", hasBehavior = false) =>
     ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior, shortcut, shortcutLabel});

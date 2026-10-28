@@ -1,9 +1,9 @@
 // @ts-check
 "use strict";
 
-const {LAYERS, validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
+const {validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
 const {layerOrderReview, profileReview} = require("../model/profile-review");
-const {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged} = require("../model/layer-order");
+const {compose, inverse, isIdentity, layerUnit, rearranged} = require("../model/layer-order");
 const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
 const {keyPlacementProblem} = require("../model/profile-placement");
@@ -19,8 +19,8 @@ const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/
 const {effectiveComboWindow} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
-const keycodes = require("../data/keycode-catalog");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, LAYER_IDENTITY, matrixPosition} = require("../data/charybdis-layout");
+const keycodes = require("../schema/keycodes");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {liveKeyboardStatus} = require("./live-profile-session");
 const {LIVE_RESULT_WORDS, quietWords} = require("../model/vocabulary");
@@ -151,7 +151,7 @@ class ProfileDraftSession {
     // A step keeps its document, edit grouping, words, time and layer order
     // together. All of them stay fixed as undo, branching and trimming move it.
     /** @param {Document} document @param {string | null} [origin] @param {string | null} [label] @param {Order} [order] @returns {HistoryEntry} */
-    historyEntry(document, origin = null, label = null, order = IDENTITY) {
+    historyEntry(document, origin = null, label = null, order = LAYER_IDENTITY) {
         return freeze({document: copy(document), origin, label, at: this.now(), order: [...order]});
     }
     get document() {return copy(this.history[this.cursor].document);}
@@ -630,12 +630,12 @@ class ProfileDraftSession {
         if (units.has("layerOrder")) {
             if (units.size > 1) throw fail("Discard the layer order on its own.");
             document = rearranged(this.current.document, inverse(order));
-            order = IDENTITY;
+            order = LAYER_IDENTITY;
         } else document = revertUnits(this.referenceFor(order).snapshot, this.current, units, this.capabilities);
         // Some bytes carry no row of their own, such as reserved macro-bank padding. Once nothing described is left, the draft is
         // the keyboard's profile again, not an indescribable difference.
         const left = this.describe(validateSnapshot(document, this.capabilities).document, order);
-        if (left.every(row => row.unit === "profile")) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = IDENTITY;}
+        if (left.every(row => row.unit === "profile")) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = LAYER_IDENTITY;}
         const label = units.has("layerOrder") ? "Put the layer order back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
         return {document: validateSnapshot(document, this.capabilities).document, label, order, reviewed};
     }
@@ -647,7 +647,7 @@ class ProfileDraftSession {
         if (this.base.incomplete) throw fail("Read the keyboard again to discard a recovery draft.");
         if (!this.dirty) return;
         const count = this.changes().length;
-        this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`, IDENTITY);
+        this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`, LAYER_IDENTITY);
     }
     // A live draft changes only by what the keyboard confirms (confirmLive).
     assertLocal() {if (this.live) throw fail("This keyboard takes edits live; Ark sends each one to it.");}

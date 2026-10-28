@@ -19,12 +19,12 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText, isOff} from "../lib/colour.mjs";
-import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
+import {GEO, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
 import {comboBadgesAt} from "../view/combo-reach.mjs";
 import {behaviourRuns} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
-import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
+import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
@@ -49,7 +49,7 @@ export function board(model, layer, options = {}) {
         const answer = answering?.get(index);
         const shown = answer?.position || position;
         const from = answer?.fellThrough ? answer.layer : null;
-        const face = keyFace(shown);
+        const face = keyFace(shown, model);
         const glass = face.kind === "transparent" || Boolean(from);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
         const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";
@@ -115,7 +115,7 @@ export function board(model, layer, options = {}) {
         // face, so state is never told by recolouring it.
         /** @param {string} name */
         const ring = (name) => `<rect class="${name}" x="${visual.x + 1.4}" y="${visual.y + 1.4}" width="${GEO.keyW - 2.8}" height="${GEO.keyH - 2.8}" rx="${GEO.radius - 1}"></rect>`;
-        const main = mode === "leds" ? String(LED_INDEX[index] ?? index) : face.main;
+        const main = mode === "leds" ? String(keyLed(model, index) ?? index) : face.main;
         const above = (tiers.length ? 1 : 0) + (combos.length ? 1 : 0);
         // A legend is sized to the room its row leaves, so one typeface at one
         // weight carries every cap instead of stepping between faces by length.
@@ -241,9 +241,9 @@ function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickabl
     // Picking LEDs, the ball is drawn like a key (.kc-ball.leds); otherwise in its light.
     const lit = mode === "leds" ? "" : ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
     const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}${mode === "leds" ? " leds" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
-        aria-label="Trackball LED ${TRACKBALL_LED}">
+        aria-label="Trackball LED ${esc(trackballLed(model))}">
         <circle cx="${esc(x)}" cy="${y}" r="${r}"${lit}></circle>
-        ${mode === "leds" ? `<text class="kc-label sm" x="${esc(x)}" y="${y}">${TRACKBALL_LED}</text>` : ""}</g>`;
+        ${mode === "leds" ? `<text class="kc-label sm" x="${esc(x)}" y="${y}">${esc(trackballLed(model))}</text>` : ""}</g>`;
     return {
         markup,
         glow: mode === "leds" ? "" : `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${esc(x)}" cy="${y}" r="${r}" fill="${paint}"></circle>`,

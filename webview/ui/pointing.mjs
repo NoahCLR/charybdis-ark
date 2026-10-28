@@ -80,7 +80,7 @@ function emptyChips(model, empties, changedSlots, pick) {
     for (const slot of empties) {
         const {keys, behaviours, combos} = whatReachesSlot(model, slot);
         const inert = keys.length + behaviours.length + combos.length;
-        const tip = `Slot ${slot.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
+        const tip = `${slot.displayName} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
         const chip = el(`<button class="slotchip ${inert ? "warn" : ""}" data-slot="${esc(slot.id)}" aria-current="${state.pointingSlot === slot.id}"
             aria-label="${esc(tip)}" data-tip="${esc(tip)}">${esc(slot.id)}${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "corner") : ""}</button>`);
         chip.addEventListener("click", () => pick(slot));

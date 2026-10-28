@@ -3,8 +3,8 @@
 // the stack, what the key reaches, and its participation.
 
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
-import {sentence} from "../../view/vocabulary.mjs";
-import {LED_INDEX} from "../../view/geometry.mjs";
+import {keyLed} from "../../view/lighting.mjs";
+import {sentence, vocabulary} from "../../view/vocabulary.mjs";
 import {behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
 import {comboUseAt, combosAt} from "../../view/combo-reach.mjs";
 import {pointingSlotFor} from "../../view/reach.mjs";
@@ -46,7 +46,7 @@ export function tabKey(body) {
 
     const node = el(`<div class="tab-grid three">
         <section>
-            <div class="sect-h"><h4>${esc(sentence(thisKeyOnThisLayer(layerName(layer))))}</h4></div>
+            <div class="sect-h"><h4>${esc(sentence(thisKeyOnThisLayer(model, layerName(layer))))}</h4></div>
             <div class="field"><span>Keycode</span>
                 <div class="input-row"><input class="input mono" id="keycodeField" data-f="key:${esc(layer.index)}:${esc(position?.layoutIndex)}:keycode" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
@@ -57,7 +57,7 @@ export function tabKey(body) {
                     <dt>Stored as</dt><dd>${esc(position ? visibleKeycode(model, position.keycode) : "—")}</dd>
                     <dt>Matrix</dt><dd>row ${esc(position?.row ?? "—")} · col ${esc(position?.column ?? "—")}</dd>
                     <dt>Layout index</dt><dd>${esc(position?.layoutIndex ?? "—")}</dd>
-                    <dt>LED index</dt><dd>${LED_INDEX[position?.layoutIndex] ?? "—"}</dd>
+                    <dt>LED index</dt><dd>${esc(keyLed(model, position?.layoutIndex) ?? "—")}</dd>
                 </dl></details>
             </div>
             ${answeredBelow(layer, position)}
@@ -119,17 +119,17 @@ export function tabKey(body) {
     if (answer && model?.participation) {
         const source = answer.layer, key = answer.position;
         const behavior = behaviourFor(model, keyMeaning(key));
-        const bp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, /** @type {import("../../../contracts/panel.js").Position & {row: number, column: number}} */ (key), behavior));
-        const cp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, /** @type {import("../../../contracts/panel.js").Position & {row: number, column: number}} */ (key), undefined, "combo"));
+        const bp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, key, behavior));
+        const cp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, key, undefined, "combo"));
         const inherited = source.index !== layer.index;
         // These switches are one key's on one layer; say so, and where the
         // wider ones are, or they read as the layer's.
         const controls = el(`<div class="stack key-participation">
-            <div class="sect-h"><h4>Behaviour and combos for ${esc(inherited ? `this key on ${layerName(source)}` : thisKeyOnThisLayer(layerName(source)))}</h4></div>
+            <div class="sect-h"><h4>Behaviour and combos for ${esc(inherited ? `${vocabulary(model).participationPlaces.keyOn} ${layerName(source)}` : thisKeyOnThisLayer(model, layerName(source)))}</h4></div>
             ${inherited ? `<p class="note">This key is transparent on this layer (${esc(layerName(layer))}), so its switches on ${esc(layerName(source))} decide.</p><button class="btn tiny" data-source-layer>Open this key on ${esc(layerName(source))}</button>` : `
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
-            ${inherited ? "" : `<p class="note">They switch only ${esc(thisKeyOnThisLayer(layerName(source)))}. To switch a behaviour or combo off on every key, use its own Use this behaviour or Use this combo; for a whole layer, Settings.</p>`}
+            ${inherited ? "" : `<p class="note">They switch only ${esc(thisKeyOnThisLayer(model, layerName(source)))}. To switch a behaviour or combo off on every key, use its own Use this behaviour or Use this combo; for a whole layer, Settings.</p>`}
             <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behavior ? "runs here" : "this key has none")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "this key can take part; each combo has its own switches too")}.</p>
             ${customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))) ? `<p class="note">${esc(customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))))}</p>` : ""}
         </div>`);
@@ -148,7 +148,7 @@ export function tabKey(body) {
 function stackRows(model, layer, position) {
     const rows = [...layers()].reverse().map((other) => {
         const there = positionAt(other, position?.layoutIndex);
-        const face = keyFace(there);
+        const face = keyFace(there, model);
         return {other, there, face, through: face.kind === "transparent" && other.index !== layer.index};
     });
     /** @param {typeof rows[number]} entry */

@@ -49,7 +49,7 @@ export function openPicker({title, context, contextKeycode, seed = [], mode = "s
 // Layer keycodes are posted by index — MO(1), LOCK_LAYER(1), LT(1, KC_A) —
 // the form the keyboard reports and the draft encodes; the name is display.
 /** @param {string | number} index */
-const layerTapName = (index) => layerName(layers()[Number(index)]) || `Layer ${index}`;
+const layerTapName = (index) => layerName(layers()[Number(index)]);
 
 export const closePicker = () => { state.picker = null; render(); };
 

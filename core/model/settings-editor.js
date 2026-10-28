@@ -6,12 +6,16 @@ const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains")
 const {effectiveTimings} = require("./gesture-timing");
 const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
-const {SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
-const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
+const {LED_FLAGS, SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
+const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_ISO, OS_OF} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
 const {layerName, VOCABULARY} = require("./vocabulary");
+// Each section's heading, and the thresholds' names, are the vocabulary's.
+const SECTION = VOCABULARY.settingsSections, THRESHOLD = VOCABULARY.thresholdNames;
+/** @param {string} words */
+const capitalised = words => words.charAt(0).toUpperCase() + words.slice(1);
 const {settingsLinkRefusal} = require("./pointing-links");
 const {settingsShortcutRefusal} = require("./shortcut-layers");
 /** @param {string} message */
@@ -63,18 +67,18 @@ const COMBO_TIMING = Object.freeze([
 // The defaults behaviours inherit, which the editor view also publishes as
 // `timing`.
 /** @type {Omit<import("../../contracts/model.js").SettingsSection, "fields"> & {fields: import("../../contracts/model.js").StoredSettingField[]}} */
-const keyTiming = {id: "keyTiming", label: "Tap & hold timing", fields: [
+const keyTiming = {id: "keyTiming", label: SECTION.keyTiming, fields: [
     // Said in words first; the QMK names are in its hover help.
     number("tappingTerm", SETTING.TAPPING_TERM, "Dual-role tap / hold threshold", "How long a key that types on tap and holds a layer or modifier waits before a press counts as a hold, with or without a behaviour, unless its behaviour sets its own.",
         {tooltip: "QMK's tapping term, used by LT(), MT(), OSM(), TT() and OSL() keys, and by their behaviours with an empty Tap / hold threshold."}),
-    number("tapHoldTerm", SETTING.TAP_HOLD_TERM, "Behaviour tap / hold threshold", "Used when a behaviour on any other key leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
-    number("longHoldTerm", SETTING.LONG_HOLD_TERM, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
-    number("multiTapTerm", SETTING.MULTI_TAP_TERM, "Multi tap window", "How long after releasing a key the next press still counts as another tap. Used when a behaviour leaves its Multi tap window empty.", {governs: {kind: "branch", count: 2}}),
+    number("tapHoldTerm", SETTING.TAP_HOLD_TERM, `Behaviour ${THRESHOLD.tapHoldTerm}`, "Used when a behaviour on any other key leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
+    number("longHoldTerm", SETTING.LONG_HOLD_TERM, capitalised(THRESHOLD.longHoldTerm), "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
+    number("multiTapTerm", SETTING.MULTI_TAP_TERM, capitalised(THRESHOLD.multiTapTerm), "How long after releasing a key the next press still counts as another tap. Used when a behaviour leaves its Multi tap window empty.", {governs: {kind: "branch", count: 2}}),
 ]};
 /** @type {import("../../contracts/model.js").SettingsSection[]} */
 const sections = [
     keyTiming,
-    {id: "normalPointerSpeed", label: "Pointer speed", area: "Mouse", fields: [
+    {id: "normalPointerSpeed", label: SECTION.normalPointerSpeed, area: "Mouse", fields: [
         // Every DPI field offers the one list in pointer-dpi.js. These two are
         // held in the upstream Charybdis config, which the keyboard only
         // accepts in its own steps, so they offer the part of the list the
@@ -83,10 +87,10 @@ const sections = [
         number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", undefined, {tooltip: "Trackball sensitivity while sniping is active, including auto-sniping. Lower DPI gives finer cursor control.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
     // Its layers, one switch each, are added with the layers' names below.
-    {id: "sniping", label: "Auto-sniping", area: "Mouse", fields: [
+    {id: "sniping", label: SECTION.sniping, area: "Mouse", fields: [
         toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while any of its layers is on. Off keeps the layers chosen."),
     ]},
-    {id: "autoMouse", label: "Auto-mouse", area: "Mouse", fields: [
+    {id: "autoMouse", label: SECTION.autoMouse, area: "Mouse", fields: [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
         layer("pointerLayer", SETTING.AUTO_MOUSE_LAYER, "Pointer layer", "The layer that moving the trackball turns on when Auto-mouse is on."),
         number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
@@ -98,26 +102,26 @@ const sections = [
     // before it fades, and refuses a profile where that is not shorter than
     // the timeout. Edited as a share of the timeout, it cannot be: a share is
     // at most 99%, and a new timeout carries the share with it.
-    {id: "automouseFade", label: "Auto-mouse fade", area: "Lighting", stage: "auto", fields: [
+    {id: "automouseFade", label: SECTION.automouseFade, area: "Lighting", stage: "auto", fields: [
         share("mouseFadeHold", SETTING.AUTO_MOUSE_DEAD_TIME, SETTING.AUTO_MOUSE_TIMEOUT, "Hold before fading", "The share of the auto-mouse timeout the colour holds before it starts to fade, 0–99%."),
     ]},
     // QMK's master switch and idle timeout darken every LED, so Ark's stages
     // too (QMK skips its indicator hooks while the matrix is off): they are
     // the Lighting screen's own, above every stage.
-    {id: "lightingPower", label: "All lighting", area: "Lighting", fields: [
+    {id: "lightingPower", label: SECTION.lightingPower, area: "Lighting", fields: [
         {...toggle("lightingEnabled", SETTING.RGB_MODE, "All lighting", "Off, every LED stays dark: the background effect, layer colours and feedback."), tooltip: "QMK's RGB Matrix enable switch.", shift: 0},
         number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout", "Time without activity before lighting turns off. 0 keeps lighting on. Maximum 24 hours.", {presentation: "duration"}),
     ]},
     // QMK's own RGB Matrix effect, which every stage paints over: its effect
     // and LED classes are added from what the keyboard reports. Its LED
     // classes limit the effect alone; the stages paint any LED.
-    {id: "rgbAppearance", label: "Background effect", area: "Lighting", stage: "base", fields: [
+    {id: "rgbAppearance", label: SECTION.rgbAppearance, area: "Lighting", stage: "base", fields: [
         {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the background effect, around the colour wheel."},
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
         {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the background effect. Layer colours and feedback have their own brightness."},
         {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the background effect's animation. Effects without animation ignore this setting."},
     ]},
-    {id: "lightingFeedback", label: "Key feedback flash", area: "Lighting", stage: "key", fields: [
+    {id: "lightingFeedback", label: SECTION.lightingFeedback, area: "Lighting", stage: "key", fields: [
         number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
 ];
@@ -199,9 +203,12 @@ function settingsSections(snapshot, settings) {
     const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/\bcolor\b/g, "colour").replace(/^./, c => c.toUpperCase())})) || [];
     if (!effects.some(effect => effect.value === currentEffect)) effects.push({value: currentEffect, label: `Current effect (${currentEffect})`});
     /** @type {[number, string][]} */
-    const ledNames = [[1, "Modifiers"], [2, "Underlighting"], [4, "Keys"], [8, "Indicators"]];
-    const flags = [{value: 255, label: "All LEDs"}, {value: 0, label: "No LEDs"}];
-    if (options) for (let mask = 1; mask < 16; mask++) if (!(mask & ~options.ledFlags)) flags.push({value: mask, label: ledNames.filter(([bit]) => mask & bit).map(([, name]) => name).join(" + ")});
+    const ledNames = [[LED_FLAGS.MODIFIER, "Modifiers"], [LED_FLAGS.UNDERGLOW, "Underlighting"], [LED_FLAGS.KEY, "Keys"], [LED_FLAGS.INDICATOR, "Indicators"]];
+    /** @type {{value: number, label: string}[]} */
+    const flags = [{value: LED_FLAGS.ALL, label: "All LEDs"}, {value: LED_FLAGS.NONE, label: "No LEDs"}];
+    // Every mix of those classes the keyboard reports it has.
+    const classes = ledNames.reduce((mask, [bit]) => mask | bit, 0);
+    if (options) for (let mask = 1; mask <= classes; mask++) if (!(mask & ~options.ledFlags)) flags.push({value: mask, label: ledNames.filter(([bit]) => mask & bit).map(([, name]) => name).join(" + ")});
     if (!flags.some(choice => choice.value === currentFlags)) flags.push({value: currentFlags, label: "Current custom LED selection"});
     rgb.fields.splice(0, 0,
         {...byte("effectMode", SETTING.RGB_MODE, 8, "Effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours paint over it." : "Read the keyboard to see the lighting effects it has."},
@@ -219,7 +226,7 @@ function settingsSections(snapshot, settings) {
     // No screen edits the default layers: moving the base layer covers them.
     // The section stays so the review lists, and can revert, a difference
     // that arrives some other way (a backup restored, say).
-    result.push({id: "startupLayers", area: "Settings", label: "Default layers",
+    result.push({id: "startupLayers", area: "Settings", label: SECTION.startupLayers,
         layerGroup: {label: "Default layers", hint: "Always on underneath every other layer. Normally only Base. QMK calls these default layers."}, fields:
         everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer a default layer: always on underneath every other layer. Keep at least one on; a higher default layer covers a lower one.", bitMask: 2 ** i, keyboardKeys: true, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
@@ -227,36 +234,36 @@ function settingsSections(snapshot, settings) {
     // applies is on, judged by the layer its key came from. Each behaviour and
     // combo has its own switch and layers in Keymap, and each key position its
     // own in the key's editor.
-    result.push({id: "behaviorSettings", area: "Settings", label: "Behaviours",
+    result.push({id: "behaviorSettings", area: "Settings", label: SECTION.behaviorSettings,
         layerGroup: {label: "On these layers", hint: "A key uses its behaviour only when the layer it comes from is on here. Off, it does what it would without one."}, fields:
         [toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Turn every behaviour on or off. Off, each key does what it would without one: a plain key, or its own LT() or MT()."),
             ...everyLayer(i => ({...toggle(`behaviorsOnLayer${i}`, SETTING.LAYER_BEHAVIORS, `On ${name(i)}`, "Keys that come from this layer use their behaviours."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // Combos get a section of their own beside their layer matching. The
     // Interface adds the default window and hold threshold to it, which
     // the keyboard stores with the combos rather than here.
-    result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: "Combos",
+    result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: SECTION.comboSettings,
         layerGroup: {label: "On these layers", hint: "A key can be part of a combo only when the layer it comes from is on here."}, fields:
         [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keymap · Combos."), keyboardKeys: true},
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
                 hint: "Off, combos still fire but use their normal output action. A key pressed on its own still uses its behaviour where its participation allows. A bypassed custom key sends its shortcut, or nothing if it has none."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
-    result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
+    result.push({id: "comboReferences", area: "Settings", label: SECTION.comboReferences, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
-    result.push({id: "keyboardOptions", area: "Settings", label: "Key swaps & typing", description: options ? "Keyboard-wide swaps and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
+    result.push({id: "keyboardOptions", area: "Settings", label: SECTION.keyboardOptions, description: options ? "Keyboard-wide swaps and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
         options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
-    const macos = host.effective === 1;
+    const macos = host.effective === MACOS;
     const setup = ["Choose the operating system yourself if detection is unknown.",
         "For emoji and other characters your layout cannot type, choose the Unicode Hex Input layout and make it your active input source.",
         "Install and run WinCompose with Right Alt as Compose.", "Use an input method/application accepting Ctrl+Shift+U, hex digits and Space. Some Linux applications do not support it."][host.effective];
     // The effective OS's layouts first, then US; with no known OS, all of them.
-    const osName = [null, "macos", "windows", "linux"][host.effective];
+    const osName = OS_OF[host.effective];
     const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
     /** @param {number} id */
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
-    result.push({id: "host", area: "Settings", label: "Your computer",
+    result.push({id: "host", area: "Settings", label: SECTION.host,
         ...(host.effective === 2 && host.unicodeEnabled
             ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"}} : {}),
         // Auto can follow detection onto another OS than the layout's; a
@@ -299,7 +306,9 @@ function settingsEditorView(snapshot) {
                 value: field.kind === "layer" ? `Layer ${value}` : String(value), enabled: Boolean(value)};
         })})),
         host: hostSettings(settings.values, snapshot.hostOs?.detected),
-        timing: Object.fromEntries(keyTiming.fields.map(field => [field.macro, String(settings.values[field.id])]))};
+        timing: Object.fromEntries(keyTiming.fields.map(field => [field.macro, String(settings.values[field.id])])),
+        // Each layer's Combo Layer Matching: the layer whose keys its combos match.
+        comboReferences: settings.layers.map(record => record.reference)};
 }
 
 /** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditOf<"updateConfigDefaults">} message @param {import("./types.js").ProfileDestination} [capabilities] */

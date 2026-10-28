@@ -3,7 +3,8 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {hostKeyVocabulary, keyLabel, keyLabelWithName, profileKeyNames} = require("../../core/model/key-names");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
-const keycodes = require("../../core/data/keycode-catalog");
+const catalog = require("../../core/data/keycode-catalog");
+const keycodes = require("../../core/schema/keycodes");
 const {PD_MODE_KEYS} = require("../../core/data/pd-mode-keys");
 
 const PD_MODE_0 = PD_MODE_KEYS[0].holdCode;
@@ -119,12 +120,12 @@ test("layer modifiers and Magic actions share host words without rewriting unrel
         const names=profileKeyNames({hostOs,layers:['Base','Navigation']});
         assert.equal(keyLabel(names,0x502c),`Navigation + ${alt}+${gui}`);
         for(const [key,label] of [['QK_MAGIC_SWAP_ALT_GUI',`Swap ${alt}⇄${gui}`],['QK_MAGIC_SWAP_LALT_LGUI',`Swap Left ${alt}⇄Left ${gui}`],['QK_MAGIC_SWAP_RALT_RGUI',`Swap Right ${alt}⇄Right ${gui}`]]) {
-            const entry=keycodes.lookup(key);
+            const entry=catalog.lookup(key);
             assert.equal(keyLabel(names,entry.value),label);
             assert.equal(names.labels[key],label);
             for(const alias of entry.aliases) assert.equal(names.labels[alias],label);
         }
-        assert.equal(keyLabel(names,keycodes.lookup('KC_MISSION_CONTROL').value),'Mission Control');
+        assert.equal(keyLabel(names,catalog.lookup('KC_MISSION_CONTROL').value),'Mission Control');
     }
 });
 
@@ -132,13 +133,13 @@ test("modifier-bearing catalogue families inherit host vocabulary regardless of 
     const {hostKeyLabel}=require('../../core/model/key-names');
     for(const hostOs of [0,1,2,3]) {
         const names=profileKeyNames({hostOs});
-        for(const entry of keycodes.entries().filter(e=>/\b[LR]?(?:Alt|GUI|Cmd)\b/.test(e.label))) {
+        for(const entry of catalog.entries().filter(e=>/\b[LR]?(?:Alt|GUI|Cmd)\b/.test(e.label))) {
             const label=hostKeyLabel(entry.label,hostOs);
             assert.equal(keyLabel(names,entry.value),label,entry.name);
             for(const alias of entry.aliases || []) assert.equal(names.labels[alias],label,alias);
         }
-        assert.equal(keyLabel(names,keycodes.lookup('SC_LAPO').value),hostKeyLabel('Left Alt/(',hostOs));
-        assert.equal(keyLabel(names,keycodes.lookup('SC_RAPC').value),hostKeyLabel('Right Alt/)',hostOs));
+        assert.equal(keyLabel(names,catalog.lookup('SC_LAPO').value),hostKeyLabel('Left Alt/(',hostOs));
+        assert.equal(keyLabel(names,catalog.lookup('SC_RAPC').value),hostKeyLabel('Right Alt/)',hostOs));
     }
 });
 

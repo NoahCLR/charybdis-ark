@@ -13,6 +13,12 @@ paints, or that it has no colour and the background effect shows through.
 
 On a key face:
 
+- A line across a key marks a key that taps one thing and holds another:
+  what it taps above, what it holds below. A layer-tap shows its layer below
+  the line and a mod-tap its modifier; a one-shot or tap-toggle layer key
+  shows its layer above and **one-shot** or **tap-toggle** below. Every other
+  key reads on one line, a layer key by its whole name, such as **Hold
+  Navigation** or **Lock Navigation**.
 - Dots show the key's behaviour, one for each kind of branch it sets: tap,
   hold and long hold, in the colours the keyboard flashes. A number beside a
   dot counts branches of that kind. A key whose behaviour a switch keeps off
@@ -133,6 +139,14 @@ layer a pointing mode's link uses still can't be one
 ([How it starts](pointing.md#how-it-starts)), and Review lists a difference
 in them that a backup brings. A key on the keyboard can change them until
 the keyboard restarts.
+
+Ark treats every default layer the keyboard keeps as on, as it treats the
+base. A key a default layer answers through a transparent key needs nothing
+held, so the board, the reach lists and combos don't mark it "while held".
+Layers you preview together show the default layers with the base. The
+lighting preview paints as the keyboard does: base and the layers that are
+on, so a default layer's colour shows only on that layer or when you preview
+it with ⌘-click.
 
 ## The workbench
 

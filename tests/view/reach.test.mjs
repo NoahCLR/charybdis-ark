@@ -4,8 +4,20 @@ import test from "node:test";
 import {keyMeaning, behaviourFor} from "../../webview/view/keyface.mjs";
 import {resolvedPositions, reachablePositions} from "../../webview/view/layer-resolution.mjs";
 import {combosInView, combosForKey} from "../../webview/view/combo-reach.mjs";
-import {reachKeys, reachText, behavioursInView, reachInView, behaviourGroups, behaviourRouteKeys, macroKeycodes, macroPlacements, customKeyPlacements, macroReach, pointingReach, pointingReachInView, pointingSlotFor, pointingAction, macroAction, namedAction, slotKeycodes, slotKeycodeNames, whatReachesSlot, holdKeyName} from "../../webview/view/reach.mjs";
+import {reachKeys, reachText, macroKeycodes, pointingSlotFor, pointingAction, macroAction, namedAction, slotKeycodes, slotKeycodeNames, whatReachesSlot, holdKeyName} from "../../webview/view/reach.mjs";
+import * as reachViews from "../../webview/view/reach.mjs";
 import {createRequire} from "node:module";
+import {publishedFor} from "../fixtures/combo-reach.mjs";
+// The combo views read the reach core publishes for the stack they are given.
+const behavioursInView = publishedFor(reachViews.behavioursInView);
+const reachInView = publishedFor(reachViews.reachInView);
+const behaviourGroups = publishedFor(reachViews.behaviourGroups);
+const behaviourRouteKeys = publishedFor(reachViews.behaviourRouteKeys);
+const macroPlacements = publishedFor(reachViews.macroPlacements);
+const customKeyPlacements = publishedFor(reachViews.customKeyPlacements);
+const macroReach = publishedFor(reachViews.macroReach);
+const pointingReach = publishedFor(reachViews.pointingReach);
+const pointingReachInView = publishedFor(reachViews.pointingReachInView);
 const {PD_MODE_KEYS} = createRequire(import.meta.url)("../../core/data/pd-mode-keys.js");
 const slotWith = (fields) => ({...fields, keys: PD_MODE_KEYS[fields.id]});
 
@@ -21,7 +33,7 @@ test("a branch action that sends a pointing mode reads as the mode, held or lock
 });
 
 test("a branch action that plays a macro reads as the macro by the name it was given", () => {
-    const model = {macros: [{keycode: "MACRO_0", name: "Sign-off", empty: false}, {keycode: "MACRO_1", name: "", empty: true}]};
+    const model = {macros: [{keycode: "MACRO_0", name: "Sign-off", empty: false}, {keycode: "MACRO_1", name: "", defaultName: "Macro 1", empty: true}]};
     assert.equal(macroAction(model, "MACRO_0").name, "Sign-off");
     const unnamed = macroAction(model, "MACRO_1");
     assert.deepEqual([unnamed.name, unnamed.empty], ["Macro 1", true], "an unnamed macro goes by its number");
@@ -32,7 +44,7 @@ test("a branch action that plays a macro reads as the macro by the name it was g
 test("pointing modes and macros read as what they are; plain keycodes read as themselves", () => {
     const model = {
         pdModes: [{id: 4, displayName: "Arrow", kind: 1, keys: {hold: "PD_MODE_4", lock: "PD_MODE_4_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}],
-        macros: [{keycode: "MACRO_2", name: "", empty: true}],
+        macros: [{keycode: "MACRO_2", name: "", defaultName: "Macro 2", empty: true}],
     };
     const pd = namedAction(model, "PD_MODE_4_LOCK");
     assert.deepEqual([pd.kind, pd.word, pd.name, pd.tags], ["pointing", "pointing mode", "Arrow", ["lock"]]);
@@ -46,6 +58,7 @@ test("a layer action reads as its layer, tagged with what it does to it", () => 
         layers: [{index: 0, name: "Base"}, {index: 1, name: "Numbers"}, {index: 2, name: "L2", displayName: "Navigation"}],
         qmkKeyLabels: {"MO(2)": "Hold Navigation", "TG(1)": "Lock Numbers", "LM(1,MOD_LSFT)": "Numbers + Shift", "LT(2,KC_F)": "F / Navigation", QK_LAYER_LOCK: "Layer Lock"},
         qmkKeyLayers: {"MO(2)": 2, "TG(1)": 1, "LM(1,MOD_LSFT)": 1, "LT(2,KC_F)": 2},
+        qmkKeyLayerForms: /** @type {Record<string, any>} */ ({"MO(2)": "MO", "TG(1)": "TG", "LM(1,MOD_LSFT)": "LM", "LT(2,KC_F)": "LT"}),
     };
     const hold = namedAction(model, "MO(2)");
     assert.deepEqual([hold.kind, hold.word, hold.name, hold.layer, hold.tags], ["layer", "layer", "Navigation", 2, ["Hold"]]);
@@ -225,8 +238,8 @@ test("a behaviour a combo sends is reached, though no key carries it", () => {
         qmkKeycodeAliases: {QK_USER_30: "LEFT_THUMB"},
         keyBehaviors: [{keycode: "LEFT_THUMB", steps: []}, {keycode: "KC_9", steps: []}],
         combos: [
-            {id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "QK_USER_30"},
-            {id: 1, badge: "C2", inputs: ["KC_K", "KC_L"], output: "QK_USER_30"},
+            {id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "QK_USER_30", outputBehaviorLayers: 0xffff},
+            {id: 1, badge: "C2", inputs: ["KC_K", "KC_L"], output: "QK_USER_30", outputBehaviorLayers: 0xffff},
         ],
     };
     const stack = withAnswers([
@@ -255,7 +268,7 @@ test("a behaviour picked under one route rings only that route's keys", () => {
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const model = {
         keyBehaviors: [{keycode: "KC_LEFT_GUI", steps: []}],
-        combos: [{id: 5, badge: "C6", inputs: ["MS_BTN1", "PD_MODE_1"], output: "KC_LEFT_GUI"}],
+        combos: [{id: 5, badge: "C6", inputs: ["MS_BTN1", "PD_MODE_1"], output: "KC_LEFT_GUI", outputBehaviorLayers: 0xffff}],
     };
     const stack = withAnswers([
         {index: 0, name: "Base", positions: [at(48, "KC_LEFT_GUI"), at(30, "KC_N"), at(31, "KC_M")]},
@@ -404,7 +417,7 @@ test("a branch route names every cell that sends it, once", () => {
             {keycode: "KC_Q", steps: [{tapCount: 0, longHold: {action: "PD_MODE_3"}}, {tapCount: 1, hold: {action: "PD_MODE_3"}, tap: {action: "PD_MODE_3_LOCK"}}]},
             {keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, tap: {action: "PD_MODE_3_LOCK"}}]},
         ],
-        combos: [{id: 5, badge: "C5", inputs: ["KC_D", "KC_F"], output: "KC_RIGHT_ALT", useOutputBehavior: true, enabled: true, allowedLayers: 0xffff}],
+        combos: [{id: 5, badge: "C5", inputs: ["KC_D", "KC_F"], output: "KC_RIGHT_ALT", useOutputBehavior: true, enabled: true, allowedLayers: 0xffff, outputBehaviorLayers: 0xffff}],
     };
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, semantic: keycode, display: keycode});
     const stack = withAnswers([{index: 0, name: "Base", positions: [at(0, "KC_Q"), at(1, "KC_Q"), at(2, "KC_D"), at(3, "KC_F")]}]);
@@ -438,8 +451,9 @@ test("a combo reaches the macro it sends, and what a behaviour it sends reaches"
         qmkKeycodeAliases: {QK_MACRO_0: "MACRO_0", QK_USER_30: "LEFT_THUMB"},
         keyBehaviors: [{keycode: "LEFT_THUMB", steps: [{tapCount: 1, hold: {action: "MACRO_1"}}]}],
         combos: [
-            {id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "QK_MACRO_0"},
-            {id: 1, badge: "C2", inputs: ["KC_J", "KC_L"], output: "QK_USER_30"},
+            // A macro has no behaviour; the behaviour C2 sends runs on every layer.
+            {id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "QK_MACRO_0", outputBehaviorLayers: 0},
+            {id: 1, badge: "C2", inputs: ["KC_J", "KC_L"], output: "QK_USER_30", outputBehaviorLayers: 0xffff},
         ],
     };
     const stack = withAnswers([
@@ -460,15 +474,15 @@ test("a combo reaches the macro it sends, and what a behaviour it sends reaches"
     assert.deepEqual(above.fromCombos, [], "on Numbers C1 needs the transparent J, so it is not this layer's own");
     assert.deepEqual(above.fromCombosBelow.map((entry) => entry.name), ["MACRO_0"]);
     assert.deepEqual(above.elsewhere, ["MACRO_1", "MACRO_2"], "C2 needs L, and Numbers stores 1 there");
-    model.combos[1].useOutputBehavior = false;
+    // Core publishes no layers while its output behaviour is off
+    // (tests/model/participation.test.js says when).
+    model.combos[1].outputBehaviorLayers = 0;
     assert.deepEqual(macroReach(model, stack, 0).fromCombos.map(entry => entry.name), ["MACRO_0"]);
     assert.deepEqual(behaviourGroups(model, stack, 0).combos, []);
     assert.deepEqual(behavioursInView(model, stack, 0).filter(entry => entry.combos.length), []);
-    model.combos[1].useOutputBehavior = true;
-    model.participation = {comboOutputBehaviors: false};
-    assert.deepEqual(macroReach(model, stack, 0).fromCombos.map(entry => entry.name), ["MACRO_0"], "global bypass retains the directly sent macro");
+    assert.deepEqual(macroReach(model, stack, 0).fromCombos.map(entry => entry.name), ["MACRO_0"], "a bypassed output retains the directly sent macro");
     assert.deepEqual(reachInView(model, stack, 0, [], macroKeycodes).map(entry => entry.name), ["MACRO_0"]);
-    model.participation.comboOutputBehaviors = true;
+    model.combos[1].outputBehaviorLayers = 0xffff;
     assert.deepEqual(macroReach(model, stack, 0).fromCombos.map(entry => entry.name), ["MACRO_0", "MACRO_1"]);
 
 });
@@ -641,9 +655,10 @@ test("generated behaviour lists use the declared owner's physical source rather 
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const row = {keycode: "CUSTOM_KEY_0", enabled: true, allowedLayers: 1,
         steps: [{tapCount: 1, tap: {action: "MACRO_0"}}]};
-    const combo = {id: 0, inputs: ["KC_A", "KC_B"], output: "CUSTOM_KEY_0"};
+    // The layers core publishes for its output: the row's own.
+    const combo = {id: 0, inputs: ["KC_A", "KC_B"], output: "CUSTOM_KEY_0", outputBehaviorLayers: 1};
     const model = {keyBehaviors: [row], combos: [combo],
-        participation: {behaviorsEnabled: true, comboOutputBehaviors: true, behaviorLayers: 0, layers: []},
+        participation: {behaviorsEnabled: true, comboOutputBehaviors: true, layers: []},
         macros: [{keycode: "MACRO_0", empty: false}]};
     const stack = withAnswers([
         {index: 0, name: "Base", positions: [at(0, "KC_C"), at(1, "KC_B")]},
@@ -656,14 +671,12 @@ test("generated behaviour lists use the declared owner's physical source rather 
     combo.inputs.reverse();
     assert.equal(view().length, 0, "A becomes the declared owner, so B cannot lend its allowance");
     combo.inputs.reverse();
-    model.configDefaults = [{id: "comboReferences", fields: [{macro: "comboReference1", value: "Layer 2"}]}];
+    model.comboReferenceLayers = Object.assign(Array.from({length: 16}, (_, layer) => layer), {1: 2});
     assert.equal(view().length, 1, "reference remapping retains Base's physical origin");
-    row.allowedLayers = 4;
+    combo.outputBehaviorLayers = 4;
     assert.equal(view().length, 0, "a reference-layer allowance cannot enable the output");
-    row.allowedLayers = 1; row.enabled = false;
-    assert.equal(view().length, 0);
-    row.enabled = true; model.participation.behaviorsEnabled = false;
-    assert.equal(view().length, 0);
+    combo.outputBehaviorLayers = 0;
+    assert.equal(view().length, 0, "no layers, as with the behaviour or the behaviours switch off");
 });
 
 test("a reach says where its keys come from, and a combo reached on this layer alone says so", () => {

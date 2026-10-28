@@ -12,12 +12,16 @@
 
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {PHASE, VOCABULARY, HALVES_WORDS, slotName} = require("../model/vocabulary");
+const {comboOutputBehaviorLayers, participation} = require("../model/participation");
+const {publishedComboReach} = require("../model/combo-reach");
 const keycodeCatalog = require("../data/keycode-catalog");
+const {offered} = require("../data/offered-keycodes");
+const keycodes = require("../schema/keycodes");
 const keycodeLegacy = require("../data/keycode-legacy");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
-const {effectiveTimings, holdTermSetting} = require("../model/gesture-timing");
+const {dualRole, effectiveTimings, holdTermSetting} = require("../model/gesture-timing");
 const {timingAlone} = require("../model/inert-behaviors");
-const {compactKeyLabels, hostKeyVocabulary, keyLabel, keyLayer, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("../model/key-names");
+const {compactKeyLabels, hostKeyVocabulary, keyLabel, keyLayer, keyLayerForm, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
@@ -30,8 +34,8 @@ const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
 const {keyboardNameView} = require("../model/keyboard-name");
 const {runningComboRows} = require("../schema/combo-domain-v1");
-const {SETTING, SHORTCUT_KEY_LIMITS} = require("../schema/settings-domain-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
+const {SETTING, SHORTCUT_KEY_LIMITS, alwaysOnLayers} = require("../schema/settings-domain-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, KEY_LEDS, LAYER_IDENTITY, TRACKBALL_LED, matrixPosition} = require("../data/charybdis-layout");
 const {compileLayerAnswers} = require("../model/layer-resolution");
 
 const {editableDomains} = require("./firmware-support");
@@ -99,7 +103,7 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
     }, max);
     const editable = binding.editable;
     const model = configurationModel({
-        layers: value.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[matrixPosition(layoutIndex)], resolved: keycodeCatalog.resolve(values[matrixPosition(layoutIndex)])}))})),
+        layers: value.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[matrixPosition(layoutIndex)], resolved: keycodes.resolve(values[matrixPosition(layoutIndex)])}))})),
         domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings, pdModes: value.pdModes},
         comboRows: runningComboRows(combos),
         comboInfo: {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),
@@ -163,11 +167,12 @@ function configurationModel(content, capabilities, editing) {
     // a layer-tap cannot be listed ahead of time, one per layer and tap key.
     // The layer each one acts on is beside it, so the interface marks the
     // layer a name ends in without working it out again.
-    const keyLayers = {...names.keyLayers};
+    const keyLayers = {...names.keyLayers}, keyLayerForms = {...names.keyLayerForms};
     for (const value of profileKeycodes(content, capabilities)) {
-        const name = keycodeCatalog.resolve(value).name, layer = keyLayer(value);
+        const name = keycodes.resolve(value).name, layer = keyLayer(value), form = keyLayerForm(value);
         catalog.labels[name] = keyLabel(names, value);
         if (layer !== undefined) keyLayers[name] = layer;
+        if (form !== undefined) keyLayerForms[name] = form;
     }
     const hostVocabulary = hostKeyVocabulary(names.hostOs);
     // The settings a pointing slot's link is judged against, once read.
@@ -181,14 +186,27 @@ function configurationModel(content, capabilities, editing) {
     const keyTurnsOn = {};
     const pointingKeys = PD_MODE_KEYS.flatMap((keys) => [keys.holdCode, keys.lockCode]);
     for (const value of new Set([...profileKeycodes(content, capabilities), ...pointingKeys, ...customKeys.map((key) => key.code)])) {
-        const mask = turnsOn(value), name = keycodeCatalog.resolve(value).name;
+        const mask = turnsOn(value), name = keycodes.resolve(value).name;
         if (mask) for (const spelled of [name, catalog.aliases[name]]) if (spelled) keyTurnsOn[spelled] = mask;
     }
+    const layers = layersForView(content.layers, catalog.labels, catalog.aliases, names.layers, content.domains.settings?.values ? alwaysOnLayers(content.domains.settings.values) : 1);
+    const outputLayers = comboOutputBehaviorLayers(content.domains.settings, content.domains.keyBehaviors?.rows || []);
+    const combos = comboRowsForView(content.comboRows, catalog.labels).map((combo, index) => ({...combo, outputBehaviorLayers: outputLayers(content.comboRows[index])}));
+    // Which layer's keys combos match while each layer is on top (Combo
+    // Layer Matching): the draft's settings, so an edit shows before it is
+    // applied; the keyboard's combo readback without them; else the layer
+    // itself.
+    const comboReferenceLayers = LAYER_IDENTITY.map((layer) => {
+        const stored = content.settingsView?.comboReferences?.[layer], read = content.comboInfo?.layerReferences?.[layer];
+        return Number.isInteger(stored) ? /** @type {number} */ (stored) : typeof read === "number" && Number.isInteger(read) ? read : layer;
+    });
     return {
         // The words for every value the keyboard stores, so the interface
         // names things as the review does (model/vocabulary.js).
         vocabulary: {...VOCABULARY, ...hostVocabulary},
-        layers: layersForView(content.layers, catalog.labels, catalog.aliases, names.layers),
+        // The LED each key carries, by layout index, and the trackball's.
+        leds: {keys: [...KEY_LEDS], trackball: TRACKBALL_LED},
+        layers,
         // What each typing key prints: plain, Shift, Option/AltGr, then both,
         // for the picker's board; null on US, whose board is drawn as is.
         hostLayoutLegends: names.legends,
@@ -225,8 +243,11 @@ function configurationModel(content, capabilities, editing) {
             baseEffect: content.baseEffect},
 
         // Native combo values, resolved from either the readback or the snapshot.
-        combos: comboRowsForView(content.comboRows, catalog.labels),
+        combos,
         comboReadback: {...content.comboInfo, writable: editing.combos},
+        comboReferenceLayers,
+        // Which combos fire from each layer, and on which keys (combo-reach.js).
+        comboReach: publishedComboReach(layers, combos, comboReferenceLayers),
         macros: content.macroView?.macros || [],
         macroNameSpace: content.macroView?.names || null,
         macroBank: content.macroView?.macroBank || null,
@@ -236,14 +257,7 @@ function configurationModel(content, capabilities, editing) {
         macroEditing: {identity: content.macroView?.identity || "", writable: editing.macros},
         behaviorTimingDefaults: content.settingsView?.timing || {},
         configDefaults: content.settingsView?.sections || [],
-        participation: content.domains.settings?.values && content.domains.settings.layers ? {
-            comboOutputBehaviors: content.domains.settings.comboOutputBehaviors !== false,
-            behaviorsEnabled: Boolean(content.domains.settings.values[SETTING.BEHAVIORS_ENABLED]),
-            combosEnabled: Boolean(content.domains.settings.values[SETTING.COMBOS_ENABLED]),
-            behaviorLayers: content.domains.settings.values[SETTING.LAYER_BEHAVIORS],
-            comboLayers: content.domains.settings.values[SETTING.LAYER_COMBOS],
-            layers: content.domains.settings.layers,
-        } : null,
+        participation: content.domains.settings?.values && content.domains.settings.layers ? participation(content.domains.settings).view() : null,
         settingsEditing: {identity: content.settingsView?.identity || "", writable: editing.settings},
         macroPayloadKeycodes: content.macroView?.macroPayloadKeycodes || [],
         macroPayloadModifierKeycodes: content.macroView?.macroPayloadModifierKeycodes || [],
@@ -259,9 +273,12 @@ function configurationModel(content, capabilities, editing) {
         // The keyboard's own name, edited on Settings with the other settings.
         keyboardName: content.keyboardNameView || null,
 
-        qmkKeycodes: catalog.entries,
+        // By the names and groups the entries end with, the profile's keys
+        // laid over the catalog's.
+        qmkKeycodes: catalog.entries.map((entry) => offered({name: entry.value, group: entry.group}) ? entry : {...entry, offered: false}),
         qmkKeyLabels: catalog.labels,
         qmkKeyLayers: keyLayers,
+        qmkKeyLayerForms: keyLayerForms,
         qmkKeyTurnsOn: keyTurnsOn,
         qmkKeyShortLabels: compactKeyLabels(catalog.labels),
         qmkKeycodeAliases: catalog.aliases,
@@ -276,7 +293,7 @@ function configurationModel(content, capabilities, editing) {
 // The UI keys layers by name and the device only knows indexes, so synthesise
 // stable names. They are display strings, not identifiers from source.
 /** @param {Configuration["layers"]} layout @param {Record<string, string>} labels @param {Record<string, string>} [aliases] @param {string[]} [layerNames] */
-function layersForView(layout, labels, aliases = {}, layerNames = []) {
+function layersForView(layout, labels, aliases = {}, layerNames = [], alwaysOn = 1) {
     const codes = layout.map(entry => {
         /** @type {(number | undefined)[]} */
         const positions = [];
@@ -287,6 +304,8 @@ function layersForView(layout, labels, aliases = {}, layerNames = []) {
     const layers = layout.map((entry, at) => ({
         name: layerRef(entry.layer),
         index: entry.layer,
+        // Base, and every default layer the keyboard keeps, is always on.
+        alwaysOn: Boolean(alwaysOn & (1 << entry.layer)),
         answers: answers[at],
         positions: entry.keys.map((key) => {
             /** @type {import("../data/types.js").ResolvedKeycode & {tapLabel?: string, layerLabel?: string}} */
@@ -328,8 +347,11 @@ function displayFor(resolved) {
     if (resolved.name === "KC_NO") {
         return "";
     }
+    // A dual-role layer key (OSL(), TT()) shows its layer, and its cap's
+    // second line what it does to it; any other reads by its whole name
+    // ("Hold Navigation"), on one line.
     if (resolved.kind === "layer") {
-        return resolved.layerLabel;
+        return dualRole(resolved.value) ? resolved.layerLabel : resolved.label;
     }
     if (resolved.kind === "layer-tap" || resolved.kind === "mod-tap") {
         return resolved.tapLabel || trim(resolved.tap);
@@ -383,7 +405,7 @@ function behaviorDefaults(content, capabilities, aliases, names) {
     const customKeys = (content.customKeyView?.keys || []).map(key => key.code);
     return Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
         const target = keycodeAction(code);
-        const name = keycodeCatalog.resolve(code).name;
+        const name = keycodes.resolve(code).name;
         const timing = effectiveTimings({target}, values, features.customKeyShortcuts);
         // Where each default comes from, named for the editor's placeholders.
         // A key follows the same one with or without a row (firmware D-F27).

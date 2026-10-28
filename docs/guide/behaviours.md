@@ -50,6 +50,10 @@ cell is dashed and shows it, marked **built in**:
 - An empty Long hold beside a Hold shows the Hold carrying on.
 - An empty Hold beside a Long hold shows the tap a release sends before the
   Long hold threshold.
+- A pointing-mode key holds its mode from the press, unless its row holds
+  another mode on a later tap: then it waits for the Tap / hold threshold,
+  so the two modes never overlap. That holds however the key is stored, by
+  its name or as its keycode.
 
 Setting an action in a dashed cell replaces what it shows. Modifier keys on
 their own show nothing built in.
@@ -73,7 +77,7 @@ setting it comes from, such as `200 · dual-role` on an `LT` or `MT` key,
 `150 · behaviour default` on any other key, and `400 · default` for the long
 hold threshold or multi tap window. Type a value to give this behaviour its own;
 clear the field to follow the default again. The defaults are under
-**Tap & hold timing** on the Behaviours settings screen (below).
+**Tap & hold timing** on Behaviour settings (below).
 
 When Review's checks find a problem with the timing, a note above the grid
 says so.
@@ -120,8 +124,8 @@ on again. A behaviour runs only where every switch allows it:
 
 | Scope | Where | Switch |
 | --- | --- | --- |
-| The whole keyboard | **Settings → Behaviours**, the Behaviours card | **Enabled** |
-| Each layer | **Settings → Behaviours**, the Behaviours card | **On these layers** |
+| The whole keyboard | **Behaviour settings**, the Behaviours card | **Enabled** |
+| Each layer | **Behaviour settings**, the Behaviours card | **On these layers** |
 | This behaviour | the behaviour editor | **Use this behaviour** and **Layers it runs on** |
 | This key on this layer | the Key tab | **Use behaviour** |
 
@@ -131,15 +135,15 @@ key, the key does what it would without one: the board shows no dots on it,
 and the Key tab and the hover card say which switch is keeping it off, with
 no branches or timing, since none of them run.
 
-A key on the keyboard can turn behaviours or combos off for now. The
-Behaviours or Combos settings screen then marks the switch **turned off by
-key**. That isn't a change and isn't in
-Review: the key, or unplugging, turns it back on.
+A key on the keyboard can turn behaviours or combos off for now. Behaviour
+settings or Combo settings then marks the switch **turned off by key**. That
+isn't a change and isn't in Review: the key, or unplugging, turns it back on.
 
-## Settings → Behaviours
+## Behaviour settings
 
-**Settings → Behaviours** in the rail shows two cards, both open: **Tap &
-hold timing** and **Behaviours**, the switches in the table above.
+**Behaviour settings** (**Behaviours** under Settings in the rail) shows two
+cards, both open: **Tap & hold timing** and **Behaviours**, the switches in
+the table above.
 
 **Tap & hold timing** holds the keyboard's default timings, used wherever a behaviour leaves its own
 empty:

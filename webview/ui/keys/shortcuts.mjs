@@ -39,7 +39,7 @@ export function keysShortcut(event) {
         if (writable() && message.changes[0].keycode !== position.keycode) post(message);
     };
     if (action === "clear") {
-        if (keyFace(position).kind !== "transparent") store(edits.clearKey(layer.name, position.layoutIndex));
+        if (keyFace(position, null).kind !== "transparent") store(edits.clearKey(layer.name, position.layoutIndex));
     } else if (action === "copy") {
         state.keyClipboard = {keycode: position.keycode, label: keyName(position)};
         navigator.clipboard?.writeText(visibleKeycode(getModel(), position.keycode)).catch(() => {});

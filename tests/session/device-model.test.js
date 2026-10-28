@@ -5,7 +5,7 @@ const test = require("node:test");
 
 const {buildDeviceModel, buildSnapshotModel, deviceSummary} = require("../../core/session/device-model");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
-const {resolve} = require("../../core/data/keycode-catalog");
+const {resolve} = require("../../core/schema/keycodes");
 
 test("behaviour editing requires supported firmware and a complete idle read", () => {
     const state = {capabilities: {supportedDomainMask: 3, maxTapStepsPerBehavior: 5}, committed: decodedDeviceProfile()};
@@ -30,7 +30,7 @@ test("behaviour rows claim their keys' built-in first actions", () => {
 
 const MODEL_FIELDS = [
     "layers", "keyBehaviors", "combos", "macros", "macroNameSpace", "behaviorTimingDefaults",
-    "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyLayers", "qmkKeyShortLabels", "qmkKeycodeAliases",
+    "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyLayers", "qmkKeyLayerForms", "qmkKeyShortLabels", "qmkKeycodeAliases",
     "qmkKeycodeSource", "qmkSpellings", "macroPayloadKeycodes", "diagnostics",
 ];
 
@@ -189,11 +189,12 @@ test("layer and tap-hold keys name their layer without losing the expression", (
         layout: layoutWith([
             {layoutIndex: 0, row: 0, column: 0, keycode: 0x5222, resolved: {name: "MO(2)", label: "Layer hold 2", kind: "layer", layer: 2, known: true}},
             {layoutIndex: 1, row: 0, column: 1, keycode: 0x4105, resolved: {name: "LT(1,KC_B)", label: "B / layer 1", kind: "layer-tap", tap: "KC_B", layer: 1, known: true}},
+            {layoutIndex: 2, row: 0, column: 2, keycode: 0x5282, resolved: {name: "OSL(2)", label: "One-shot layer 2", kind: "layer", layer: 2, value: 0x5282, known: true}},
         ]),
     });
 
     const [momentary, layerTap] = model.layers[0].positions;
-    assert.equal(momentary.display, "Symbols", "the cap names the layer, not its number");
+    assert.equal(momentary.display, "Hold Symbols", "a single-role layer key's cap reads by its whole name, the layer by name, not its number");
     assert.equal(momentary.editLabel, "Hold Symbols");
     assert.equal(momentary.keycode, "MO(2)", "the raw keycode keeps the number");
     assert.equal(layerTap.display, "B");
@@ -201,6 +202,7 @@ test("layer and tap-hold keys name their layer without losing the expression", (
     assert.equal(layerTap.editLabel, "B / Numbers");
     assert.equal(model.qmkKeyLabels["LT(1,KC_B)"], "B / Numbers", "any keycode on the board can be named by keycode");
     assert.equal(layerTap.keycode, "LT(1,KC_B)");
+    assert.equal(model.layers[0].positions[2].display, "Symbols", "a dual-role layer key's cap names its layer; what it does is below the line");
 });
 
 test("an unresolved keycode is shown, not hidden", () => {
@@ -524,6 +526,18 @@ test("every name the model gives a layer key carries the layer the model says it
         if (model.qmkKeyLayers[input] !== undefined) assert.ok(carries(combo.inputDisplays[at], model.qmkKeyLayers[input]), `${input} reads "${combo.inputDisplays[at]}"`);
     });
     assert.equal(model.qmkKeyLayers.KC_C, undefined, "a key on no layer is not in the table");
+    // And what each does to its layer, by QMK's function, so the interface
+    // never reads it out of the name.
+    assert.deepEqual(model.layers[0].positions.slice(0, 5).map(position => model.qmkKeyLayerForms[position.keycode] ?? model.qmkKeyLayerForms[position.semantic]),
+        ["MO", "LT", "LOCK_LAYER", "LM", "TG"]);
+    assert.deepEqual(Object.keys(model.qmkKeyLayerForms).sort(), Object.keys(model.qmkKeyLayers).sort(), "every layer key has its layer and its function");
+    assert.equal(model.qmkKeyLayerForms.KC_C, undefined);
+    // A single-role layer key's cap reads by its whole name; a layer-tap's by
+    // its tap, its layer below the line (keyface.mjs).
+    const [hold, layerTap, lock, , toggle] = model.layers[0].positions;
+    assert.deepEqual([hold.display, lock.display, toggle.display], [hold.editLabel, lock.editLabel, toggle.editLabel]);
+    assert.ok(/^Hold /.test(hold.display), hold.display);
+    assert.equal(layerTap.display, "B");
 });
 
 test("snapshot presentation uses its decoded configuration and real device diagnostics", () => {
@@ -564,7 +578,8 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     assert.equal(model.pdModes.length, 32);
     assert.equal(model.combos[0].termMs, 50);
     assert.equal(model.combos[0].followsDefault, true);
-    assert.deepEqual(model.participation.layers, draft.current.decoded.settings.layers);
+    assert.deepEqual(model.participation, require("../../core/model/participation").participation(draft.current.decoded.settings).view(),
+        "participation as core decides it, each layer's keys by layout index");
     assert.deepEqual({device: model.device, diagnostics: model.diagnostics}, deviceSummary(state));
     assert.match(model.diagnostics.join(" "), /Layout has not been read/);
     assert.match(model.diagnostics.join(" "), /Combo read unavailable/);
@@ -591,4 +606,58 @@ test("snapshot presentation reuses a matching decode and follows the binding for
         }
     }
     assert.equal(draft.current.decoded, current.decoded);
+});
+
+// Combo Layer Matching, published so the interface never reads it out of a
+// settings field's words: the draft's settings first, so an edit shows before
+// it is applied, then the keyboard's combo readback, then each layer itself.
+test("each layer's combo reference layer comes from the draft's settings, else the keyboard's readback, else itself", () => {
+    const portable = require("../../core/model/portable-profile");
+    const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
+    const {editSettings} = require("../fixtures/profile-document");
+    const doc = editSettings(require("../fixtures/pd-profile").document(), (settings) => {settings.layers[2].reference = 0; settings.layers[5].reference = 3;});
+    const model = buildSnapshotModel({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS},
+        DEMO_CAPABILITIES, {editable: true, reason: null});
+    assert.deepEqual(model.comboReferenceLayers, Array.from({length: 16}, (_, layer) => layer === 2 ? 0 : layer === 5 ? 3 : layer));
+    assert.deepEqual(buildDeviceModel({combos: {state: "read", rows: [], layerReferences: [0, 0, 1]}}).comboReferenceLayers.slice(0, 4), [0, 0, 1, 3],
+        "without settings, the keyboard's readback, and past it each layer itself");
+    assert.deepEqual(buildDeviceModel({}).comboReferenceLayers, Array.from({length: 16}, (_, layer) => layer));
+});
+
+test("each published layer says whether it is always on: base, and every default layer the keyboard keeps", () => {
+    const portable = require("../../core/model/portable-profile");
+    const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
+    const {editSettings} = require("../fixtures/profile-document");
+    const {SETTING} = require("../../core/schema/settings-domain-v1");
+    const doc = editSettings(require("../fixtures/pd-profile").document(), (settings) => {settings.values[SETTING.DEFAULT_LAYERS] = 0b100;});
+    const model = buildSnapshotModel({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS},
+        DEMO_CAPABILITIES, {editable: true, reason: null});
+    assert.deepEqual(model.layers.filter((layer) => layer.alwaysOn).map((layer) => layer.index), [0, 2]);
+    assert.deepEqual(buildDeviceModel({}).layers.filter((layer) => layer.alwaysOn), [], "no layers read, none to mark");
+});
+
+// The view tests hand-build models (tests/fixtures/combo-reach.mjs gives them
+// the reach core would publish), so what a published model carries is held
+// here, on the demo profile.
+test("the published model carries each layer's combo reach and each combo's output behaviour layers, as core works them out", () => {
+    const portable = require("../../core/model/portable-profile");
+    const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
+    const {comboReach} = require("../../core/model/combo-reach");
+    const {editSettings} = require("../fixtures/profile-document");
+    const {SETTING} = require("../../core/schema/settings-domain-v1");
+    /** @param {any} doc */
+    const modelOf = (doc) => buildSnapshotModel({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS},
+        DEMO_CAPABILITIES, {editable: true, reason: null});
+    const demo = structuredClone(require("../../core/data/demo-profile.charybdis.json"));
+    const model = modelOf(demo);
+    assert.equal(model.comboReach.length, model.layers.length);
+    assert.deepEqual(model.comboReach, comboReach(model.layers, model.combos, model.comboReferenceLayers));
+    assert.ok(model.comboReach[0].some((reach) => reach.fires), "the demo's combos fire from base");
+    assert.ok(model.combos.some((combo) => combo.outputBehaviorLayers), "and some run their output's behaviour");
+    const defaults = modelOf(editSettings(structuredClone(demo), (settings) => { settings.values[SETTING.DEFAULT_LAYERS] = 0b11; }));
+    assert.equal(defaults.layers[1].alwaysOn, true);
+    assert.notDeepEqual(defaults.comboReach, model.comboReach, "a default layer changes it");
+    assert.deepEqual(defaults.comboReach, comboReach(defaults.layers, defaults.combos, defaults.comboReferenceLayers), "and it is worked out again");
+    const vetoed = modelOf(editSettings(structuredClone(demo), (settings) => { settings.comboOutputBehaviors = false; }));
+    assert.deepEqual(vetoed.combos.map((combo) => combo.outputBehaviorLayers), vetoed.combos.map(() => 0), "Combo outputs use behaviours off runs none");
 });

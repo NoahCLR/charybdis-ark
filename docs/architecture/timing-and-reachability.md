@@ -182,8 +182,12 @@ An empty tier is not "nothing": the keyboard runs the key's own meaning
 there.
 
 1. `builtInActions` (`core/model/built-in-behavior.js`) decides a key's
-   built-in tap and hold.
-2. `behaviorDefaults` (`core/session/device-model.js`) publishes them, with
+   built-in tap and hold. Given a row's steps, it judges the hold with them:
+   a pointing-mode key whose row holds another mode on a later tap count
+   holds its own only from Tap / hold, not from the press.
+2. `behaviorRowsForView` (`core/model/device-profile-view.js`) publishes them
+   on each row, judged with its steps; `behaviorDefaults`
+   (`core/session/device-model.js`) publishes them for a key with no row, with
    the effective timing, its source setting and `timingAlone`. It does so for
    every keycode the profile holds and every custom key, placed or not.
 3. The editor draws them as dashed cells (`impliedBranch` in

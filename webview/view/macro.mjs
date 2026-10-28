@@ -10,90 +10,49 @@
 // is not an error here — the step builder passes through that state — and
 // unreleased() reports it.
 
+import {vocabulary, word} from "./vocabulary.mjs";
+import {MACRO_LIMITS, macroProblemWords, readMacroPayload} from "../../rules/macro-payload.mjs";
+
 /** @typedef {import("./types.js").MacroStep} MacroStep */
 
-// Each kind of macro step by its one name (glossary "Macro step"): the add
-// buttons, the step editor and the picker it opens all say it this way.
-/** @type {[MacroStep["kind"], string][]} */
-export const STEP_KINDS = [
-    ["text", "Text"], ["tap", "Key or chord"], ["delay", "Delay"],
-    ["press", "Press"], ["release", "Release"],
-];
-/** @param {string} kind */
-export const stepKindName = (kind) => STEP_KINDS.find(([value]) => value === kind)?.[1] || kind;
+// Each kind of macro step, in the order the add buttons offer them; its one
+// name (glossary "Macro step"), which the add buttons, the step editor and
+// the picker it opens all say, is the vocabulary's (macroSteps).
+/** @type {readonly MacroStep["kind"][]} */
+export const STEP_KINDS = ["text", "tap", "delay", "press", "release"];
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} kind */
+export const stepKindName = (model, kind) => word(vocabulary(model).macroSteps, kind);
 // The button that adds a step of this kind.
-/** @param {string} kind */
-export const addStepLabel = (kind) => `+ ${stepKindName(kind)}`;
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} kind */
+export const addStepLabel = (model, kind) => `+ ${stepKindName(model, kind)}`;
 
-const MAX_DELAY = 65535, MAX_KEYS = 16;
-/** @param {string} character */
-const printable = (character) => {
-    const code = character.codePointAt(0);
-    if (code === undefined) return false;
-    return code === 9 || code === 10 || (code >= 32 && code <= 126) || (code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF));
-};
+// A macro's limits (rules/macro-payload.mjs): its longest delay in
+// milliseconds, and the keys it holds at once, a chord's included.
+export const MAX_DELAY = MACRO_LIMITS.maxDelayMs, MAX_KEYS = MACRO_LIMITS.maxHeldKeys;
 
+// A macro's steps, as far as they read, and what is wrong in words: the shared
+// grammar read by key name, a key known by its alias's name, and only the keys
+// a macro can send when the model lists them. Text that needs Unicode entry
+// with an ordinary key held is said once the rest reads; without a host
+// layout, that text is anything past ASCII, and without the model's modifier
+// keys no held key counts as ordinary, so core alone says it. A key left
+// held is not an error here: the editor names each one (unreleased), as core
+// refuses it.
 /** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] */
 export function parseMacro(payload, options = {}) {
-    /** @type {MacroStep[]} */
-    const steps = [];
-    /** @type {Set<string>} */
-    const held = new Set();
-    /** @param {string} key */
-    const keyId = key => options.aliases?.[key] || key;
-    let text = "";
-    let textHoldError = false;
-    // Text the host layout cannot type needs Unicode entry, which a held
-    // ordinary key would corrupt; without a layout, that is any non-ASCII text.
-    /** @param {string} character */
-    const needsEntry = character => options.layoutChars ? !options.layoutChars.includes(character) : /[^\x00-\x7F]/u.test(character);
-    const flush = () => { if (options.textEntry && [...text].some(needsEntry) && [...held].some(key => options.modifierKeys ? !options.modifierKeys.includes(key) : !/KC_(?:LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|LEFT_CTRL|LEFT_SHIFT|LEFT_ALT|LEFT_GUI|RIGHT_CTRL|RIGHT_SHIFT|RIGHT_ALT|RIGHT_GUI)$/.test(key))) textHoldError = true; if (text) steps.push({kind: "text", text}); text = ""; };
-    const source = String(payload ?? "");
     const allowed = options.keys?.length ? new Set(options.keys) : null;
-
-    for (let index = 0; index < source.length;) {
-        // The loop bounds guarantee a code point at this index.
-        const character = String.fromCodePoint(/** @type {number} */ (source.codePointAt(index)));
-        index += character.length;
-        if ((character === "{" || character === "}") && source[index] === character) { text += character; index++; continue; }
-        if (character === "}") return fail(steps, "Unexpected } — use }} for a literal closing brace.");
-        if (character !== "{") {
-            if (!printable(character)) return fail(steps, "Use valid Unicode text, tabs or newlines; control characters and unpaired surrogates are unsupported.");
-            text += character; continue;
-        }
-        flush();
-        const end = source.indexOf("}", index);
-        if (end < 0) return fail(steps, "A macro command is missing its }.");
-        const command = source.slice(index, end).trim();
-        index = end + 1;
-        if (/^\d+$/.test(command)) {
-            if (Number(command) > MAX_DELAY) return fail(steps, "A macro delay must be between 0 and 65,535 milliseconds.");
-            steps.push({kind: "delay", delay: Number(command)}); continue;
-        }
-        if (!command) return fail(steps, "An empty {} is not a macro command.");
-        const kind = command[0] === "+" ? "press" : command[0] === "-" ? "release" : "tap";
-        const keys = (kind === "tap" ? command : command.slice(1)).split(",").map((name) => name.trim()).filter(Boolean);
-        if (!keys.length) return fail(steps, "A macro command needs at least one key.");
-        if (kind !== "tap" && keys.length !== 1) return fail(steps, "A press or release names one key; use a tap for a chord.");
-        const identities = keys.map(keyId);
-        if (keys.length > MAX_KEYS || new Set(identities).size !== keys.length) return fail(steps, "A chord is up to 16 distinct keys.");
-        const unknown = allowed && keys.find((key) => !allowed.has(key));
-        if (unknown) return fail(steps, `${unknown} is not a key a macro can send.`);
-        if (kind === "release") {
-            if (!held.delete(identities[0])) return fail(steps, `${keys[0]} is released but was never pressed.`);
-        } else {
-            if (identities.some((key) => held.has(key))) return fail(steps, "A macro presses a key that is already held.");
-            if (held.size + keys.length > MAX_KEYS) return fail(steps, "A macro holds at most 16 keys at once.");
-            if (kind === "press") held.add(identities[0]);
-        }
-        steps.push({kind, keys});
-    }
-    flush();
-    return textHoldError ? fail(steps, "Release ordinary keys before text your keyboard layout cannot type, which needs Unicode entry; modifier holds are supported.") : {steps, error: ""};
+    const {steps, error} = readMacroPayload(String(payload ?? ""), {
+        identity: (key) => options.aliases?.[key] || key,
+        sendable: (key) => !allowed || allowed.has(key),
+        textEntry: options.textEntry,
+        needsEntry: (character) => options.layoutChars ? !options.layoutChars.includes(character) : /[^\x00-\x7F]/u.test(character),
+        ordinary: (key) => Boolean(options.modifierKeys) && !options.modifierKeys?.includes(/** @type {string} */ (key)),
+        skipEmptyNames: true,
+    });
+    /** @type {MacroStep[]} */
+    const read = steps.map((step) => step.kind === "text" || step.kind === "delay" ? step : {kind: step.kind, keys: step.keys});
+    return {steps: read, error: error ? macroProblemWords(error, options.problems) : ""};
 }
-
-/** @param {MacroStep[]} steps @param {string} error */
-const fail = (steps, error) => ({steps, error});
 
 /** @param {MacroStep} step @param {(name: string) => string} [label] */
 export const describeStep = (step, label = (name) => name) => step.kind === "text" ? step.text
@@ -113,14 +72,17 @@ export function serializeMacroStep(step) {
 export const serializeMacro = (steps) => steps.map(serializeMacroStep).join("");
 
 // Editable steps retain incomplete fields locally. The raw view must reflect
-// them verbatim, while incomplete commands are never posted for staging.
-/** @param {readonly MacroStep[]} steps */
-export function macroStepsInput(steps) {
+// them verbatim, while incomplete commands are never posted for staging. A
+// delay out of range is said in the vocabulary's words for that problem; a
+// key step with no key yet is the editor's own.
+/** @param {readonly MacroStep[]} steps @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} [model] */
+export function macroStepsInput(steps, model) {
+    const problems = vocabulary(model).macroProblems;
     let error = "";
     const payload = steps.map(step => {
         if (step.kind === "text") return serializeMacroStep(step);
         if (step.kind === "delay") {
-            if (!/^\d+$/.test(String(step.delay)) || Number(step.delay) > MAX_DELAY) error ||= "Enter a delay between 0 and 65,535 milliseconds.";
+            if (!/^\d+$/.test(String(step.delay)) || Number(step.delay) > MAX_DELAY) error ||= macroProblemWords({code: "delay"}, problems);
             return `{${step.delay}}`;
         }
         if (!step.keys?.length) error ||= "Choose a key for each key step.";
@@ -187,12 +149,12 @@ export function unreleased(steps, aliases = {}) {
 // Whether a slot answers a search. A macro is found by the name it was given,
 // and by the slot it sits in as the screens label it — "M3", "Macro 3" or its
 // keycode — so an unnamed macro can still be found. Case is ignored.
-/** @param {{keycode?: string, name?: string} | null | undefined} slot @param {unknown} query */
+/** @param {{keycode?: string, name?: string, defaultName?: string} | null | undefined} slot @param {unknown} query */
 export function macroMatches(slot, query) {
     const needle = String(query ?? "").trim().toLowerCase();
     if (!needle) return true;
     const number = String(slot?.keycode ?? "").split("_").at(-1);
-    return [slot?.name, `M${number}`, `Macro ${number}`, slot?.keycode]
+    return [slot?.name, `M${number}`, slot?.defaultName, slot?.keycode]
         .some((text) => String(text ?? "").toLowerCase().includes(needle));
 }
 

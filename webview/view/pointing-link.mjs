@@ -16,7 +16,7 @@
 /** @param {Model | null} model @param {number} index */
 const nameOf = (model, index) => {
     const layer = (model?.layers || []).find((entry) => entry.index === index);
-    return layer ? layer.displayName || layer.name : `Layer ${index}`;
+    return layer?.displayName || layer?.name || "";
 };
 
 // Every layer the board has, in the tab order. A layer the keyboard ignores in

@@ -65,7 +65,7 @@ export function stageKey(model) {
     const colour = section(current?.label || "Feedback");
     colour.append(colourControl(model, {
         colour: current?.colour, canEdit, title: current?.label || "",
-        ...offWording("key"),
+        ...offWording(model, "key"),
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
     const policy = section("When and where");

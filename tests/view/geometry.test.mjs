@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {GEO, LED_INDEX, boardOutlineMarkup, TRACKBALL_LED, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../../webview/view/geometry.mjs";
+import {GEO, boardOutlineMarkup, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../../webview/view/geometry.mjs";
 
 test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(0), false, "left home column");
@@ -8,9 +8,6 @@ test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(50), false, "left thumb cluster");
     assert.equal(isRightHalf(51), true, "right thumb cluster");
     assert.equal(isRightHalf(55), true);
-    assert.equal(LED_INDEX[0], 0);
-    assert.equal(LED_INDEX[51], 53, "right thumb keys carry right-half LEDs");
-    assert.equal(new Set(Object.values(LED_INDEX)).size, 56, "every position has its own LED");
 });
 
 test("locality answers for the regions the firmware defines", () => {
@@ -56,7 +53,6 @@ test("every position lands inside the drawn board", () => {
 });
 
 test("the trackball LED sits on the right half and is nobody's trigger key", () => {
-    assert.equal(TRACKBALL_LED, 56, "the index the firmware solders the trackball LED at");
     assert.equal(trackballInLocality("RGB_BOTH_HALVES"), true);
     assert.equal(trackballInLocality("RGB_RIGHT_HALF"), true);
     assert.equal(trackballInLocality("RGB_LEFT_HALF"), false);

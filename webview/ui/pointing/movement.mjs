@@ -1,6 +1,6 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {AXIS, DIAGONALS, DIRECTIONS, axisReads, scrollAxesOf} from "../../view/pointing-config.mjs";
+import {AXIS, DIAGONALS, DIRECTIONS, axisReads, scrollAxesOf, tapPlaceWord} from "../../view/pointing-config.mjs";
 import {ARROWS, SCROLL_LEAD, scrollLabel, words} from "./common.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
@@ -15,7 +15,8 @@ export function movement(model, slot, scrolling, {field, select, shortcut, modif
         /** @type {HTMLElement} */ (card.querySelector("[data-axis]")).append(select("Reads", words(model).axes, slot.axis, "axis", {inline: true,
             tip: "Which movement this mode turns into keys. Switching to one axis empties the other axis's shortcuts."}));
         const cross = /** @type {HTMLElement} */ (card.querySelector(".pd-cross"));
-        for (const [direction, label] of DIRECTIONS) {
+        for (const direction of DIRECTIONS) {
+            const label = tapPlaceWord(model, "directions", direction);
             if (reads.includes(direction)) {
                 cross.append(shortcut(label, slot.directions?.[direction]?.keycode, `dir:${direction}`, {
                     klass: `arm ${direction}`, labelHtml: `<b>${ARROWS[direction]}</b> ${esc(label)}`,
@@ -23,7 +24,8 @@ export function movement(model, slot, scrolling, {field, select, shortcut, modif
             }
         }
         if (slot.axis === AXIS.EIGHT) {
-            for (const [diagonal, label] of DIAGONALS) {
+            for (const diagonal of DIAGONALS) {
+                const label = tapPlaceWord(model, "diagonals", diagonal);
                 cross.append(shortcut(label, slot.diagonals?.[diagonal]?.keycode, `diag:${diagonal}`, {
                     klass: `arm ${diagonal}`, labelHtml: `<b>${ARROWS[diagonal]}</b> ${esc(label)}`,
                 }));

@@ -48,6 +48,9 @@ test("every file the build writes is named by its content, and the manifest besi
         assert.ok(core.includes("core/transport/webhid-adapter.js"), "the page's own adapter is the one it carries");
         const panel = fs.readFileSync(path.join(outdir, manifest.panel), "utf8");
         assert.ok(!panel.includes("core/"), "the panel bundle is the renderer alone");
+        for (const rule of ["rules/layer-answers.mjs", "rules/qmk-keycodes.mjs", "rules/layer-placement.mjs", "rules/keycode-expression.mjs"]) {
+            assert.ok(core.includes(rule) && panel.includes(rule), `core and the panel each carry ${rule}`);
+        }
         assert.deepEqual(checkStaticSite(outdir, {project: root}), [], "what the build writes is ready to publish");
     } finally {
         fs.rmSync(root, {recursive: true, force: true});

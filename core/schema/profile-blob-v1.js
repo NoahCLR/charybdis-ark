@@ -1,6 +1,9 @@
 // @ts-check
 "use strict";
 const {LAYERS} = require("../data/charybdis-layout");
+const {CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
+const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
+const {MACRO_DOMAIN_V1} = require("./macro-domain-v1");
 const {u8: assertU8, u16: assertU16, u32: assertU32, asBytes, copyBytes, protocolError} = require("./bytes");
 
 // The one profile format the keyboard stores: schema 4.3, up to 130,048 bytes
@@ -44,9 +47,9 @@ const PROFILE_ACTION_KINDS = Object.freeze({
 
 const PROFILE_ACTION_LIMITS = Object.freeze({
     maxLogicalLayers: LAYERS,
-    maxPdModes: 32,
-    maxMacroSlots: 128,
-    maxCustomKeys: 128,
+    maxPdModes: POINTING_SLOT_COUNT,
+    maxMacroSlots: MACRO_DOMAIN_V1.SLOTS,
+    maxCustomKeys: CUSTOM_KEY_SLOTS,
 });
 
 const MAGIC_BYTES = Buffer.from(PROFILE_BLOB_V1.MAGIC, "ascii");

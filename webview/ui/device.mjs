@@ -57,7 +57,7 @@ export function screenDevice() {
         ...(build?.version ? /** @type {const} */ ([["Ark", esc(`Ark ${build.version}`)]]) : []),
         ["Halves", demo ? "Demo · no keyboard" : `<span class="halves">${halves}</span>`],
     ]);
-    const usage = model?.portable?.available ? profileUsageView(model.portable.usage, model?.macroBank) : null;
+    const usage = model?.portable?.available ? profileUsageView(model, model.portable.usage, model?.macroBank) : null;
     const diagnosticsOpen = (state.settingsOpen || []).includes("diagnostics");
     // Diagnostics reads each half's flash pauses when it opens, and once for
     // each connection while it stays open: a keyboard reconnected or chosen

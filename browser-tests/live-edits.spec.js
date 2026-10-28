@@ -198,7 +198,7 @@ test("pointing: a scrolling field posts its record", async ({page}) => {
     await change(page.locator('[data-f="pointing:0:scroll:divisorH"]'), 71);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "savePdMode"})]);
 });
-test("pointer settings: a pointer setting posts", async ({page}) => {
+test("Pointer: a pointer setting posts", async ({page}) => {
     await openLive(page, "pointer");
     await change(page.locator('[data-f="setting:mouseTimeout"]'), 900);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateConfigDefaults"})]);

@@ -152,7 +152,7 @@ export function commitBar() {
     if (draft.busy && apply?.state === "done") {
         return el(`<div class="commit applying readback" role="status" aria-live="polite">
             ${spinner()}<strong>Saved — reading back the keyboard</strong>
-            <span class="readback-detail">${esc(postApplyReadText(model.postApplyRead))}</span>
+            <span class="readback-detail">${esc(postApplyReadText(model, model.postApplyRead))}</span>
             <span class="readback-note">Editing resumes when this read finishes.</span></div>`);
     }
     // A failed Apply stays on screen until it is dismissed, so where it

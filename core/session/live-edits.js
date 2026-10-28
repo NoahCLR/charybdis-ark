@@ -26,9 +26,9 @@
  * @typedef {import("./profile-draft-session.js").LiveTarget} Target
  */
 const {fingerprint} = require("../model/portable-profile");
-const {EDIT_MODE} = require("../protocol/profile-edit-v1");
+const {EDIT_MODE, isEditMode} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS, PHASE, quietWords} = require("../model/vocabulary");
-const {IDENTITY} = require("../model/layer-order");
+const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
 const {expectReconnect, renamedTo} = require("./keyboard-reconnect");
@@ -259,14 +259,14 @@ const LIVE_ACTIONS = Object.freeze({
         draft.assertRevision(revision);
         const before = session.beforeApply;
         if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before a save on this keyboard to put back.");
-        return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before the save", origin: "edit", order: IDENTITY}, {replaceWhenLarge: true});
+        return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before the save", origin: "edit", order: LAYER_IDENTITY}, {replaceWhenLarge: true});
     },
     // Discard all is Revert: the keyboard runs its saved profile again, and
     // the history keeps a step for it, so undo sends the edits back.
     discard: context => LIVE_ACTIONS.revert(context),
     revert: async ({draft, revision, session}) => {
         draft.assertRevision(revision, {allowStale: false});
-        if (await revertTo(session, draft, {document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: IDENTITY})) {
+        if (await revertTo(session, draft, {document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: LAYER_IDENTITY})) {
             session.notice = "Reverted: the keyboard runs its saved profile again. Undo sends the edits back.";
         }
     },
@@ -331,7 +331,7 @@ async function setEditMode(session, message, recoveryFor, shell) {
     const draft = session.draft, service = session.service;
     if (!draft) throw new Error("Read the keyboard before changing how edits reach it.");
     const mode = message.mode;
-    if (!(/** @type {number[]} */ (Object.values(EDIT_MODE))).includes(mode)) throw new Error(`Ark offers ${[EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW, EDIT_MODE.APPLY].map(value => EDIT_MODE_WORDS[value].label).join(", ")}.`);
+    if (!isEditMode(mode)) throw new Error(`Ark offers ${[EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW, EDIT_MODE.APPLY].map(value => EDIT_MODE_WORDS[value].label).join(", ")}.`);
     draft.assertRevision(message.draftRevision);
     const known = service.snapshot().editMode;
     if (known?.mode === mode && !known.conflict && Boolean(draft.live) === (mode !== EDIT_MODE.APPLY)) return;

@@ -15,7 +15,7 @@ test("each Settings screen draws its own sections open, with nothing to fold and
     for (const [screen, title, sections] of [
         ["behaviours", "Behaviours", ["keyTiming", "behaviorSettings"]],
         ["combos", "Combos", ["comboSettings", "comboReferences"]],
-        ["pointer", "Pointer settings", ["normalPointerSpeed", "sniping", "autoMouse"]],
+        ["pointer", "Pointer", ["normalPointerSpeed", "sniping", "autoMouse"]],
         ["host", "Host", ["host", "keyboardOptions"]],
     ]) {
         await page.locator(`[data-screen="${screen}"]`).click();

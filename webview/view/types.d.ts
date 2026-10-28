@@ -13,6 +13,8 @@ export interface MacroOptions {
     keys?: readonly string[];
     modifierKeys?: readonly string[];
     layoutChars?: string | readonly string[];
+    /** The words for each reason a macro does not read (vocabulary.macroProblems). */
+    problems?: Readonly<Record<string, string>>;
 }
 export interface FaceRows {
     comboHeight: number;

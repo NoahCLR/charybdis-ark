@@ -12,9 +12,10 @@ const {macroEditorView} = require("./macro-editor");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
-const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES, KEY_BEHAVIOR_TIER_FIELDS} = require("../schema/key-behavior-domain-v1");
+const {PD_AXIS, PD_KIND} = require("../schema/pd-mode-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
-const {VOCABULARY, word, layerName: layerCalled, slotName, modifierNames} = require("./vocabulary");
+const {VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, modifierNames} = require("./vocabulary");
 
 /**
  * @typedef {import("../schema/types.js").SemanticAction} Action
@@ -104,12 +105,12 @@ function pointingFields(slot, names) {
     result.set(L.linkedLayers, layerSet(slot.linkedLayers, names, "None"));
     result.set(L.linkTurnsOn, layerSet(slot.linkTurnsOn, names, "None"));
     if (slot.linkedLayers) result.set(L.linkEnds, word(P.linkEnds, slot.linkEnds));
-    if (slot.kind === 1) {
+    if (slot.kind === PD_KIND.DIRECTIONAL) {
         result.set("Axes", word(P.axes, slot.axis));
         result.set("Horizontal movement per tap", slot.thresholdX);
         result.set("Vertical movement per tap", slot.thresholdY);
-        for (const direction of ["left", "right", "up", "down"]) result.set(direction[0].toUpperCase() + direction.slice(1), tap(slot.directions[direction]));
-        if (slot.axis === 3) for (const [diagonal, name] of [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]]) {
+        for (const [direction, name] of P.directions) result.set(name, tap(slot.directions[direction]));
+        if (slot.axis === PD_AXIS.EIGHT) for (const [diagonal, name] of P.diagonals) {
             result.set(name, tap(slot.diagonals?.[diagonal]));
         }
         result.set("When a direction is empty", word(P.emptyDirection, slot.emptyDirection ?? 0));
@@ -154,8 +155,9 @@ const positionName = slot => THUMBS.get(slot) || `${slot < 30 ? "Left" : "Right"
 // differ (everything it holds, for an added or removed item), and where it
 // is edited, so the review can go there.
 
-// Tiers by the field that stores them, named in the vocabulary's words.
-const TIERS = /** @type {const} */ ([["tap", "tap"], ["hold", "hold"], ["longHold", "long"]]);
+// Tiers in the grid's order, each with the field that stores it, named in
+// the vocabulary's words.
+const TIERS = /** @type {[import("../../contracts/edits.js").Tier, "tap" | "hold" | "longHold"][]} */ (Object.entries(KEY_BEHAVIOR_TIER_FIELDS));
 
 // A behaviour as fields: its timing, the anchor, then every tier the grid
 // shows, named as the grid names it (1× tap, 2× hold).
@@ -178,13 +180,13 @@ function behaviourFields(row, defaults, names, shortcuts) {
         ["Enabled", row.enabled ? "on" : "off"],
         ["Allowed layers", allowedLayers(row.allowedLayers, names)],
     ]);
-    for (const step of row.steps) for (const [tier, name] of TIERS) {
+    for (const step of row.steps) for (const [name, tier] of TIERS) {
         const branch = step[tier];
         if (!branch) continue;
         const hold = tier === "tap" ? undefined : /** @type {import("../schema/types.js").HoldBranch} */ (branch);
         const reaches = hold ? hold.action : /** @type {Action} */ (branch);
         if (tier === "tap" && !reaches.kind) continue;
-        const how = tier === "tap" ? "" : ` · ${word(VOCABULARY.holdStyles[name], Object.entries(KEY_BEHAVIOR_HOLD_STYLES).find(([, id]) => id === hold?.style)?.[0])}${hold?.repeatHz ? ` · ${hold?.repeatHz} Hz` : ""}`;
+        const how = name === "tap" ? "" : ` · ${word(VOCABULARY.holdStyles[name], Object.entries(KEY_BEHAVIOR_HOLD_STYLES).find(([, id]) => id === hold?.style)?.[0])}${hold?.repeatHz ? ` · ${hold?.repeatHz} Hz` : ""}`;
         // A tier is named as the grid names it, and carries which branch and
         // tier it is, so the review can colour it as the grid does.
         // Compared by what is stored, so a renamed or cleared pointing mode
@@ -421,7 +423,7 @@ function profileReview(before, after, capabilities) {
             ["Uninterruptible playback", {key: macro.protection,
                 text: macro.protection === "auto" ? `${word(VOCABULARY.macroProtection, macro.protection)} · ${macro.uninterruptible ? "on" : "off"}` : word(VOCABULARY.macroProtection, macro.protection)}]]));
         const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
-        item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
+        item("Macros", `macro:${i}`, `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
     });
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
@@ -455,8 +457,8 @@ function profileReview(before, after, capabilities) {
             };
             // The effect belongs to Host, so discarding it restores Host and
             // preserves independently edited macro text and names.
-            item("Macros", "settings:host", `Macro ${index}${macro.name ? ` · ${macro.name}` : ""} · Your computer settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
-            /** @type {Change} */ (items.at(-1)).note = "Playback changes because of Host → Your computer. Discard it together with that change.";
+            item("Macros", "settings:host", `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · Your computer settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
+            /** @type {Change} */ (items.at(-1)).note = `Playback changes because of ${VOCABULARY.settingsScreens.host} → Your computer. Discard it together with that change.`;
         });
     }
     // A custom key is its name and shortcut here; what its behaviour adds is

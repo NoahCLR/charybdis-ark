@@ -2,7 +2,7 @@
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {vocabulary} from "./vocabulary.mjs";
 import {actionLabel, canonicalKeycode} from "./keyface.mjs";
-import {macroOfName} from "./keycode-expression.mjs";
+import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MODS, MOD_BITS, MOD_RIGHT, QK, inBlock, keyOf, macroOfName, modsOf, wrapperOf} from "../../rules/qmk-keycodes.mjs";
 
 // Numeric keycodes, named.
 //
@@ -11,10 +11,7 @@ import {macroOfName} from "./keycode-expression.mjs";
 // catalogue the keyboard itself reported, and falls back to the hex value
 // rather than inventing a name it cannot prove.
 
-/** @type {[number, string][]} */
-const MOD_WRAPPERS_LEFT = [[1, "C"], [2, "S"], [4, "A"], [8, "G"]];
-/** @type {[number, string][]} */
-const MOD_WRAPPERS_RIGHT = [[1, "RCTL"], [2, "RSFT"], [4, "RALT"], [8, "RGUI"]];
+const LEFT_MODS = [MODS.LCTL, MODS.LSFT, MODS.LALT, MODS.LGUI], RIGHT_MODS = [MODS.RCTL, MODS.RSFT, MODS.RALT, MODS.RGUI];
 
 export function keyName(/** @type {Model} */ model, /** @type {number} */ code) {
     if (!code) return "";
@@ -26,12 +23,13 @@ export function keyName(/** @type {Model} */ model, /** @type {number} */ code) 
 
     // Modifier-wrapped basic keycodes: 0x0100–0x1fff carries the held
     // modifiers in bits 8–12, and bit 12 means they are the right-hand ones.
-    if (code >= 0x0100 && code <= 0x1fff) {
-        const base = direct(code & 0xff);
-        const bits = (code >> 8) & 0x1f;
-        if (base && bits) {
-            const wrappers = bits & 0x10 ? MOD_WRAPPERS_RIGHT : MOD_WRAPPERS_LEFT;
-            return wrappers.filter(([bit]) => bits & bit).reduceRight((value, [, name]) => `${name}(${value})`, base);
+    // The side flag with no modifier is no name of QMK's, so it stays hex.
+    if (inBlock(code, QK.MODS)) {
+        const base = direct(keyOf(code));
+        const bits = modsOf(code);
+        if (base && bits & MOD_BITS) {
+            const mods = bits & MOD_RIGHT ? RIGHT_MODS : LEFT_MODS;
+            return mods.filter((mod) => bits & mod & MOD_BITS).reduceRight((value, mod) => `${wrapperOf(mod)}(${value})`, base);
         }
     }
     return `0x${code.toString(16).toUpperCase()}`;
@@ -52,9 +50,9 @@ export function keyDisplayName(/** @type {Model} */ model, /** @type {number} */
 // the modifiers and bit 12 puts them on the right. 0 for any other keycode.
 /** @param {number} code */
 export const compactModifierMask = (code) => {
-    if (code < 0x0100 || code > 0x1fff) return 0;
-    const compact = (code >> 8) & 0x1f;
-    return compact & 0x10 ? (compact & 0x0f) << 4 : compact & 0x0f;
+    if (!inBlock(code, QK.MODS)) return 0;
+    const compact = modsOf(code);
+    return compact & MOD_RIGHT ? (compact & MOD_BITS) << 4 : compact & MOD_BITS;
 };
 
 // Labels arrive with the current model; never retain a translated name.
@@ -78,21 +76,22 @@ export function modifierPick(model, {keys = [], mods = []}) {
     /** @param {string} name */
     const entryOf = (name) => (model?.qmkKeycodes || []).find((entry) => entry.value === (model?.qmkKeycodeAliases?.[name] || name) || entry.aliases?.includes(name));
     const code = keys[0] ? entryOf(keys[0])?.keycode : undefined;
-    const keyBit = code !== undefined && code >= 0xe0 && code <= 0xe7 ? 1 << (code - 0xe0) : 0;
+    const keyBit = code !== undefined && inBlock(code, MODIFIER_KEYS) ? 1 << (code - MODIFIER_KEYS.first) : 0;
     if (keys.length && !keyBit) return null;
     const mask = wrapped | keyBit;
     if (!mask) return null;
-    const oneSide = (/** @type {number} */ bits) => !(bits & 0x0f) || !(bits & 0xf0);
+    const {LEFT, RIGHT} = MODIFIER_KEY_SIDES;
+    const oneSide = (/** @type {number} */ bits) => !(bits & LEFT) || !(bits & RIGHT);
     const single = (/** @type {number} */ bits) => bits !== 0 && (bits & (bits - 1)) === 0;
     // The clicked modifier stays the key when it can. Otherwise a set on one
     // side gives its first modifier, and a set on both sides the lone modifier
     // of one side, the left first, so the rest share the other side.
     const inner = keyBit && oneSide(mask & ~keyBit) ? keyBit
         : oneSide(mask) ? mask & -mask
-        : single(mask & 0x0f) ? mask & 0x0f
-        : single(mask & 0xf0) ? mask & 0xf0 : 0;
+        : single(mask & LEFT) ? mask & LEFT
+        : single(mask & RIGHT) ? mask & RIGHT : 0;
     if (!inner) return {shortcut: {mods: mask, keys: [], layers: 0, layerKind: 0}};
-    const name = (model?.qmkKeycodes || []).find((entry) => entry.keycode === 0xe0 + Math.log2(inner))?.value;
+    const name = (model?.qmkKeycodes || []).find((entry) => entry.keycode === MODIFIER_KEYS.first + Math.log2(inner))?.value;
     if (!name) return null;
     return {keys: [name], mods: controls.filter((entry) => mask & ~inner & entry.bit).map((entry) => entry.value)};
 }
@@ -113,7 +112,7 @@ export function pickerModifierProblem(model, picker) {
     const selected = model?.qmkKeycodeAliases?.[picker.keys[0]] || picker.keys[0];
     const code = model?.qmkKeycodes?.find(entry => entry.value === selected)?.keycode;
     if (code !== undefined) mask |= compactModifierMask(code);
-    return (mask & 0x0f) && (mask & 0xf0)
+    return (mask & MODIFIER_KEY_SIDES.LEFT) && (mask & MODIFIER_KEY_SIDES.RIGHT)
         ? "A keycode can hold left modifiers or right modifiers together. Choose modifiers from one side." : "";
 }
 
@@ -127,13 +126,13 @@ export function macroIndex(code) {
     if (named !== undefined) return named;
     const match = /^(?:QK_MACRO_|MC_)(\d+)$/.exec(text);
     if (match && Number(match[1]) > 31) return null;
-    const value = match ? Number(match[1]) : /^(?:0x[0-9a-f]+|\d+)$/i.test(text) ? Number(text) - 0x7700 : -1;
-    return Number.isInteger(value) && value >= 0 && value < 128 ? value : null;
+    const value = match ? Number(match[1]) : /^(?:0x[0-9a-f]+|\d+)$/i.test(text) ? Number(text) - QK.MACRO.first : -1;
+    return Number.isInteger(value) && inBlock(QK.MACRO.first + value, QK.MACRO) ? value : null;
 }
 /** @param {Model} model @param {string | number | null | undefined} code */
 export function pointingMacro(model, code) {
     const index = macroIndex(code);
     if (index === null) return null;
     const slot = model?.macros?.find(slot => slot.keycode === `MACRO_${index}`);
-    return {index, name: slot?.name || `Macro ${index}`, empty: Boolean(slot?.empty)};
+    return {index, name: slot?.name || slot?.defaultName || `MACRO_${index}`, empty: Boolean(slot?.empty)};
 }

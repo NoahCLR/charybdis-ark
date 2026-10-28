@@ -135,8 +135,10 @@ _Avoid_: restore (alone), load, upload
 **Screen**:
 One of Ark's top-level views chosen from the rail, in three groups: Keymap,
 Lighting, Macros, Custom keys and Pointing modes under Configure; Behaviours,
-Combos, Pointer settings and Host under Settings; Backups and Keyboard under
-Keyboard.
+Combos, Pointer and Host under Settings; Backups and Keyboard under
+Keyboard. Outside the rail, a Settings screen is named with "settings" after
+it (Behaviour settings, Combo settings, Pointer settings, Host settings),
+since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
 
 **Area**:

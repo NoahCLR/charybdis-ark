@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {withAnswers} from "../fixtures/layer-answers.mjs";
-import {resolvedPositions, reachablePositions, comboActivations, activations, viewPositions} from "../../webview/view/layer-resolution.mjs";
+import {resolvedPositions, reachablePositions, viewPositions} from "../../webview/view/layer-resolution.mjs";
 import {pointingReach} from "../../webview/view/reach.mjs";
 
 test("a transparent key can be answered by any layer below that is held with this one", () => {
@@ -68,15 +68,19 @@ test("resolution consumes published facts, including native transparency whose n
         "an incomplete model supplies no inferred resolution facts");
 });
 
-test("combo activation enumeration uses only published lower answering layers", () => {
+// A keyboard can keep default layers on beside base (QMK's default layer
+// state); core marks them alwaysOn, and they answer without being held.
+test("a default layer the keyboard keeps on answers without being held, like base", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const stack = withAnswers([
-        {positions: [{layoutIndex: 0, keycode: "KC_A"}]},
-        {positions: [{layoutIndex: 0, keycode: "KC_NO"}]},
-        {positions: [{layoutIndex: 0, keycode: "KC_TRANSPARENT"}]},
-        {positions: [{layoutIndex: 0, keycode: "KC_B"}]},
-        {positions: [{layoutIndex: 0, keycode: "KC_TRANSPARENT"}]},
+        {index: 0, name: "Base", positions: [at(0, "KC_A"), at(1, "KC_B")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_1")]},
+        {index: 2, name: "Colemak", alwaysOn: true, positions: [at(0, "KC_Q"), at(1, "KC_TRANSPARENT")]},
+        {index: 3, name: "Top", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT")]},
     ]);
-    assert.deepEqual(comboActivations(stack, 4), [[], [1], [3], [1, 3]]);
-    assert.deepEqual(comboActivations(stack, 3), [[]], "a mapped top key cannot change with lower holds");
-    assert.deepEqual(activations(3), [[], [1], [2], [1, 2]], "general reach still offers every hold set");
+    assert.deepEqual(resolvedPositions(stack, 3).map((entry) => [entry.position.keycode, entry.layer.name, entry.whileHeld]),
+        [["KC_Q", "Colemak", false], ["KC_B", "Base", false]], "the default layer answers with nothing held");
+    assert.deepEqual(reachablePositions(stack, 3).filter((entry) => entry.layer.name === "Colemak").map((entry) => entry.whileHeld), [false]);
+    assert.deepEqual(viewPositions(stack, 3).map((entry) => entry.position.keycode), [], "a layer shown alone is the view by itself");
+    assert.deepEqual(viewPositions(stack, 3, [1]).map((entry) => entry.position.keycode), ["KC_Q", "KC_1"], "held with another, the default layer joins as base does");
 });

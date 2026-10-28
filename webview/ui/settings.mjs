@@ -1,6 +1,6 @@
 // @ts-check
 // The Settings screens: the keyboard's global policy, exactly as it reports
-// it, a screen per subject (Behaviours, Combos, Pointer settings, Host).
+// it, a screen per subject (Behaviours, Combos, Pointer, Host).
 //
 // The sections, fields, hints and limits all come from the device snapshot, so
 // these screens render what the firmware says it has rather than a list this
@@ -35,7 +35,7 @@ export const screenBehaviours = () => settingsScreen("behaviours", "Behaviours",
     "How long a key waits to tell a tap from a hold, and the layers on which keys use their behaviours.");
 export const screenCombos = () => settingsScreen("combos", "Combos",
     "Whether combos run and on which layers, the timing every combo shares, and the layer each layer matches its combos on.");
-export const screenPointer = () => settingsScreen("pointer", "Pointer settings",
+export const screenPointer = () => settingsScreen("pointer", "Pointer",
     "How the trackball moves the pointer: its speed, sniping (a slower speed for precise work), and the layer moving the ball turns on.");
 export const screenHost = () => settingsScreen("host", "Host",
     "The computer the keyboard is plugged into, which macros type for, and the key swaps and typing options for every layer.");
@@ -104,7 +104,7 @@ function referenceCard(model, section, canEdit) {
         const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}">
             <span class="txt">${layerCell(model, field, layer)}</span>
             <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
-            ${layers().map((entry) => `<option value="Layer ${esc(entry.index)}" ${field.value === `Layer ${entry.index}` ? "selected" : ""}>${esc(entry.displayName || entry.name)}</option>`).join("")}</select></label>`);
+            ${layers().map((entry) => `<option value="${esc(entry.name)}" ${field.value === entry.name ? "selected" : ""}>${esc(entry.displayName || entry.name)}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (cell.querySelector("select")).addEventListener("change", submit);
         grid.appendChild(cell);
     }
@@ -256,7 +256,7 @@ function fieldRow(field, canEdit, submit, slot, durations) {
     }
     if (field.kind === "layer") {
         const node = el(`<select class="input" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${editable ? "" : "disabled"}>
-            ${layers().map((layer) => `<option value="Layer ${esc(layer.index)}" ${field.value === `Layer ${layer.index}` ? "selected" : ""}>${esc(layer.displayName || layer.name)}</option>`).join("")}</select>`);
+            ${layers().map((layer) => `<option value="${esc(layer.name)}" ${field.value === layer.name ? "selected" : ""}>${esc(layer.displayName || layer.name)}</option>`).join("")}</select>`);
         node.addEventListener("change", submit);
         control.appendChild(node);
         return row;

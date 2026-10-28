@@ -1,10 +1,11 @@
 // @ts-check
 // Where a set of keycodes is reached: on a layer, as a behaviour's action, or
 // as a combo's output, and that said in one line. Pure, from #156's Trackball
-// rules; Pointer settings uses it for the sniping keys.
+// rules; Pointer uses it for the sniping keys.
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
-/** @typedef {{keys: {layer: any, position: any}[], behaviours: any[], combos: any[], layers: string[]}} Placements */
+/** @typedef {import("../../contracts/panel.js").PublishedModel} PublishedModel */
+/** @typedef {{keys: {layer: PublishedModel["layers"][number], position: import("../../contracts/panel.js").Position}[], behaviours: PublishedModel["keyBehaviors"], combos: PublishedModel["combos"], layers: string[]}} Placements */
 
 // A name is matched by the value the keyboard stores too, as a position keeps
 // whatever the keyboard calls the keycode.

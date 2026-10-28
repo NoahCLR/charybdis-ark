@@ -6,7 +6,7 @@ const {DRAFT_EDIT_TYPES, DRAFT_EDITS, editedBy, inDomain, draftEditLabel} = requ
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const portable = require("../../core/model/portable-profile");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
-const keycodes = require("../../core/data/keycode-catalog");
+const keycodes = require("../../core/schema/keycodes");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 
 const ROOT = path.join(__dirname, "..", "..");

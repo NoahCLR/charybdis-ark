@@ -2,6 +2,7 @@
 "use strict";
 const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
 const {LAYERS} = require("../data/charybdis-layout");
+const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
 const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError, canonical} = require("./bytes");
 
 /**
@@ -19,7 +20,7 @@ const RGB_DOMAIN_V1 = Object.freeze({
     // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14).
     DOMAIN_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
     FORMAT_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
-    POINTING_SLOTS: 32,
+    POINTING_SLOTS: POINTING_SLOT_COUNT,
     HEADER_SIZE: 16,
     PHYSICAL_LED_COUNT: 58,
     LED_BITMAP_SIZE: 8,

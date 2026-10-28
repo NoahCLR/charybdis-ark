@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
-const {LAYERS} = require("../data/charybdis-layout");
+const {ALL_LAYERS, LAYERS} = require("../data/charybdis-layout");
 const {encodeSemanticAction, decodeSemanticAction} = require("./profile-blob-v1");
 const {nativeCode} = require("./actions");
 const {canonical} = require("./bytes");
@@ -20,7 +20,6 @@ const HEADER_SIZE = 8;
 const ROW_FIXED_SIZE = 12;
 const COMBO_LIMITS = Object.freeze({maxRows: 128, maxInputs: 16, maxLayers: LAYERS});
 const FLAG = Object.freeze({HOLD: 1, TAP: 2, ORDERED: 4, DISABLED: 8, OUTPUT_BYPASS: 16});
-const ALL_LAYERS = 2 ** COMBO_LIMITS.maxLayers - 1;
 /** @param {number | null} value @param {number} min @returns {value is number} */
 const ms = (value, min) => typeof value === "number" && Number.isInteger(value) && value >= min && value <= 65535;
 /** @param {number} inputs */
@@ -98,4 +97,4 @@ const effectiveComboWindow = (table, row) => row.termMs ?? table.defaultTermMs;
 const runningComboRows = table => table.rows.map(row => ({...row, termMs: effectiveComboWindow(table, row), followsDefault: row.termMs === null,
     inputs: row.inputs.map(action => /** @type {number} */ (nativeCode(action))), output: /** @type {number} */ (nativeCode(row.output))}));
 
-module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboWindow, runningComboRows};
+module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, encodeComboDomain, decodeComboDomain, effectiveComboWindow, runningComboRows};

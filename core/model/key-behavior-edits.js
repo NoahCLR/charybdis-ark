@@ -3,12 +3,13 @@
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 
 const {nativeCode} = require("../schema/actions");
-const keycodes = require("../data/keycode-catalog");
+const keycodes = require("../schema/keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression} = require("../schema/compiled-profile-v1");
-const {actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
+const {actionName, isOwnedLayerCode, knownActionAbi, momentaryCall} = require("../schema/actions");
 const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
+const {LAYERS} = require("../data/charybdis-layout");
 const {behaviorPlacementProblem} = require("./profile-placement");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
@@ -49,7 +50,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         || (native(left) !== undefined && native(left) === native(right));
     // The keyboard refuses a profile whose actions sit where it cannot run
     // them, so every row is checked, not only the one being edited.
-    const layerCount = capabilities.compiledLayerCount ?? 16;
+    const layerCount = capabilities.compiledLayerCount ?? LAYERS;
     /** @param {Row[]} rows */
     const checkPlacements = (rows) => {
         const problem = behaviorPlacementProblem(rows, {layerCount});
@@ -68,7 +69,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         /** @type {Action} */
         let result;
         const encoded = keycodes.encode(name);
-        if (encoded !== undefined && !/^MO\s*\(/.test(name)) {
+        if (encoded !== undefined && !momentaryCall(name)) {
             // Where an owned layer keycode may go is checked with the rest of the
             // row (behaviorPlacementProblem); only keycodes the keyboard does not
             // run through its layer ownership are refused here.
@@ -80,7 +81,8 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
             result = semanticActionForExpression(name, {});
             if (result.kind === ACTION.QMK_KEYCODE) {
                 // Native expressions must pass the catalog's structural
-                // checks; the legacy compiler accepts invalid modifier wraps.
+                // checks, so only a bare name the keyboard knows besides
+                // (DPI_MOD) gets through here.
                 if (!/^[A-Z][A-Z0-9_]*$/.test(name)) throw invalid(`Unsupported key expression: ${name}.`);
                 if (!knownAbi) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
             }

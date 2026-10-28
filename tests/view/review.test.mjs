@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {categorySummary, changesKept, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
+import {createRequire} from "node:module";
+import {SECTION_ROWS, categorySummary, changesKept, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
+
+const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
+const words = {vocabulary: VOCABULARY};
 
 const item = (area, title, group, extra = {}) => ({area, title, group, status: "changed", fields: [], ...extra});
 
@@ -67,7 +71,7 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(placeState({kind: "macro", index: 4}).macroSlot, "MACRO_4");
     assert.deepEqual(placeState({kind: "customKey", index: 2}), {screen: "customKeys", customKey: "CUSTOM_KEY_2"});
     assert.ok(draftMarks([{place: {kind: "customKey", index: 2}, status: "changed"}]).customKeys.has("CUSTOM_KEY_2"));
-    assert.deepEqual(categorySummary([{place: {kind: "customKey", index: 2}, status: "changed"}]).map(({category, rows}) => [category, rows]),
+    assert.deepEqual(categorySummary(words, [{place: {kind: "customKey", index: 2}, status: "changed"}]).map(({category, rows}) => [category, rows]),
         [["Keys", [{label: "Custom keys", count: 1}]]], "names and shortcuts alike");
     assert.equal(placeState({kind: "pointing", slot: 6}).pointingSlot, 6);
     assert.equal(placeState({kind: "lighting", stage: "pd"}).stage, "pd");
@@ -123,8 +127,7 @@ test("a settings section timed on a lighting stage marks that stage's tab too", 
 
 test("a profile file's differences are counted by what they configure, split as each screen is", () => {
     const at = (place, extra = {}) => ({status: "changed", place, ...extra});
-    const stages = [{id: "base", label: "Background effect"}, {id: "layers", label: "Layer colours"}, {id: "auto", label: "Auto-mouse fade"}, {id: "key", label: "Key feedback"}];
-    const groups = categorySummary([
+    const groups = categorySummary(words, [
         at({kind: "pointing", slot: 2}), at({kind: "settings", section: "sniping"}), at({kind: "settings", section: "autoMouse"}),
         at({kind: "lighting", stage: "key"}), at({kind: "settings", section: "lightingFeedback", area: "Lighting", stage: "key"}), at({kind: "lighting", stage: "layers", layer: 3}),
         at({kind: "lighting", stage: null}), at({kind: "settings", section: "rgbAppearance", area: "Lighting", stage: "base"}), at({kind: "settings", section: "lightingPower", area: "Lighting"}),
@@ -132,7 +135,7 @@ test("a profile file's differences are counted by what they configure, split as 
         at({kind: "combo", index: 7}, {status: "removed"}), at({kind: "key", layer: 3}), at({kind: "key", layer: 0}), at({kind: "key", layer: 3}),
         at({kind: "settings", section: "keyTiming"}), at({kind: "behaviour"}, {status: "added"}), at({kind: "layers"}, {unit: "layerName:2"}),
         at({kind: "settings"}, {unit: "settings:otherKeyOptions"}), at({kind: "macro", index: 4}), at(null, {unit: "profile", title: "Stored profile"}),
-    ], {names: ["Base", "Numbers", "Symbols", "Navigation"], stages});
+    ], {names: ["Base", "Numbers", "Symbols", "Navigation"]});
     assert.deepEqual(groups.map((group) => [group.category, group.count]),
         [["Keys", 8], ["Lighting", 7], ["Macros", 1], ["Mouse", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");
     const rows = (category) => groups.find((group) => group.category === category).rows.map((row) => `${row.label} ${row.count}`);
@@ -145,6 +148,20 @@ test("a profile file's differences are counted by what they configure, split as 
     assert.deepEqual(rows("Other"), ["Stored profile 1"]);
     assert.deepEqual(rows("Macros"), [], "a category that is its one row shows no rows");
     assert.equal(groups[0].status, "1 added · 6 changed · 1 removed");
+});
+
+// The summary's own words for settings sections, as it has always shown them;
+// three differ from the Settings screens' section labels.
+test("a profile file's settings sections are counted under the vocabulary's words, each in its category", () => {
+    assert.deepEqual(Object.keys(SECTION_ROWS).sort(), Object.keys(VOCABULARY.fileSections).sort(), "every section placed has words, and only those");
+    const at = (section) => ({status: "changed", place: {kind: "settings", section}});
+    const labels = Object.fromEntries(categorySummary(words, Object.keys(SECTION_ROWS).map(at))
+        .flatMap((group) => group.rows.map((row) => [row.label, group.category])));
+    assert.deepEqual(labels, {
+        "Tap & hold timing": "Keys", "Default layers": "Keys", "Behaviour settings": "Keys", "Combo settings": "Keys", "Combo layer matching": "Keys",
+        "Key swaps & typing": "Keys", "All lighting": "Lighting", "Background effect": "Lighting", "Key feedback": "Lighting",
+        "Pointer speed": "Mouse", "Auto-sniping": "Mouse", "Auto-mouse": "Mouse",
+    });
 });
 
 test("a stale draft says how many changes it keeps, in agreement", () => {

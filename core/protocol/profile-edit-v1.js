@@ -81,7 +81,10 @@ const KNOWN_EDIT_FLAGS = 0xffff;
 
 // How the client's edits reach the keyboard, stored on the keyboard outside
 // every profile. A keyboard never set is in Live preview + save.
+// Its numbers are contracts/model.d.ts EditMode (tests/protocol/profile-edit-v1.test.js).
 const EDIT_MODE = Object.freeze({APPLY: 0, LIVE: 1, LIVE_REVIEW: 2});
+/** @param {unknown} mode @returns {mode is import("../../contracts/model.js").EditMode} */
+const isEditMode = (mode) => (/** @type {unknown[]} */ (Object.values(EDIT_MODE))).includes(mode);
 const SPLICE_FLAGS = Object.freeze({CREATE: 1 << 0, DROP: 1 << 1});
 
 const ProfileEditProtocolError = protocolError("ProfileEditProtocolError");
@@ -165,7 +168,7 @@ function buildRestartRequest(transactionId) {
 }
 /** @param {number} transactionId @param {number} mode */
 function buildEditModeRequest(transactionId, mode) {
-    if (!(/** @type {number[]} */ (Object.values(EDIT_MODE))).includes(mode)) throw new RangeError("Unknown edit mode.");
+    if (!isEditMode(mode)) throw new RangeError("Unknown edit mode.");
     const report = header(PROFILE_EDIT_V1.VALUE_MODE, transactionId);
     report[5] = mode;
     return report;
@@ -372,7 +375,7 @@ async function readActiveProfile(connection, options) {
     return {metadata, bytes};
 }
 
-module.exports = {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, EDIT_MODE, SPLICE_FLAGS, ProfileEditProtocolError,
+module.exports = {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, EDIT_MODE, isEditMode, SPLICE_FLAGS, ProfileEditProtocolError,
     buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest, buildEditAbortRequest,
     buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, editReplyMatcher, decodeEditReply, sendEditRequest,
     decodeEditStatusPages, decodeAutoSavePage, decodeSafeBoundaryPage, readEditStatus, readSafeBoundaryReasons, decodeEditProgress, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,

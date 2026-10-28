@@ -61,7 +61,8 @@ test("the native resolver refuses expressions whose bits would land on another k
     const {resolveNativeQmkExpression: resolve} = require("../../core/schema/compiled-profile-v1");
     // Well-formed expressions still resolve, including nested modifiers.
     assert.equal(resolve("C(S(0x04))", {}), 0x0304);
-    assert.equal(resolve("LT(15,0x04)", {}), 0x4f04);
+    assert.equal(resolve("LT(15,KC_A)", {qmkKeycodeValues: {KC_A: 4}}), 0x4f04);
+    assert.equal(resolve("LT(15,0x04)", {}), undefined, "a tap is a key's name, as QMK spells it");
     assert.equal(resolve("LOCK_LAYER(15)", {}) - resolve("LOCK_LAYER(0)", {}), 15);
     // Each of these used to OR into an unrelated keycode: a dead user keycode,
     // a macro with Ctrl dropped, RIGHT_THUMB, TO(4), QK_BOOTLOADER, MO(1)+mods.

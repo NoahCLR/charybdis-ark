@@ -8,19 +8,11 @@ export {configureReady, screenAvailable};
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {import("../../contracts/model.js").CountedProgress} CountedProgress */
 
-import {phaseWords} from "./vocabulary.mjs";
+import {phaseWords, readStepWords} from "./vocabulary.mjs";
 
-/** @type {Readonly<Record<string, string>>} */
-const POST_APPLY_READ = {
-    layout: "Reading keys and layers",
-    profile: "Reading saved lighting, behaviours and settings",
-    combos: "Checking active combos",
-    baseRgb: "Checking base lighting",
-};
-
-/** @param {{step: string, progress?: CountedProgress | null} | null | undefined} read */
-export function postApplyReadText(read) {
-    const label = (read ? POST_APPLY_READ[read.step] : undefined) || "Confirming the completed save";
+/** @param {Parameters<typeof readStepWords>[0]} model @param {{step: string, progress?: CountedProgress | null} | null | undefined} read */
+export function postApplyReadText(model, read) {
+    const label = (read ? readStepWords(model, read.step) : undefined) || "Confirming the completed save";
     const progress = read?.progress;
     return progress && Number.isInteger(progress.done) && Number.isInteger(progress?.total) && progress.total > 0
         ? `${label} · ${progress.done} of ${progress.total}` : label;

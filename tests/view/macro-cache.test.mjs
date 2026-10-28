@@ -3,6 +3,9 @@ import test from "node:test";
 import {createMacroReader} from "../../webview/view/macro-cache.mjs";
 import {parseMacro, macroPeek, macroPeekSteps} from "../../webview/view/macro.mjs";
 import {withStepFocus} from "../../webview/view/macro-focus.mjs";
+import {createRequire} from "node:module";
+const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
+const {macroModifierKeycodes} = createRequire(import.meta.url)("../../core/schema/macro-payload");
 
 test("unchanged bank reads parse each slot once per purpose while changed payloads parse again", () => {
     let calls = 0;
@@ -33,10 +36,10 @@ test("local step focus metadata stays outside the core's cached parsing", () => 
 test("a new published model cannot reuse parsing under old host settings", () => {
     const read = createMacroReader();
     // A held key across text the layout cannot type is fine until Unicode entry is on.
-    const native = {macroUnicode: {mode: 0}};
+    const native = {macroUnicode: {mode: 0}, macroPayloadModifierKeycodes: macroModifierKeycodes(), vocabulary: VOCABULARY};
     assert.equal(read(native, "MACRO_0", "{+KC_A}é{-KC_A}", "grid").error, "");
     assert.match(read({...native, macroUnicode: {mode: 1}}, "MACRO_0", "{+KC_A}é{-KC_A}", "grid").error, /Release ordinary keys/);
-    const model = {macroPayloadKeycodes: ["KC_A"], qmkKeycodeAliases: {KC_ENT: "KC_ENTER"}};
+    const model = {macroPayloadKeycodes: ["KC_A"], qmkKeycodeAliases: {KC_ENT: "KC_ENTER"}, vocabulary: VOCABULARY};
     assert.match(read(model, "MACRO_0", "{KC_B}", "editor").error, /not a key/);
     assert.equal(read(model, "MACRO_0", "{KC_B}", "peek").error, "", "peek preserves its independent permissive parser");
     assert.equal(read({...model, macroPayloadKeycodes: ["KC_B"]}, "MACRO_0", "{KC_B}", "editor").error, "");

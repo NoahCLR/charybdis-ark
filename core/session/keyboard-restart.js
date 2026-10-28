@@ -29,7 +29,7 @@
  */
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS} = require("../model/vocabulary");
-const {IDENTITY} = require("../model/layer-order");
+const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {snapshotOf} = require("./live-profile-session");
 const {expectRestart, followKeyboard} = require("./keyboard-reconnect");
 const {fingerprint} = require("../model/portable-profile");
@@ -156,7 +156,7 @@ async function putBack(session, restart, read) {
     }
     const kept = fingerprint(restart.kept);
     try {
-        const sent = await proposeLive(session, {document: restart.kept, label: RESTART_LABEL, origin: "edit", order: IDENTITY}, {confirmed: true, replaceWhenLarge: true});
+        const sent = await proposeLive(session, {document: restart.kept, label: RESTART_LABEL, origin: "edit", order: LAYER_IDENTITY}, {confirmed: true, replaceWhenLarge: true});
         // They are back once the keyboard confirmed them, unsaved.
         const back = session.draft === draft && draft.live?.unsaved && draft.current.fingerprint === kept;
         if (!sent || !back) return `Your unsaved edits were not put back: the keyboard changed meanwhile.${inRecovery(restart.recovery)}${slave}`;

@@ -9,23 +9,27 @@
  */
 const {keycodeAction, knownActionAbi, pointingSlotOfCode} = require("../schema/actions");
 const {decodeProfileBlob, decodeStoredProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
-const {ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
+const {COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {SETTING, SETTING_FIELDS, decodeSettings} = require("../schema/settings-domain-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
+const {ALL_LAYERS, CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
+const {QK, inBlock, LAYER_FORMS, LAYER_FORM_LAYERS, layerModLayer, layerTapLayer, withLayerModLayer, withLayerTapLayer} = require("../../rules/qmk-keycodes.mjs");
 const {layerName} = require("./vocabulary");
 const {reorderLinkRefusal} = require("./pointing-links");
 const {reorderShortcutRefusal} = require("./shortcut-layers");
-const {decodeMacroPayload} = require("../schema/macro-payload");
+const {readStoredMacro} = require("./macro-input");
+const {MACRO_LIMITS} = require("../../rules/macro-payload.mjs");
+const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {hostSettings} = require("../schema/host-settings");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A current-format file contains one complete canonical schema-4 blob.
 // Keymap and macro streams are decoded editor views, never extra authorities.
 // Document version 5 refuses the former separate layers/macros format (D-L64).
-const MACRO_SLOTS = 128;
 // Base64 for 130,048 bytes plus the small JSON envelope fits in 192 KiB.
 const FILE_MAX_BYTES = 196608;
+// What a file over FILE_MAX_BYTES is told, wherever it is refused.
+const FILE_TOO_LARGE = "This profile file is too large.";
 const DOCUMENT_VERSION = 5;
 const {DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, encodeProfileDomains} = require("../schema/profile-domains");
 /** @type {readonly number[]} */
@@ -44,9 +48,11 @@ function base64(value, max, label) {
     if (bytes.length > max || bytes.toString("base64") !== value) throw fail(`Invalid ${label}.`);
     return bytes;
 }
+// The most digits a stored delay may have.
+const DELAY_DIGITS = String(MACRO_LIMITS.maxDelayMs).length;
 /** @param {Buffer} bytes @param {import("../schema/types.js").MacroOptions} [options] */
 function validateMacro(bytes, {textEntry = false, layout} = {}) {
-    decodeMacroPayload(bytes, {textEntry, layout});
+    readStoredMacro(bytes, {textEntry, layout});
     const held = new Set(); let index = 0;
     /** @param {number} v */
     const key = v => (v >= 4 && v <= 0xa4) || (v >= 0xe0 && v <= 0xe7);
@@ -57,20 +63,18 @@ function validateMacro(bytes, {textEntry = false, layout} = {}) {
         if (type === 5) {index++; continue;}
         if (type === 4) {
             let digits = "";
-            while (index < bytes.length && bytes[index] >= 48 && bytes[index] <= 57 && digits.length < 5) digits += String.fromCharCode(bytes[index++]);
-            if (!digits || Number(digits) > 65535 || bytes[index++] !== 124) throw fail("Invalid macro delay.");
+            while (index < bytes.length && bytes[index] >= 48 && bytes[index] <= 57 && digits.length < DELAY_DIGITS) digits += String.fromCharCode(bytes[index++]);
+            if (!digits || Number(digits) > MACRO_LIMITS.maxDelayMs || bytes[index++] !== 124) throw fail("Invalid macro delay.");
         } else {
             const k = bytes[index++];
             if (![1, 2, 3].includes(type) || !key(k)) throw fail("Unsupported macro key instruction.");
             if (type === 1 && held.has(k)) throw fail("A macro taps a key it already holds.");
-            if (type === 2) {if (held.has(k) || held.size >= 16) throw fail("Unbalanced macro keys."); held.add(k);}
+            if (type === 2) {if (held.has(k) || held.size >= MACRO_LIMITS.maxHeldKeys) throw fail("Unbalanced macro keys."); held.add(k);}
             if (type === 3 && !held.delete(k)) throw fail("Unbalanced macro keys.");
         }
     }
     if (held.size) throw fail("A macro leaves keys pressed.");
 }
-// Firmware's macro domain capacity, including all slot terminators.
-const MACRO_BANK_BYTES = 34903;
 // The whole profile the keyboard runs, every domain: each domain its active
 // profile holds, otherwise the compiled default the firmware falls back to
 // (a profile saved without the keymap or macros types the authored ones), and
@@ -132,7 +136,7 @@ function createSnapshot({profile, actionAbiDigest}) {
 /** @param {unknown} value @param {ProfileDestination} [capabilities] @returns {DecodedProfile} */
 function validateSnapshot(value, capabilities) {
     if (typeof value === "string") {
-        if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail("This profile file is too large.");
+        if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail(FILE_TOO_LARGE);
         try {value = JSON.parse(value);} catch {throw fail("This is not a valid profile file.");}
     }
     // Inspect the unvalidated object; its complete shape is established below.
@@ -188,7 +192,7 @@ function validateSnapshot(value, capabilities) {
     // The macro domain includes any optional unused tail. A destination
     // validates its advertised limit without constructing another storage bank.
     const stored = payload("macros").length;
-    const macroCapacity = capabilities?.macroBytes ?? MACRO_BANK_BYTES;
+    const macroCapacity = capabilities?.macroBytes ?? MACRO_DOMAIN_V1.MAX_SIZE;
     if (stored > macroCapacity) throw fail(`Macros need ${stored} bytes; this keyboard holds ${macroCapacity}.`);
     // This same complete blob is both the portable profile and the candidate.
     const candidateBytes = profile;
@@ -276,13 +280,13 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     /** @param {number} code */
     function native(code) {
         if (!renumbers) return code;
-        if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= LAYERS) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (reach(layer) << 8);}
-        for (const start of [0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x52c0, 0x52e0, LAYER_LOCK_BASE]) {
-            const width = start === LAYER_LOCK_BASE ? LAYER_LOCK_SLOTS : 32;
+        if (inBlock(code, QK.LAYER_TAP)) {const layer = layerTapLayer(code); if (layer >= LAYERS) throw fail("A key points outside the layer bank."); return withLayerTapLayer(code, reach(layer));}
+        for (const start of [...Object.values(LAYER_FORMS), LAYER_LOCK_BASE]) {
+            const width = start === LAYER_LOCK_BASE ? LAYER_LOCK_SLOTS : LAYER_FORM_LAYERS;
             if (code >= start && code < start + width) {if (code - start >= LAYERS) throw fail("A key points outside the layer bank."); return start + reach(code - start);}
         }
         // Layer-mod stores a four-bit layer followed by five modifier bits.
-        if (code >= 0x5000 && code <= 0x51ff) {const layer = (code >> 5) & 15; if (layer >= LAYERS) throw fail("Invalid layer-mod reference."); return (code & 0xfe1f) | reach(layer) << 5;}
+        if (inBlock(code, QK.LAYER_MOD)) {const layer = layerModLayer(code); if (layer >= LAYERS) throw fail("Invalid layer-mod reference."); return withLayerModLayer(code, reach(layer));}
         return code;
     }
     const layers = order.map(old => validated.layers[old].map(native));
@@ -353,4 +357,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, FILE_MAX_BYTES, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

@@ -1,6 +1,7 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {NAME_TIP} from "../../view/names.mjs";
+import {vocabulary} from "../../view/vocabulary.mjs";
 import {KIND, dpiOptions, readConfig, scrollStarter, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
 import {post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -54,7 +55,7 @@ export function editor(model, slot, canEdit, slots) {
         // The slot is staged once a field of the new form is changed.
         {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(/** @type {HTMLSelectElement} */ (event.target).value)}; render(); }}));
     headBody.append(select("Pointer speed while active", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
-        {tip: "Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in Pointer settings → Pointer speed."}));
+        {tip: `Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in ${vocabulary(model).settingsScreens.pointer} → Pointer speed.`}));
     // Its light, beside the mark that shows it.
     headBody.append(lightRow(model, slot));
     wrap.append(head);

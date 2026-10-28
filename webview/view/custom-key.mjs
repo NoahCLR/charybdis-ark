@@ -11,6 +11,8 @@ import {sentence, vocabulary} from "./vocabulary.mjs";
 import {customKeyKeycodes, customKeyPlacements, reachGroups} from "./reach.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
 import {compactModifierMask} from "./keyvalues.mjs";
+import {LAYERS} from "./layout.mjs";
+import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, TAPPING_TOGGLE, inBlock, keyOf} from "../../rules/qmk-keycodes.mjs";
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {import("../../contracts/panel.js").CustomKey} CustomKey */
@@ -32,8 +34,6 @@ export const sameShortcut = (a, b) => (a.mods ?? 0) === (b.mods ?? 0) && (a.keys
 // How a shortcut turns its layers on (SHORTCUT_LAYER_KINDS): hold, lock, move
 // to, tap-toggle, one-shot; hold without layers.
 export const LAYER_KIND = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
-// QMK's TAPPING_TOGGLE: the tap of a tap-toggle key that locks its layers.
-const TAPPING_TOGGLE = 5;
 /** @param {CustomKey} key */
 export const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || LAYER_KIND.HOLD : LAYER_KIND.HOLD);
 /** @param {CustomKey} key */
@@ -152,7 +152,7 @@ export function shortcutLayerUnder(key) {
 
 // The layers a shortcut holds on, lowest first.
 /** @param {CustomKey} key */
-export const shortcutLayerList = (key) => Array.from({length: 16}, (_, layer) => layer).filter((layer) => (key.shortcut?.layers ?? 0) & (1 << layer));
+export const shortcutLayerList = (key) => Array.from({length: LAYERS}, (_, layer) => layer).filter((layer) => (key.shortcut?.layers ?? 0) & (1 << layer));
 
 // Where only a custom key's shortcut runs (a behaviour step that sends the
 // key, or a combo output whose behaviour does not run), what it sends.
@@ -224,10 +224,10 @@ export function shortcutModifiers(model, name) {
     const value = model?.qmkKeycodeAliases?.[name] || name;
     const code = (model?.qmkKeycodes || []).find((row) => row.value === value || row.aliases.includes(value))?.keycode;
     if (code === undefined) return null;
-    if (code >= 0xe0 && code <= 0xe7) return {key: "", mods: 1 << (code - 0xe0)};
+    if (inBlock(code, MODIFIER_KEYS)) return {key: "", mods: 1 << (code - MODIFIER_KEYS.first)};
     const mods = compactModifierMask(code);
     if (!mods) return null;
-    const base = (model?.qmkKeycodes || []).find((row) => row.keycode === (code & 0xff));
+    const base = (model?.qmkKeycodes || []).find((row) => row.keycode === keyOf(code));
     return base && shortcutKeyCode(model, base.value) !== null ? {key: base.value, mods} : null;
 }
 
@@ -325,7 +325,7 @@ export function shortcutPickKey(model, pick, name) {
 /** @param {Model} model @param {number} index */
 const layerWords = (model, index) => {
     const layer = (model?.layers || []).find((entry) => entry.index === index);
-    return layer ? layer.displayName || layer.name : `Layer ${index}`;
+    return layer?.displayName || layer?.name || "";
 };
 
 // The picker's choice in words, for its footer: "Left Ctrl + Right Alt + K",
@@ -383,7 +383,7 @@ export function shortcutOffer(model, {mods = [], keys = []}) {
     if (!mods.length || !keys.length || !(model?.customKeyShortcutKeys || []).length) return null;
     const shortcut = shortcutPick(model, {mods, keys});
     if (!shortcut.keys.length) return null;
-    return (shortcut.mods & 0x0f) && (shortcut.mods & 0xf0) ? shortcut : null;
+    return (shortcut.mods & MODIFIER_KEY_SIDES.LEFT) && (shortcut.mods & MODIFIER_KEY_SIDES.RIGHT) ? shortcut : null;
 }
 
 // A custom key that already holds exactly this shortcut, to use rather than
