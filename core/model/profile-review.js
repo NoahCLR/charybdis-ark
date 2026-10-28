@@ -389,7 +389,7 @@ function profileReview(before, after, capabilities) {
         for (const layoutIndex of CHARYBDIS_4X6_LAYOUT_MATRIX.keys()) {
             const position = matrixPosition(layoutIndex);
             /** @param {import("../schema/types.js").LayerRecord} entry @returns {Fields} */
-            const fields = entry => new Map([["Use shared behaviour", entry.bypass.includes(position) ? "off" : "on"], ["Join combos", entry.exclude.includes(position) ? "off" : "on"]]);
+            const fields = entry => new Map([["Use behaviour", entry.bypass.includes(position) ? "off" : "on"], ["Join combos", entry.exclude.includes(position) ? "off" : "on"]]);
             // Named where the key sits, as its layout change is.
             item("Keys", `placement:${layer}:${position}`, `Participation · ${layerName(b, layer)} · ${positionName(position)}`, fields(record), fields(b.settings.layers[layer]),
                 {kind: "key", layer, layoutIndex: LAYOUT_INDEX.get(position)}, [true, true]);

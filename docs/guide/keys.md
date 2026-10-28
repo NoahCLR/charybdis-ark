@@ -5,7 +5,8 @@ does on this layer and lets you change it.
 
 ## The Key tab
 
-**This position** shows the key's **Keycode** and what it **Does**. Change it
+**This key on this layer** (the layer's name follows, as in *This key on
+this layer (Number)*) shows the key's **Keycode** and what it **Does**. Change it
 by typing a keycode or with **Pick…**. The field takes QMK's spellings, such
 as `LCTL_T(KC_A)` or `SGUI(KC_S)`. A keycode the keyboard can't store stays in
 the field with the reason under it, and nothing changes.
@@ -13,19 +14,24 @@ the field with the reason under it, and nothing changes.
 **Where it is stored** unfolds the key's matrix row and column, layout index
 and LED index. Once open, it stays open as you select other keys.
 
-**Use behaviour** and **Join combos** switch this key, on this layer, out of
-behaviours and combos. Turn off Use behaviour on a gaming layer, for example,
-so the key sends its plain keycode at once. The line under the switches says
-whether the behaviour runs here and the key can join combos, and if not,
-which switch keeps it off. A transparent key takes its switches from the
-layer it falls through to; **Open source placement** goes there.
+**Behaviour and combos for this key on this layer** holds **Use behaviour**
+and **Join combos**. They switch only this key, on this layer, out of
+behaviours and combos: the same key on another layer, and other keys on this
+one, keep theirs. Turn off Use behaviour on a gaming layer, for example, so
+the key sends its plain keycode at once. To switch a behaviour or a combo off
+on every key, use its own **Use this behaviour** or **Use this combo**; to
+switch a whole layer, Settings. The line under the switches says whether the
+behaviour runs here and the key can join combos, and if not, which switch
+keeps it off. A key transparent on this layer takes its switches from the
+layer it falls through to; **Open this key on** that layer goes there.
 
 **This key on every layer** lists this position on all 16 layers, highest
 first. Three or more transparent layers in a row fold into one line; click it
 to see each. Click a row to switch to that layer.
 
 **What this key reaches** links to its behaviour, its combos (or **New** to
-start one with this key) and any pointing mode it runs.
+start one with this key) and any pointing mode it runs. A behaviour or combo
+a switch keeps off here says **not used**, and which switch.
 
 When you preview layers together and the key is answered from a lower layer,
 the Key tab says so. A keycode you set here goes on the top layer and wins.

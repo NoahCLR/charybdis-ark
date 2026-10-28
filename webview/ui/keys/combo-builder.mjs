@@ -17,11 +17,9 @@ import * as edits from "../../view/edits.mjs";
 import {timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
 import {keyNameMarked} from "../marks.mjs";
-import {vocabulary} from "../../view/vocabulary.mjs";
+import {sentence, vocabulary} from "../../view/vocabulary.mjs";
 import {comboFull, comboMissing} from "../../view/combo-form.mjs";
 
-/** @param {string} text */
-const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 // A builder input by the name the core gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
 /** @param {Model} model @param {string} name */

@@ -1223,6 +1223,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-key { border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-family: var(--mono); font-size: 10.5px; line-height: 16px; color: var(--text-2); }
 .hc-key .mk { gap: 4px; }
 .hc-key.here { color: var(--text); border-color: var(--line-2); background: var(--surface-3); font-weight: 600; }
+/* A combo a switch keeps off for this key: dimmed, with why under its keys. */
+.hc-combo.hc-off > :not(.hc-sub) { opacity: .55; }
+.hc-combo > .hc-sub { grid-column: 2; margin: 0; }
 /* A macro's steps as chips: each a small macro editor tile, mark then label,
    never wider than its row; a long label ends in an ellipsis. */
 .step-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
