@@ -2,6 +2,7 @@
 import {actionLabel, behaviourFor, canonicalKeycode, keyMeaning, layerOfKeycode} from "./keyface.mjs";
 import {reachablePositions, viewPositions, downTheStack} from "./layer-resolution.mjs";
 import {comboGroups, comboOutput, combosInView, comboInputOn} from "./combo-reach.mjs";
+import {ALL_LAYERS} from "./participation.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("./keyface-types.js").PointingSlot} PointingSlot */
@@ -25,7 +26,7 @@ function comboBehaviourFor(model, combo, keys, stack, at, held = []) {
     const physical = placements.some(key => key.reference) ? viewPositions(stack, at, held) : [];
     const permitted = placements.some(key => {
         const source = key.reference ? physical.find(entry => entry.position.layoutIndex === key.position.layoutIndex)?.layer : key.layer;
-        return source && ((row.allowedLayers ?? 0xffff) & (2 ** source.index));
+        return source && ((row.allowedLayers ?? ALL_LAYERS) & (2 ** source.index));
     });
     return permitted ? row : undefined;
 }

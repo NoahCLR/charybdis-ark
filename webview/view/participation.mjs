@@ -1,5 +1,8 @@
 // @ts-check
 // Permissions follow the layer supplying a key, including transparent keys.
+// A behaviour or combo that names no layers runs on every layer of the bank
+// (ALL_LAYERS in core/data/charybdis-layout.js).
+export const ALL_LAYERS = 0xffff;
 /** @typedef {{participation?: import("../../contracts/model.js").Participation | null, layers?: Partial<Pick<import("../../contracts/panel.js").Layer, "index" | "name" | "displayName">>[]} | null | undefined} ParticipationModel */
 // A key by its matrix position, which places its bits in a layer record. A
 // key the keyboard reported none for has no placement bit to veto it.
@@ -25,7 +28,7 @@ const nameOf = (model, layer) => {
 function definitionReasons(model, layer, definition, kind) {
     const reasons = [];
     if (definition?.enabled === false) reasons.push(kind === "behavior" ? "Use this behaviour is off" : "Use this combo is off");
-    if (definition && !((definition.allowedLayers ?? 0xffff) & 2 ** layer)) reasons.push(`Layers it runs on leaves out ${thisLayer(nameOf(model, layer))}`);
+    if (definition && !((definition.allowedLayers ?? ALL_LAYERS) & 2 ** layer)) reasons.push(`Layers it runs on leaves out ${thisLayer(nameOf(model, layer))}`);
     return reasons;
 }
 

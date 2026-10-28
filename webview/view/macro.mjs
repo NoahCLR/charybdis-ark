@@ -25,7 +25,9 @@ export const stepKindName = (kind) => STEP_KINDS.find(([value]) => value === kin
 /** @param {string} kind */
 export const addStepLabel = (kind) => `+ ${stepKindName(kind)}`;
 
-const MAX_DELAY = 65535, MAX_KEYS = 16;
+// A macro's limits (MACRO_LIMITS in core/schema/macro-payload.js): its
+// longest delay in milliseconds, and the keys it holds at once, a chord's included.
+export const MAX_DELAY = 65535, MAX_KEYS = 16;
 /** @param {string} character */
 const printable = (character) => {
     const code = character.codePointAt(0);

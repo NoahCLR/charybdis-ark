@@ -3,7 +3,7 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
+import {MAX_DELAY, MAX_KEYS, describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
 import {withStepFocus} from "../../view/macro-focus.mjs";
 import {actionLabel} from "../../view/keyface.mjs";
 import {appendSequenceStep, moveSequenceStep, sequenceFace, sequenceInsertionAt, sequenceIssues} from "../../view/macro-sequence.mjs";
@@ -69,7 +69,7 @@ export function insertStep(model, slot, steps, kind) {
     if (kind === "text") insert({kind, text: ""});
     else if (kind === "delay") insert({kind, delay: 120});
     else openPicker({title: stepKindName(kind), contextKeycode: slot.keycode,
-        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? 16 : 1,
+        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? MAX_KEYS : 1,
         onPick: expression => insert({kind, keys: expression.split(",").map(key => key.trim()).filter(Boolean)}),
     });
 }
@@ -207,7 +207,7 @@ export function stepEditor(model, slot, steps, step, index, canEdit) {
             <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button>
             <button class="btn tiny ghost" data-close-step aria-label="Close step editor">×</button></span></div>
         ${step.kind === "text" ? `<label class="field"><textarea data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:text" aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${esc(index)}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
-            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${esc(index)}" type="number" min="0" max="65535" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
+            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${esc(index)}" type="number" min="0" max="${MAX_DELAY}" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
             : `<div class="row"><span class="tok">${esc(describeStep(step, key => actionLabel(model, key))) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
     </div>`);
     const input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (node.querySelector("textarea, input"));
@@ -221,7 +221,7 @@ export function stepEditor(model, slot, steps, step, index, canEdit) {
         /** @type {HTMLElement | null} */ (document.querySelector(`[data-step-id="${CSS.escape(step.focusId || "")}"]`))?.focus();
     });
     /** @type {HTMLElement | null} */ (node.querySelector("[data-pick-step]"))?.addEventListener("click", () => openPicker({
-        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? 16 : 1,
+        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? MAX_KEYS : 1,
         onPick: expression => {
             const next = macroForm(slot.keycode).steps ?? steps;
             saveSteps(slot, next.map((item, at) => at === index ? {...item, keys: expression.split(",").map(key => key.trim()).filter(Boolean)} : item), true); render();

@@ -824,4 +824,4 @@ function draftChecks(keyboard, draft, order = IDENTITY) {
     return compareFindings(keyboard ? layerReach(keyboard) : [], layerReach(draft), order);
 }
 
-module.exports = {layerReach, draftChecks, compareFindings, findingKey, keycodeLayersOn, LEVELS};
+module.exports = {layerReach, draftChecks, compareFindings, findingKey, keycodeLayersOn, LEVELS, TAPPING_TOGGLE};

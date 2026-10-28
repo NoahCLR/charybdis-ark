@@ -1,7 +1,7 @@
 // @ts-check
 // Captured events stay separate from the macro text. Compact capture can then
 // revise a pending tap into a chord when another key overlaps it.
-import {samePayload, serializeMacroStep} from "./macro.mjs";
+import {MAX_DELAY, samePayload, serializeMacroStep} from "./macro.mjs";
 
 /** @typedef {{keycode: string, type: 'keydown' | 'keyup', time: number}} RecordedKey */
 /** @typedef {{step: import('./types.js').MacroStep, time: number, end: number}} TimedStep */
@@ -116,7 +116,7 @@ function compactGroup(events, modifiers = []) {
 function delayPayload(duration) {
     let result = "";
     while (duration > 0) {
-        const part = Math.min(65535, duration);
+        const part = Math.min(MAX_DELAY, duration);
         result += `{${part}}`; duration -= part;
     }
     return result;

@@ -89,6 +89,9 @@ function animatedGlow(model) {
     return {h: String(base.hue ?? 0), s: String(Math.round(Number(base.saturation ?? 0) / 4)), v: String(Math.round(brightness * 0.6))};
 }
 
+// QMK's LED classes as the stored flags name them (LED_FLAGS in
+// core/schema/settings-domain-v1.js): every class, the modifier and the key.
+export const LED_FLAGS = Object.freeze({ALL: 255, MODIFIER: 1, KEY: 4});
 // Which LEDs the background effect paints: QMK skips an LED whose class the stored
 // flags leave out. On this board the "modifier" class is the eight thumb keys
 // and the trackball LED, the "key" class every other key.
@@ -97,9 +100,9 @@ export function baseReaches(model, layoutIndex) {
     const field = baseField(model, "effectLeds");
     if (!field) return true;
     const flags = Number(field.value);
-    if (flags === 255) return true;
+    if (flags === LED_FLAGS.ALL) return true;
     const thumb = layoutIndex === undefined || Object.hasOwn(GEO.thumbs, layoutIndex);
-    return Boolean(flags & (thumb ? 1 : 4));
+    return Boolean(flags & (thumb ? LED_FLAGS.MODIFIER : LED_FLAGS.KEY));
 }
 
 // The key a trackball mode's preview starts from: the first key that holds or

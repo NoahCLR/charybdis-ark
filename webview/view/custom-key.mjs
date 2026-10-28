@@ -32,8 +32,9 @@ export const sameShortcut = (a, b) => (a.mods ?? 0) === (b.mods ?? 0) && (a.keys
 // How a shortcut turns its layers on (SHORTCUT_LAYER_KINDS): hold, lock, move
 // to, tap-toggle, one-shot; hold without layers.
 export const LAYER_KIND = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
-// QMK's TAPPING_TOGGLE: the tap of a tap-toggle key that locks its layers.
-const TAPPING_TOGGLE = 5;
+// QMK's TAPPING_TOGGLE: the tap of a tap-toggle key that locks its layers
+// (core/model/layer-reach.js walks the same).
+export const TAPPING_TOGGLE = 5;
 /** @param {CustomKey} key */
 export const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || LAYER_KIND.HOLD : LAYER_KIND.HOLD);
 /** @param {CustomKey} key */

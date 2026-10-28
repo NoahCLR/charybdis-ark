@@ -18,7 +18,7 @@ import {stageOrder} from "../view/vocabulary.mjs";
 import {copyTitle, deleteRecovery, downloadRecovery, shellOf, useRecovery} from "../view/shell-panel.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {reviewPortableProfile} from "../view/edits.mjs";
-import {fitsLine} from "../view/backups.mjs";
+import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE, fitsLine} from "../view/backups.mjs";
 import {importCallout, importNote} from "../view/edit-mode.mjs";
 
 export function screenProfile() {
@@ -125,7 +125,7 @@ function wireProfileDrop(card) {
         const dropped = Array.from(/** @type {DataTransfer} */ (event.dataTransfer).files);
         if (dropped.length !== 1) {tell("Drop one profile file at a time."); return;}
         const file = dropped[0];
-        if (file.size > 196608) {tell("This profile file is too large."); return;}
+        if (file.size > PROFILE_FILE_MAX_BYTES) {tell(PROFILE_FILE_TOO_LARGE); return;}
         const draft = getModel()?.draft;
         if (!draft) return;
         const {id, revision} = draft;

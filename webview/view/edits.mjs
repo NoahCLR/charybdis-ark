@@ -8,6 +8,7 @@
 
 import {hsv} from "../lib/colour.mjs";
 import {behaviourChangesNothing} from "./behavior-editor.mjs";
+import {ALL_LAYERS} from "./participation.mjs";
 
 /**
  * @typedef {import("../../contracts/edits.js").BaseIdentity} BaseIdentity
@@ -114,7 +115,7 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowed
         multiTapTerm: term("multiTapTerm"),
         keepsAutoMouseAnchored: anchored ?? behaviour.keepsAutoMouseAnchored,
         enabled: enabled ?? behaviour.enabled ?? true,
-        allowedLayers: allowedLayers ?? behaviour.allowedLayers ?? 0xffff,
+        allowedLayers: allowedLayers ?? behaviour.allowedLayers ?? ALL_LAYERS,
         steps,
     };
     if (behaviourChangesNothing({...behavior, timingAlone: behaviour.timingAlone})) return behaviour.stored ? deleteBehaviour(behaviour.keycode, identity) : null;
