@@ -2,6 +2,14 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {APPLY_STEPS, ApplyProgress, failureReason} = require("../../core/session/apply-progress");
+const {contractUnion} = require("../fixtures/contract-unions");
+
+// The posted ApplyStep is the contract's union; the steps are these, each once.
+test("an Apply has a step for every member of the contract's ApplyStep, and no other", () => {
+    const ids = APPLY_STEPS.map(step => step.id);
+    assert.equal(new Set(ids).size, ids.length);
+    assert.deepEqual([...ids].sort(), contractUnion("model.d.ts", "ApplyStep").sort());
+});
 
 test("an Apply moves forward through its steps and never back", () => {
     const views = [];

@@ -8,7 +8,7 @@ import {reviewColumns, reviewItem} from "./review-items.mjs";
 import {checksSection} from "./checks.mjs";
 import {checkSourceGroup, checksToConfirm, confirmText} from "../view/checks.mjs";
 import {shortcut} from "../view/shortcuts.mjs";
-import {quietWords} from "../view/edit-mode.mjs";
+import {LIVE, quietWords} from "../view/edit-mode.mjs";
 
 export function reviewOverlay() {
     const model = getModel();
@@ -45,7 +45,7 @@ export function reviewOverlay() {
     const live = Boolean(draft.live);
     // In Live edit the keyboard saves by itself: the review only shows what is
     // not saved yet, with Revert, and Save again only once its own save failed.
-    const keyboardSaves = draft.live?.mode === 1;
+    const keyboardSaves = draft.live?.mode === LIVE;
     const columns = live ? reviewColumns("What changes", "Saved", "Running now")
         : reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));

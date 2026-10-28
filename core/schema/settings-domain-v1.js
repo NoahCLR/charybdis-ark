@@ -176,12 +176,15 @@ function shortcutKeysRefusal(keys) {
 const SHORTCUT_LAYER_KINDS = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
 /** @param {unknown} kind @param {number} layers */
 const validLayerKind = (kind, layers) => Number.isInteger(kind) && /** @type {number} */ (kind) >= SHORTCUT_LAYER_KINDS.HOLD && /** @type {number} */ (kind) <= SHORTCUT_LAYER_KINDS.ONESHOT && (layers !== 0 || kind === SHORTCUT_LAYER_KINDS.HOLD);
+/** @param {unknown} value @param {number} max @returns {value is number} */
+const wholeUpTo = (value, max) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= max;
 /** @param {unknown} shortcut @returns {shortcut is import("./types.js").CustomKeyShortcut} */
-const validShortcut = shortcut => typeof shortcut === "object" && shortcut !== null
-    && Number.isInteger(/** @type {any} */ (shortcut).mods) && /** @type {any} */ (shortcut).mods >= 0 && /** @type {any} */ (shortcut).mods <= 0xff
-    && !shortcutKeysRefusal(/** @type {any} */ (shortcut).keys)
-    && Number.isInteger(/** @type {any} */ (shortcut).layers) && /** @type {any} */ (shortcut).layers >= 0 && /** @type {any} */ (shortcut).layers <= 0xffff && !(/** @type {any} */ (shortcut).layers & 1)
-    && validLayerKind(/** @type {any} */ (shortcut).layerKind, /** @type {any} */ (shortcut).layers);
+function validShortcut(shortcut) {
+    if (typeof shortcut !== "object" || shortcut === null) return false;
+    const {mods, keys, layers, layerKind} = /** @type {{mods?: unknown, keys?: unknown, layers?: unknown, layerKind?: unknown}} */ (shortcut);
+    return wholeUpTo(mods, 0xff) && !shortcutKeysRefusal(keys)
+        && wholeUpTo(layers, 0xffff) && !(layers & 1) && validLayerKind(layerKind, layers);
+}
 // Why a shortcut is not one the keyboard stores, in words, or "" when it is:
 // its keys' refusal when they are what is wrong, else the shape it has.
 /** @param {unknown} shortcut */

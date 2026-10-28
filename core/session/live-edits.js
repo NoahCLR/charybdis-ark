@@ -26,7 +26,7 @@
  * @typedef {import("./profile-draft-session.js").LiveTarget} Target
  */
 const {fingerprint} = require("../model/portable-profile");
-const {EDIT_MODE} = require("../protocol/profile-edit-v1");
+const {EDIT_MODE, isEditMode} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS, PHASE, quietWords} = require("../model/vocabulary");
 const {IDENTITY} = require("../model/layer-order");
 const {ProfileDraftSession} = require("./profile-draft-session");
@@ -331,7 +331,7 @@ async function setEditMode(session, message, recoveryFor, shell) {
     const draft = session.draft, service = session.service;
     if (!draft) throw new Error("Read the keyboard before changing how edits reach it.");
     const mode = message.mode;
-    if (!(/** @type {number[]} */ (Object.values(EDIT_MODE))).includes(mode)) throw new Error(`Ark offers ${[EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW, EDIT_MODE.APPLY].map(value => EDIT_MODE_WORDS[value].label).join(", ")}.`);
+    if (!isEditMode(mode)) throw new Error(`Ark offers ${[EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW, EDIT_MODE.APPLY].map(value => EDIT_MODE_WORDS[value].label).join(", ")}.`);
     draft.assertRevision(message.draftRevision);
     const known = service.snapshot().editMode;
     if (known?.mode === mode && !known.conflict && Boolean(draft.live) === (mode !== EDIT_MODE.APPLY)) return;

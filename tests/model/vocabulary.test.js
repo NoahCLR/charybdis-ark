@@ -66,11 +66,7 @@ test("macro playback statuses have one set of presentation words", () => {
 
 test("every stable device phase has immutable words and matches the posted PhaseId contract", () => {
     const {PHASE, PHASE_WORDS} = require("../../core/model/vocabulary");
-    const fs = require("node:fs"), path = require("node:path");
-    const declarations = fs.readFileSync(path.join(__dirname, "../../contracts/model.d.ts"), "utf8");
-    const declaration = /export type PhaseId = ([^;]+);/.exec(declarations);
-    assert.ok(declaration);
-    const ids = [...declaration[1].matchAll(/'([^']+)'/g)].map(match => match[1]).sort();
+    const ids = /** @type {string[]} */ (require("../fixtures/contract-unions").contractUnion("model.d.ts", "PhaseId")).sort();
     assert.deepEqual(Object.values(PHASE).sort(), ids);
     assert.deepEqual(Object.keys(PHASE_WORDS).sort(), ids);
     assert.equal(VOCABULARY.phases, PHASE_WORDS);

@@ -18,7 +18,7 @@ import {cellEditor} from "./cell-editor.mjs";
 import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
 import {saveBehaviour} from "./save-behaviour.mjs";
 
-const {TIER_FIELDS} = edits;
+const {TIER_FIELDS, TIERS} = edits;
 
 // How a tier runs, as the vocabulary words it.
 /** @param {import("../../../contracts/edits.js").Tier} kind @param {string | undefined} style */
@@ -130,7 +130,7 @@ export function behaviourEditor(behaviour) {
             <span class="bl">${esc([sendsKind(model, branch.action), styleLabel(kind, branch.style)].filter(Boolean).join(" · "))}</span></button>`;
     };
 
-    const dashed = steps.some((step) => /** @type {import("../../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).some((kind) => !step[TIER_FIELDS[kind]]
+    const dashed = steps.some((step) => TIERS.some((kind) => !step[TIER_FIELDS[kind]]
         && (inheritedBranch(behaviour, step, kind) || impliedBranch(behaviour, step, kind))));
     const node = el(`<div>
         <div class="beh-head">
@@ -155,7 +155,7 @@ export function behaviourEditor(behaviour) {
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="bgrid">
             <span></span>
-            ${/** @type {import("../../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).map((kind) => `<div class="btier">${tierDot(model, kind)}${esc(tierName(model, kind))}</div>`).join("")}
+            ${TIERS.map((kind) => `<div class="btier">${tierDot(model, kind)}${esc(tierName(model, kind))}</div>`).join("")}
             ${timingControl("multiTapTerm", "Multi tap window")}
             <p class="bterm">On release, before the Tap / hold threshold</p>
             ${timingControl("tapHoldTerm", "Tap / hold threshold")}
@@ -163,7 +163,7 @@ export function behaviourEditor(behaviour) {
             ${steps.map((step) => `
                 <div class="bhead">${branchBadge(model, step.tapCount + 1)}
                     <span>${esc(branchName(model, step.tapCount + 1))}</span></div>
-                ${/** @type {import("../../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).map((kind) => cellFor(step, kind)).join("")}`).join("")}
+                ${TIERS.map((kind) => cellFor(step, kind)).join("")}`).join("")}
         </div>
         <div id="cellEditor"></div>
         <p class="note beh-foot">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are left out of the profile.${dashed ? " A dashed cell is what the keyboard does there with nothing set: the key's own action, or the other hold tier carrying on. It is not stored, and setting an action there replaces it." : ""}</p>

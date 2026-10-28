@@ -1,8 +1,10 @@
-import type {Scalar} from './edits.js';
+import type {Scalar, Tier} from './edits.js';
 
 /** Device operation identity is stable when presentation words change. */
 export type PhaseId = 'idle' | 'available' | 'empty' | 'connected' | 'demo' | 'enumerate' | 'connect' | 'refresh' | 'starting' | 'read-layout' | 'read-profile' | 'read-complete' | 'restore-complete' | 'disconnect' | 'read-combos' | 'read-base-rgb' | 'live-edit' | 'live-save' | 'live-revert' | 'edit-mode' | 'restart';
 export type EditModeId = 'apply' | 'live' | 'liveReview';
+/** How edits reach the keyboard, as it stores it (core/protocol/profile-edit-v1.js EDIT_MODE): 0 Review and save, 1 Live edit, 2 Live preview + save. */
+export type EditMode = 0 | 1 | 2;
 export interface PhaseWords {label: string; read?: string; busy?: string; writes: boolean}
 
 export interface CountedProgress {done: number; total: number}
@@ -48,6 +50,7 @@ export interface StatusModel {
     draft?: {changes?: readonly unknown[]; live?: unknown};
 }
 
+/** The steps of one Apply, in order (core/session/apply-progress.js APPLY_STEPS). */
 export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'slave' | 'commit' | 'converge' | 'verify';
 /** `saved`: "none" nothing was saved; "decided" the keyboard decided to save and finishes by itself; "unknown". */
 /** `verdict` is the sentence for `saved` (core/session/interruption.js APPLY_VERDICTS) that every notice about this Apply starts with. */
@@ -83,7 +86,7 @@ export type WordList<T = Scalar> = readonly (readonly [T, string])[];
 export type HalvesId = 'agree' | 'alone' | 'apart' | 'unread';
 export interface Vocabulary {
     phases: Readonly<Record<PhaseId, Readonly<PhaseWords>>>;
-    editModes: Readonly<Record<number, Readonly<{id: EditModeId; label: string; hint: string; detail: string}>>>;
+    editModes: Readonly<Record<EditMode, Readonly<{id: EditModeId; label: string; hint: string; detail: string}>>>;
     halves: Readonly<Record<HalvesId, Readonly<{label: string; detail: string}>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];
     hostOs: WordList<number>;
@@ -96,7 +99,7 @@ export interface Vocabulary {
     tapSends: string;
     holdFromPress: string;
     timingSources: Record<string, string>;
-    tiers: Readonly<Record<string, string>>;
+    tiers: Readonly<Record<Tier, string>>;
     branches: readonly string[];
     localities: WordList<string>;
     paintModes: WordList<string>;

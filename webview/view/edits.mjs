@@ -51,8 +51,12 @@ export const swapKeys = (layer, from, to) => layoutKeys(layer, [
 
 // ── key behaviours ──────────────────────────────────────────────────────
 
-/** @type {Record<Tier, 'tap' | 'hold' | 'longHold'>} */
-export const TIER_FIELDS = {tap: "tap", hold: "hold", long: "longHold"};
+// A step's tiers by the field that stores each (core/schema/key-behavior-domain-v1.js
+// KEY_BEHAVIOR_TIER_FIELDS, pinned by tests/view/enum-drift.test.mjs), and the
+// tiers in the grid's order.
+/** @type {Readonly<Record<Tier, 'tap' | 'hold' | 'longHold'>>} */
+export const TIER_FIELDS = Object.freeze({tap: "tap", hold: "hold", long: "longHold"});
+export const TIERS = /** @type {readonly Tier[]} */ (Object.freeze(Object.keys(TIER_FIELDS)));
 export const DEFAULT_REPEAT_HZ = "20";
 
 /** @param {string} keycode @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteBehavior'>} */

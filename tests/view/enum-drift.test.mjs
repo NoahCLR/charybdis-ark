@@ -1,5 +1,5 @@
 // The webview keeps a few wire numbers of its own — pointing kinds, axes,
-// what ends a link's mode, modifier bits — because its pure modules need them at import
+// what ends a link's mode, modifier bits, edit modes — because its pure modules need them at import
 // time and it may not import core/. They are the keyboard's numbers, so they
 // are pinned here to the schema that defines them: a change there fails here,
 // not on a keyboard.
@@ -9,7 +9,8 @@ import test from "node:test";
 import {createRequire} from "node:module";
 import {AXIS, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES} from "../../webview/view/pointing-config.mjs";
 import {modifierBits, modifierNames} from "../../webview/view/keyvalues.mjs";
-import {TIER_FIELDS} from "../../webview/view/edits.mjs";
+import {TIER_FIELDS, TIERS} from "../../webview/view/edits.mjs";
+import {APPLY, EDIT_MODE, LIVE, LIVE_REVIEW} from "../../webview/view/edit-mode.mjs";
 import {POINTING_MODE_IDS} from "../../webview/view/lighting.mjs";
 import {NAME_MAX_BYTES} from "../../webview/view/names.mjs";
 
@@ -39,6 +40,13 @@ test("the webview's modifier bits and names are the vocabulary's", () => {
 
 test("the webview's tiers are the vocabulary's", () => {
     assert.deepEqual(Object.keys(TIER_FIELDS).sort(), Object.keys(VOCABULARY.tiers).sort());
+    assert.deepEqual(TIERS, Object.keys(VOCABULARY.tiers), "in the grid's order");
+    assert.deepEqual(TIER_FIELDS, {...require("../../core/schema/key-behavior-domain-v1").KEY_BEHAVIOR_TIER_FIELDS}, "each stored in the schema's field");
+});
+
+test("the webview's edit modes are the keyboard's", () => {
+    assert.deepEqual(EDIT_MODE, {...require("../../core/protocol/profile-edit-v1").EDIT_MODE});
+    assert.deepEqual([APPLY, LIVE, LIVE_REVIEW], [EDIT_MODE.APPLY, EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW]);
 });
 
 test("the webview names every pointing slot's lighting row as the RGB schema does", () => {

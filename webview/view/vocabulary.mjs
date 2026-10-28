@@ -6,10 +6,11 @@
 // hover card and the review never call one value two things. A value the
 // table does not know reads as itself rather than disappearing.
 
-/** @typedef {{vocabulary?: import("../../contracts/model.js").Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
+/** @typedef {import("../../contracts/model.js").Vocabulary} Vocabulary */
+/** @typedef {{vocabulary?: Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
 
-/** @type {import("../../contracts/model.js").Vocabulary} */
-const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), editModes: {}, halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+/** @type {Vocabulary} */
+const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), editModes: /** @type {Vocabulary["editModes"]} */ ({}), halves: /** @type {Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: /** @type {Vocabulary["tiers"]} */ ({}), branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []}, pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], linkLabels: {starts: "", keyTurnsOn: "", startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
@@ -53,10 +54,11 @@ export const phaseWords = (model, phase) => phase ? model?.vocabulary?.phases?.[
 export const halvesWords = (model, halves) => (halves && model?.vocabulary?.halves?.[halves]) || {label: String(halves ?? ""), detail: ""};
 
 // How edits reach the keyboard, in the words core chose: 0 Review and save,
-// 1 Live edit, 2 Live preview + save. A mode the table does not know reads as
-// its number.
+// 1 Live edit, 2 Live preview + save. A mode the table does not know (the
+// keyboard may report one) reads as its number.
 /** @param {VocabularyModel | null | undefined} model @param {number} mode @returns {{id: string, label: string, hint: string, detail: string}} */
-export const editModeWords = (model, mode) => vocabulary(model).editModes?.[mode] || {id: String(mode), label: `Mode ${mode}`, hint: "", detail: ""};
+export const editModeWords = (model, mode) => /** @type {Readonly<Partial<Record<number, Vocabulary["editModes"][import("../../contracts/model.js").EditMode]>>>} */ (vocabulary(model).editModes)?.[mode]
+    || {id: String(mode), label: `Mode ${mode}`, hint: "", detail: ""};
 
 // Words written mid-sentence, starting one: the first letter capitalised.
 /** @param {string} text */

@@ -12,7 +12,7 @@ const {macroEditorView} = require("./macro-editor");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
-const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES, KEY_BEHAVIOR_TIER_FIELDS} = require("../schema/key-behavior-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
 const {VOCABULARY, word, layerName: layerCalled, slotName, modifierNames} = require("./vocabulary");
 
@@ -154,8 +154,9 @@ const positionName = slot => THUMBS.get(slot) || `${slot < 30 ? "Left" : "Right"
 // differ (everything it holds, for an added or removed item), and where it
 // is edited, so the review can go there.
 
-// Tiers by the field that stores them, named in the vocabulary's words.
-const TIERS = /** @type {const} */ ([["tap", "tap"], ["hold", "hold"], ["longHold", "long"]]);
+// Tiers in the grid's order, each with the field that stores it, named in
+// the vocabulary's words.
+const TIERS = /** @type {[import("../../contracts/edits.js").Tier, "tap" | "hold" | "longHold"][]} */ (Object.entries(KEY_BEHAVIOR_TIER_FIELDS));
 
 // A behaviour as fields: its timing, the anchor, then every tier the grid
 // shows, named as the grid names it (1× tap, 2× hold).
@@ -178,13 +179,13 @@ function behaviourFields(row, defaults, names, shortcuts) {
         ["Enabled", row.enabled ? "on" : "off"],
         ["Allowed layers", allowedLayers(row.allowedLayers, names)],
     ]);
-    for (const step of row.steps) for (const [tier, name] of TIERS) {
+    for (const step of row.steps) for (const [name, tier] of TIERS) {
         const branch = step[tier];
         if (!branch) continue;
         const hold = tier === "tap" ? undefined : /** @type {import("../schema/types.js").HoldBranch} */ (branch);
         const reaches = hold ? hold.action : /** @type {Action} */ (branch);
         if (tier === "tap" && !reaches.kind) continue;
-        const how = tier === "tap" ? "" : ` · ${word(VOCABULARY.holdStyles[name], Object.entries(KEY_BEHAVIOR_HOLD_STYLES).find(([, id]) => id === hold?.style)?.[0])}${hold?.repeatHz ? ` · ${hold?.repeatHz} Hz` : ""}`;
+        const how = name === "tap" ? "" : ` · ${word(VOCABULARY.holdStyles[name], Object.entries(KEY_BEHAVIOR_HOLD_STYLES).find(([, id]) => id === hold?.style)?.[0])}${hold?.repeatHz ? ` · ${hold?.repeatHz} Hz` : ""}`;
         // A tier is named as the grid names it, and carries which branch and
         // tier it is, so the review can colour it as the grid does.
         // Compared by what is stored, so a renamed or cleared pointing mode

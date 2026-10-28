@@ -111,7 +111,7 @@ export function pdTrigger(model, layer, slotId) {
     const stack = model?.layers || [];
     const order = [layer, ...stack.filter((row) => row !== layer)].filter(Boolean);
     for (const row of order) {
-        const found = (row?.positions || []).find((position) => pointingSlotFor(/** @type {any} */ (model), keyMeaning(position))?.id === slotId);
+        const found = (row?.positions || []).find((position) => pointingSlotFor(model, keyMeaning(position))?.id === slotId);
         if (found) return {layoutIndex: found.layoutIndex, layer: /** @type {number} */ (row?.index)};
     }
     return null;

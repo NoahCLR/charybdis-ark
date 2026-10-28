@@ -20,6 +20,7 @@ const {PHASE, editModeWords, heldWords, quietWords} = require("../model/vocabula
  * @typedef {import("./types.js").LayerEditState} LayerEdit
  * @typedef {import("../model/types.js").CompleteSnapshot} Snapshot
  */
+const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
@@ -143,7 +144,7 @@ function buildPanelModel(session, state) {
         // Live edit's words say the quiet interval the keyboard reports.
         const quietMs = (draft.live?.keyboard || draft.keyboard)?.quietMs;
         if (quietMs && model.vocabulary) model.vocabulary = {...model.vocabulary, editModes: editModeWords(quietMs)};
-        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === 1
+        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === EDIT_MODE.LIVE
             ? `The keyboard runs these edits now · it saves them by itself after ${quietWords(quietMs)} without typing`
             : "The keyboard runs these edits now · Save makes them permanent; unplugging it puts back what is saved";
         else if (draft.dirty && draft.matching && !draft.live) model.device.subtitle = "Showing your local draft · the keyboard still runs its saved profile";

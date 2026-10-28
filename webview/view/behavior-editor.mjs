@@ -54,7 +54,11 @@ function timingWords(model, sources) {
     return Object.fromEntries(Object.entries(sources || {}).map(([name, source]) => [name, words[source] || ""]));
 }
 
-export function behaviourTimingField(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour, /** @type {"tapHoldTerm" | "longHoldTerm" | "multiTapTerm"} */ name) {
+/** @typedef {"tapHoldTerm" | "longHoldTerm" | "multiTapTerm"} TimingName */
+// A behaviour's timing as a field: what it stores, the default it follows and
+// the words for where that comes from. Only these parts of a row are read.
+/** @typedef {Partial<Record<TimingName, import("../../contracts/edits.js").Scalar>> & Pick<import("../../contracts/panel.js").BehaviorView, "timingDefaults" | "timingWords">} TimedBehaviour */
+export function behaviourTimingField(/** @type {TimedBehaviour} */ behaviour, /** @type {TimingName} */ name) {
     const stored = String(behaviour[name] ?? "0");
     const followsDefault = Number(stored) === 0;
     const fallback = behaviour.timingDefaults?.[name];
@@ -87,7 +91,7 @@ export function behaviourThresholds(/** @type {Model} */ model, /** @type {impor
     const steps = behaviour.steps || [];
     /** @param {"tapHoldTerm" | "longHoldTerm" | "multiTapTerm"} name */
     const term = (name) => {
-        const field = behaviourTimingField(/** @type {any} */ (row), name);
+        const field = behaviourTimingField(row, name);
         return {name, ms: field.followsDefault ? field.fallback : field.stored};
     };
     const used = {

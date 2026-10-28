@@ -46,6 +46,10 @@ const KEY_BEHAVIOR_HOLD_STYLES = Object.freeze({
     REPEAT_WHILE_HELD: 3,
     TAP_ON_RELEASE_AFTER_HOLD: 4,
 });
+// A step's tiers in the grid's order, by the field that stores each; every
+// tier the contract names has one.
+/** @type {Readonly<Record<import("../../contracts/edits.js").Tier, "tap" | "hold" | "longHold">>} */
+const KEY_BEHAVIOR_TIER_FIELDS = Object.freeze({tap: "tap", hold: "hold", long: "longHold"});
 
 const KEY_BEHAVIOR_LIMITS = Object.freeze({
     maxRows: 128,
@@ -460,6 +464,7 @@ module.exports = {
     KEY_BEHAVIOR_DOMAIN_V1,
     KEY_BEHAVIOR_HOLD_STYLES,
     KEY_BEHAVIOR_LIMITS,
+    KEY_BEHAVIOR_TIER_FIELDS,
     decodeKeyBehaviorDomain,
     decodeKeyBehaviorDomainEnvelope,
     encodeKeyBehaviorDomain,
