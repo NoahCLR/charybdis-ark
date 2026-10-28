@@ -57,3 +57,7 @@ export const halvesWords = (model, halves) => (halves && model?.vocabulary?.halv
 // its number.
 /** @param {VocabularyModel | null | undefined} model @param {number} mode @returns {{id: string, label: string, hint: string, detail: string}} */
 export const editModeWords = (model, mode) => vocabulary(model).editModes?.[mode] || {id: String(mode), label: `Mode ${mode}`, hint: "", detail: ""};
+
+// Words written mid-sentence, starting one: the first letter capitalised.
+/** @param {string} text */
+export const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);

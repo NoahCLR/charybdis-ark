@@ -3,13 +3,14 @@
 // the stack, what the key reaches, and its participation.
 
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
+import {sentence} from "../../view/vocabulary.mjs";
 import {LED_INDEX} from "../../view/geometry.mjs";
 import {behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
-import {combosAt} from "../../view/combo-reach.mjs";
+import {comboUseAt, combosAt} from "../../view/combo-reach.mjs";
 import {pointingSlotFor} from "../../view/reach.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
 import {currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable} from "../../store.mjs";
-import {participationAt} from "../../view/participation.mjs";
+import {behaviourRuns, participationAt, thisKeyOnThisLayer} from "../../view/participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
 import {keyProblem} from "../../view/keycode-expression.mjs";
@@ -29,10 +30,23 @@ export function tabKey(body) {
     const behaviourOpen = canHaveBehaviour(model, followed.keycode);
     const combos = position ? combosAt(model, layers(), state.layer, position.layoutIndex) : [];
     const slot = pointingSlotFor(model, keyMeaning(position));
+    // The key the keyboard answers with here, and the layer that supplies it:
+    // its switches there decide what runs (firmware's participation policy).
+    const answer = position && resolvedPositions(layers(), state.layer, heldLayers()).find(entry => entry.position.layoutIndex === position.layoutIndex);
+    const behaviourUse = answer ? behaviourRuns(model, answer.layer.index, answer.position, behaviour) : {runs: Boolean(behaviour), reasons: []};
+    /** @param {string[]} reasons */
+    const notUsed = (reasons) => ` · <span class="dim">not used: ${esc(reasons.join("; "))}</span>`;
+    // The combos listed are the layer's own (combosAt), with nothing held, so
+    // they are judged in that view; the behaviour follows the key that answers.
+    /** @param {import("../../../contracts/panel.js").ComboView} combo */
+    const comboNotUsed = (combo) => {
+        const use = comboUseAt(model, layers(), state.layer, [], position?.layoutIndex ?? -1, combo);
+        return use.fires ? "" : notUsed(use.reasons);
+    };
 
     const node = el(`<div class="tab-grid three">
         <section>
-            <div class="sect-h"><h4>This position on ${esc(layerName(layer))}</h4></div>
+            <div class="sect-h"><h4>${esc(sentence(thisKeyOnThisLayer(layerName(layer))))}</h4></div>
             <div class="field"><span>Keycode</span>
                 <div class="input-row"><input class="input mono" id="keycodeField" data-f="key:${esc(layer.index)}:${esc(position?.layoutIndex)}:keycode" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
@@ -59,11 +73,11 @@ export function tabKey(body) {
             <div class="stack key-reaches">
                 <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours" ${behaviourOpen ? "" : "disabled"}>
                     <span class="rl">Behaviour</span>
-                    <span class="rv">${behaviour ? `${actionMarked(model, behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}${behaviourOpen && followed.from ? ` · from ${esc(layerName(followed.from))}` : ""}</span>
+                    <span class="rv">${behaviour ? `${actionMarked(model, behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}${behaviourOpen && followed.from ? ` · from ${esc(layerName(followed.from))}` : ""}${behaviour && !behaviourUse.runs ? notUsed(behaviourUse.reasons) : ""}</span>
                     <span class="ra">${behaviour ? "Edit" : "Open"}</span></button>
                 <button class="reach ${combos.length ? "" : "empty"}" data-goto="combos">
                     <span class="rl">Combos</span>
-                    <span class="rv">${combos.length ? combos.map((combo) => `${comboBadge(model, combo.badge)} → ${comboOutputMarked(model, combo)}`).join(" · ") : "not part of a combo"}</span>
+                    <span class="rv">${combos.length ? combos.map((combo) => `${comboBadge(model, combo.badge)} → ${comboOutputMarked(model, combo)}${comboNotUsed(combo)}`).join(" · ") : "not part of a combo"}</span>
                     <span class="ra">${combos.length ? "Edit" : "New"}</span></button>
                 ${slot ? `<button class="reach" data-goto="pointing"><span class="rl">Pointing</span>
                     <span class="rv">${marked(model, {kind: "pointing", slot: slot.id}, slot.displayName || `Slot ${slot.id}`)}</span><span class="ra">Edit</span></button>` : ""}
@@ -102,18 +116,20 @@ export function tabKey(body) {
         if (state.tab === "combos" && !combos.length) openComboBuilder(null, edits.comboDefaultWindowValue(getModel()));
         render();
     }));
-    const answer = position && resolvedPositions(layers(), state.layer, heldLayers()).find(entry => entry.position.layoutIndex === position.layoutIndex);
     if (answer && model?.participation) {
         const source = answer.layer, key = answer.position;
         const behavior = behaviourFor(model, keyMeaning(key));
         const bp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, /** @type {import("../../../contracts/panel.js").Position & {row: number, column: number}} */ (key), behavior));
         const cp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, /** @type {import("../../../contracts/panel.js").Position & {row: number, column: number}} */ (key), undefined, "combo"));
         const inherited = source.index !== layer.index;
+        // These switches are one key's on one layer; say so, and where the
+        // wider ones are, or they read as the layer's.
         const controls = el(`<div class="stack key-participation">
-            <div class="sect-h"><h4>Behaviour and combos on ${esc(layerName(source))}</h4></div>
-            ${inherited ? `<p class="note">This transparent key takes its participation from ${esc(layerName(source))}.</p><button class="btn tiny" data-source-layer>Open source placement</button>` : `
+            <div class="sect-h"><h4>Behaviour and combos for ${esc(inherited ? `this key on ${layerName(source)}` : thisKeyOnThisLayer(layerName(source)))}</h4></div>
+            ${inherited ? `<p class="note">This key is transparent on this layer (${esc(layerName(layer))}), so its switches on ${esc(layerName(source))} decide.</p><button class="btn tiny" data-source-layer>Open this key on ${esc(layerName(source))}</button>` : `
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
+            ${inherited ? "" : `<p class="note">They switch only ${esc(thisKeyOnThisLayer(layerName(source)))}. To switch a behaviour or combo off on every key, use its own Use this behaviour or Use this combo; for a whole layer, Settings.</p>`}
             <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behavior ? "runs here" : "this key has none")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "this key can take part; each combo has its own switches too")}.</p>
             ${customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))) ? `<p class="note">${esc(customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))))}</p>` : ""}
         </div>`);

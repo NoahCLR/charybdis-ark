@@ -76,7 +76,7 @@ test("a transparent late-layer key explains its source and opens that placement"
         store.setModel(model); store.showLayer(15); store.render();
     }, model);
     await expect(page.locator('[data-source-layer]')).toBeVisible();
-    await expect(page.locator('.bench-body')).toContainText("This transparent key takes its participation");
+    await expect(page.locator('.bench-body')).toContainText("This key is transparent on this layer");
     await expect(page.locator('[data-use-behavior]')).toHaveCount(0);
     await page.locator('[data-source-layer]').click();
     await expect(page.locator('[data-use-behavior]')).toBeEnabled();
@@ -100,4 +100,66 @@ test("a transparent late-layer key explains its source and opens that placement"
         const {state} = await import("/webview/store.mjs");
         return [state.tab, state.behaviourRow];
     })).toEqual(["behaviours", below.semantic || below.keycode]);
+});
+
+test("a key whose behaviour is switched off for it on this layer shows no dots there, keeps them elsewhere, and its hover and Key tab say why", async ({page}) => {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto("/preview/index.html");
+    await page.locator('[data-screen="keys"]').click();
+    // A Base key with a behaviour that has branches, then the same model with
+    // Use behaviour off for that key on Base.
+    const found = await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const {behaviourFor, keyMeaning} = await import("/webview/view/keyface.mjs");
+        const model = store.getModel();
+        const key = model.layers[0].positions.find(position => position.row !== undefined && behaviourFor(model, keyMeaning(position))?.steps?.length);
+        store.showLayer(0); store.state.tab = "key"; store.state.selected = key.layoutIndex; store.render();
+        return {index: key.layoutIndex, placement: key.row * 6 + key.column, name: model.layers[0].displayName || model.layers[0].name};
+    });
+    const key = page.locator(`g.kc[data-key="${found.index}"]`);
+    await expect(key.locator("circle").first()).toBeAttached();
+    // The same keycode on a second layer, so one placement can be switched
+    // off while the other keeps its behaviour. This fixture changes a native
+    // layout value, so republish the facts the core regenerates after it.
+    const model = await page.evaluate(async ({index, placement}) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        const base = model.layers[0].positions.find(position => position.layoutIndex === index);
+        const other = model.layers[1].positions.find(position => position.layoutIndex === index);
+        Object.assign(other, {keycode: base.keycode, semantic: base.semantic, value: base.value, display: base.display});
+        model.participation.layers[0].bypass = [placement];
+        return model;
+    }, found);
+    const answers = compileLayerAnswers(model.layers.map(layer => {
+        const codes = [];
+        for (const key of layer.positions) codes[key.layoutIndex] = key.value;
+        return codes;
+    }));
+    model.layers.forEach((layer, at) => { layer.answers = answers[at]; });
+    await page.evaluate(async model => {
+        const store = await import("/webview/store.mjs");
+        store.setModel(model); store.showLayer(1); store.render();
+    }, model);
+    await expect(key.locator("circle").first()).toBeAttached();
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        store.showLayer(0); store.render();
+    });
+    await expect(key.locator("circle")).toHaveCount(0);
+
+    const why = `Use behaviour is off for this key on this layer (${found.name})`;
+    await key.hover();
+    const card = page.locator(".hovercard:not(.hc-side)");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("Key behaviour not used");
+    await expect(card).toContainText(why);
+    await expect(card.locator(".hc-branch")).toHaveCount(0);
+
+    const body = page.locator(".bench-body");
+    await expect(body.locator("h4").first()).toHaveText(`This key on this layer (${found.name})`);
+    await expect(body.locator('.key-reaches [data-goto="behaviours"]')).toContainText(`not used: ${why}`);
+    await expect(body.locator(".key-participation")).toContainText(`Behaviour and combos for this key on this layer (${found.name})`);
+    await expect(body.locator(".key-participation")).toContainText(`They switch only this key on this layer (${found.name}).`);
+    expect(errors).toEqual([]);
 });

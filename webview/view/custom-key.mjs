@@ -7,7 +7,7 @@
 // tap-toggled or one-shot. A behaviour on the key works on top of it, and a
 // behaviour step on another key that sends it sends the shortcut only, layers
 // included.
-import {vocabulary} from "./vocabulary.mjs";
+import {sentence, vocabulary} from "./vocabulary.mjs";
 import {customKeyKeycodes, customKeyPlacements, reachGroups} from "./reach.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
 import {compactModifierMask} from "./keyvalues.mjs";
@@ -67,13 +67,11 @@ function shortcutRuns(key) {
         default: return "held while the key is held, tapped when it is tapped";
     }
 }
-/** @param {string} text */
-const upper = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 // A shortcut's limits in words, as core says them (model.
 // customKeyShortcutKeyLimits): "up to 6 keys held together, at most one media
 // key and one system key"; `start` begins a sentence with them.
 /** @param {Model} model @param {boolean} [start] */
-export const shortcutLimitWords = (model, start = false) => (start ? upper : String)(model?.customKeyShortcutKeyLimits?.words || "");
+export const shortcutLimitWords = (model, start = false) => (start ? sentence : String)(model?.customKeyShortcutKeyLimits?.words || "");
 
 // A slot in use: named, or sending a shortcut, or with a behaviour. Any other
 // is an empty slot, drawn as one on the Custom keys screen, and is not a key a
@@ -98,7 +96,7 @@ export const customKeyOf = (model, keycode) => /^CUSTOM_KEY_\d+$/.test(String(ke
 export function customKeyDoes(key) {
     const sends = hasShortcut(key) ? key.shortcutLabel : "";
     if (sends && key.hasBehavior) return `Its behaviour, on top of ${sends}: a tap or hold the behaviour leaves empty ${shortcutAct(key)}${momentary(key) ? `, and ${FROM_EVERY_PRESS}` : ""}.`;
-    if (sends) return `${upper(shortcutAct(key))}: ${shortcutRuns(key)}. Set taps and holds in its grid to give it more.`;
+    if (sends) return `${sentence(shortcutAct(key))}: ${shortcutRuns(key)}. Set taps and holds in its grid to give it more.`;
     if (key.hasBehavior) return "Only what its behaviour says. Give it a shortcut to send one where the behaviour leaves a tap or hold empty.";
     return "Nothing yet. Give it a shortcut, or set taps and holds in its grid.";
 }
@@ -109,8 +107,8 @@ export function customKeyDoes(key) {
 /** @param {CustomKey} key */
 export function customKeyShortcutLine(key) {
     if (!hasShortcut(key)) return "No shortcut: it does only what its behaviour says.";
-    return key.hasBehavior ? `${upper(shortcutAct(key))} where its behaviour leaves a tap or hold empty${momentary(key) ? `; ${FROM_EVERY_PRESS}` : ""}.`
-        : `${upper(shortcutAct(key))}: ${shortcutRuns(key)}.`;
+    return key.hasBehavior ? `${sentence(shortcutAct(key))} where its behaviour leaves a tap or hold empty${momentary(key) ? `; ${FROM_EVERY_PRESS}` : ""}.`
+        : `${sentence(shortcutAct(key))}: ${shortcutRuns(key)}.`;
 }
 
 // A custom key under its name in the hover card: with no shortcut, only that,

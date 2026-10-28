@@ -594,7 +594,15 @@ combos, and **Use behaviour** / **Join combos** on placements
 (`browser-tests/participation.spec.js`).
 
 The Key tab explains each blocked scope, and a transparent key leads to the
-placement that supplies it (`tests/view/participation.test.mjs`). Controls
+placement that supplies it (`tests/view/participation.test.mjs`). The board, the
+hover card and the Key tab judge a key at the placement that supplies it, with
+every scope: the board draws a key's behaviour dots only where its behaviour runs, and a
+combo's badge only where the key joins it and the keys that may cover every
+input (`tests/view/combo-reach.test.mjs`); the hover card and **What this key
+reaches** show a behaviour or combo that does not run as not used, with its
+reasons and no branches or timing (`browser-tests/participation.spec.js`).
+Words about one placement say *this key on this layer (<layer>)*, never only
+the layer, so they cannot read as the layer's switches. Controls
 are ordinary draft edits; switching off keeps definitions and timing, and a
 reorder moves masks and placement bits with their layers
 (`tests/view/edits.test.mjs`).

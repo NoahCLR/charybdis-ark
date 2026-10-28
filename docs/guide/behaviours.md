@@ -127,8 +127,9 @@ on again. A behaviour runs only where every switch allows it:
 
 The layer that counts is the one the key comes from: a transparent key takes
 the switches of the layer it falls through to. When a behaviour is off for a
-key, the key does what it would without one, and the Key tab and the hover
-card say which switch is keeping it off.
+key, the key does what it would without one: the board shows no dots on it,
+and the Key tab and the hover card say which switch is keeping it off, with
+no branches or timing, since none of them run.
 
 A key on the keyboard can turn behaviours or combos off for now. The
 Behaviours or Combos settings screen then marks the switch **turned off by

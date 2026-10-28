@@ -73,7 +73,9 @@ against. Pick the layer itself to keep its combos independent.
 Like behaviours, a combo fires only where every switch allows it: **Enabled**
 and **On these layers** on the Combos settings screen, the combo's own **Use this combo** and
 **Layers it runs on**, and **Join combos** on each of its keys in the Key tab.
-Every key in the combo must be allowed to take part.
+Every key in the combo must be allowed to take part. A combo that can't fire
+from a key has no badge on it, and the Key tab and the hover card list it as
+**not used**, with the switch that keeps it off.
 
 Whether the output's behaviour runs depends on the behaviours switch on the
 Behaviours settings screen, **Combo outputs use behaviours**, the combo's **Use output

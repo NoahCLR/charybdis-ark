@@ -1,6 +1,7 @@
 // @ts-check
 import {behaviourFor, keyFace, keyMeaning} from "./keyface.mjs";
 import {comboActivations, downTheStack, resolvedPositions, viewPositions} from "./layer-resolution.mjs";
+import {comboJoins} from "./participation.mjs";
 /** @typedef {import("../../contracts/panel.js").ComboView} ComboView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("../../contracts/panel.js").Position} Position */
@@ -107,10 +108,57 @@ function comboKeysAmong(positions, combo) {
     for (const position of positions) {
         if (!comboTouches(combo, position)) continue;
         keys.push(position);
-        covered.add(inputs.find((name) => inputOn(name, position)) ?? position.keycode);
+        covered.add(inputPressed(combo, position));
     }
     return {keys, covered: covered.size};
 }
+
+// The input of a combo a key presses, by the name the combo stores.
+/** @param {ComboView} combo @param {Position} position */
+const inputPressed = (combo, position) => (combo?.inputs || []).find((name) => inputOn(name, position)) ?? position.keycode;
+
+// Whether a combo fires from each of the keys that press it in one view, and
+// why not: every key has to be allowed to join it on the layer that supplies
+// it (firmware's combo decision), and the keys allowed must still cover every
+// input, or the chord never forms; then each key says which others cannot.
+// Under Combo Layer Matching the keycode is the reference layer's but the
+// permissions stay the supplying layer's.
+/** @typedef {{fires: boolean, reasons: string[]}} ComboUse */
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {ComboView} combo @param {ResolvedKey[]} keys @returns {Map<number, ComboUse>} */
+function comboUses(model, stack, at, held, combo, keys) {
+    /** @type {Map<number, number> | null} */
+    let supplied = null;
+    /** @param {ResolvedKey} key */
+    const source = (key) => {
+        if (!key.reference) return key.layer?.index ?? at;
+        supplied ??= new Map(resolvedPositions(stack, at, held).map((entry) => [entry.position.layoutIndex, entry.layer?.index ?? at]));
+        return supplied.get(key.position.layoutIndex) ?? stack[at]?.index ?? at;
+    };
+    const judged = keys.map((key) => {
+        const layer = source(key);
+        return {key, layer, input: inputPressed(combo, key.position), ...comboJoins(model, layer, key.position, combo)};
+    });
+    const covered = new Set(judged.filter((row) => row.joins).map((row) => row.input));
+    const chord = covered.size >= (combo.inputs || []).length;
+    // Only keys whose input no other key covers keep the chord from forming.
+    const blocking = judged.filter((row) => !row.joins && !covered.has(row.input));
+    /** @param {typeof judged[number]} row */
+    const keyOnLayer = ({input, layer}) => {
+        const supplier = stack.find((candidate) => candidate.index === layer);
+        return `${combo.inputDisplays?.[(combo.inputs || []).indexOf(input)] || input} on ${supplier?.displayName || supplier?.name || `Layer ${layer}`}`;
+    };
+    const blockedWords = `its other key${blocking.length === 1 ? "" : "s"} ${blocking.map(keyOnLayer).join(", ")} cannot join it, so it never forms`;
+    return new Map(judged.map(({key, joins, reasons}) => [key.position.layoutIndex,
+        joins && !chord ? {fires: false, reasons: [blockedWords]} : {fires: joins, reasons}]));
+}
+/** @param {Map<number, Map<ComboView, ComboUse>>} uses @param {ComboView} combo @param {Map<number, ComboUse>} byKey */
+const recordUses = (uses, combo, byKey) => {
+    for (const [layoutIndex, use] of byKey) {
+        const here = uses.get(layoutIndex) || new Map();
+        here.set(combo, use);
+        uses.set(layoutIndex, here);
+    }
+};
 
 /**
  * Combos, grouped the way everything else is — but a combo is the one thing a
@@ -211,20 +259,24 @@ function groupCombos(model, stack, at) {
 // combo that can never fire here is not marked — and under Combo Layer
 // Matching the keys whose position the reference layer supplies are. The
 // board asks once per key, so each (model, layer) is grouped once.
-/** @type {WeakMap<Partial<import("../../contracts/panel.js").PublishedModel>, Map<number, {stack: Layer[]; keys: Map<number, ComboView[]>}>>} */
+/** @typedef {{keys: Map<number, ComboView[]>, uses: Map<number, Map<ComboView, ComboUse>>}} ComboMarks */
+/** @type {WeakMap<Partial<import("../../contracts/panel.js").PublishedModel>, Map<number, {stack: Layer[]} & ComboMarks>>} */
 const combosByModel = new WeakMap();
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {Map<number, ComboView[]>} */
-export function combosOnLayer(model, stack, at) {
-    if (!model) return new Map();
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {ComboMarks} */
+function marksOnLayer(model, stack, at) {
+    if (!model) return {keys: new Map(), uses: new Map()};
     let perLayer = combosByModel.get(model);
     if (!perLayer) combosByModel.set(model, perLayer = new Map());
     const cached = perLayer.get(at);
-    if (cached?.stack === stack) return cached.keys;
+    if (cached?.stack === stack) return cached;
     const {onKeys, throughKeys} = comboGroups(model, stack, at);
     const order = new Map((model.combos || []).map((combo, index) => [combo, index]));
     /** @type {Map<number, ComboView[]>} */
     const keys = new Map();
+    /** @type {Map<number, Map<ComboView, ComboUse>>} */
+    const uses = new Map();
     for (const entry of [...onKeys, ...throughKeys]) {
+        recordUses(uses, entry.combo, comboUses(model, stack, at, entry.held.map((layer) => stack.indexOf(layer)), entry.combo, entry.keys));
         for (const key of entry.keys) {
             if (key.fellThrough) continue;
             const combos = keys.get(key.position.layoutIndex) || [];
@@ -233,9 +285,12 @@ export function combosOnLayer(model, stack, at) {
         }
     }
     for (const combos of keys.values()) combos.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
-    perLayer.set(at, {stack, keys});
-    return keys;
+    const marks = {stack, keys, uses};
+    perLayer.set(at, marks);
+    return marks;
 }
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {Map<number, ComboView[]>} */
+export const combosOnLayer = (model, stack, at) => marksOnLayer(model, stack, at).keys;
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number} layoutIndex */
 export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, stack, at).get(layoutIndex) || [];
 
@@ -246,34 +301,63 @@ export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, 
 // that key as an input. Under Combo Layer Matching the keyboard matches the
 // reference layer's raw keycodes, never an answer from below, so the layer's
 // own marks already say it all. Each (model, layer, preview) is grouped once.
-/** @type {WeakMap<Partial<import("../../contracts/panel.js").PublishedModel>, Map<string, {stack: Layer[]; keys: Map<number, ComboView[]>}>>} */
+/** @type {WeakMap<Partial<import("../../contracts/panel.js").PublishedModel>, Map<string, {stack: Layer[]} & ComboMarks>>} */
 const previewCombosByModel = new WeakMap();
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held */
-export function combosInPreview(model, stack, at, held) {
-    const own = combosOnLayer(model, stack, at);
-    if (!model || !held?.length || comboReferenceLayer(model, at) !== at) return own;
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @returns {ComboMarks} */
+function marksInPreview(model, stack, at, held) {
+    const own = marksOnLayer(model, stack, at);
+    if (!model || !held?.length) return own;
     let perView = previewCombosByModel.get(model);
     if (!perView) previewCombosByModel.set(model, perView = new Map());
     const view = `${at}:${held.join(",")}`;
     const cached = perView.get(view);
-    if (cached?.stack === stack) return cached.keys;
-    const keys = new Map([...own].map(([layoutIndex, combos]) => [layoutIndex, [...combos]]));
+    if (cached?.stack === stack) return cached;
+    if (comboReferenceLayer(model, at) !== at) {
+        // The reference layer's keycodes are matched whatever is held, so the
+        // marks stay the layer's own; the layers held still supply each key,
+        // and so decide its permissions.
+        /** @type {Map<number, Map<ComboView, ComboUse>>} */
+        const uses = new Map();
+        const {onKeys, throughKeys} = comboGroups(model, stack, at);
+        for (const entry of [...onKeys, ...throughKeys]) recordUses(uses, entry.combo, comboUses(model, stack, at, held, entry.combo, entry.keys));
+        const marks = {stack, keys: own.keys, uses};
+        perView.set(view, marks);
+        return marks;
+    }
+    const keys = new Map([...own.keys].map(([layoutIndex, combos]) => [layoutIndex, [...combos]]));
+    const uses = new Map([...own.uses].map(([layoutIndex, found]) => [layoutIndex, new Map(found)]));
     for (const {combo, keys: pressed} of combosInView(model, stack, at, held)) {
+        const found = comboUses(model, stack, at, held, combo, pressed);
         for (const key of pressed) {
             if (!key.fellThrough) continue;
             const combos = keys.get(key.position.layoutIndex) || [];
             if (!combos.includes(combo)) combos.push(combo);
             keys.set(key.position.layoutIndex, combos);
+            recordUses(uses, combo, new Map([[key.position.layoutIndex, /** @type {ComboUse} */ (found.get(key.position.layoutIndex))]]));
         }
     }
     const order = new Map((model.combos || []).map((combo, index) => [combo, index]));
     for (const combos of keys.values()) combos.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
-    perView.set(view, {stack, keys});
-    return keys;
+    const marks = {stack, keys, uses};
+    perView.set(view, marks);
+    return marks;
 }
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held */
+export const combosInPreview = (model, stack, at, held) => marksInPreview(model, stack, at, held).keys;
 /** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {number} layoutIndex */
 export const combosShownAt = (model, stack, at, held, layoutIndex) =>
     combosInPreview(model, stack, at, held).get(layoutIndex) || [];
+// Whether a combo the key takes part in fires from it in this view, and why
+// not (comboUses). A combo the key is not in fires from it nowhere, so it has
+// nothing to say against it.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {number} layoutIndex @param {ComboView} combo @returns {ComboUse} */
+export const comboUseAt = (model, stack, at, held, layoutIndex, combo) =>
+    marksInPreview(model, stack, at, held).uses.get(layoutIndex)?.get(combo) ?? {fires: true, reasons: []};
+// The badges the board draws on a key: its combos that fire from it here.
+// The Key tab and the hover card list the others too, saying why they do not.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {number} layoutIndex */
+export const comboBadgesAt = (model, stack, at, held, layoutIndex) =>
+    combosShownAt(model, stack, at, held, layoutIndex).filter((combo) => comboUseAt(model, stack, at, held, layoutIndex, combo).fires);
 
 // The combo builder holds its inputs by the names the combo stores, in stored
 // order, never by board position: a combo fires on keycodes, and one position

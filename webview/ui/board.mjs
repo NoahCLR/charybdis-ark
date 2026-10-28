@@ -12,12 +12,17 @@
 // answering key's behaviour dots and the badges of the combos it fires in this
 // preview (combosInPreview). Selection and
 // edits still name this layer's own position.
+//
+// Dots and badges mark only what runs: a behaviour or combo that a switch
+// keeps off for the key, on the layer that supplies it, marks nothing there
+// (firmware's participation policy).
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
-import {combosShownAt} from "../view/combo-reach.mjs";
+import {comboBadgesAt} from "../view/combo-reach.mjs";
+import {behaviourRuns} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
@@ -66,8 +71,9 @@ export function board(model, layer, options = {}) {
         }
 
         const showMarks = faces && mode !== "leds";
-        const tiers = showMarks ? behaviourTiers(behaviourFor(model, keyMeaning(shown))) : [];
-        const combos = showMarks ? combosShownAt(model, stack, layer?.index ?? 0, held, index) : [];
+        const behaviour = showMarks ? behaviourFor(model, keyMeaning(shown)) : undefined;
+        const tiers = behaviour && behaviourRuns(model, (from || layer)?.index ?? 0, shown, behaviour).runs ? behaviourTiers(behaviour) : [];
+        const combos = showMarks ? comboBadgesAt(model, stack, layer?.index ?? 0, held, index) : [];
         const sub = mode === "leds" ? "" : face.sub;
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: combos.length > 0, sub: Boolean(sub)});
