@@ -46,9 +46,9 @@ Around the core:
   only each other, use no DOM and no Node, and take primitives (masks, index
   arrays, plain records), never a decoded profile or the posted model. Core
   loads them with `require()`, `webview/view/` by relative path, and the web
-  build bundles them into both. Core publishes every firmware decision that
-  depends only on the profile; a rule is here only because the page has to
-  run it as a person clicks. The shell runs none.
+  build bundles them into both. A firmware decision that depends only on the
+  profile is computed in core and published instead; a rule is here only
+  because the page has to run it as a person clicks. The shell runs none.
 - **`contracts/`**: type declarations shared by the core, the shell and the
   interface for what crosses the panel boundary. No runtime code.
 
