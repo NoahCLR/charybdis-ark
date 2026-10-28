@@ -7,11 +7,9 @@
 // PD_MODE_0, MACRO_3 — resolved to profile actions and native keycodes.
 
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfName} = require("../data/pd-mode-keys");
-const {combineModifiers} = require("../data/keycode-catalog");
+const {QK, LAYER_FORMS, LAYER_FORM_LAYERS, PACKED_LAYERS, MODS, MODIFIER_WRAPPERS, combineModifiers, keyOf, MOD_MASK, layerTap, modified, modsOf, modTap, oneShotMod} = require("../data/qmk-keycodes");
 const {customKeyCode, customKeyOfName, layerLockCode, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
-
-const QMK_MACRO_BASE = 0x7700;
 
 // The macro slot a name reaches: MACRO_n, or VIA_MACRO_n, the name before
 // firmware D-F31 dropped VIA, so a name typed the old way still reaches its
@@ -49,23 +47,23 @@ const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_MODE_KEYS.flatMap(({slot,
     return entries;
 })));
 
+// The wrappers this resolver has always taken: a subset of QMK's
+// (qmk-keycodes.js) with no right-hand pairs, plus LAS, which QMK spells LSA.
+// The draft tries the catalogue's encoder first, so this table only decides
+// what it falls back to; it is kept as it was rather than changing what an
+// edit is accepted with.
 /** @type {Readonly<Record<string, number>>} */
-const MODIFIER_WRAPPERS = Object.freeze({
-    C: 0x0100, LCTL: 0x0100,
-    S: 0x0200, LSFT: 0x0200,
-    A: 0x0400, LALT: 0x0400,
-    G: 0x0800, LGUI: 0x0800,
-    LCAG: 0x0d00, LCA: 0x0500, LCG: 0x0900, LCS: 0x0300,
-    LAG: 0x0c00, LSG: 0x0a00, LAS: 0x0600,
-    MEH: 0x0700, HYPR: 0x0f00,
-    RCTL: 0x1100, RSFT: 0x1200, RALT: 0x1400, RGUI: 0x1800,
+const LEGACY_WRAPPERS = Object.freeze({
+    ...Object.fromEntries(["C", "LCTL", "S", "LSFT", "A", "LALT", "G", "LGUI", "LCAG", "LCA", "LCG", "LCS", "LAG", "LSG",
+        "MEH", "HYPR", "RCTL", "RSFT", "RALT", "RGUI"].map(name => [name, MODIFIER_WRAPPERS[name]])),
+    LAS: MODIFIER_WRAPPERS.LSA,
 });
 
+// MOD_ names for MT() and OSM(): QMK's eight, and MOD_HYPR and MOD_MEH.
 /** @type {Readonly<Record<string, number>>} */
 const MODIFIER_BITS = Object.freeze({
-    MOD_LCTL: 0x01, MOD_LSFT: 0x02, MOD_LALT: 0x04, MOD_LGUI: 0x08,
-    MOD_RCTL: 0x11, MOD_RSFT: 0x12, MOD_RALT: 0x14, MOD_RGUI: 0x18,
-    MOD_HYPR: 0x0f, MOD_MEH: 0x07,
+    ...Object.fromEntries(Object.entries(MODS).map(([name, bits]) => [`MOD_${name}`, bits])),
+    MOD_HYPR: MODIFIER_WRAPPERS.HYPR, MOD_MEH: MODIFIER_WRAPPERS.MEH,
 });
 
 class ProfileExpressionError extends Error {
@@ -101,8 +99,6 @@ function semanticActionForExpression(value, model, label = "Action") {
     return {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: numeric};
 }
 
-const QK_MODS_MAX = 0x1fff;
-
 /** @param {unknown} value @param {ExpressionModel} model @returns {number | undefined} */
 function resolveNativeQmkExpression(value, model) {
     const expression = normalizeExpression(value);
@@ -117,7 +113,7 @@ function resolveNativeQmkExpression(value, model) {
     if (expression === "XXXXXXX") return catalog.KC_NO ?? 0;
 
     const macro = macroOfName(expression);
-    if (macro !== undefined) return QMK_MACRO_BASE + macro;
+    if (macro !== undefined) return QK.MACRO.first + macro;
     const custom = customKeyOfName(expression);
     if (custom !== undefined) return customKeyCode(custom);
 
@@ -126,11 +122,10 @@ function resolveNativeQmkExpression(value, model) {
 
     const call = parseCall(expression);
     if (!call) return undefined;
-    if (["TO", "MO", "DF", "TG", "OSL"].includes(call.name) && call.args.length === 1) {
+    // TT() and PDF() are the catalogue's alone.
+    if ((call.name === "TO" || call.name === "MO" || call.name === "DF" || call.name === "TG" || call.name === "OSL") && call.args.length === 1) {
         const layer = layerIdOrUndefined(call.args[0], model);
-        /** @type {Record<string, number>} */
-        const bases = {TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280};
-        return layer === undefined || layer > 0x1f ? undefined : bases[call.name] | layer;
+        return layer === undefined || layer >= LAYER_FORM_LAYERS ? undefined : LAYER_FORMS[call.name] | layer;
     }
     // The firmware supports a lock for each of its sixteen layers; the rest of
     // the reserved block has no key behind it.
@@ -141,27 +136,27 @@ function resolveNativeQmkExpression(value, model) {
     // A modifier wrapper only applies to a basic or already-modified key
     // (QK_MODS, up to 0x1FFF). Anything above would OR the modifier bits into
     // an unrelated keycode, e.g. C(MACRO_3) into a macro without Ctrl.
-    if (MODIFIER_WRAPPERS[call.name] !== undefined && call.args.length === 1) {
+    if (LEGACY_WRAPPERS[call.name] !== undefined && call.args.length === 1) {
         const keycode = resolveNativeQmkExpression(call.args[0], model);
-        if (keycode === undefined || keycode > QK_MODS_MAX) return undefined;
-        const mods = combineModifiers((keycode >> 8) & 0x1f, MODIFIER_WRAPPERS[call.name] >> 8);
-        return mods === undefined ? undefined : (mods << 8) | (keycode & 0xff);
+        if (keycode === undefined || keycode > QK.MODS.last) return undefined;
+        const mods = combineModifiers(modsOf(keycode), LEGACY_WRAPPERS[call.name]);
+        return mods === undefined ? undefined : modified(mods, keyOf(keycode));
     }
     if (call.name === "OSM" && call.args.length === 1) {
         const mods = resolveModifierBits(call.args[0]);
-        return mods === undefined ? undefined : 0x52a0 | mods;
+        return mods === undefined ? undefined : oneShotMod(mods);
     }
     if (call.name === "LT" && call.args.length === 2) {
         const layer = layerIdOrUndefined(call.args[0], model);
         const keycode = resolveNativeQmkExpression(call.args[1], model);
         // QK_LAYER_TAP has four layer bits; layer 16 and up would spill into
         // TO(), MO() and QK_BOOTLOADER.
-        return layer === undefined || layer > 0x0f || keycode === undefined || keycode > 0xff ? undefined : 0x4000 | (layer << 8) | keycode;
+        return layer === undefined || layer >= PACKED_LAYERS || keycode === undefined || keycode > QK.BASIC.last ? undefined : layerTap(layer, keycode);
     }
     if (call.name === "MT" && call.args.length === 2) {
         const mods = resolveModifierBits(call.args[0]);
         const keycode = resolveNativeQmkExpression(call.args[1], model);
-        return mods === undefined || keycode === undefined || keycode > 0xff ? undefined : 0x2000 | (mods << 8) | keycode;
+        return mods === undefined || keycode === undefined || keycode > QK.BASIC.last ? undefined : modTap(mods, keycode);
     }
     return undefined;
 }
@@ -177,7 +172,7 @@ function resolveModifierBits(value) {
         if (combined === undefined) return undefined;
         result = combined;
     }
-    return result & 0x1f;
+    return result & MOD_MASK;
 }
 
 /** @param {unknown} value @param {ExpressionModel} model @param {string} label */

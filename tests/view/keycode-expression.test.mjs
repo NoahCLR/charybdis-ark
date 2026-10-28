@@ -41,7 +41,8 @@ const EXPRESSIONS = [
     "MO(2)", "MO(15)", "MO(16)", "TG(1)", "TO(0)", "TT(3)", "OSL(4)", "DF(1)", "PDF(1)", "LOCK_LAYER(1)", "LOCK_LAYER(16)",
     "S(MO(2))", "G(PD_MODE_0)", "S(MACRO_0)", "G(A(S(C(LT(3,KC_F)))))", "C(PD_MODE_0)",
     "PD_MODE_0", "PD_MODE_0_LOCK", "PD_SLOT_0", "PD_SLOT_0_LOCK", "PD_SLOT_32", "MACRO_0", "MACRO_127", "MACRO_128", "CUSTOM_KEY_5",
-    "OSM(MOD_LSFT)", "LM(1, MOD_LSFT)", "LM(16, MOD_LSFT)", "0x0004", "0x5240", "4", "NOT_A_KEY", "", "LT(3,", "KC_A)",
+    "OSM(MOD_LSFT)", "OSM(MOD_RSFT)", "OSM(MOD_RCTL|MOD_RALT)", "OS_RSFT", "OS_RCS", "RCS(KC_A)", "LCSG(KC_A)", "RSAG(KC_A)", "LSA(KC_A)", "LAS(KC_A)",
+    "LM(1, MOD_LSFT)", "LM(16, MOD_LSFT)", "0x0004", "0x5240", "4", "NOT_A_KEY", "", "LT(3,", "KC_A)",
 ];
 
 test("the picker's check stores what the draft stores and refuses what it refuses", () => {

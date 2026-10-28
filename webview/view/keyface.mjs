@@ -2,6 +2,7 @@
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("../../contracts/panel.js").Position} Position */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
+import {MODIFIER_WRAPPERS, MODS, MOD_RIGHT, macroOfName} from "./keycode-expression.mjs";
 // What a key shows: its legend, and the marks for everything it reaches.
 //
 // The model already resolved each position to a display label; this adds the
@@ -93,7 +94,7 @@ export const keyMeaning = (/** @type {import("../../contracts/panel.js").Positio
 /** @param {ViewModel} model @param {string} name */
 export const visibleKeycode = (model, name) => {
     const semantic = model?.qmkKeycodeAliases?.[name] || "";
-    if (/^MACRO_(?:[0-9]|[1-5][0-9]|6[0-3])$/.test(semantic)) return semantic;
+    if (/^MACRO_\d+$/.test(semantic) && macroOfName(semantic) !== undefined) return semantic;
     return semantic && /^0x[0-9a-f]+$/i.test(name) ? semantic : name || "";
 };
 
@@ -136,21 +137,18 @@ export const behaviourFor = (model, keycode) =>
 // row says KC_ENTER and LGUI(KC_C), and an expression may or may not space its
 // arguments or nest two modifiers either way round. Every name goes through the
 // keyboard's alias table, and every modifier wrapper becomes one ordered set.
-/** @type {Record<string, string[]>} */
-const WRAPPER_MODS = {
-    C: ["LCTL"], LCTL: ["LCTL"], S: ["LSFT"], LSFT: ["LSFT"], A: ["LALT"], LALT: ["LALT"], LOPT: ["LALT"],
-    G: ["LGUI"], LGUI: ["LGUI"], LCMD: ["LGUI"], LWIN: ["LGUI"],
-    RCTL: ["RCTL"], RSFT: ["RSFT"], RALT: ["RALT"], ROPT: ["RALT"], ALGR: ["RALT"], RGUI: ["RGUI"], RCMD: ["RGUI"], RWIN: ["RGUI"],
-    LCS: ["LCTL", "LSFT"], LCA: ["LCTL", "LALT"], LCG: ["LCTL", "LGUI"], LSA: ["LSFT", "LALT"], LSG: ["LSFT", "LGUI"],
-    LAG: ["LALT", "LGUI"], LCAG: ["LCTL", "LALT", "LGUI"], MEH: ["LCTL", "LSFT", "LALT"], HYPR: ["LCTL", "LSFT", "LALT", "LGUI"],
+const MOD_ORDER = /** @type {(keyof typeof MODS)[]} */ (Object.keys(MODS));
+/** @param {string} wrapper The modifiers a wrapper spelling holds, by their long names, or undefined for no wrapper. */
+const wrapperMods = (wrapper) => {
+    const bits = Object.hasOwn(MODIFIER_WRAPPERS, wrapper) ? MODIFIER_WRAPPERS[wrapper] : undefined;
+    return bits === undefined ? undefined : MOD_ORDER.filter((mod) => (MODS[mod] & MOD_RIGHT) === (bits & MOD_RIGHT) && MODS[mod] & bits & 0x0f);
 };
-const MOD_ORDER = ["LCTL", "LSFT", "LALT", "LGUI", "RCTL", "RSFT", "RALT", "RGUI"];
 export function canonicalKeycode(/** @type {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} */ model, /** @type {string} */ expression) {
     let text = String(expression ?? "").replace(/\s+/g, "");
     /** @type {Set<string>} */
     const mods = new Set();
-    for (let match; (match = /^([A-Z]+)\((.*)\)$/.exec(text)) && WRAPPER_MODS[match[1]];) {
-        WRAPPER_MODS[match[1]].forEach((mod) => mods.add(mod));
+    for (let match, held; (match = /^([A-Z]+)\((.*)\)$/.exec(text)) && (held = wrapperMods(match[1]));) {
+        held.forEach((mod) => mods.add(mod));
         text = match[2];
     }
     const inner = text.replace(/[A-Za-z_][A-Za-z0-9_]*/g, (name) => model?.qmkKeycodeAliases?.[name] ?? name);

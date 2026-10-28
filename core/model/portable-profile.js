@@ -13,6 +13,7 @@ const {ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema
 const {SETTING, SETTING_FIELDS, decodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
+const {QK, inBlock, LAYER_FORMS, LAYER_FORM_LAYERS, layerModLayer, layerTapLayer, withLayerModLayer, withLayerTapLayer} = require("../data/qmk-keycodes");
 const {layerName} = require("./vocabulary");
 const {reorderLinkRefusal} = require("./pointing-links");
 const {reorderShortcutRefusal} = require("./shortcut-layers");
@@ -276,13 +277,13 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     /** @param {number} code */
     function native(code) {
         if (!renumbers) return code;
-        if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= LAYERS) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (reach(layer) << 8);}
-        for (const start of [0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x52c0, 0x52e0, LAYER_LOCK_BASE]) {
-            const width = start === LAYER_LOCK_BASE ? LAYER_LOCK_SLOTS : 32;
+        if (inBlock(code, QK.LAYER_TAP)) {const layer = layerTapLayer(code); if (layer >= LAYERS) throw fail("A key points outside the layer bank."); return withLayerTapLayer(code, reach(layer));}
+        for (const start of [...Object.values(LAYER_FORMS), LAYER_LOCK_BASE]) {
+            const width = start === LAYER_LOCK_BASE ? LAYER_LOCK_SLOTS : LAYER_FORM_LAYERS;
             if (code >= start && code < start + width) {if (code - start >= LAYERS) throw fail("A key points outside the layer bank."); return start + reach(code - start);}
         }
         // Layer-mod stores a four-bit layer followed by five modifier bits.
-        if (code >= 0x5000 && code <= 0x51ff) {const layer = (code >> 5) & 15; if (layer >= LAYERS) throw fail("Invalid layer-mod reference."); return (code & 0xfe1f) | reach(layer) << 5;}
+        if (inBlock(code, QK.LAYER_MOD)) {const layer = layerModLayer(code); if (layer >= LAYERS) throw fail("Invalid layer-mod reference."); return withLayerModLayer(code, reach(layer));}
         return code;
     }
     const layers = order.map(old => validated.layers[old].map(native));

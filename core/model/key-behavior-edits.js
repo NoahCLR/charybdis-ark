@@ -80,7 +80,9 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
             result = semanticActionForExpression(name, {});
             if (result.kind === ACTION.QMK_KEYCODE) {
                 // Native expressions must pass the catalog's structural
-                // checks; the legacy compiler accepts invalid modifier wraps.
+                // checks; the older resolver (compiled-profile-v1.js) also
+                // takes decimal numbers and LAS(), which QMK spells LSA(), so
+                // only a bare name it knows (DPI_MOD) gets through here.
                 if (!/^[A-Z][A-Z0-9_]*$/.test(name)) throw invalid(`Unsupported key expression: ${name}.`);
                 if (!knownAbi) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
             }

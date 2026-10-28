@@ -2,7 +2,7 @@
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {vocabulary} from "./vocabulary.mjs";
 import {actionLabel, canonicalKeycode} from "./keyface.mjs";
-import {macroOfName} from "./keycode-expression.mjs";
+import {MODS, MOD_RIGHT, QK, inBlock, macroOfName, wrapperOf} from "./keycode-expression.mjs";
 
 // Numeric keycodes, named.
 //
@@ -11,10 +11,7 @@ import {macroOfName} from "./keycode-expression.mjs";
 // catalogue the keyboard itself reported, and falls back to the hex value
 // rather than inventing a name it cannot prove.
 
-/** @type {[number, string][]} */
-const MOD_WRAPPERS_LEFT = [[1, "C"], [2, "S"], [4, "A"], [8, "G"]];
-/** @type {[number, string][]} */
-const MOD_WRAPPERS_RIGHT = [[1, "RCTL"], [2, "RSFT"], [4, "RALT"], [8, "RGUI"]];
+const LEFT_MODS = [MODS.LCTL, MODS.LSFT, MODS.LALT, MODS.LGUI], RIGHT_MODS = [MODS.RCTL, MODS.RSFT, MODS.RALT, MODS.RGUI];
 
 export function keyName(/** @type {Model} */ model, /** @type {number} */ code) {
     if (!code) return "";
@@ -26,12 +23,12 @@ export function keyName(/** @type {Model} */ model, /** @type {number} */ code) 
 
     // Modifier-wrapped basic keycodes: 0x0100–0x1fff carries the held
     // modifiers in bits 8–12, and bit 12 means they are the right-hand ones.
-    if (code >= 0x0100 && code <= 0x1fff) {
+    if (inBlock(code, QK.MODS)) {
         const base = direct(code & 0xff);
         const bits = (code >> 8) & 0x1f;
         if (base && bits) {
-            const wrappers = bits & 0x10 ? MOD_WRAPPERS_RIGHT : MOD_WRAPPERS_LEFT;
-            return wrappers.filter(([bit]) => bits & bit).reduceRight((value, [, name]) => `${name}(${value})`, base);
+            const mods = bits & MOD_RIGHT ? RIGHT_MODS : LEFT_MODS;
+            return mods.filter((mod) => bits & mod & 0x0f).reduceRight((value, mod) => `${wrapperOf(mod)}(${value})`, base);
         }
     }
     return `0x${code.toString(16).toUpperCase()}`;
@@ -52,7 +49,7 @@ export function keyDisplayName(/** @type {Model} */ model, /** @type {number} */
 // the modifiers and bit 12 puts them on the right. 0 for any other keycode.
 /** @param {number} code */
 export const compactModifierMask = (code) => {
-    if (code < 0x0100 || code > 0x1fff) return 0;
+    if (!inBlock(code, QK.MODS)) return 0;
     const compact = (code >> 8) & 0x1f;
     return compact & 0x10 ? (compact & 0x0f) << 4 : compact & 0x0f;
 };
@@ -127,7 +124,7 @@ export function macroIndex(code) {
     if (named !== undefined) return named;
     const match = /^(?:QK_MACRO_|MC_)(\d+)$/.exec(text);
     if (match && Number(match[1]) > 31) return null;
-    const value = match ? Number(match[1]) : /^(?:0x[0-9a-f]+|\d+)$/i.test(text) ? Number(text) - 0x7700 : -1;
+    const value = match ? Number(match[1]) : /^(?:0x[0-9a-f]+|\d+)$/i.test(text) ? Number(text) - QK.MACRO.first : -1;
     return Number.isInteger(value) && value >= 0 && value < 128 ? value : null;
 }
 /** @param {Model} model @param {string | number | null | undefined} code */

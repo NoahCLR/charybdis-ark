@@ -43,13 +43,16 @@
 // buffered rather than tapped, so it claims nothing.
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
-const {customKeyOfCode} = require("../data/user-keycodes");
+const {customKeyOfCode, PD_HOLD_BASE} = require("../data/user-keycodes");
+const {QK, inBlock, MOD_MASK, keyOf, modsOf, layerTapLayer} = require("../data/qmk-keycodes");
 const {SHORTCUT_LAYER_KINDS, shortcutPresent} = require("../schema/settings-domain-v1");
 
 /** @param {number} code @param {number} start @param {number} end */
 const within = (code, start, end) => code >= start && code <= end;
+// A key a tap sends: a basic key past KC_NO and KC_TRNS that is no modifier,
+// or a modified key.
 /** @param {number} code */
-const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
+const plainKey = (code) => (within(code, 0x0004, QK.BASIC.last) && !within(code, 0x00e0, 0x00e7)) || inBlock(code, QK.MODS);
 
 /** @typedef {{customKeyShortcuts?: readonly import("../schema/types.js").CustomKeyShortcut[]}} BuiltInFeatures */
 /** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean}} */
@@ -68,21 +71,21 @@ function builtInActions(target, {customKeyShortcuts = []} = {}) {
     if (target?.kind === ACTION.POINTING_MODE_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
-    if (within(code, 0x7700, 0x777f)) return {releaseTaps: true};
+    if (inBlock(code, QK.MACRO)) return {releaseTaps: true};
     if (plainKey(code)) {
         return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true, releaseTaps: true};
     }
-    if (within(code, 0x4000, 0x4fff)) {
-        return {tap: keycodeAction(code & 0xff), hold: {kind: ACTION.LAYER_MOMENTARY, operand: (code >> 8) & 0x0f}};
+    if (inBlock(code, QK.LAYER_TAP)) {
+        return {tap: keycodeAction(keyOf(code)), hold: {kind: ACTION.LAYER_MOMENTARY, operand: layerTapLayer(code)}};
     }
-    if (within(code, 0x2000, 0x3fff)) {
-        return {tap: keycodeAction(code & 0xff), hold: keycodeAction(((code >> 8) & 0x1f) << 8)};
+    if (inBlock(code, QK.MOD_TAP)) {
+        return {tap: keycodeAction(keyOf(code)), hold: keycodeAction(modsOf(code) << 8)};
     }
-    if (within(code, 0x5220, 0x523f)) return {hold: {kind: ACTION.LAYER_MOMENTARY, operand: code & 0x0f}, fromPress: true};
-    if (within(code, 0x5000, 0x51ff)) return {hold: keycodeAction(code), fromPress: true};
-    if (within(code, 0x7e80, 0x7e9f)) return {hold: keycodeAction(code), fromPress: true};
-    if (within(code, 0x52a0, 0x52bf)) {
-        return {tap: keycodeAction(code), hold: keycodeAction((code & 0x1f) << 8)};
+    if (inBlock(code, QK.MOMENTARY)) return {hold: {kind: ACTION.LAYER_MOMENTARY, operand: code & 0x0f}, fromPress: true};
+    if (inBlock(code, QK.LAYER_MOD)) return {hold: keycodeAction(code), fromPress: true};
+    if (within(code, PD_HOLD_BASE, PD_HOLD_BASE + 0x1f)) return {hold: keycodeAction(code), fromPress: true};
+    if (inBlock(code, QK.ONE_SHOT_MOD)) {
+        return {tap: keycodeAction(code), hold: keycodeAction((code & MOD_MASK) << 8)};
     }
     return {};
 }

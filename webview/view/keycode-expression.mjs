@@ -12,8 +12,33 @@
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 
-const LAYER_FORMS = Object.freeze({TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280, TT: 0x52c0, PDF: 0x52e0});
-const WRAPPERS = Object.freeze({
+// QMK's keycode layout and the keyboard's own blocks, as core/data/
+// qmk-keycodes.js and core/data/user-keycodes.js have them: the interface may
+// not import core, so tests/view/keycode-layout-drift.test.mjs pins each.
+/** @param {number} first @param {number} last */
+const block = (first, last) => Object.freeze({first, last});
+export const QK = Object.freeze({
+    BASIC: block(0x0000, 0x00ff),
+    MODS: block(0x0100, 0x1fff),
+    MOD_TAP: block(0x2000, 0x3fff),
+    LAYER_TAP: block(0x4000, 0x4fff),
+    LAYER_MOD: block(0x5000, 0x51ff),
+    ONE_SHOT_MOD: block(0x52a0, 0x52bf),
+    DEF_LAYER: block(0x5240, 0x525f),
+    PERSISTENT_DEF_LAYER: block(0x52e0, 0x52ff),
+    MACRO: block(0x7700, 0x777f),
+});
+/** @param {number} code @param {{first: number, last: number}} range */
+export const inBlock = (code, {first, last}) => code >= first && code <= last;
+// The layer keycodes with their layer in the low five bits.
+export const LAYER_FORMS = Object.freeze({TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280, TT: 0x52c0, PDF: 0x52e0});
+/** @param {number} code */
+const isLayerForm = (code) => /** @type {readonly number[]} */ (Object.values(LAYER_FORMS)).includes(code & ~0x1f);
+// QMK's five modifier bits, and every wrapper spelling with the bits it adds.
+export const MODS = Object.freeze({LCTL: 0x01, LSFT: 0x02, LALT: 0x04, LGUI: 0x08, RCTL: 0x11, RSFT: 0x12, RALT: 0x14, RGUI: 0x18});
+export const MOD_RIGHT = 0x10;
+/** @type {Readonly<Record<string, number>>} */
+export const MODIFIER_WRAPPERS = Object.freeze({
     C: 0x01, LCTL: 0x01, S: 0x02, LSFT: 0x02,
     A: 0x04, LALT: 0x04, LOPT: 0x04,
     G: 0x08, LGUI: 0x08, LCMD: 0x08, LWIN: 0x08,
@@ -24,8 +49,9 @@ const WRAPPERS = Object.freeze({
     RCS: 0x13, RCA: 0x15, RCG: 0x19, RSA: 0x16, RSG: 0x1a, RAG: 0x1c,
     RCSG: 0x1b, RCAG: 0x1d, RSAG: 0x1e,
 });
-const MOD_BITS = Object.freeze({CTL: 1, SFT: 2, ALT: 4, GUI: 8});
-const MACRO_BASE = 0x7700, LAYER_LOCK_BASE = 0x7ec0, LAYER_LOCKS = 16;
+/** @param {number} mods The first wrapper spelling for these modifier bits: C, S, A, G, RCTL, … for one. */
+export const wrapperOf = (mods) => Object.keys(MODIFIER_WRAPPERS).find((name) => MODIFIER_WRAPPERS[name] === mods);
+export const LAYER_LOCK_BASE = 0x7ec0, LAYER_LOCKS = 16;
 
 // The macro slot a name reaches: MACRO_n, or VIA_MACRO_n, the name before
 // firmware D-F31 dropped VIA, so a name typed the old way still reaches its
@@ -42,15 +68,15 @@ const own = (table, name) => Object.hasOwn(table, name) ? table[name] : undefine
 
 // QMK keeps one side flag for all of a compact keycode's modifiers.
 /** @param {number} before @param {number} added */
-const combine = (before, added) => (before & 0x0f) && (added & 0x0f) && ((before ^ added) & 0x10) ? undefined : before | added;
+const combine = (before, added) => (before & 0x0f) && (added & 0x0f) && ((before ^ added) & MOD_RIGHT) ? undefined : before | added;
 
 /** @param {string} text */
 function modifierBits(text) {
     let bits = 0;
     for (const part of text.split("|")) {
-        const match = part.trim().match(/^MOD_([LR])(CTL|SFT|ALT|GUI)$/);
+        const match = part.trim().match(/^MOD_([LR](?:CTL|SFT|ALT|GUI))$/);
         if (!match) return undefined;
-        const next = combine(bits, MOD_BITS[/** @type {keyof typeof MOD_BITS} */ (match[2])] | (match[1] === "R" ? 0x10 : 0));
+        const next = combine(bits, MODS[/** @type {keyof typeof MODS} */ (match[1])]);
         if (next === undefined) return undefined;
         bits = next;
     }
@@ -93,7 +119,7 @@ export function keycodeValue(model, expression) {
     const spellings = model?.qmkSpellings;
     if (spellings && Object.hasOwn(spellings.names, text)) return keycodeValue(model, spellings.names[text]);
     const macro = macroOfName(text);
-    if (macro !== undefined) return MACRO_BASE + macro;
+    if (macro !== undefined) return QK.MACRO.first + macro;
     let match = text.match(/^0x([0-9a-f]{1,4})$/i);
     if (match) return Number.parseInt(match[1], 16);
     if (/^\d+$/.test(text)) return Number(text) <= 0xffff ? Number(text) : undefined;
@@ -108,29 +134,29 @@ export function keycodeValue(model, expression) {
         return Number(inner) < 32 ? base + Number(inner) : undefined;
     }
     if (name === "LOCK_LAYER") return /^\d+$/.test(inner) && Number(inner) < LAYER_LOCKS ? LAYER_LOCK_BASE + Number(inner) : undefined;
-    const wrapper = own(WRAPPERS, name);
+    const wrapper = own(MODIFIER_WRAPPERS, name);
     if (wrapper !== undefined) {
         const key = keycodeValue(model, inner);
-        if (key === undefined || key > 0x1fff) return undefined;
+        if (key === undefined || key > QK.MODS.last) return undefined;
         const bits = combine((key >> 8) & 0x1f, wrapper);
         return bits === undefined ? undefined : (key & 0xff) | (bits << 8);
     }
     const args = inner.split(",").map((part) => part.trim());
     if (name === "MT" && args.length === 2) {
         const bits = modifierBits(args[0]), tap = plainKey(model, args[1]);
-        return bits !== undefined && tap !== undefined ? 0x2000 | (bits << 8) | tap : undefined;
+        return bits !== undefined && tap !== undefined ? QK.MOD_TAP.first | (bits << 8) | tap : undefined;
     }
     if (name === "LT" && args.length === 2) {
         const tap = plainKey(model, args[1]);
-        return /^\d+$/.test(args[0]) && Number(args[0]) < 16 && tap !== undefined ? 0x4000 | (Number(args[0]) << 8) | tap : undefined;
+        return /^\d+$/.test(args[0]) && Number(args[0]) < 16 && tap !== undefined ? QK.LAYER_TAP.first | (Number(args[0]) << 8) | tap : undefined;
     }
     if (name === "OSM" && args.length === 1) {
         const bits = modifierBits(args[0]);
-        return bits === undefined ? undefined : 0x52a0 | bits;
+        return bits === undefined ? undefined : QK.ONE_SHOT_MOD.first | bits;
     }
     if (name === "LM" && args.length === 2) {
         const bits = modifierBits(args[1]);
-        return /^\d+$/.test(args[0]) && Number(args[0]) < 16 && bits ? 0x5000 | (Number(args[0]) << 5) | bits : undefined;
+        return /^\d+$/.test(args[0]) && Number(args[0]) < 16 && bits ? QK.LAYER_MOD.first | (Number(args[0]) << 5) | bits : undefined;
     }
     return undefined;
 }
@@ -140,26 +166,27 @@ export function keycodeValue(model, expression) {
 function plainKey(model, name) {
     if (!/^[A-Za-z0-9_]+$/.test(name)) return undefined;
     const value = namesOf(model).get(name) ?? (model?.qmkSpellings && Object.hasOwn(model.qmkSpellings.names, name) ? keycodeValue(model, model.qmkSpellings.names[name]) : undefined);
-    return value !== undefined && value <= 0xff ? value : undefined;
+    return value !== undefined && value <= QK.BASIC.last ? value : undefined;
 }
 
 // Whether a keycode is a plain key, the only kind a tap with a hold can send.
 /** @param {Model} model @param {string} expression */
 export const isPlainKey = (model, expression) => {
     const value = keycodeValue(model, expression);
-    return value !== undefined && value <= 0xff;
+    return value !== undefined && value <= QK.BASIC.last;
 };
 
 // Whether modifiers can wrap a keycode: a plain or already-modified key.
 /** @param {Model} model @param {string} expression */
 export const takesModifiers = (model, expression) => {
     const value = keycodeValue(model, expression);
-    return value !== undefined && value <= 0x1fff;
+    return value !== undefined && value <= QK.MODS.last;
 };
 
 // What is wrong with a layout key expression, in words, or "" when the draft
 // takes it. Layer keycodes are checked as the keyboard checks a saved profile:
-// a layer it has, and never DF() or PDF().
+// a layer it has, and never DF() or PDF(). A one-shot modifier sits among the
+// layer forms but holds modifiers, not a layer.
 /** @param {Model} model @param {string} expression */
 export function keyProblem(model, expression) {
     const text = normalizeExpression(expression);
@@ -167,12 +194,11 @@ export function keyProblem(model, expression) {
     const code = keycodeValue(model, text);
     if (code === undefined) return `${text} is not a key this keyboard can store.`;
     const layers = model?.layers?.length || 16;
-    const range = (/** @type {number} */ base, span = 0x20) => code >= base && code < base + span;
-    if (range(0x5240) || range(0x52e0)) return "DF() and PDF() change the default layer, which this keyboard keeps to itself. Use Move to, Hold or Lock.";
-    const layer = range(0x4000, 0x1000) ? (code >> 8) & 0x0f
-        : range(0x5000, 0x200) ? (code >> 5) & 0x0f
-        : range(0x5200, 0x100) ? code & 0x1f
-        : range(LAYER_LOCK_BASE, LAYER_LOCKS) ? code - LAYER_LOCK_BASE : undefined;
+    if (inBlock(code, QK.DEF_LAYER) || inBlock(code, QK.PERSISTENT_DEF_LAYER)) return "DF() and PDF() change the default layer, which this keyboard keeps to itself. Use Move to, Hold or Lock.";
+    const layer = inBlock(code, QK.LAYER_TAP) ? (code >> 8) & 0x0f
+        : inBlock(code, QK.LAYER_MOD) ? (code >> 5) & 0x0f
+        : isLayerForm(code) ? code & 0x1f
+        : inBlock(code, {first: LAYER_LOCK_BASE, last: LAYER_LOCK_BASE + LAYER_LOCKS - 1}) ? code - LAYER_LOCK_BASE : undefined;
     if (layer !== undefined && layer >= layers) return `This keyboard has ${layers} layers, numbered 0–${layers - 1}.`;
     return "";
 }
@@ -187,5 +213,5 @@ export function comboOutputProblem(model, expression) {
     if (problem) return problem;
     const code = /** @type {number} */ (keycodeValue(model, expression));
     if (code === 0) return "A combo has to send something. Choose a key.";
-    return code >= 0x4000 && code < 0x5000 ? "A combo can't send Tap-hold: it decides tap or hold on a key of its own. Send Hold or the key instead." : "";
+    return inBlock(code, QK.LAYER_TAP) ? "A combo can't send Tap-hold: it decides tap or hold on a key of its own. Send Hold or the key instead." : "";
 }

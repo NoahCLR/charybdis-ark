@@ -107,7 +107,7 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | No webview module posts an object literal: `post()` and `postLeavingDemo()` take a builder's output or a message the store hands back | `tests/scripts/conventions.test.js` |
 | Every stored enum value has a word | `tests/model/vocabulary.test.js` |
 | A draft edit type agrees across `core/model/draft-edits.js`, `contracts/edits.d.ts` and `webview/view/edits.mjs` | `tests/model/draft-edits.test.js` |
-| A webview number that is also a wire number equals the schema's | `tests/view/enum-drift.test.mjs` |
+| A webview number that is also a wire number equals the schema's, QMK's keycode layout included | `tests/view/enum-drift.test.mjs`, `tests/view/keycode-layout-drift.test.mjs` |
 | Every form control has a `data-f` identity, unique on screen | `tests/view/form-identities.test.mjs`, `browser-tests/focus-identities.spec.js` |
 | No screen names a key or action as plain text | `tests/view/key-names-marked.test.mjs` |
 | Every value interpolated into webview markup, or handed to `el()` or an HTML setter, is escaped, a number by construction or markup a checked template made; the exceptions say why | `tests/view/markup-escaped.test.mjs` |

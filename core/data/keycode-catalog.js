@@ -13,6 +13,8 @@
 
 const catalog = require("./keycode-catalog.json");
 const legacy = require("./keycode-legacy");
+const qmk = require("./qmk-keycodes");
+const {QK, inBlock, combineModifiers} = qmk;
 
 const BY_VALUE = new Map(catalog.entries.map((entry) => [entry.value, entry]));
 /** @type {Map<string, typeof catalog.entries[number]>} */
@@ -26,39 +28,27 @@ for (const entry of catalog.entries) {
     }
 }
 
-// QMK's quantum keycode ranges. Kept here rather than derived from the catalog
-// because the catalog lists the range markers only as boundaries, which the
-// generator deliberately drops.
-const LAYER_FORMS = Object.freeze([
-    {base: 0x5200, name: "TO", label: "Layer move"},
-    {base: 0x5220, name: "MO", label: "Layer hold"},
-    {base: 0x5240, name: "DF", label: "Default layer"},
-    {base: 0x5260, name: "TG", label: "Layer toggle"},
-    {base: 0x5280, name: "OSL", label: "One-shot layer"},
-    {base: 0x52c0, name: "TT", label: "Layer tap toggle"},
-    {base: 0x52e0, name: "PDF", label: "Persistent default layer"},
-]);
+// QMK's quantum keycode ranges and modifier wrappers (qmk-keycodes.js); the
+// catalog lists the range markers only as boundaries, which the generator
+// deliberately drops. The words for each layer form and modifier are these.
+/** @type {Readonly<Record<keyof typeof qmk.LAYER_FORMS, string>>} */
+const LAYER_FORM_LABELS = Object.freeze({
+    TO: "Layer move", MO: "Layer hold", DF: "Default layer", TG: "Layer toggle",
+    OSL: "One-shot layer", TT: "Layer tap toggle", PDF: "Persistent default layer",
+});
+const LAYER_FORMS = Object.freeze(Object.entries(qmk.LAYER_FORMS).map(([name, base]) =>
+    ({base, name, label: LAYER_FORM_LABELS[/** @type {keyof typeof qmk.LAYER_FORMS} */ (name)]})));
 const MODIFIERS = [
-    {bit: 1, name: "CTL", label: "Ctrl"}, {bit: 2, name: "SFT", label: "Shift"},
-    {bit: 4, name: "ALT", label: "Alt"}, {bit: 8, name: "GUI", label: "Cmd"},
+    {bit: qmk.MODS.LCTL, name: "CTL", label: "Ctrl"}, {bit: qmk.MODS.LSFT, name: "SFT", label: "Shift"},
+    {bit: qmk.MODS.LALT, name: "ALT", label: "Alt"}, {bit: qmk.MODS.LGUI, name: "GUI", label: "Cmd"},
 ];
 // Modified-key spellings share QMK's five modifier bits. The picker emits
 // short forms (for example G for Cmd), while device readback uses long forms.
-const MODIFIER_WRAPPERS = new Map(Object.entries({
-    C: 0x01, LCTL: 0x01, S: 0x02, LSFT: 0x02,
-    A: 0x04, LALT: 0x04, LOPT: 0x04,
-    G: 0x08, LGUI: 0x08, LCMD: 0x08, LWIN: 0x08,
-    LCS: 0x03, LCA: 0x05, LCG: 0x09, LSA: 0x06, LSG: 0x0a, LAG: 0x0c,
-    LCSG: 0x0b, LCAG: 0x0d, LSAG: 0x0e, MEH: 0x07, HYPR: 0x0f,
-    RCTL: 0x11, RSFT: 0x12, RALT: 0x14, ALGR: 0x14, ROPT: 0x14,
-    RGUI: 0x18, RCMD: 0x18, RWIN: 0x18,
-    RCS: 0x13, RCA: 0x15, RCG: 0x19, RSA: 0x16, RSG: 0x1a, RAG: 0x1c,
-    RCSG: 0x1b, RCAG: 0x1d, RSAG: 0x1e,
-}));
+const MODIFIER_WRAPPERS = new Map(Object.entries(qmk.MODIFIER_WRAPPERS));
 
 /** @param {number} bits */
 function modifiers(bits) {
-    const side = bits & 0x10 ? "R" : "L";
+    const side = bits & qmk.MOD_RIGHT ? "R" : "L";
     return MODIFIERS.filter(mod => bits & mod.bit).map(mod => ({
         name: side + mod.name, label: (side === "R" ? "Right " : "") + mod.label,
     }));
@@ -92,17 +82,17 @@ function resolve(value) {
         return tap;
     }
 
-    if (value >= 0x0100 && value <= 0x1fff) {
-        const key = BY_VALUE.get(value & 0xff);
-        const mods = modifiers((value >> 8) & 0x1f);
+    if (inBlock(value, QK.MODS)) {
+        const key = BY_VALUE.get(qmk.keyOf(value));
+        const mods = modifiers(qmk.modsOf(value));
         if (key && mods.length) return {
             value, name: mods.reduceRight((name, mod) => `${mod.name}(${name})`, key.name),
             label: [...mods.map(mod => mod.label), key.label].join("+"),
             group: "modifiers", kind: "modified", known: true,
         };
     }
-    if (value >= 0x52a0 && value <= 0x52bf) {
-        const mods = modifiers(value & 0x1f);
+    if (inBlock(value, QK.ONE_SHOT_MOD)) {
+        const mods = modifiers(value & qmk.MOD_MASK);
         if (mods.length) return {
             value, name: `OSM(${mods.map(mod => `MOD_${mod.name}`).join("|")})`,
             label: `One-shot ${mods.map(mod => mod.label).join("+")}`,
@@ -110,9 +100,9 @@ function resolve(value) {
         };
     }
     // LM(layer, mods): a layer hold with its modifiers held too.
-    if (value >= 0x5000 && value <= 0x51ff) {
-        const layer = (value >> 5) & 0x0f;
-        const mods = modifiers(value & 0x1f);
+    if (inBlock(value, QK.LAYER_MOD)) {
+        const layer = qmk.layerModLayer(value);
+        const mods = modifiers(value & qmk.MOD_MASK);
         if (mods.length) return {
             value, name: `LM(${layer},${mods.map(mod => `MOD_${mod.name}`).join("|")})`,
             label: `Layer ${layer} + ${mods.map(mod => mod.label).join("+")}`,
@@ -128,7 +118,7 @@ function resolve(value) {
 function resolveLayerKeycode(value) {
     for (const form of LAYER_FORMS) {
         const layer = value - form.base;
-        if (layer >= 0 && layer < 32) {
+        if (layer >= 0 && layer < qmk.LAYER_FORM_LAYERS) {
             return {
                 value,
                 name: `${form.name}(${layer})`,
@@ -147,10 +137,10 @@ function resolveLayerKeycode(value) {
 // basic keycode in the low byte.
 /** @param {number} value @returns {import("./types.js").ResolvedKeycode | undefined} */
 function resolveTapHold(value) {
-    const tapped = BY_VALUE.get(value & 0xff);
+    const tapped = BY_VALUE.get(qmk.keyOf(value));
     if (!tapped) return undefined;
-    if ((value & 0xf000) === 0x4000) {
-        const argument = (value >> 8) & 0x0f;
+    if (inBlock(value, QK.LAYER_TAP)) {
+        const argument = qmk.layerTapLayer(value);
         return {
             value,
             name: `LT(${argument},${tapped.name})`,
@@ -162,8 +152,8 @@ function resolveTapHold(value) {
             known: true,
         };
     }
-    if ((value & 0xe000) !== 0x2000) return undefined;
-    const mods = modifiers((value >> 8) & 0x1f);
+    if (!inBlock(value, QK.MOD_TAP)) return undefined;
+    const mods = modifiers(qmk.modsOf(value));
     if (!mods.length) return undefined;
     return {
         value,
@@ -203,47 +193,47 @@ function encode(expression) {
     if (shorthand && Object.hasOwn(legacy.MOD_TAP_SHORTHANDS, shorthand[1])) return encode(`MT(${legacy.MOD_TAP_SHORTHANDS[shorthand[1]]}, ${shorthand[2]})`);
     if (shorthand && Object.hasOwn(legacy.WRAPPER_ALIASES, shorthand[1])) return encode(`${legacy.WRAPPER_ALIASES[shorthand[1]]}(${shorthand[2]})`);
 
-    const layerForm = text.match(/^(MO|TG|OSL|TO|DF|TT|PDF)\(\s*(\d+)\s*\)$/);
-    if (layerForm) {
+    const layerForm = text.match(/^([A-Z]+)\(\s*(\d+)\s*\)$/);
+    const form = layerForm ? LAYER_FORMS.find(form => form.name === layerForm[1]) : undefined;
+    if (layerForm && form) {
         const layer = Number(layerForm[2]);
-        const form = LAYER_FORMS.find(form => form.name === layerForm[1]);
-        return layer < 32 && form ? form.base + layer : undefined;
+        return layer < qmk.LAYER_FORM_LAYERS ? form.base + layer : undefined;
     }
 
     const wrapper = text.match(/^([A-Z]+)\(\s*(.+)\s*\)$/);
     const modifier = wrapper ? MODIFIER_WRAPPERS.get(wrapper[1]) : undefined;
     if (wrapper && modifier !== undefined) {
         const key = encode(wrapper[2]);
-        if (key === undefined || key > 0x1fff) return undefined;
-        const bits = combineModifiers((key >> 8) & 0x1f, modifier);
-        return bits === undefined ? undefined : (key & 0xff) | (bits << 8);
+        if (key === undefined || key > QK.MODS.last) return undefined;
+        const bits = combineModifiers(qmk.modsOf(key), modifier);
+        return bits === undefined ? undefined : qmk.modified(bits, qmk.keyOf(key));
     }
     // A mod-tap or layer-tap taps a plain key (0x00-0xFF), by any name.
     const modTap = text.match(/^MT\(\s*([^,]+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
     if (modTap) {
         const bits = encodeModifiers(modTap[1]);
         const tapped = plainKey(modTap[2]);
-        return bits !== undefined && tapped !== undefined ? 0x2000 | (bits << 8) | tapped : undefined;
+        return bits !== undefined && tapped !== undefined ? qmk.modTap(bits, tapped) : undefined;
     }
     const oneshot = text.match(/^OSM\(\s*(.+)\s*\)$/);
     if (oneshot) {
         const bits = encodeModifiers(oneshot[1]);
-        return bits === undefined ? undefined : 0x52a0 | bits;
+        return bits === undefined ? undefined : qmk.oneShotMod(bits);
     }
 
     const layerMod = text.match(/^LM\(\s*(\d+)\s*,\s*(.+)\s*\)$/);
     if (layerMod) {
         const layer = Number(layerMod[1]);
         const bits = encodeModifiers(layerMod[2]);
-        return layer < 16 && bits ? 0x5000 | (layer << 5) | bits : undefined;
+        return layer < qmk.PACKED_LAYERS && bits ? qmk.layerMod(layer, bits) : undefined;
     }
 
     const layerTap = text.match(/^LT\(\s*(\d+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
     if (layerTap) {
         const layer = Number(layerTap[1]);
         const tapped = plainKey(layerTap[2]);
-        if (layer < 16 && tapped !== undefined) {
-            return 0x4000 | (layer << 8) | tapped;
+        if (layer < qmk.PACKED_LAYERS && tapped !== undefined) {
+            return qmk.layerTap(layer, tapped);
         }
         return undefined;
     }
@@ -259,30 +249,20 @@ function encode(expression) {
 /** @param {string} name */
 function plainKey(name) {
     const value = BY_NAME.get(name)?.value ?? (Object.hasOwn(legacy.NAMES, name) ? encode(legacy.NAMES[name]) : undefined);
-    return value !== undefined && value <= 0xff ? value : undefined;
+    return value !== undefined && value <= QK.BASIC.last ? value : undefined;
 }
 
 /** @param {string} expression */
 function encodeModifiers(expression) {
     let bits = 0;
     for (const part of expression.split("|")) {
-        const match = part.trim().match(/^MOD_([LR])(CTL|SFT|ALT|GUI)$/);
+        const match = part.trim().match(/^MOD_([LR](?:CTL|SFT|ALT|GUI))$/);
         if (!match) return undefined;
-        const modifier = MODIFIERS.find(mod => mod.name === match[2]);
-        if (!modifier) return undefined;
-        const combined = combineModifiers(bits, modifier.bit | (match[1] === "R" ? 0x10 : 0));
+        const combined = combineModifiers(bits, qmk.MODS[/** @type {keyof typeof qmk.MODS} */ (match[1])]);
         if (combined === undefined) return undefined;
         bits = combined;
     }
     return bits;
-}
-
-// QMK has one side flag for every modifier in a compact keycode. Combining
-// left and right masks would silently move all of them to the right.
-/** @param {number} before @param {number} added @returns {number | undefined} */
-function combineModifiers(before, added) {
-    return (before & 0x0f) && (added & 0x0f) && ((before ^ added) & 0x10)
-        ? undefined : before | added;
 }
 
 /** @param {string} name */
@@ -327,4 +307,4 @@ function metadata() {
     };
 }
 
-module.exports = {aliasTable, combineModifiers, encode, entries, lookup, metadata, resolve};
+module.exports = {aliasTable, encode, entries, lookup, metadata, resolve};

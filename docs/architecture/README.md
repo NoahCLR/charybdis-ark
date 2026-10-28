@@ -11,7 +11,7 @@ of truth (D-L11); every edit goes through one draft (D-L19, D-L35).
 
 | Layer | Owns | May import |
 | --- | --- | --- |
-| `core/data/` | Inert vendored data: the keycode catalog, the key layout, pointing-mode bindings, host keyboard layouts, the demo profile | nothing |
+| `core/data/` | Inert vendored data: the keycode catalog, QMK's keycode layout, the key layout, pointing-mode bindings, host keyboard layouts, the demo profile | nothing |
 | `core/transport/` | Device adapters (WebHID for the page, node-hid for Node scripts, a fake) and the request coordinator that serialises requests to the keyboard | `data/` |
 | `core/schema/` | Profile byte formats and domain decoders: each domain's layout, limits and canonical encoding | `data/` |
 | `core/protocol/` | What is spoken to the keyboard over Profile Wire: framing, pages, live edits, candidate transfers | `transport/`, `schema/`, `data/` |
@@ -54,7 +54,9 @@ Around the core:
 - A draft edit type: one entry in `core/model/draft-edits.js`, its payload in
   `contracts/edits.d.ts`, its builder in `webview/view/edits.mjs`.
 - Naming an action, its native keycode or a layer reference:
-  `core/schema/actions.js`.
+  `core/schema/actions.js`. Where a kind of QMK keycode sits in the number
+  space, how it packs its arguments, and how a modifier wrapper is spelled:
+  `core/data/qmk-keycodes.js`, never a literal of its own.
 - A rule about what something means on screen (a colour, a key face, a
   locality): `webview/view/`, with a test. A screen or component:
   `webview/ui/`.

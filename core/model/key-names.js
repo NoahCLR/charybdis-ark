@@ -17,6 +17,7 @@ const {VOCABULARY} = require("./vocabulary");
 const {PD_MODE_KEYS, pdModeKeyOfName} = require("../data/pd-mode-keys");
 const {CUSTOM_KEY_SLOTS, customKeyCode, layerLockOfCode} = require("../data/user-keycodes");
 const keycodes = require("../data/keycode-catalog");
+const {MODS, wrapperOf} = require("../data/qmk-keycodes");
 const {actionName} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
@@ -244,7 +245,8 @@ function compactKeyLabels(labels) {
 /** @param {number} [hostOs] */
 function hostKeyVocabulary(hostOs = 0) {
     const modifiers = VOCABULARY.modifiers.map(/** @returns {[number, string]} */ ([bit, label]) => [bit, hostKeyLabel(label, hostOs)]);
-    const wrappers = ["C", "S", "A", "G", "RCTL", "RSFT", "RALT", "RGUI"];
+    // The modifiers' QMK bits, in the vocabulary's order: left, then right.
+    const wrappers = Object.values(MODS).map(mods => /** @type {string} */ (wrapperOf(mods)));
     const pickerModifiers = modifiers.map(([bit, label], i) => ({bit, value: wrappers[i], label: i < 4 ? label.replace(/^Left /, "") : label}));
     return {modifiers, pickerModifiers};
 }

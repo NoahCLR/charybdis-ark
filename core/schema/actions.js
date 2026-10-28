@@ -10,6 +10,7 @@
 // ask here rather than each doing it their own way.
 
 const keycodes = require("../data/keycode-catalog");
+const {QK, inBlock, LAYER_FORMS, layerFormBase, layerFormLayer, layerTapLayer, layerModLayer} = require("../data/qmk-keycodes");
 const {PD_MODE_KEYS, pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
@@ -72,10 +73,10 @@ const layerOfRef = text => {
 // keycodes the keyboard runs through its own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold
 // whose fifth tap locks, OSL as a one-shot). Where each may go is
 // placementProblem's to say.
-const OWNED_LAYER_BASES = Object.freeze([0x5200, 0x5260, 0x5280, 0x52c0]); // TO, TG, OSL, TT
+const OWNED_LAYER_BASES = Object.freeze([LAYER_FORMS.TO, LAYER_FORMS.TG, LAYER_FORMS.OSL, LAYER_FORMS.TT]);
 /** @param {number} code @param {number} layerCount */
 const isOwnedLayerCode = (code, layerCount) =>
-    OWNED_LAYER_BASES.includes(code & ~0x1f) && (code & 0x1f) < layerCount;
+    OWNED_LAYER_BASES.includes(layerFormBase(code)) && layerFormLayer(code) < layerCount;
 
 // Where a stored action may be placed, as the keyboard checks a profile it is
 // asked to save (noah_action_supported_at in users/noah/lib/action). Only
@@ -91,22 +92,21 @@ const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress"
 
 /** @param {number} code @param {number} layerCount @returns {{kind: string, places: Placement[]} | undefined} */
 function layerRuleOf(code, layerCount) {
-    /** @param {number} base @param {number} [span] */
-    const range = (base, span = 0x20) => code >= base && code < base + span;
-    const layer = code & 0x1f;
-    if (range(0x4000, 0x1000)) return ((code >> 8) & 0x0f) < layerCount ? {kind: "layerTap", places: [PLACEMENT.KEY]} : {kind: "unowned", places: []};
-    if (range(0x5000, 0x200)) return ((code >> 5) & 0x0f) < layerCount ? {kind: "layerMod", places: [PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT]} : {kind: "unowned", places: []};
-    if (range(0x5240) || range(0x52e0)) return {kind: "unowned", places: []};
-    if (!(range(0x5200) || range(0x5220) || range(0x5260) || range(0x5280) || range(0x52c0))) return undefined;
-    if (layer >= layerCount) return {kind: "unowned", places: []};
-    if (range(0x5220) || range(0x52c0)) return {kind: "hold", places: [PLACEMENT.KEY, PLACEMENT.HOLD_PRESS, PLACEMENT.COMBO_OUTPUT]};
-    if (range(0x5280)) return {kind: "oneShot", places: [PLACEMENT.KEY, PLACEMENT.TAP, PLACEMENT.COMBO_OUTPUT]};
+    /** @param {import("../data/qmk-keycodes").KeycodeBlock} block */
+    const range = block => inBlock(code, block);
+    if (range(QK.LAYER_TAP)) return layerTapLayer(code) < layerCount ? {kind: "layerTap", places: [PLACEMENT.KEY]} : {kind: "unowned", places: []};
+    if (range(QK.LAYER_MOD)) return layerModLayer(code) < layerCount ? {kind: "layerMod", places: [PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT]} : {kind: "unowned", places: []};
+    if (range(QK.DEF_LAYER) || range(QK.PERSISTENT_DEF_LAYER)) return {kind: "unowned", places: []};
+    if (!(range(QK.TO) || range(QK.MOMENTARY) || range(QK.TOGGLE_LAYER) || range(QK.ONE_SHOT_LAYER) || range(QK.LAYER_TAP_TOGGLE))) return undefined;
+    if (layerFormLayer(code) >= layerCount) return {kind: "unowned", places: []};
+    if (range(QK.MOMENTARY) || range(QK.LAYER_TAP_TOGGLE)) return {kind: "hold", places: [PLACEMENT.KEY, PLACEMENT.HOLD_PRESS, PLACEMENT.COMBO_OUTPUT]};
+    if (range(QK.ONE_SHOT_LAYER)) return {kind: "oneShot", places: [PLACEMENT.KEY, PLACEMENT.TAP, PLACEMENT.COMBO_OUTPUT]};
     return undefined;
 }
 
 /** @param {import("./types.js").SemanticAction} action @param {Placement} placement @param {{layerCount?: number}} [options] */
 function placementProblem(action, placement, {layerCount = 16} = {}) {
-    const code = action.kind === ACTION.LAYER_MOMENTARY ? 0x5220 | action.operand : nativeCode(action);
+    const code = action.kind === ACTION.LAYER_MOMENTARY ? LAYER_FORMS.MO | action.operand : nativeCode(action);
     const rule = code === undefined ? undefined : layerRuleOf(code, layerCount);
     if (!rule || rule.places.includes(placement)) return undefined;
     const name = actionName(action);

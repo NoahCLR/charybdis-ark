@@ -12,6 +12,7 @@
 // review notes the ones it reads.
 const {nativeCode, actionName} = require("../schema/actions");
 const {customKeyOfCode, PD_HOLD_BASE} = require("../data/user-keycodes");
+const {QK, LAYER_FORMS, layerFormBase, layerFormLayer} = require("../data/qmk-keycodes");
 const {LAYERS} = require("../data/charybdis-layout");
 const {shortcutPresent} = require("../schema/settings-domain-v1");
 
@@ -26,10 +27,10 @@ const {shortcutPresent} = require("../schema/settings-domain-v1");
 // while down (MO, TT, OSL, LM) on a layer it has, pointing-mode holds, and
 // custom keys with a shortcut. TO, TG, LOCK_LAYER, pointing-mode locks, DF
 // and PDF it does not, so a timing alone does nothing there.
-const ANY_LAYER = /** @type {const} */ ([[0x2000, 0x3fff], [0x4000, 0x4fff], [0x5000, 0x51ff], [0x52a0, 0x52bf],
-    [PD_HOLD_BASE, PD_HOLD_BASE + 0x1f]]);
+const ANY_LAYER = /** @type {const} */ ([[QK.MOD_TAP.first, QK.MOD_TAP.last], [QK.LAYER_TAP.first, QK.LAYER_TAP.last],
+    [QK.LAYER_MOD.first, QK.LAYER_MOD.last], [QK.ONE_SHOT_MOD.first, QK.ONE_SHOT_MOD.last], [PD_HOLD_BASE, PD_HOLD_BASE + 0x1f]]);
 // MO, OSL and TT name their layer in their low five bits.
-const LAYER_IN_LOW_BITS = /** @type {const} */ ([0x5220, 0x5280, 0x52c0]);
+const LAYER_IN_LOW_BITS = /** @type {const} */ ([LAYER_FORMS.MO, LAYER_FORMS.OSL, LAYER_FORMS.TT]);
 
 // Whether a row's timing alone does something on this key.
 /** @param {Action} target @param {Shortcuts | undefined} shortcuts */
@@ -38,7 +39,7 @@ function timingAlone(target, shortcuts) {
     if (code === undefined) return false;
     const slot = customKeyOfCode(code);
     if (slot !== undefined) return shortcutPresent(shortcuts?.[slot]);
-    if (/** @type {readonly number[]} */ (LAYER_IN_LOW_BITS).includes(code & ~0x1f)) return (code & 0x1f) < LAYERS;
+    if (/** @type {readonly number[]} */ (LAYER_IN_LOW_BITS).includes(layerFormBase(code))) return layerFormLayer(code) < LAYERS;
     return ANY_LAYER.some(([start, end]) => code >= start && code <= end);
 }
 

@@ -39,6 +39,7 @@ const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
 const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
+const {QK, inBlock, LAYER_FORMS, layerFormBase, layerFormLayer, layerModLayer, layerTapLayer} = require("../data/qmk-keycodes");
 const {pdModeKeyOfCode, PD_MODE_KEYS} = require("../data/pd-mode-keys");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
@@ -144,18 +145,18 @@ function layerEffects(code, links, own = true) {
     if (key) return modeEffects(key.slot, key.locked, links);
     const custom = customKeyOfCode(code);
     if (custom !== undefined) return shortcutEffects(custom, links, own);
-    if (code >= 0x4000 && code <= 0x4fff) return within((code >> 8) & 15, [{kind: "hold", layer: (code >> 8) & 15}]);
-    if (code >= 0x5000 && code <= 0x51ff) return within((code >> 5) & 15, [{kind: "hold", layer: (code >> 5) & 15}]);
+    if (inBlock(code, QK.LAYER_TAP)) return within(layerTapLayer(code), [{kind: "hold", layer: layerTapLayer(code)}]);
+    if (inBlock(code, QK.LAYER_MOD)) return within(layerModLayer(code), [{kind: "hold", layer: layerModLayer(code)}]);
     if (layerLockOfCode(code) !== undefined) return [{kind: "lock", layer: /** @type {number} */ (layerLockOfCode(code))}];
-    if (code < 0x5200 || code >= 0x5300) return [];
-    const layer = code & 31;
-    switch (code & ~31) {
-        case 0x5200: return within(layer, [{kind: "move", layer}]);
-        case 0x5220: return within(layer, [{kind: "hold", layer}]);
-        case 0x5260: return within(layer, [{kind: "lock", layer}]);
-        case 0x5280: return within(layer, [{kind: "hold", layer, oneShot: true}]);
-        case 0x52c0: return within(layer, [{kind: "hold", layer}, {kind: "lock", layer, taps: TAPPING_TOGGLE}]);
-        case 0x5240: case 0x52e0: return [{kind: "unowned", layer}];
+    if (code < QK.TO.first || code > QK.PERSISTENT_DEF_LAYER.last) return [];
+    const layer = layerFormLayer(code);
+    switch (layerFormBase(code)) {
+        case LAYER_FORMS.TO: return within(layer, [{kind: "move", layer}]);
+        case LAYER_FORMS.MO: return within(layer, [{kind: "hold", layer}]);
+        case LAYER_FORMS.TG: return within(layer, [{kind: "lock", layer}]);
+        case LAYER_FORMS.OSL: return within(layer, [{kind: "hold", layer, oneShot: true}]);
+        case LAYER_FORMS.TT: return within(layer, [{kind: "hold", layer}, {kind: "lock", layer, taps: TAPPING_TOGGLE}]);
+        case LAYER_FORMS.DF: case LAYER_FORMS.PDF: return [{kind: "unowned", layer}];
         default: return [];
     }
 }

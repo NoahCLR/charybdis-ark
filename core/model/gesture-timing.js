@@ -9,6 +9,7 @@ const {effectiveComboWindow} = require("../schema/combo-domain-v1");
 const {SETTING, SHORTCUT_LAYER_KINDS} = require("../schema/settings-domain-v1");
 const {nativeCode, actionName} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
+const {QK} = require("../data/qmk-keycodes");
 
 /**
  * @typedef {import("../schema/types.js").BehaviorStep} BehaviorStep
@@ -20,8 +21,10 @@ const SHORT_WINDOW_MS = 50; // advisory comfort heuristic, never a validity limi
 const transparent = action => nativeCode(action) === 1;
 /** @param {number | undefined} code @param {number} start @param {number} end */
 const within = (code, start, end) => code !== undefined && code >= start && code <= end;
-// QMK's dual-role keys: MT(), LT(), OSL(), OSM() and TT().
-const DUAL_ROLE = /** @type {const} */ ([[0x2000, 0x3fff], [0x4000, 0x4fff], [0x5280, 0x52df]]);
+// QMK's dual-role keys: MT(), LT(), OSL(), OSM() and TT(), the last three
+// side by side.
+const DUAL_ROLE = /** @type {const} */ ([[QK.MOD_TAP.first, QK.MOD_TAP.last], [QK.LAYER_TAP.first, QK.LAYER_TAP.last],
+    [QK.ONE_SHOT_LAYER.first, QK.LAYER_TAP_TOGGLE.last]]);
 // The setting a key's Tap / hold threshold follows when its row sets none, or
 // when it has no row. A dual-role key follows the dual-role term either way,
 // every other row the behaviour term (firmware D-F27 "Every dual-role key",
