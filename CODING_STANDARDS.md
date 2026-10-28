@@ -18,6 +18,10 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   device policy, layer resolution or editability is a second home for that
   rule. The owners are listed in the
   [interface contracts](docs/spec/interface-contracts.md#shared-rule-ownership).
+- A firmware decision that depends only on the profile is computed in core
+  and published; the interface interprets what is posted (D-L73). A firmware
+  rule the page has to run as a person clicks lives once in `rules/`, takes
+  primitives, and is imported by core and `webview/view/`, never copied.
 - The words for a value the keyboard stores live in `core/model/vocabulary.js`
   and reach the interface as `model.vocabulary`; a screen holds no
   enum-to-words table of its own.
@@ -96,10 +100,11 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | Rule | Check |
 | --- | --- |
 | `core/` layers import one way, type imports included; `contracts/` is inert and imports only itself | `tests/layering.test.js` |
+| `rules/` imports only `rules/`, uses no DOM or Node, and loads with `require()`; core runs it only from `schema/` up, the interface only from `webview/view/`, the shell never | `tests/layering.test.js`, `tsconfig.rules.json` |
 | The interface imports nothing from `core/`, types included, and cannot touch the filesystem | `tests/layering.test.js` |
-| The runtime never reads the firmware repository: no `keymap.c`, `config.h`, `rgb_config.c` or QMK paths in `core/`, `webview/` or `web/` | `tests/layering.test.js` |
+| The runtime never reads the firmware repository: no `keymap.c`, `config.h`, `rgb_config.c` or QMK paths in `core/`, `rules/`, `webview/` or `web/` | `tests/layering.test.js` |
 | The device service takes its adapter from its caller, with no default; the web build refuses node-hid and its adapter | `tests/session/profile-device-service.test.js`, `tests/scripts/web-build.test.js` |
-| Every `core/` module has a test in the matching `tests/` layer | `tests/layering.test.js` |
+| Every `core/` module has a test in the matching `tests/` layer, and every `rules/` module one in `tests/rules/` | `tests/layering.test.js` |
 | Every source module starts with `// @ts-check`; the strict type checks pass | `tests/scripts/conventions.test.js`, `npm run typecheck` |
 | Screens author no colour literals | `tests/scripts/conventions.test.js` |
 | Semantic lookups never use a position's stored keycode name | `tests/scripts/conventions.test.js` |

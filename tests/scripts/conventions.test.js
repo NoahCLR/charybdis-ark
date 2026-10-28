@@ -11,7 +11,7 @@ const sources = directory => fs.readdirSync(path.join(root, directory), {withFil
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
 test("source modules explicitly opt into JavaScript type checking", () => {
-    const files = ["core", "webview", "web", "scripts"].flatMap(sources)
+    const files = ["core", "rules", "webview", "web", "scripts"].flatMap(sources)
         .concat(["playwright.config.js"]);
     assert.deepEqual(files.filter(file => !/^\/\/ @ts-check\s*$/m.test(read(file))), []);
 });

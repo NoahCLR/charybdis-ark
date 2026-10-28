@@ -1,7 +1,8 @@
 # Ark's architecture
 
 Ark is a core with no shell dependency, the web page's shell that runs it,
-and an interface that only renders what the core posts. The keyboard is the source
+an interface that only renders what the core posts, and the shared rules both
+of them run. The keyboard is the source
 of truth (D-L11); every edit goes through one draft (D-L19, D-L35).
 
 ## The layers
@@ -13,13 +14,16 @@ of truth (D-L11); every edit goes through one draft (D-L19, D-L35).
 | --- | --- | --- |
 | `core/data/` | Inert vendored data: the keycode catalog, the key layout, pointing-mode bindings, host keyboard layouts, the demo profile | nothing |
 | `core/transport/` | Device adapters (WebHID for the page, node-hid for Node scripts, a fake) and the request coordinator that serialises requests to the keyboard | `data/` |
-| `core/schema/` | Profile byte formats and domain decoders: each domain's layout, limits and canonical encoding | `data/` |
-| `core/protocol/` | What is spoken to the keyboard over Profile Wire: framing, pages, live edits, candidate transfers | `transport/`, `schema/`, `data/` |
-| `core/model/` | Complete profiles as documents: snapshots, backups, draft edits, Review's changes and checks, reachability, vocabulary | `schema/`, `data/` |
+| `core/schema/` | Profile byte formats and domain decoders: each domain's layout, limits and canonical encoding | `data/`, `rules/` |
+| `core/protocol/` | What is spoken to the keyboard over Profile Wire: framing, pages, live edits, candidate transfers | `transport/`, `schema/`, `data/`, `rules/` |
+| `core/model/` | Complete profiles as documents: snapshots, backups, draft edits, Review's changes and checks, reachability, vocabulary | `schema/`, `data/`, `rules/` |
 | `core/session/` | Everything that holds state across a connection: reads, the draft, Apply, Save, live edits, recovery copies, and the panel loop the shell runs | all of the above |
+| `rules/` | Firmware rules the page also runs as a person clicks, such as which layer answers under the layers turned on (D-L73) | `rules/` only |
 
 Every layer may import from itself, type-only imports follow the same rules,
-and any layer may use the inert type declarations in `contracts/`.
+and any layer may use the inert type declarations in `contracts/`. `data/`
+is inert and `transport/` moves bytes without knowing what they mean, so
+neither runs a rule.
 
 Around the core:
 
@@ -33,9 +37,18 @@ Around the core:
 - **The interface**, `webview/`: browser ES modules with no build step.
   It imports nothing from `core/`, not even types; it renders the model the
   shell posts and posts edits back. `webview/view/` turns the model into what
-  is drawn and builds every posted edit, purely; `webview/ui/` holds the
-  frame (`frame.mjs`), the screens and their components; `webview/lib/` the
-  DOM, focus and colour helpers.
+  is drawn and builds every posted edit, purely, and is the one part of the
+  interface that imports `rules/`; `webview/ui/` holds the frame
+  (`frame.mjs`), the screens and their components; `webview/lib/` the DOM,
+  focus and colour helpers. The store and screens reach a rule through
+  `view/`.
+- **The shared rules**, `rules/` (D-L73): synchronous ES modules that import
+  only each other, use no DOM and no Node, and take primitives (masks, index
+  arrays, plain records), never a decoded profile or the posted model. Core
+  loads them with `require()`, `webview/view/` by relative path, and the web
+  build bundles them into both. Core publishes every firmware decision that
+  depends only on the profile; a rule is here only because the page has to
+  run it as a person clicks. The shell runs none.
 - **`contracts/`**: type declarations shared by the core, the shell and the
   interface for what crosses the panel boundary. No runtime code.
 
@@ -55,6 +68,10 @@ Around the core:
   `contracts/edits.d.ts`, its builder in `webview/view/edits.mjs`.
 - Naming an action, its native keycode or a layer reference:
   `core/schema/actions.js`.
+- A firmware decision that depends only on the profile: computed in core
+  and published in the model. A firmware rule the page has to run as a
+  person clicks: `rules/`, with a test in `tests/rules/`, imported by core
+  and by `webview/view/`.
 - A rule about what something means on screen (a colour, a key face, a
   locality): `webview/view/`, with a test. A screen or component:
   `webview/ui/`.

@@ -105,6 +105,7 @@ core/            the app, with no shell dependency and no DOM (D-L71)
   model/         complete documents, edits, review and layer rewrites
   session/       state across a connection, the draft, the shared panel loop
   data/          inert vendored data: the keycode catalog, the layout
+rules/           firmware rules core and the interface both run, ES modules (D-L73)
 contracts/       declarations for data posted between shell and panel; no code
 webview/         the interface: browser ES modules, no build step
   lib/ view/     pure helpers and model → presentation, with tests
@@ -112,7 +113,7 @@ webview/         the interface: browser ES modules, no build step
   styles.css     the design system
 web/             the web shell and build entries
 scripts/         developer entry points and build steps
-tests/           mirrors core/; view/ the interface, scripts/ the developer tools,
+tests/           mirrors core/; rules/ the shared rules, view/ the interface, scripts/ the developer tools,
                  integration/ the bridge's runners, types/ compile-time cases
 browser-tests/   Playwright specs: the preview's controls and the built page
 upstream/        pinned firmware and QMK inputs; read its AGENTS.md
@@ -121,7 +122,9 @@ preview/ dist/   ignored output of `npm run preview` and `npm run build:web`
 
 `core/` imports one way (D-L10); the layer table is in
 [architecture](architecture/README.md) and `tests/layering.test.js` enforces it. The
-webview receives the model as a message and imports nothing from `core/`.
+webview receives the model as a message and imports nothing from `core/`;
+`webview/view/` and core's layers from `schema/` up import the shared rules in
+`rules/` (D-L73), which import only each other.
 `web/` imports `core/` through `web/core.mjs`, and `webview/` never imports
 `web/`. How `core/` reads, edits and applies
 is in [`core/README.md`](../core/README.md).
@@ -156,8 +159,9 @@ automatically:
 
 | Configuration | Checks | Environment |
 | --- | --- | --- |
-| `tsconfig.foundation.json` | `core/`, `contracts/` | Node types only; fails if core leans on a type only something above it brings |
-| `tsconfig.json` | core and its type tests | Node |
+| `tsconfig.rules.json` | `rules/` | no Node types, no DOM; a rule runs in both |
+| `tsconfig.foundation.json` | `core/`, `rules/`, `contracts/` | Node types only; fails if core leans on a type only something above it brings |
+| `tsconfig.json` | core, the rules and core's type tests | Node |
 | `tsconfig.shells.json` | `web/` | page DOM, no Node globals |
 | `tsconfig.webview.json` | `webview/` | page DOM, no Node types |
 | `tsconfig.worker.json` | `web/sleep-worker.js` | WebWorker |
@@ -293,8 +297,9 @@ overrides git), Content Security Policy (`POLICY`, written once) and
 for tests and is never published. `npm run check:site` refuses anything Pages
 would run as server code.
 
-`core/` and `webview/` stay unbuilt source, and no module of `core/` is
-rewritten for the browser. The build fails if node-hid, its adapter or any
+`core/`, `rules/` and `webview/` stay unbuilt source, and no module of
+`core/` is rewritten for the browser. `rules/` reaches both the core and the
+panel bundles. The build fails if node-hid, its adapter or any
 Node built-in would reach a bundle, or a bundle takes any package but
 `buffer`. To give the web shell more of `core/`, export it from
 `web/core.mjs`.
@@ -316,8 +321,12 @@ Recovery copies made there stay in that origin's storage.
 spec in Chromium: the screens' controls and the edits they post, in both
 themes, the bundle against Node (it must decode and re-encode every profile
 fixture exactly), and the built page against a fake `navigator.hid` whose
-keyboard is the read-only fake. Install the browser once with
-`npx playwright install chromium`. None of this tests Ark on a keyboard.
+keyboard is the read-only fake. Its specs load `core/` and the interface in
+Node too, so Playwright leaves `rules/` to Node's own loaders
+(`build.external` in `playwright.config.js`): its compiler would otherwise
+give `require()` and `import()` of a rule the same compiled code. Install the
+browser once with `npx playwright install chromium`. None of this tests Ark on
+a keyboard.
 
 ### Publishing the web page
 

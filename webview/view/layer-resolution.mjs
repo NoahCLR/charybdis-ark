@@ -1,4 +1,5 @@
 // @ts-check
+import {answeringCandidate} from "../../rules/layer-answers.mjs";
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 // Every activation this layer can be the top of: layer 0 is always on, this
 // layer is held, and any set of the layers between may be held alongside.
@@ -54,8 +55,7 @@ function answeredUnder(stack, at, on) {
     const active = on.reduce((mask, layer) => mask | (1 << layer), 0);
     const answeredKey = sourceKeys(stack, at);
     return (stack[at]?.positions || []).flatMap(position => {
-        const answer = stack[at]?.answers?.[position.layoutIndex]?.find(candidate =>
-            (active & candidate.active) !== 0 && (active & candidate.blocked) === 0);
+        const answer = answeringCandidate(stack[at]?.answers?.[position.layoutIndex], active);
         const key = answer ? answeredKey(position.layoutIndex, answer.layer) : null;
         return key ? [key] : [];
     });
