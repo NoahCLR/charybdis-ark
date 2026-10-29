@@ -8,7 +8,8 @@ const {PHASE, editModeWords, heldWords, layerName, quietWords} = require("../mod
 // service, the draft, the layer editor, and the outbox the next model carries
 // (a notice, an accepted edit, a request to reset forms). Whether its draft
 // may be edited, and the changes that move several of its fields at once, are
-// panel-session-state.js's. Everything here is
+// panel-session-state.js's; how its draft follows what Ark reads is
+// draft-follow.js's. Everything here is
 // free of the page, so it is tested like the rest of core/; panel-loop.js runs
 // it, and the web shell (web/web-shell.mjs) keeps only the browser's picker,
 // storage, files and progress.
@@ -29,7 +30,7 @@ const {ProfileDraftSession} = require("./profile-draft-session");
 const {DRAFT_EDITS} = require("../model/draft-edits");
 const {buildDeviceModel, buildSnapshotModel, deviceLabels} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
-const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
+const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft} = require("./panel-session-state");
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
 const {LOST_WORDS, RECONNECT_WORDS, RESTART_WORDS} = require("./keyboard-reconnect");
@@ -72,36 +73,6 @@ function shellModel(shell) {
         progress: offered.progress || null,
         words: {...SHELL_WORDS, ...shell?.words},
     };
-}
-
-// A complete read of a supported keyboard opens the draft, or refreshes the
-// one already open against what the keyboard now holds.
-/** @param {ModelSession} session @param {State} state @param {import("../model/types.js").ProfileSnapshot | null | undefined} [portable] */
-function observePortable(session, state, portable = session.service.portable) {
-    if (session.draft && state.connected && portable !== session.observedPortable) session.draft.follow(portable, state.selectedDeviceId);
-    if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !canEdit(state.capabilities))) {
-        setDraft(session, undefined);
-    }
-    if (!portable || portable === session.observedPortable || !state.connected || !canEdit(state.capabilities)) return;
-    if (portable.incomplete && !session.draft) return;
-    const live = "live" in portable && Boolean(portable.live);
-    // A keyboard whose edit mode changed under an open draft: an untouched
-    // draft starts again in the new mode; one with work waits, stale, for the
-    // person to discard it (switching modes here asks first).
-    if (session.draft && Boolean(session.draft.live) !== live && state.selectedDeviceId === session.draft.deviceId && !portable.incomplete) {
-        if (session.draft.live || !session.draft.dirty) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
-        else session.draft.needsRead = true;
-    } else if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
-    else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities);
-    session.observedPortable = portable;
-}
-
-// A service notification advances the draft lifecycle explicitly. Rendering
-// the same state again is only a projection and cannot perform this step.
-/** @param {ModelSession} session @param {State} state */
-function observeService(session, state) {
-    if (!session.demo) observePortable(session, state);
-    if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken ?? null);
 }
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
@@ -454,4 +425,4 @@ function portableLayersView(edit) {
         titles: edit.names.map((/** @type {string} */ _, /** @type {number} */ index) => layerName(edit.names, index)), keysFollow: edit.keysFollow !== false} : null;
 }
 
-module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, portableLayersView, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, portableLayersView, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit};

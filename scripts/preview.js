@@ -12,7 +12,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {PHASE} = require("../core/model/vocabulary");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildPanelModel, observeService, portableLayersView, startLayerEdit} = require("../core/session/panel-session");
+const {buildPanelModel, portableLayersView, startLayerEdit} = require("../core/session/panel-session");
+const {followService} = require("../core/session/draft-follow");
 const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/schema/keycodes");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/data/charybdis-layout");
@@ -264,7 +265,7 @@ async function deviceModel() {
         /** @type {import("../core/session/types.js").PanelSession} */
         // The page's shell, keeping no recovery copies: the fixture's are not this keyboard's.
         const panel = {service, shell: {panel: () => ({...OFFERED, recoveries: []})}};
-        observeService(panel, service.snapshot());
+        followService(panel, service.snapshot());
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
         model.portable.layers = portableLayersView(panel.portableLayers);

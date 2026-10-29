@@ -2,7 +2,8 @@
 const {editMacros} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {applyLayerEdit, buildPanelModel: projectPanelModel, observeService, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit} = require("../../core/session/panel-session");
+const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit} = require("../../core/session/panel-session");
+const {followRead, followService} = require("../../core/session/draft-follow");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
@@ -14,44 +15,50 @@ const snapshot = () => {
 const device = {id: "kb", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"};
 const connected = (extra = {}) => ({connected: true, busy: false, selectedDeviceId: "kb", devices: [device], capabilities, ...extra});
 
-// Lifecycle cases use the same explicit notification then projection as the
-// panel loop. Their existing state and editability assertions remain intact.
-const buildPanelModel = (session, state) => {observeService(session, state); return projectPanelModel(session, state);};
+// Building the model is a projection (D-L61): what opens, keeps or stales the
+// draft is a read it follows (followRead), or a service notice the panel loop
+// observes before it projects (followService), and each case says which.
 
-// A panel session exactly as panel-loop.js keeps one, with the first complete
-// read already in: publishing it opens the draft.
-function panelWithDraft() {
-    const read = snapshot();
-    const session = {service: {portable: read}};
-    buildPanelModel(session, connected());
+// A panel session as panel-loop.js keeps one, with the first complete read
+// followed: it opened the draft.
+/** @param {object} [state] */
+function panelWithDraft(state = connected()) {
+    const session = {service: {}};
+    followRead(session, snapshot(), state);
     return session;
 }
 
 test("projecting a model does not open a draft or observe a new connection", () => {
     const session = {service: {portable: snapshot()}};
-    projectPanelModel(session, connected({connectionToken: 1}));
+    buildPanelModel(session, connected({connectionToken: 1}));
     assert.equal(session.draft, undefined, "projection cannot open a draft");
-    observeService(session, connected({connectionToken: 1}));
+    followService(session, connected({connectionToken: 1}));
+    assert.ok(session.draft, "the notice follows the service's read");
     session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
     const before = session.draft.view(connected({connectionToken: 1}));
-    projectPanelModel(session, connected({connectionToken: 2}));
+    buildPanelModel(session, connected({connectionToken: 2}));
     assert.deepEqual(session.draft.view(connected({connectionToken: 1})), before, "projection cannot mark a retained draft stale");
     const changed = structuredClone(session.draft.document); editMacros(changed, macros => macros[0] = Buffer.from("test").toString("base64"));
     session.portableReview = Object.freeze({document: changed, before: snapshot()});
-    const first = projectPanelModel(session, connected({connectionToken: 1}));
-    const second = projectPanelModel(session, connected({connectionToken: 1}));
+    const first = buildPanelModel(session, connected({connectionToken: 1}));
+    const second = buildPanelModel(session, connected({connectionToken: 1}));
     assert.deepEqual(first, second, "repeated projection preserves the model and leaves the import review untouched");
 });
 
-test("a complete read opens one draft, and later publishes keep it", () => {
+test("a complete read opens one draft, and later reads keep it", () => {
     const session = panelWithDraft();
-    const draft = session.draft;
+    const draft = session.draft, read = session.observedPortable;
     assert.ok(draft, "the draft opens on the first complete read");
-    buildPanelModel(session, connected());
-    assert.equal(session.draft, draft, "publishing again does not replace it");
-    const legacy = {service: {portable: snapshot()}};
-    buildPanelModel(legacy, connected({capabilities: {...capabilities, compiledLayerCount: 5}}));
+    assert.equal(draft.deviceId, "kb");
+    followRead(session, read, connected());
+    assert.equal(session.draft, draft, "following the same read again does not replace it");
+    followRead(session, snapshot(), connected());
+    assert.equal(session.draft, draft, "a later read of the same profile keeps it");
+    assert.equal(draft.revision, 1, "with its history");
+    const legacy = {service: {}};
+    followRead(legacy, snapshot(), connected({capabilities: {...capabilities, compiledLayerCount: 5}}));
     assert.equal(legacy.draft, undefined, "a five-layer keyboard stays read-only");
+    assert.equal(legacy.observedPortable, undefined, "and its read is not followed");
 });
 
 test("draft edits are staged, and refused when stale, draftless or on the wrong keyboard", () => {
@@ -140,8 +147,8 @@ test("switching keyboards preserves a dirty draft without showing it as editable
     const original = session.draft;
     const edit = {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]};
     original.stage({...edit, draftRevision: original.revision});
-    session.service.portable = snapshot();
     const other = connected({selectedDeviceId: "other", devices: [device, {id: "other", label: "Another Charybdis"}]});
+    followRead(session, snapshot(), other);
     const model = buildPanelModel(session, other);
     assert.equal(session.draft, original);
     assert.equal(model.draft.matching, false);
@@ -150,17 +157,16 @@ test("switching keyboards preserves a dirty draft without showing it as editable
     assert.throws(() => routeMessage(session, {...edit, draftId: original.id, draftRevision: original.revision}, other), /Reconnect/);
 
     original.reset(snapshot());
-    session.service.portable = snapshot();
-    buildPanelModel(session, other);
+    followRead(session, snapshot(), other);
     assert.notEqual(session.draft, original, "a clean draft follows the newly selected keyboard");
     assert.equal(session.draft.deviceId, "other");
 });
 
 test("the panel marks a retained draft stale after reconnecting to the same device choice", () => {
-    const session = {service: {portable: snapshot()}};
-    buildPanelModel(session, connected({connectionToken: 1}));
+    const session = panelWithDraft(connected({connectionToken: 1}));
     session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
-    session.service.portable = snapshot();
+    followRead(session, snapshot(), connected({connectionToken: 2}));
+    assert.equal(session.draft.connectionChanged, true, "the read came over a new connection");
     const model = buildPanelModel(session, connected({connectionToken: 2}));
     assert.equal(model.draft.matching, true);
     assert.equal(model.draft.connectionChanged, true);
@@ -192,11 +198,12 @@ test("a read held by its draft says why on the load, and a failed read does not"
 });
 
 test("a new connection blocks draft edits before portable readback finishes", () => {
-    const session = {service: {portable: snapshot()}};
-    buildPanelModel(session, connected({connectionToken: 1}));
+    const session = panelWithDraft(connected({connectionToken: 1}));
     session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
-    session.service.portable = undefined;
+    // The service has read nothing over the new connection yet.
     const current = connected({connectionToken: 2});
+    followService(session, current);
+    assert.equal(session.draft.stale, true, "the notice of the new connection stales the draft");
     const model = buildPanelModel(session, current);
     assert.equal(model.draft.connectionChanged, true);
     assert.equal(model.draft.stale, true);
@@ -211,11 +218,12 @@ test("the published editability is what the router accepts, connection changes i
     const other = {id: "other", label: "Another Charybdis"};
     const unsupported = {...capabilities, actionAbiDigest: 0x1d3fcacc};
     /** @param {string} label @param {(session: object) => object} arrange returns the state the panel answers to */
+    // Each state reaches the panel as the loop meets it: its notice, then the model.
     const agree = (label, arrange, expected) => {
-        const session = {service: {portable: snapshot()}};
-        buildPanelModel(session, connected({connectionToken: 1}));
+        const session = panelWithDraft(connected({connectionToken: 1}));
         const state = arrange(session);
         const draft = session.draft;
+        followService(session, state);
         const model = buildPanelModel(session, state);
         let staged;
         try {staged = routeMessage(session, {...edit, draftId: draft.id, draftRevision: draft.revision}, state) === "staged";}
@@ -235,8 +243,7 @@ test("the published editability is what the router accepts, connection changes i
 });
 
 test("Apply is routed only for a draft bound to its keyboard; the draft judges the rest as it writes", () => {
-    const session = {service: {portable: snapshot()}};
-    buildPanelModel(session, connected({connectionToken: 1}));
+    const session = panelWithDraft(connected({connectionToken: 1}));
     const message = {type: "applyProfileDraft", draftId: session.draft.id, draftRevision: session.draft.revision};
     assert.equal(routeMessage(session, message, connected({connectionToken: 1})), "draft");
     assert.throws(() => routeMessage(session, message, connected({connectionToken: 1, connected: false})), /^Error: Reconnect the keyboard this draft belongs to/);
@@ -248,13 +255,13 @@ test("Apply is routed only for a draft bound to its keyboard; the draft judges t
 });
 
 test("a new connection is refused before any model has noticed it, and the next model agrees", () => {
-    const session = {service: {portable: snapshot()}};
-    buildPanelModel(session, connected({connectionToken: 1}));
+    const session = panelWithDraft(connected({connectionToken: 1}));
     const draft = session.draft, reconnected = connected({connectionToken: 2});
     assert.equal(draft.stale, false, "nothing has marked the draft stale yet");
     assert.throws(() => routeMessage(session, {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}],
         draftId: draft.id, draftRevision: draft.revision}, reconnected), /Reconnect/);
     assert.equal(draft.dirty, false);
+    followService(session, reconnected);
     const published = buildPanelModel(session, reconnected).draft;
     assert.equal(published.editable, false);
     assert.equal(published.reason, "connection-changed");
@@ -272,6 +279,8 @@ test("discarding an old draft on a legacy keyboard clears it without opening an 
 test("a clean draft closes automatically when selecting a legacy keyboard", () => {
     const session = panelWithDraft();
     const legacy = connected({selectedDeviceId: "old", capabilities: {...capabilities, compiledLayerCount: 5}});
+    followService(session, legacy);
+    assert.equal(session.draft, undefined);
     assert.equal(buildPanelModel(session, legacy).draft, undefined);
     assert.equal(session.resetDraftForms, true);
 });
@@ -279,6 +288,7 @@ test("a clean draft closes automatically when selecting a legacy keyboard", () =
 test("an eight-slot action vocabulary cannot offer portable profile controls", () => {
     const session = panelWithDraft();
     const unsupported = connected({capabilities: {...capabilities, actionAbiDigest: 0x1d3fcacc}});
+    followService(session, unsupported);
     const model = buildPanelModel(session, unsupported);
     assert.equal(model.portable.available, false);
     assert.equal(model.draft, undefined);
@@ -288,6 +298,7 @@ test("an unsupported vocabulary keeps unapplied edits read-only even with the sa
     const session = panelWithDraft(), draft = session.draft;
     draft.stage({type: "updateLayoutKeys", draftRevision: draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
     const unsupported = connected({capabilities: {...capabilities, actionAbiDigest: 0x1d3fcacc}});
+    followService(session, unsupported);
     const model = buildPanelModel(session, unsupported);
     assert.equal(session.draft, draft, "unapplied edits remain available for the original firmware");
     assert.equal(model.draft.dirty, true);
@@ -337,12 +348,12 @@ test("a finished Apply is shown only during its own readback", () => {
 });
 
 test("configure screens stay gated until a complete editable read finishes", () => {
-    const session = {service: {portable: null}, readBusy: true, readReady: false};
+    const session = {service: {}, readBusy: true, readReady: false};
     const partial = connected({layout: {state: "read", layers: []}, committed: {state: "read"}});
     assert.equal(buildPanelModel(session, partial).load.state, "loading", "layout and lighting alone do not expose the board");
     session.readBusy = false;
     assert.equal(buildPanelModel(session, partial).load.state, "unavailable", "a failed complete read remains gated");
-    session.service.portable = snapshot();
+    followRead(session, snapshot(), partial);
     session.readReady = true;
     assert.equal(buildPanelModel(session, partial).load.state, "ready", "the complete read opens the editable draft");
     session.readBusy = true;
@@ -514,7 +525,7 @@ test("a layer is dragged to any place above the base, and Make base swaps it wit
 
 test("the profile meter follows the draft, and is absent without a keyboard or an advertised size", () => {
     const sized = {...capabilities, maxProfilePayload: 130048, maxBehaviorRows: 64};
-    const session = {service: {portable: snapshot()}};
+    const session = panelWithDraft(connected({capabilities: sized}));
     const keyboard = buildPanelModel(session, connected({capabilities: sized})).portable.usage;
     assert.equal(keyboard.source, "keyboard", "with nothing changed, the figures are the keyboard's");
     assert.equal(keyboard.capacity, 130048);
@@ -593,8 +604,8 @@ test("older firmware keeps independent readback while a dirty current draft is r
 test("every model the panel publishes carries the vocabulary the screens read their words from", () => {
     const {VOCABULARY} = require("../../core/model/vocabulary");
     const models = {
-        "no keyboard": projectPanelModel({service: {}}, {connected: false, devices: []}),
-        "a keyboard not read yet": projectPanelModel({service: {}}, connected()),
+        "no keyboard": buildPanelModel({service: {}}, {connected: false, devices: []}),
+        "a keyboard not read yet": buildPanelModel({service: {}}, connected()),
         "a draft": buildPanelModel(panelWithDraft(), connected()),
     };
     for (const [when, model] of Object.entries(models)) {

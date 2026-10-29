@@ -27,12 +27,13 @@ const {canEdit, hasCurrentLayers} = require("./firmware-support");
 const {validateSnapshot, FILE_MAX_BYTES, FILE_TOO_LARGE} = require("../model/portable-profile");
 const {failureSentence} = require("../model/vocabulary");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
-const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
+const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
+const {followRead, readFailed, takeNews} = require("./draft-follow");
 const {closeEditors, whileApplying} = require("./panel-session-state");
 const {compose} = require("../model/layer-order");
 const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
-const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, retryRead, saveCutShortResult, setEditMode} = require("./live-edits");
+const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, saveCutShortResult, setEditMode} = require("./live-edits");
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
 const {isStartingTimeout, readOnceStarted, startingTimeout} = require("./keyboard-starting");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
@@ -143,10 +144,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         macroFailure = ` Macros and global settings could not be read. ${failureSentence(error)}`;
         // A follow-back's read the keyboard moved under is the live watch's
         // to read again (live-watch.js), within its bound.
-        if (session.reconnect && session.draft?.live) {
-            session.draft.needsRead = true;
-            retryRead(session, error);
-        }
+        if (session.reconnect && session.draft?.live) readFailed(session, error);
     }
     if (!portable) {
         // A partly readable keyboard still gets its independent diagnostics.
@@ -173,7 +171,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     if (macroFailure) session.notice += macroFailure;
     // A live keyboard that restarted (a replug, a lost connection) since Ark
     // knew of unsaved edits: in Live edit it may have saved them first.
-    const restarted = session.draft?.restartedWithUnsaved;
+    const restarted = takeNews(session, "restarted");
     // A Save cut short says what became of its edits, which also tells the restart.
     const saveResult = saveCutShortResult(session, portable);
     if (saveResult) {
@@ -183,16 +181,12 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         if (session.reconnect) session.reconnect.after = [session.reconnect.after, saveResult].filter(Boolean).join(" ");
     }
     // A restart Ark asked for kept the edits itself and says what became of them.
-    else if (restarted && session.draft && !session.restart) {
+    else if (restarted && !session.restart) {
         session.notice += restarted.kept ? " The keyboard restarted since Ark last read it and kept your edits: it saved them first."
             : restarted.mode === EDIT_MODE.LIVE ? " The keyboard restarted before it saved your last edits, so those are gone: it runs what it saved."
             : " The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";
     }
-    if (session.draft) session.draft.restartedWithUnsaved = undefined;
-    if (session.draft?.changedElsewhere) {
-        session.notice += ` ${CHANGED_ELSEWHERE}`;
-        session.draft.changedElsewhere = false;
-    }
+    if (takeNews(session, "changedElsewhere")) session.notice += ` ${CHANGED_ELSEWHERE}`;
     const ready = Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
         && hasCurrentLayers(state.capabilities) && portable && !portable.incomplete);
     // After a restart Ark asked for, the edits it kept go back to the keyboard.
@@ -265,7 +259,7 @@ const DRAFT_ACTIONS = Object.freeze({
         draft.assertRevision(revision, {allowStale: true});
         if (service.snapshot().selectedDeviceId !== draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to.");
         const snapshot = await service.readPortableProfile({forRestore: true});
-        observePortable(session, service.snapshot(), snapshot);
+        followRead(session, snapshot, service.snapshot());
         draft.rebase(revision);
         session.resetDraftForms = true;
         session.notice = "Review now compares your draft with the latest keyboard state. Save will replace the differences shown.";

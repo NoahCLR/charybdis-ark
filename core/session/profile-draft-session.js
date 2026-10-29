@@ -152,10 +152,6 @@ class ProfileDraftSession {
     checksCache;
     /** @type {boolean | undefined} */
     needsRead;
-    /** @type {{kept: boolean, mode: number} | undefined} A live keyboard restarted while Ark knew of unsaved edits; the next read says whether they were kept (saved by the keyboard first) or are gone. */
-    restartedWithUnsaved;
-    /** @type {boolean | undefined} A live keyboard's working copy changed under the same session without Ark (another app, a lost answer, an edit that did not land as sent); the next read says the draft started again. */
-    changedElsewhere;
     /** @type {LiveExpectation | undefined} Ark's own live edit the keyboard took whole but whose outcome Ark has not heard (live-edits.js): the next read confirms it if it shows exactly that edit. */
     expectedLive;
     now() {return Date.now();}
@@ -271,10 +267,13 @@ class ProfileDraftSession {
         if ((state.connectionToken ?? null) !== this.connectionToken) return "connection-changed";
         return "";
     }
-    /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] @param {import("../model/types.js").ProfileDestination} [capabilities] */
+    // The draft takes a read of its keyboard. What it told that a person
+    // should hear is returned (a live keyboard's restart or a change made
+    // without Ark, observeLive), for the read that says it (draft-follow.js).
+    /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] @param {import("../model/types.js").ProfileDestination} [capabilities] @returns {import("./types.js").ReadNews | undefined} */
     observe(snapshot, deviceId, connectionToken = null, capabilities = this.capabilities) {
         if (!snapshot || deviceId !== this.deviceId) return;
-        if (this.live) {this.observeLive(snapshot, connectionToken, capabilities); return;}
+        if (this.live) return this.observeLive(snapshot, connectionToken, capabilities);
         this.latestCapabilities = copy(capabilities);
         const dirty = this.dirty;
         if (!dirty && !snapshot.incomplete && JSON.stringify(capabilities) !== JSON.stringify(this.capabilities)) {
@@ -307,8 +306,11 @@ class ProfileDraftSession {
     // keyboard vouches for it by its session and revision); anything else
     // (another client's edit, a key adjustment, a restart, a Save elsewhere)
     // starts the draft again from what the keyboard has, with no history it
-    // cannot vouch for, and says so.
-    /** @param {Snapshot} snapshot @param {import("./types.js").ConnectionToken} connectionToken @param {import("../model/types.js").ProfileDestination} capabilities */
+    // cannot vouch for, and says so: a restart over unsaved edits, kept (the
+    // keyboard saved them first) or gone, or a working copy changed under the
+    // same session without Ark (another app, a lost answer, an edit that did
+    // not land as sent).
+    /** @param {Snapshot} snapshot @param {import("./types.js").ConnectionToken} connectionToken @param {import("../model/types.js").ProfileDestination} capabilities @returns {import("./types.js").ReadNews | undefined} */
     observeLive(snapshot, connectionToken, capabilities) {
         const token = connectionToken ?? null;
         this.latestConnectionToken = token;
@@ -338,9 +340,12 @@ class ProfileDraftSession {
             return;
         }
         // A new session is a restart: whatever was unsaved is gone (D-F32).
-        if (liveSnapshot.live.session !== live.session) {if (live.unsaved) this.restartedWithUnsaved = {kept: liveSnapshot.saved.fingerprint === this.current.fingerprint, mode: liveSnapshot.live.mode};}
-        else if (liveSnapshot.live.revision !== live.revision || liveSnapshot.fingerprint !== this.current.fingerprint) this.changedElsewhere = true;
+        /** @type {import("./types.js").ReadNews | undefined} */
+        let news;
+        if (liveSnapshot.live.session !== live.session) {if (live.unsaved) news = {restarted: {kept: liveSnapshot.saved.fingerprint === this.current.fingerprint, mode: liveSnapshot.live.mode}};}
+        else if (liveSnapshot.live.revision !== live.revision || liveSnapshot.fingerprint !== this.current.fingerprint) news = {changedElsewhere: true};
         this.resetLive(liveSnapshot);
+        return news;
     }
     // Whether a read shows exactly the edit Ark sent, published: the same
     // session, one revision on, its transaction the last the keyboard

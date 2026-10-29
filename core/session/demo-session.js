@@ -29,6 +29,7 @@ const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {panelControl} = require("./panel-control-registry");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
+const {forgetRead} = require("./draft-follow");
 const {validateSnapshot, fingerprint, summary} = require("../model/portable-profile");
 const {ACTION_ABI} = require("../schema/actions");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
@@ -175,7 +176,7 @@ function openDemo(session, state, {value, fileName = null} = {}) {
 /** @param {Session} session @param {Session["draft"]} draft */
 function replaceDemoDraft(session, draft) {
     replaceDraft(session, draft);
-    session.observedPortable = undefined;
+    forgetRead(session);
     session.readReady = undefined;
 }
 

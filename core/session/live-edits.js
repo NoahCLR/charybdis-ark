@@ -29,8 +29,8 @@ const {fingerprint} = require("../model/portable-profile");
 const {EDIT_MODE, isEditMode} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS, INTERRUPTION_REASONS, PHASE, SAVE_WORDS, arkCode, failureSentence, quietWords} = require("../model/vocabulary");
 const {LAYER_IDENTITY} = require("../data/charybdis-layout");
-const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
+const {keepStale, needRead, readAndFollow, replaceFromRead, takeNews, takeRead} = require("./draft-follow");
 const {expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {interruption, saveResult} = require("./interruption");
 
@@ -207,32 +207,14 @@ function saveCutShortResult(session, read) {
     return said;
 }
 
-// The keyboard as it is now, after a refusal or a lost answer. A failed read
-// leaves the draft stale, which says to read again.
+// The keyboard as it is now, after a refusal or a lost answer. Until it is
+// read, the draft is stale, which says to read again; a read that fails
+// leaves it so.
 /** @param {Session} session */
 async function reread(session) {
-    const draft = session.draft;
-    if (draft) draft.needsRead = true;
+    needRead(session);
     if (!session.service.snapshot().connected) return;
-    try {
-        const read = await session.service.readKeyboardProfile();
-        session.draft?.observe(read, session.service.snapshot().selectedDeviceId, session.service.snapshot().connectionToken, session.service.snapshot().capabilities || undefined);
-        session.observedPortable = read;
-        session.liveReadRetry = undefined;
-        if (session.draft?.changedElsewhere) {session.notice = CHANGED_ELSEWHERE; session.draft.changedElsewhere = false;}
-    } catch (error) {retryRead(session, error);}
-}
-
-// Only a read that moved underneath us is automatically retried. Three
-// failed reads in this cycle leave Read keyboard to the person; unrelated
-// stale Review and save drafts and persistent device failures are never polled
-// away.
-/** @param {Session} session @param {unknown} error */
-function retryRead(session, error) {
-    const draft = session.draft;
-    if (!draft || codeOf(error) !== "PROFILE_CHANGED") {session.liveReadRetry = undefined; return;}
-    const attempts = session.liveReadRetry?.draftId === draft.id ? session.liveReadRetry.attempts : 0;
-    session.liveReadRetry = {draftId: draft.id, attempts: attempts + 1};
+    if (await readAndFollow(session) && takeNews(session, "changedElsewhere")) session.notice = CHANGED_ELSEWHERE;
 }
 
 // A posted edit, in Live preview + save: the same editors stage it, the
@@ -359,10 +341,8 @@ async function setEditMode(session, message, recoveryFor, shell) {
     }
     await service.setEditMode(mode);
     // The draft starts again from the keyboard in its new mode.
-    const read = await service.readKeyboardProfile();
+    replaceFromRead(session, await service.readKeyboardProfile());
     const state = service.snapshot();
-    replaceDraft(session, new ProfileDraftSession(read, state.selectedDeviceId, /** @type {import("../model/types.js").ProfileDestination} */ (state.capabilities), state.connectionToken));
-    session.observedPortable = read;
     session.liveProposal = undefined;
     const words = {
         [EDIT_MODE.APPLY]: "edits wait in Ark's draft until you review and save them.",
@@ -391,17 +371,13 @@ async function sendApplyDraft(session, kept, mode, notice) {
         // The Review and save draft belongs to the person until publication
         // succeeds, even if the keyboard refuses the return to Review and
         // save.
-        replaceDraft(session, kept);
-        kept.needsRead = true;
-        session.observedPortable = service.portable || undefined;
+        keepStale(session, kept);
         let back = false;
         try {
             await service.setEditMode(EDIT_MODE.APPLY);
             const read = await service.readKeyboardProfile();
-            const state = service.snapshot();
             replaceDraft(session, kept);
-            kept.observe(read, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined);
-            session.observedPortable = read;
+            takeRead(session, kept, read);
             back = true;
         } catch {}
         const review = EDIT_MODE_WORDS[EDIT_MODE.APPLY].label;
@@ -425,4 +401,4 @@ function closingLoses(session) {
     return draft.live.unsaved || draft.dirty;
 }
 
-module.exports = {LIVE_ACTIONS, CHANGED_ELSEWHERE, closingLoses, liveEdit, proposeLive, reread, retryRead, saveCutShortResult, setEditMode};
+module.exports = {LIVE_ACTIONS, CHANGED_ELSEWHERE, closingLoses, liveEdit, proposeLive, reread, saveCutShortResult, setEditMode};

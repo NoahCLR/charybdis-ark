@@ -3,7 +3,8 @@ const {profileLayers, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {draftControl, portableControl, readKeyboard, rereadKeyboard} = require("../../core/session/panel-controls");
-const {buildPanelModel, observeService} = require("../../core/session/panel-session");
+const {buildPanelModel} = require("../../core/session/panel-session");
+const {followRead} = require("../../core/session/draft-follow");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
@@ -46,7 +47,7 @@ const shell = () => {
 function sessionWithDraft() {
     const service = fakeService();
     const session = {service};
-    observeService(session, service.snapshot());
+    followRead(session, service.portable, service.snapshot());
     buildPanelModel(session, service.snapshot());
     return session;
 }
@@ -233,7 +234,7 @@ test("a destination blocker refuses Apply before recovery or HID", async () => {
     const service = fakeService(), h = shell();
     service.portable.limits.brightnessMax = 50;
     const session = {service};
-    observeService(session, service.snapshot());
+    followRead(session, service.portable, service.snapshot());
     buildPanelModel(session, service.snapshot());
     stage(session, {type: "updateMacro", keycode: "MACRO_0", payload: "hello"});
     session.draft.review(session.draft.revision);

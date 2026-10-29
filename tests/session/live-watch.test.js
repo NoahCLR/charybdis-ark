@@ -143,8 +143,7 @@ test("under a Review and save draft, a key adjustment the keyboard saved is read
     // keyboard saved it.
     changed[3][2] = 0x07;
     keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
-    await session.service.readKeyboardProfile();
-    require("../../core/session/panel-session").observePortable(session, require("../../core/session/demo-session").panelState(session));
+    assert.equal(await require("../../core/session/draft-follow").readAndFollow(session), true);
     assert.ok(session.draft.live);
     keyboard.autoSave();
     assert.equal(await look(), true);

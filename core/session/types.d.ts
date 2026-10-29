@@ -154,9 +154,12 @@ export interface DemoSession {
     noticeFailed?: boolean;
     portableReview?: unknown;
     portableLayers?: unknown;
+    /** The read the open draft last followed (draft-follow.js). */
     observedPortable?: import('../model/types.js').ProfileSnapshot;
     service: {capabilities?: Partial<DeviceCapabilities> | null; snapshot(): PanelDeviceState};
 }
+/** What a read told the draft that a person should hear (ProfileDraftSession.observe): a live keyboard restarted over unsaved edits, kept (saved first) or gone, in the edit mode it came back in; or its working copy changed without Ark. */
+export interface ReadNews {restarted?: {kept: boolean; mode: number}; changedElsewhere?: boolean}
 export type ActiveDemoSession = DemoSession & {demo: DemoMetadata; draft: NonNullable<DemoSession['draft']>};
 export interface ProfileChooser {chooseProfile?: () => string | {text: string; name?: string} | undefined | Promise<string | {text: string; name?: string} | undefined>}
 
@@ -174,10 +177,13 @@ export interface PanelSession extends DemoSession {
     portableReview?: PortableReview;
     portableLayers?: LayerEditState;
     acceptedEdit?: ReturnType<NonNullable<DemoSession['draft']>['stage']>;
-    /** A live edit waiting on its trap check (plan answer 2): sent on confirmLiveEdit, dropped on cancelLiveEdit. */
-    /** What the live watch last saw of a keyboard under a Review and save draft (live-watch.js). */
+    /** The failed reads the live watch has retried for a stale draft (draft-follow.js). */
     liveReadRetry?: {draftId: string; attempts: number};
+    /** What reads a draft followed told that is not said yet (draft-follow.js takeNews). */
+    readNews?: ReadNews & {draftId: string};
+    /** What the live watch last saw of a keyboard under a Review and save draft (live-watch.js). */
     applyWatch?: {draftId: string; session: number; revision: number; savedGeneration: number};
+    /** A live edit waiting on its trap check (plan answer 2): sent on confirmLiveEdit, dropped on cancelLiveEdit. */
     liveProposal?: {id: number; draftId: string; revision: number; target: import('./profile-draft-session.js').LiveTarget;
         checks: import('../../contracts/model.js').Check[]; accepted?: ReturnType<NonNullable<DemoSession['draft']>['stage']>; replaceWhenLarge?: boolean};
     applyRunning?: boolean;

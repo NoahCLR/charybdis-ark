@@ -23,12 +23,10 @@
 // menu is open, or which is hidden. A look that goes unanswered is skipped
 // (background-reads.js).
 
-const {retryRead} = require("./live-edits");
-const {observePortable} = require("./panel-session");
-const {panelState} = require("./demo-session");
+const {endRetries, readAndFollow, retryPending} = require("./draft-follow");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 
-const LIVE_WATCH_MS = 1000, LIVE_READ_RETRIES = 3;
+const LIVE_WATCH_MS = 1000;
 const MOVED = "The keyboard changed by itself (a DPI or lighting key, or another app); Ark read it again.";
 const FOLLOWED = "Ark read the keyboard again now that it is back; the draft is what it runs.";
 
@@ -45,7 +43,7 @@ async function checkLive(session) {
     if (elsewhere && !await followBack(session, draft)) return false;
     if (draft.stale) {
         if (!retryPending(session, draft)) return false;
-        await readAgain(session);
+        await readAndFollow(session);
         if (elsewhere && session.draft === draft && !draft.stale) session.notice = FOLLOWED;
         return true;
     }
@@ -59,7 +57,7 @@ async function checkLive(session) {
     const settled = draft.live.mode === EDIT_MODE.APPLY && status.mode === EDIT_MODE.APPLY && !status.unsaved;
     if (settled || status.session !== draft.live.session || status.revision !== draft.live.revision || status.mode !== draft.live.mode) {
         const restarted = status.session !== draft.live.session;
-        await readAgain(session);
+        await readAndFollow(session);
         session.resetDraftForms = true;
         if (!restarted && session.draft && !session.draft.stale) {
             session.notice = status.mode !== before.live?.mode ? "The keyboard's edit mode was changed elsewhere; Ark read it again." : MOVED;
@@ -73,25 +71,17 @@ async function checkLive(session) {
 // as its own save after a rename does) waits for a read under the old device
 // id or connection. If the keyboard now connected names the draft's edit
 // session it is the same keyboard on the same boot: the draft follows it,
-// and the stale-draft retry below reads it again, within its bound.
+// and the stale-draft retry (draft-follow.js retryPending) reads it again,
+// within its bound.
 /** @param {import("./types.js").RunningPanelSession} session @param {NonNullable<import("./types.js").RunningPanelSession["draft"]>} draft */
 async function followBack(session, draft) {
     if (!draft.live || !retryPending(session, draft)) return false;
     const status = await session.service.readLiveStatus();
     if (!status || session.draft !== draft || session.portableBusy || session.service.busy) return false;
     // Another keyboard, or this one restarted: the person reads it.
-    if (status.session !== draft.live.session) {session.liveReadRetry = undefined; return false;}
+    if (status.session !== draft.live.session) {endRetries(session); return false;}
     draft.followSession(status.session, session.service.snapshot().selectedDeviceId);
     return true;
-}
-
-// A stale draft is read again automatically only after a read the keyboard
-// moved under (live-edits.js retryRead), and at most LIVE_READ_RETRIES
-// failed reads in all.
-/** @param {import("./types.js").RunningPanelSession} session @param {NonNullable<import("./types.js").RunningPanelSession["draft"]>} draft */
-function retryPending(session, draft) {
-    const retry = session.liveReadRetry;
-    return Boolean(draft.needsRead && retry?.draftId === draft.id && retry.attempts < LIVE_READ_RETRIES);
 }
 
 // A Review and save draft: the keyboard's own keys may still change what it
@@ -113,23 +103,9 @@ async function checkApply(session, draft, status) {
     const same = seen ? (seen.session === status.session && seen.revision === status.revision && seen.savedGeneration === status.savedGeneration)
         : base && base.committedGeneration === status.savedGeneration && base.committedOriginHalf === status.savedOrigin;
     if (status.unsaved || same) return told;
-    await readAgain(session);
+    await readAndFollow(session);
     if (session.draft && !session.draft.stale) session.notice = MOVED;
     return true;
-}
-
-// Read the keyboard as a Refresh does and let the panel take it: the draft
-// follows, or changes kind when the keyboard's mode did.
-/** @param {import("./types.js").RunningPanelSession} session */
-async function readAgain(session) {
-    try {
-        await session.service.readKeyboardProfile();
-        observePortable(session, panelState(session));
-        session.liveReadRetry = undefined;
-    } catch (error) {
-        if (session.draft) session.draft.needsRead = true;
-        retryRead(session, error);
-    }
 }
 
 // A look waiting for its time never keeps a process alive by itself (Node

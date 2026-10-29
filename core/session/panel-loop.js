@@ -50,7 +50,8 @@
  */
 const {panelControl} = require("./panel-control-registry");
 const {ProfileDeviceService} = require("./profile-device-service");
-const {buildPanelModel, observeService, panelRequest, routeMessage} = require("./panel-session");
+const {buildPanelModel, panelRequest, routeMessage} = require("./panel-session");
+const {followService} = require("./draft-follow");
 const {panelCatalog} = require("../model/profile-model");
 const {beginRead, boundDraft, closeEditors, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
 const {awaitReconnect, endReconnect, expectLost} = require("./keyboard-reconnect");
@@ -120,7 +121,7 @@ function openPanelLoop(shell, options) {
 
 /** @param {Session} session @param {Shell} shell */
 function serviceChanged(session, shell) {
-    observeService(session, panelState(session));
+    followService(session, panelState(session));
     publish(session, shell);
 }
 
@@ -298,7 +299,7 @@ async function connectAndRead(session, selectedDeviceId, shell) {
         // Injected services need not emit notifications, and a failed read
         // may still have changed connection facts. Observe once at this
         // explicit operation boundary before projecting the reply.
-        observeService(session, panelState(session));
+        followService(session, panelState(session));
         endRead(session, ready);
         publish(session, shell);
     }

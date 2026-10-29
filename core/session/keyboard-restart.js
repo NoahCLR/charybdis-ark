@@ -34,6 +34,7 @@ const {snapshotOf} = require("./live-profile-session");
 const {expectRestart, followKeyboard} = require("./keyboard-reconnect");
 const {fingerprint} = require("../model/portable-profile");
 const {proposeLive} = require("./live-edits");
+const {takeRead} = require("./draft-follow");
 
 const RESTART_LABEL = "Put back the unsaved edits from before the restart";
 
@@ -115,11 +116,8 @@ async function putBackAfterRestart(session) {
     if (state.selectedDeviceId) followKeyboard(session, restart.deviceId || "", state.selectedDeviceId);
     const followed = session.draft;
     // A live draft takes a live read; anything else is the panel's, which
-    // asks before a draft changes its kind (observePortable).
-    if (portable && "live" in portable && portable.live && followed?.live && followed.deviceId === state.selectedDeviceId) {
-        followed.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined);
-        session.observedPortable = portable;
-    }
+    // asks before a draft changes its kind (draft-follow.js followRead).
+    if (portable && "live" in portable && portable.live && followed?.live && followed.deviceId === state.selectedDeviceId) takeRead(session, followed, portable);
     // A Review and save draft takes the new connection when the keyboard
     // still holds what it began from. Its read says nothing of the keyboard's
     // saving: look at it now, so a keyboard that stopped again is told from

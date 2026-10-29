@@ -102,10 +102,18 @@ the profile step after Apply (`reuse`) and a live read with nothing unsaved
 
 ## The draft
 
-`observePortable` (`panel-session.js`) opens a `ProfileDraftSession`
+`followRead` (`draft-follow.js`) opens a `ProfileDraftSession`
 (`profile-draft-session.js`) from a complete snapshot of an editable keyboard
 and follows later snapshots. Its history holds up to 101 frozen entries, each
 with its document, origin, label, time and layer order.
+
+- A read reaches the draft once, by the service's change notice, which the
+  panel loop observes explicitly (`followService`, D-L61), or by the
+  operation that made it (`readAndFollow`), whichever comes first; the
+  session keeps the read it last followed. A read that fails leaves the draft
+  stale, and one the keyboard moved under counts toward the live watch's
+  retries. `draft-follow.js` owns all three: the read followed, the draft
+  waiting for a read, and the retries.
 
 - The draft is bound to the device and `connectionToken` it was read over. An
   untouched draft follows the keyboard. One with edits stays, marked stale,
@@ -240,9 +248,12 @@ splice against them.
 vouches for it (same session and revision, same saved and current
 fingerprints), also over a new connection, or when it shows exactly the edit
 Ark sent last (below). Anything else starts again from
-the keyboard and says why: a new session is a restart, after which unsaved
-edits are gone or were saved first (`restartedWithUnsaved`); a moved revision
-is `changedElsewhere`. `follow` keeps the draft on the same keyboard listed
+the keyboard and says why, as what `observe` returns: a new session is a
+restart, after which unsaved edits are gone or were saved first
+(`restarted`); a moved revision is `changedElsewhere`. That news waits with
+the draft until a read that says it takes it (`takeNews`, `draft-follow.js`):
+Read keyboard says both, and the read after a refused or lost live edit says
+a change made elsewhere. `follow` keeps the draft on the same keyboard listed
 under a new device id after a rename, by its session.
 
 ### A live edit

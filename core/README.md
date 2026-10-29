@@ -22,7 +22,8 @@ running unsaved live edits; that read also keeps the working copy's exact
 bytes, which live edits splice against.
 
 **Editing.** The snapshot seeds `ProfileDraftSession`
-(`session/profile-draft-session.js`): one complete document with its history.
+(`session/profile-draft-session.js`): one complete document with its history,
+which follows each later read (`session/draft-follow.js`).
 `session/panel-session.js` routes each message the panel posts; an edit
 reaches `stage()`, which finds its editor through `model/draft-edits.js` and
 rewrites one domain. Review (`model/profile-review.js`) and the checks
