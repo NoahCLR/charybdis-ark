@@ -172,19 +172,32 @@ export interface LayerEffect {
 export interface LayerEffectSource {layer?: number; layoutIndex?: number; code?: number; combo?: number; trackball?: boolean}
 export interface OfferedLayerEffect extends LayerEffect {how: string; note?: string; from: LayerEffectSource}
 export type WalkLayerEffect = OfferedLayerEffect | {kind: 'release'; layer: number; layers?: number; from?: undefined; how?: undefined};
-export interface BoundedLayerWalk {
+/** The bounded walk's explicit states: a state is its locks with the held layers above them. */
+export interface LayerStateGraph {
     complete: boolean;
     cache: Map<number, OfferedLayerEffect[]>;
     edges: Map<number, {to: number; effect: WalkLayerEffect}[]>;
     parent: Map<number, {from: number; effect: WalkLayerEffect} | null>;
     home: Set<number>;
-    symbolic?: false;
-    reachabilityComplete?: undefined;
-    reachedLayers?: undefined;
-    effects?: undefined;
-    reachableCombos?: undefined;
-    affectedLayers?: undefined;
-    uncertainty?: {affectedLayers: number};
+}
+/** A set of locks with no way back to Base, the lock that gets into it and the steps from rest. */
+export interface LayerTrap {locks: number; effect: WalkLayerEffect; path: WalkLayerEffect[]}
+/** What the walk over a profile's layer states found, whichever walk ran (layer-walk.js). */
+export interface LayerWalk {
+    /** Which layers and combos can be reached is established; the reach findings rest on it. */
+    reachabilityComplete: boolean;
+    /** Whether every set of locks has a way back to Base is established; `traps` are then every one there is, up to the named few. */
+    escapeComplete: boolean;
+    /** The layers an unfinished check involves, none once both are established. */
+    affectedLayers: number;
+    reachedLayers: number;
+    /** The combos that can fire; meaningful only once reachability is established. */
+    reachableCombos: Set<number>;
+    /** What reachable states offer the layers, each with where it comes from. */
+    effects: OfferedLayerEffect[];
+    /** The smallest traps, at most MAX_TRAPS, and how many smallest traps there are. */
+    traps: LayerTrap[];
+    trapCount: number;
 }
 
 /** Reviews retain semantic targets until the panel model resolves key names. */

@@ -85,8 +85,8 @@ profile, so Review says so before Apply (D-L36).
 
 `layerReach` (`core/model/layer-reach.js`) models a state as locked layers
 plus layers held on top; what each key does to the layers is
-`core/model/layer-effects.js`, and the walk over the states
-`core/model/layer-walk.js`. Each key resolves as the firmware does: the highest
+`core/model/layer-effects.js`, and the walk over the states `walkLayers`
+(`core/model/layer-walk.js`). Each key resolves as the firmware does: the highest
 active layer that is not transparent answers. A key moves the state by:
 
 - its own layer action, less what its row replaces (a row with steps drops
@@ -148,8 +148,8 @@ trap no person could fall into. Holding is not limited by fingers, and a
 one-shot counts as a hold. So the walk finds every way out a person could, and
 elsewhere never invents a trap.
 
-`compactWalk` (`layer-walk.js`) compiles keys and combos into conditions on
-active layers. `analyzeLayerStates` (`layer-state-graph.js`) explores them as
+`walkLayers` first compiles keys and combos into conditions on active
+layers. `analyzeLayerStates` (`layer-state-graph.js`) explores them as
 shared Boolean decisions, so independent layers do not multiply into separate
 states.
 
@@ -159,11 +159,17 @@ states.
   are checked together.
 - Review names up to four smallest trapping combinations, each with an entry
   path and a fix, and counts the rest.
-- When the budget runs out before reachability is proved, `boundedWalk`
-  enumerates up to 4,096 states and 65,536 edges.
+- When the budget runs out before reachability is proved, the walk
+  enumerates up to 4,096 states and 65,536 edges instead, and names its
+  smallest traps the same way.
 - A check that still cannot finish is a `reachabilityIncomplete` warning
   naming the layers involved. When only escape is unproved, the reachability
   findings stand. Nothing is marked fixed where the check stayed uncertain.
+
+Either way `walkLayers` gives one answer: whether reachability and escape
+were established, the layers left unsettled, the layers and combos reached,
+what reachable states offer, and the smallest traps with their count.
+`layerReach` only words it as findings.
 
 Besides traps, the walk reports unreachable layers and combos, layer keys left
 to QMK, and layer keys that do nothing (`findings` in `layer-reach.js`).
@@ -178,9 +184,10 @@ escape.
 
 Held by `tests/model/layer-reach.test.js` ("compiled source and declared-owner
 conditions agree with an exhaustive profile oracle"),
-`tests/model/layer-walk.test.js` ("the compact walk and the bounded walk reach
-the same layers") and `tests/model/layer-state-graph.test.js` ("compact
-analysis agrees with exhaustive enumeration on seeded interacting graphs").
+`tests/model/layer-walk.test.js` ("both walks find the same smallest traps, the
+lock that gets into each and the steps from rest") and
+`tests/model/layer-state-graph.test.js` ("compact analysis agrees with
+exhaustive enumeration on seeded interacting graphs").
 
 ## Built-in branches
 
