@@ -69,7 +69,7 @@ function profileContracts(document: PortableDocument, snapshot: CompleteSnapshot
     // @ts-expect-error Layout edits use Layer n references rather than bare indices.
     draft.stage({type: 'updateLayoutKeys', layer: 0, changes: [], draftRevision: draft.revision});
     // @ts-expect-error Profile-domain edits cannot write the separate macro bank.
-    editDeviceProfile(Buffer.alloc(32), {type: 'updateMacro', keycode: 'MACRO_0', payload: 'hello'});
+    editDeviceProfile(document, {type: 'updateMacro', keycode: 'MACRO_0', payload: 'hello'});
     const validated = validateSnapshot(document);
     const same: PortableDocument = decodedOf({document, decoded: validated}).document;
     const reader = new ProfilePayloadReader(connection);

@@ -64,7 +64,9 @@ Around the core:
   `core/model/settings-editor.js`, which names it through `SETTING`.
 - Anything holding state across a connection: `core/session/`. What a panel
   control does, in order, is `core/session/panel-controls.js`.
-- Documents, completeness and layer-reference rewrites: `core/model/`.
+- Documents, completeness and layer-reference rewrites: `core/model/`. A
+  change to a document's domains goes through `editProfileDomains`
+  (`core/model/portable-profile.js`), never a decode and encode of its own.
 - The words for a value the keyboard stores: `core/model/vocabulary.js`,
   posted as `model.vocabulary` and read through `webview/view/vocabulary.mjs`.
 - A draft edit type: one entry in `core/model/draft-edits.js`, its payload in

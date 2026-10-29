@@ -71,10 +71,10 @@ test("a profile the keyboard stores that does not read is said as its answer, ne
 
 test("a stored profile whose macros do not decode is the keyboard's answer, never a backup's", () => {
     const {createSnapshot} = require("../../core/model/portable-profile");
-    const {replaceDomain, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
+    const {withPayload} = require("../fixtures/profile-document");
     const stored = Buffer.from(document().profile, "base64");
     // A macro domain of one zero byte: a blob that reads, a domain that does not.
-    const profile = replaceDomain(stored, PROFILE_DOMAIN_IDS.MACROS, () => Buffer.alloc(1));
+    const profile = withPayload(stored, "macros", () => Buffer.alloc(1));
     assert.throws(() => createSnapshot({profile, actionAbiDigest: document().actionAbiDigest}),
         (error) => failureSentence(error) === FAILURE_WORDS.unreadable && !/this file/.test(failureSentence(error)));
 });

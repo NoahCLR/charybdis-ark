@@ -219,7 +219,7 @@ here: its home and tests are in
 | Edit modes: their words and the order the switch offers them ([more](#edit-modes)) | `core/model/vocabulary.js`, `core/session/panel-session.js` | `tests/model/vocabulary.test.js`, `tests/protocol/profile-edit-v1.test.js`, `tests/session/live-watch.test.js`, `tests/view/edit-mode.test.mjs`, `tests/view/enum-drift.test.mjs`, `browser-tests/live-edits.spec.js` |
 | Actions, native keycodes, decode limits, layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
 | Custom-key shortcut keys (firmware D-F26): which keys a shortcut holds, and the caps on them ([more](#custom-key-shortcut-keys)) | `core/schema/settings-domain-v1.js` (`SHORTCUT_KEY_CAPS`, `shortcutKeysRefusal`), `core/model/custom-key-editor.js` | `tests/schema/settings-domain-v1.test.js`, `tests/model/custom-key-editor.test.js`, `tests/view/custom-key.test.mjs`, `browser-tests/custom-key-shortcut.spec.js` |
-| Decoding once: a snapshot's decoded form, and draft history entries ([more](#decoding-once)) | `core/model/portable-profile.js`, `core/session/profile-draft-session.js` | `tests/session/profile-draft-session.test.js` |
+| Decoding once: a snapshot's decoded form, draft history entries, and a document's domains as an edit changes them ([more](#decoding-once)) | `core/model/portable-profile.js`, `core/session/profile-draft-session.js` | `tests/session/profile-draft-session.test.js`, `tests/model/portable-profile.test.js` |
 | Pure edits and presentation; the model imports no session or protocol module | `core/model/device-profile-edits.js`, `core/model/key-behavior-edits.js`, `core/model/device-profile-view.js` | `tests/model/device-profile-edits.test.js`, `tests/layering.test.js` |
 | Layer answers: which stack slots answer each position under which active layers ([more](#layer-answers)) | `core/model/layer-resolution.js` compiles and publishes each position's answers; `rules/layer-answers.mjs` says which one answers under the layers that are on | `tests/model/layer-resolution.test.js`, `tests/rules/layer-answers.test.mjs`, `tests/view/layer-resolution.test.mjs` |
 | Combo inputs: which keys press a combo's inputs (by the input positions the keyboard reports, otherwise by keycode or what the key means) and whether they cover every input, so its chord forms (D-L73) | `rules/combo-inputs.mjs`, read by `core/model/combo-reach.js` (`comboReach`) and `webview/view/combo-reach.mjs` (the view of the layers turned on, and which key is a combo's input number n) | `tests/rules/combo-inputs.test.mjs`, `tests/model/combo-reach.test.js`, `tests/view/combo-reach.test.mjs` |
@@ -291,6 +291,18 @@ message) is the codec's words too (`shortcutStoreRefusal`,
 A snapshot's `decoded` form is taken with `decodedOf`
 (`core/model/portable-profile.js`), which decodes afresh only when the
 document changed; draft history entries are frozen and decoded once each.
+
+A document's domains change one way: `editProfileDomains`
+(`core/model/portable-profile.js`). Its change opens each domain it edits,
+decoded once with the document's codec options (the keyboard's tap depth,
+or the one the document's RGB palette counts; its brightness limit; its
+action slots); only opened domains are encoded again, every other keeps its
+bytes. A result too large for the keyboard is one refusal, `PROFILE_FULL`, in
+`PROFILE_FULL_WORDS` (by the count it went past, otherwise the profile as a
+whole, or a name's words for a name's edit), and the document it makes is
+validated like any other. `readProfileDomains` opens a document's domains
+the same way, to read only: Discard copies from it
+(`tests/model/portable-profile.test.js`).
 
 ### Layer answers
 

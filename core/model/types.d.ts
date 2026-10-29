@@ -31,6 +31,13 @@ export interface ProfileDestination extends Partial<ActionLimits> {
     detectedHostOs?: number;
 }
 
+/** What a document's domains are read and written against: the keyboard's capabilities and limits, when it has them. */
+export interface DomainsContext {
+    capabilities?: ProfileDestination;
+    limits?: SnapshotFacts['limits'];
+}
+/** A document's domain, opened as its model; the same model each time it is opened. */
+export type OpenDomain = <K extends import('../schema/profile-domains-types.js').DomainKey>(key: K) => import('../schema/profile-domains-types.js').DomainModels[K];
 export interface DecodedProfile {
     document: PortableDocument;
     profile: Buffer;

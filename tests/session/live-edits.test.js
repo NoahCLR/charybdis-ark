@@ -227,7 +227,7 @@ test("a stale edit (another client, a key adjustment) is not sent, and the keybo
     const {keyboard, shell, session, key} = await open(t);
     const other = Buffer.from(document().profile, "base64");
     const changed = validateSnapshot(document()).layers; changed[2][0] = 0x04;
-    keyboard.externalEdit(require("../../core/schema/profile-domains").replaceDomain(other, 0x60, () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
+    keyboard.externalEdit(require("../fixtures/profile-document").withPayload(other, "keymap", () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
     await key(0, 5, "KC_W");
     assert.match(lastMessage(shell).notice, /^Not sent: the keyboard changed by itself/);
     assert.deepEqual(shell.errors, [], "no failure is raised");
@@ -564,7 +564,7 @@ test("a working copy changed without Ark is said, and the draft starts again fro
     const {keyboard, session, key, loop, shell} = await open(t);
     await key(0, 14, "KC_F");
     const edited = validateSnapshot({...document(), profile: keyboard.working.toString("base64")}).layers; edited[3][3] = 0x04;
-    keyboard.externalEdit(require("../../core/schema/profile-domains").replaceDomain(keyboard.working, 0x60, () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(edited)));
+    keyboard.externalEdit(require("../fixtures/profile-document").withPayload(keyboard.working, "keymap", () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(edited)));
     await loop.handleMessage({type: "refresh"});
     assert.match(lastMessage(shell).notice, /not what Ark last saw/);
     assert.equal(session.draft.history.length, 1);
@@ -709,7 +709,7 @@ test("Send live keeps the original Review and save draft when a stale send also 
         if (!raced && report[0] === 0x07 && report[2] === 0x20) {
             raced = true;
             const changed = validateSnapshot(document()).layers; changed[2][0] = 0x04;
-            keyboard.externalEdit(require("../../core/schema/profile-domains").replaceDomain(keyboard.saved, 0x60, () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
+            keyboard.externalEdit(require("../fixtures/profile-document").withPayload(keyboard.saved, "keymap", () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
         }
         return answer(report);
     };

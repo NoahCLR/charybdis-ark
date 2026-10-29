@@ -16,7 +16,7 @@ const {FAILURE_WORDS, PHASE} = require("../../core/model/vocabulary");
 const {STARTING, STARTING_WORDS} = require("../../core/session/keyboard-starting");
 const {PROFILE_ACTIVE_KIND, ProfileWireProtocolError} = require("../../core/protocol/profile-wire-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const {replaceDomain} = require("../../core/schema/profile-domains");
+const {withPayload} = require("../fixtures/profile-document");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 
 /** @param {import("node:test").TestContext} t @param {{mode?: number, recoveryFails?: boolean, comesBack?: boolean, boot?: Parameters<ReturnType<typeof booting>["boot"]>[0], newId?: boolean, serial?: boolean}} [options] */
@@ -301,7 +301,7 @@ test("under a Review and save draft, a keyboard changed across the restart leave
     const layers = validateSnapshot(document()).layers; layers[3][2] = 0x06;
     const restarted = keyboard.restarting.onRestart;
     keyboard.restarting.onRestart = () => {
-        keyboard.externalEdit(replaceDomain(keyboard.saved, 0x60, () => encodeKeymapDomain(layers)));
+        keyboard.externalEdit(withPayload(keyboard.saved, "keymap", () => encodeKeymapDomain(layers)));
         keyboard.autoSave();
         restarted?.();
     };

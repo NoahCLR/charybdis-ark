@@ -1,6 +1,5 @@
 // @ts-check
 "use strict";
-const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 
 // The 128 custom keys. A key has an identity (CUSTOM_KEY_n, keycode
 // 0x7f00 + n), a name and a shortcut: modifiers from either side, up to six
@@ -11,9 +10,9 @@ const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains")
 // works on top of it. Without either, the key does nothing. A behaviour step on
 // another key that sends a custom key sends only its shortcut.
 
-const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
+const {NAME_DOES_NOT_FIT, decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
 const {shortcutLayerTargets, shortcutRefusal} = require("./shortcut-layers");
 const keycodes = require("../data/keycode-catalog");
@@ -84,11 +83,11 @@ function editCustomKey(snapshot, message, capabilities) {
     }
     const was = value.settings.customKeyShortcuts[slot], now = settings.customKeyShortcuts[slot];
     if (settings.customKeyNames[slot] === value.settings.customKeyNames[slot] && shortcutIdentity(now) === shortcutIdentity(was)) return value.document;
-    /** @type {import("./types.js").PortableDocument} */
-    const document = JSON.parse(JSON.stringify(value.document));
-    document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
-    validateSnapshot(document, capabilities);
-    return document;
+    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: NAME_DOES_NOT_FIT}, open => {
+        const stored = open("settings");
+        stored.customKeyNames[slot] = settings.customKeyNames[slot];
+        stored.customKeyShortcuts[slot] = settings.customKeyShortcuts[slot];
+    });
 }
 
 module.exports = {customKeyEditorView, editCustomKey};

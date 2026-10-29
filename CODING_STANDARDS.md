@@ -49,6 +49,9 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 
 - Decode once. Take a snapshot's decoded form with `decodedOf(snapshot)`
   (`core/model/portable-profile.js`); a draft history entry is decoded once.
+  Change a document's domains with `editProfileDomains` and read another
+  document's with `readProfileDomains`, beside it: they hold the codec
+  options and the full-profile refusal.
 - Decode defensively: everything from a keyboard or a file is untrusted.
   Check lengths, refuse noncanonical bytes and fail with a stable `code`, never
   a guess.

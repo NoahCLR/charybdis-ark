@@ -310,10 +310,10 @@ test("the macro domain can use its full advertised capacity without an extra VIA
 });
 
 test("unused macro tails survive names and layer edits, while stream edits reclaim their shared space", () => {
-    const {replaceDomain} = require("../../core/schema/profile-domains");
+    const {withPayload} = require("../fixtures/profile-document");
     const {reorderLayers} = require("../../core/model/portable-profile");
     const source = pdDocument();
-    source.profile = replaceDomain(Buffer.from(source.profile, "base64"), 112, payload => Buffer.concat([payload, Buffer.alloc(99, 65), Buffer.from([0])])).toString("base64");
+    source.profile = withPayload(Buffer.from(source.profile, "base64"), "macros", payload => Buffer.concat([payload, Buffer.alloc(99, 65), Buffer.from([0])])).toString("base64");
     const current = snapshot(source), bytes = Buffer.from(source.profile, "base64");
     const caps = {...CURRENT_CAPABILITIES, macroBytes: 34903, maxProfilePayload: bytes.length};
     assert.equal(profileMacroBudget(validateSnapshot(source), caps).free, 100);

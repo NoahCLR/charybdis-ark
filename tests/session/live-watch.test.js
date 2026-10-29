@@ -9,7 +9,7 @@ const {lastMessage, lastModel, openLoop} = require("../fixtures/panel-loop");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const {replaceDomain} = require("../../core/schema/profile-domains");
+const {withPayload} = require("../fixtures/profile-document");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
 
@@ -58,7 +58,7 @@ test("Save is not Live edit's: it is refused until the keyboard's own save fails
 test("an adjustment key's edit is read as news, not as a failure", async t => {
     const {keyboard, shell, session, look} = await open(t);
     const changed = validateSnapshot(document()).layers; changed[3][1] = 0x05;
-    keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(Buffer.from(document().profile, "base64"), "keymap", () => encodeKeymapDomain(changed)));
     assert.equal(await look(), true);
     assert.match(lastMessage(shell).notice, /changed by itself/);
     assert.deepEqual(shell.errors, []);
@@ -130,7 +130,7 @@ test("under a Review and save draft, a key adjustment the keyboard saved is read
     assert.equal(session.draft.live, null);
     assert.equal(await look(), false, "the first look only notes where the keyboard is");
     const changed = validateSnapshot(document()).layers; changed[3][2] = 0x06;
-    keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(Buffer.from(document().profile, "base64"), "keymap", () => encodeKeymapDomain(changed)));
     assert.equal(await look(), false, "unsaved: the keyboard saves it after its quiet moment");
     keyboard.autoSave();
     assert.equal(await look(), true);
@@ -142,7 +142,7 @@ test("under a Review and save draft, a key adjustment the keyboard saved is read
     // Revert could settle it), and returns to Review and save once the
     // keyboard saved it.
     changed[3][2] = 0x07;
-    keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(Buffer.from(document().profile, "base64"), "keymap", () => encodeKeymapDomain(changed)));
     await session.service.readKeyboardProfile();
     require("../../core/session/panel-session").observePortable(session, require("../../core/session/demo-session").panelState(session));
     assert.ok(session.draft.live);
@@ -200,7 +200,7 @@ for (const flag of ["stopped", "slaveStopped"]) test(`under a Review and save dr
 test("an automatic save racing a reread is read again at once, and the draft synchronizes", async t => {
     const {keyboard, session, look} = await open(t);
     const changed = validateSnapshot(document()).layers; changed[3][1] = 0x05;
-    keyboard.externalEdit(replaceDomain(keyboard.saved, 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(keyboard.saved, "keymap", () => encodeKeymapDomain(changed)));
     const answer = keyboard.answer;
     let raced = false;
     keyboard.answer = report => {
@@ -254,7 +254,7 @@ for (const dirty of [false, true]) test(`the first look under a Review and save 
     if (dirty) await key(0, 11, "KC_R");
     const kept = session.draft.current.document.profile;
     const changed = validateSnapshot(document()).layers; changed[3][2] = 0x06;
-    keyboard.externalEdit(replaceDomain(keyboard.saved, 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(keyboard.saved, "keymap", () => encodeKeymapDomain(changed)));
     keyboard.autoSave();
     assert.equal(await look(), true, "compare the very first status to the successful snapshot");
     if (dirty) {

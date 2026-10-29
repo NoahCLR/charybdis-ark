@@ -96,12 +96,6 @@ test("wrong keys, stale drafts, long names and older firmware are refused", () =
     assert.equal(editCustomKey(current, {...message, name: ""}, capabilities), validateSnapshot(current.document, capabilities).document, "an unchanged name is no edit");
 });
 
-test("a name that meets the profile's ceiling says the profile is full", () => {
-    const {encodeNamedProfile} = require("../../core/model/portable-profile");
-    assert.throws(() => encodeNamedProfile({schema: {major: 4, minor: 3}, domains: [{id: 0x40, version: 11, payload: Buffer.alloc(130048)}]}),
-        error => error.code === "PROFILE_FULL" && /profile is full/.test(error.message));
-});
-
 test("a shortcut is staged, reviewed beside the name, discarded alone and named in the host's words", () => {
     const before = snapshot(pdDocument());
     const message = {keycode: "CUSTOM_KEY_2", shortcut: {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}, expectedFingerprint: before.fingerprint};

@@ -669,18 +669,3 @@ test("an edit past a count the keyboard caps is refused in words, by that count,
         index => ({type: "saveBehavior", behavior: {keycode: keys[index], steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_X"}}]}}), keys.length);
     assert.equal(failureSentence(behaviours), PROFILE_FULL_WORDS.counts.behaviours(rows + 2));
 });
-
-test("an edit past the profile as a whole says the profile is full, and any other refusal is left as it is", () => {
-    const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
-    const {draft} = fixture();
-    const edit = {type: "saveRgbReusableLedGroup", group: {ledIndices: [0]}, draftRevision: draft.revision};
-    // As the profile blob refuses one too large, naming no count of its own.
-    draft.proposed = () => {throw Object.assign(new Error("Profile blob is 70000 bytes; maximum is 65535."), {code: "CAPACITY_EXCEEDED"});};
-    assert.throws(() => draft.propose(edit), error => error.code === "PROFILE_FULL" && failureSentence(error) === PROFILE_FULL_WORDS.profile);
-    // A count the words do not know is the profile as a whole, too.
-    draft.proposed = () => {throw Object.assign(new Error("Some table is full."), {code: "CAPACITY_EXCEEDED", limit: "constructor", most: 1});};
-    assert.throws(() => draft.propose(edit), error => failureSentence(error) === PROFILE_FULL_WORDS.profile);
-    const conflict = Object.assign(new Error("Read the keyboard before editing."), {code: "PROFILE_DRAFT_CONFLICT"});
-    draft.proposed = () => {throw conflict;};
-    assert.throws(() => draft.propose(edit), error => error === conflict);
-});

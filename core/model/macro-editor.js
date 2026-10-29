@@ -1,10 +1,10 @@
 // @ts-check
 "use strict";
-const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
+const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 
-const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
+const {NAME_DOES_NOT_FIT, decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
-const {SETTINGS, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, macroProtectionOf} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
@@ -97,33 +97,29 @@ function editMacro(snapshot, message, capabilities) {
     const index = macroIndex(message.keycode);
     if (message.payload === undefined && message.name === undefined && message.protection === undefined) throw fail("Send the macro's steps, its name or its playback protection.");
     const value = validateSnapshot(snapshot.document, capabilities);
-    /** @type {import("./types.js").PortableDocument} */
-    const document = JSON.parse(JSON.stringify(value.document));
-    const slots = value.macroSlots.map(bytes => Buffer.from(bytes));
-    if (message.payload !== undefined) {
-        const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
-        const status = macroInputStatus(snapshot, message, capabilities);
-        if (status.error) throw fail(status.error, status.code);
-        const protection = message.protection ?? macroProtectionOf(slots[index]);
-        const bytes = encodeMacroPayload(message.payload, {textEntry: Boolean(host.unicodeMode), layout: host.layout, protection});
-        slots[index] = bytes;
-    }
-    if (message.protection !== undefined && message.payload === undefined) {
-        const bytes = slots[index];
-        const previous = macroProtectionOf(bytes);
-        const prefix = encodeMacroPayload("", {protection: message.protection});
-        slots[index] = Buffer.concat([prefix, bytes.subarray(previous === "auto" ? 0 : 3)]);
-    }
-    if (message.name !== undefined && message.name !== value.settings.macroNames[index]) {
-        if (typeof message.name !== "string") throw fail("A macro name must be text.");
-        if (!validName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "MACRO_NAME_INVALID");
-        const settings = structuredClone(value.settings);
-        settings.macroNames[index] = message.name.trim();
-        document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
-    }
-    if (message.payload !== undefined || message.protection !== undefined) document.profile = replaceDomain(Buffer.from(document.profile, "base64"), PROFILE_DOMAIN_IDS.MACROS, () => require("../schema/macro-domain-v1").encodeMacroDomain(slots)).toString("base64");
-    validateSnapshot(document, capabilities);
-    return document;
+    const renaming = message.name !== undefined && message.name !== value.settings.macroNames[index];
+    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: renaming ? NAME_DOES_NOT_FIT : undefined}, open => {
+        if (message.payload !== undefined) {
+            const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
+            const status = macroInputStatus(snapshot, message, capabilities);
+            if (status.error) throw fail(status.error, status.code);
+            const slots = open("macros");
+            const protection = message.protection ?? macroProtectionOf(slots[index]);
+            slots[index] = encodeMacroPayload(message.payload, {textEntry: Boolean(host.unicodeMode), layout: host.layout, protection});
+        }
+        if (message.protection !== undefined && message.payload === undefined) {
+            const slots = open("macros");
+            const bytes = slots[index];
+            const previous = macroProtectionOf(bytes);
+            const prefix = encodeMacroPayload("", {protection: message.protection});
+            slots[index] = Buffer.concat([prefix, bytes.subarray(previous === "auto" ? 0 : 3)]);
+        }
+        if (renaming) {
+            if (typeof message.name !== "string") throw fail("A macro name must be text.");
+            if (!validName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "MACRO_NAME_INVALID");
+            open("settings").macroNames[index] = message.name.trim();
+        }
+    });
 }
 
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [capabilities] */

@@ -91,9 +91,9 @@ test("a key changed to a layer key carries that layer's mark, and one changed to
 test("a key's participation is named where the key sits, as its layout change is", () => {
     const {editDeviceProfile}=require("../../core/model/device-profile-edits");
     const {matrixPosition}=require("../../core/data/charybdis-layout");
-    const before=snapshot(document()), after=structuredClone(before.document);
-    editLayers(after, layers => layers[0][matrixPosition(7)]=0x05); // KC_B
-    after.profile=editDeviceProfile(Buffer.from(after.profile,"base64"),{type:"updatePlacementPolicy",layer:0,layoutIndex:7,useBehavior:false,joinCombos:true}).toString("base64");
+    const before=snapshot(document()), keyed=structuredClone(before.document);
+    editLayers(keyed, layers => layers[0][matrixPosition(7)]=0x05); // KC_B
+    const after=editDeviceProfile(keyed,{type:"updatePlacementPolicy",layer:0,layoutIndex:7,useBehavior:false,joinCombos:true});
     const rows=profileReview(before,snapshot(after));
     const key=rows.find(row=>row.unit.startsWith("layout:")), placement=rows.find(row=>row.unit.startsWith("placement:"));
     assert.equal(key.title,"Base · Right · row 1, column 5");

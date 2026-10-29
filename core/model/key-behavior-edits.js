@@ -5,13 +5,11 @@ const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 const {nativeCode} = require("../schema/actions");
 const keycodes = require("../schema/keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression} = require("../schema/compiled-profile-v1");
 const {actionName, isOwnedLayerCode, knownActionAbi, momentaryCall} = require("../schema/actions");
-const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
 const {LAYERS} = require("../data/charybdis-layout");
 const {behaviorPlacementProblem} = require("./profile-placement");
-const {profileDepthOptions} = require("../schema/profile-depth");
 const {VOCABULARY} = require("./vocabulary");
 
 /**
@@ -41,12 +39,12 @@ function integer(value, max, label, optional = false) {
 /** @param {import("../../contracts/edits.js").TimingTerm} term */
 const timingName = (term) => VOCABULARY.thresholdNames[term].charAt(0).toUpperCase() + VOCABULARY.thresholdNames[term].slice(1);
 
-/** @param {Buffer} payload @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
-function editKeyBehaviors(payload, message, capabilities = {}) {
+// One behaviour edit, made in place on the opened behaviours domain
+// (portable-profile.js editProfileDomains encodes it).
+/** @param {{rows: Row[]}} behaviors @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
+function editKeyBehaviors(behaviors, message, capabilities = {}) {
     if (!((capabilities.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS)) throw invalid("This firmware does not support saving key behaviours.");
-    const maxPdModes = POINTING_SLOT_COUNT;
-    /** @type {{rows: Row[]}} */
-    const {rows} = decodeKeyBehaviorDomain(payload, profileDepthOptions(capabilities).behaviors);
+    const {rows} = behaviors;
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest ?? 0);
     /** @param {Action} action */
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
@@ -57,16 +55,10 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     // The keyboard refuses a profile whose actions sit where it cannot run
     // them, so every row is checked, not only the one being edited.
     const layerCount = capabilities.compiledLayerCount ?? LAYERS;
-    /** @param {Row[]} rows */
-    const checkPlacements = (rows) => {
+    const checkPlacements = () => {
         const problem = behaviorPlacementProblem(rows, {layerCount});
         if (problem) throw invalid(problem);
     };
-    /** @param {Row[]} rows */
-    const encode = (rows) => checkPlacements(rows) ?? encodeKeyBehaviorDomain({rows}, {
-        limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
-        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxMacroSlots: capabilities.macroSlots, maxCustomKeys: capabilities.customKeySlots},
-    });
     /** @param {unknown} value @param {Action} [previous] @returns {Action} */
     const action = (value, previous) => {
         const name = String(value ?? "").trim();
@@ -127,7 +119,8 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         } else {
             rows[from.index] = {...rows[from.index], target: to.target};
         }
-        return encode(rows);
+        checkPlacements();
+        return;
     }
 
     /** @type {BehaviorInput} */
@@ -194,7 +187,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         if (previous) rows[index] = row;
         else rows.push(row);
     }
-    return encode(rows);
+    checkPlacements();
 }
 
 // Whether a behaviour saved for this key finds a row already there, found as

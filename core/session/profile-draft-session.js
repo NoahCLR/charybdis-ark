@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const {validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
+const {editProfileDomains, validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
 const {layerOrderReview, profileReview} = require("../model/profile-review");
 const {compose, inverse, isIdentity, layerUnit, rearranged} = require("../model/layer-order");
 const {layerName: layerCalled} = require("../model/vocabulary");
@@ -22,7 +22,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, LAYER_IDENTITY, matrixPosition} = re
 const keycodes = require("../schema/keycodes");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {liveKeyboardStatus} = require("./live-profile-session");
-const {LIVE_RESULT_WORDS, PROFILE_FULL_WORDS, quietWords} = require("../model/vocabulary");
+const {LIVE_RESULT_WORDS, quietWords} = require("../model/vocabulary");
 
 // What the panel shows of the keyboard's own saving and its halves.
 /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
@@ -56,18 +56,6 @@ const freeze = value => {
 };
 /** @param {string} text */
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
-// An edit a byte format refused as too large for the keyboard: the person's
-// edit, said in words (PROFILE_FULL_WORDS), by the count it went past where
-// the format names one (its `limit` and `most`), its own text kept
-// beneath for the diagnostics. Any other refusal is left as it is.
-/** @param {unknown} error */
-const fullProfile = error => {
-    const details = /** @type {{code?: unknown, limit?: unknown, most?: unknown} | null | undefined} */ (error);
-    if (details?.code !== "CAPACITY_EXCEEDED") return error;
-    const counted = typeof details.limit === "string" && typeof details.most === "number" && Object.hasOwn(PROFILE_FULL_WORDS.counts, details.limit)
-        ? PROFILE_FULL_WORDS.counts[details.limit](details.most) : undefined;
-    return Object.assign(new Error(counted ?? PROFILE_FULL_WORDS.profile), {code: "PROFILE_FULL", cause: error});
-};
 /**
  * A document a live edit would leave the keyboard with, and how the history
  * takes it once the keyboard confirms it.
@@ -436,10 +424,6 @@ class ProfileDraftSession {
     // (live-edits.js).
     /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
     propose(message) {
-        try {return this.proposed(message);} catch (error) {throw fullProfile(error);}
-    }
-    /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
-    proposed(message) {
         this.assertRevision(message.draftRevision);
         const current = this.current, before = current.fingerprint;
         let document;
@@ -464,10 +448,7 @@ class ProfileDraftSession {
     editProfile(message, base) {
         const expected = "expectedBase" in message ? message.expectedBase : undefined;
         if (expected && (/** @type {const} */ (["source", "generation", "digest", "originHalf"])).some(key => expected[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
-        return {...base, profile: editDeviceProfile(Buffer.from(base.profile, "base64"), message, {
-            capabilities: this.capabilities,
-            combos: this.combos(), maximumBrightness: this.current.limits?.brightnessMax,
-        }).toString("base64")};
+        return editDeviceProfile(base, message, {capabilities: this.capabilities, limits: this.current.limits, combos: this.combos()});
     }
     // The edit a custom key made for a shortcut carries: a layout key, a
     // behaviour or a combo, staged on the document that already holds the key
@@ -494,18 +475,17 @@ class ProfileDraftSession {
     editLayout({layer: reference, changes}, base = this.document) {
         const layer = layerOfRef(reference);
         if (layer === undefined || !(layer < LAYERS) || !Array.isArray(changes)) throw fail("Choose a layer reported by this keyboard.");
-        const document = copy(base);
-        const layers = validateSnapshot(base).layers;
-        for (const change of changes) {
-            const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
-            const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
-            if (!position || code === undefined || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
-            const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
-            if (misplaced) throw fail(misplaced);
-            layers[layer][matrixPosition(change.layoutIndex)] = code;
-        }
-        document.profile = require("../schema/profile-domains").replaceDomain(Buffer.from(base.profile, "base64"), 0x60, () => require("../schema/keymap-domain-v1").encodeKeymapDomain(layers)).toString("base64");
-        return document;
+        return editProfileDomains(base, {capabilities: this.capabilities, limits: this.current.limits}, open => {
+            const layers = open("keymap");
+            for (const change of changes) {
+                const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
+                const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
+                if (!position || code === undefined || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
+                const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
+                if (misplaced) throw fail(misplaced);
+                layers[layer][matrixPosition(change.layoutIndex)] = code;
+            }
+        });
     }
     // The keyboard's profile rearranged into an order, with the order it
     // stands for; the keyboard's own profile, and no order, when the order

@@ -1,9 +1,9 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {bytes, capabilities} = require("../fixtures/device-profile");
+const {bytes, capabilities, deviceDocument} = require("../fixtures/device-profile");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const {decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
+const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 const {ACTION_ABI, actionName} = require("../../core/schema/actions");
 const {editDeviceProfile} = require("../../core/model/device-profile-edits");
@@ -16,7 +16,13 @@ const disabled = () => ({style: "", action: "", repeatHz: ""});
 const form = () => ({keycode: "KC_A", tapHoldTerm: "", longHoldTerm: "0", multiTapTerm: "250", keepsAutoMouseAnchored: true,
     steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "G(KC_N)"}, hold: disabled(), longHold: disabled()},
         {tapCount: 4, tap: disabled(), hold: {style: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: "25"}, longHold: disabled()}]});
-const edit = (message, caps = capabilities, input = payload) => editKeyBehaviors(input, message, caps);
+// One edit on the behaviours `input` holds, and the domain it leaves them as.
+const edit = (message, caps = capabilities, input = payload) => {
+    const behaviors = decodeKeyBehaviorDomain(input);
+    editKeyBehaviors(behaviors, message, caps);
+    return encodeKeyBehaviorDomain(behaviors);
+};
+const payloads = document => decodeProfileBlob(Buffer.from(document.profile, "base64")).domains;
 const rowFor = (input, name) => decodeKeyBehaviorDomain(input).rows.find(row => actionName(row.target) === name);
 
 test("every device behaviour survives the editor's sparse and disabled branches byte-for-byte", () => {
@@ -39,8 +45,9 @@ test("behaviour creation, edit and deletion preserve unrelated rows and profile 
     assert.deepEqual(rowFor(changed, "KC_A").steps, [], "timing-only rows are valid");
     const removed = edit({type: "deleteBehavior", keycode: "KC_A"}, capabilities, changed);
     assert.deepEqual(removed, payload);
-    const next = editDeviceProfile(bytes, {type: "saveBehavior", behavior: form()}, {capabilities});
-    assert.deepEqual(decodeProfileBlob(next).domains[0].payload, decodeProfileBlob(bytes).domains[0].payload);
+    const document = deviceDocument(), next = editDeviceProfile(document, {type: "saveBehavior", behavior: form()}, {capabilities});
+    assert.deepEqual(payloads(next).find(domain => domain.id === 0x20).payload, added);
+    assert.deepEqual(payloads(next).filter(domain => domain.id !== 0x20), payloads(document).filter(domain => domain.id !== 0x20));
     assert.deepEqual(decodeKeyBehaviorDomain(added).rows.filter(row => actionName(row.target) !== "KC_A"), original.rows);
 });
 
@@ -97,8 +104,11 @@ test("invalid edits and references are rejected before upload", () => {
     assert.throws(() => save({...form(), keepsAutoMouseAnchored: "false"}), /flag/);
     assert.throws(() => edit({type: "deleteBehavior", keycode: "KC_A"}), /no longer/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, supportedDomainMask: 1}), /firmware/);
-    assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxBehaviorRows: original.rowCount}), /row count/);
-    assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxPopulatedBehaviorSteps: original.populatedStepCount}), /step count/);
+    // The keyboard's counts are the domain's, refused as it is encoded, in
+    // the words the person reads.
+    const saveOn = (caps) => editDeviceProfile(deviceDocument(), {type: "saveBehavior", behavior: form()}, {capabilities: caps});
+    assert.throws(() => saveOn({...capabilities, maxBehaviorRows: original.rowCount}), {code: "PROFILE_FULL", message: `The keyboard holds at most ${original.rowCount} behaviours. Remove one before adding another.`});
+    assert.throws(() => saveOn({...capabilities, maxPopulatedBehaviorSteps: original.populatedStepCount}), /at most \d+ behaviour tap counts/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxTapStepsPerBehavior: 4}), /Tap branch index/);
 });
 
