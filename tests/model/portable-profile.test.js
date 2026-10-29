@@ -413,18 +413,18 @@ test("a document's domains are read and written with its keyboard's depth, brigh
 });
 
 test("a change past what the keyboard holds says the profile is full, by the count it went past, and any other refusal is left as it is", () => {
-    const {editProfileDomains, NAME_DOES_NOT_FIT} = require("../../core/model/portable-profile");
+    const {editProfileDomains} = require("../../core/model/portable-profile");
     const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
     const {PROFILE_BLOB_V1} = require("../../core/schema/profile-blob-v1");
     const source = document();
     const overflow = open => {open("macros")[0] = Buffer.alloc(PROFILE_BLOB_V1.MAX_SIZE, 0x41);};
     assert.throws(() => editProfileDomains(source, {}, overflow), error => error.code === "PROFILE_FULL" && failureSentence(error) === PROFILE_FULL_WORDS.profile && error.cause.code === "CAPACITY_EXCEEDED");
     // A name's edit says so in a name's words.
-    assert.throws(() => editProfileDomains(source, {full: NAME_DOES_NOT_FIT}, overflow), error => error.code === "PROFILE_FULL" && error.message === NAME_DOES_NOT_FIT);
+    assert.throws(() => editProfileDomains(source, {full: PROFILE_FULL_WORDS.name}, overflow), error => error.code === "PROFILE_FULL" && error.message === PROFILE_FULL_WORDS.name);
     // A count the format names is said by that count, whatever the edit.
     const rows = validateSnapshot(source).behaviors.rows.length;
     const more = open => {const {rows: all} = open("behaviors"); all.push({...all[0], target: {kind: 1, flags: 0, operand: 0x68}});};
-    assert.throws(() => editProfileDomains(source, {full: NAME_DOES_NOT_FIT, capabilities: {maxBehaviorRows: rows}}, more), error => failureSentence(error) === PROFILE_FULL_WORDS.counts.behaviours(rows));
+    assert.throws(() => editProfileDomains(source, {full: PROFILE_FULL_WORDS.name, capabilities: {maxBehaviorRows: rows}}, more), error => failureSentence(error) === PROFILE_FULL_WORDS.counts.behaviours(rows));
     // A count the words do not know is the profile as a whole.
     const unknown = Object.assign(new Error("Some table is full."), {code: "CAPACITY_EXCEEDED", limit: "constructor", most: 1});
     assert.throws(() => editProfileDomains(source, {}, () => {throw unknown;}), error => failureSentence(error) === PROFILE_FULL_WORDS.profile && error.cause === unknown);

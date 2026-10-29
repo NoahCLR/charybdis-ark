@@ -170,7 +170,9 @@ const SAVE_FAILURE_WORDS = Object.freeze({
 
 // What an edit says that would not fit (profile-draft-session.js propose):
 // a count the keyboard caps, by the usage table's name for it (usageCounts),
-// or the profile as a whole. Ark refuses it before the keyboard sees it, so
+// the profile as a whole, or a name: every name fits the settings domain, but
+// the whole profile shares one ceiling, so a long name can meet it once
+// behaviours, combos and other names have used the room. Ark refuses it before the keyboard sees it, so
 // nothing is lost and the person chooses what goes.
 const PROFILE_FULL_WORDS = Object.freeze({
     /** @type {Readonly<Record<string, (most: number) => string>>} */
@@ -181,6 +183,7 @@ const PROFILE_FULL_WORDS = Object.freeze({
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
     }),
     profile: "This change does not fit: the keyboard's profile is full. Remove an LED group, a behaviour, a combo or a macro first.",
+    name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
 });
 
 // What an Apply or a Save cut short says (core/session/interruption.js):

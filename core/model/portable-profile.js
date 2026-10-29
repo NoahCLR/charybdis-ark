@@ -222,11 +222,6 @@ function validateSnapshot(value, capabilities) {
     return {document: /** @type {PortableDocument} */ (candidate), profile, candidate: candidateBytes, layers, macroSlots: macros, settings, rgb, behaviors, combos, pdModes, codecOptions, danglingPointingKeys: Object.fromEntries(danglingPointingKeys)};
 }
 
-// What a renamed macro, custom key or keyboard is told when the profile has
-// no room for it. Every name fits the settings domain, but the whole profile
-// shares one ceiling, so a long name can meet it once behaviours, combos and
-// other names have used the room.
-const NAME_DOES_NOT_FIT = "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.";
 // An edit a byte format refused as too large for the keyboard: the person's
 // edit, said in words (PROFILE_FULL_WORDS), by the count it went past where
 // the format names one (its `limit` and `most`), otherwise as `full`, its own
@@ -376,7 +371,7 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     }
     // Reordering layers never rewrites macro streams or their allowed unused
     // tail: the macros are never opened.
-    return editProfileDomains(document, {full: NAME_DOES_NOT_FIT}, open => {
+    return editProfileDomains(document, {full: PROFILE_FULL_WORDS.name}, open => {
         const keymap = open("keymap");
         const layers = order.map(old => keymap[old].map(native));
         if (order[0] !== 0) {
@@ -444,4 +439,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, NAME_DOES_NOT_FIT, editProfileDomains, readProfileDomains, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, editProfileDomains, readProfileDomains, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

@@ -10,7 +10,8 @@
 // works on top of it. Without either, the key does nothing. A behaviour step on
 // another key that sends a custom key sends only its shortcut.
 
-const {NAME_DOES_NOT_FIT, decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {PROFILE_FULL_WORDS} = require("./vocabulary");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
@@ -83,7 +84,7 @@ function editCustomKey(snapshot, message, capabilities) {
     }
     const was = value.settings.customKeyShortcuts[slot], now = settings.customKeyShortcuts[slot];
     if (settings.customKeyNames[slot] === value.settings.customKeyNames[slot] && shortcutIdentity(now) === shortcutIdentity(was)) return value.document;
-    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: NAME_DOES_NOT_FIT}, open => {
+    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: PROFILE_FULL_WORDS.name}, open => {
         const stored = open("settings");
         stored.customKeyNames[slot] = settings.customKeyNames[slot];
         stored.customKeyShortcuts[slot] = settings.customKeyShortcuts[slot];

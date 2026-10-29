@@ -2,7 +2,7 @@
 "use strict";
 const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 
-const {NAME_DOES_NOT_FIT, decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {SETTINGS} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
@@ -10,7 +10,7 @@ const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, macroProtection
 const {hostSettings} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
 const {inspectMacroInput, inspectMacroPlayback, readStoredMacro} = require("./macro-input");
-const {VOCABULARY, macroDefaultName, word} = require("./vocabulary");
+const {PROFILE_FULL_WORDS, VOCABULARY, macroDefaultName, word} = require("./vocabulary");
 const {macroName, macroOfName} = require("../../rules/qmk-keycodes.mjs");
 /** @param {string} message @param {string} [code] */
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
@@ -98,7 +98,7 @@ function editMacro(snapshot, message, capabilities) {
     if (message.payload === undefined && message.name === undefined && message.protection === undefined) throw fail("Send the macro's steps, its name or its playback protection.");
     const value = validateSnapshot(snapshot.document, capabilities);
     const renaming = message.name !== undefined && message.name !== value.settings.macroNames[index];
-    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: renaming ? NAME_DOES_NOT_FIT : undefined}, open => {
+    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: renaming ? PROFILE_FULL_WORDS.name : undefined}, open => {
         if (message.payload !== undefined) {
             const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
             const status = macroInputStatus(snapshot, message, capabilities);

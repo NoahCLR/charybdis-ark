@@ -7,7 +7,8 @@
 // reviewed, applied and backed up like any other. Empty means the
 // firmware's built-in name; the keyboard then reports that as its product.
 
-const {NAME_DOES_NOT_FIT, decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {PROFILE_FULL_WORDS} = require("./vocabulary");
 const {SETTINGS} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
 
@@ -41,7 +42,7 @@ function editKeyboardName(snapshot, message, capabilities) {
     if (!validName(name)) throw fail(`A keyboard name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "KEYBOARD_NAME_INVALID");
     const value = validateSnapshot(snapshot.document, capabilities);
     if (name === value.settings.keyboardName) return value.document;
-    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: NAME_DOES_NOT_FIT}, open => {open("settings").keyboardName = name;});
+    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: PROFILE_FULL_WORDS.name}, open => {open("settings").keyboardName = name;});
 }
 
 module.exports = {storedKeyboardName, keyboardNameView, editKeyboardName};
