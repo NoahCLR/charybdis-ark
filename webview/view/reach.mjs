@@ -1,7 +1,8 @@
 // @ts-check
 // The reach machinery every Keymap tab shares: what a layer reaches by name,
 // grouped by route or in the view the board shows, the keys the board rings
-// for it, and the layers a macro or custom key is placed on.
+// for it, and the layers a macro or custom key is placed on. A tab reads it
+// through tabReach (tab-reach.mjs).
 import {behaviourFor, keyKindOf, keyMeaning} from "./keyface.mjs";
 import {downTheStack} from "./layer-resolution.mjs";
 import {layerView} from "./layer-view.mjs";
@@ -13,6 +14,7 @@ import {keyName} from "./keyvalues.mjs";
 /** @typedef {import("./keyface-types.js").ComboGroupEntry} ComboGroupEntry */
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
 /** @typedef {import("./keyface-types.js").ReachEntry} ReachEntry */
+/** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 /** @typedef {import("./keyface-types.js").BranchCell} BranchCell */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
 
@@ -34,7 +36,7 @@ export const reachText = ({named = [], sources = [], matched = []}, {names = tru
  * is what the board draws. A row On this view (`inView`) rings only the keys
  * of the layers on in that view.
  */
-/** @param {LayerView} view @param {Partial<Pick<ReachEntry, "keys" | "behaviours" | "combos">> | null | undefined} entry @param {boolean} [inView] */
+/** @param {LayerView} view @param {{keys?: ResolvedKey[], behaviours?: {keycode: string}[], combos?: {keys: ResolvedKey[]}[]} | null | undefined} entry @param {boolean} [inView] */
 export function reachKeys(view, entry, inView = false) {
     const indexes = new Set([...(entry?.keys || []), ...(entry?.combos || []).flatMap((route) => route.keys)]
         .map((key) => key.position.layoutIndex));
@@ -125,39 +127,28 @@ const namesOfKind = (model, kind) => (keycode) => {
 /** @param {ViewModel} model */
 export const macroNamesOf = (model) => namesOfKind(model, "macro");
 
-/**
- * The layers a macro is set off from, in stack order: every layer that holds a
- * way to it itself — a key naming it, a behaviour mapped there whose branch
- * sends it, or a combo firing from its keys that sends it, directly or through
- * a behaviour. Each route carries the group the Keymap tab lists it under, so a
- * screen can open that layer on the same row, and the keys the board rings.
- * What a layer only reaches under a transparent key is the lower layer's route,
- * listed for that layer, not repeated for every layer above it. `at` is the
- * layer's position in the stack, which is how a screen selects it.
- */
-/** @param {ViewModel} model @param {string} keycode */
-export const macroPlacements = (model, keycode) => placementsVia(macroReach, model, keycode);
-
-// Where a macro or a custom key is placed, by the Keymap tab that lists it.
-/** @param {ViewModel} model @param {"macros" | "customKeys"} tab @param {string} keycode */
-export const placementsOf = (model, tab, keycode) => (tab === "macros" ? macroPlacements : customKeyPlacements)(model, keycode);
-
 // The custom key a keycode is, if it is one.
 /** @param {ViewModel} model */
 export const customKeyNamesOf = (model) => namesOfKind(model, "customKey");
 
-// Where a custom key is placed, whatever it does: a key carrying it, a
-// behaviour branch sending it (which sends its shortcut, D-L63) or a combo
-// sending it.
-/** @param {ViewModel} model @param {string} keycode */
-export const customKeyPlacements = (model, keycode) => placementsVia(
-    (view) => reachGroups(view, customKeyNamesOf(view.model), [keycode]), model, keycode);
-
-/** @param {import("./keyface-types.js").ReachOf} reachOf @param {ViewModel} model @param {string} keycode */
-function placementsVia(reachOf, model, keycode) {
+/**
+ * The layers a macro or a custom key is set off from, by the Keymap tab that
+ * lists it, in stack order: every layer that holds a way to it itself — a key
+ * naming it, a behaviour mapped there whose branch sends it (a custom key's
+ * sends its shortcut, D-L63), or a combo firing from its keys that sends it,
+ * directly or through a behaviour. Each route carries the group the Keymap tab
+ * lists it under, so a screen can open that layer on the same row, and the
+ * keys the board rings. What a layer only reaches under a transparent key is
+ * the lower layer's route, listed for that layer, not repeated for every layer
+ * above it. `at` is the layer's position in the stack, which is how a screen
+ * selects it.
+ */
+/** @param {ViewModel} model @param {"macros" | "customKeys"} tab @param {string} keycode */
+export function placementsOf(model, tab, keycode) {
+    const namesOf = namesOfKind(model, tab === "macros" ? "macro" : "customKey");
     return (model?.layers || []).map((layer, at) => {
         const view = layerView(model, at);
-        const reach = reachOf(view);
+        const reach = reachGroups(view, namesOf, [keycode]);
         /** @type {['here' | 'branches' | 'combos', ReachEntry[]][]} */
         const groups = [["here", reach.onKeys], ["branches", reach.fromBranches], ["combos", reach.fromCombos]];
         const routes = groups
@@ -276,19 +267,3 @@ export function reachGroups(view, namesOf, all) {
         fromCombosBelow: downTheStack(fromCombosBelow),
         elsewhere: all.filter((name) => !found.has(name))};
 }
-
-/**
- * Macro slots, grouped by how this layer sets them off.
- *
- * A key on this layer can carry a macro keycode, which the board shows. A
- * transparent key lets a lower layer's macro key answer instead, which the
- * board shows only as falling through. A behaviour this layer reaches can fire
- * one from any of its branches, and that the board cannot show at all, because
- * the key cap carries the behaviour, not what its branches send. The rest are
- * slots holding a payload nothing here reaches.
- */
-/** @param {LayerView} view */
-export const macroReach = (view) => reachGroups(view, macroNamesOf(view.model),
-    (view.model?.macros || [])
-        // An empty slot is not a macro this layer is missing, it is a slot.
-        .filter((slot) => !slot.empty).map((slot) => slot.keycode));

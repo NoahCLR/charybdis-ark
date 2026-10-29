@@ -8,7 +8,7 @@
 // behaviour step on another key that sends it sends the shortcut only, layers
 // included.
 import {layerCalledAt, sentence, vocabulary} from "./vocabulary.mjs";
-import {customKeyNamesOf, customKeyPlacements, reachGroups} from "./reach.mjs";
+import {customKeyNamesOf, placementsOf} from "./reach.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
 import {compactModifierMask} from "./keyvalues.mjs";
 import {LAYERS} from "./layout.mjs";
@@ -78,13 +78,6 @@ export const shortcutLimitWords = (model, start = false) => (start ? sentence : 
 // layer could be missing.
 /** @param {CustomKey | null | undefined} key */
 export const customKeyInUse = (key) => Boolean(key && (key.name || key.hasBehavior || hasShortcut(key)));
-
-// Custom keys, grouped the ways a layer reaches them, as macros are: a key
-// carrying one, a transparent key letting a lower one, a behaviour branch
-// sending one (which sends its shortcut only, D-L63), or a combo sending one.
-/** @param {import("./keyface-types.js").LayerView} view */
-export const customKeyReach = (view) => reachGroups(view, customKeyNamesOf(view.model),
-    (view.model?.customKeys || []).filter(customKeyInUse).map((key) => key.keycode));
 
 // The custom key a keycode names, if it is one: one of the custom keys core
 // publishes, by its name or any other it is read by, the bare hex a combo
@@ -400,7 +393,7 @@ export const customKeyWithShortcut = (model, shortcut, {runsBehaviour = true} = 
 // name, behaviour or shortcut and on no layer or combo.
 /** @param {Model} model */
 export const unusedCustomKey = (model) => (model?.customKeys || []).find((key) =>
-    !key.name && !key.hasBehavior && !hasShortcut(key) && !customKeyPlacements(model, key.keycode).length);
+    !key.name && !key.hasBehavior && !hasShortcut(key) && !placementsOf(model, "customKeys", key.keycode).length);
 
 // What the picker offers for a shortcut no keycode holds (D-L63). A custom key
 // with exactly that shortcut is used if it does only that. Where the field

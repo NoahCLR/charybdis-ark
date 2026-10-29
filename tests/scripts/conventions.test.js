@@ -117,7 +117,7 @@ test("markup reaches the page's HTML sinks only through its Trusted Types policy
 });
 
 test("semantic domain lookups do not use a position's stored keycode name", () => {
-    const badLookup = /(?:behaviourFor|pointingSlotFor|macroNamesOf|macroPlacements|customKeyPlacements)\([^;\n]*\b(?:position|pos)\.keycode\b|(?<![!=])===(?!=)\s*(?:position|pos)\.keycode\b/;
+    const badLookup = /(?:behaviourFor|pointingSlotFor|macroNamesOf|placementsOf)\([^;\n]*\b(?:position|pos)\.keycode\b|(?<![!=])===(?!=)\s*(?:position|pos)\.keycode\b/;
     // inputOn accepts native or semantic combo input names: it checks both.
     // The action-use matcher also accepts native catalogue names/values.
     const compatibilityLines = [
@@ -372,10 +372,12 @@ const wordTables = source => {
 const WORD_TABLES_ALLOWED = new Set([
     // The demo's own panel text, which no keyboard stores.
     "webview/view/demo.mjs#DEMO_WORDS",
-    // The Keys workbench's reach groups, and the routes a Custom keys or
-    // Macros reach line counts, are the interface's own grouping of what the
-    // layers reach (reach-groups.mjs, reach.mjs); no keyboard stores them.
+    // The Keys workbench's reach groups, what each says when it lists
+    // nothing, and the routes a Custom keys or Macros reach line counts, are
+    // the interface's own grouping of what the layers reach (reach-groups.mjs,
+    // tab-reach.mjs); no keyboard stores them.
     "webview/view/reach-groups.mjs#GROUP_TITLES",
+    "webview/view/tab-reach.mjs#EMPTY_WORDS",
     "webview/view/reach-groups.mjs#ROUTE_WORDS",
     // The commit bar's own question before it saves or sends, one part of
     // the sentence confirmText composes from the page's other words; it

@@ -28,9 +28,10 @@ reads as a grid (D-L32).
 The Keys workbench keeps what the selected layer stores apart from what the
 layers in view reach:
 
-- Tab counts count what the selected layer stores (`storedCount`); the Key
-  tab counts mapped keys, not transparent or disabled ones
-  (`tests/view/reach-groups.test.mjs`, `tests/view/lighting.test.mjs`).
+- Tab counts count what the selected layer stores (`tabReach`'s `count`,
+  `webview/view/tab-reach.mjs`); the Key tab counts mapped keys, not
+  transparent or disabled ones (`tests/view/tab-reach.test.mjs`,
+  `tests/view/lighting.test.mjs`).
   Reach rows name keys as the board does, never by layout index (no test).
   A route through a behaviour names its key, then each cell that sends the
   row's thing as Review marks a tier (branch badge, tier dot, tier name),
@@ -245,7 +246,8 @@ here: its home and tests are in
 | The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, and what a search finds (at most `SEARCH_ROWS` keycodes), drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs` |
 | The hover card's behaviour row: whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold, drawn by `webview/ui/hover-card.mjs` and placed by `webview/ui/hover.mjs` | `webview/view/hover-card.mjs` (`keyBehaviour`) | `tests/view/hover-card.test.mjs`, `browser-tests/participation.spec.js` |
 | One view of the layer stack: the layer the board shows and the layers previewed with it, by their place in the stack, which is each published layer's `index`; what answers and what shows at each key in it, and the combos and behaviours it reaches, each worked out once per model and view. Screens ask the current one (`currentView()`, `webview/store.mjs`) rather than passing the layer and the preview | `webview/view/layer-view.mjs` (`layerView`, read through `view.answerAt`, `view.shownAt`, `view.combos`, `view.behaviours`) | `tests/view/layer-view.test.mjs`, `tests/view/combo-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs` |
-| A reach row picked in a Keymap tab: its id (`group:name`, `reachRowId`), and the keys the board rings for it by the route it was picked under | `webview/view/reach-groups.mjs` (`pickedReachKeys`), `webview/view/behaviour-reach.mjs` (`behaviourRouteKeys`, read as `view.behaviours.routeKeys`) | `tests/view/reach-groups.test.mjs`, `tests/view/behaviour-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
+| What a layer view reaches as each Keymap tab lists it: the tab's groups, what each lists and says when empty, the tab's count, and the group a row asked for by name is picked under | `webview/view/tab-reach.mjs` (`tabReach`) | `tests/view/tab-reach.test.mjs`, `tests/view/reach.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
+| A reach row picked in a Keymap tab: its id (`group:name`, `reachRowId`), and the keys the board rings for it by the route it was picked under | `webview/view/tab-reach.mjs` (`tabReach`'s `keysFor`), `webview/view/behaviour-reach.mjs` (`behaviourRouteKeys`, read as `view.behaviours.routeKeys`) | `tests/view/tab-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
 | Device facts, the review sheet, the unsaved-demo dialog; the app keeps routing, rendering, focus and scroll, and window keys | `webview/ui/device.mjs`, `webview/ui/review-overlay.mjs`, `webview/ui/leave-demo.mjs` | (no test) |
 
 ### Number entry
@@ -390,7 +392,8 @@ as `qmkKeyTurnsOn`.
 The Keys workbench's Pointing modes tab reads only these: a starting layer
 reaches its mode by itself, and a key, behaviour cell or combo reaches it by
 turning such a layer on with no layer ending that start on, the layer it is
-pressed on included (`webview/view/pointing-reach.mjs` `pointingReach`). Its
+pressed on included (`webview/view/pointing-reach.mjs` `pointingReach`, read
+through `tabReach`). Its
 columns say the link (the layers that start it, an ignored one marked with the
 card's reason, what ends it, the layers its key turns on), a route that starts
 it says what it sends, and the slot is tagged started beside hold or lock.

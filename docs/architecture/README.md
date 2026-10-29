@@ -86,6 +86,10 @@ Around the core:
   value, `webview/view/layer-view.mjs`, which a screen takes from
   `currentView()` in `webview/store.mjs` rather than passing the model, the
   layer and the preview to each function.
+- What that view reaches as a Keymap tab lists it (its groups, their
+  entries and empty words, the tab's count, the keys a picked row rings):
+  `tabReach(view, tab)`, `webview/view/tab-reach.mjs`. A tab draws its rows
+  from it; a new tab or group gets its lists and words there.
 
 ## Facts and their homes
 

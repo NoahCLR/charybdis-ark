@@ -15,7 +15,7 @@
 // shortcut from another key's behaviour.
 
 import {el, esc} from "../lib/dom.mjs";
-import {customKeyPlacements} from "../view/reach.mjs";
+import {placementsOf} from "../view/reach.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {titleName, attachTitleName} from "./title-name.mjs";
 import {canEdit as canEditArea, getModel, layers, post, render, state, writable} from "../store.mjs";
@@ -132,7 +132,7 @@ const keyFields = (model, key) => {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
 function behaviourCard(model, key) {
     const behaviour = behaviourEditorRow(model, key.keycode);
-    const placements = customKeyPlacements(model, key.keycode);
+    const placements = placementsOf(model, "customKeys", key.keycode);
     const placed = placements.length > 0;
     const card = el(`<div class="card custom-key-behaviour">
         <div class="card-h"><h3>What it does</h3>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {resolvedPositions, reachablePositions, viewPositions} from "../../webview/view/layer-resolution.mjs";
-import {pointingReach} from "../../webview/view/pointing-reach.mjs";
+import {tabReach} from "../../webview/view/tab-reach.mjs";
 import * as edits from "../../webview/view/edits.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 
@@ -45,7 +45,7 @@ test("a transparent key can be answered by any layer below that is held with thi
     // leaves Base answering. It names nothing, so no group ever lists it.
     assert.deepEqual(at(reachable, 1).map((entry) => [entry.position.keycode, entry.whileHeld]),
         [["KC_NO", true], ["KC_RIGHT_ALT", false]]);
-    assert.deepEqual(pointingReach(layerView(model, 2)).fromBranchesBelow.map((entry) => entry.name), ["4"],
+    assert.deepEqual(tabReach(layerView(model, 2), "pointing").groups.find((group) => group.id === "belowBranches")?.entries.map((entry) => entry.name), ["4"],
         "so the behaviour on Base is reached, and the mode its branch sends with it");
 });
 

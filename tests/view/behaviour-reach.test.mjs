@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {reachKeys} from "../../webview/view/reach.mjs";
+import {tabReach} from "../../webview/view/tab-reach.mjs";
 import {comboBehaviourFor} from "../../webview/view/behaviour-reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 import {macroMessage} from "../../webview/view/edits.mjs";
@@ -42,7 +42,7 @@ test("a behaviour a combo sends is reached, though no key carries it", () => {
     assert.deepEqual(base.here, [], "no key carries it");
     assert.deepEqual(base.combos.map((entry) => [entry.row.keycode, entry.combos.map((route) => route.combo.badge)]),
         [["CUSTOM_KEY_0", ["C0", "C1"]]], "one row, naming every combo that sends it");
-    assert.deepEqual(reachKeys(layerView(model, 0), {behaviours: [{keycode: "CUSTOM_KEY_0"}], combos: base.combos[0].combos}).sort(), [0, 1, 2],
+    assert.deepEqual(tabReach(layerView(model, 0), "behaviours").keysFor("combos:CUSTOM_KEY_0").sort(), [0, 1, 2],
         "the board rings the keys chorded for either combo");
     assert.deepEqual(base.elsewhere.map((row) => row.keycode), ["KC_9"], "no longer called unreachable");
 

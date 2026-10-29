@@ -21,13 +21,25 @@ export interface BehaviorCombo {row: BehaviorView; combos: ComboRoute[]}
 export interface ComboGroupEntry extends ComboRoute {inputs: number; covered: number; held: Layer[]}
 export interface ComboGroups {onKeys: ComboGroupEntry[]; throughKeys: ComboGroupEntry[]; fromBranches: never[]; fromBranchesBelow: never[]; elsewhere: ComboGroupEntry[]}
 export interface ReachRecord {directKeys: ResolvedKey[]; fellKeys: ResolvedKey[]; directRows: ReachedBehavior[]; belowRows: ReachedBehavior[]; directCombos: ReachedCombo[]; belowCombos: ReachedCombo[]}
-export type ReachOf = (view: LayerView) => ReachGroup;
 // Whether a combo fires from a key in one view, and the words for why not.
 export interface ComboUse {fires: boolean; reasons: string[]}
 // The combos the board marks on each key in one view, by layout index, and whether each fires from it there.
 export interface ComboMarks {keys: Map<number, ComboView[]>; uses: Map<number, Map<ComboView, ComboUse>>}
 export interface BehaviourGroups {here: BehaviorView[]; through: {row: BehaviorView; layer: Layer; whileHeld: boolean}[]; combos: BehaviorCombo[]; combosBelow: BehaviorCombo[]; elsewhere: BehaviorView[]}
 export interface BehaviourInView {row: BehaviorView; keys: ResolvedKey[]; combos: ComboRoute[]}
+// What one layer view reaches, as a Keymap tab lists it (view/tab-reach.mjs). A behaviour's row: the keys in view
+// carrying it and the combos sending it, or the layer below a transparent key answers from, as its group says.
+export interface BehaviourReachEntry {name: string; row: BehaviorView; keys: ResolvedKey[]; combos: ComboRoute[]; layer: Layer | null; whileHeld: boolean}
+export type ComboReachEntry = ComboRoute & Partial<Pick<ComboGroupEntry, 'inputs' | 'covered' | 'held'>> & {name: string};
+export interface ReachRows {macros: ReachEntry; customKeys: ReachEntry; pointing: ReachEntry; behaviours: BehaviourReachEntry; combos: ComboReachEntry}
+export type ReachTab = keyof ReachRows;
+export interface TabReachGroup<E> {readonly id: string; readonly empty: string; readonly entries: E[]}
+export interface TabReach<E> {
+    readonly groups: TabReachGroup<E>[];
+    readonly count: number;
+    keysFor(rowId: string | null | undefined): number[];
+    groupOf(name: string | number): string | undefined;
+}
 // The key whose behaviour a pick on the board opens, and the layer below that answers with it, if one does.
 export interface BehaviourKey {keycode: string; from: Layer | null}
 // One view of the layer stack (view/layer-view.mjs): `at` on top, by its place in the stack, with `held` previewed on under it.

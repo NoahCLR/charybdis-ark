@@ -11,6 +11,7 @@ import {reachRowId, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {keyMeaning, keyName} from "../../view/keyface.mjs";
+import {tabReach} from "../../view/tab-reach.mjs";
 import {comboBuilder} from "./combo-builder.mjs";
 import {keysReach} from "./reach.mjs";
 
@@ -18,7 +19,6 @@ import {keysReach} from "./reach.mjs";
 export function tabCombos(body, right) {
     const model = getModel();
     const combos = model?.combos || [];
-    const readback = model?.comboReadback || {};
     const canEdit = canEditArea("combos");
 
     right.replaceChildren();
@@ -35,15 +35,13 @@ export function tabCombos(body, right) {
     </div>`);
 
     const view = currentView();
-    const groupsOf = view.combos.groups;
-    const inView = view.combos.inView;
+    const reach = tabReach(view, "combos");
     const changedCombos = draftMarks(model?.draft?.changes).combos;
     // A combo asked for by id is picked under the group that lists it on
     // this layer, and that group opens so the row is there to see.
     if (state.pickCombo !== null) {
         const id = String(state.pickCombo);
-        const route = /** @type {[string, import("../../view/keyface-types.js").ComboRoute[]][]} */ ([["view", inView], ["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]])
-            .find(([, entries]) => entries.some((entry) => String(entry.combo.id) === id))?.[0];
+        const route = reach.groupOf(id);
         state.pickCombo = null;
         state.reachRow.combos = route ? reachRowId(route, id) : null;
         if (route) state.reachGroups = setReachGroupOpen(state.reachGroups, route, true);
@@ -59,16 +57,15 @@ export function tabCombos(body, right) {
             <td class="muted">${esc(requires)}</td>
             <td class="muted">${reachedBy}</td></tr>`;
     };
-    /** @param {string} group @param {import("../../view/keyface-types.js").ComboGroupEntry & {inputs?: number, covered?: number}} entry */
+    /** @param {string} group @param {import("../../view/keyface-types.js").ComboReachEntry} entry */
     const reachedBy = (group, entry) => group !== "elsewhere" ? keysReach(entry.keys, {names: false})
         : entry.inputs ? `${entry.covered} of ${entry.inputs} inputs, never at once` : "no inputs";
     // The selected key as the layers in view answer it, and every combo that
     // takes it as an input. Each row still says how this layer reaches that
     // combo, from the group that lists it.
     const onKey = view.combos.onKey(state.selected);
-    const listed = /** @type {[string, import("../../view/keyface-types.js").ComboGroupEntry[]][]} */ ([["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]])
-        .flatMap(([group, entries]) => entries.map((entry) => /** @type {[number, {group: string, entry: import("../../view/keyface-types.js").ComboGroupEntry}]} */ ([entry.combo.id, {group, entry}])));
-    const routes = new Map(listed);
+    const routes = new Map(reach.groups.filter((group) => group.id !== "view")
+        .flatMap(({id, entries}) => entries.map((entry) => /** @type {const} */ ([entry.combo.id, {group: id, entry}]))));
     const comboGroupRows = [
         {id: "key", detail: onKey.position ? keyNameMarked(model, keyName(onKey.position, model), keyMeaning(onKey.position)) : "nothing answers here",
             rows: onKey.combos.map((combo) => {
@@ -77,15 +74,8 @@ export function tabCombos(body, right) {
             }),
             drafted: onKey.combos.some((combo) => changedCombos.has(combo.id)),
             empty: onKey.position ? "No combo takes this key as an input." : "Every layer in view is transparent at the selected key."},
-        {id: "view", rows: inView.map((entry) => row("view", entry, keysReach(entry.keys, {names: false}))),
-            drafted: inView.some((entry) => changedCombos.has(entry.combo.id)),
-            empty: "No combo fires with the layers in this view."},
-        {id: "here", rows: groupsOf.onKeys.map((entry) => row("here", entry, reachedBy("here", entry))), drafted: groupsOf.onKeys.some((entry) => changedCombos.has(entry.combo.id)),
-            empty: readback.state === "read" ? "No combo has all of its inputs on this layer." : "Combos have not been read from this keyboard."},
-        {id: "through", rows: groupsOf.throughKeys.map((entry) => row("through", entry, reachedBy("through", entry))), drafted: groupsOf.throughKeys.some((entry) => changedCombos.has(entry.combo.id)),
-            empty: "No combo is completed by keys falling through."},
-        {id: "elsewhere", drafted: groupsOf.elsewhere.some((entry) => changedCombos.has(entry.combo.id)), rows: groupsOf.elsewhere.map((entry) => row("elsewhere", entry, reachedBy("elsewhere", entry))),
-            empty: "Every combo on the board fires from this layer."},
+        ...reach.groups.map(({id, empty, entries}) => ({id, empty, drafted: entries.some((entry) => changedCombos.has(entry.combo.id)),
+            rows: entries.map((entry) => row(id, entry, reachedBy(id, entry)))})),
     ];
     const comboTable = reachTable("combos", comboGroupRows, [
         ["", "7%"], ["Inputs", "25%"], ["Sends", "21%"], ["Window", "10%"],

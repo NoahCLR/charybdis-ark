@@ -112,10 +112,10 @@ function panelBoundary(model: PublishedModel, reply: PanelResponse) {
 void panelBoundary;
 
 import {keyFace} from '../../webview/view/keyface.mjs';
-import {macroReach, reachKeys, macroPlacements} from '../../webview/view/reach.mjs';
+import {reachKeys, placementsOf} from '../../webview/view/reach.mjs';
+import {tabReach} from '../../webview/view/tab-reach.mjs';
 import {namedAction} from '../../webview/view/named-action.mjs';
 import {layerView} from '../../webview/view/layer-view.mjs';
-import {reachEntries} from '../../webview/view/reach-groups.mjs';
 import type {ReviewSummary} from '../../contracts/model.js';
 import type {Position} from '../../contracts/panel.js';
 
@@ -123,9 +123,13 @@ function rendererViews(model: PublishedModel, position: Position) {
     const face = keyFace(position, model);
     const kind: 'none' | 'transparent' | 'disabled' | 'layer' | 'key' = face.kind;
     const view = layerView(model, 0);
-    const behaviors = macroReach(view);
+    const behaviors = tabReach(view, 'macros');
     const combos = view.combos.groups;
-    const names: string[] = reachEntries(behaviors, 'here').map(entry => entry.name);
+    const names: string[] = behaviors.groups[0].entries.map(entry => entry.name);
+    const behaviourRow: string = tabReach(view, 'behaviours').groups[0].entries[0].row.keycode;
+    const comboId: number = tabReach(view, 'combos').groups[0].entries[0].combo.id;
+    // @ts-expect-error The Key tab lists no reach rows.
+    tabReach(view, 'key').groups[0].entries[0].name;
     const comboKeys: number[] = reachKeys(view, combos.onKeys[0]);
     const summary: ReviewSummary = {unit: 'behavior:KC_A', title: 'A', status: 'changed', place: {kind: 'behaviour'}};
     // @ts-expect-error A key face receives the stored name, not a numeric wire keycode.
@@ -135,16 +139,16 @@ function rendererViews(model: PublishedModel, position: Position) {
     // @ts-expect-error A key import summary must retain its layer reference.
     const missingLayer: ReviewSummary = {unit: 'key', title: 'A', status: 'changed', place: {kind: 'key'}};
     // @ts-expect-error Reached keys retain their typed position rather than an unrestricted object.
-    reachEntries(behaviors, 'here')[0].keys[0].position.slot;
+    behaviors.groups[0].entries[0].keys[0].position.slot;
     // @ts-expect-error The empty combo-map branch still stores typed combos.
     layerView(null, 0).combos.marks.keys.set(0, ['KC_A']);
-    const routeName: string = macroPlacements(model, 'MACRO_0')[0].routes[0].entry.name;
+    const routeName: string = placementsOf(model, 'macros', 'MACRO_0')[0].routes[0].entry.name;
     const action = namedAction(model, 'PD_MODE_0');
     if (action?.kind === 'pointing') {
         const slot: number = action.slot.id;
         void slot;
     }
-    void [kind, names, comboKeys, summary, missingLayer, routeName];
+    void [kind, names, behaviourRow, comboId, comboKeys, summary, missingLayer, routeName];
 }
 void rendererViews;
 

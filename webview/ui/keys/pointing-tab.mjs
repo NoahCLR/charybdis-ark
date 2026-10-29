@@ -4,14 +4,13 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {keyMeaning} from "../../view/keyface.mjs";
-import {reachInView} from "../../view/reach.mjs";
-import {pointingReach, pointingReachInView, pointingVariant, slotKeycodeNames} from "../../view/pointing-reach.mjs";
+import {tabReach} from "../../view/tab-reach.mjs";
+import {pointingVariant, slotKeycodeNames} from "../../view/pointing-reach.mjs";
 import {linkRows} from "../../view/pointing-link.mjs";
 import {pdColourRow} from "../../view/lighting.mjs";
 import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
-import {reachEntries} from "../../view/reach-groups.mjs";
 import {mark, slotNamedWithKeycodes} from "../marks.mjs";
 import {slotNamed, vocabulary, word} from "../../view/vocabulary.mjs";
 import {layersNamed, layersOfMask, pointingReachLines} from "./reach.mjs";
@@ -19,8 +18,7 @@ import {layersNamed, layersOfMask, pointingReachLines} from "./reach.mjs";
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabPointing(body, right) {
     const model = getModel();
-    const view = currentView();
-    const reach = {...pointingReach(view), inView: pointingReachInView(view)};
+    const reach = tabReach(currentView(), "pointing");
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Pointing modes screen</button>`);
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
@@ -70,7 +68,7 @@ export function tabPointing(body, right) {
     // which only when it has both. A route that starts the mode by turning on
     // a layer in its link (entry.startVia) sends neither.
     /** @param {string} group */
-    const reachCard = (group) => (/** @type {ReturnType<typeof reachInView>[number]} */ entry) => {
+    const reachCard = (group) => (/** @type {import("../../view/keyface-types.js").ReachEntry} */ entry) => {
         const actions = [...entry.keys.map((key) => keyMeaning(key.position)),
             ...(entry.behaviours || []).map((row) => row.action), ...(entry.combos || []).map((route) => route.action)];
         const own = actions.filter((keycode) => !entry.startVia?.[keycode]);
@@ -79,28 +77,10 @@ export function tabPointing(body, right) {
         return card(group, entry.name, lines, {variants, started: Boolean(entry.starts?.length) || own.length < actions.length});
     };
 
-    /** @type {{id: string, rows: string[], empty: string, drafted?: boolean, ids?: string[]}[]} */
-    const groups = [
-        {id: "view", rows: reach.inView.map(reachCard("view")),
-            empty: "No pointing mode is reached by the layers in this view."},
-        {id: "here", rows: reach.onKeys.map(reachCard("here")),
-            empty: "No pointing mode is placed on this layer."},
-        {id: "through", rows: reach.throughKeys.map(reachCard("through")),
-            empty: "No transparent key falls through to a pointing-mode key."},
-        {id: "branches", rows: reach.fromBranches.map(reachCard("branches")),
-            empty: "No behaviour mapped on this layer sends a pointing mode."},
-        {id: "combos", rows: reach.fromCombos.map(reachCard("combos")),
-            empty: "No combo on this layer sends a pointing mode."},
-        {id: "belowBranches", rows: reach.fromBranchesBelow.map(reachCard("belowBranches")),
-            empty: "No behaviour under a transparent key sends a pointing mode."},
-        {id: "belowCombos", rows: reach.fromCombosBelow.map(reachCard("belowCombos")),
-            empty: "No combo that needs a transparent key sends a pointing mode."},
-        {id: "elsewhere", rows: reach.elsewhere.map((slotId) => card("elsewhere", slotId, "not reached from this layer")),
-            empty: "Every configured mode is reached from this layer.", ids: reach.elsewhere},
-    ];
     // A folded group holding a changed slot says so on its header.
-    for (const group of groups) group.drafted = (group.ids || reachEntries(reach, group.id).map((entry) => entry.name))
-        .some((id) => changedSlots.has(Number(id)));
+    const groups = reach.groups.map(({id, empty, entries}) => ({id, empty,
+        rows: entries.map((entry) => id === "elsewhere" ? card(id, entry.name, "not reached from this layer") : reachCard(id)(entry)),
+        drafted: entries.some((entry) => changedSlots.has(Number(entry.name)))}));
     const node = reachTable("pointing", groups, [["Slot", "24%"], ["Mode", "14%"], [words.linkLabels.startedBy, "10%"], [words.linkLabels.endsWhen, "8%"], [words.linkLabels.keyTurnsOnShort, "9%"], ["Reached by", "29%"], ["", "6%"]]);
     attachReachRows(node, "pointing");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editpd]")).forEach((button) => button.addEventListener("click", () => {

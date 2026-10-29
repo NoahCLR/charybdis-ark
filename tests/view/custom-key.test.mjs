@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
-import {customKeyInUse, customKeyBypassText, customKeyReach, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, sameShortcut, shortcutKeyCode, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickModifier, shortcutPickLabel, shortcutPickMods, shortcutPickProblem, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice, shortcutLayerRows, shortcutLayerList, shortcutWhen, shortcutLayerTag, shortcutLayerUnder, shortcutLayerKinds, LAYER_KIND} from "../../webview/view/custom-key.mjs";
+import {customKeyInUse, customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, sameShortcut, shortcutKeyCode, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickModifier, shortcutPickLabel, shortcutPickMods, shortcutPickProblem, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice, shortcutLayerRows, shortcutLayerList, shortcutWhen, shortcutLayerTag, shortcutLayerUnder, shortcutLayerKinds, LAYER_KIND} from "../../webview/view/custom-key.mjs";
 import {customKeyNameMessage, customKeyShortcutMessage} from "../../webview/view/edits.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
+import {tabReach} from "../../webview/view/tab-reach.mjs";
 import {published as publishedProfile} from "../fixtures/published-behaviours.mjs";
 
 const require = createRequire(import.meta.url);
@@ -256,14 +257,15 @@ test("the Custom keys tab groups a layer's custom keys the ways a macro is reach
         behaviours: [{keycode: "KC_A", steps: [{tapCount: 1, tap: {style: "TAP_SENDS", action: "CUSTOM_KEY_3"}}]}],
         edits: [0, 1, 2, 3].map((slot) => customKeyNameMessage(`CUSTOM_KEY_${slot}`, `Key ${slot}`))});
     const names = (entries) => entries.map((entry) => entry.name);
+    const customKeyReach = (view) => Object.fromEntries(tabReach(view, "customKeys").groups.map((group) => [group.id, group.entries]));
     const base = customKeyReach(layerView(model, 0));
-    assert.deepEqual(names(base.onKeys), ["CUSTOM_KEY_0"]);
-    assert.deepEqual(names(base.fromCombos), ["CUSTOM_KEY_2"], "a combo on Base's keys sends it");
-    assert.deepEqual(names(base.fromBranches), ["CUSTOM_KEY_3"], "a behaviour step on Base sends it");
-    assert.deepEqual(base.elsewhere, ["CUSTOM_KEY_1"], "unreachable from Base; the unnamed empty slots are no keys at all");
+    assert.deepEqual(names(base.here), ["CUSTOM_KEY_0"]);
+    assert.deepEqual(names(base.combos), ["CUSTOM_KEY_2"], "a combo on Base's keys sends it");
+    assert.deepEqual(names(base.branches), ["CUSTOM_KEY_3"], "a behaviour step on Base sends it");
+    assert.deepEqual(names(base.elsewhere), ["CUSTOM_KEY_1"], "unreachable from Base; the unnamed empty slots are no keys at all");
     const numbers = customKeyReach(layerView(model, 1));
-    assert.deepEqual(names(numbers.onKeys), ["CUSTOM_KEY_1"]);
-    assert.deepEqual(names(numbers.throughKeys), ["CUSTOM_KEY_0"], "a transparent key falls through to Base's");
+    assert.deepEqual(names(numbers.here), ["CUSTOM_KEY_1"]);
+    assert.deepEqual(names(numbers.through), ["CUSTOM_KEY_0"], "a transparent key falls through to Base's");
 });
 
 // A shortcut can hold layers too (firmware D-F26): layers alone are a

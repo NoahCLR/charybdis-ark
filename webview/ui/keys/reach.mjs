@@ -1,29 +1,32 @@
 // @ts-check
 /**
  * @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model
+ * @typedef {import("../../view/keyface-types.js").ReachEntry} ReachEntry
  */
 // What this layer reaches: the keys the board rings for the picked row, and
 // the "Reached by" words every reach table shares.
 
 import {esc} from "../../lib/dom.mjs";
 import {actionLabel, keyMeaning, keyName} from "../../view/keyface.mjs";
-import {placementsOf, reachInView, reachText} from "../../view/reach.mjs";
+import {placementsOf, reachText} from "../../view/reach.mjs";
+import {tabReach} from "../../view/tab-reach.mjs";
 import {pointingSlotFor} from "../../view/pointing-reach.mjs";
 import {customKeyOf, shortcutLayerList, shortcutLayerTag} from "../../view/custom-key.mjs";
 import {getModel, layers, render, state} from "../../store.mjs";
-import {pickedReachKeys, placementChips, placementOpening, setReachGroupOpen} from "../../view/reach-groups.mjs";
+import {placementChips, placementOpening, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {layerSwatch} from "../layerbar.mjs";
 import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked, layerTagged, marked} from "../marks.mjs";
 import {tierName, layerCalled} from "../../view/vocabulary.mjs";
-import {behaviourRoute} from "./behaviour-selection.mjs";
+import {behaviourRowId} from "./behaviour-selection.mjs";
 
 // The keys the board rings: the ones that reach whatever row is picked in the
 // open tab. A behaviour is found on the keys carrying it; anything a branch
 // sends is found on the same keys, which is the whole point of saying so.
+// The Behaviours tab keeps its pick with the behaviour it opens.
 /** @param {import("../../view/keyface-types.js").LayerView} view */
 export function reachHighlight(view) {
-    if (state.tab === "behaviours") return view.behaviours.routeKeys(state.behaviourRow || "", behaviourRoute());
-    return pickedReachKeys(view, state.tab, state.reachRow[/** @type {keyof typeof state.reachRow} */ (state.tab)]);
+    return tabReach(view, state.tab).keysFor(state.tab === "behaviours" ? behaviourRowId()
+        : state.reachRow[/** @type {keyof typeof state.reachRow} */ (state.tab)]);
 }
 
 // The layers a macro or custom key is placed on, each a chip in its layer
@@ -95,10 +98,10 @@ const namedKey = (model, keycode) => {
 /** @param {Model} model @param {import("../../view/keyface-types.js").BranchCell[]} cells */
 const cellsMarked = (model, cells) => cells
     .map((cell) => marked(model, {kind: "tier", ...cell}, tierName(model, cell.tier).toLowerCase())).join(" or ");
-/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry @param {{action: string}} route @param {boolean} showSends */
+/** @param {Model} model @param {ReachEntry} entry @param {{action: string}} route @param {boolean} showSends */
 const sendsOf = (model, entry, route, showSends) => showSends && route.action && String(entry.name) !== String(route.action)
     ? `sends ${namedKey(model, route.action)}` : "";
-/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
+/** @param {Model} model @param {ReachEntry} entry */
 const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
     const sent = sendsOf(model, entry, row, showSends);
     return `from ${namedKey(model, row.keycode)} · ${cellsMarked(model, row.cells)}${sent ? ` ${sent}` : ""}`
@@ -108,7 +111,7 @@ const branchReach = (model, entry, showSends = true) => entry.behaviours.map((ro
 // A combo is named by its badge and the keys chorded to fire it; one that
 // fires a behaviour says so, since its branch is what sends the thing, and one
 // that needs a transparent key names the layer answering for it.
-/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
+/** @param {Model} model @param {ReachEntry} entry */
 export const comboReach = (model, entry, showSends = true) => entry.combos.map(({combo, via, action, keys, cells}) => {
     const sources = [...new Set(keys.filter((key) => key.fellThrough).map(sourceLabel))];
     const sent = sendsOf(model, entry, {action}, showSends);
@@ -124,7 +127,7 @@ export const comboReach = (model, entry, showSends = true) => entry.combos.map((
 // key's: "Dragscroll hold · 2× ● hold sends Dragscroll lock", the cell after
 // the key, which is not named a second time. A cell sending what the key
 // already sends adds nothing to it and is left out.
-/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
+/** @param {Model} model @param {ReachEntry} entry */
 export const reachLabel = (model, entry, showSends = true) => {
     const onKeys = new Set((entry.keys || []).map((key) => keyMeaning(key.position)));
     const own = (entry.behaviours || []).filter((row) => onKeys.has(row.keycode));
@@ -152,7 +155,7 @@ export const reachLabel = (model, entry, showSends = true) => {
 // both (`showSends`). A cell of a key's own behaviour that does what the key
 // already does adds nothing and is left out. A layer starting the mode itself
 // is the last line: "turning on ▦ Navigation".
-/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry @param {boolean} showSends */
+/** @param {Model} model @param {ReachEntry} entry @param {boolean} showSends */
 export function pointingReachLines(model, entry, showSends) {
     const keys = entry.keys || [], rows = entry.behaviours || [], combos = entry.combos || [];
     const onKeys = new Set(keys.map((key) => keyMeaning(key.position)));

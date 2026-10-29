@@ -38,8 +38,9 @@ export function layerView(model, at, on = []) {
     return view;
 }
 
+// Work done on first read and kept; tab-reach.mjs reads its lists the same way.
 /** @template T @param {() => T} work @returns {() => T} */
-const once = (work) => {
+export const once = (work) => {
     /** @type {{value: T} | null} */
     let kept = null;
     return () => (kept ??= {value: work()}).value;

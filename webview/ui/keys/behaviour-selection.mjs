@@ -3,6 +3,7 @@
 // board, the workbench tabs and the Key tab's link all select through here.
 
 import {currentView, state} from "../../store.mjs";
+import {reachRowId} from "../../view/reach-groups.mjs";
 
 // The group the picked behaviour was picked in, while it is still the picked
 // one. A behaviour selected any other way — a fresh one, a moved one, the Key
@@ -10,6 +11,10 @@ import {currentView, state} from "../../store.mjs";
 /** @returns {import("../../view/keyface-types.js").BehaviorRoute | null} */
 export const behaviourRoute = () =>
     state.behaviourRoute && state.behaviourRoute.row === state.behaviourRow ? /** @type {import("../../view/keyface-types.js").BehaviorRoute} */ (state.behaviourRoute.group) : null;
+
+// The picked behaviour as a reach row (reachRowId), under the group it was
+// picked in; with no route, under none.
+export const behaviourRowId = () => reachRowId(behaviourRoute() || "", state.behaviourRow || "");
 
 // The key a board position opens in Behaviours: a transparent key follows the
 // key answered from below.

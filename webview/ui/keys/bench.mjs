@@ -3,10 +3,7 @@
 // and the macros, custom keys and pointing modes this layer reaches.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {macroReach} from "../../view/reach.mjs";
-import {pointingReach} from "../../view/pointing-reach.mjs";
-import {storedCount} from "../../view/reach-groups.mjs";
-import {customKeyReach} from "../../view/custom-key.mjs";
+import {tabReach} from "../../view/tab-reach.mjs";
 import {mappedKeyCount} from "../../view/lighting.mjs";
 import {currentLayer, currentView, getModel, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
@@ -36,14 +33,7 @@ export function bench() {
     const view = currentView();
     const layer = currentLayer();
     /** @type {Record<string, string>} */
-    const counts = {
-        key: String(mappedKeyCount(model, layer)),
-        behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(view.behaviours.groups)),
-        combos: String(view.combos.groups.onKeys.length),
-        macros: String(storedCount(macroReach(view))),
-        customKeys: String(storedCount(customKeyReach(view))),
-        pointing: String(storedCount(pointingReach(view))),
-    };
+    const counts = Object.fromEntries(TABS.map(({id}) => [id, String(id === "key" ? mappedKeyCount(model, layer) : tabReach(view, id).count)]));
     // A tab whose list holds something the draft changed says so.
     const marks = draftMarks(model?.draft?.changes);
     /** @type {Record<string, boolean>} */
