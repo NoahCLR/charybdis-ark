@@ -3,7 +3,8 @@
 
 const {validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
 const {layerOrderReview, profileReview} = require("../model/profile-review");
-const {compose, inverse, isIdentity, layerUnit, rearranged} = require("../model/layer-order");
+const {compose, inverse, isIdentity, rearranged} = require("../model/layer-order");
+const {UNIT, unitByLayer} = require("../model/review-units");
 const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
 const {LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
@@ -469,14 +470,14 @@ class ProfileDraftSession {
         const current = this.current;
         if (this.base.incomplete) return [{area: "Recovery", unit: null, title: "Complete profile", status: "changed", group: null, place: null,
             fields: [{label: "", before: "Interrupted profile; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
-        const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => layerUnit(row.unit, this.order)));
+        const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => unitByLayer(row.unit, this.order)));
         const parent = new Map([...shown].map(unit => [unit, unit]));
         /** @param {string} unit @returns {string} */
         const find = unit => {while (parent.get(unit) !== unit) unit = /** @type {string} */ (parent.get(unit)); return unit;};
         const steps = [];
         for (let step = 1; step <= this.cursor; step++) {
             if (this.history[step].origin !== "edit") continue;
-            const touched = this.stepUnits(step).map(unit => layerUnit(unit, this.history[step].order)).filter(unit => shown.has(unit));
+            const touched = this.stepUnits(step).map(unit => unitByLayer(unit, this.history[step].order)).filter(unit => shown.has(unit));
             for (const unit of touched.slice(1)) parent.set(find(unit), find(touched[0]));
             if (touched.length) steps.push({label: this.history[step].label, unit: touched[0]});
         }
@@ -493,7 +494,7 @@ class ProfileDraftSession {
         const title = list => !list?.length ? null : list.length === 1 ? list[0] : `${list[0]} and ${list.length - 1} more edit${list.length === 2 ? "" : "s"}`;
         const groups = new Map();
         return rows.map(row => {
-            const root = find(layerUnit(row.unit, this.order));
+            const root = find(unitByLayer(row.unit, this.order));
             if (!groups.has(root)) groups.set(root, groups.size);
             return placed({...row, group: groups.get(root), groupTitle: title(titles.get(root))});
         });
@@ -563,7 +564,7 @@ class ProfileDraftSession {
         // moves with its layer and stays; anything else goes back to the
         // reference, so the order stays.
         let document, order = this.order;
-        if (units.has("layerOrder")) {
+        if (units.has(UNIT.layerOrder)) {
             if (units.size > 1) throw fail("Discard the layer priority on its own.");
             document = rearranged(this.current.document, inverse(order));
             order = LAYER_IDENTITY;
@@ -571,8 +572,8 @@ class ProfileDraftSession {
         // Some bytes carry no row of their own, such as reserved macro-bank padding. Once nothing described is left, the draft is
         // the keyboard's profile again, not an indescribable difference.
         const left = this.describe(validateSnapshot(document, this.capabilities).document, order);
-        if (left.every(row => row.unit === "profile")) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = LAYER_IDENTITY;}
-        const label = units.has("layerOrder") ? "Put the layer priority back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
+        if (left.every(row => row.unit === UNIT.profile)) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = LAYER_IDENTITY;}
+        const label = units.has(UNIT.layerOrder) ? "Put the layer priority back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
         return {document: validateSnapshot(document, this.capabilities).document, label, order, reviewed};
     }
     // Discard the whole draft as one more step, so undo brings it back: the

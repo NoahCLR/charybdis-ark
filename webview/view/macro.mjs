@@ -41,6 +41,11 @@ export const protectionChoiceLabel = (model, {value, label}, uninterruptible) =>
 export const macroNumber = (keycode) => macroOfName(String(keycode ?? "")) ?? null;
 /** @param {{keycode?: string} | null | undefined} slot */
 export const macroShortName = (slot) => `M${macroNumber(slot?.keycode) ?? ""}`;
+// The review unit a macro's change names: core's (core/model/review-units.js
+// UNIT.macro), copied since the interface may not import core and pinned by
+// tests/view/enum-drift.test.mjs.
+/** @param {number | null} index */
+export const macroUnit = (index) => `macro:${index}`;
 
 // A macro's limits (rules/macro-payload.mjs): its longest delay in
 // milliseconds, and the keys it holds at once, a chord's included.
@@ -190,7 +195,7 @@ export function samePayload(a, b, aliases = {}) {
 /** @param {readonly Pick<import("../../contracts/model.js").ReviewChange, "unit">[] | undefined} changes @param {string} keycode @param {boolean} local @returns {{state: "local" | "draft" | "read", dot: string, text: string}} */
 export function macroLocalState(changes, keycode, local) {
     if (local) return {state: "local", dot: "draft", text: "edited here"};
-    const unit = `macro:${macroNumber(keycode)}`;
+    const unit = macroUnit(macroNumber(keycode));
     return (changes || []).some((change) => change.unit === unit)
         ? {state: "draft", dot: "draft", text: "changed in draft"}
         : {state: "read", dot: "on", text: "as read"};
