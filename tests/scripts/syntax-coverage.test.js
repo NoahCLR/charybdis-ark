@@ -1,6 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const {syntaxCoverage} = require("../../scripts/syntax-coverage");
 
@@ -13,8 +14,19 @@ test("each source keeps a parser, including files outside TypeScript and Node te
     assert.equal(checker("webview/ui/board.mjs"), "typescript");
     assert.equal(checker("rules/layer-answers.mjs"), "typescript", "the shared rules have their own config");
     assert.equal(checker("tests/scripts/syntax-coverage.test.js"), "test");
-    assert.equal(checker("playwright.config.js"), "node");
+    assert.equal(checker("playwright.config.js"), "typescript", "the preview config carries Playwright's DOM types");
     assert.equal(checker("browser-tests/preview.spec.js"), "node");
     assert.equal(checker("tests/integration/run_profile_rgb_v1_tests.sh"), "shell");
     assert.ok(coverage.every(entry => ["node", "shell", "typescript", "test"].includes(entry.checker)));
+});
+
+test("every module marked // @ts-check is in one of npm run typecheck's configurations", () => {
+    // The pragma (tests/scripts/conventions.test.js) only shows errors in an
+    // editor; a module no configuration includes is never checked.
+    const root = path.resolve(__dirname, "../..");
+    const marked = syntaxCoverage(root).filter(({file}) => file.endsWith("js")
+        && /^\/\/ @ts-check\s*$/m.test(fs.readFileSync(path.join(root, file), "utf8"))
+        && !/^(?:tests|browser-tests)\//.test(file));
+    assert.ok(marked.length);
+    assert.deepEqual(marked.filter(({checker}) => checker !== "typescript").map(({file}) => file), []);
 });

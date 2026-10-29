@@ -9,6 +9,7 @@ import {layersOn, toggleLayer} from "./view/layer-set.mjs";
 import {initialReachGroups} from "./view/reach-groups.mjs";
 import {leaving} from "./view/demo.mjs";
 import {afterDraftChange, initialState, kept, resets, resetsTo} from "./view/state-fields.mjs";
+import {withCatalog} from "./catalog.mjs";
 
 const panelApi = acquirePanelApi();
 
@@ -165,6 +166,14 @@ let renderer = () => {};
 
 export const getModel = () => model;
 export const setModel = (/** @type {import("../contracts/panel.js").PublishedModel} */ next) => { model = next; };
+
+// What every model of this build starts from, as the core last posted it.
+// A posted model leaves it out, so the model the screens read is the posted
+// one with it laid back under (catalog.mjs), or null until it has come.
+/** @type {import("../contracts/panel.js").PanelCatalog | null} */
+let catalog = null;
+export const setCatalog = (/** @type {import("../contracts/panel.js").PanelCatalog} */ next) => { catalog = next; };
+export const receivedModel = (/** @type {import("../contracts/panel.js").PostedModel} */ posted) => withCatalog(posted, catalog);
 export const setRenderer = (/** @type {() => void} */ fn) => { renderer = fn; };
 export const render = () => renderer();
 
@@ -197,7 +206,6 @@ export function toggleLayerOn(index) {
     if (row === state.behaviourRow) return;
     Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null});
 }
-export const layerName = (/** @type {Partial<Pick<import("../contracts/panel.js").Layer, "name" | "displayName">> | null | undefined} */ layer) => layer?.displayName || layer?.name || "";
 /** @param {import("../contracts/panel.js").Layer | null | undefined} layer @param {number | undefined} index */
 export const positionAt = (layer, index) =>
     (layer?.positions || []).find((position) => position.layoutIndex === index);

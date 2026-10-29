@@ -4,7 +4,8 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {keyMeaning} from "../../view/keyface.mjs";
-import {pointingReach, pointingVariant, reachInView, slotKeycodeNames} from "../../view/reach.mjs";
+import {reachInView} from "../../view/reach.mjs";
+import {pointingReach, pointingVariant, slotKeycodeNames} from "../../view/pointing-reach.mjs";
 import {linkRows} from "../../view/pointing-link.mjs";
 import {pdColourRow} from "../../view/lighting.mjs";
 import {getModel, layers, render, state} from "../../store.mjs";
@@ -12,7 +13,7 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
 import {mark, slotNamedWithKeycodes} from "../marks.mjs";
-import {vocabulary, word} from "../../view/vocabulary.mjs";
+import {slotNamed, vocabulary, word} from "../../view/vocabulary.mjs";
 import {layersNamed, layersOfMask, pointingReachLines, pointingView} from "./reach.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
@@ -53,9 +54,9 @@ export function tabPointing(body, right) {
         const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs.` : "";
         return `<tr${reachAttrs("pointing", group, slot.id)}>
             <td><span class="slot-named"><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${mark(model, {kind: "pointing", slot: slot.id})}</span>
-                ${slotNamedWithKeycodes(slot.displayName || `Slot ${slot.id}`, keycodes)}${changedSlots.has(slot.id) ? draftDot() : ""}</span></td>
+                ${slotNamedWithKeycodes(slotNamed(slot), keycodes)}${changedSlots.has(slot.id) ? draftDot() : ""}</span></td>
             <td class="muted">${slot.kind
-                ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${esc(slot.dpi)} DPI` : " · normal pointer speed"}`
+                ? `${esc(word(words.kinds, slot.kind))}${slot.dpi ? ` · ${esc(slot.dpi)} DPI` : " · normal pointer speed"}`
                 : "Empty · these keys do nothing yet"}</td>
             <td class="muted">${slot.kind ? linkLayers(link.filter((entry) => entry.starts)) : "—"}</td>
             <td class="muted">${slot.kind && slot.linkStarts.length ? esc(word(words.linkEnds, slot.linkEnds)) : "—"}</td>

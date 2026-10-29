@@ -8,7 +8,7 @@
  * @typedef {{kind: number, operand: number}} WalkAction
  */
 const {keycodeAction, knownActionAbi, pointingSlotOfCode} = require("../schema/actions");
-const {decodeProfileBlob, decodeStoredProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
+const {decodeProfileBlob, decodeStoredProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
 const {COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {SETTING, SETTING_FIELDS, decodeSettings} = require("../schema/settings-domain-v1");
 const {ALL_LAYERS, CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
@@ -21,6 +21,7 @@ const {readStoredMacro} = require("./macro-input");
 const {MACRO_LIMITS} = require("../../rules/macro-payload.mjs");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {hostSettings} = require("../schema/host-settings");
+const {answered} = require("../schema/bytes");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A current-format file contains one complete canonical schema-4 blob.
@@ -29,23 +30,30 @@ const {profileDepthOptions} = require("../schema/profile-depth");
 // Base64 for 130,048 bytes plus the small JSON envelope fits in 192 KiB.
 const FILE_MAX_BYTES = 196608;
 // What a file over FILE_MAX_BYTES is told, wherever it is refused.
-const FILE_TOO_LARGE = "This profile file is too large.";
+const FILE_TOO_LARGE = "This file is too large for a backup.";
 const DOCUMENT_VERSION = 5;
-const {DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, encodeProfileDomains} = require("../schema/profile-domains");
+const {DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, encodeProfileDomains, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-domains");
 /** @type {readonly number[]} */
 const DOMAIN_IDS = DOCUMENT_PROFILE_DOMAINS.map(domain => domain.id);
 /** @param {number} id @param {Buffer} payload */
 const domain = (id, payload) => ({id, version: PROFILE_DOMAIN_VERSIONS[id], payload});
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
+// What a key reaching past the keyboard's layers is told.
+const OUTSIDE_LAYERS = "A key in this profile reaches a layer the keyboard does not have.";
+// What a backup whose profile does not decode is told; why it did not is
+// the failure's cause, for the diagnostics.
+const DAMAGED = "The profile in this file is damaged, so Ark cannot read it.";
+/** @param {unknown} cause */
+const damaged = cause => Object.assign(fail(DAMAGED), {cause});
 // What a backup in another format than current firmware's is told.
 const OLDER_FORMAT = "This profile is in a format current firmware does not store, so Ark cannot read it. Export a new backup from a keyboard on current firmware.";
 const PHYSICAL_MATRIX_SLOTS = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => matrixPosition(layoutIndex)));
-/** @param {unknown} value @param {number} max @param {string} label */
-function base64(value, max, label) {
-    if (typeof value !== "string" || value.length > Math.ceil(max / 3) * 4 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw fail(`Invalid ${label}.`);
+/** @param {unknown} value @param {number} max @param {string} refusal what a value that is not canonical base64 is told */
+function base64(value, max, refusal) {
+    if (typeof value !== "string" || value.length > Math.ceil(max / 3) * 4 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw fail(refusal);
     const bytes = Buffer.from(value, "base64");
-    if (bytes.length > max || bytes.toString("base64") !== value) throw fail(`Invalid ${label}.`);
+    if (bytes.length > max || bytes.toString("base64") !== value) throw fail(refusal);
     return bytes;
 }
 // The most digits a stored delay may have.
@@ -64,16 +72,16 @@ function validateMacro(bytes, {textEntry = false, layout} = {}) {
         if (type === 4) {
             let digits = "";
             while (index < bytes.length && bytes[index] >= 48 && bytes[index] <= 57 && digits.length < DELAY_DIGITS) digits += String.fromCharCode(bytes[index++]);
-            if (!digits || Number(digits) > MACRO_LIMITS.maxDelayMs || bytes[index++] !== 124) throw fail("Invalid macro delay.");
+            if (!digits || Number(digits) > MACRO_LIMITS.maxDelayMs || bytes[index++] !== 124) throw fail("A macro in this profile has a delay the keyboard cannot play.");
         } else {
             const k = bytes[index++];
-            if (![1, 2, 3].includes(type) || !key(k)) throw fail("Unsupported macro key instruction.");
-            if (type === 1 && held.has(k)) throw fail("A macro taps a key it already holds.");
-            if (type === 2) {if (held.has(k) || held.size >= MACRO_LIMITS.maxHeldKeys) throw fail("Unbalanced macro keys."); held.add(k);}
-            if (type === 3 && !held.delete(k)) throw fail("Unbalanced macro keys.");
+            if (![1, 2, 3].includes(type) || !key(k)) throw fail("A macro in this profile presses a key the keyboard cannot play.");
+            if (type === 1 && held.has(k)) throw fail("A macro in this profile taps a key it is already holding.");
+            if (type === 2) {if (held.has(k) || held.size >= MACRO_LIMITS.maxHeldKeys) throw fail(`A macro in this profile holds a key it is already holding, or more than ${MACRO_LIMITS.maxHeldKeys} keys at once.`); held.add(k);}
+            if (type === 3 && !held.delete(k)) throw fail("A macro in this profile releases a key it is not holding.");
         }
     }
-    if (held.size) throw fail("A macro leaves keys pressed.");
+    if (held.size) throw fail("A macro in this profile ends with keys still held.");
 }
 // The whole profile the keyboard runs, every domain: each domain its active
 // profile holds, otherwise the compiled default the firmware falls back to
@@ -87,17 +95,17 @@ function validateMacro(bytes, {textEntry = false, layout} = {}) {
 // stores no combos at all.
 /** @param {Uint8Array} active @param {Uint8Array} defaults @param {import("./types.js").NativeComboTable} combos @param {Buffer} settings */
 function materializeProfile(active, defaults, combos, settings) {
-    if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
+    if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard's firmware changes how combos work in ways a profile cannot hold, so Ark cannot read its profile.");
     const live = decodeStoredProfileBlob(active), fallback = decodeStoredProfileBlob(defaults);
     /** @param {number} id */
     const stored = id => live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
     /** @type {import("../schema/types.js").ProfileDomain[]} */
     const domains = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES, PROFILE_DOMAIN_IDS.KEYMAP, PROFILE_DOMAIN_IDS.MACROS].map(id => {
         const found = stored(id);
-        if (!found) throw fail("The keyboard did not report every profile domain.");
+        if (!found) throw fail("The keyboard did not report every part of its profile. Read it again.");
         return found;
     });
-    decodeSettings(settings);
+    answered(() => decodeSettings(settings));
     domains.push(stored(PROFILE_DOMAIN_IDS.COMBOS) || domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(comboTableOf(combos))), domain(PROFILE_DOMAIN_IDS.SETTINGS, settings));
     return encodeProfileBlob({domains});
 }
@@ -112,7 +120,7 @@ function materializeStored(stored, defaults) {
     const own = decodeStoredProfileBlob(stored), fallback = decodeStoredProfileBlob(defaults);
     const domains = DOMAIN_IDS.map(id => {
         const found = own.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
-        if (!found) throw fail("The keyboard did not report every profile domain.");
+        if (!found) throw fail("The keyboard did not report every part of its profile. Read it again.");
         return found;
     });
     return encodeProfileBlob({domains});
@@ -126,44 +134,52 @@ function comboTableOf(combos) {
             termMs: row.followsDefault ? null : row.termMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered,
             enabled: row.enabled ?? true, useOutputBehavior: row.useOutputBehavior ?? true, allowedLayers: row.allowedLayers ?? ALL_LAYERS}))};
 }
+// A backup of profile bytes the keyboard sent (its complete read, or its saved
+// profile and working copy): a check they fail is the keyboard's answer not
+// reading, never a file's (schema/bytes.js answered).
 /** @param {{profile: Buffer, actionAbiDigest: number}} snapshot */
 function createSnapshot({profile, actionAbiDigest}) {
     /** @type {PortableDocument} */
     const document = {format: "charybdis-profile", version: DOCUMENT_VERSION, keyboard: "charybdis-4x6", actionAbiDigest,
         profile: profile.toString("base64")};
-    validateSnapshot(document); return document;
+    answered(() => validateSnapshot(document)); return document;
 }
 /** @param {unknown} value @param {ProfileDestination} [capabilities] @returns {DecodedProfile} */
 function validateSnapshot(value, capabilities) {
     if (typeof value === "string") {
         if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail(FILE_TOO_LARGE);
-        try {value = JSON.parse(value);} catch {throw fail("This is not a valid profile file.");}
+        try {value = JSON.parse(value);} catch {throw fail("This file is not a valid backup.");}
     }
     // Inspect the unvalidated object; its complete shape is established below.
     const candidate = /** @type {Partial<Record<keyof PortableDocument, unknown>> | null | undefined} */ (value);
-    if (!candidate || candidate.format !== "charybdis-profile" || candidate.keyboard !== "charybdis-4x6" || typeof candidate.actionAbiDigest !== "number" || !Number.isInteger(candidate.actionAbiDigest) || candidate.actionAbiDigest < 1 || candidate.actionAbiDigest > 0xffffffff) throw fail("Choose a supported Charybdis profile file.");
+    if (!candidate || candidate.format !== "charybdis-profile" || candidate.keyboard !== "charybdis-4x6" || typeof candidate.actionAbiDigest !== "number" || !Number.isInteger(candidate.actionAbiDigest) || candidate.actionAbiDigest < 1 || candidate.actionAbiDigest > 0xffffffff) throw fail("Choose a Charybdis backup.");
     if (candidate.version !== DOCUMENT_VERSION || !knownActionAbi(candidate.actionAbiDigest)) throw fail(OLDER_FORMAT);
-    if (Object.keys(candidate).some(key => !["format", "version", "keyboard", "actionAbiDigest", "profile"].includes(key))) throw fail("This profile contains unsupported fields.");
-    const profile = base64(candidate.profile, PROFILE_BLOB_V1.MAX_SIZE, "profile data");
+    if (Object.keys(candidate).some(key => !["format", "version", "keyboard", "actionAbiDigest", "profile"].includes(key))) throw fail("This file holds more than a backup from current firmware does, so Ark cannot read it.");
+    const profile = base64(candidate.profile, PROFILE_BLOB_V1.MAX_SIZE, DAMAGED);
     let domains;
     try {domains = decodeProfileBlob(profile).domains;} catch (error) {
         if (error instanceof ProfileBlobProtocolError && ["INCOMPATIBLE_SCHEMA", "UNKNOWN_DOMAIN_VERSION"].includes(error.code)) throw fail(OLDER_FORMAT);
-        throw error;
+        throw damaged(error);
     }
-    if (domains.map(d => d.id).join() !== DOMAIN_IDS.join()) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
+    if (domains.map(d => d.id).join() !== DOMAIN_IDS.join()) throw fail("This backup is missing part of the profile. Ark imports only a complete backup.");
     /** @param {import("../schema/profile-domains-types.js").DomainKey} key */
     const payload = key => /** @type {import("../schema/types.js").ProfileDomain} */ (domains.find(domain => domain.id === domainCodec(key).id)).payload;
-    const layers = domainCodec("keymap").decode(payload("keymap"));
-    const macros = domainCodec("macros").decode(payload("macros"));
+    /** @template {import("../schema/profile-domains-types.js").DomainKey} K @param {K} key @param {Parameters<import("../schema/profile-domains-types.js").DomainCodec<K>["decode"]>[1]} [options] */
+    const decoded = (key, options) => {
+        try {return domainCodec(key).decode(payload(key), options);}
+        catch (error) {throw damaged(error);}
+    };
+    const layers = decoded("keymap");
+    const macros = decoded("macros");
     macros.forEach(slot => validateMacro(slot));
-    const pdModes = domainCodec("pdModes").decode(payload("pdModes"));
+    const pdModes = decoded("pdModes");
     const codecOptions = profileDepthOptions(capabilities, payload("rgb"));
-    const rgb = domainCodec("rgb").decode(payload("rgb"), codecOptions), behaviors = domainCodec("behaviors").decode(payload("behaviors"), codecOptions),
-        combos = domainCodec("combos").decode(payload("combos")), settings = domainCodec("settings").decode(payload("settings"));
+    const rgb = decoded("rgb", codecOptions), behaviors = decoded("behaviors", codecOptions),
+        combos = decoded("combos"), settings = decoded("settings");
     // With Unicode playback on, a held ordinary key cannot span text the
     // layout leaves to Unicode entry.
     if (settings.values[SETTING.UNICODE_HOST_MODE] & 0x100) for (const macro of macros) validateMacro(macro, {textEntry: true, layout: hostSettings(settings.values).layout});
-    if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`RGB does not cover all ${LAYERS} layers.`);
+    if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`The lighting in this profile does not cover all ${LAYERS} layers.`);
     // A key for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
     // activate a slot whose record is empty rather than misbehaving
@@ -185,10 +201,10 @@ function validateSnapshot(value, capabilities) {
     const checkAction = action => {
         if ([4, 5].includes(action.kind)) checkPd(action.operand);
         if (action.kind === 1) checkNativePd(action.operand);
-        if ([2, 3].includes(action.kind) && action.operand >= LAYERS) throw fail("A profile action references a missing layer.");
+        if ([2, 3].includes(action.kind) && action.operand >= LAYERS) throw fail("A behaviour or combo in this profile reaches a layer the keyboard does not have.");
     };
     walkActions(behaviors, checkAction); walkActions(combos, checkAction);
-    if (capabilities && (candidate.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== LAYERS || ((capabilities.supportedDomainMask ?? 0) & PROFILE_DOMAIN_MASK) !== PROFILE_DOMAIN_MASK)) throw fail(`The connected firmware does not support this profile's action vocabulary or ${LAYERS}-layer storage.`);
+    if (capabilities && (candidate.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== LAYERS || ((capabilities.supportedDomainMask ?? 0) & PROFILE_DOMAIN_MASK) !== PROFILE_DOMAIN_MASK)) throw fail("The keyboard's firmware cannot take this profile: it was made for other firmware. Update both halves to current firmware.");
     // The macro domain includes any optional unused tail. A destination
     // validates its advertised limit without constructing another storage bank.
     const stored = payload("macros").length;
@@ -280,13 +296,13 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     /** @param {number} code */
     function native(code) {
         if (!renumbers) return code;
-        if (inBlock(code, QK.LAYER_TAP)) {const layer = layerTapLayer(code); if (layer >= LAYERS) throw fail("A key points outside the layer bank."); return withLayerTapLayer(code, reach(layer));}
+        if (inBlock(code, QK.LAYER_TAP)) {const layer = layerTapLayer(code); if (layer >= LAYERS) throw fail(OUTSIDE_LAYERS); return withLayerTapLayer(code, reach(layer));}
         for (const start of [...Object.values(LAYER_FORMS), LAYER_LOCK_BASE]) {
             const width = start === LAYER_LOCK_BASE ? LAYER_LOCK_SLOTS : LAYER_FORM_LAYERS;
-            if (code >= start && code < start + width) {if (code - start >= LAYERS) throw fail("A key points outside the layer bank."); return start + reach(code - start);}
+            if (code >= start && code < start + width) {if (code - start >= LAYERS) throw fail(OUTSIDE_LAYERS); return start + reach(code - start);}
         }
         // Layer-mod stores a four-bit layer followed by five modifier bits.
-        if (inBlock(code, QK.LAYER_MOD)) {const layer = layerModLayer(code); if (layer >= LAYERS) throw fail("Invalid layer-mod reference."); return withLayerModLayer(code, reach(layer));}
+        if (inBlock(code, QK.LAYER_MOD)) {const layer = layerModLayer(code); if (layer >= LAYERS) throw fail(OUTSIDE_LAYERS); return withLayerModLayer(code, reach(layer));}
         return code;
     }
     const layers = order.map(old => validated.layers[old].map(native));

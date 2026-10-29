@@ -6,7 +6,7 @@ import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusBesideCount, stillShown} from "../view/review.mjs";
 import {reviewColumns, reviewItem} from "./review-items.mjs";
 import {checksSection} from "./checks.mjs";
-import {checkSourceGroup, checksToConfirm, confirmText} from "../view/checks.mjs";
+import {checkSources, checksToConfirm, confirmText, levelCountWords} from "../view/checks.mjs";
 import {shortcut} from "../view/shortcuts.mjs";
 import {LIVE, quietWords} from "../view/edit-mode.mjs";
 
@@ -17,23 +17,11 @@ export function reviewOverlay() {
     // Discarding goes back to the keyboard's value; it waits while the draft
     // is out of step with the keyboard or busy, as editing does.
     const canDiscard = writable();
-    /** @type {Map<import("../../contracts/model.js").Check, number | undefined>} */
-    const sourceByCheck = new Map();
-    /** @type {Map<number | null | undefined, {warning: number, trap: number}>} */
-    const sourceCounts = new Map();
-    for (const check of draft.checks) {
-        const group = checkSourceGroup(check, draft.changes);
-        if (group === null) continue;
-        sourceByCheck.set(check, group);
-        const count = sourceCounts.get(group) || {warning: 0, trap: 0};
-        if (check.level === "warning" || check.level === "trap") count[check.level] += check.kind === "trapOverflow" ? (check.count ?? 1) : 1;
-        sourceCounts.set(group, count);
-    }
+    const {groupOf: sourceByCheck, counts: sourceCounts} = checkSources(draft.checks, draft.changes);
     /** @param {number | null | undefined} group */
     const sourceLabel = (group) => {
         const count = sourceCounts.get(group);
-        if (!count) return "";
-        return `Source of ${[count.trap && `${count.trap} trap${count.trap === 1 ? "" : "s"}`, count.warning && `${count.warning} warning${count.warning === 1 ? "" : "s"}`].filter(Boolean).join(" and ")}`;
+        return count ? `Source of ${levelCountWords(count)}` : "";
     };
     /** @param {import("../../contracts/model.js").ReviewChange} entry @param {number} index @param {string} discard @param {boolean} titleSlot @param {string} source */
     const item = (entry, index, discard, titleSlot, source) => reviewItem(model, entry, {discard, titleSlot, sourceLabel: source,
@@ -47,7 +35,7 @@ export function reviewOverlay() {
     // not saved yet, with Revert, and Save again only once its own save failed.
     const keyboardSaves = draft.live?.mode === LIVE;
     const columns = live ? reviewColumns("What changes", "Saved", "Running now")
-        : reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");
+        : reviewColumns("What changes", demo.active ? "In the demo profile" : "On the keyboard", "In your draft");
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
     /** @type {import("../../contracts/model.js").ReviewChange[]} */
     const shown = [];
@@ -95,21 +83,21 @@ export function reviewOverlay() {
             ${sections}
             <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
                 : keyboardSaves ? `The keyboard already runs these changes and saves them by itself after ${esc(quietWords(draft.live?.keyboard))} without typing. Revert puts back what is saved.`
-                : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then writes them as its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
-                : "Save keeps a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts the save, the recovery copy restores it."}</div></div>
+                : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then makes them its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
+                : "Save keeps a recovery copy, sends the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts the save, the recovery copy keeps what it held."}</div></div>
         </div>
         ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>
-            <span class="right"><button class="btn primary" data-act="export">Export…</button></span></div>`
+            <span class="right"><button class="btn primary" data-act="export">Export profile…</button></span></div>`
         : confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm profile checks">
             <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks, live ? "save" : "apply"))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
                 <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Save anyway</button></span></div>`
         : `<div class="sheet-f"><span class="note" data-tip="${esc(model?.device?.summary || "")}">${esc(model?.device?.label || "")} · ${esc(model?.device?.savedProfile || "")}</span>
-            <span class="right">${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc(`Put back what is saved. Nothing is written; Undo (${shortcut("Z")}) sends the edits again.`)}">Revert</button>` : ""}
+            <span class="right">${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc(`Put back what is saved. The saved profile stays as it is; Undo (${shortcut("Z")}) sends the edits again.`)}">Revert</button>` : ""}
                 ${keyboardSaves ? draft.live?.keyboard?.saveFailed ? `<button class="btn primary" data-act="save-again" ${draft.connected && !draft.stale ? "" : "disabled"}
                     data-tip="${esc("The keyboard's own save failed. Ask it to save these edits again, after a recovery copy of what is saved now.")}">Save again</button>` : ""
                 : `<button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
-                    ${blockers.length ? `data-tip="Resolve the blockers in Checks before saving."` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>Save to keyboard</button>`}</span></div>`}
+                    ${blockers.length ? `data-tip="Resolve the blockers in Checks before saving."` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is saved.")}"` : ""}>Save to keyboard</button>`}</span></div>`}
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.

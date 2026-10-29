@@ -35,7 +35,7 @@ class NodeHidDeviceAdapter {
         } catch (cause) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.ENUMERATION_FAILED,
-                "Could not enumerate Charybdis Raw HID interfaces.",
+                "Ark could not list the connected keyboards.",
                 {cause}
             );
         }
@@ -43,7 +43,8 @@ class NodeHidDeviceAdapter {
         if (!Array.isArray(devices)) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.ENUMERATION_FAILED,
-                "node-hid devicesAsync() did not return an array."
+                "node-hid devicesAsync() did not return an array.",
+                {fault: "ark"}
             );
         }
 
@@ -75,7 +76,7 @@ class NodeHidDeviceAdapter {
         if (!descriptor) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.DEVICE_NOT_FOUND,
-                `No matching Charybdis Raw HID interface was found for ${id}.`,
+                "Ark cannot find that keyboard now. Check that it is plugged in, then choose it again.",
                 {deviceId: id}
             );
         }
@@ -89,7 +90,7 @@ class NodeHidDeviceAdapter {
         } catch (cause) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.CONNECT_FAILED,
-                `Could not open Charybdis Raw HID interface ${id}.`,
+                "Ark could not open the keyboard. Close any other program using it, then try again.",
                 {cause, deviceId: id}
             );
         }
@@ -103,7 +104,7 @@ class NodeHidDeviceAdapter {
             }
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.CONNECT_FAILED,
-                `Could not initialize Charybdis Raw HID interface ${id}.`,
+                "Ark could not start talking to the keyboard. Unplug it, plug it back in and try again.",
                 {cause, deviceId: id}
             );
         }
@@ -138,7 +139,7 @@ class NodeHidConnectedDevice {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.INVALID_ADAPTER,
                 "node-hid returned an invalid connected device handle.",
-                {deviceId}
+                {deviceId, fault: "ark"}
             );
         }
         this.nativeDevice = nativeDevice;
@@ -284,7 +285,8 @@ function validateHidModule(hid) {
     if (!hid || typeof hid.devicesAsync !== "function" || typeof hid.HIDAsync?.open !== "function") {
         throw liveLinkError(
             LIVE_LINK_ERROR_CODES.NATIVE_MODULE_UNAVAILABLE,
-            "node-hid must provide devicesAsync() and HIDAsync.open()."
+            "node-hid must provide devicesAsync() and HIDAsync.open().",
+            {fault: "ark"}
         );
     }
     return hid;
@@ -382,15 +384,8 @@ function closeNativeDevice(device) {
 }
 
 module.exports = {
-    CHARYBDIS_PRODUCT_ID,
-    CHARYBDIS_VENDOR_ID,
-    NODE_HID_REPORT_ID,
     NODE_HID_REPORT_SIZE,
-    NodeHidConnectedDevice,
     NodeHidDeviceAdapter,
-    QMK_RAW_HID_USAGE,
-    QMK_RAW_HID_USAGE_PAGE,
     addNodeHidReportId,
-    isCharybdisRawHidDevice,
     normalizeNodeHidInputReport,
 };

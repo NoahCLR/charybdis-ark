@@ -28,6 +28,9 @@ const customKeyOfName = name => {
     const match = /^CUSTOM_KEY_(0|[1-9]\d*)$/.exec(String(name ?? ""));
     return match && Number(match[1]) < CUSTOM_KEY_SLOTS ? Number(match[1]) : undefined;
 };
+// The name the keyboard gives a custom key.
+/** @param {number} slot */
+const customKeyName = slot => `CUSTOM_KEY_${slot}`;
 // The layer-lock block as the shared layer rules read it (rules/).
 const LAYER_LOCK_BLOCK = Object.freeze({first: LAYER_LOCK_BASE, count: LAYER_LOCK_SLOTS});
 /** @param {number} layer */
@@ -38,5 +41,5 @@ const layerLockOfCode = code => Number.isInteger(code) && code >= LAYER_LOCK_BAS
 module.exports = {
     CUSTOM_KEY_BASE, PD_HOLD_BASE, PD_LOCK_BASE, LAYER_LOCK_BASE, CUSTOM_KEY_SLOTS, LAYER_LOCK_SLOTS, LAYER_LOCK_BLOCK,
     RETIRED_CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_SLOTS,
-    customKeyCode, customKeyOfCode, customKeyOfName, layerLockCode, layerLockOfCode,
+    customKeyCode, customKeyName, customKeyOfCode, customKeyOfName, layerLockCode, layerLockOfCode,
 };

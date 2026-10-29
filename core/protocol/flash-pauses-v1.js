@@ -21,8 +21,10 @@ const FLASH_PAUSES_V1 = Object.freeze({
     PULL_MS: 1000,
 });
 
+// A page that does not read: its text is for the diagnostics
+// (schema/bytes.js protocolError).
 /** @param {string} message */
-const invalid = (message) => Object.assign(new Error(`${message} Read the keyboard again.`), {code: "INVALID_FLASH_PAUSES"});
+const invalid = (message) => Object.assign(new Error(message), {code: "INVALID_FLASH_PAUSES", fault: "answer"});
 
 /** @param {Uint8Array} payload @param {number} offset */
 const u32 = (payload, offset) => (payload[offset] | payload[offset + 1] << 8 | payload[offset + 2] << 16 | payload[offset + 3] << 24) >>> 0;

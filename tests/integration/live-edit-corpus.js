@@ -13,8 +13,8 @@ const {spawn} = require("node:child_process");
 const {createInterface} = require("node:readline");
 const {LiveEditCoordinator} = require("../../core/session/live-edit-coordinator");
 const {applySplices, diffProfiles} = require("../../core/schema/profile-splices");
-const {PROFILE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
-const {crc32, decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
+const {crc32, decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeSettings, encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {decodeCapabilityPages} = require("../../core/protocol/profile-wire-v1");
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_FLAGS, EDIT_PHASE, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest,

@@ -1,11 +1,12 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {KIND, newMode, scrollStarter} from "../../view/pointing-config.mjs";
-import {holdKeyName, whatReachesSlot} from "../../view/reach.mjs";
+import {holdKeyName, whatReachesSlot} from "../../view/pointing-reach.mjs";
 import {post} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {unavailable} from "../frame.mjs";
 import {actionMarked, mark} from "../marks.mjs";
+import {listed} from "../../view/vocabulary.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot */
 function inertNote(model, slot) {
@@ -15,7 +16,7 @@ function inertNote(model, slot) {
     if (keys.length) parts.push(`${keys.length} key${keys.length === 1 ? "" : "s"} on ${esc(layers.join(", "))}`);
     if (behaviours.length) parts.push(`${behaviours.length} behaviour${behaviours.length === 1 ? "" : "s"} (${behaviours.map((row) => actionMarked(model, row.keycode)).join(", ")})`);
     if (combos.length) parts.push(`${combos.length} combo output${combos.length === 1 ? "" : "s"} (${esc(combos.map((row) => row.badge).join(", "))})`);
-    return `<div class="unavailable">${parts.join(" and ")} still reach this slot. The keyboard refuses to activate an empty slot, so they do nothing until it is configured — they do not need to be removed first.</div>`;
+    return `<div class="unavailable">${listed(parts)} still reach this slot. The keyboard refuses to activate an empty slot, so they do nothing until it is configured — they do not need to be removed first.</div>`;
 }
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */

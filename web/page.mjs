@@ -6,7 +6,7 @@
 // neither, and shows only a notice (web/phone.mjs).
 
 import {isPhone, showPhoneNotice} from "./phone.mjs";
-import {initialTheme, startWebShell} from "./web-shell.mjs";
+import {initialTheme, showLoadFailure, startWebShell} from "./web-shell.mjs";
 
 /* global __ARK_VERSION__, __ARK_COMMIT__, __ARK_SLEEP_WORKER__, __ARK_PANEL__ */
 const build = {version: __ARK_VERSION__, commit: __ARK_COMMIT__};
@@ -18,8 +18,19 @@ if (isPhone({matchMedia, screen: globalThis.screen})) {
 } else {
     // WebHID exists only in a secure context (HTTPS or localhost).
     const hid = globalThis.isSecureContext ? navigator.hid : undefined;
+    /** @type {import("./types.js").SleepWorker | undefined} */
     let worker;
-    try {worker = new Worker(new URL(__ARK_SLEEP_WORKER__, import.meta.url));} catch {worker = undefined;}
+    // The page requires Trusted Types (scripts/build-web.js POLICY): the one
+    // script it starts by URL is this build's worker, and this policy passes
+    // that URL alone.
+    const workerUrl = new URL(__ARK_SLEEP_WORKER__, import.meta.url).href;
+    /** @typedef {{createScriptURL: (url: string) => string}} ScriptPolicy */
+    const scripts = /** @type {{trustedTypes?: {createPolicy: (name: string, rules: ScriptPolicy) => ScriptPolicy}}} */ (globalThis)
+        .trustedTypes?.createPolicy("ark-worker", {createScriptURL: (url) => {
+            if (url !== workerUrl) throw new TypeError(`Only the sleep worker starts by URL, not ${url}.`);
+            return url;
+        }});
+    try {worker = new Worker(scripts ? scripts.createScriptURL(workerUrl) : workerUrl);} catch {worker = undefined;}
 
     const {api} = startWebShell({
         hid,
@@ -35,5 +46,9 @@ if (isPhone({matchMedia, screen: globalThis.screen})) {
     });
     window.acquirePanelApi = () => api;
     // A URL rather than a name, so the build leaves the panel its own file.
-    import(new URL(__ARK_PANEL__, import.meta.url).href);
+    // One that does not load says so rather than leaving the page blank.
+    import(new URL(__ARK_PANEL__, import.meta.url).href).catch((error) => {
+        console.error(error);
+        showLoadFailure(document, /** @type {HTMLElement} */ (document.getElementById("root")));
+    });
 }

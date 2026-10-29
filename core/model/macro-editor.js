@@ -4,12 +4,14 @@ const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains")
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
-const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, encodeSettings} = require("../schema/settings-domain-v1");
+const {validName} = require("../schema/profile-name");
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, macroProtectionOf} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
 const {inspectMacroInput, inspectMacroPlayback, readStoredMacro} = require("./macro-input");
-const {VOCABULARY, macroDefaultName} = require("./vocabulary");
+const {VOCABULARY, macroDefaultName, word} = require("./vocabulary");
+const {macroName, macroOfName} = require("../../rules/qmk-keycodes.mjs");
 /** @param {string} message @param {string} [code] */
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
@@ -45,7 +47,7 @@ function macroEditorView(snapshot, capabilities) {
         const protection = macroProtectionOf(bytes);
         const needsUnicodeEntry = playback.typing.some(route => route.method !== "layout");
         const needsUnicodeSetup = playback.code === "UNICODE_SETUP_REQUIRED";
-        return {keycode: `MACRO_${index}`, name: names[index], defaultName: macroDefaultName(index),
+        return {keycode: macroName(index), name: names[index], defaultName: macroDefaultName(index),
             payload, protection, uninterruptible: protection === "on" || (protection === "auto" && needsUnicodeEntry),
             needsUnicodeEntry, needsUnicodeSetup, playbackError: playback.error, playbackCode: playback.code, empty: !payload, bytes: bytes.length,
             playable: !playback.error, available: !budget.outOfRoom.has(index),
@@ -54,9 +56,12 @@ function macroEditorView(snapshot, capabilities) {
     };
     return {identity: snapshot.fingerprint,
         // Text types through the host layout; what it cannot type needs Unicode
-        // entry (mode). The interface judges held keys against layoutChars.
+        // entry (mode), said in `entry`. The interface judges held keys
+        // against layoutChars.
         unicode: {mode: host.unicodeMode, enabled: host.unicodeEnabled, os: host.effective,
-            layout: host.layout, layoutFits: host.layoutFits, layoutName: layout.name, layoutChars: layout.chars},
+            layout: host.layout, layoutFits: host.layoutFits, layoutName: layout.name, layoutChars: layout.chars,
+            entry: host.unicodeMode ? word(VOCABULARY.unicodeEntry, host.unicodeMode)
+                : VOCABULARY.unicodeEntryOff.find(([os]) => os === host.effective)?.[1] ?? word(VOCABULARY.unicodeEntryOff, 0)},
         macros: slots.map(slot),
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
             slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS},
@@ -81,9 +86,8 @@ function macroInputStatus(snapshot, message, capabilities) {
 
 /** @param {string} keycode */
 function macroIndex(keycode) {
-    const match = /^MACRO_(\d+)$/.exec(keycode || "");
-    const index = match ? Number(match[1]) : -1;
-    if (!match || index >= MACRO_DOMAIN_V1.SLOTS || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");
+    const index = macroOfName(keycode || "");
+    if (index === undefined || index >= MACRO_DOMAIN_V1.SLOTS) throw fail("Choose a macro slot reported by the keyboard.");
     return index;
 }
 

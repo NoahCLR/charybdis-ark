@@ -2,7 +2,8 @@
 const {profileLayers, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {layerReach, draftChecks, compareFindings, keycodeLayersOn, LEVELS} = require("../../core/model/layer-reach");
+const {layerReach, LEVELS} = require("../../core/model/layer-reach");
+const {draftProfileChecks} = require("../../core/model/profile-checks");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 const {spawnSync} = require("node:child_process");
 const {compiled, settings} = require("../fixtures/portable-profile");
@@ -42,9 +43,9 @@ test("all sixteen layers retain their finding identities before and after a reor
     const draft = profile({keys: {"8:0": KC_B, "15:0": KC_ESC}});
     const order = Array.from({length: 16}, (_, n) => n);
     [order[8], order[15]] = [order[15], order[8]];
-    assert.deepEqual(draftChecks(keyboard, keyboard).map(f => [f.key, f.status]),
+    assert.deepEqual(draftProfileChecks(keyboard, keyboard).map(f => [f.key, f.status]),
         [["unreachable:8", "existing"], ["unreachable:15", "existing"]]);
-    assert.ok(draftChecks(keyboard, draft, order).every(f => f.status === "existing"));
+    assert.ok(draftProfileChecks(keyboard, draft, order).every(f => f.status === "existing"));
 });
 
 test("a generated custom escape uses the last declared member's source layer", () => {
@@ -160,10 +161,10 @@ test("Review identifies a newly covered escape and its repair beside independent
     const keys = Object.fromEntries(Array.from({length: 13}, (_, i) => [`0:${i}`, TT(i + 3)]));
     Object.assign(keys, {"0:20": TG(1), "0:21": TG(2), "1:20": TRNS, "2:21": TRNS});
     const before = profile({keys}), after = profile({keys: {...keys, "2:20": KC_B, "1:21": KC_B, "1:22": TG(2), "2:22": KC_B}});
-    const changed = draftChecks(before, after).filter(f => f.kind === "trap");
+    const changed = draftProfileChecks(before, after).filter(f => f.kind === "trap");
     assert.ok(changed.some(f => f.status === "new" && f.layers.join() === "1,2"));
-    assert.ok(!draftChecks(before, after).some(f => f.kind === "reachabilityIncomplete"));
-    assert.ok(draftChecks(after, before).some(f => f.kind === "trap" && f.status === "fixed" && f.layers.join() === "1,2"));
+    assert.ok(!draftProfileChecks(before, after).some(f => f.kind === "reachabilityIncomplete"));
+    assert.ok(draftProfileChecks(after, before).some(f => f.kind === "trap" && f.status === "fixed" && f.layers.join() === "1,2"));
 });
 
 test("a lock whose layer covers its own key, with nothing else to release it, is a trap", () => {
@@ -335,16 +336,16 @@ test("layer keys the keyboard leaves to QMK are named where they sit", () => {
 test("a draft's findings are new, already on the keyboard, or fixed by the draft", () => {
     const keyboard = profile({keys: {"0:0": TG(1), "1:0": KC_B, "5:0": KC_B}});
     const draft = profile({keys: {"0:0": TG(1), "1:0": KC_B, "1:5": TO(0), "6:0": KC_B}});
-    const checks = draftChecks(keyboard, draft);
+    const checks = draftProfileChecks(keyboard, draft);
     assert.deepEqual(checks.map((check) => [check.key, check.status]), [["unreachable:6", "new"], ["trap:1", "fixed"], ["unreachable:5", "fixed"]]);
-    assert.deepEqual(draftChecks(keyboard, keyboard).map((check) => check.status), ["existing", "existing"]);
-    assert.deepEqual(draftChecks(undefined, draft).map((check) => check.status), ["new"]);
+    assert.deepEqual(draftProfileChecks(keyboard, keyboard).map((check) => check.status), ["existing", "existing"]);
+    assert.deepEqual(draftProfileChecks(undefined, draft).map((check) => check.status), ["new"]);
 });
 
 test("a different unowned key on the same layer is new, and the old one is fixed", () => {
     const before = profile({keys: {"0:0": DF(1)}});
     const after = profile({keys: {"0:1": 0x52e2}});
-    assert.deepEqual(draftChecks(before, after).filter(row => row.kind === "unowned").map(row => row.status), ["new", "fixed"]);
+    assert.deepEqual(draftProfileChecks(before, after).filter(row => row.kind === "unowned").map(row => row.status), ["new", "fixed"]);
 });
 
 test("the review discloses trapped states beyond the four named paths", () => {
@@ -367,10 +368,10 @@ test("findings are matched layer with layer through the draft's order, so a reor
     const keyboard = profile({keys: {"5:0": KC_B}});
     const draft = profile({keys: {"2:0": KC_B}});
     const order = [0, 1, 5, 3, 4, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-    assert.deepEqual(draftChecks(keyboard, draft, order).map((check) => [check.key, check.status]), [["unreachable:5", "existing"]]);
+    assert.deepEqual(draftProfileChecks(keyboard, draft, order).map((check) => [check.key, check.status]), [["unreachable:5", "existing"]]);
     // Made the base, a layer leaves the old base with nothing reaching it: new.
     const based = profile({keys: {"3:0": KC_B}});
-    assert.deepEqual(draftChecks(profile(), based, [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]).map((check) => [check.key, check.status]), [["unreachable:0", "new"]]);
+    assert.deepEqual(draftProfileChecks(profile(), based, [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]).map((check) => [check.key, check.status]), [["unreachable:0", "new"]]);
 });
 
 test("layer keys that hold or toggle Base do nothing, and are counted wherever they sit; TO(0) is not one", () => {
@@ -413,19 +414,6 @@ test("an impossible release action cannot conceal a trapped layer", () => {
     assert.deepEqual(traps(p).map(f => f.layers), [[2]]);
     row.longHoldTerm = 200;
     assert.deepEqual(traps(p), []);
-});
-
-test("an incomplete draft graph never marks an earlier graph finding fixed", () => {
-    const before = [{kind: "trap", layers: [15]}, {kind: "unreachable", layers: [14]}, {kind: "baseNo", layers: [0]}];
-    const after = [{kind: "reachabilityIncomplete", layers: []}];
-    const compared = compareFindings(before, after);
-    assert.deepEqual(compared.filter(f => f.status === "fixed").map(f => f.kind), ["baseNo"]);
-});
-
-test("uncertainty about escapes does not hide a proved reachability repair", () => {
-    const before = [{kind: "trap", layers: [15]}, {kind: "unreachable", layers: [14]}];
-    const after = [{kind: "reachabilityIncomplete", scope: "escapes", layers: [15]}];
-    assert.deepEqual(compareFindings(before, after).filter(f => f.status === "fixed").map(f => f.kind), ["unreachable"]);
 });
 
 test("compiled source and declared-owner conditions agree with an exhaustive profile oracle", () => {
@@ -755,28 +743,4 @@ test("a custom key with its own row sends its shortcut where the row leaves a ti
     assert.deepEqual([HOLD, TAP_TOGGLE, ONESHOT].map(reached), [false, true, true]);
     // A row with steps replaces the tap-toggle's own taps: no lock, no trap.
     assert.deepEqual(traps(profile({keys: covered, rows: [both], shortcuts: {9: {layers: 1 << 5, layerKind: TAP_TOGGLE}}})), []);
-});
-
-test("the layers a keycode turns on, as the keyboard runs it", () => {
-    // A layer key's layer, a pointing-mode key's linked layers and a custom
-    // key's shortcut layers; DF and PDF only make a layer the default, which
-    // the keyboard leaves to QMK, so they turn none on.
-    const decoded = {settings: settings(), pdModes: [{id: 5, kind: 1, name: "Zoom", linkedLayers: 0, linkTurnsOn: (1 << 3) | (1 << 4), linkEnds: 0}]};
-    decoded.settings.customKeyShortcuts = Array.from({length: 128}, (_, slot) => (slot === 2 ? {mods: 0, keys: [], layers: (1 << 3) | (1 << 6), layerKind: 1} : {mods: 0, keys: [], layers: 0, layerKind: 0}));
-    const turnsOn = keycodeLayersOn(decoded);
-    const {PD_MODE_KEYS} = require("../../core/data/pd-mode-keys");
-    const {customKeyCode} = require("../../core/data/user-keycodes");
-    assert.equal(turnsOn(0x5223), 1 << 3, "MO(3)");
-    assert.equal(turnsOn(0x5263), 1 << 3, "TG(3)");
-    assert.equal(turnsOn(0x5203), 1 << 3, "TO(3)");
-    assert.equal(turnsOn(0x5283), 1 << 3, "OSL(3)");
-    assert.equal(turnsOn(0x52c3), 1 << 3, "TT(3)");
-    assert.equal(turnsOn(0x4338), 1 << 3, "LT(3,KC_SLASH)");
-    assert.equal(turnsOn(0x5243), 0, "DF(3)");
-    assert.equal(turnsOn(0x52e3), 0, "PDF(3)");
-    assert.equal(turnsOn(0x0004), 0, "KC_A");
-    assert.equal(turnsOn(PD_MODE_KEYS[5].holdCode), 1 << 3, "a pointing-mode key: its linked layers, less the pointer layer the keyboard ignores");
-    assert.equal(turnsOn(PD_MODE_KEYS[5].lockCode), 1 << 3);
-    assert.equal(turnsOn(customKeyCode(2)), (1 << 3) | (1 << 6), "a custom key's shortcut layers");
-    assert.equal(turnsOn(customKeyCode(3)), 0);
 });

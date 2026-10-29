@@ -98,7 +98,7 @@ pointer layer can't be in a link: their rows are dimmed, say why, and both
 switches are off limits. Settings won't make a layer a link uses the
 pointer layer or a default layer: take it out of the link first. A layer
 reorder moves a link as it moves layer keys, so the same keys still start
-the mode ([Rename & Reorder](board-and-layers.md#rename--reorder)). If a
+the mode ([Rename & reorder](board-and-layers.md#rename--reorder)). If a
 profile arrives with a link on such a layer, the card and Review say the
 keyboard ignores that layer until you switch it off.
 
@@ -189,6 +189,6 @@ Your computer decides what each button number does.
 
 Modes once had mouse button overrides, which made buttons 1–3 do something
 else while the mode ran. The keyboard no longer has them; a linked layer does
-that job (see [How it starts](#how-it-starts)). A backup made on firmware that had them is
-from older firmware, and Ark refuses it (see
+that job (see [How it starts](#how-it-starts)). A backup made on firmware that
+had them is from older firmware, and Ark refuses it (see
 [Backups](backups.md)).

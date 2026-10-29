@@ -20,6 +20,7 @@
 // them back into the keys it draws. Which keys press a combo's inputs is the
 // shared rule in rules/combo-inputs.mjs.
 
+const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {alwaysOnMask, answeringCandidate} = require("../../rules/layer-answers.mjs");
 const {comboKeysAmong, comboTouches, inputPressed} = require("../../rules/combo-inputs.mjs");
 
@@ -180,6 +181,24 @@ function comboReach(stack, combos, references) {
     });
 }
 
+// Which layer's keys combos match while each layer is on top (Combo Layer
+// Matching), the one rule for the published model and Review's walk: the
+// profile's layer record, which QMK's combo engine reads
+// (combo_ref_from_layer), so a drafted change counts before it is applied;
+// without a profile, the keyboard's combo readback (GET 0x06 page 1), which
+// reports those records; past both, the layer itself. A build with a fixed
+// reference layer, where the two could differ, is never read as a profile
+// (portable-profile.js).
+/** @param {readonly (number | undefined)[] | null} [stored] @param {readonly (number | undefined)[] | null} [read] @returns {number[]} */
+function comboReferenceLayers(stored, read) {
+    /** @param {number | undefined} value @returns {value is number} */
+    const layer = (value) => typeof value === "number" && Number.isInteger(value);
+    return LAYER_IDENTITY.map((at) => {
+        const own = stored?.[at], reported = read?.[at];
+        return layer(own) ? own : layer(reported) ? reported : at;
+    });
+}
+
 // Each publish rebuilds the model, but what this reads changes only with an
 // edit to keys, combos, their matching or the default layers, so the last few
 // answers are kept by exactly what they read.
@@ -197,4 +216,4 @@ function publishedComboReach(stack, combos, references) {
     return reach;
 }
 
-module.exports = {comboReach, publishedComboReach};
+module.exports = {comboReach, comboReferenceLayers, publishedComboReach};

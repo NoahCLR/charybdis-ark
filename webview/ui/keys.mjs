@@ -13,6 +13,7 @@ import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, heldLayers, layers, post, previewing, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftMarks} from "../view/review.mjs";
+import {vocabulary, word} from "../view/vocabulary.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
@@ -23,9 +24,6 @@ import {behaviourKey, selectBehaviourKey} from "./keys/behaviour-selection.mjs";
 import {pickKeycodeFor, swapKeys} from "./keys/key-edits.mjs";
 import {reachHighlight} from "./keys/reach.mjs";
 
-export {keysShortcut} from "./keys/shortcuts.mjs";
-export {matchBehavioursHeight} from "./keys/bench.mjs";
-export {previewFoot};
 
 export function screenKeys() {
     const model = getModel();
@@ -38,7 +36,7 @@ export function screenKeys() {
     const blocked = unavailable(model);
     if (!layer) {
         const content = el(`<div class="content"><div class="pad"><div class="screen-stub">
-            <h3>Nothing read yet</h3><p class="note">${esc(blocked || "Choose Read keyboard to load this keyboard's layers.")}</p></div></div></div>`);
+            <h3>Nothing read yet</h3><p class="note">${esc(blocked || "Choose Read keyboard to read this keyboard's layers.")}</p></div></div></div>`);
         main.appendChild(content);
         return main;
     }
@@ -77,7 +75,7 @@ export function screenKeys() {
                 // transparent key picks what shows through it, and switching
                 // layers afterwards leaves this input as it is.
                 const answer = comboAnswers(model, layers(), state.layer, heldLayers()).get(index);
-                state.combo.inputs = toggleComboInput(state.combo.inputs, answer, model?.firmware?.keysPerCombo);
+                state.combo.inputs = toggleComboInput(model, state.combo.inputs, answer, model?.firmware?.keysPerCombo);
             } else {
                 state.selected = index;
                 // Follow the key the board shows, including one with no
@@ -90,7 +88,7 @@ export function screenKeys() {
         onSwap: writable() ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
     }));
     card.appendChild(previewing() ? previewFoot(layer) : el(`<div class="board-foot"><span class="board-foot-text">${lit
-        ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
+        ? `lit ${esc(hsvLabel(row.color))} · ${esc(word(vocabulary(model).paintModes, row.mode).toLowerCase())}`
         : "no layer colour · the background effect shows through"}</span></div>`));
     card.append(bar);
     stage.append(card, legend(model));

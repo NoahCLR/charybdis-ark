@@ -5,8 +5,9 @@ conservative analysis behind them
 ([D-L36](../adr/0036-review-checks-reach-and-save-blockers.md),
 [D-L48](../adr/0048-timing-advice-follows-firmware-capability.md),
 [D-L49](../adr/0049-timing-findings-constrain-reachability-conservatively.md);
-for the person, the [guide](../guide/review-and-save.md#timing-checks)). Firmware owns timing
-and [participation](../../upstream/firmware/docs/spec/participation-policy.md).
+for the person, the [guide](../guide/review-and-save.md#timing-checks)).
+Firmware owns timing and
+[participation](../../upstream/firmware/docs/spec/participation-policy.md).
 Ark owns the analysis, its limits and how inherited behaviour is shown.
 
 ## From profile to Review
@@ -20,18 +21,19 @@ Ark owns the analysis, its limits and how inherited behaviour is shown.
    (`layer-reach.js`), timing (`gesture-timing.js`), rows that change nothing
    (`inert-behaviors.js`) and whole-profile checks, among them the two
    **blockers**: brightness over the keyboard's limit, and an effect it lacks.
-3. `compareFindings` (`layer-reach.js`) marks each check new, existing or
+3. `compareFindings` (`compare-findings.js`) marks each check new, existing or
    fixed. Its `findingKey` names layers through the draft's order, so a check
    follows its layer through a reorder.
 
 Core enforces each level, not only the interface:
 
-- **Blocker.** Apply, and Save in Live preview + save, refuse it before a recovery
-  copy or HID write. A live edit that adds one is not sent, nor is a draft
-  holding one sent live.
-- **Trap or warning.** Apply, and Save in Live preview + save, need `confirmChecks`
-  for the reviewed revision, whether the draft made it or the keyboard had
-  it. A live edit that adds one waits as a proposal (`checksAdded`).
+- **Blocker.** Apply, and Save in Live preview + save, refuse it before a
+  recovery copy or HID write. A live edit that adds one is not sent, nor is a
+  draft holding one sent live.
+- **Trap or warning.** Apply, and Save in Live preview + save, need
+  `confirmChecks` for the reviewed revision, whether the draft made it or the
+  keyboard had it. A live edit that adds one waits as a proposal
+  (`checksAdded`).
 - **Notice.** It only informs.
 
 Data the keyboard would refuse outright is refused by its editor, the decoder
@@ -47,7 +49,7 @@ it").
 else the setting. Every dual-role key (`MT()`, `LT()`, `OSL()`, `OSM()`,
 `TT()`) follows the dual-role term, with or without a row. Any other row
 follows the behaviour term. The checks, the layer walk, the editor's defaults
-(`behaviorDefaults` in `core/session/device-model.js`), review and default
+(`behaviorDefaults` in `core/model/profile-model.js`), review and default
 normalization all use this one function. So the editor and Review resolve a
 key alike (D-L49).
 
@@ -82,7 +84,9 @@ no "clear all" key, so only unplugging recovers. The keyboard accepts such a
 profile, so Review says so before Apply (D-L36).
 
 `layerReach` (`core/model/layer-reach.js`) models a state as locked layers
-plus layers held on top. Each key resolves as the firmware does: the highest
+plus layers held on top; what each key does to the layers is
+`core/model/layer-effects.js`, and the walk over the states
+`core/model/layer-walk.js`. Each key resolves as the firmware does: the highest
 active layer that is not transparent answers. A key moves the state by:
 
 - its own layer action, less what its row replaces (a row with steps drops
@@ -95,21 +99,21 @@ active layer that is not transparent answers. A key moves the state by:
   toggles them as a layer lock, as for a key, a behaviour branch or a combo
   output that runs the mode;
 - a custom key's shortcut (firmware D-F26), which turns its layers on as its
-  kind's layer key does: held as `MO()`, locked as a lock of several, moved
-  to as `TO()` of several, held with a fifth-tap lock as `TT()`, or held as a
+  kind's layer key does: held as `MO()`, locked as a lock of several, moved to
+  as `TO()` of several, held with a fifth-tap lock as `TT()`, or held as a
   one-shot as `OSL()`. That is the key itself, a behaviour hold that presses
   and holds it, or a combo output that sends it. On its own key with its own
   row, the row sends the shortcut where it leaves a tier empty: tapped from an
   empty first tap, held from the fallback hold, which only the first press has
   and only while it authors neither a hold nor a long hold, so a lock or a
-  move happens from either and a held shortcut only from that hold; a tap-toggle or one-shot shortcut's layers are on from every
-  press, whatever the row, and a row with steps drops the tap-toggle's
-  fifth-tap lock. A tap that sends it does what tapping that layer key does: a
-  held or tap-toggle shortcut turns its layers on only for the tap, so it
-  moves no state, while a lock, a move or a one-shot does; sent by a step, or
-  by a combo that does not run the key's behaviour, a tap-toggle shortcut
-  only holds, since its taps are its key's, while a combo that runs it acts as
-  the key itself;
+  move happens from either and a held shortcut only from that hold; a
+  tap-toggle or one-shot shortcut's layers are on from every press, whatever
+  the row, and a row with steps drops the tap-toggle's fifth-tap lock. A tap
+  that sends it does what tapping that layer key does: a held or tap-toggle
+  shortcut turns its layers on only for the tap, so it moves no state, while a
+  lock, a move or a one-shot does; sent by a step, or by a combo that does not
+  run the key's behaviour, a tap-toggle shortcut only holds, since its taps
+  are its key's, while a combo that runs it acts as the key itself;
 - the trackball, which turns on the pointer layer unless an auto-sniping
   layer other than it, or a linked layer that starts its mode, keeps it off.
   A link that a higher layer ends starts its mode, and so keeps the pointer
@@ -125,28 +129,29 @@ mode always counts as keeping the pointer layer off, even where a mode key
 held over it would let the pointer layer back.
 
 A key that turns several layers on is one effect on all of them: they go on
-together, and a hold of them is released together, so the walk never reaches
-a state where only some of one key's layers are on. A lock of several turns them all on, or all off once all of them are
-on. A shortcut's Lock shares each layer's lock with `TG()` (firmware layer
-ownership), so this is exact: turning them all off releases a layer a `TG()`
-locked too, as the keyboard does. A pointing mode's lock key is walked the
-same way, though the keyboard's mode owns its layers apart from the locks, so
-there the walk may let go of a layer a `TG()` still keeps on. A move to several
-locks them alone and lets every other lock go; `TO(0)`'s is the base alone,
-which lets them all go. A hold's release joins
-the walk once a state reached can make that hold. Layers are not tracked by
-the key that holds or locks them, though: where two holds share a layer (a
-shortcut holding Navigation and Extra, and an `MO()` of Navigation), letting
-either go drops the shared layer, and the other's release still lets go of
-what is left of it; a lock of one layer of a set toggles that layer alone.
-Only there can the walk reach a state a person cannot, and so name a trap no
-person could fall into. Holding is not limited by fingers, and a
-one-shot counts as a hold. So the walk finds every way out a person could,
-and elsewhere never invents a trap.
+together, and a hold of them is released together, so the walk never reaches a
+state where only some of one key's layers are on. A lock of several turns them
+all on, or all off once all of them are on. A shortcut's Lock shares each
+layer's lock with `TG()` (firmware layer ownership), so this is exact: turning
+them all off releases a layer a `TG()` locked too, as the keyboard does. A
+pointing mode's lock key is walked the same way, though the keyboard's mode
+owns its layers apart from the locks, so there the walk may let go of a layer
+a `TG()` still keeps on. A move to several locks them alone and lets every
+other lock go; `TO(0)`'s is the base alone, which lets them all go. A hold's
+release joins the walk once a state reached can make that hold. Layers are not
+tracked by the key that holds or locks them, though: where two holds share a
+layer (a shortcut holding Navigation and Extra, and an `MO()` of Navigation),
+letting either go drops the shared layer, and the other's release still lets
+go of what is left of it; a lock of one layer of a set toggles that layer
+alone. Only there can the walk reach a state a person cannot, and so name a
+trap no person could fall into. Holding is not limited by fingers, and a
+one-shot counts as a hold. So the walk finds every way out a person could, and
+elsewhere never invents a trap.
 
-`compactWalk` compiles keys and combos into conditions on active layers.
-`analyzeLayerStates` (`layer-state-graph.js`) explores them as shared Boolean
-decisions, so independent layers do not multiply into separate states.
+`compactWalk` (`layer-walk.js`) compiles keys and combos into conditions on
+active layers. `analyzeLayerStates` (`layer-state-graph.js`) explores them as
+shared Boolean decisions, so independent layers do not multiply into separate
+states.
 
 - A permanent `TO(0)`, or a toggle for every lockable layer, proves escape at
   once. Otherwise a backward pass finds the states with a way home.
@@ -171,10 +176,11 @@ the last declared member owns the output, and placement bypasses and layer
 behaviour switches are physical-only. A bypassed custom output supplies no
 escape.
 
-Held by `tests/model/layer-reach.test.js` ("compiled source and
-declared-owner conditions agree with an exhaustive profile oracle") and
-`tests/model/layer-state-graph.test.js` ("compact analysis agrees with
-exhaustive enumeration on seeded interacting graphs").
+Held by `tests/model/layer-reach.test.js` ("compiled source and declared-owner
+conditions agree with an exhaustive profile oracle"),
+`tests/model/layer-walk.test.js` ("the compact walk and the bounded walk reach
+the same layers") and `tests/model/layer-state-graph.test.js` ("compact
+analysis agrees with exhaustive enumeration on seeded interacting graphs").
 
 ## Built-in branches
 
@@ -187,7 +193,7 @@ there.
    holds its own only from Tap / hold, not from the press.
 2. `behaviorRowsForView` (`core/model/device-profile-view.js`) publishes them
    on each row, judged with its steps; `behaviorDefaults`
-   (`core/session/device-model.js`) publishes them for a key with no row, with
+   (`core/model/profile-model.js`) publishes them for a key with no row, with
    the effective timing, its source setting and `timingAlone`. It does so for
    every keycode the profile holds and every custom key, placed or not.
 3. The editor draws them as dashed cells (`impliedBranch` in
@@ -211,7 +217,9 @@ steps, no anchor and no timing that applies to its key.
 `timingAlone` follows the firmware key runtime's classification. It is
 narrower than the contract's words ("dual-role, layer and pd-mode keys"):
 `TO()`, `TG()`, `LOCK_LAYER()`, pointing-mode locks, `DF()` and `PDF()` are
-not handled anyway. A firmware change to it is an Ark follow-up.
+not handled anyway. `timingAlone` holds for exactly the keys that runtime
+handles with or without a row, so a firmware change to its classification
+changes `core/model/inert-behaviors.js` and its tests with it.
 
 The rule crosses to the interface twice. `device-profile-view.js` publishes
 `changesNothing` per stored row. `behaviorDefaults` publishes `timingAlone`

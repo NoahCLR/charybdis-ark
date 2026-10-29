@@ -18,10 +18,8 @@ import {el, esc} from "../lib/dom.mjs";
 import {customKeyPlacements} from "../view/reach.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {titleName, attachTitleName} from "./title-name.mjs";
-import {ROUTE_WORDS, setReachGroupOpen} from "../view/reach-groups.mjs";
-import {canEdit as canEditArea, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
+import {canEdit as canEditArea, getModel, layers, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
-import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./frame.mjs";
 import {keyName} from "../view/keyvalues.mjs";
@@ -29,6 +27,7 @@ import {customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine, sameS
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourEditor} from "./keys/behaviour-editor.mjs";
+import {placementChipsMarkup, showPlacements} from "./keys/reach.mjs";
 
 
 export function screenCustomKeys() {
@@ -47,7 +46,7 @@ export function screenCustomKeys() {
     if (!keys.length) {
         pad.classList.remove("library");
         pad.appendChild(el(`<div class="screen-stub"><h3>No custom keys read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's custom keys.")}</p></div>`));
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's custom keys.")}</p></div>`));
         main.appendChild(content);
         return main;
     }
@@ -108,16 +107,22 @@ function editor(model, key, canEdit) {
         state.placement = {keycode: key.keycode};
         state.screen = "keys"; state.tab = "key"; render();
     });
-    /** @type {NodeListOf<HTMLElement>} */ (card.querySelectorAll("[data-goto-layer]")).forEach((button) => button.addEventListener("click", () =>
-        showOnLayer(key.keycode, Number(button.dataset.gotoLayer))));
+    showPlacements(card, "customKeys", key.keycode);
     return card;
 }
 
 // The key's own fields, in the order the card shows them; its name is the
 // card's title. The shortcut is a placeholder filled in once the card exists
-// (shortcutField).
+// (shortcutField). Then the layers where a key carries it, a behaviour sends
+// it or a combo does, each in its layer colour; a click shows that layer with
+// the key picked.
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
-const keyFields = (model, key) => [`<div data-shortcut></div>`, placedOn(model, key)];
+const keyFields = (model, key) => {
+    const chips = placementChipsMarkup(model, "customKeys", key.keycode);
+    return [`<div data-shortcut></div>`, `<div class="field"><span>On layers</span>
+        ${chips ? `<div class="row layer-chips">${chips}</div>`
+            : `<span class="note">No key, behaviour or combo sends this custom key. Place it on a key to use it.</span>`}</div>`];
+};
 
 // What the key does: in words (its shortcut, its behaviour on top, both, or
 // nothing yet), then its behaviour editor, the same one the Keymap screen's
@@ -133,7 +138,7 @@ function behaviourCard(model, key) {
         <div class="card-h"><h3>What it does</h3>
             <span class="tag">${key.hasBehavior ? "Behaviour" : "No behaviour yet"}</span>
             ${placed ? `<span class="right row actions"><button class="btn tiny ghost" data-act="show-behaviour"
-                data-tip="Open this behaviour in Keymap · Behaviours, with the board showing the keys that reach it.">Show on the Keymap screen</button></span>` : ""}</div>
+                data-tip="Open this behaviour in Keymap → Behaviours, with the board showing the keys that reach it.">Show on the Keymap screen</button></span>` : ""}</div>
         <div class="card-b stack"><p class="note" data-does>${esc(customKeyDoes(key))}</p></div></div>`);
     const body = /** @type {HTMLElement} */ (card.querySelector(".card-b"));
     if (behaviour) body.appendChild(behaviourEditor(behaviour));
@@ -173,32 +178,4 @@ function shortcutField(model, key, canEdit) {
         },
     }));
     return node;
-}
-
-// The layers where a key carries this custom key or a combo sends it, each in
-// its layer colour; a click shows that layer with the key picked.
-/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
-function placedOn(model, key) {
-    const chips = customKeyPlacements(model, layers(), key.keycode).map(({layer, at, routes}) => {
-        const swatch = layerSwatch(model, layer);
-        const how = routes.map((route) => `${ROUTE_WORDS[route.group] || route.group}${route.group === "here" && route.keys.length > 1 ? ` ×${route.keys.length}` : ""}`).join(" · ");
-        return `<button class="layer-chip link" data-goto-layer="${esc(at)}"
-            data-tip="${esc(swatch.tip)} · reached by ${esc(how)} · show on the board">${swatch.html}
-            <span>${esc(layerName(layer))}</span><span class="idx">${esc(how)}</span></button>`;
-    }).join("");
-    return `<div class="field"><span>On layers</span>
-        ${chips ? `<div class="row layer-chips">${chips}</div>`
-            : `<span class="note">No key, behaviour or combo sends this custom key. Place it on a key to use it.</span>`}</div>`;
-}
-
-/** @param {string} keycode @param {number} at */
-function showOnLayer(keycode, at) {
-    const placement = customKeyPlacements(getModel(), layers(), keycode).find((entry) => entry.at === at);
-    const route = placement?.routes[0];
-    if (!route) return;
-    Object.assign(state, {screen: "keys", tab: "customKeys", layer: at, placement: null});
-    if (route.keys.length) state.selected = route.keys[0];
-    state.reachRow.customKeys = `${route.group}:${keycode}`;
-    state.reachGroups = setReachGroupOpen(state.reachGroups, route.group, true);
-    render();
 }

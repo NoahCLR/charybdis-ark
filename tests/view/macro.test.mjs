@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {sequenceFace} from "../../webview/view/macro-sequence.mjs";
-import {TEXT_CHIP, TEXT_TIP, describeStep, macroChips, macroMatches, macroPeek, parseMacro as parseMacroWith, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
+import {TEXT_CHIP, TEXT_TIP, describeStep, macroChips, macroMatches, macroNumber, macroShortName, macroPeekSteps, parseMacro as parseMacroWith, protectionChoiceLabel, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
 import {createRequire as requireFrom} from "node:module";
 // The step editor reads a macro with the vocabulary's words for what is wrong.
 const {VOCABULARY: WORDS} = requireFrom(import.meta.url)("../../core/model/vocabulary");
@@ -56,6 +56,8 @@ test("a slot's cell shows what the macro sends, not the modifier they all start 
     // Twelve real slots all opened with {+KC_LEFT_GUI}, so every cell read
     // "KC_LEFT_…" and no slot could be told from another.
     const label = (name) => ({KC_SPACE: "Space", KC_DOT: ".", KC_X: "X", KC_LEFT_GUI: "Left GUI"})[name] || name;
+    // The cell reads the steps the peek parses, which the permissive parser gives.
+    const macroPeek = (payload, named) => macroPeekSteps(parseMacroWith(payload).steps, named);
     assert.equal(macroPeek("{+KC_LEFT_GUI}{KC_SPACE}{-KC_LEFT_GUI}", label), "Space");
     assert.equal(macroPeek("{+KC_LEFT_GUI}{+KC_LEFT_SHIFT}{KC_DOT}{-KC_LEFT_SHIFT}{-KC_LEFT_GUI}", label), ".");
     assert.equal(macroPeek("hello", label), "hello", "text still speaks for itself");
@@ -107,6 +109,11 @@ test("a macro is found by its name, and by its slot when it has none", () => {
     assert.equal(macroMatches(unnamed, "MACRO_12"), true, "and its keycode");
     assert.equal(macroMatches(unnamed, "screen"), false);
     assert.equal(macroMatches(unnamed, ""), true, "an empty search hides nothing");
+});
+
+test("a macro slot's number and short name come from the name its keycode goes by", () => {
+    assert.deepEqual([macroNumber("MACRO_0"), macroNumber("MACRO_127"), macroShortName({keycode: "MACRO_12"})], [0, 127, "M12"]);
+    for (const keycode of ["MACRO_128", "MACRO_03", "QK_MACRO_3", "KC_A", "", undefined]) assert.equal(macroNumber(keycode), null, String(keycode));
 });
 
 
@@ -230,4 +237,14 @@ test("a macro's chip tells an unkept edit, a change kept in the draft and the ma
     // A playback change Your computer caused is listed under the macro, but it
     // is not a change to the macro.
     assert.equal(macroLocalState([{unit: "settings:host"}], "MACRO_0", false).text, "as read");
+});
+
+// The dropdown says Automatic as core does, with whether the macro plays
+// uninterruptibly now; a chosen setting says only its word.
+test("an Uninterruptible playback choice reads in core's words", () => {
+    const model = {vocabulary: WORDS};
+    const choices = WORDS.macroProtection.map(([value, label]) => ({value, label}));
+    assert.deepEqual(choices.map((choice) => protectionChoiceLabel(model, choice, true)), ["Automatic · on", "On", "Off"]);
+    assert.equal(protectionChoiceLabel(model, choices[0], false), "Automatic · off");
+    assert.equal(protectionChoiceLabel(null, choices[0], true), "Automatic", "without core's words, the choice's own");
 });

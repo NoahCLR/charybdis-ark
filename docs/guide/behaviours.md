@@ -80,7 +80,7 @@ clear the field to follow the default again. The defaults are under
 **Tap & hold timing** on Behaviour settings (below).
 
 When Review's checks find a problem with the timing, a note above the grid
-says so.
+says so, headed **Timing notice** or **Timing warning**.
 
 ## More switches
 
@@ -145,8 +145,8 @@ isn't a change and isn't in Review: the key, or unplugging, turns it back on.
 cards, both open: **Tap & hold timing** and **Behaviours**, the switches in
 the table above.
 
-**Tap & hold timing** holds the keyboard's default timings, used wherever a behaviour leaves its own
-empty:
+**Tap & hold timing** holds the keyboard's default timings, used wherever a
+behaviour leaves its own empty:
 
 - **Dual-role tap / hold threshold**: for keys that type on tap and hold a
   layer or modifier, such as `LT` and `MT` keys, with or without a behaviour.

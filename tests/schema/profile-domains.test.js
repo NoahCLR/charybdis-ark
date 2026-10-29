@@ -21,8 +21,6 @@ test("one canonical registry pins every current domain's identity, version, wire
         {name: "MACROS", id: 112, key: "macros", readKey: undefined, version: 1, wireBit: 64, area: "macros"},
     ]);
     assert.equal(PROFILE_DOMAIN_MASK, 127);
-    assert.equal(require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_DOMAINS, PROFILE_WIRE_DOMAINS);
-    assert.equal(require("../../core/schema/profile-blob-v1").PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_VERSIONS);
     assert.ok(Object.isFrozen(PROFILE_DOMAINS));
     for (const domain of PROFILE_DOMAINS) {
         assert.ok(Object.isFrozen(domain));

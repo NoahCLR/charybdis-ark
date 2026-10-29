@@ -35,6 +35,10 @@ const {NAME_MAX_BYTES, validName, nameOfBytes, encodeName} = require("./profile-
 
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS"});
+// A refusal that names the format's bytes rather than a person's choice: Ark's
+// own fault where Ark wrote them (schema/bytes.js protocolError).
+/** @param {string} message */
+const malformed = message => Object.assign(fail(message), {fault: "ark"});
 
 // What the firmware accepts for a value, given that it is a uint32 and the
 // layer count. A plain range also says its bounds, for an editor to offer.
@@ -236,7 +240,7 @@ function positionsOfBitmap(bytes, positions) {
     const set = [];
     for (let position = 0; position < SETTINGS.PLACEMENT_MAX_POSITIONS; position++) {
         if ((bytes[position >> 3] >> (position & 7)) & 1) {
-            if (position >= positions) throw fail("A placement bit names a key position this keyboard does not have.");
+            if (position >= positions) throw malformed("A placement bit names a key position this keyboard does not have.");
             set.push(position);
         }
     }
@@ -246,7 +250,7 @@ function positionsOfBitmap(bytes, positions) {
 function bitmapOfPositions(list, positions) {
     const bytes = Buffer.alloc(SETTINGS.PLACEMENT_BYTES);
     for (const position of list ?? []) {
-        if (!Number.isInteger(position) || position < 0 || position >= positions) throw fail("A placement names a key position this keyboard does not have.");
+        if (!Number.isInteger(position) || position < 0 || position >= positions) throw malformed("A placement names a key position this keyboard does not have.");
         bytes[position >> 3] |= 1 << (position & 7);
     }
     return bytes;
@@ -259,27 +263,27 @@ const defaultLayerRecord = layer => ({reference: layer, bypass: [], exclude: []}
 
 /** @param {import("./types.js").SettingsDomain} value @param {number} [layers] @param {number} [positions] */
 function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSITIONS) {
-    if ((value?.formatVersion ?? SETTINGS.VERSION) !== SETTINGS.VERSION) throw fail("Unsupported settings format.");
+    if ((value?.formatVersion ?? SETTINGS.VERSION) !== SETTINGS.VERSION) throw malformed("Unsupported settings format.");
     if (!value || !Array.isArray(value.values) || value.values.length !== SETTINGS.COUNT || !value.values.every((v, id) => validSetting(id, v, layers))
-        || value.values[SETTING.AUTO_MOUSE_TIMEOUT] <= value.values[SETTING.AUTO_MOUSE_DEAD_TIME]) throw fail("Invalid keyboard settings.");
-    if (!Array.isArray(value.names) || value.names.length !== SETTINGS.LAYERS) throw fail("Missing layer names.");
-    if (!Array.isArray(value.layers) || value.layers.length !== SETTINGS.LAYERS) throw fail("Missing layer records.");
-    if (!Array.isArray(value.macroNames) || value.macroNames.length !== SETTINGS.MACRO_NAMES) throw fail("Missing macro names.");
-    if (!Array.isArray(value.customKeyNames) || value.customKeyNames.length !== SETTINGS.CUSTOM_KEY_NAMES) throw fail("Missing custom key names.");
-    if (typeof value.keyboardName !== "string") throw fail("Missing keyboard name.");
-    if (!Array.isArray(value.customKeyShortcuts) || value.customKeyShortcuts.length !== SETTINGS.CUSTOM_KEY_SHORTCUTS) throw fail("Missing custom key shortcuts.");
+        || value.values[SETTING.AUTO_MOUSE_TIMEOUT] <= value.values[SETTING.AUTO_MOUSE_DEAD_TIME]) throw malformed("Invalid keyboard settings.");
+    if (!Array.isArray(value.names) || value.names.length !== SETTINGS.LAYERS) throw malformed("Missing layer names.");
+    if (!Array.isArray(value.layers) || value.layers.length !== SETTINGS.LAYERS) throw malformed("Missing layer records.");
+    if (!Array.isArray(value.macroNames) || value.macroNames.length !== SETTINGS.MACRO_NAMES) throw malformed("Missing macro names.");
+    if (!Array.isArray(value.customKeyNames) || value.customKeyNames.length !== SETTINGS.CUSTOM_KEY_NAMES) throw malformed("Missing custom key names.");
+    if (typeof value.keyboardName !== "string") throw malformed("Missing keyboard name.");
+    if (!Array.isArray(value.customKeyShortcuts) || value.customKeyShortcuts.length !== SETTINGS.CUSTOM_KEY_SHORTCUTS) throw malformed("Missing custom key shortcuts.");
     const refused = value.customKeyShortcuts.find(shortcut => !validShortcut(shortcut));
     if (refused !== undefined) throw fail(shortcutStoreRefusal(refused));
     const named = value.customKeyShortcuts.findIndex(shortcut => shortcut.layers & alwaysOnLayers(value.values));
     if (named >= 0) throw fail(`Custom key ${named}'s shortcut turns on a default layer, which is always on.`);
     const fixed = Buffer.alloc(SETTINGS.FIXED_SIZE);
     HEADER.copy(fixed);
-    if (value.comboOutputBehaviors !== undefined && typeof value.comboOutputBehaviors !== "boolean") throw fail("Combo output behaviour permission must be on or off.");
+    if (value.comboOutputBehaviors !== undefined && typeof value.comboOutputBehaviors !== "boolean") throw malformed("Combo output behaviour permission must be on or off.");
     fixed[SETTINGS_HEADER_FLAGS.OFFSET] = value.comboOutputBehaviors === false ? SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS : 0;
     value.values.forEach((v, id) => fixed.writeUInt32LE(v, SETTINGS.SCALARS_OFFSET + id * 4));
     value.layers.forEach((record, layer) => {
         const at = SETTINGS.LAYER_RECORDS_OFFSET + layer * SETTINGS.LAYER_RECORD_SIZE;
-        if (!Number.isInteger(record?.reference) || record.reference < 0 || record.reference >= layers) throw fail("A combo reference layer is outside the layer bank.");
+        if (!Number.isInteger(record?.reference) || record.reference < 0 || record.reference >= layers) throw malformed("A combo reference layer is outside the layer bank.");
         fixed[at] = record.reference;
         bitmapOfPositions(record.bypass, positions).copy(fixed, at + 1);
         bitmapOfPositions(record.exclude, positions).copy(fixed, at + 1 + SETTINGS.PLACEMENT_BYTES);
@@ -301,7 +305,7 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
 
 /** @param {Buffer} bytes @param {number} [layers] @param {number} [positions] */
 function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSITIONS) {
-    if (!Buffer.isBuffer(bytes) || bytes.length < SETTINGS.MIN_SIZE || bytes.length > SETTINGS.MAX_SIZE || HEADER.some((byte, offset) => offset === SETTINGS_HEADER_FLAGS.OFFSET ? Boolean(bytes[offset] & ~SETTINGS_HEADER_FLAGS.KNOWN) : bytes[offset] !== byte)) throw fail("Unsupported settings format.");
+    if (!Buffer.isBuffer(bytes) || bytes.length < SETTINGS.MIN_SIZE || bytes.length > SETTINGS.MAX_SIZE || HEADER.some((byte, offset) => offset === SETTINGS_HEADER_FLAGS.OFFSET ? Boolean(bytes[offset] & ~SETTINGS_HEADER_FLAGS.KNOWN) : bytes[offset] !== byte)) throw malformed("Unsupported settings format.");
     const values = Array.from({length: SETTINGS.COUNT}, (_, id) => bytes.readUInt32LE(SETTINGS.SCALARS_OFFSET + id * 4));
     const layerRecords = Array.from({length: SETTINGS.LAYERS}, (_, layer) => {
         const at = SETTINGS.LAYER_RECORDS_OFFSET + layer * SETTINGS.LAYER_RECORD_SIZE;
@@ -312,31 +316,31 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
         const record = [...bytes.subarray(at + 1, at + 1 + SHORTCUT_KEY_COUNT)];
         const count = record.indexOf(0) < 0 ? SHORTCUT_KEY_COUNT : record.indexOf(0);
         const keys = record.slice(0, count);
-        if (record.slice(count).some(Boolean)) throw fail(`Custom key ${slot}'s shortcut has a key after its last.`);
+        if (record.slice(count).some(Boolean)) throw malformed(`Custom key ${slot}'s shortcut has a key after its last.`);
         const refusal = shortcutKeysRefusal(keys);
-        if (refusal) throw fail(`Custom key ${slot}'s shortcut: ${refusal}`);
+        if (refusal) throw malformed(`Custom key ${slot}'s shortcut: ${refusal}`);
         const layers = bytes.readUInt16LE(at + 1 + SHORTCUT_KEY_COUNT);
-        if (layers & alwaysOnLayers(values)) throw fail(`Custom key ${slot}'s shortcut turns on a layer that is always on.`);
+        if (layers & alwaysOnLayers(values)) throw malformed(`Custom key ${slot}'s shortcut turns on a layer that is always on.`);
         const layerKind = bytes[at + 3 + SHORTCUT_KEY_COUNT];
-        if (!validLayerKind(layerKind, layers)) throw fail(`Custom key ${slot}'s shortcut turns its layers on in no way the keyboard knows.`);
+        if (!validLayerKind(layerKind, layers)) throw malformed(`Custom key ${slot}'s shortcut turns its layers on in no way the keyboard knows.`);
         return {mods: bytes[at], keys, layers, layerKind};
     });
     let offset = SETTINGS.FIXED_SIZE;
     const nameRecord = () => {
-        if (offset >= bytes.length) throw fail("Missing name.");
+        if (offset >= bytes.length) throw malformed("Missing name.");
         const length = bytes[offset++];
-        if (length > NAME_MAX_BYTES || offset + length > bytes.length) throw fail("Invalid name length.");
+        if (length > NAME_MAX_BYTES || offset + length > bytes.length) throw malformed("Invalid name length.");
         const name = nameOfBytes(bytes.subarray(offset, offset + length));
         offset += length;
-        if (name === undefined) throw fail("Invalid name encoding.");
+        if (name === undefined) throw malformed("Invalid name encoding.");
         return name;
     };
     const names = Array.from({length: SETTINGS.LAYERS}, nameRecord);
     const macroNames = Array.from({length: SETTINGS.MACRO_NAMES}, nameRecord);
     const customKeyNames = Array.from({length: SETTINGS.CUSTOM_KEY_NAMES}, nameRecord);
     const keyboardName = nameRecord();
-    if (offset !== bytes.length) throw fail("Unexpected settings data.");
+    if (offset !== bytes.length) throw malformed("Unexpected settings data.");
     const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, customKeyShortcuts, keyboardName, formatVersion: SETTINGS.VERSION};
-    return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
+    return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => malformed("Noncanonical settings data."));
 }
-module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, LED_FLAGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, shortcutKeysRefusal, shortcutStoreRefusal, SHORTCUT_KEY_REFUSALS, SHORTCUT_KEY_CAPS, SHORTCUT_KEY_LIMITS, validShortcut, shortcutSends, shortcutPresent, shortcutIdentity, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS, LED_FLAGS, SHORTCUT_KEYS, SHORTCUT_LAYER_KINDS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validSetting, validShortcutKey, shortcutKeysRefusal, shortcutStoreRefusal, SHORTCUT_KEY_REFUSALS, SHORTCUT_KEY_CAPS, SHORTCUT_KEY_LIMITS, shortcutSends, shortcutPresent, shortcutIdentity, alwaysOnLayers, defaultLayerRecord, encodeSettings, decodeSettings};

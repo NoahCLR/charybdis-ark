@@ -6,9 +6,9 @@
 // the shared rule in rules/definition-switches.mjs. Why one does not take part
 // is a reason code, worded by the vocabulary.
 import {definitionReasons} from "../../rules/definition-switches.mjs";
-import {vocabulary} from "./vocabulary.mjs";
+import {layerCalledAt, vocabulary} from "./vocabulary.mjs";
 /** @typedef {import("../../contracts/model.js").ParticipationReason} Reason */
-/** @typedef {{participation?: import("../../contracts/model.js").Participation | null, layers?: Partial<Pick<import("../../contracts/panel.js").Layer, "index" | "name" | "displayName">>[]} & import("./vocabulary.mjs").VocabularyModel | null | undefined} ParticipationModel */
+/** @typedef {{participation?: import("../../contracts/model.js").Participation | null, layers?: (Pick<import("../../contracts/panel.js").Layer, "index"> & Partial<Pick<import("../../contracts/panel.js").Layer, "displayName">>)[]} & import("./vocabulary.mjs").VocabularyModel | null | undefined} ParticipationModel */
 // A key by its layout index. A key the keyboard reported none for has no
 // placement switch to veto it.
 /** @typedef {{layoutIndex?: number}} Placed */
@@ -21,19 +21,14 @@ import {vocabulary} from "./vocabulary.mjs";
 export const thisKeyOnThisLayer = (model, name) => `${vocabulary(model).participationPlaces.key}${name ? ` (${name})` : ""}`;
 /** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} [name] */
 const thisLayer = (model, name) => `${vocabulary(model).participationPlaces.layer}${name ? ` (${name})` : ""}`;
-/** @param {ParticipationModel} model @param {number} layer */
-const nameOf = (model, layer) => {
-    const found = model?.layers?.find((row) => row.index === layer);
-    return found?.displayName || found?.name || "";
-};
 
 // A reason in the words of the switch that says no, naming the layer or the
 // placement where it does.
 /** @param {ParticipationModel} model @param {"behavior" | "combo"} kind @param {number} layer @param {Reason} reason */
 function reasonWords(model, kind, layer, reason) {
     const words = vocabulary(model).participationReasons?.[kind]?.[reason] ?? reason;
-    if (reason === "layer" || reason === "layers") return `${words} ${thisLayer(model, nameOf(model, layer))}`;
-    if (reason === "placement") return `${words} ${thisKeyOnThisLayer(model, nameOf(model, layer))}`;
+    if (reason === "layer" || reason === "layers") return `${words} ${thisLayer(model, layerCalledAt(model, layer))}`;
+    if (reason === "placement") return `${words} ${thisKeyOnThisLayer(model, layerCalledAt(model, layer))}`;
     return words;
 }
 

@@ -13,7 +13,7 @@ export function leaveDemoOverlay() {
         <div class="sheet-b"><p>${esc(leave.ask.detail)}</p></div>
         <div class="sheet-f"><button class="btn ghost" data-act="stay">Stay in the demo</button>
             <span class="right"><button class="btn" data-act="confirm-leave">${esc(leave.ask.confirm)}</button>
-                <button class="btn primary" data-act="export">Export…</button></span></div>
+                <button class="btn primary" data-act="export">Export profile…</button></span></div>
     </div></div>`);
     const close = () => {state.overlay = null; state.leaveDemo = null; rerender();};
     node.addEventListener("click", (event) => {

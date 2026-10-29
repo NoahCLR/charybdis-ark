@@ -114,7 +114,7 @@ test("every other message names the handler that answers it", () => {
     assert.equal(session.portableReview, undefined, "a file review belongs to the previous keyboard");
     assert.equal(session.portableLayers, undefined, "a layer editor belongs to the previous keyboard");
     session.readBusy = false;
-    assert.throws(() => routeMessage(session, {type: "selectDevice", deviceId: "missing"}, connected()), /current device list/);
+    assert.throws(() => routeMessage(session, {type: "selectDevice", deviceId: "missing"}, connected()), /keyboard menu/);
     assert.throws(() => routeMessage(session, {type: "refresh"}, connected({busy: true})), /current operation/, "another device operation blocks readback explicitly");
     assert.equal(routeMessage(session, {type: "ready"}, connected({busy: true})), "none", "a reloaded panel waits on the model, not a refusal");
     assert.equal(routeMessage(session, {type: "somethingNew"}, connected()), "none");

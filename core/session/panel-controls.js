@@ -25,6 +25,7 @@
 const {panelControl} = require("./panel-control-registry");
 const {canEdit, hasCurrentLayers} = require("./firmware-support");
 const {validateSnapshot, FILE_MAX_BYTES, FILE_TOO_LARGE} = require("../model/portable-profile");
+const {failureSentence} = require("../model/vocabulary");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
@@ -50,20 +51,10 @@ const run = (shell, title, work) => shell.progress ? shell.progress(title, work)
 const savedNotice = (result, verb) => result?.slaveUnseen
     ? `Complete profile ${verb} both halves and active. The slave half confirmed its copy but is not connected now; plug the cable between the halves back in.`
     : `Complete profile ${verb} both halves and verified.`;
-// A notice says in words why a read failed. An answer from the keyboard that
-// did not decode says so; the decoder's own text (which page, how many bytes)
-// stays in the diagnostics, where the device service put it.
-const UNDECODED = new Set(["MALFORMED_RESPONSE", "NONCANONICAL_RESPONSE", "INCOMPATIBLE_RESPONSE", "CORRELATION_MISMATCH", "PAYLOAD_CORRUPT"]);
-/** @param {unknown} error */
-function failureWords(error) {
-    const {code, message} = /** @type {{code?: unknown, message?: unknown}} */ (error ?? {});
-    if (typeof code === "string" && UNDECODED.has(code)) return "the keyboard answered with something Ark could not decode (see the diagnostics)";
-    return typeof message === "string" ? message : String(error);
-}
 // The profile is saved whatever the read after it does, so a failed read is
 // said after the save rather than in place of it.
 /** @param {unknown} error */
-const rereadFailure = (error) => `Reading the keyboard again failed: ${failureWords(error).replace(/\.$/, "")}. `;
+const rereadFailure = (error) => `Reading the keyboard again failed. ${failureSentence(error)} `;
 
 // A save that renamed the keyboard is followed by the keyboard reconnecting
 // under its new name. Its readback may be cut short by that: the keyboard is
@@ -113,7 +104,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         return false;
     }
     if (selectedDeviceId && !devices.some((device) => device.id === selectedDeviceId)) {
-        throw new Error("The selected keyboard is no longer available. Read the device list again.");
+        throw new Error("The selected keyboard is no longer available. Choose a keyboard from the keyboard menu.");
     }
     // A keyboard that left the list is let go: on the web page, choosing
     // another keyboard lists only that one, and reading connects it.
@@ -142,14 +133,14 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         throw error;
     }
     let macroFailure = "", portable;
-    try {portable = await run(shell, "Reading the complete keyboard configuration", () => readOnceStarted(service, started, () => service.readKeyboardProfile()));}
+    try {portable = await run(shell, "Reading the keyboard's complete profile", () => readOnceStarted(service, started, () => service.readKeyboardProfile()));}
     catch (error) {
         if (isStartingTimeout(error)) return timedOut();
         if (/** @type {Error & {code?: string}} */ (error).code === "FIRMWARE_UPDATE_REQUIRED") {
             session.notice = /** @type {Error} */ (error).message;
             return false;
         }
-        macroFailure = " Macros and global settings could not be read: " + failureWords(error);
+        macroFailure = ` Macros and global settings could not be read. ${failureSentence(error)}`;
         // A follow-back's read the keyboard moved under is the live watch's
         // to read again (live-watch.js), within its bound.
         if (session.reconnect && session.draft?.live) {
@@ -160,21 +151,24 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     if (!portable) {
         // A partly readable keyboard still gets its independent diagnostics.
         // A failed complete read never opens an editable draft.
-        await run(shell, "Reading layout from the keyboard", () => service.readLayout());
+        await run(shell, "Reading keys and layers", () => service.readLayout());
         // A failure stays in the keyboard's state, said below.
-        await run(shell, "Reading keyboard profile", () => service.readCommittedProfile()).catch(() => {});
+        await run(shell, "Reading the keyboard's saved profile", () => service.readCommittedProfile()).catch(() => {});
         await service.readBaseRgb();
         await service.readCombos();
     }
     const state = service.snapshot();
     if (state.error || state.committed?.state !== "read") {
-        session.notice = `The keyboard profile could not be read: ${state.error ? failureWords(state.error).replace(/\.$/, "") : "no verified profile was returned"}.`;
+        // Each failure says itself in words (model/vocabulary.js
+        // failureSentence); the decoder's own text stays in the diagnostics,
+        // where the device service put it.
+        session.notice = `The keyboard profile could not be read. ${state.error ? failureSentence(state.error) : "The keyboard returned no verified profile."}`;
     } else {
         const description = state.committed.source === "compiled"
-            ? "the keyboard's compiled defaults"
-            : `committed profile generation ${state.committed.generation}`;
+            ? "compiled defaults"
+            : `saved profile, generation ${state.committed.generation}`;
         const failures = state.committed.failures?.length || 0;
-        session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
+        session.notice = `Read the keyboard's ${description}.` + (failures ? ` ${failures} part${failures === 1 ? "" : "s"} of it could not be read; see Diagnostics on the Keyboard screen.` : "");
     }
     if (macroFailure) session.notice += macroFailure;
     // A live keyboard that restarted (a replug, a lost connection) since Ark
@@ -264,7 +258,7 @@ const DRAFT_ACTIONS = Object.freeze({
         if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
         const complete = hasCurrentLayers(state.capabilities);
         discardDraftForDevice(session, state, complete ? await service.readPortableProfile() : undefined);
-        session.notice = complete ? "Draft discarded. Showing the saved keyboard configuration." : "Draft discarded. This keyboard remains read-only.";
+        session.notice = complete ? "Draft discarded. Showing the keyboard's saved profile." : "Draft discarded. This keyboard remains read-only.";
         return;
     }),
     rebase: liveOr("rebase", async ({draft, revision, session, service}) => {
@@ -345,7 +339,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         const chosen = message.type === "reviewPortableProfile" ? message : await shell.chooseProfile?.();
         if (chosen === undefined) return;
         const text = typeof chosen === "string" ? chosen : chosen.text;
-        if (typeof text !== "string") throw new Error("This profile file could not be read.");
+        if (typeof text !== "string") throw new Error("This file could not be read.");
         if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error(FILE_TOO_LARGE);
         const value = validateSnapshot(text, panelCapabilities(session) || undefined);
         session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,

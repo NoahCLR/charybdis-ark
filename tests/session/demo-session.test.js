@@ -8,26 +8,22 @@ const assert = require("node:assert/strict");
 const {openPanelLoop} = require("../../core/session/panel-loop");
 const {fingerprint} = require("../../core/model/portable-profile");
 const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {asRead, fakeShell} = require("../fixtures/panel-loop");
 const {document32: pdDocument} = require("../fixtures/pointing-slots-32");
 const {ACTION_ABI} = require("../../core/schema/actions");
 const {
     DEMO_CAPABILITIES, DEMO_DEVICE_ID, DEMO_LIMITS, DEMO_OPTIONS, demoProfile, demoRefusal, demoSnapshot, demoState, panelState,
 } = require("../../core/session/demo-session");
 
-function recordingShell(extra = {}) {
-    const shell = {
-        posted: [], errors: [], exports: [], chosen: [],
-        post: (message) => {shell.posted.push(message);},
-        showError: (text) => {shell.errors.push(text);},
-        progress: async (title, work) => work(),
-        saveRecovery: async () => {throw new Error("the demo never saves a recovery copy");},
-        chooseProfile: async () => shell.chosen.shift(),
-        saveExport: async (file) => {shell.exports.push(file); return "/exports/" + file.fileName;},
-        ...extra,
-    };
-    return shell;
+// The shared fixture's shell, whose file chooser hands over `chosen` in turn;
+// the demo never saves a recovery copy.
+function recordingShell() {
+    /** @type {{text: string, name: string}[]} */
+    const chosen = [];
+    return fakeShell({chosen, chooseProfile: async () => chosen.shift(),
+        saveRecovery: async () => {throw new Error("the demo never saves a recovery copy");}});
 }
-const last = (shell) => shell.posted[shell.posted.length - 1];
+const last = (shell) => asRead(shell, shell.posted[shell.posted.length - 1]);
 
 // The loop over the fake keyboard, unplugged until `plugIn()`.
 async function unplugged(shell = recordingShell()) {
@@ -69,8 +65,8 @@ test("the demo checks current profiles as Import does and refuses older backups"
     assert.equal(demoSnapshot(pdDocument()).document.actionAbiDigest, ACTION_ABI);
     assert.throws(() => demoSnapshot({...pdDocument(), actionAbiDigest: 0x1d3fcacc}), {code: "INVALID_PORTABLE_PROFILE"});
     assert.throws(() => demoSnapshot({...pdDocument(), version: 1}), {code: "INVALID_PORTABLE_PROFILE"});
-    assert.throws(() => demoSnapshot("{}"), /supported Charybdis profile/);
-    assert.throws(() => demoSnapshot("not json"), /not a valid profile/);
+    assert.throws(() => demoSnapshot("{}"), /Choose a Charybdis backup/);
+    assert.throws(() => demoSnapshot("not json"), /not a valid backup/);
 });
 
 test("the demo is offered with no keyboard, and not over a keyboard or its unapplied edits", () => {
@@ -114,7 +110,7 @@ test("with no keyboard the demo opens the bundled profile in a real draft, and n
         assert.equal(model.apply, null);
         assert.equal("pdUpgradeAvailable" in model.portable, false, "no shell offers the retired PD upgrade export");
         assert.equal(model.profileIdentity.originHalf, DEMO_DEVICE_ID);
-        assert.equal(model.portable.usage.source, "demo", "an unedited demo is the demo setup, not a keyboard's");
+        assert.equal(model.portable.usage.source, "demo", "an unedited demo is the demo profile, not a keyboard's");
 
         // A panel that loads again stays in the demo.
         await loop.handleMessage({type: "ready"});
@@ -168,7 +164,7 @@ test("Export saves the demo's draft, edits and all; leaving afterwards asks noth
         const [file] = shell.exports;
         assert.match(file.fileName, /^charybdis-demo-\d{4}-\d\d-\d\d\.charybdis\.json$/);
         assert.equal(fingerprint(JSON.parse(file.text)), current.fingerprint, "the file holds the draft, not the demo profile");
-        assert.match(last(shell).notice, /Demo setup exported to \/exports\/.+Import it on your keyboard/);
+        assert.match(last(shell).notice, /Demo profile exported to \/exports\/.+Import it on your keyboard/);
         assert.equal(last(shell).model.demo.unsaved, false);
 
         await loop.handleMessage({type: "leaveDemo"});
@@ -219,7 +215,7 @@ test("Open a profile file replaces the demo profile with the file, checked as Im
         const before = loop.session.draft;
         shell.chosen.push({text: "{\"format\": \"something-else\"}", name: "bad.json"});
         await loop.handleMessage({type: "openDemoProfile"});
-        assert.match(last(shell).notice, /^Failed.*supported Charybdis profile/);
+        assert.match(last(shell).notice, /^Failed.*Choose a Charybdis backup/);
         assert.equal(loop.session.draft, before);
         assert.equal(last(shell).model.demo.fileName, "mine.charybdis.json");
 

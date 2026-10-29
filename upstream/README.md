@@ -1,14 +1,16 @@
 # Imported firmware and QMK contracts
 
-This folder makes app development self-contained. These are reviewed snapshots,
-not symlinks, a firmware checkout, or code the app loads from another repository.
-The application runtime uses its own codecs and vendored `core/data/` catalog.
-Tests, fixture previews and catalog maintenance use the files here.
+This folder makes app development self-contained. These are reviewed
+snapshots, not symlinks, a firmware checkout, or code the app loads from
+another repository. The application runtime uses its own codecs and vendored
+`core/data/` catalog. Tests, fixture previews and catalog maintenance use the
+files here.
 
 For ongoing firmware development, inspect the real checkout, `charybdis-4x6`
-beside this one in Noah's workspace, not these snapshots. The
-[workspace map](../docs/development.md#local-development-workspace) explains how
-to locate task worktrees and distinguish current source from this pinned baseline.
+beside this one in Noah's workspace, not these snapshots. The [workspace
+map](../docs/development.md#local-development-workspace) explains how to
+locate task worktrees and distinguish current source from this pinned
+baseline.
 
 | Directory | Purpose | Owner |
 | --- | --- | --- |
@@ -20,12 +22,12 @@ to locate task worktrees and distinguish current source from this pinned baselin
 | `qmk/version.txt` | Catalog's original QMK version stamp, synthesized for reproducible generation without a QMK Git checkout | Import metadata |
 
 [`manifest.json`](manifest.json) records the repository URL, full commit ID,
-original path, original SHA-256 and local SHA-256 for each imported file.
-The firmware pin is a commit on firmware's trunk, and the QMK pin is normally
-the BK commit that firmware's own `qmk-pin.json` names at that commit, so the
-inputs are the ones the firmware is built with ([below](#updating-a-contract)). These
-pins describe source provenance, not proof that every firmware/QMK combination
-passed hardware acceptance.
+original path, original SHA-256 and local SHA-256 for each imported file. The
+firmware pin is a commit on firmware's trunk, and the QMK pin is normally the
+BK commit that firmware's own `qmk-pin.json` names at that commit, so the
+inputs are the ones the firmware is built with
+([below](#updating-a-contract)). These pins describe source provenance, not
+proof that every firmware/QMK combination passed hardware acceptance.
 
 Fixtures and QMK inputs are byte-for-byte copies. Documentation links are
 adjusted to local copies when available and revision-pinned upstream URLs
@@ -55,31 +57,33 @@ Node dependencies have been installed.
    Fetch the firmware checkout, then run the bridge with `--publish` before
    landing.
 2. Refresh with the tool, which reads only committed blobs and never fetches:
-   `npm run upstream -- --firmware PATH --qmk PATH` re-pins every listed file to
-   firmware's local `dev` and to the BK commit that firmware's `qmk-pin.json`
-   names, so Ark's BK inputs are the ones the firmware is built with (or
-   `--firmware-rev REV` / `--qmk-rev REV`), one source per repository. It rewrites each file's hashes and transformation note, the QMK
-   version stamp (`git describe --tags --exclude 'v2*'` of the pinned commit, so
-   the stack's own `vYYYY.MM.DD` release tags never replace the upstream QMK
-   version) and the keycode catalog. It lists files whose content changed
+   `npm run upstream -- --firmware PATH --qmk PATH` re-pins every listed file
+   to firmware's local `dev` and to the BK commit that firmware's
+   `qmk-pin.json` names, so Ark's BK inputs are the ones the firmware is built
+   with (or `--firmware-rev REV` / `--qmk-rev REV`), one source per
+   repository. It rewrites each file's hashes and transformation note, the QMK
+   version stamp (`git describe --tags --exclude 'v2*'` of the pinned commit,
+   so the stack's own `vYYYY.MM.DD` release tags never replace the upstream
+   QMK version) and the keycode catalog. It lists files whose content changed
    separately from those whose pinned links only moved, and flags changed
    fixture or QMK input bytes. Documentation links to another imported file
    stay as written; every other relative link is pinned to the source commit.
    Never edit fixture bytes simply to match the app.
-3. To add a file, list it in the manifest (`path`, `source`, `sourcePath`), then
-   refresh; to move or drop one, change or remove its entry, and the refresh
-   deletes every file here the manifest no longer lists (`--check` fails on
-   one). Documentation mirrors the source layout, so a moved firmware spec
-   moves here too. Import format samples only: never a fixture the firmware
-   regenerates from its keymap or authored defaults. Agreement requires every
-   imported fixture to equal the firmware's, so such a file would block a
-   firmware release on an ordinary keymap edit, which agreement deliberately
-   never compares ([agreement](../docs/development.md#agreement-with-a-firmware-contract)). Ark builds
-   older-format inputs for its refusal tests itself.
-4. Review the diff, then run `npm run check`, `npm run keycodes -- --check` and
-   `npm run upstream -- --check --firmware PATH --qmk PATH`, which rebuilds every
-   file from the commit its entry pins and fails on any difference; CI's
-   compatibility job runs the same check. An explicit
+3. To add a file, list it in the manifest (`path`, `source`, `sourcePath`),
+   then refresh; to move or drop one, change or remove its entry, and the
+   refresh deletes every file here the manifest no longer lists (`--check`
+   fails on one). Documentation mirrors the source layout, so a moved firmware
+   spec moves here too. Import format samples only: never a fixture the
+   firmware regenerates from its keymap or authored defaults. Agreement
+   requires every imported fixture to equal the firmware's, so such a file
+   would block a firmware release on an ordinary keymap edit, which agreement
+   deliberately never compares
+   ([agreement](../docs/development.md#agreement-with-a-firmware-contract)).
+   Ark builds older-format inputs for its refusal tests itself.
+4. Review the diff, then run `npm run check`, `npm run keycodes -- --check`
+   and `npm run upstream -- --check --firmware PATH --qmk PATH`, which
+   rebuilds every file from the commit its entry pins and fails on any
+   difference; CI's compatibility job runs the same check. An explicit
    `npm run keycodes -- --qmk /path/to/qmk` compares a candidate checkout's
    catalog without updating the imported inputs or manifest.
 5. For wire changes, update the app's codecs and tests in the same change and
@@ -88,9 +92,10 @@ Node dependencies have been installed.
 
 Ark owns cross-language runners under `tests/integration/`. They compile
 probes from the selected firmware and compare readers, writers, candidate
-transfers and sparse macro reads with Ark's current implementation. Use the separate
-[compatibility bridge](../docs/development.md#the-compatibility-bridge); it also fails when a pinned
-fixture differs from the selected firmware and lists specs that lag it. Firmware itself does not require
-Ark; it keeps independent regression fixtures and C tests. The imported
-snapshots here remain unchanged and do not replace integration or physical
-interruption acceptance.
+transfers and sparse macro reads with Ark's current implementation. Use the
+separate [compatibility
+bridge](../docs/development.md#the-compatibility-bridge); it also fails when a
+pinned fixture differs from the selected firmware and lists specs that lag it.
+Firmware itself does not require Ark; it keeps independent regression fixtures
+and C tests. The imported snapshots here remain unchanged and do not replace
+integration or physical interruption acceptance.

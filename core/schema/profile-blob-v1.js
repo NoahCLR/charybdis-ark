@@ -4,7 +4,7 @@ const {LAYERS} = require("../data/charybdis-layout");
 const {CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
 const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
 const {MACRO_DOMAIN_V1} = require("./macro-domain-v1");
-const {u8: assertU8, u16: assertU16, u32: assertU32, asBytes, copyBytes, protocolError} = require("./bytes");
+const {u8: assertU8, u16: assertU16, u32: assertU32, answerFault, asBytes, copyBytes, protocolError} = require("./bytes");
 
 // The one profile format the keyboard stores: schema 4.3, up to 130,048 bytes
 // (one 128 KiB flash slot less its 1 KiB record, firmware D-F29). Schema 4 opens the new
@@ -24,7 +24,7 @@ const PROFILE_BLOB_V1 = Object.freeze({
     MAX_SIZE: 130048,
 });
 
-const {PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
+const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
 /** @param {number} major @param {number} minor */
 function assertSchema(major, minor) {
     if (major !== PROFILE_BLOB_V1.SCHEMA_MAJOR || minor !== PROFILE_BLOB_V1.SCHEMA_MINOR) {
@@ -54,7 +54,7 @@ const PROFILE_ACTION_LIMITS = Object.freeze({
 
 const MAGIC_BYTES = Buffer.from(PROFILE_BLOB_V1.MAGIC, "ascii");
 
-const ProfileBlobProtocolError = protocolError("ProfileBlobProtocolError");
+const ProfileBlobProtocolError = protocolError("ProfileBlobProtocolError", "ark");
 
 /** @param {import("./types.js").BlobInput} [profile] @param {import("./types.js").BlobOptions} [options] */
 function encodeProfileBlob(profile = {}, options = {}) {
@@ -372,20 +372,23 @@ function hexByte(value) {
     return Number(value).toString(16).padStart(2, "0");
 }
 
-// What a keyboard storing another format than current firmware's is told.
-// Ark supports only current firmware and migrates nothing, so it reads such a
-// keyboard no further.
-function firmwareUpdateRequired() {
-    return Object.assign(new Error("This keyboard's firmware stores its profile in a format Ark does not read: Ark supports only current firmware. Update both halves, then read the keyboard again. The keyboard has not been changed."), {code: "FIRMWARE_UPDATE_REQUIRED"});
+// What a keyboard whose firmware is not current is told, whether its
+// answers or the format it stores say so. Ark supports only current firmware
+// and migrates nothing, so it reads such a keyboard no further. `words` are
+// another sentence only where reading again would not help.
+/** @param {{words?: string, cause?: unknown}} [options] */
+function firmwareUpdateRequired({words = "This keyboard's firmware is not current, and Ark supports only current firmware. Update both halves, then read the keyboard again. The keyboard has not been changed.", cause} = {}) {
+    return Object.assign(new Error(words), {code: "FIRMWARE_UPDATE_REQUIRED"}, cause === undefined ? {} : {cause});
 }
 
 // A profile blob as a keyboard stores it, refused with firmwareUpdateRequired
-// when its schema or a domain version is not current firmware's.
+// when its schema or a domain version is not current firmware's; any other
+// refusal is the keyboard's answer not reading (bytes.js answerFault).
 /** @param {Uint8Array} value */
 function decodeStoredProfileBlob(value) {
     try {return decodeProfileBlob(value);} catch (error) {
         if (error instanceof ProfileBlobProtocolError && ["INCOMPATIBLE_SCHEMA", "UNKNOWN_DOMAIN_VERSION"].includes(String(error.code))) throw firmwareUpdateRequired();
-        throw error;
+        throw answerFault(error);
     }
 }
 
@@ -393,8 +396,6 @@ module.exports = {
     PROFILE_ACTION_KINDS,
     PROFILE_ACTION_LIMITS,
     PROFILE_BLOB_V1,
-    PROFILE_DOMAIN_IDS,
-    PROFILE_DOMAIN_VERSIONS,
     ProfileBlobProtocolError,
     crc32,
     decodeDomainEnvelope,

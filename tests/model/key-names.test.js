@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {hostKeyVocabulary, keyLabel, keyLabelWithName, profileKeyNames} = require("../../core/model/key-names");
+const {heldModifierWords, hostKeyVocabulary, keyLabel, keyLabelWithName, layerModWords, profileKeyNames} = require("../../core/model/key-names");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const catalog = require("../../core/data/keycode-catalog");
 const keycodes = require("../../core/schema/keycodes");
@@ -10,7 +10,7 @@ const {PD_MODE_KEYS} = require("../../core/data/pd-mode-keys");
 const PD_MODE_0 = PD_MODE_KEYS[0].holdCode;
 
 test("compact basic-key labels retain modifier side, host and layout naming under every alias", () => {
-    const {compactKeyLabels, compactKeyLabel} = require("../../core/model/key-names");
+    const {compactKeyLabels} = require("../../core/model/key-names");
     for (const [hostOs, gui, alt] of [[0, "GUI", "Alt"], [1, "Cmd", "Opt"], [2, "Win", "Alt"], [3, "Super", "Alt"]]) {
         const full = profileKeyNames({hostOs, hostLayout: 9}).labels;
         const compact = compactKeyLabels(full);
@@ -21,7 +21,7 @@ test("compact basic-key labels retain modifier side, host and layout naming unde
         assert.equal(full.KC_LGUI, `Left ${hostOs === 1 ? "Command" : hostOs === 2 ? "Windows" : gui}`, "full names remain untouched");
     }
     assert.equal(compactKeyLabels({}).KC_SPC, "Space");
-    assert.equal(compactKeyLabel("An unfamiliar long name"), "An unfamiliar long name");
+    assert.equal(compactKeyLabels({KC_A: "An unfamiliar long name"}).KC_A, "An unfamiliar long name", "an unknown name stays whole");
     assert.equal(compactKeyLabels({}).MACRO_0, undefined, "profile names are not shortened");
 });
 
@@ -31,6 +31,31 @@ test("semantic target aliases link the native ABI and stay absent for an unknown
     assert.equal(aliases[keycodes.resolve(PD_MODE_0).name], "PD_MODE_0");
     assert.equal(aliases[keycodes.resolve(PD_MODE_KEYS[5].holdCode).name], "PD_MODE_5");
     assert.deepEqual(profileKeyNames({behaviors, actionsKnown: false}).aliases, {});
+});
+
+test("a layer-mod's modifiers read in the host's words, as its label ends", () => {
+    const shift = /** @type {number} */ (keycodes.encode("LM(1,MOD_LSFT)")), mac = /** @type {number} */ (keycodes.encode("LM(2,MOD_LCTL|MOD_LGUI)"));
+    const names = profileKeyNames({layers: ["Base", "Numbers", "Symbols"], hostOs: 1});
+    assert.equal(layerModWords(names, shift), "Shift");
+    assert.equal(layerModWords(names, mac), "Ctrl+Command");
+    assert.equal(keyLabel(names, mac), "Symbols + Ctrl+Command");
+    assert.equal(layerModWords(names, 0x04), undefined, "any other key holds no layer's modifiers");
+});
+
+// A mod-tap's hold names its modifiers from the keycode's modifier bits, the
+// way a layer-mod does, never by cutting its label.
+test("a mod-tap's modifiers read from its bits, in the host's words", () => {
+    const command = /** @type {number} */ (keycodes.encode("MT(MOD_LGUI,KC_A)")), right = /** @type {number} */ (keycodes.encode("MT(MOD_RCTL|MOD_RSFT,KC_SLSH)"));
+    assert.equal(keycodes.resolve(command).modifiers, "Cmd", "resolve carries a mod-tap's modifiers as a layer-mod's");
+    const mac = profileKeyNames({hostOs: 1}), windows = profileKeyNames({hostOs: 2});
+    assert.equal(heldModifierWords(mac, command), "Command");
+    assert.equal(heldModifierWords(windows, command), "Windows");
+    assert.equal(heldModifierWords(mac, right), "Right Ctrl+Right Shift");
+    assert.equal(keyLabel(mac, command), "A / Command");
+    assert.equal(keyLabel(mac, right), `${keyLabel(mac, 0x38)} / Right Ctrl+Right Shift`, "the tap reads by its own name");
+    assert.equal(heldModifierWords(mac, /** @type {number} */ (keycodes.encode("LM(1,MOD_LSFT)"))), "Shift", "a layer-mod's too");
+    assert.equal(heldModifierWords(mac, 0x04), undefined, "a key that holds no modifiers");
+    assert.equal(heldModifierWords(mac, /** @type {number} */ (keycodes.encode("LT(1,KC_A)"))), undefined, "a layer-tap holds a layer, not modifiers");
 });
 
 test("a key reads by the profile's name for it, under every name it is known by", () => {
@@ -179,4 +204,24 @@ test("macOS ISO labels swap the same positions as playback, including modified k
     assert.equal(keyLabel(german, 0x233), "Ö");
     assert.equal(keyLabel(german, 0x211c), "Z / Ctrl");
     assert.equal(keyLabel(german, 0x4133), "Ö / Layer 1");
+});
+
+test("the layout read counts only keys the app cannot name", () => {
+    const {unnamedKeyCount} = require("../../core/model/key-names");
+    const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x67df11b3}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
+    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");
+});
+
+test("what a keycode is, where the interface treats it apart: transparent, disabled, a macro's or a custom key's", () => {
+    const {keyKind} = require("../../core/model/key-names");
+    const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../../core/data/user-keycodes");
+    const {QK} = require("../../rules/qmk-keycodes.mjs");
+    assert.equal(keyKind(keycodes.encode("KC_TRANSPARENT")), "transparent");
+    assert.equal(keyKind(keycodes.encode("KC_NO")), "disabled");
+    for (const value of [QK.MACRO.first, QK.MACRO.last]) assert.equal(keyKind(value), "macro");
+    for (const slot of [0, CUSTOM_KEY_SLOTS - 1]) assert.equal(keyKind(customKeyCode(slot)), "customKey");
+    for (const value of [keycodes.encode("KC_A"), QK.MACRO.first - 1, QK.MACRO.last + 1, customKeyCode(CUSTOM_KEY_SLOTS), PD_MODE_KEYS[0].holdCode]) {
+        assert.equal(keyKind(value), undefined, `0x${value.toString(16)}`);
+    }
 });

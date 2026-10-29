@@ -23,6 +23,15 @@ export const LINK_ENDS = {NOTHING: 0, HIGHER_LAYER: 1, OTHER_LAYER: 2};
 // What a direction's shortcut does with modifiers held while it sends: they
 // apply, the chosen ones are left out, or the shortcut is sent exactly.
 export const MODIFIER_POLICY = {INHERIT: 0, MASK: 1, EXACT: 2};
+// What each choice does, said by the words its dropdown offers it in
+// (vocabulary pointing.modifierPolicy), so the tip and the choices agree.
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model */
+export const modifierPolicyTip = (model) => {
+    const named = (/** @type {number} */ policy) => word(vocabulary(model).pointing.modifierPolicy, policy);
+    return `${named(MODIFIER_POLICY.INHERIT)}: modifiers you hold apply to the shortcut, so Shift with an arrow selects. `
+        + `${named(MODIFIER_POLICY.MASK)}: the modifiers chosen below are left out while it sends. `
+        + `${named(MODIFIER_POLICY.EXACT)}: it sends exactly its shortcut, whatever you hold.`;
+};
 // The straight directions in the order the editor draws them; their words
 // are the vocabulary's (tapPlaceWord).
 export const DIRECTIONS = ["up", "left", "right", "down"];
@@ -42,7 +51,7 @@ export const tapPlaceWord = (model, group, name) => word(vocabulary(model).point
 // keeps a shortcut or a threshold on an axis it does not read, so the form
 // draws only these and the record carries the others as zero.
 /** @type {Record<number, string[]>} */
-export const AXIS_DIRECTIONS = {
+const AXIS_DIRECTIONS = {
     [AXIS.VERTICAL]: ["up", "down"],
     [AXIS.HORIZONTAL]: ["left", "right"],
     [AXIS.DOMINANT]: ["up", "left", "right", "down"],
@@ -84,7 +93,7 @@ export function dpiOptions(choices, current) {
 // unreversed would scroll the other way, four or more times as fast.
 export const SCROLL_STARTER = {thresholdH: 2, thresholdV: 3, divisorH: 6, divisorV: 8, intervalMs: 8, expireMs: 80, lockMs: 55,
     startNumerator: 7, startDenominator: 4, sustainNumerator: 5, sustainDenominator: 4, decayDivisor: 4, invert: 2};
-export const SCROLL_STARTER_DPI = 100;
+const SCROLL_STARTER_DPI = 100;
 /** @typedef {{dpi: number, scroll: Record<string, number>}} ScrollStarter */
 /** @type {ScrollStarter} */
 export const SHIPPED_SCROLL = Object.freeze({dpi: SCROLL_STARTER_DPI, scroll: Object.freeze({...SCROLL_STARTER})});
@@ -124,9 +133,10 @@ export const DIRECTIONAL_STARTER_THRESHOLD = 60;
 // The record posted for a slot. The slot is posted whole, with the fields the
 // form owns replaced — the firmware stores one record, so half a record is
 // never sent. `form` maps each drawn field to a reader; a field that is not
-// drawn keeps the value the slot was read with.
-/** @param {PointingSlot} slot @param {import("../../contracts/edits.js").PdForm} form @returns {PdConfig} */
-export function readConfig(slot, form) {
+// drawn keeps the value the slot was read with. `model` names the keycodes a
+// shortcut is typed as (tapRecord).
+/** @param {PointingSlot} slot @param {import("../../contracts/edits.js").PdForm} form @param {Partial<import("../../contracts/panel.js").PublishedModel> | null} [model] @returns {PdConfig} */
+export function readConfig(slot, form, model = null) {
     /** @param {Scalar | null | undefined} value @param {number} fallback */
     const number = (value, fallback) => {
         const text = String(value ?? "").trim();
@@ -160,7 +170,7 @@ export function readConfig(slot, form) {
             keycode: (form[`dir:${direction}`]?.() ?? String(slot.directions?.[direction]?.keycode ?? 0)) || "0",
             modifierPolicy: form[`dirPolicy:${direction}`]?.() ?? slot.directions?.[direction]?.modifierPolicy ?? 0,
             mask: form[`dirMask:${direction}`]?.() ?? slot.directions?.[direction]?.mask ?? 0,
-        }) : tapRecord({})]));
+        }, model) : tapRecord({})]));
         // Diagonals exist only in eight-direction mode; any other axis
         // carries them as zero, which the keyboard requires.
         const eight = axis === AXIS.EIGHT;
@@ -168,7 +178,7 @@ export function readConfig(slot, form) {
             keycode: (form[`diag:${diagonal}`]?.() ?? String(slot.diagonals?.[diagonal]?.keycode ?? 0)) || "0",
             modifierPolicy: form[`diagPolicy:${diagonal}`]?.() ?? slot.diagonals?.[diagonal]?.modifierPolicy ?? 0,
             mask: form[`diagMask:${diagonal}`]?.() ?? slot.diagonals?.[diagonal]?.mask ?? 0,
-        }) : tapRecord({})]));
+        }, model) : tapRecord({})]));
         config.emptyDirection = form.emptyDirection ? form.emptyDirection() : slot.emptyDirection ?? 0;
         config.directionOutput = form.directionOutput ? form.directionOutput() : slot.directionOutput ?? 0;
     } else {
@@ -195,11 +205,12 @@ function linkRecord(slot, form) {
 // One direction's shortcut as the keyboard stores it: no shortcut stores
 // nothing at all, and a modifier mask goes only with "Ignore", which needs
 // one. Clearing a shortcut that left out modifiers therefore posts an empty
-// direction rather than a mask the keyboard refuses.
-/** @param {Partial<PdTap>} tap */
-export function tapRecord({keycode, modifierPolicy, mask}) {
+// direction rather than a mask the keyboard refuses. A macro, under any name
+// the model gives it, carries no modifiers.
+/** @param {Partial<PdTap>} tap @param {Partial<import("../../contracts/panel.js").PublishedModel> | null} [model] */
+function tapRecord({keycode, modifierPolicy, mask}, model = null) {
     const code = String(keycode ?? "").trim() || "0";
-    if (macroIndex(code) !== null) return {keycode: code, modifierPolicy: MODIFIER_POLICY.INHERIT, mask: 0};
+    if (macroIndex(code, model) !== null) return {keycode: code, modifierPolicy: MODIFIER_POLICY.INHERIT, mask: 0};
     if (code === "0") return {keycode: "0", modifierPolicy: MODIFIER_POLICY.INHERIT, mask: 0};
     const policy = Number(modifierPolicy) || MODIFIER_POLICY.INHERIT;
     return {keycode: code, modifierPolicy: policy, mask: policy === MODIFIER_POLICY.MASK ? Number(mask) || 0 : 0};
@@ -212,8 +223,8 @@ export const TAP_ROWS = [...DIRECTIONS.map((name) => ({key: `dir:${name}`, group
 // "Ignore" is stored only with the modifiers it leaves out, and they are
 // chosen after it, so until then the direction posts as the slot stored it
 // and the editor holds the choice.
-/** @param {PointingSlot} slot @param {PdConfig} config */
-export function settleTaps(slot, config) {
+/** @param {PointingSlot} slot @param {PdConfig} config @param {Partial<import("../../contracts/panel.js").PublishedModel> | null} [model] */
+export function settleTaps(slot, config, model = null) {
     /** @type {Record<string, PdTap>} */
     const pending = {};
     if (config.kind !== KIND.DIRECTIONAL) return {config, pending};
@@ -224,7 +235,7 @@ export function settleTaps(slot, config) {
         pending[key] = tap;
         /** @type {Partial<PdTap>} */
         const stored = slot[group]?.[name] || {};
-        settled[group][name] = tapRecord({keycode: tap.keycode, modifierPolicy: stored.modifierPolicy, mask: stored.mask});
+        settled[group][name] = tapRecord({keycode: tap.keycode, modifierPolicy: stored.modifierPolicy, mask: stored.mask}, model);
     }
     return {config: settled, pending};
 }

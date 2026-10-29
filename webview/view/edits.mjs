@@ -171,7 +171,7 @@ export const comboDefaultWindowValue = (model) => String(model?.comboReadback?.d
 // ── lighting ────────────────────────────────────────────────────────────
 
 /** @param {Colour} colour */
-export const hsvPayload = (colour) => {
+const hsvPayload = (colour) => {
     const [h, s, v] = hsv(colour);
     return {h, s, v};
 };

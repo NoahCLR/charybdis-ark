@@ -9,7 +9,9 @@
  * @typedef {{waitingSafeBoundary?: boolean, lastStatusName?: string, busyStreak?: number, busyReason?: string, transportFailureCount?: number}} SlaveFailure
  */
 
-const {APPLY_VERDICTS, INTERRUPTION_REASONS, interruption} = require("./interruption");
+const {interruption} = require("./interruption");
+const {PROFILE_DOMAINS} = require("../schema/profile-domains");
+const {APPLY_VERDICTS, FAILURE_WORDS, INTERRUPTION_REASONS, PROFILE_AREAS, SAVE_FAILURE_WORDS, SAVE_STEP_WORDS, failureSentence} = require("../model/vocabulary");
 
 // The steps of one Apply, as the person watching it sees them.
 //
@@ -20,16 +22,8 @@ const {APPLY_VERDICTS, INTERRUPTION_REASONS, interruption} = require("./interrup
 // pinned to the step that was running, with the reason the keyboard gave.
 
 /** @type {readonly {id: ApplyStep, label: string}[]} */
-const APPLY_STEPS = Object.freeze(/** @type {const} */ ([
-    {id: "check", label: "Check the keyboard"},
-    {id: "backup", label: "Save a recovery copy"},
-    {id: "upload", label: "Send the profile"},
-    {id: "validate", label: "Keyboard checks the profile"},
-    {id: "slave", label: "Copy the profile to the slave half"},
-    {id: "commit", label: "Save it on the master half"},
-    {id: "converge", label: "Finish the slave half"},
-    {id: "verify", label: "Check both halves"},
-]));
+const APPLY_STEPS = Object.freeze(/** @type {const} */ (["check", "backup", "upload", "validate", "slave", "commit", "converge", "verify"])
+    .map((id) => Object.freeze({id, label: SAVE_STEP_WORDS[id]})));
 /** @type {Readonly<Record<string, number>>} */
 const STEP_INDEX = Object.freeze(Object.fromEntries(APPLY_STEPS.map((step, index) => [step.id, index])));
 
@@ -125,75 +119,50 @@ class ApplyProgress {
     }
 }
 
-/** @type {Readonly<Record<number, string>>} */
-const DOMAIN_NAMES = Object.freeze({0x10: "lighting", 0x20: "key behaviours", 0x30: "combos", 0x40: "settings", 0x50: "pointing modes"});
+// Each part of the profile, by its domain id, as Review names its area.
+/** @type {ReadonlyMap<number, string>} */
+const DOMAIN_NAMES = new Map(PROFILE_DOMAINS.map(domain => [domain.id, PROFILE_AREAS[domain.area]]));
 
-// What the keyboard's candidate error means, in the words of the person who
-// pressed Apply. Unlisted errors fall back to their wire name.
-/** @type {Readonly<Record<string, string>>} */
-const DEVICE_REASONS = Object.freeze({
-    CAPACITY_EXCEEDED: "The profile is larger than the keyboard can store.",
-    INCOMPATIBLE_SCHEMA: "The keyboard's firmware does not accept this profile format.",
-    UNSUPPORTED_DOMAIN: "The keyboard's firmware does not support part of this profile.",
-    INCOMPATIBLE_ACTION_ABI: "The profile was made for different firmware.",
-    CHECKSUM_MISMATCH: "The profile arrived damaged.",
-    STORAGE_FAILURE: "The keyboard could not write its storage.",
-    VALIDATION_REJECTED: "The keyboard rejected the profile",
-    ACTIVATION_FAILED: "The keyboard saved the profile but could not start using it.",
-    DURABILITY_UNKNOWN: "The keyboard could not confirm whether the save was written.",
-    TIMEOUT: "The keyboard gave up waiting for this save.",
-    PEER_SUPERSEDED: "The slave half already had a newer profile.",
-    PEER_PREPARE_YIELDED: "The slave half was saving a profile of its own at the same time.",
-    POSTCOMMIT_AUTHORITY_LOST: "The slave half reported a newer profile after the master half saved.",
-    PEER_COMMIT_CONFLICT: "The two halves disagree about which profile is current.",
-    PEER_TRANSFER_FAILED: "The slave half could not take the profile.",
-});
-
-// The slave half's last answer to the split transfer, when the keyboard
-// reports it (candidate status page 1).
-/** @type {Readonly<Record<string, string>>} */
-const SLAVE_REASONS = Object.freeze({
-    BUSY: "The slave half kept answering that it was busy.",
-    STALE: "The slave half already had a newer profile.",
-    CONFLICT: "The slave half holds a conflicting profile.",
-    CORRUPT: "The slave half's copy was damaged.",
-    INCOMPATIBLE: "The slave half runs incompatible firmware.",
-    STORAGE_ERROR: "The slave half could not store the profile, even after trying again.",
-    VALIDATION_ERROR: "The slave half rejected the profile.",
-    DIGEST_MISMATCH: "The copy on the slave half did not match what was sent.",
-    RANGE_ERROR: "The copy to the slave half went out of order.",
-    INVALID_FRAME: "The link between the halves garbled a message.",
-});
+// Why a save stopped, by the keyboard's candidate error, the slave half's
+// last answer and why it kept answering busy (vocabulary.js). An unlisted
+// keyboard error is said as one this Ark does not know; its name stays with
+// the failure, for the diagnostics.
+const {keyboard: DEVICE_REASONS, slave: SLAVE_REASONS, slaveBusy: SLAVE_BUSY_REASONS} = SAVE_FAILURE_WORDS;
 
 /** @param {DeviceFailure | null | undefined} error */
 function locate(error) {
     if (!error || error.domainId === 0xff || error.domainId === undefined) return "";
-    const domain = DOMAIN_NAMES[error.domainId] || `domain 0x${error.domainId.toString(16)}`;
+    // A part this Ark does not know is not named at all.
+    const domain = DOMAIN_NAMES.get(error.domainId);
+    if (!domain) return "";
     return error.rowIndex !== 0xffff && error.rowIndex !== undefined ? ` in ${domain}, row ${error.rowIndex + 1}` : ` in ${domain}`;
 }
-
-// Why the slave half kept answering BUSY, when it said.
-/** @type {Readonly<Record<string, string>>} */
-const SLAVE_BUSY_REASONS = Object.freeze({
-    MAILBOX_FULL: "The slave half stopped handling requests from the master half.",
-    OTHER_COPY: "The slave half was still holding an earlier, unfinished copy.",
-    NO_LEASE: "The slave half dropped the copy partway and did not take it up again.",
-    STORE_WORKING: "The slave half did not finish storing its copy.",
-    PULLING: "The slave half was fetching a profile of its own.",
-    CONVERGENCE_ONLY: "The slave half was finishing another save.",
-});
 
 // Ark's own wait running out, from the upload coordinator: the keyboard kept
 // answering but made no progress Ark could see.
 const STALLED = new Set(["COMMIT_OUTCOME_AMBIGUOUS", "VALIDATION_OUTCOME_AMBIGUOUS", "OPERATION_OUTCOME_AMBIGUOUS", "MAILBOX_BUSY", "UPLOAD_BUSY"]);
-const HELD = "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
-const HELD_ARK_WAIT = "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard waited to save until Ark stopped waiting for it.";
 
 // Errors whose text is for diagnostics only: the coordinators' and the
-// transport's. Two coordinator codes carry whatever stopped them (CARRIED).
-const CARRIED = new Set(["UPLOAD_FAILED", "COMMIT_FAILED"]);
+// transport's.
 /** @param {FailureDetails | null | undefined} error */
 const diagnosticOnly = error => error?.name === "CandidateUploadError" || error?.name === "LiveLinkTransportError";
+
+// What a coordinator's or the transport's error stands for, by its cause
+// chain: the first cause that is neither (Ark's sentence, a fault in Ark, an
+// answer that did not read), else whether one of them was a fault in Ark
+// (the transport's `fault: "ark"`, device-adapter.js).
+/** @param {FailureDetails} error @returns {{cause?: FailureDetails, arkFault: boolean}} */
+function carried(error) {
+    const seen = new Set();
+    let arkFault = false;
+    for (let link = /** @type {unknown} */ (error); link && typeof link === "object" && !seen.has(link); link = /** @type {{cause?: unknown}} */ (link).cause) {
+        seen.add(link);
+        const details = /** @type {FailureDetails & {fault?: unknown}} */ (link);
+        if (!diagnosticOnly(details)) return {cause: details, arkFault};
+        arkFault ||= details.fault === "ark";
+    }
+    return {arkFault};
+}
 
 // Why an Apply stopped, in the words of the person who pressed it: a lost
 // connection anywhere in the cause first (a restarted keyboard makes the slave
@@ -207,27 +176,32 @@ function failureReason(error, slave) {
     const device = error?.deviceError || error?.status?.error;
     if (device?.name && device.name !== "NONE") {
         // The copy was ready; the save waited for the master half to go idle.
-        if (device.name === "TIMEOUT" && slave?.waitingSafeBoundary) return HELD;
+        if (device.name === "TIMEOUT" && slave?.waitingSafeBoundary) return SAVE_FAILURE_WORDS.held;
         // The copy to the slave half stopped: its last answer says why.
         if (device.name === "PEER_TRANSFER_FAILED" && slave?.lastStatusName && SLAVE_REASONS[slave.lastStatusName]) return SLAVE_REASONS[slave.lastStatusName];
         const known = DEVICE_REASONS[device.name];
         if (known) return device.name === "VALIDATION_REJECTED" ? `${known}${locate(device)}.` : known;
-        return `The keyboard reported ${device.name}.`;
+        return SAVE_FAILURE_WORDS.unknownKeyboard;
     }
     // Ark's own wait ran out while the keyboard waited for a safe moment.
-    if (slave?.waitingSafeBoundary && STALLED.has(error?.code || "")) return HELD_ARK_WAIT;
+    if (slave?.waitingSafeBoundary && STALLED.has(error?.code || "")) return SAVE_FAILURE_WORDS.heldArkWait;
     if (slave && (slave.busyStreak ?? 0) >= 3 && slave.busyReason && SLAVE_BUSY_REASONS[slave.busyReason]) return SLAVE_BUSY_REASONS[slave.busyReason];
     if (slave && slave.lastStatusName && slave.lastStatusName !== "OK" && SLAVE_REASONS[slave.lastStatusName]) return SLAVE_REASONS[slave.lastStatusName];
-    if (slave && (slave.transportFailureCount ?? 0) > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
+    if (slave && (slave.transportFailureCount ?? 0) > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return SAVE_FAILURE_WORDS.linkSilent;
     if (cut === "unanswered") return INTERRUPTION_REASONS.unanswered;
-    if (STALLED.has(error?.code || "")) return "The keyboard stopped making progress, so Ark stopped waiting for it.";
-    if (diagnosticOnly(error)) {
-        // An Ark refusal the coordinator carried (a keyboard that changed
-        // under the upload) is said as Ark says it.
-        const cause = /** @type {FailureDetails | undefined} */ (error?.cause);
-        return CARRIED.has(error?.code || "") && cause?.message && !diagnosticOnly(cause) ? failureReason(cause, slave) : "The keyboard answered in a way Ark did not expect.";
+    if (STALLED.has(error?.code || "")) return SAVE_FAILURE_WORDS.stalled;
+    if (error && diagnosticOnly(error)) {
+        // What stopped the coordinator, carried in its cause, is said as Ark
+        // says it: Ark's own sentence (a keyboard that changed under the
+        // upload), a fault in Ark as Ark's own problem, an answer that did
+        // not read as the keyboard's. A fault in Ark beneath the transport is
+        // Ark's too; only what the coordinator saw the keyboard answer
+        // itself is the keyboard's unexpected answer.
+        const {cause, arkFault} = carried(error);
+        if (cause) return cause.message ? failureReason(cause, slave) : failureSentence(cause);
+        return arkFault ? FAILURE_WORDS.unexpected : SAVE_FAILURE_WORDS.unexpected;
     }
-    return error?.message || INTERRUPTION_REASONS.unanswered;
+    return error?.message ? failureSentence(error) : INTERRUPTION_REASONS.unanswered;
 }
 
 module.exports = {APPLY_STEPS, ApplyProgress, failureReason};

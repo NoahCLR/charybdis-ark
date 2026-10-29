@@ -21,13 +21,13 @@ export const leaveDemo = () => ({type: "leaveDemo"});
 // What the panel says in the demo.
 export const DEMO_WORDS = Object.freeze({
     status: "Demo · no keyboard",
-    banner: "No keyboard is connected. Change anything: edits stay in this window, and Export saves them as a profile file for your keyboard.",
+    banner: "No keyboard is connected. Change anything: edits stay in this tab, and Export profile keeps them as a backup for your keyboard.",
     explore: "Explore a demo",
-    exploreTip: "Open Ark on a demo setup, with no keyboard. Every screen works and every edit shows in the review; only saving needs a keyboard.",
-    exportNote: "Save the demo setup, with your edits, as a complete profile file. On your keyboard, Import it to review and save it.",
-    // Where a check the draft did not make comes from: the demo setup.
-    existingChecks: "Already in the demo setup",
-    existingCheck: "in the demo setup",
+    exploreTip: "Open Ark on a demo profile, with no keyboard. Every screen works and every edit shows in the review; only saving needs a keyboard.",
+    exportNote: "Export the demo profile, with your edits, as a complete backup. On your keyboard, import it to review and save it.",
+    // Where a check the draft did not make comes from: the demo profile.
+    existingChecks: "Already in the demo profile",
+    existingCheck: "in the demo profile",
 });
 
 // Leaving the demo, or opening another file in it, loses edits not exported
@@ -43,8 +43,8 @@ export function leaving(model, message) {
     const them = changes === 1 ? "it" : "them";
     return {
         ask: {
-            title: replacing ? "Open another profile file?" : "Leave the demo?",
-            detail: `Your ${count} in the demo ${changes === 1 ? "has" : "have"} not been exported. ${replacing ? "Opening another file replaces" : "Leaving loses"} ${them}; Export saves ${them} as a profile file first.`,
+            title: replacing ? "Open another backup?" : "Leave the demo?",
+            detail: `Your ${count} in the demo ${changes === 1 ? "has" : "have"} not been exported. ${replacing ? "Opening another file replaces" : "Leaving loses"} ${them}; Export profile keeps ${them} as a backup.`,
             confirm: replacing ? "Open without exporting" : "Leave without exporting",
         },
         message: {...message, discardDemo: true},

@@ -14,16 +14,15 @@ const {editMacro} = require("../model/macro-editor");
 const {editCustomKey} = require("../model/custom-key-editor");
 const {editKeyboardName} = require("../model/keyboard-name");
 const {editDeviceProfile} = require("../model/device-profile-edits");
+const {profileComboReadback} = require("../model/profile-model");
 const {DRAFT_EDITS, editedBy, draftEditLabel} = require("../model/draft-edits");
-const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
-const {effectiveComboWindow} = require("../schema/combo-domain-v1");
-const {SETTING} = require("../schema/settings-domain-v1");
+const {actionName, knownActionAbi, layerOfRef} = require("../schema/actions");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, LAYER_IDENTITY, matrixPosition} = require("../data/charybdis-layout");
 const keycodes = require("../schema/keycodes");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {liveKeyboardStatus} = require("./live-profile-session");
-const {LIVE_RESULT_WORDS, quietWords} = require("../model/vocabulary");
+const {LIVE_RESULT_WORDS, PROFILE_FULL_WORDS, quietWords} = require("../model/vocabulary");
 
 // What the panel shows of the keyboard's own saving and its halves.
 /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
@@ -57,6 +56,18 @@ const freeze = value => {
 };
 /** @param {string} text */
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
+// An edit a byte format refused as too large for the keyboard: the person's
+// edit, said in words (PROFILE_FULL_WORDS), by the count it went past where
+// the format names one (its `limit` and `most`), its own text kept
+// beneath for the diagnostics. Any other refusal is left as it is.
+/** @param {unknown} error */
+const fullProfile = error => {
+    const details = /** @type {{code?: unknown, limit?: unknown, most?: unknown} | null | undefined} */ (error);
+    if (details?.code !== "CAPACITY_EXCEEDED") return error;
+    const counted = typeof details.limit === "string" && typeof details.most === "number" && Object.hasOwn(PROFILE_FULL_WORDS.counts, details.limit)
+        ? PROFILE_FULL_WORDS.counts[details.limit](details.most) : undefined;
+    return Object.assign(new Error(counted ?? PROFILE_FULL_WORDS.profile), {code: "PROFILE_FULL", cause: error});
+};
 /**
  * A document a live edit would leave the keyboard with, and how the history
  * takes it once the keyboard confirms it.
@@ -425,6 +436,10 @@ class ProfileDraftSession {
     // (live-edits.js).
     /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
     propose(message) {
+        try {return this.proposed(message);} catch (error) {throw fullProfile(error);}
+    }
+    /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
+    proposed(message) {
         this.assertRevision(message.draftRevision);
         const current = this.current, before = current.fingerprint;
         let document;
@@ -532,7 +547,7 @@ class ProfileDraftSession {
         if (!this.dirty) return [];
         const current = this.current;
         if (this.base.incomplete) return [{area: "Recovery", unit: null, title: "Complete profile", status: "changed", group: null, place: null,
-            fields: [{label: "", before: "Interrupted configuration; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
+            fields: [{label: "", before: "Interrupted profile; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
         const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => layerUnit(row.unit, this.order)));
         const parent = new Map([...shown].map(unit => [unit, unit]));
         /** @param {string} unit @returns {string} */
@@ -628,7 +643,7 @@ class ProfileDraftSession {
         // reference, so the order stays.
         let document, order = this.order;
         if (units.has("layerOrder")) {
-            if (units.size > 1) throw fail("Discard the layer order on its own.");
+            if (units.size > 1) throw fail("Discard the layer priority on its own.");
             document = rearranged(this.current.document, inverse(order));
             order = LAYER_IDENTITY;
         } else document = revertUnits(this.referenceFor(order).snapshot, this.current, units, this.capabilities);
@@ -636,7 +651,7 @@ class ProfileDraftSession {
         // the keyboard's profile again, not an indescribable difference.
         const left = this.describe(validateSnapshot(document, this.capabilities).document, order);
         if (left.every(row => row.unit === "profile")) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = LAYER_IDENTITY;}
-        const label = units.has("layerOrder") ? "Put the layer order back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
+        const label = units.has("layerOrder") ? "Put the layer priority back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
         return {document: validateSnapshot(document, this.capabilities).document, label, order, reviewed};
     }
     // Discard the whole draft as one more step, so undo brings it back: the
@@ -832,17 +847,12 @@ class ProfileDraftSession {
             session: status.session, revision: status.revision};
     }
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor].document).fingerprint, originHalf: this.deviceId};}
-    // The draft's combos as the keyboard would report them: every window as
-    // it resolves, and whether it follows the default.
+    // The draft's combos as the keyboard would report them
+    // (profile-model.js). The constructor gates the action ABI, so every
+    // stored action has a native code.
     /** @returns {Extract<import("./types.js").ComboRead, {state: "read"}>} */
     combos() {
-        const {combos, settings} = this.decode(this.history[this.cursor].document).decoded;
-        // The constructor gates the action ABI, and all stored actions have native codes.
-        /** @param {import("../schema/types.js").SemanticAction} action */
-        const native = action => /** @type {number} */ (nativeCode(action));
-        return {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),
-            version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
-            rows: combos.rows.map(row => ({...row, termMs: effectiveComboWindow(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
+        return profileComboReadback(this.decode(this.history[this.cursor].document).decoded);
     }
     /** @param {import("./types.js").DraftDeviceContext} state */
     view(state) {
@@ -871,5 +881,4 @@ class ProfileDraftSession {
             keyboard: connected ? liveKeyboardView(this.keyboardStatus) : null};
     }
 }
-// The router (panel-session.js) and the web build take the registry's list from here.
-module.exports = {ProfileDraftSession, DRAFT_EDITS};
+module.exports = {ProfileDraftSession};

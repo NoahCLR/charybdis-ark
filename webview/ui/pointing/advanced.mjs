@@ -1,6 +1,6 @@
 // @ts-check
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
-import {AXIS, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, tapPlaceWord, thresholdDistance} from "../../view/pointing-config.mjs";
+import {AXIS, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, modifierPolicyTip, readsHorizontal, readsVertical, tapPlaceWord, thresholdDistance} from "../../view/pointing-config.mjs";
 import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
 import {word} from "../../view/vocabulary.mjs";
 import {state} from "../../store.mjs";
@@ -26,7 +26,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     if (!scrolling) {
         // An axis the mode does not read has no threshold to set. Sending
         // once per movement, the threshold is how far a movement has to go.
-        const per = slot.directionOutput === 1 ? "movement before it sends" : "movement per tap";
+        const per = word(words(model).directionStep, slot.directionOutput);
         const dpi = modeDpi(slot, model.configDefaults);
         /** @param {number} counts */
         const distance = (counts) => {
@@ -59,7 +59,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
                     continue;
                 }
                 const policy = select(`${label} with held modifiers`, words(model).modifierPolicy, tap.modifierPolicy ?? 0, `${prefix}Policy:${name}`,
-                    {tip: "Inherit: modifiers you hold apply to the shortcut, so Shift with an arrow selects. Ignore: the modifiers chosen below are left out while it sends. Exact: it sends exactly its shortcut, whatever you hold."});
+                    {tip: modifierPolicyTip(model)});
                 /** @type {HTMLElement} */ (policy.querySelector("span")).classList.add("sr");
                 const masking = tap.modifierPolicy === MODIFIER_POLICY.MASK;
                 const left = masking ? modifierNames(model, tap.mask).join(", ") || "choose at least one below" : "—";

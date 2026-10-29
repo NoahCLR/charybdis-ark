@@ -11,7 +11,7 @@
 /** @typedef {{readonly active: number, readonly blocked: number}} AnswerCandidate */
 
 /** Whether `candidate` answers while the layers in the `active` mask are on. */
-export function answersUnder(/** @type {AnswerCandidate} */ candidate, /** @type {number} */ active) {
+function answersUnder(/** @type {AnswerCandidate} */ candidate, /** @type {number} */ active) {
     return (active & candidate.active) !== 0 && (active & candidate.blocked) === 0;
 }
 

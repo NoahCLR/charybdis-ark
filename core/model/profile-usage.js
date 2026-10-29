@@ -17,7 +17,8 @@
 
 const {decodedOf} = require("./portable-profile");
 const {profileMacroBudget} = require("./macro-editor");
-const {PROFILE_ACTION_KINDS: ACTION, PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
+const {PROFILE_ACTION_KINDS: ACTION, decodeProfileBlob} = require("../schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 const {shortcutPresent} = require("../schema/settings-domain-v1");
 
 /** @param {number | undefined} value @returns {value is number} */

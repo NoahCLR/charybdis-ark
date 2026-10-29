@@ -43,7 +43,9 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
         const {reviewItem} = await import("/webview/ui/review-items.mjs");
         const {actionLabel} = await import("/webview/view/keyface.mjs");
         const model = getModel();
-        const box = (html) => Object.assign(document.createElement("div"), {innerHTML: html});
+        // The page takes markup only through the panel's policy (Trusted Types).
+        const {html} = await import("/webview/lib/dom.mjs");
+        const box = (markup) => Object.assign(document.createElement("div"), {innerHTML: html(markup)});
         const read = (node) => ({
             icons: [...node.querySelectorAll(".kind-icon")].map((icon) =>
                 `${icon.classList.contains("layer") ? "layer" : "pointing"}${icon.getAttribute("style")?.includes("color:") ? "" : " off"}`),
@@ -113,7 +115,8 @@ test("the layer bar keeps its swatches, Settings' per-layer switches mark their 
         const {mark} = await import("/webview/ui/marks.mjs");
         const model = structuredClone(getModel());
         model.rgb.stages.forEach((stage) => { if (stage.id === "layers") stage.enabled = false; });
-        const node = Object.assign(document.createElement("div"), {innerHTML: mark(model, {kind: "layer", layer: NAVIGATION})});
+        const {html} = await import("/webview/lib/dom.mjs");
+        const node = Object.assign(document.createElement("div"), {innerHTML: html(mark(model, {kind: "layer", layer: NAVIGATION}))});
         return node.querySelector(".kind-icon")?.className;
     }, NAVIGATION);
     expect(off).toBe("kind-icon layer off");
@@ -139,6 +142,7 @@ test("a layer or pointing-mode action is named with its tag, a layer-tap by its 
         const {actionMarked, keyNameMarked} = await import("/webview/ui/marks.mjs");
         const {reviewItem} = await import("/webview/ui/review-items.mjs");
         const {actionLabel} = await import("/webview/view/keyface.mjs");
+        const {html} = await import("/webview/lib/dom.mjs");
         const model = getModel();
         const slot = model.pdModes.find((entry) => entry.id === ZOOM);
         const drawn = {
@@ -155,7 +159,7 @@ test("a layer or pointing-mode action is named with its tag, a layer-tap by its 
             reviewTitle: reviewItem(model, {unit: "y", title: actionLabel(model, slot.keys.hold), status: "removed",
                 place: {kind: "behaviour", keycode: slot.keys.hold}, fields: []}),
         };
-        for (const [name, html] of Object.entries(drawn)) document.body.insertAdjacentHTML("beforeend", `<div data-drawn="${name}">${html}</div>`);
+        for (const [name, markup] of Object.entries(drawn)) document.body.insertAdjacentHTML("beforeend", html(`<div data-drawn="${name}">${markup}</div>`));
     }, {NAVIGATION, ZOOM});
     const read = (name) => page.locator(`[data-drawn="${name}"]`).evaluate(namedIn);
     expect((await read("hold")).named).toEqual([{icon: "layer", name: "Navigation", tags: ["Hold"]}]);

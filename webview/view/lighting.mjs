@@ -6,8 +6,8 @@
 // from the draft, because the draft is what the model carries.
 
 import {GEO, inLocality, trackballInLocality} from "./geometry.mjs";
-import {pointingSlotFor} from "./reach.mjs";
-import {keyMeaning} from "./keyface.mjs";
+import {pointingSlotFor} from "./pointing-reach.mjs";
+import {keyKindOf, keyMeaning} from "./keyface.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 import {OFF, inheritsStageColour, layerPaints, ledColour} from "../../rules/led-light.mjs";
 
@@ -75,7 +75,7 @@ const baseField = (model, macro) => (model?.configDefaults || []).find((section)
 // An effect other than Solid colour animates: it has no single colour, but it
 // is lit, so it must never be drawn as off.
 /** @param {Model} model */
-export function baseAnimated(model) {
+function baseAnimated(model) {
     const base = model?.rgb?.baseEffect;
     return Boolean(base && base.state === "read" && base.enabled && base.effectId !== 1);
 }
@@ -97,7 +97,7 @@ export const LED_FLAGS = Object.freeze({ALL: 255, MODIFIER: 1, KEY: 4});
 // flags leave out. On this board the "modifier" class is the eight thumb keys
 // and the trackball LED, the "key" class every other key.
 /** @param {Model} model @param {number | undefined} layoutIndex undefined for the trackball LED */
-export function baseReaches(model, layoutIndex) {
+function baseReaches(model, layoutIndex) {
     const field = baseField(model, "effectLeds");
     if (!field) return true;
     const flags = Number(field.value);
@@ -144,13 +144,15 @@ export function feedbackColours(model) {
 export const tierColour = (model, kind) => feedbackColours(model)[kind] || OFF;
 
 // A key counts as mapped on a layer when it stores something of its own;
-// transparent and disabled positions keep the layer underneath.
-/** @param {Position} position */
-export const isMapped = (position) =>
-    Boolean(position?.keycode) && !["KC_TRANSPARENT", "KC_TRNS", "_______", "KC_NO", "XXXXXXX"].includes(position?.keycode || "");
+// transparent and disabled positions keep the layer underneath (qmkKeyKinds).
+/** @param {Model} model @param {Position | undefined} position */
+const isMapped = (model, position) => {
+    const kind = position?.keycode ? keyKindOf(model, position.keycode) : "disabled";
+    return kind !== "transparent" && kind !== "disabled";
+};
 
-/** @param {Layer} layer */
-export const mappedKeyCount = (layer) => (layer?.positions || []).filter(isMapped).length;
+/** @param {Model} model @param {Layer} layer */
+export const mappedKeyCount = (model, layer) => (layer?.positions || []).filter((position) => isMapped(model, position)).length;
 
 // The firmware's two rules for "no colour" (rules/led-light.mjs).
 export {inheritsStageColour, layerPaints};
@@ -167,9 +169,9 @@ export const offWording = (model, stage) => vocabulary(model).colourOff[stage] |
 /** @param {Model} model @param {Layer} layer @param {number} l @param {Position} position */
 function mappedOn(model, layer, l, position) {
     if (!position) return false;
-    if (l === layer?.index) return isMapped(position);
+    if (l === layer?.index) return isMapped(model, position);
     const other = (model?.layers || []).find((row) => row.index === l) || model?.layers?.[l];
-    return isMapped((other?.positions || []).find((row) => row.layoutIndex === position.layoutIndex));
+    return isMapped(model, (other?.positions || []).find((row) => row.layoutIndex === position.layoutIndex));
 }
 
 /**

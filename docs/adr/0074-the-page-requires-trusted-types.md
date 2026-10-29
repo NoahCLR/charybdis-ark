@@ -1,0 +1,9 @@
+# The page requires Trusted Types
+
+Cited as D-L74.
+
+The web page requires Trusted Types, and two policies are all it allows: `ark-html` (`webview/lib/dom.mjs`, `html`), through which every piece of the panel's markup reaches an HTML sink, and `ark-worker` (`web/page.mjs`), which passes this build's sleep worker's URL and refuses any other. Its Content Security Policy says so (`require-trusted-types-for 'script'`, `trusted-types ark-html ark-worker`); `scripts/build-web.js` writes it once (`POLICY`), into the page's `<meta>` tag and its `_headers`, and `scripts/check-static-site.js` refuses a site without it either way. A keyboard and a file are untrusted, and Ark draws what they hold as markup: under Trusted Types a sink that skips the policy fails in the browser rather than opening a way in that only review would catch. `ark-html` passes markup as it is. What makes markup safe is that every value in it was escaped where the markup was written, which `tests/view/markup-escaped.test.mjs` judges, and `tests/scripts/conventions.test.js` allows a sink only in the forms that check sees. The preview (`scripts/preview.js`) requires Trusted Types too, with `ark-html` alone, so a screen whose markup skips the policy fails there and in the browser suite as it would on the page. The page also sends `Cross-Origin-Opener-Policy: same-origin`, keeping a browsing context group of its own since it opens no window that needs it as opener, and `Strict-Transport-Security` for its own host, keeping it on HTTPS, which WebHID needs (`web/_headers`).
+
+## Considered options
+
+A policy that sanitizes markup: rejected, because it would quietly drop what an unescaped value carried in rather than fail, hiding the very mistake the escape check is there to find. Leaving Trusted Types off and relying on the escape check alone: rejected, because a sink that check cannot see would reach the page silently.

@@ -96,7 +96,9 @@ export type PanelRequest = PanelCommand & Partial<DraftIdentity>;
 export type ReadStep = 'layout' | 'profile' | 'combos' | 'baseRgb';
 export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProgress} | {source: 'portable'; progress: string}) & {operationId: number; phase: PhaseId; selectedDeviceId: string; connectionToken: number | string | null};
 export type MacroValidation = MacroInspection | {error: string; code: string};
-export type PanelResponse<M = import('./panel.js').PublishedModel> =
+/** What the shell posts to the panel. The catalog comes before the first model, and again after each `ready`; a model leaves out what it holds. */
+export type PanelResponse<M = import('./panel.js').PostedModel> =
+    | {type: 'catalog'; catalog: import('./panel.js').PanelCatalog}
     | {type: 'model'; model: M; notice?: string; failed?: boolean; resetDraftForms?: boolean; acceptedEdit?: {message: {type: string}; previousFingerprint: string; fingerprint: string}}
     | ({type: 'applyProgress'; apply: ApplyView} & Partial<DraftIdentity>)
     | ({type: 'readProgress'; read: ReadProgress} & Partial<DraftIdentity>)

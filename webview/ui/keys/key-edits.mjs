@@ -3,7 +3,8 @@
 // swapping two keys by dragging one onto the other.
 
 import {keyMeaning} from "../../view/keyface.mjs";
-import {currentLayer, getModel, layerName, positionAt, post, state, writable} from "../../store.mjs";
+import {currentLayer, getModel, positionAt, post, state, writable} from "../../store.mjs";
+import {layerCalled} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
 
@@ -15,7 +16,7 @@ export function pickKeycodeFor(layoutIndex) {
     const position = positionAt(layer, layoutIndex);
     state.selected = layoutIndex;
     openPicker({
-        title: `Keycode on ${layerName(layer)}`,
+        title: `Keycode on ${layerCalled(layer)}`,
         context: `index ${layoutIndex}`,
         seed: position ? [keyMeaning(position)] : [],
         layoutKey: true,

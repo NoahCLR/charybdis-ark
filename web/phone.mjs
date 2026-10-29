@@ -99,7 +99,7 @@ function githubMarkOf(document, className) {
 // The board's shape alone: every key and the trackball where the panel's
 // board puts them (webview/view/geometry.mjs), with no legends.
 /** @param {Document} document */
-export function boardOutline(document) {
+function boardOutline(document) {
     /** @template {keyof SVGElementTagNameMap} K @param {K} tag @param {Record<string, string | number>} attributes @returns {SVGElementTagNameMap[K]} */
     const make = (tag, attributes) => {
         const node = document.createElementNS(SVG, tag);

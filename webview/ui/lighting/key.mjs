@@ -7,7 +7,7 @@ import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 import {groupRowsTable} from "./led-rows.mjs";
-import {sectionsIn} from "../settings.mjs";
+import {sectionsIn} from "../../view/settings-layout.mjs";
 
 // How fast feedback blinks. The keyboard stores it with its settings, so it
 // saves as a settings section of one field.

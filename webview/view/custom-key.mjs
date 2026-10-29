@@ -7,8 +7,8 @@
 // tap-toggled or one-shot. A behaviour on the key works on top of it, and a
 // behaviour step on another key that sends it sends the shortcut only, layers
 // included.
-import {sentence, vocabulary} from "./vocabulary.mjs";
-import {customKeyKeycodes, customKeyPlacements, reachGroups} from "./reach.mjs";
+import {layerCalledAt, sentence, vocabulary} from "./vocabulary.mjs";
+import {customKeyNamesOf, customKeyPlacements, reachGroups} from "./reach.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
 import {compactModifierMask} from "./keyvalues.mjs";
 import {LAYERS} from "./layout.mjs";
@@ -35,7 +35,7 @@ export const sameShortcut = (a, b) => (a.mods ?? 0) === (b.mods ?? 0) && (a.keys
 // to, tap-toggle, one-shot; hold without layers.
 export const LAYER_KIND = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
 /** @param {CustomKey} key */
-export const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || LAYER_KIND.HOLD : LAYER_KIND.HOLD);
+const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || LAYER_KIND.HOLD : LAYER_KIND.HOLD);
 /** @param {CustomKey} key */
 const layersAlone = (key) => Boolean(key.shortcut?.layers) && !sendsKeys(key.shortcut);
 /** @param {CustomKey} key */
@@ -83,13 +83,18 @@ export const customKeyInUse = (key) => Boolean(key && (key.name || key.hasBehavi
 // carrying one, a transparent key letting a lower one, a behaviour branch
 // sending one (which sends its shortcut only, D-L63), or a combo sending one.
 /** @param {Model} model @param {import("../../contracts/panel.js").Layer[]} stack @param {number} at */
-export const customKeyReach = (model, stack, at) => reachGroups(model, stack, at, customKeyKeycodes,
+export const customKeyReach = (model, stack, at) => reachGroups(model, stack, at, customKeyNamesOf(model),
     (model?.customKeys || []).filter(customKeyInUse).map((key) => key.keycode));
 
-// The custom key a keycode names, if it is one.
+// The custom key a keycode names, if it is one: one of the custom keys core
+// publishes, by its name or any other it is read by, the bare hex a combo
+// stores included (customKeyNamesOf).
 /** @param {Model} model @param {string | null | undefined} keycode */
-export const customKeyOf = (model, keycode) => /^CUSTOM_KEY_\d+$/.test(String(keycode ?? ""))
-    ? (model?.customKeys || []).find((key) => key.keycode === keycode) : undefined;
+export const customKeyOf = (model, keycode) => {
+    if (!keycode) return undefined;
+    const [name = keycode] = customKeyNamesOf(model)(keycode);
+    return (model?.customKeys || []).find((key) => key.keycode === name);
+};
 
 // "What it does": its shortcut, its behaviour on top, both, or nothing yet.
 /** @param {CustomKey} key */
@@ -115,8 +120,10 @@ export function customKeyShortcutLine(key) {
 // since its behaviour shows below. A shortcut has its own section instead.
 /** @param {CustomKey | null | undefined} key */
 export function customKeyHeadline(key) {
-    if (!key || hasShortcut(key)) return "";
-    return key.hasBehavior ? "No shortcut" : "No shortcut and no behaviour yet: it sends nothing.";
+    if (!key || hasShortcut(key)) return null;
+    // Under a behaviour the missing shortcut is a quiet aside; alone, the key
+    // sends nothing, which the card says plainly.
+    return key.hasBehavior ? {text: "No shortcut", quiet: true} : {text: "No shortcut and no behaviour yet: it sends nothing.", quiet: false};
 }
 
 // When a custom key's shortcut runs on it, for the hover card's Shortcut
@@ -322,11 +329,6 @@ export function shortcutPickKey(model, pick, name) {
     return next;
 }
 
-/** @param {Model} model @param {number} index */
-const layerWords = (model, index) => {
-    const layer = (model?.layers || []).find((entry) => entry.index === index);
-    return layer?.displayName || layer?.name || "";
-};
 
 // The picker's choice in words, for its footer: "Left Ctrl + Right Alt + K",
 // its keys in order ("Left Shift + A + S + Play"), then its layers by name, lowest first, led by their kind's verb unless held,
@@ -335,7 +337,7 @@ const layerWords = (model, index) => {
 export function shortcutPickLabel(model, shortcut) {
     const mods = (vocabulary(model).modifiers || []).filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
     const keys = shortcut.keys.map((code) => (model?.qmkKeycodes || []).find((row) => row.keycode === code)).map((entry) => entry ? entry.label || entry.value : "");
-    const layers = (model?.layers || []).map((layer) => layer.index).filter((index) => (shortcut.layers ?? 0) & 2 ** index).sort((a, b) => a - b).map((index) => layerWords(model, index));
+    const layers = (model?.layers || []).map((layer) => layer.index).filter((index) => (shortcut.layers ?? 0) & 2 ** index).sort((a, b) => a - b).map((index) => layerCalledAt(model, index));
     const verb = shortcut.layerKind ? (vocabulary(model).customKeys?.layerKinds || []).find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
     if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;
     return [...mods, ...keys, ...layers].filter(Boolean).join(" + ");
@@ -367,7 +369,7 @@ export function shortcutLayerRows(model, chosen) {
     return (model?.layers || []).map((layer) => {
         const target = targets.find((entry) => entry.layer === layer.index);
         const on = Boolean(chosen & 2 ** layer.index), unusable = Boolean(target?.refusal);
-        return {layer: layer.index, name: layerWords(model, layer.index), on, unusable,
+        return {layer: layer.index, name: layerCalledAt(model, layer.index), on, unusable,
             why: unusable && target?.alwaysOn && words ? words[target.alwaysOn] : "", tip: target?.refusal || ""};
     });
 }

@@ -4,9 +4,8 @@
 // are read as news, and its flags show with the one action that helps.
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {openPanelLoop} = require("../../core/session/panel-loop");
-const {checkLive, watchLive} = require("../../core/session/live-watch");
-const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {watchLive} = require("../../core/session/live-watch");
+const {lastMessage, lastModel, openLoop} = require("../fixtures/panel-loop");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {validateSnapshot} = require("../../core/model/portable-profile");
@@ -14,44 +13,21 @@ const {replaceDomain} = require("../../core/schema/profile-domains");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
 
-function fakeShell() {
-    const shell = {
-        posted: [], errors: [], recoveries: [], made: [],
-        post: (message) => {shell.posted.push(message);},
-        showError: (text) => {shell.errors.push(text);},
-        saveRecovery: async (doc, about) => {shell.recoveries.push(doc); shell.made.push(about); return `/recovery/${shell.recoveries.length}.json`;},
-        saveExport: async () => undefined,
-    };
-    return shell;
-}
-const model = shell => shell.posted.filter(message => message.type === "model").at(-1);
-
+// The loop on a live keyboard in Live edit, unless `options` say otherwise.
 /** @param {import("node:test").TestContext} t @param {object} [options] */
-async function open(t, options = {}) {
-    const keyboard = liveKeyboard({document: document(), mode: EDIT_MODE.LIVE, ...options});
-    const shell = fakeShell();
-    const loop = openPanelLoop(shell, {adapter: fakeKeyboardAdapter({keyboard}), defaultTimeoutMs: 300, sleep: async () => {}});
-    t.after(() => loop.close());
-    await loop.handleMessage({type: "refresh"});
-    /** @param {object} message */
-    const send = message => loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, ...message});
-    /** @param {number} layer @param {number} layoutIndex @param {string} keycode */
-    const key = (layer, layoutIndex, keycode) => send({type: "updateLayoutKeys", layer: `Layer ${layer}`, changes: [{layoutIndex, keycode}]});
-    const look = async () => {const changed = await checkLive(loop.session); if (changed) loop.publish(); return changed;};
-    return {keyboard, shell, loop, send, key, look, session: loop.session};
-}
+const open = (t, options = {}) => openLoop(t, {keyboard: liveKeyboard({document: document(), mode: EDIT_MODE.LIVE, ...options})});
 
-test("in Live an edit runs at once, and Ark shows it saved once the keyboard says it saved it", async t => {
+test("in Live edit an edit runs at once, and Ark shows it saved once the keyboard says it saved it", async t => {
     const {keyboard, shell, session, key, look, send} = await open(t);
     assert.equal(session.draft.live.mode, EDIT_MODE.LIVE);
-    assert.deepEqual(model(shell).model.editMode.offered, [EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW, EDIT_MODE.APPLY], "all three modes are offered: Live edit, Live preview + save, Review and save");
+    assert.deepEqual(lastModel(shell).editMode.offered, [EDIT_MODE.LIVE, EDIT_MODE.LIVE_REVIEW, EDIT_MODE.APPLY], "all three modes are offered: Live edit, Live preview + save, Review and save");
     await key(0, 10, "KC_X");
     assert.ok(keyboard.working, "the keyboard runs the edit");
-    assert.equal(model(shell).model.draft.live.unsaved, true);
+    assert.equal(lastModel(shell).draft.live.unsaved, true);
     assert.equal(await look(), false, "nothing new while the keyboard waits for quiet");
     assert.equal(keyboard.autoSave(), true, "the quiet period passes on the keyboard");
     assert.equal(await look(), true);
-    const live = model(shell).model.draft.live;
+    const live = lastModel(shell).draft.live;
     assert.equal(live.unsaved, false);
     assert.equal(live.keyboard.savedByKeyboard, true, "saved by the keyboard, by its own status");
     assert.equal(session.draft.dirty, false, "what is saved is what it runs");
@@ -59,20 +35,20 @@ test("in Live an edit runs at once, and Ark shows it saved once the keyboard say
     assert.deepEqual(shell.recoveries, [], "Ark wrote nothing and kept no recovery copy: the keyboard saved");
     await send({type: "undoProfileDraft"});
     assert.ok(keyboard.working, "undo is one more live edit");
-    assert.equal(model(shell).model.draft.live.keyboard.savedByKeyboard, false);
-    assert.equal(model(shell).model.draft.live.unsaved, true);
+    assert.equal(lastModel(shell).draft.live.keyboard.savedByKeyboard, false);
+    assert.equal(lastModel(shell).draft.live.unsaved, true);
     assert.equal(keyboard.mutations.filter(report => report[2] === 0x25).length, 0, "Ark never asked it to save");
 });
 
-test("Save is not Live's: it is refused until the keyboard's own save fails, then it saves again without a review", async t => {
+test("Save is not Live edit's: it is refused until the keyboard's own save fails, then it saves again without a review", async t => {
     const {keyboard, shell, session, key, look, send} = await open(t);
     await key(0, 11, "KC_W");
     await send({type: "saveProfileDraft"});
-    assert.match(model(shell).notice, /saves by itself/);
+    assert.match(lastMessage(shell).notice, /saves by itself/);
     keyboard.faults.autoSaveFails = 4;
     keyboard.autoSave();
     assert.equal(await look(), true);
-    assert.equal(model(shell).model.draft.live.keyboard.saveFailed, true, "the failure is shown");
+    assert.equal(lastModel(shell).draft.live.keyboard.saveFailed, true, "the failure is shown");
     await send({type: "saveProfileDraft"});
     assert.equal(keyboard.working, null, "saved on the second try");
     assert.equal(shell.recoveries.length, 1, "a save Ark asks for keeps a recovery copy first");
@@ -84,13 +60,13 @@ test("an adjustment key's edit is read as news, not as a failure", async t => {
     const changed = validateSnapshot(document()).layers; changed[3][1] = 0x05;
     keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
     assert.equal(await look(), true);
-    assert.match(model(shell).notice, /changed by itself/);
+    assert.match(lastMessage(shell).notice, /changed by itself/);
     assert.deepEqual(shell.errors, []);
     assert.equal(validateSnapshot(session.draft.current.document).layers[3][1], 0x05, "the draft shows what the keyboard runs");
     assert.equal(session.draft.live.revision, keyboard.revision);
     keyboard.autoSave();
     await look();
-    assert.equal(model(shell).model.draft.live.keyboard.savedByKeyboard, true, "and the keyboard saves it in Live");
+    assert.equal(lastModel(shell).draft.live.keyboard.savedByKeyboard, true, "and the keyboard saves it in Live edit");
 });
 
 test("the slave half refusing the edits, a save waiting for quiet and an unstored mode are shown", async t => {
@@ -98,7 +74,7 @@ test("the slave half refusing the edits, a save waiting for quiet and an unstore
     await key(0, 12, "KC_V");
     keyboard.raised.slaveRefused = true; keyboard.raised.modeNotStored = true; keyboard.raised.slaveStoragePaused = true;
     assert.equal(await look(), true);
-    const published = model(shell).model;
+    const published = lastModel(shell);
     assert.deepEqual([published.draft.live.slaveRefused, published.editMode.notStored, published.draft.live.keyboard.storagePaused], [true, true, true]);
     keyboard.raised.slaveRefused = false;
     await send({type: "revertProfileDraft"});
@@ -136,20 +112,20 @@ test("the watch looks on the shell's sleep until stopped", async t => {
     assert.equal(session.draft.live.unsaved, false);
 });
 
-test("a replug in Live keeps what the keyboard saved, and says so", async t => {
+test("a replug in Live edit keeps what the keyboard saved, and says so", async t => {
     const {keyboard, shell, loop, key} = await open(t);
     await key(0, 15, "KC_S");
     keyboard.autoSave();
     keyboard.replug();
     await loop.handleMessage({type: "refresh"});
-    assert.match(model(shell).notice, /kept your edits/);
+    assert.match(lastMessage(shell).notice, /kept your edits/);
     await key(0, 16, "KC_R");
     keyboard.replug();
     await loop.handleMessage({type: "refresh"});
-    assert.match(model(shell).notice, /before it saved your last edits/);
+    assert.match(lastMessage(shell).notice, /before it saved your last edits/);
 });
 
-test("under an Apply draft, a key adjustment the keyboard saved is read again; one still unsaved opens live and goes back to Apply once saved", async t => {
+test("under a Review and save draft, a key adjustment the keyboard saved is read again; one still unsaved opens live and goes back to Review and save once saved", async t => {
     const {keyboard, shell, session, look} = await open(t, {mode: EDIT_MODE.APPLY});
     assert.equal(session.draft.live, null);
     assert.equal(await look(), false, "the first look only notes where the keyboard is");
@@ -158,7 +134,7 @@ test("under an Apply draft, a key adjustment the keyboard saved is read again; o
     assert.equal(await look(), false, "unsaved: the keyboard saves it after its quiet moment");
     keyboard.autoSave();
     assert.equal(await look(), true);
-    assert.match(model(shell).notice, /changed by itself/);
+    assert.match(lastMessage(shell).notice, /changed by itself/);
     assert.equal(session.draft.live, null, "still an Apply draft");
     assert.equal(validateSnapshot(session.draft.current.document).layers[3][2], 0x06, "showing what the keyboard saved");
     assert.equal(session.draft.dirty, false);
@@ -181,43 +157,43 @@ test("a queued key adjustment reaches the panel before its revision changes", as
     const {keyboard, shell, look} = await open(t);
     keyboard.raised.adjustmentPending = true;
     assert.equal(await look(), true);
-    assert.equal(model(shell).model.draft.live.keyboard.adjustmentPending, true);
-    assert.equal(model(shell).model.draft.keyboard.adjustmentPending, true, "the draft's keyboard view is the live one");
+    assert.equal(lastModel(shell).draft.live.keyboard.adjustmentPending, true);
+    assert.equal(lastModel(shell).draft.keyboard.adjustmentPending, true, "the draft's keyboard view is the live one");
     keyboard.raised.adjustmentPending = false;
     assert.equal(await look(), true);
-    assert.equal(model(shell).model.draft.live.keyboard.adjustmentPending, false);
+    assert.equal(lastModel(shell).draft.live.keyboard.adjustmentPending, false);
 });
 
 
-test("under an Apply draft, a queued key adjustment reaches the panel too", async t => {
+test("under a Review and save draft, a queued key adjustment reaches the panel too", async t => {
     const {keyboard, shell, session, look} = await open(t, {mode: EDIT_MODE.APPLY});
     assert.equal(session.draft.live, null);
     assert.equal(await look(), false, "the first look only notes where the keyboard is");
-    assert.equal(model(shell).model.draft.keyboard, null, "nothing said before a look");
+    assert.equal(lastModel(shell).draft.keyboard, null, "nothing said before a look");
     keyboard.raised.adjustmentPending = true;
     assert.equal(await look(), true);
-    assert.equal(model(shell).model.draft.live, null, "still an Apply draft");
-    assert.equal(model(shell).model.draft.keyboard.adjustmentPending, true);
+    assert.equal(lastModel(shell).draft.live, null, "still an Apply draft");
+    assert.equal(lastModel(shell).draft.keyboard.adjustmentPending, true);
     assert.equal(await look(), false, "nothing new while it stays pending");
     keyboard.raised.adjustmentPending = false;
     assert.equal(await look(), true);
-    assert.equal(model(shell).model.draft.keyboard.adjustmentPending, false);
+    assert.equal(lastModel(shell).draft.keyboard.adjustmentPending, false);
 });
 
-for (const flag of ["stopped", "slaveStopped"]) test(`under an Apply draft, a ${flag === "stopped" ? "master" : "slave"} half that stopped saving reaches the panel`, async t => {
+for (const flag of ["stopped", "slaveStopped"]) test(`under a Review and save draft, a ${flag === "stopped" ? "master" : "slave"} half that stopped saving reaches the panel`, async t => {
     const {keyboard, shell, session, look, key} = await open(t, {mode: EDIT_MODE.APPLY});
     await key(0, 11, "KC_R");
     assert.equal(await look(), false, "the first look only notes where the keyboard is");
     keyboard.raised[flag] = true;
     assert.equal(await look(), true);
-    const published = model(shell).model.draft;
+    const published = lastModel(shell).draft;
     assert.equal(published.live, null, "still an Apply draft");
     assert.equal(published.keyboard[flag], true);
     assert.equal(published.changes.length, 1, "the draft keeps its edit");
     assert.equal(await look(), false, "nothing new while it stays stopped");
     keyboard.raised[flag] = false;
     assert.equal(await look(), true);
-    assert.equal(model(shell).model.draft.keyboard[flag], false);
+    assert.equal(lastModel(shell).draft.keyboard[flag], false);
     assert.equal(session.draft.dirty, true);
 });
 
@@ -273,7 +249,7 @@ test("persistent coherence failures exhaust a bounded automatic reread budget", 
     assert.equal(session.draft.needsRead, true);
 });
 
-for (const dirty of [false, true]) test(`the first Apply poll catches a saved adjustment (draft edited: ${dirty})`, async t => {
+for (const dirty of [false, true]) test(`the first look under a Review and save draft catches a saved adjustment (draft edited: ${dirty})`, async t => {
     const {keyboard, session, look, key} = await open(t, {mode: EDIT_MODE.APPLY});
     if (dirty) await key(0, 11, "KC_R");
     const kept = session.draft.current.document.profile;

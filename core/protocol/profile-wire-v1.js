@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
+const {PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 
 const {requestHandled} = require("./raw-hid-unhandled");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
@@ -95,6 +95,8 @@ class ProfileWireProtocolError extends Error {
         super(message);
         this.name = "ProfileWireProtocolError";
         this.code = code;
+        // Its text names bytes and layouts (schema/bytes.js protocolError).
+        this.fault = "answer";
         Object.assign(this, details);
     }
 }
@@ -382,7 +384,6 @@ module.exports = {
     PROFILE_STATE_FLAGS,
     PROFILE_WIRE_KNOWN_MASKS,
     PROFILE_WIRE_FEATURES,
-    PROFILE_WIRE_DOMAINS,
     PROFILE_WIRE_V1,
     ProfileWireProtocolError,
     buildProfileGetRequest,

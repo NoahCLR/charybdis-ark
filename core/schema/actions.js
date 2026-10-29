@@ -10,10 +10,10 @@
 // ask here rather than each doing it their own way.
 
 const keycodes = require("./keycodes");
-const {LAYER_FORMS, layerFormBase, layerFormLayer} = require("../../rules/qmk-keycodes.mjs");
+const {LAYER_FORMS, layerFormBase, layerFormLayer, macroName} = require("../../rules/qmk-keycodes.mjs");
 const {layerRuleOf} = require("../../rules/layer-placement.mjs");
 const {callParts} = require("../../rules/keycode-expression.mjs");
-const {LAYER_LOCK_BLOCK} = require("../data/user-keycodes");
+const {LAYER_LOCK_BLOCK, customKeyName} = require("../data/user-keycodes");
 // The keyboard's layer-lock block, LOCK_LAYER(n).
 const {PD_MODE_KEYS, pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {LAYERS} = require("../data/charybdis-layout");
@@ -42,8 +42,8 @@ function actionName(action) {
         case ACTION.QMK_KEYCODE: return keycodes.resolve(action.operand).name;
         case ACTION.LAYER_MOMENTARY: return `MO(${action.operand})`;
         case ACTION.LAYER_LOCK: return `LOCK_LAYER(${action.operand})`;
-        case ACTION.MACRO: return `MACRO_${action.operand}`;
-        case ACTION.CUSTOM_KEY: return `CUSTOM_KEY_${action.operand}`;
+        case ACTION.MACRO: return macroName(action.operand);
+        case ACTION.CUSTOM_KEY: return customKeyName(action.operand);
         case ACTION.POINTING_MODE_MOMENTARY:
         case ACTION.POINTING_MODE_LOCK: {
             const keys = PD_MODE_KEYS[action.operand];

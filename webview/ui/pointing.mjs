@@ -10,10 +10,10 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
 import {KIND} from "../view/pointing-config.mjs";
-import {whatReachesSlot} from "../view/reach.mjs";
+import {whatReachesSlot} from "../view/pointing-reach.mjs";
 import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
 import {mark} from "./marks.mjs";
-import {word} from "../view/vocabulary.mjs";
+import {slotNamed, word} from "../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./frame.mjs";
 import {axisLabel, words} from "./pointing/common.mjs";
@@ -39,7 +39,7 @@ export function screenPointing() {
     if (!model || !slots.length) {
         pad.classList.remove("pd-page");
         pad.appendChild(el(`<div class="screen-stub"><h3>No pointing modes read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's pointing modes.")}</p></div>`));
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's pointing modes.")}</p></div>`));
         main.appendChild(content);
         return main;
     }
@@ -80,7 +80,7 @@ function emptyChips(model, empties, changedSlots, pick) {
     for (const slot of empties) {
         const {keys, behaviours, combos} = whatReachesSlot(model, slot);
         const inert = keys.length + behaviours.length + combos.length;
-        const tip = `${slot.displayName} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
+        const tip = `${slotNamed(slot)} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
         const chip = el(`<button class="slotchip ${inert ? "warn" : ""}" data-slot="${esc(slot.id)}" aria-current="${state.pointingSlot === slot.id}"
             aria-label="${esc(tip)}" data-tip="${esc(tip)}">${esc(slot.id)}${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "corner") : ""}</button>`);
         chip.addEventListener("click", () => pick(slot));

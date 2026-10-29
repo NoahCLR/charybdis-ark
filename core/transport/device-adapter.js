@@ -28,7 +28,10 @@ const LIVE_LINK_ERROR_CODES = Object.freeze({
 
 // A transport failure: its `code` is what code acts on; its message is a
 // person's sentence naming no device path, since a shell may show it. Which
-// device it was is `deviceId`, which the diagnostics record.
+// device it was is `deviceId`, which the diagnostics record. One that is a
+// fault in Ark (an adapter not keeping its contract) says so with
+// `fault: "ark"`, and its text is for the diagnostics only
+// (model/vocabulary.js failureSentence).
 class LiveLinkTransportError extends Error {
     /**
      * @param {import("./types.js").TransportErrorCode} code
@@ -39,6 +42,7 @@ class LiveLinkTransportError extends Error {
         super(message, options.cause === undefined ? undefined : {cause: options.cause});
         this.name = "LiveLinkTransportError";
         this.code = code;
+        if (options.fault !== undefined) this.fault = options.fault;
         if (options.deviceId !== undefined) {
             this.deviceId = options.deviceId;
         }
@@ -63,13 +67,15 @@ function normalizeRawHidReport(value, label = "Raw HID report") {
     if (!(value instanceof Uint8Array)) {
         throw liveLinkError(
             LIVE_LINK_ERROR_CODES.INVALID_REPORT,
-            `${label} must be a Buffer or Uint8Array.`
+            `${label} must be a Buffer or Uint8Array.`,
+            {fault: "ark"}
         );
     }
     if (value.byteLength !== RAW_HID_REPORT_SIZE) {
         throw liveLinkError(
             LIVE_LINK_ERROR_CODES.INVALID_REPORT,
-            `${label} must be exactly ${RAW_HID_REPORT_SIZE} bytes; received ${value.byteLength}.`
+            `${label} must be exactly ${RAW_HID_REPORT_SIZE} bytes; received ${value.byteLength}.`,
+            {fault: "ark"}
         );
     }
     return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
@@ -80,7 +86,8 @@ function assertDeviceAdapter(adapter) {
     if (!adapter || typeof adapter.listDevices !== "function" || typeof adapter.connect !== "function") {
         throw liveLinkError(
             LIVE_LINK_ERROR_CODES.INVALID_ADAPTER,
-            "A live-link device adapter must implement listDevices() and connect(deviceId)."
+            "A live-link device adapter must implement listDevices() and connect(deviceId).",
+            {fault: "ark"}
         );
     }
     return adapter;
@@ -95,7 +102,7 @@ function assertConnectedDevice(device, deviceId) {
         throw liveLinkError(
             LIVE_LINK_ERROR_CODES.INVALID_ADAPTER,
             `Connected device ${deviceId} is missing: ${missing.join(", ")}.`,
-            {deviceId}
+            {deviceId, fault: "ark"}
         );
     }
     return device;
@@ -106,7 +113,8 @@ function normalizeDeviceDescriptors(devices) {
     if (!Array.isArray(devices)) {
         throw liveLinkError(
             LIVE_LINK_ERROR_CODES.INVALID_ADAPTER,
-            "Device adapter listDevices() must return an array."
+            "Device adapter listDevices() must return an array.",
+            {fault: "ark"}
         );
     }
 
@@ -116,7 +124,8 @@ function normalizeDeviceDescriptors(devices) {
         if (!id || seen.has(id)) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.INVALID_ADAPTER,
-                `Device descriptor ${index} must have a unique non-empty string id.`
+                `Device descriptor ${index} must have a unique non-empty string id.`,
+                {fault: "ark"}
             );
         }
         seen.add(id);

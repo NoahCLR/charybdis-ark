@@ -7,6 +7,8 @@ export interface ResolvedKeycode {
     known: boolean;
     layer?: number;
     tap?: string;
+    /** A layer-mod's and a mod-tap's modifiers, as its label ends: "Shift", "Right Ctrl+Right Shift". */
+    modifiers?: string;
 }
 
 export type HostLayoutCell = string | {dead: string} | null;

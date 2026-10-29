@@ -74,7 +74,7 @@ function keyboardDot(model) {
     const health = model?.device?.health;
     const reconnecting = model?.reconnecting;
     if (demoOf(model).active) return {tone: "demo", busy: false,
-        tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only saving needs a keyboard."};
+        tip: "Nothing is connected. The demo runs Ark's own draft over a demo profile; only saving needs a keyboard."};
     if (reconnecting) return {tone: "", busy: true,
         tip: reconnecting.restart ? "The keyboard is restarting. It comes back by itself in a moment, and Ark reads it again."
             : reconnecting.lost ? "Ark lost the keyboard and is connecting it again."

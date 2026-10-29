@@ -7,11 +7,13 @@ const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {editLayers} = require("../fixtures/profile-document");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
+const {testClock} = require("../fixtures/panel-loop");
 
 /** @param {import("node:test").TestContext} t @param {object} [options] */
 async function live(t, options = {}) {
     const keyboard = liveKeyboard({document: document(), ...options});
-    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const {service} = await connectedService(t, {keyboard}, {now, sleep});
     return {service, keyboard, snapshot: () => snapshotLive(service.connection, service.requestIds, service.capabilities)};
 }
 
@@ -93,7 +95,8 @@ for (const during of [0x04, 0x21]) test(`an automatic save landing during the ${
 
 test("a read waits while the keyboard reports a save running, then reads what it saved", async t => {
     const keyboard = liveKeyboard({document: document(), mode: EDIT_MODE.LIVE});
-    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const {service} = await connectedService(t, {keyboard}, {now, sleep});
     const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
     keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
     keyboard.startAutoSave();
@@ -111,7 +114,8 @@ test("a read waits while the keyboard reports a save running, then reads what it
 
 test("a read waits while the keyboard is still taking an edit, then reads what it settled on", async t => {
     const keyboard = liveKeyboard({document: document()});
-    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const {service} = await connectedService(t, {keyboard}, {now, sleep});
     const {buildEditBeginRequest, buildEditAbortRequest} = require("../../core/protocol/profile-edit-v1");
     keyboard.answer(buildEditBeginRequest(9, {session: keyboard.session, revision: keyboard.revision, splices: 1, insertTotal: 1}));
     let waits = 0;
@@ -125,7 +129,8 @@ test("a read waits while the keyboard is still taking an edit, then reads what i
 
 test("a save that does not end is waited for a bounded time, then left to the person", async t => {
     const keyboard = liveKeyboard({document: document(), mode: EDIT_MODE.LIVE});
-    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const {service} = await connectedService(t, {keyboard}, {now, sleep});
     const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
     keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
     // A held key keeps the keyboard's own save from finishing.

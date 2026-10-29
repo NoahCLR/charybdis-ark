@@ -1213,7 +1213,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-layers { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .hc-layers .hc-under { margin-top: -2px; }
 .hc-flow { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11px; }
-/* A combo in the hover card: badge, what it sends, then the keys that press it (ui/hover.mjs). */
+/* A combo in the hover card: badge, what it sends, then the keys that press it (ui/hover-card.mjs). */
 .hc-combo { display: grid; grid-template-columns: 30px minmax(0,1fr); column-gap: 9px; row-gap: 5px; align-items: center; }
 .hc-combo + .hc-combo { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .hc-sends { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; row-gap: 2px; min-width: 0; font-size: 11px; line-height: 18px; overflow-wrap: anywhere; }
@@ -1248,7 +1248,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 /* What answers a transparent key, set apart as its own group under the viewed
    layer's key. */
 .hc-through { background: var(--surface-2); }
-/* The behaviours a key's combos run, each its own card beside the key's (ui/hover.mjs). */
+/* The behaviours a key's combos run, each its own card beside the key's (ui/hover-card.mjs, placed by ui/hover.mjs). */
 .hovercard-side { position: fixed; z-index: 90; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .hovercard-side[hidden] { display: none; }
 /* Tinted with the combo colour the keyboard flashes (ui/marks.mjs comboTint),
@@ -1797,6 +1797,11 @@ details[open] > summary .chev { transform: rotate(90deg); }
   background: var(--surface-2); color: var(--text); text-decoration: none; font-weight: 520; }
 .phone-notice .phone-build { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--text-3); text-decoration: none; }
 .phone-build-mark { width: 14px; height: 14px; flex: none; fill: currentColor; }
+
+/* ── the panel's own file did not load: a plain message in its place (web/web-shell.mjs) ── */
+.load-failure { display: grid; gap: var(--s-3); max-width: 34rem; margin: 0 auto; padding: var(--s-7) var(--s-5);
+  font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-2); overflow-wrap: anywhere; }
+.load-failure h1 { font-size: var(--fs-title); line-height: var(--lh-title); font-weight: var(--fw-strong); color: var(--text); }
 .flash-pauses-section > .note { margin-bottom: 8px; }
 .flash-pauses { table-layout: fixed; }
 .flash-pauses th:first-child { width: 40%; }

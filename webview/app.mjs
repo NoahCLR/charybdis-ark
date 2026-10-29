@@ -15,18 +15,21 @@ import {getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
 import {chooseKeyboard, shellOf, otherTheme, setTheme} from "./view/shell-panel.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
-import {readScreen, screenAvailable} from "./view/readiness.mjs";
-import {SCREENS, screenDefinition, secondaryScreen} from "./view/screens.mjs";
-import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
+import {readScreen} from "./view/readiness.mjs";
+import {SCREENS, screenAvailable, screenDefinition, secondaryScreen} from "./view/screens.mjs";
+import {hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
-import {keysShortcut, matchBehavioursHeight, screenKeys} from "./ui/keys.mjs";
+import {screenKeys} from "./ui/keys.mjs";
+import {keysShortcut} from "./ui/keys/shortcuts.mjs";
+import {matchBehavioursHeight} from "./ui/keys/bench.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
 import {escapeKeyboardMenu} from "./ui/keyboard-menu.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenBehaviours, screenCombos, screenHost, screenPointer} from "./ui/settings.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
-import {screenMacros, receiveMacroValidation} from "./ui/macros.mjs";
+import {screenMacros} from "./ui/macros.mjs";
+import {receiveMacroValidation} from "./ui/macros/validation.mjs";
 import {reconcileRecording} from "./ui/macros/recorder.mjs";
 import {macroClipboardShortcut, macroHistoryShortcut} from './ui/macros/history.mjs';
 import {macroStepShortcut} from "./ui/macros/steps.mjs";
@@ -115,7 +118,7 @@ function readPlaceholder(read, model) {
             <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
                 : read.state === "blocked" ? (demoHere ? `<div class="read-actions">${exploreButton("primary")}</div>` : "")
-                : `<div class="read-actions">${choose ? '<button class="btn primary" data-act="choose-keyboard">Choose keyboard</button>' : ""}
+                : `<div class="read-actions">${choose ? '<button class="btn primary" data-act="choose-keyboard">Choose keyboard…</button>' : ""}
                     ${model?.device?.connected ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
                     ${demoHere ? exploreButton("ghost") : ""}
                     ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
@@ -138,7 +141,7 @@ function demoBanner(demo) {
         <i class="dot demo" aria-hidden="true"></i><strong>${esc(DEMO_WORDS.status)}</strong>
         <span class="copy">${esc(DEMO_WORDS.banner)}${demo.fileName ? ` <span class="mono">${esc(demo.fileName)}</span>` : ""}</span>
         <span class="acts"><button class="btn tiny" data-act="open-demo-profile"
-                data-tip="Open one of your exported .charybdis.json profiles in the demo, in place of this setup.">Open a profile file…</button>
+                data-tip="Open one of your exported .charybdis.json backups in the demo, in place of this profile.">Open a backup…</button>
             <button class="btn tiny ghost" data-act="leave-demo" data-tip="Close the demo and go back to connecting a keyboard.">Leave demo</button></span>
     </div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="open-demo-profile"]')).addEventListener("click", () => postLeavingDemo(openDemoProfile()));
@@ -159,7 +162,6 @@ function reveal() {
 }
 
 setRenderer(render);
-bindLayerIndex(() => state.layer);
 mountHover(root);
 mountNumberEntry(root);
 

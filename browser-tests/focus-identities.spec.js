@@ -48,10 +48,14 @@ for (const [screen, state] of surfaces) {
                 store.setModel(model); store.render();
             });
         }
-        await page.locator("details:not([open])").evaluateAll(nodes => nodes.forEach(node => {
+        // The browser's own toggle event follows each opening, as a task:
+        // wait for every one, so what the screen keeps of its folds has
+        // caught up before the publishes below draw it again.
+        await page.locator("details:not([open])").evaluateAll(nodes => Promise.all(nodes.map(node => {
+            const toggled = new Promise(resolve => node.addEventListener("toggle", event => {if (event.isTrusted) resolve(undefined);}));
             node.open = true; node.dispatchEvent(new Event("toggle"));
-        }));
-        await page.waitForTimeout(30);
+            return toggled;
+        })));
         expect(await identityProblems(page)).toEqual([]);
         const ids = await page.locator("input:visible:enabled, select:visible:enabled, textarea:visible:enabled")
             .evaluateAll(nodes => nodes.map(node => node.getAttribute("data-f")));
@@ -130,18 +134,20 @@ test("ambiguous form identities are refused while action and SVG hooks still res
     await openControls(page, "keys");
     const result = await page.evaluate(async () => {
         const {captureFocus, restoreFocus} = await import("/webview/lib/focus.mjs");
+        // The page takes markup only through the panel's policy (Trusted Types).
+        const {html} = await import("/webview/lib/dom.mjs");
         const root = document.createElement("div"); document.body.append(root);
-        root.innerHTML = '<input data-f="duplicate"><input data-f="duplicate">';
+        root.innerHTML = html('<input data-f="duplicate"><input data-f="duplicate">');
         root.querySelector("input").focus();
         const ambiguous = captureFocus(root);
-        root.innerHTML = '<input data-f="stable">'; root.querySelector("input").focus();
+        root.innerHTML = html('<input data-f="stable">'); root.querySelector("input").focus();
         const form = captureFocus(root);
-        root.innerHTML = '<input data-f="stable"><input data-f="stable">'; restoreFocus(root, form);
+        root.innerHTML = html('<input data-f="stable"><input data-f="stable">'); restoreFocus(root, form);
         const refusesReplacement = !root.contains(document.activeElement);
         const restored = [];
         for (const markup of ['<button data-act="test">Action</button>', '<svg><g data-key="42" role="button" tabindex="0"></g></svg>']) {
-            root.innerHTML = markup; root.querySelector("[data-act], [data-key]").focus();
-            const captured = captureFocus(root); root.innerHTML = markup; restoreFocus(root, captured);
+            root.innerHTML = html(markup); root.querySelector("[data-act], [data-key]").focus();
+            const captured = captureFocus(root); root.innerHTML = html(markup); restoreFocus(root, captured);
             restored.push(root.contains(document.activeElement));
         }
         root.remove(); return {ambiguous, refusesReplacement, restored};

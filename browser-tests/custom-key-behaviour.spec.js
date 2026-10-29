@@ -38,7 +38,7 @@ test("the custom key bank scrolls on its own and keeps its place, so the editor 
     await expect.poll(() => bank.evaluate(node => node.scrollTop)).toBe(0);
 });
 
-test("a custom key tile hovers its tip, not the board's key card", async ({page}) => {
+test("a custom key tile hovers its tip, not the board's hover card", async ({page}) => {
     await openControls(page, "customKeys");
     const tile = page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_5"]');
     await tile.hover();

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
-import {behaviourTimingChecks, checkGroups, checkSourceGroup, checkTags, checksToConfirm, confirmText} from "../../webview/view/checks.mjs";
+import {behaviourTimingChecks, checkGroups, checkLevelWord, checkSourceGroup, checkSources, checkTags, checksToConfirm, confirmText, levelCountWords, levelCounts} from "../../webview/view/checks.mjs";
 
 const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
 const model = {vocabulary: VOCABULARY};
@@ -50,6 +50,23 @@ test("an unowned layer key points to its changed key even with other edit groups
     assert.equal(checkSourceGroup({...warning, place: {kind: "key", layer: 3, layoutIndex: 13}}, changes), null);
 });
 
+test("the review counts each draft group's new traps and warnings, an overflow as the traps it stands for", () => {
+    const changes = [{group: 1, place: {kind: "key", layer: 3, layoutIndex: 12}}, {group: 2, place: {kind: "key", layer: 3, layoutIndex: 20}}];
+    const unowned = (layoutIndex, level = "warning") => ({...check(level, "new", `key ${layoutIndex}`), kind: "unowned", place: {kind: "key", layer: 3, layoutIndex}});
+    const overflow = {...check("trap", "new"), kind: "trapOverflow", count: 4};
+    const checks = [unowned(12), unowned(12, "trap"), unowned(20), unowned(30), overflow, unowned(12, "notice"), {...unowned(20), status: "existing"}];
+    const {groupOf, counts} = checkSources(checks, changes);
+    assert.deepEqual([...groupOf.values()], [1, 1, 2], "only a new trap or warning with one source group");
+    assert.deepEqual(Object.fromEntries(counts), {1: {trap: 1, warning: 1}, 2: {trap: 0, warning: 1}});
+    assert.deepEqual(checkSources([overflow], [changes[0]]).counts.get(1), {trap: 4, warning: 0}, "one group is the source of every new finding");
+    assert.deepEqual(checkSources().counts.size, 0);
+
+    assert.deepEqual(levelCounts([overflow, check("trap", "new"), check("warning", "existing"), check("notice", "new")]), {trap: 5, warning: 1});
+    assert.equal(levelCountWords({trap: 1, warning: 2}), "1 trap and 2 warnings");
+    assert.equal(levelCountWords({trap: 3, warning: 0}), "3 traps");
+    assert.equal(levelCountWords({trap: 0, warning: 1}), "1 warning");
+});
+
 test("the confirmation names one finding or counts traps and warnings together", () => {
     assert.equal(confirmText([]), "");
     assert.equal(confirmText([check("trap", "new", "Numbers can lock with no way back to Base")]),
@@ -67,10 +84,16 @@ test("a check's tags say its level, and where it comes from unless it is new", (
     assert.deepEqual(checkTags(model, check("warning", "fixed")), ["Warning", "fixed"]);
 });
 
-test("in the demo, what the draft started from is the demo setup, not a keyboard", () => {
+test("a check's level reads in the vocabulary's words, and a level it does not know as itself", () => {
+    assert.equal(checkLevelWord(model, "warning"), "Warning");
+    assert.equal(checkLevelWord({}, "warning"), "warning", "a model without the vocabulary still names the level");
+    assert.equal(checkLevelWord(model, /** @type {any} */ ("later")), "later");
+});
+
+test("in the demo, what the draft started from is the demo profile, not a keyboard", () => {
     assert.equal(checkGroups([check("warning", "existing")])[0].title, "Already on the keyboard");
-    assert.equal(checkGroups([check("warning", "existing")], {demo: true})[0].title, "Already in the demo setup");
-    assert.deepEqual(checkTags(model, check("notice", "existing"), {demo: true}), ["Notice", "in the demo setup"]);
+    assert.equal(checkGroups([check("warning", "existing")], {demo: true})[0].title, "Already in the demo profile");
+    assert.deepEqual(checkTags(model, check("notice", "existing"), {demo: true}), ["Notice", "in the demo profile"]);
     for (const group of checkGroups([check("trap", "new"), check("warning", "existing"), check("notice", "fixed")], {demo: true})) {
         assert.doesNotMatch(group.title, /keyboard/, group.id);
     }

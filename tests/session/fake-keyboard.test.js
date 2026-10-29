@@ -3,6 +3,7 @@ const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {openPanelLoop} = require("../../core/session/panel-loop");
+const {fakeShell, testClock} = require("../fixtures/panel-loop");
 const {validateSnapshot, fingerprint} = require("../../core/model/portable-profile");
 const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
 const {STARTING} = require("../../core/session/keyboard-starting");
@@ -11,18 +12,8 @@ const {backup32, document32} = require("../fixtures/pointing-slots-32");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 const pdProfile = require("../fixtures/pd-profile");
 
-function recordingShell() {
-    const shell = {
-        posted: [], errors: [],
-        post: (message) => {shell.posted.push(message);},
-        showError: (text) => {shell.errors.push(text);},
-        progress: async (title, work) => work(),
-        saveRecovery: async () => {throw new Error("a read must not save a recovery copy");},
-        chooseProfile: async () => undefined,
-        saveExport: async () => undefined,
-    };
-    return shell;
-}
+// A shell that records what a read hands it, and refuses to save a recovery copy.
+const recordingShell = () => fakeShell({saveRecovery: async () => {throw new Error("a read must not save a recovery copy");}});
 const last = (shell) => shell.posted[shell.posted.length - 1];
 
 // Two current documents: the compiled profile with an empty layout, and a
@@ -174,7 +165,7 @@ test("a configuration that keeps changing through the shared read's wait leaves 
     // A read it changes under is read again while the wait for it to start
     // lasts (keyboard-starting.js), so it changes under every one of them:
     // each status read during the shared read, never the wait's own.
-    const clock = {now: 0};
+    const clock = testClock();
     let statusReads = 0;
     adapter.keyboard.answer = request => {
         const responses = original(request);
@@ -183,16 +174,16 @@ test("a configuration that keeps changing through the shared read's wait leaves 
         }
         return responses;
     };
-    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 200, now: () => clock.now, sleep: async ms => {clock.now += ms;}});
+    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 200, now: clock.now, sleep: clock.sleep});
     try {
         await loop.handleMessage({type: "ready"});
-        assert.ok(clock.now >= STARTING.WAIT_MS, "read again until the wait's bound");
+        assert.ok(clock.now() >= STARTING.WAIT_MS, "read again until the wait's bound");
         assert.equal(loop.session.readReady, false);
         assert.equal(loop.session.draft, undefined);
         assert.equal(loop.session.service.portable, undefined);
         assert.equal(loop.session.service.layout.state, "read", "independent layout diagnostics remain available");
         assert.equal(last(shell).model.load.state, "unavailable");
-        assert.match(last(shell).notice, /payload did not match its active identity/);
+        assert.match(last(shell).notice, /profile changed while Ark read it/);
         assert.deepEqual(adapter.keyboard.mutations, []);
     } finally {await loop.close();}
 });

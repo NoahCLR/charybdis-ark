@@ -1,10 +1,11 @@
 # Developing Ark
 
-Ark is its own repository: the web page (D-L71), with its tests, fixture preview and keycode catalog generation. Ordinary app
-commands read only this checkout (D-L44). Firmware compilation, authored C
-profiles, hardware measurements and diagnostics belong to the firmware
-repository. How a change is made and handed back is in
-[AGENTS.md](../AGENTS.md); this page is the reference behind it.
+Ark is its own repository: the web page (D-L71), with its tests, fixture
+preview and keycode catalog generation. Ordinary app commands read only this
+checkout (D-L44). Firmware compilation, authored C profiles, hardware
+measurements and diagnostics belong to the firmware repository. How a change
+is made and handed back is in [AGENTS.md](../AGENTS.md); this page is the
+reference behind it.
 
 ## Local development workspace
 
@@ -47,21 +48,22 @@ Two sources of firmware truth, for two questions:
   and manifest. They lag firmware development by design; do not re-pin just
   because the firmware moved.
 
-Separate agents use separate worktrees. The
-[compatibility bridge](#the-compatibility-bridge) reads three checkouts
-as they are, so agree a quiet period with agents changing them and pass the
-paths actually under test. Firmware's contract probe, which the bridge and
+Separate agents use separate worktrees. The [compatibility
+bridge](#the-compatibility-bridge) reads three checkouts as they are, so agree
+a quiet period with agents changing them and pass the paths actually under
+test. Firmware's contract probe, which the bridge and
 [agreement](#agreement-with-a-firmware-contract) call, runs in firmware's
 build image, so Docker must be running. Nothing reserves the keyboard:
-coordinate before using it, close other Ark tabs or diagnostic sessions first, and
-never flash or Apply just to check an editor change. The fixture preview and
-app tests need no keyboard.
+coordinate before using it, close other Ark tabs or diagnostic sessions first,
+and never flash or Apply just to check an editor change. The fixture preview
+and app tests need no keyboard.
 
 ## Development
 
 ### Working on Ark
 
-Use Node 26.10.0 (`nvm use` reads `.nvmrc`), run `npm ci`, then
+Use Node 26.10.0 or newer (`nvm use` reads `.nvmrc`; `engines` says the
+floor), run `npm ci`, then
 `npm run check`. `npm run web` serves the page you are working on in Chrome
 ([the web build](#the-web-build)); `npm run preview` the interface against the
 test fixtures. No firmware or QMK checkout is needed. Only the
@@ -121,20 +123,17 @@ upstream/        pinned firmware and QMK inputs; read its AGENTS.md
 preview/ dist/   ignored output of `npm run preview` and `npm run build:web`
 ```
 
-`core/` imports one way (D-L10); the layer table is in
-[architecture](architecture/README.md) and `tests/layering.test.js` enforces it. The
-webview receives the model as a message and imports nothing from `core/`;
-`webview/view/` and core's layers from `schema/` up import the shared rules in
-`rules/` (D-L73), which import only each other.
-`web/` imports `core/` through `web/core.mjs`, and `webview/` never imports
-`web/`. How `core/` reads, edits and applies
-is in [`core/README.md`](../core/README.md).
+What each part may import, the shared rules in `rules/` among them, is in
+[architecture](architecture/README.md#the-layers), and
+`tests/layering.test.js` enforces it. How `core/` reads, edits and applies is
+in [`core/README.md`](../core/README.md).
 
 The app runtime never reads the firmware repository. These developer-only
 tools may read explicitly selected checkouts, and nothing in the app imports
 them:
 
-- `scripts/generate-keycode-catalog.js` regenerates the vendored catalog (D-L05).
+- `scripts/generate-keycode-catalog.js` regenerates the vendored catalog
+  (D-L05).
 - `scripts/refresh-upstream.js` re-pins or checks `upstream/` from committed
   blobs.
 - `scripts/check-compatibility.js` is the
@@ -144,12 +143,23 @@ them:
 - `scripts/preview.js` renders the interface against the test fixtures.
 - `scripts/build-web.js` builds [the web page](#the-web-build).
 - `scripts/probe-live-link.js` lists the keyboards node-hid sees.
+- `scripts/generate-host-layouts.js` (`npm run host-layouts`) regenerates
+  `core/data/host-layouts.json` from the pinned firmware fixture;
+  `tests/data/host-layouts.test.js` checks it still reproduces.
 
-node-hid is a development dependency, for Node scripts and agents that drive a
-keyboard: they pass `new NodeHidDeviceAdapter()`
-(`core/transport/node-hid-adapter.js`) to the device service themselves, which
-has no default adapter (`npm run preview -- --device` does). The page passes
-WebHID's, and the web build refuses node-hid.
+node-hid is an optional dependency, so a native build that fails never stops
+the page's `npm ci`; without it the probe says so and stops. Which adapter
+each caller passes is in [architecture](architecture/README.md#the-layers). A
+Node script that drives a keyboard, as `npm run preview -- --device` does,
+passes the node-hid adapter to the device service itself:
+
+```js
+const {ProfileDeviceService} = require("./core/session/profile-device-service");
+const {NodeHidDeviceAdapter} = require("./core/transport/node-hid-adapter");
+const service = new ProfileDeviceService({adapter: new NodeHidDeviceAdapter()});
+```
+
+Close any Ark tab first: one connection at a time holds the keyboard.
 
 ### Type checking
 
@@ -161,13 +171,15 @@ automatically:
 | Configuration | Checks | Environment |
 | --- | --- | --- |
 | `tsconfig.rules.json` | `rules/` | no Node types, no DOM; a rule runs in both |
-| `tsconfig.foundation.json` | `core/`, `rules/`, `contracts/` | Node types only; fails if core leans on a type only something above it brings |
-| `tsconfig.json` | core, the rules and core's type tests | Node |
+| `tsconfig.json` | `core/`, `rules/`, `contracts/` and core's type tests | Node types only; the type tests import only core and contracts (`tests/layering.test.js`), so core cannot lean on a type only something above it brings |
 | `tsconfig.shells.json` | `web/` | page DOM, no Node globals |
 | `tsconfig.webview.json` | `webview/` | page DOM, no Node types |
 | `tsconfig.worker.json` | `web/sleep-worker.js` | WebWorker |
 | `tsconfig.developer.json` | `scripts/`, `tests/fixtures/`, integration corpora | Node |
-| `tsconfig.preview.json` | the preview builder and macro inspector | Node and DOM |
+| `tsconfig.preview.json` | the preview builder, macro inspector and `playwright.config.js` | Node and DOM |
+
+Every module marked `// @ts-check` outside `tests/` and `browser-tests/` is in
+one of these (`tests/scripts/syntax-coverage.test.js`).
 
 One gotcha in the web shell's check. `Buffer` is its one Node-shaped global:
 the build injects the `buffer` package (`web/buffer.mjs`), and
@@ -208,21 +220,23 @@ Tests use injected device adapters (`core/transport/fake-device-adapter.js`).
   reports, both halves' profile records, the durable decision, the slave
   half's commit and activation. Its faults exercise BUSY, lost replies,
   cancellation and disconnected recovery. Restore tests call `restoreProfile`
-  with a request connection, as the shell does.
+  with a request connection and a test clock (`now`, `sleep`), as the device
+  service passes its own (`tests/fixtures/portable-restore.js`).
+- `tests/fixtures/panel-loop.js` runs the panel loop as the page does, for
+  session tests: `fakeShell` records what the loop posts (`lastMessage`,
+  `lastModel`, `notices` read it back), `testClock` moves on at every wait
+  the loop asks for instead of waiting, and `openLoop` opens the loop on a
+  fake keyboard, on that clock unless given another, and reads it once.
+- `tests/fixtures/published-model.js` gives the interface's tests the model
+  core publishes, built by core's own builders: `publishedModel` for a
+  profile (the demo's unless given) with edits staged as the panel posts
+  them, `panelModel` for the panel's whole model of a draft (`openDraft`), and
+  `connectedState` for a connected keyboard. A fact renamed or reshaped in
+  core fails the view tests too.
 
 These fakes model protocol state and transfer correctness, not flash
 durability, split scheduling or a physical interruption. A successful
 `npm run probe:live-link` proves only that node-hid loads and enumerates.
-A Node script that drives a keyboard passes the node-hid adapter to the
-device service itself:
-
-```js
-const {ProfileDeviceService} = require("./core/session/profile-device-service");
-const {NodeHidDeviceAdapter} = require("./core/transport/node-hid-adapter");
-const service = new ProfileDeviceService({adapter: new NodeHidDeviceAdapter()});
-```
-
-Close any Ark tab first: one connection at a time holds the keyboard.
 
 ### Running it without a keyboard
 
@@ -233,7 +247,9 @@ and logs every edit posted back. `?shell=` answers in other states (no
 keyboard, a browser without WebHID, the demo, a live keyboard; each is
 commented in `scripts/preview.js`), `?theme=light` starts in the light theme,
 and `?screen=lighting` opens a screen. `npm run preview -- --multiple` adds a
-second keyboard to the selector. Look at a new screen in both themes.
+second keyboard to the selector. Like the web page it requires Trusted Types,
+so markup a test sets in it goes through `html` in `webview/lib/dom.mjs` too.
+Look at a new screen in both themes.
 
 ### Proving a control is wired
 
@@ -255,10 +271,9 @@ payload in `tests/view/edits.test.mjs`.
 
 ### Verification
 
-While working, run the targeted tests, then `npm run check`,
-`npm run keycodes -- --check` and `git diff --check`. Interface changes add
-`npm run preview` (driving a new control) and `npm run test:browser`; preview
-or setup changes add `npm run preview`. A docs-only change may skip the runtime checks; say so.
+Which checks a change runs before it is handed back is the one list in
+[AGENTS.md](../AGENTS.md#checks). Preview or setup changes add
+`npm run preview`, and a docs-only change may skip the runtime checks; say so.
 
 The handoff gate is the work-queue vault's `verify`. For a branch of Ark it
 always runs `npm ci`, loads node-hid, `npm run check`, catalog reproduction,
@@ -268,12 +283,12 @@ preview, browser-test or dependency changes add the preview and browser
 smoke; `--full` runs them always. The firmware host suite and pair build are
 not Ark gates.
 
-Run the bridge yourself, against the checkouts involved, before handing
-back a wire, schema, codec or macro-sizing change; UI-only work needs only the
-app checks while developing. A local pin may name any committed firmware
-revision. Before landing a change that moves a pin, fetch the firmware
-checkout and run the bridge with `--publish`; `land` refuses a pin that is not
-on its published trunk. No automated check is hardware acceptance.
+Run the bridge yourself, against the checkouts involved, before handing back a
+change that [the checks](../AGENTS.md#checks) send to it; UI-only work needs
+only the app checks while developing. A local pin may name any committed
+firmware revision. Before landing a change that moves a pin, fetch the
+firmware checkout and run the bridge with `--publish`; `land` refuses a pin
+that is not on its published trunk. No automated check is hardware acceptance.
 
 ### Trying a branch before it lands
 
@@ -295,15 +310,21 @@ The web page (D-L71) runs `core/` and the panel in Chrome or Edge.
 overrides git), Content Security Policy (`POLICY`, written once) and
 `_headers` are described at the top of `scripts/build-web.js` and
 `web/_headers`. `dist/web-manifest.json`, beside the site, maps hashed names
-for tests and is never published. `npm run check:site` refuses anything Pages
-would run as server code.
+for tests and is never published. The bundles are minified with their names
+kept, so a stack still names the source's functions; a test asks the build
+for each bundle's inputs rather than reading them out of the output.
+`npm run check:site` refuses anything Pages would run as server code, and a
+site without its Content Security Policy, as a header and in the page, its
+Trusted Types allow-list exactly the page's two policies, or without the
+opener policy and HSTS `web/_headers` sends.
 
-`core/`, `rules/` and `webview/` stay unbuilt source, and no module of
-`core/` is rewritten for the browser. `rules/` reaches both the core and the
-panel bundles. The build fails if node-hid, its adapter or any
-Node built-in would reach a bundle, or a bundle takes any package but
-`buffer`. To give the web shell more of `core/`, export it from
-`web/core.mjs`.
+`core/`, `rules/` and `webview/` stay unbuilt source, and no module of `core/`
+is rewritten for the browser. `rules/` reaches both the core and the panel
+bundles. The build fails if node-hid, its adapter or any Node built-in would
+reach a bundle, or a bundle takes any package but `buffer`. To give the web
+shell more of `core/`, export it from `web/core.mjs` and name it in
+`tests/scripts/web-build.test.js`, which pins the entry to what its readers
+use.
 
 The shell runs `core/` and the interface through the shared panel loop; what
 it offers reaches the interface as `model.shell`. What it does, and why, is
@@ -353,11 +374,6 @@ link is the Branch Preview URL from Cloudflare's pull request comment or
 check, which follows the branch, so the same link stays current as the
 branch moves; never build the address from the branch name yourself.
 
-Until the next release, `main` still carries the former uploader
-(`publish-web.yml`), so a `main` push can trigger it. Once both branches are
-past it, delete the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` GitHub
-secrets.
-
 **Cloudflare project settings (Noah).** In the `charybdis-ark` project,
 connect `NoahCLR/charybdis-ark` with production branch `main`, framework
 preset None, build command `npm ci && npm run build:web`, output directory
@@ -367,9 +383,10 @@ Node). Enable build comments, automatic production deployments and previews
 for every non-production branch; watch paths `*`. Keep the custom domains
 `ark.ncleroy.dev` and `ark-dev.ncleroy.dev` on the project; `ark-dev` needs
 its proxied CNAME to `dev.charybdis-ark.pages.dev`, or it serves production.
-See Cloudflare's
-[build image](https://developers.cloudflare.com/pages/configuration/build-image/)
-and [GitHub integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/)
+See Cloudflare's [build
+image](https://developers.cloudflare.com/pages/configuration/build-image/) and
+[GitHub
+integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/)
 pages. To rebuild, use **Retry deployment** on the build in Cloudflare.
 
 **Manual fallback**, from a clean checkout of the branch, testing the very
@@ -401,6 +418,9 @@ pull requests into it (D-L51). A release's `dev` → `main` pull request runs
 - `Promotion from dev`: the head is this repository's `dev` and the merge tree
   is exactly `dev`'s.
 
+Each action is pinned by its commit, with the tag in a comment, and `check`
+also runs `git diff --check` on the pull request's change.
+
 Gating on the pins lets firmware move ahead without turning Ark red: Ark
 vouches for what it pins, and agreement proves the released pair
 speaks one contract (D-L50). A release may keep an older pin that still
@@ -428,13 +448,14 @@ moved or deleted.
 
 ## Upstream pins
 
-The firmware and QMK files Ark imports are reviewed copies under
-`upstream/`, with commit and checksum provenance in `upstream/manifest.json`.
-Specs there are copies of firmware-owned contracts; their code and bare
-firmware paths refer to the pinned commit. Ark follows what the keyboard
-advertises, never assuming it runs the pinned revision. How to re-pin, add a
-file or check reproduction is in [`upstream/README.md`](../upstream/README.md#updating-a-contract);
-never edit fixture bytes to match the app.
+The firmware and QMK files Ark imports are reviewed copies under `upstream/`,
+with commit and checksum provenance in `upstream/manifest.json`. Specs there
+are copies of firmware-owned contracts; their code and bare firmware paths
+refer to the pinned commit. Ark follows what the keyboard advertises, never
+assuming it runs the pinned revision. How to re-pin, add a file or check
+reproduction is in
+[`upstream/README.md`](../upstream/README.md#updating-a-contract); never edit
+fixture bytes to match the app.
 
 ## The compatibility bridge
 
@@ -505,8 +526,9 @@ judges it with Ark's own runtime code. It fails unless:
 - Ark knows the action-ABI digest (`KNOWN_ACTION_ABIS`);
 - the firmware supports every domain Ark registers;
 - it is a split build that saves (feature bits 0 and 1;
-  `CURRENT_MUTATION_FEATURES` in `core/protocol/profile-wire-v1.js`). The feature word holds only build differences
-  (firmware D-F28), so the pointing bit is reported, not compared;
+  `CURRENT_MUTATION_FEATURES` in `core/protocol/profile-wire-v1.js`). The
+  feature word holds only build differences (firmware D-F28), so the pointing
+  bit is reported, not compared;
 - Ark's BK keycode and layout inputs equal those at firmware's BK pin (by
   content, not commit);
 - Ark's pinned fixtures equal the firmware's.

@@ -5,16 +5,14 @@ import {createRequire} from "node:module";
 import {firmwareFacts} from "../../webview/view/firmware-facts.mjs";
 
 const require = createRequire(import.meta.url);
-const portable = require("../../core/model/portable-profile");
-const {buildSnapshotModel} = require("../../core/session/device-model");
-const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
+const {openDraft, panelModel} = require("../fixtures/published-model");
 const {document} = require("../fixtures/pd-profile");
-const doc = document();
-const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS};
-const model = buildSnapshotModel(snapshot, DEMO_CAPABILITIES, {editable: true, reason: null});
+// The panel's model for current firmware, its ceilings as the firmware reports them.
+const {draft, state} = openDraft(document());
+const model = panelModel(draft, state);
 
 test("the firmware facts state what the firmware reports, each needing a build", () => {
-    const facts = firmwareFacts({...model, firmware: {layers: 16, tapCounts: 5, macros: 128, customKeys: 128, leds: 58, combos: 128, repeatHz: 100}});
+    const facts = firmwareFacts(model);
     const by = Object.fromEntries(facts.map((fact) => [fact.label, fact.value]));
     assert.equal(by.Layers, "16 layers");
     assert.equal(by["Tap counts"], "5 per behaviour");

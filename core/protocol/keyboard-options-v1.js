@@ -2,8 +2,10 @@
 "use strict";
 const {isUnhandledEcho, orUnhandled, unhandledError} = require("./raw-hid-unhandled");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
+// Options that do not read: their text is for the diagnostics
+// (schema/bytes.js protocolError).
 /** @param {string} message */
-const fail = message => Object.assign(new Error(message), {code: "INVALID_KEYBOARD_OPTIONS"});
+const fail = message => Object.assign(new Error(message), {code: "INVALID_KEYBOARD_OPTIONS", fault: "answer"});
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {number} page */
 async function readPage(connection, ids, page) {
@@ -24,7 +26,7 @@ async function readKeyboardOptions(connection, ids) {
         if (bytes.length !== Math.min(25, length - offset)) throw fail("Truncated keyboard options.");
         chunks.push(bytes);
     }
-    if (!metadata.equals(await readPage(connection, ids, 2))) throw fail("Keyboard options changed during readback. Read the keyboard again.");
+    if (!metadata.equals(await readPage(connection, ids, 2))) throw Object.assign(new Error("Keyboard options changed during readback. Read the keyboard again."), {code: "INVALID_KEYBOARD_OPTIONS"});
     const bytes = Buffer.concat(chunks), masks = Array.from({length: 13}, (_, i) => bytes.readUInt16LE(i * 2));
     if (masks.some(mask => !mask || (mask & (mask - 1))) || new Set(masks).size !== 13) throw fail("Invalid keyboard option bit assignments.");
     const effects = Array.from({length: count}, (_, i) => {

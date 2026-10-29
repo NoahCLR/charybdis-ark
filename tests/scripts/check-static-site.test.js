@@ -1,7 +1,8 @@
 "use strict";
 
 // scripts/check-static-site.js: the gate before publishing. A real build
-// passes; server code, a stray file, or a cache rule on the wrong file fails.
+// passes; server code, a stray file, a cache rule on the wrong file, a
+// missing header or a missing or widened policy fails.
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -98,6 +99,81 @@ test("_headers has to cache exactly the hashed files for good, and the page neve
         assert.match(edit((text) => text.replace("/*\n", "/*\n  Cache-Control: public, max-age=60\n")), /sets Cache-Control for every file/);
         assert.match(edit((text) => `  X-Orphan: 1\n${text}`), /a header before any path/);
         assert.match(edit((text) => text.replace(/^  X-Robots-Tag: .*\n/m, "")), /lets search engines index the page/);
+    } finally {
+        done();
+    }
+});
+
+test("_headers has to send every file the opener policy and HSTS the build writes", async () => {
+    const {fresh, done} = await sites();
+    try {
+        const headers = (change) => {
+            const at = fresh();
+            const file = path.join(at.site, "_headers");
+            fs.writeFileSync(file, change(fs.readFileSync(file, "utf8")));
+            return checkStaticSite(at.site, {project: at.project});
+        };
+        const coop = ["_headers (/*) does not send Cross-Origin-Opener-Policy once, with same-origin"];
+        const hsts = ["_headers (/*) does not send Strict-Transport-Security once, with a max-age of a year or more and nothing else"];
+        assert.deepEqual(headers((text) => text.replace(/^  Cross-Origin-Opener-Policy: .*\n/m, "")), coop);
+        assert.deepEqual(headers((text) => text.replace("Cross-Origin-Opener-Policy: same-origin", "Cross-Origin-Opener-Policy: unsafe-none")), coop);
+        assert.deepEqual(headers((text) => text.replace("Cross-Origin-Opener-Policy: same-origin", "Cross-Origin-Opener-Policy: same-origin-allow-popups")), coop);
+        assert.deepEqual(headers((text) => text.replace(/^(  Cross-Origin-Opener-Policy: .*)\n/m, "$1\n$1\n")), coop);
+        assert.deepEqual(headers((text) => text.replace(/^  Strict-Transport-Security: .*\n/m, "")), hsts);
+        assert.deepEqual(headers((text) => text.replace(/Strict-Transport-Security: max-age=\d+/, "Strict-Transport-Security: max-age=86400")), hsts);
+        assert.deepEqual(headers((text) => text.replace(/Strict-Transport-Security: max-age=\d+/, "Strict-Transport-Security: max-age=0")), hsts);
+        assert.deepEqual(headers((text) => text.replace(/(Strict-Transport-Security: max-age=\d+)/, "$1; includeSubDomains")), hsts);
+        assert.deepEqual(headers((text) => text.replace(/^(  Strict-Transport-Security: .*)\n/m, "$1\n$1\n")), hsts);
+    } finally {
+        done();
+    }
+});
+
+test("the page's policy is in force in its <meta> tag and as a header", async () => {
+    const {fresh, done} = await sites();
+    try {
+        const edit = (name, change) => {
+            const at = fresh();
+            const file = path.join(at.site, name);
+            fs.writeFileSync(file, change(fs.readFileSync(file, "utf8")));
+            return checkStaticSite(at.site, {project: at.project});
+        };
+        const headers = (change) => edit("_headers", change);
+        const page = (change) => edit("index.html", change);
+        assert.deepEqual(headers((text) => text.replace(/^  Content-Security-Policy: .*\n/m, "")), ["_headers (/*) carries no Content-Security-Policy"]);
+        assert.deepEqual(headers((text) => text.replace(/^(  Content-Security-Policy: .*)\n/m, "$1\n$1\n")), ["_headers sends two Content-Security-Policy headers for every file (/*)"]);
+        assert.deepEqual(headers((text) => text.replace("; frame-ancestors 'none'", "")), ["_headers (/*)'s Content-Security-Policy lacks frame-ancestors 'none'"]);
+        assert.deepEqual(headers((text) => text.replace("default-src 'none'", "default-src 'self'")), ["_headers (/*)'s Content-Security-Policy lacks default-src 'none'"]);
+        assert.deepEqual(headers((text) => text.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")), ["_headers (/*)'s Content-Security-Policy lacks script-src 'self'"]);
+        assert.deepEqual(page((html) => html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\n?/, "")), ["index.html carries no Content-Security-Policy"]);
+        assert.deepEqual(page((html) => html.replace("script-src &#39;self&#39;", "script-src *")), ["index.html's Content-Security-Policy lacks script-src 'self'"]);
+    } finally {
+        done();
+    }
+});
+
+test("the page's policy allows exactly the Trusted Types policies the page creates", async () => {
+    const {fresh, done} = await sites();
+    try {
+        const edit = (name, change) => {
+            const at = fresh();
+            const file = path.join(at.site, name);
+            fs.writeFileSync(file, change(fs.readFileSync(file, "utf8")));
+            return checkStaticSite(at.site, {project: at.project});
+        };
+        const lacks = (where) => [`${where}'s Content-Security-Policy lacks trusted-types ark-html ark-worker`];
+        const twice = (where) => [`${where}'s Content-Security-Policy names trusted-types twice`];
+        const header = "_headers (/*)";
+        assert.deepEqual(edit("_headers", (text) => text.replace("; trusted-types ark-html ark-worker", "")), lacks(header));
+        assert.deepEqual(edit("_headers", (text) => text.replace("; require-trusted-types-for 'script'", "")), [`${header}'s Content-Security-Policy lacks require-trusted-types-for 'script'`]);
+        for (const widened of ["trusted-types ark-html ark-worker default", "trusted-types ark-html ark-worker 'allow-duplicates'", "trusted-types *", "trusted-types ark-html"]) {
+            assert.deepEqual(edit("_headers", (text) => text.replace("trusted-types ark-html ark-worker", widened)), lacks(header), widened);
+            assert.deepEqual(edit("index.html", (html) => html.replace("trusted-types ark-html ark-worker", widened.replace(/'/g, "&#39;"))), lacks("index.html"), widened);
+        }
+        // A second directive of a name is ignored by the browser, so it can
+        // only mislead.
+        assert.deepEqual(edit("_headers", (text) => text.replace("trusted-types ark-html ark-worker", "trusted-types ark-html ark-worker; trusted-types default")), twice(header));
+        assert.deepEqual(edit("index.html", (html) => html.replace("trusted-types ark-html ark-worker", "trusted-types ark-html ark-worker; Trusted-Types *")), twice("index.html"));
     } finally {
         done();
     }

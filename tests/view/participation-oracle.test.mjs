@@ -15,8 +15,7 @@ import {resolvedPositions} from "../../webview/view/layer-resolution.mjs";
 
 const require = createRequire(import.meta.url);
 const portable = require("../../core/model/portable-profile");
-const {buildSnapshotModel} = require("../../core/session/device-model");
-const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
+const {publishedModel: modelOf} = require("../fixtures/published-model");
 const {document} = require("../fixtures/pd-profile");
 const {editLayers, editSettings} = require("../fixtures/profile-document");
 const {participation} = require("../../core/model/participation");
@@ -29,9 +28,6 @@ const activationSets = (layers) => layers.reduce((/** @type {number[][]} */ sets
 /** @param {number} seed */
 const random = (seed) => () => { seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff; return seed / 0x80000000; };
 const MATRIX = CHARYBDIS_4X6_LAYOUT_MATRIX.map((_, layoutIndex) => matrixPosition(layoutIndex));
-/** @param {import("../../core/model/types.js").PortableDocument} doc */
-const modelOf = (doc) => buildSnapshotModel({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS},
-    DEMO_CAPABILITIES, {editable: true, reason: null});
 
 test("a behaviour runs, and a key joins a combo, where core says it does", () => {
     for (let seed = 1; seed <= 12; seed++) {

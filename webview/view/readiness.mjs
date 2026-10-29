@@ -3,7 +3,6 @@
 // The core keeps the gate closed across the small gaps between HID requests.
 
 import {configureReady, screenAvailable, screenDefinition} from "./screens.mjs";
-export {configureReady, screenAvailable};
 
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {import("../../contracts/model.js").CountedProgress} CountedProgress */

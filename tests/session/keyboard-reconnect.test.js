@@ -8,6 +8,7 @@ const {document} = require("../fixtures/portable-profile");
 const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {connectedService} = require("../fixtures/connected-service");
 const {openPanelLoop} = require("../../core/session/panel-loop");
+const {fakeShell, testClock} = require("../fixtures/panel-loop");
 
 const snapshot = (value) => ({document: value, fingerprint: fingerprint(value), summary: summary(value)});
 const named = (name, base = snapshot(document())) => snapshot(editKeyboardName(base, {name, expectedFingerprint: base.fingerprint}));
@@ -49,14 +50,9 @@ function stubSession(state = {}) {
         enumerate: async () => {calls.push("enumerate");}, expectReconnect: (on) => {calls.push(`expect:${on}`);}};
     return {service};
 }
-// A clock the wait's sleeps move forward.
-function clock() {
-    const time = {now: 0};
-    return {now: () => time.now, sleep: async (ms) => {time.now += ms;}, time};
-}
 
 test("a stored rename expects a reconnect even when the USB product already has the target text", () => {
-    const session = stubSession(), {now} = clock();
+    const session = stubSession(), {now} = testClock();
     assert.equal(expectReconnect(session, null, now), undefined);
     assert.ok(expectReconnect(stubSession(), "Charybdis (4x6) Splinky", now), "empty and explicit built-in names are different stored names");
     const expected = expectReconnect(session, "Desk", now);
@@ -74,7 +70,7 @@ test("a stored rename expects a reconnect even when the USB product already has 
 });
 
 test("the renamed keyboard drops off, comes back under its new name and is read again", async () => {
-    const session = stubSession(), timing = clock(), reads = [], published = [];
+    const session = stubSession(), timing = testClock(), reads = [], published = [];
     const expected = expectReconnect(session, "Desk", timing.now);
     expected.saved = "Complete profile applied. Recovery copy: /r.json";
     let ticks = 0;
@@ -95,35 +91,35 @@ test("the renamed keyboard drops off, comes back under its new name and is read 
 
 test("a safe restart may be delayed beyond ten seconds; only the return wait is bounded", async () => {
     {
-        const session = stubSession(), timing = clock(), reads = [];
+        const session = stubSession(), timing = testClock(), reads = [];
         const expected = expectReconnect(session, "Desk", timing.now);
         const sleep = async (ms) => {
             await timing.sleep(ms);
-            if (timing.time.now === 15000) {
+            if (timing.now() === 15000) {
                 assert.equal(session.reconnect, expected, "the keyboard can still be waiting for a held key or macro");
                 assert.deepEqual(session.service.calls, ["expect:true"]);
                 Object.assign(session.service.state, {connected: false, devices: []});
             }
-            if (timing.time.now === 15500) session.service.state.devices = [{id: "back", product: "Desk"}];
+            if (timing.now() === 15500) session.service.state.devices = [{id: "back", product: "Desk"}];
         };
         await awaitReconnect(session, expected, {sleep, now: timing.now, publish: () => {}, read: async (id) => {
             reads.push(id); session.service.state.connected = true;
         }});
         assert.equal(session.reconnect, undefined);
         assert.equal(session.notice, RECONNECT_WORDS.back("Desk"));
-        assert.equal(timing.time.now, 15500);
+        assert.equal(timing.now(), 15500);
         assert.deepEqual(reads, ["back"]);
     }
     {
-        const session = stubSession({connected: false, devices: []}), timing = clock();
+        const session = stubSession({connected: false, devices: []}), timing = testClock();
         const expected = expectReconnect(stubSession(), "Desk", timing.now);
         session.reconnect = expected;
         await awaitReconnect(session, expected, {...timing, publish: () => {}, read: async () => {throw new Error("nothing to read");}});
         assert.equal(session.notice, RECONNECT_WORDS.timeout);
-        assert.ok(timing.time.now >= 10000 && timing.time.now <= 11000);
+        assert.ok(timing.now() >= 10000 && timing.now() <= 11000);
     }
     {
-        const session = stubSession({connected: false, devices: [{id: "a", product: "Charybdis"}, {id: "b", product: "Charybdis"}]}), timing = clock(), reads = [];
+        const session = stubSession({connected: false, devices: [{id: "a", product: "Charybdis"}, {id: "b", product: "Charybdis"}]}), timing = testClock(), reads = [];
         const expected = {deviceId: "kb", serialNumber: "", name: "Desk", otherDevices: [], startedAt: 0, dropped: false};
         session.reconnect = expected;
         await awaitReconnect(session, expected, {...timing, publish: () => {}, read: async (id) => {reads.push(id);}});
@@ -135,7 +131,7 @@ test("a safe restart may be delayed beyond ten seconds; only the return wait is 
 test("the return wait ignores the other keyboard left connected until the renamed one is back", async () => {
     for (const product of ["Travel", "Desk"]) {
         const other = {id: "other", product};
-        const session = stubSession(), timing = clock(), reads = [];
+        const session = stubSession(), timing = testClock(), reads = [];
         session.service.state.devices.push(other);
         const expected = expectReconnect(session, "Desk", timing.now);
         let ticks = 0;
@@ -155,7 +151,7 @@ test("the return wait ignores the other keyboard left connected until the rename
 });
 
 test("failed enumeration never reconnects from a stale list, and the timeout preserves the recovery notice", async () => {
-    const session = stubSession(), timing = clock(), reads = [];
+    const session = stubSession(), timing = testClock(), reads = [];
     const expected = expectReconnect(session, "Desk", timing.now);
     expected.saved = "Saved. Recovery copy: /r.json";
     session.service.state.connected = false;
@@ -169,7 +165,7 @@ test("failed enumeration never reconnects from a stale list, and the timeout pre
 
 test("the wait gives way to the person, waits out a running operation, and says when reading it again failed", async () => {
     {
-        const session = stubSession({connected: false, devices: []}), timing = clock();
+        const session = stubSession({connected: false, devices: []}), timing = testClock();
         const expected = {deviceId: "kb", serialNumber: "", name: "Desk", otherDevices: [], startedAt: 0, dropped: false};
         session.reconnect = expected;
         const sleep = async (ms) => {await timing.sleep(ms); session.reconnect = undefined;};
@@ -177,10 +173,10 @@ test("the wait gives way to the person, waits out a running operation, and says 
         assert.equal(session.notice, undefined, "a cancelled wait says nothing");
     }
     {
-        const session = stubSession({connected: false, busy: true, devices: [{id: "a", product: "Desk"}]}), timing = clock(), reads = [];
+        const session = stubSession({connected: false, busy: true, devices: [{id: "a", product: "Desk"}]}), timing = testClock(), reads = [];
         const expected = {deviceId: "kb", serialNumber: "", name: "Desk", otherDevices: [], startedAt: 0, dropped: true};
         session.reconnect = expected;
-        const sleep = async (ms) => {await timing.sleep(ms); if (timing.time.now >= 1500) session.service.state.busy = false;};
+        const sleep = async (ms) => {await timing.sleep(ms); if (timing.now() >= 1500) session.service.state.busy = false;};
         await awaitReconnect(session, expected, {sleep, now: timing.now, publish: () => {},
             read: async (id) => {reads.push(id); session.service.state.error = {message: "no answer"};}});
         assert.deepEqual(reads, ["a"], "read once the running operation ended");
@@ -189,7 +185,7 @@ test("the wait gives way to the person, waits out a running operation, and says 
     {
         // A read that connected but did not come back ready (its complete
         // profile could not be read, though no error stayed behind) failed.
-        const session = stubSession({connected: false, devices: [{id: "a", product: "Desk"}]}), timing = clock();
+        const session = stubSession({connected: false, devices: [{id: "a", product: "Desk"}]}), timing = testClock();
         const expected = {deviceId: "kb", serialNumber: "", name: "Desk", otherDevices: [], startedAt: 0, dropped: true};
         session.reconnect = expected;
         await awaitReconnect(session, expected, {...timing, publish: () => {},
@@ -222,10 +218,9 @@ test("an expected disconnect is no error to the device service; an unexpected on
 });
 
 test("in the panel loop, a renamed keyboard is followed through its restart and read again under its new name", async (t) => {
-    const posted = [];
-    const shell = {post: (message) => {posted.push(message);}, progress: async (title, work) => work(), saveRecovery: async () => "/r.json", saveExport: async () => undefined};
+    const shell = fakeShell(), posted = shell.posted, clock = testClock();
     const {service, adapter} = await connectedService(t);
-    const loop = openPanelLoop(shell, {service, reconnect: {sleep: () => new Promise((resolve) => setTimeout(resolve, 5)), waitMs: 5000}});
+    const loop = openPanelLoop(shell, {service, reconnect: {sleep: clock.sleep, now: clock.now}});
     await loop.handleMessage({type: "refresh"});
     const before = loop.session.draft;
     assert.ok(before, "a complete read opened the draft");
@@ -236,7 +231,7 @@ test("in the panel loop, a renamed keyboard is followed through its restart and 
     const renamed = named("Desk", before.base);
     adapter.keyboard = fakeKeyboard({document: renamed.document});
     loop.session.reconnect = undefined;
-    assert.ok(expectReconnect(/** @type {any} */ (loop.session), "Desk"));
+    assert.ok(expectReconnect(/** @type {any} */ (loop.session), "Desk", clock.now));
     await loop.handleMessage({type: "openProfileDraftHistory"});
     adapter.lastConnection().emitDisconnect(new Error("USB restarted."));
     assert.equal(service.snapshot().error, null, "no error while it restarts");

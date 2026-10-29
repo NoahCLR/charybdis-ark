@@ -29,7 +29,7 @@ const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {panelControl} = require("./panel-control-registry");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
-const {validateSnapshot, fingerprint, summary} = require("./portable-profile-session");
+const {validateSnapshot, fingerprint, summary} = require("../model/portable-profile");
 const {ACTION_ABI} = require("../schema/actions");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_LIMITS} = require("../schema/key-behavior-domain-v1");
@@ -111,8 +111,8 @@ const DEMO_OPTIONS = Object.freeze({
 // What core says in the demo: the device it is not, and why Save is not here.
 const DEMO_WORDS = Object.freeze({
     label: "Demo",
-    bundled: "the demo setup",
-    applyNeedsKeyboard: "Saving needs a keyboard. Export this setup, then import it on your keyboard to review and save it there.",
+    bundled: "the demo profile",
+    applyNeedsKeyboard: "Saving needs a keyboard. Export this profile, then import it on your keyboard to review and save it there.",
 });
 
 /** @param {string} text @param {string} [code] */
@@ -212,7 +212,7 @@ const DEMO_ACTIONS = Object.freeze({
         if (chosen === undefined) return;
         const name = typeof chosen === "string" ? null : chosen.name || null;
         openDemo(session, state, {value: typeof chosen === "string" ? chosen : chosen.text, fileName: name});
-        session.notice = `Opened ${name || "the profile file"} in the demo.`;
+        session.notice = `Opened ${name || "the backup"} in the demo.`;
         return;
     },
 });
@@ -305,13 +305,13 @@ function demoHeader(session, busy) {
 function demoDiagnostics(session) {
     return [
         `No keyboard is connected. The demo opened ${session.demo.name} as current firmware would hold it: sixteen layers, 32 pointing slots, 128 macros and 128 custom keys.`,
-        "Edits, checks and the review work as they would on a keyboard. Saving needs one: export the setup, then import it on your keyboard.",
+        "Edits, checks and the review work as they would on a keyboard. Saving needs one: export the profile, then import it on your keyboard.",
     ];
 }
 
 module.exports = {
     DEMO_ACTIONS,
     DEMO_CAPABILITIES, DEMO_DEVICE_ID, DEMO_LIMITS, DEMO_OPTIONS, DEMO_WORDS,
-    assertDemoMayClose, demoControl, demoDiagnostics, demoExport, demoHeader, demoModel, demoProfile, demoRefusal, demoSnapshot,
+    demoControl, demoDiagnostics, demoExport, demoHeader, demoModel, demoProfile, demoRefusal, demoSnapshot,
     demoState, demoUnsaved, leaveDemo, openDemo, panelCapabilities, panelState,
 };

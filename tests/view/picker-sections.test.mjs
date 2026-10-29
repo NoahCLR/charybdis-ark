@@ -2,26 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {entriesForPickerSection, pickable, pickerSections} from "../../webview/view/picker-sections.mjs";
 
-const catalogue = [
-    {value: "KC_A", group: "basic"},
-    {value: "KC_SLASH", group: "basic"},
-    {value: "KC_EXLM", group: "shifted"},
-    {value: "KC_HOME", group: "basic"},
-    {value: "KC_KP_1", group: "basic"},
-    {value: "KC_F12", group: "basic"},
-    {value: "KC_MUTE", group: "media"},
-    {value: "QK_RGB_MATRIX_TOGGLE", group: "rgb_matrix"},
-    {value: "PD_MODE_0", group: "Pointing modes"},
-    {value: "CUSTOM_KEY_0", group: "Custom keys"},
-    {value: "QK_USER_20", group: "user", offered: false},
-    {value: "QK_MACRO_9", group: "macro", offered: false},
-    {value: "QK_BOOT", group: "quantum"},
-    {value: "QK_MOUSE_BUTTON_1", group: "mouse"},
-    {value: "DPI_MOD", group: "kb"},
-    {value: "DRGSCRL", group: "kb", offered: false},
-    {value: "DRG_TOG", group: "kb", offered: false},
-    {value: "QK_KB_8", group: "kb", offered: false},
-];
+import {createRequire} from "node:module";
+
+const {profileDocument, publishedModel} = createRequire(import.meta.url)("../fixtures/published-model");
+
+// Representative entries of the catalogue core publishes for a profile, as
+// it offers them: the keyboard's unnamed user keys, native macros and
+// unsupported keyboard slots are in it, not offered.
+const published = publishedModel(profileDocument()).qmkKeycodes;
+const catalogue = ["KC_A", "KC_SLASH", "KC_EXLM", "KC_HOME", "KC_KP_1", "KC_F12", "KC_AUDIO_MUTE", "QK_RGB_MATRIX_TOGGLE", "PD_MODE_0", "CUSTOM_KEY_0",
+    "QK_USER_20", "QK_MACRO_9", "QK_BOOTLOADER", "QK_MOUSE_BUTTON_1", "DPI_MOD", "DRGSCRL", "DRG_TOG", "QK_KB_8"].map((value) => {
+    const entry = published.find((candidate) => candidate.value === value);
+    assert.ok(entry, `${value} is in the published catalogue`);
+    return entry;
+});
 
 test("the picker uses task-shaped sections instead of raw QMK group names", () => {
     assert.deepEqual(pickerSections().map(({label}) => label), [
@@ -40,9 +34,10 @@ test("curated picker sections route representative keycodes", () => {
     // The keyboard's own pointer keys sit with the mouse; its unnamed slots do nothing.
     assert.deepEqual(entriesForPickerSection(catalogue, section("mouse")).map((entry) => entry.value), ["QK_MOUSE_BUTTON_1", "DPI_MOD"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("custom")).map((entry) => entry.value), ["CUSTOM_KEY_0"]);
-    assert.deepEqual(entriesForPickerSection(catalogue, section("other")).map((entry) => entry.value), ["QK_BOOT"]);
+    assert.deepEqual(entriesForPickerSection(catalogue, section("other")).map((entry) => entry.value), ["QK_BOOTLOADER"]);
     assert.equal(entriesForPickerSection(catalogue, section("all")).length, catalogue.length - 5, "native macros, retired user keys and unsupported keyboard slots are excluded");
-    assert.equal(pickable({value: "QK_MACRO_9", group: "macro", offered: false}), false, "what core does not offer");
+    assert.deepEqual(catalogue.filter((entry) => entry.offered === false).map((entry) => entry.value), ["QK_USER_20", "QK_MACRO_9", "DRGSCRL", "DRG_TOG", "QK_KB_8"], "core offers none of these");
+    assert.equal(pickable(catalogue.find((entry) => entry.value === "QK_MACRO_9")), false, "what core does not offer");
 });
 
 test("Charybdis's own drag scroll is offered nowhere; the PD_MODE_0 pointing mode is drag scroll", () => {

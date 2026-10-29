@@ -2,7 +2,7 @@
 
 A backup is one file that holds everything the keyboard stores: keys,
 layers, behaviours, combos, macros, custom keys, pointing modes, lighting,
-settings and the keyboard's name. It holds the complete profile, so restoring
+settings and the keyboard's name. It holds the complete profile, so importing
 it doesn't depend on what the keyboard had before.
 
 Everything here is on the **Backups** screen. It needs a keyboard on current
@@ -22,7 +22,7 @@ Keep one somewhere safe before you try something big.
 
 ## Import profile
 
-**Choose profile…**, or drop a backup file onto the **Import profile** card.
+**Import profile…**, or drop a backup file onto the **Import profile** card.
 Ark checks the file and compares it with the keyboard before anything
 changes. The sheet says:
 
@@ -44,17 +44,22 @@ the keyboard's profile, like **Discard all**.
 Ark refuses a file it can't read, more than one file at a time, and a file
 from older firmware. It never replaces your draft with a file it refused.
 
+A backup always becomes a draft first, so **Import profile…** and a recovery
+copy's **Use as draft** wait until Ark has read the keyboard's complete
+profile. If it can't, read the keyboard again (see
+[Connecting](connecting.md#reading-the-keyboard)).
+
 ## Recovery copies
 
-Before every save, before leaving Live edit and before restoring a
-backup, Ark saves a recovery copy of what the keyboard held, and it doesn't
-write anything if it can't save one. A restart with unsaved edits keeps a
-copy of those edits the same way.
+Before every save and before leaving Live edit, Ark saves a recovery copy of
+what the keyboard held, and it doesn't save anything if it can't save one. A
+restart with unsaved edits keeps a copy of those edits the same way.
 
 Each copy is named by what made it, the keyboard it came from and when, for
 example "Before saving live edits · Noah's Charybdis · 23 Oct 2026, 14:02". A
-copy from before a save in Review and save is "Before saving a draft". Copies kept by
-an older Ark don't record those, and are named "Recovery copy" and when.
+copy from before a save in Review and save is "Before saving a draft". Copies
+kept by an older Ark don't record those, and are named "Recovery copy" and
+when.
 
 The copies are kept in the browser and listed under **Recovery copies**,
 newest first, each with **Use as draft**, **Download** and **Delete**. Use as
@@ -64,11 +69,11 @@ Clearing the site's data deletes them, so download any you want to keep.
 
 ## Firmware updates
 
-A backup restores onto the same firmware release. Ark works with the current
+A backup imports onto the same firmware release. Ark works with the current
 firmware only and converts nothing: when a firmware update changes how the
 profile is stored, the keyboard starts from its compiled defaults and older
 backups no longer import. Check the firmware's release notes before updating,
 and export a fresh backup afterwards.
 
-**Start from the compiled defaults** is not available yet. Until then,
-restore a backup made before your changes.
+To go back to the profile you had before your changes, import a backup made
+before them.

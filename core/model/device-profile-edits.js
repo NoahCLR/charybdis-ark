@@ -1,8 +1,8 @@
 // @ts-check
 "use strict";
-const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
+const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 const {encodePdDomain, decodePdDomain, pdTapProblem, isPdMacro, PD_DOMAIN} = require("../schema/pd-mode-domain-v1");
-const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
+const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_POINTING_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
 
 const catalog = require("../data/keycode-catalog");

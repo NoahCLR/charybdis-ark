@@ -3,10 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const {
-    buildCanonicalStudioProfileV1,
-    semanticActionForExpression,
-} = require("../../core/schema/compiled-profile-v1");
+const {semanticActionForExpression} = require("../../core/schema/compiled-profile-v1");
 
 function minimalStudioModel() {
     return {
@@ -79,7 +76,7 @@ test("authored compact expressions cannot silently switch a modifier's side", ()
     for (const expression of ["RSFT(C(KC_A))", "C(RSFT(KC_A))", "RALT(KC_EXLM)",
         "MT(MOD_LCTL|MOD_RSFT, KC_A)", "OSM(MOD_RSFT|MOD_LCTL)"]) {
         assert.equal(resolve(expression, model), undefined, expression);
-        assert.throws(() => semanticActionForExpression(expression, model), /cannot be represented/);
+        assert.throws(() => semanticActionForExpression(expression, model), {code: "UNSUPPORTED_ACTION", message: `${expression} is not a key this keyboard can store.`});
     }
     assert.equal(resolve("S(C(KC_A))", model), 0x0304);
     assert.equal(resolve("RSFT(RCTL(KC_A))", model), 0x1304);

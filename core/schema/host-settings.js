@@ -65,4 +65,4 @@ function followHostOs(values, before, detected) {
     values[HOST_SETTING] = ((values[HOST_SETTING] & ~LAYOUT_MASK) | (layoutForOs(next.layout, next.effective) << LAYOUT_SHIFT)) >>> 0;
     return values;
 }
-module.exports = {HOST_SETTING, UNICODE_ENABLED, LAYOUT_SHIFT, LAYOUT_MASK, MACOS, MACOS_ISO, OS_OF, HOST_SETTING_BITS, validHostSetting, hostSettings, layoutFits, layoutForOs, followHostOs};
+module.exports = {HOST_SETTING, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_ISO, OS_OF, validHostSetting, hostSettings, layoutFits, layoutForOs, followHostOs};

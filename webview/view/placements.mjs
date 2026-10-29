@@ -3,6 +3,8 @@
 // as a combo's output, and that said in one line. Pure, from #156's Trackball
 // rules; Pointer uses it for the sniping keys.
 
+import {layerCalled} from "./vocabulary.mjs";
+
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {import("../../contracts/panel.js").PublishedModel} PublishedModel */
 /** @typedef {{keys: {layer: PublishedModel["layers"][number], position: import("../../contracts/panel.js").Position}[], behaviours: PublishedModel["keyBehaviors"], combos: PublishedModel["combos"], layers: string[]}} Placements */
@@ -21,7 +23,7 @@ export function keycodePlacements(model, names) {
         for (const position of layer.positions || []) {
             if (!wanted.has(position.keycode) && !wanted.has(position.semantic ?? "") && !(position.value !== undefined && values.has(position.value))) continue;
             keys.push({layer, position});
-            layers.add(layer.displayName || layer.name);
+            layers.add(layerCalled(layer));
         }
     }
     const behaviours = (model?.keyBehaviors || []).filter((row) => (row.steps || []).some((step) =>
@@ -32,17 +34,31 @@ export function keycodePlacements(model, names) {
 
 /** @param {number} count @param {string} one */
 const plural = (count, one) => `${count} ${one}${count === 1 ? "" : "s"}`;
+// The layers keys are on, each with how many: "Base · 2 keys".
+/** @param {Placements["keys"]} keys */
+function keysByLayer(keys) {
+    /** @type {Map<string, number>} */
+    const counts = new Map();
+    for (const {layer} of keys) {
+        const name = layerCalled(layer);
+        counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    return [...counts].map(([name, count]) => `${name} · ${plural(count, "key")}`);
+}
+
+// Where keys are placed, read on after what they are: "on Base · 2 keys,
+// Numbers · 1 key", or "not placed on any layer".
+/** @param {Placements["keys"]} keys */
+export const keysPlacedOn = (keys) => {
+    const places = keysByLayer(keys);
+    return places.length ? `on ${places.join(", ")}` : "not placed on any layer";
+};
+
 // The layers its keys are on and how many, then the behaviours and combos
 // that send it. Nothing at all reads as "Not placed".
 /** @param {Placements} placements */
 export function reachLine({keys, behaviours, combos}) {
-    /** @type {Map<string, number>} */
-    const counts = new Map();
-    for (const {layer} of keys) {
-        const name = layer.displayName || layer.name;
-        counts.set(name, (counts.get(name) || 0) + 1);
-    }
-    const parts = [...counts].map(([name, count]) => `${name} · ${plural(count, "key")}`);
+    const parts = keysByLayer(keys);
     if (behaviours.length) parts.push(`${plural(behaviours.length, "behaviour")}`);
     if (combos.length) parts.push(`${plural(combos.length, "combo")}`);
     return parts.length ? parts.join(", ") : "Not placed";

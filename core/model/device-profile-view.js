@@ -4,7 +4,7 @@
 // Presentation of validated device domains. Names here describe wire IDs;
 // configuration values and membership always come from the received domain.
 const {actionName, layerRef} = require("../schema/actions");
-const {VOCABULARY, branchName} = require("./vocabulary");
+const {VOCABULARY, branchName, failureSentence} = require("./vocabulary");
 const {keyLabel, shortcutLabel} = require("./key-names");
 const keycodes = require("../schema/keycodes");
 const {ALL_LAYERS} = require("../data/charybdis-layout");
@@ -154,7 +154,7 @@ function rgbForView(domain) {
 
 /** @param {import("./types.js").BaseRgbRead | null | undefined} read @param {number} [maximumBrightness] */
 function baseRgbForView(read, maximumBrightness) {
-    if (read?.state !== "read") return {state: read?.state || "unread", message: read?.error?.message || "Base RGB has not been read from the keyboard."};
+    if (read?.state !== "read") return {state: read?.state || "unread", message: read?.error ? failureSentence(read.error) : "The background effect has not been read from the keyboard."};
     return baseEffectForView(read, maximumBrightness);
 }
 

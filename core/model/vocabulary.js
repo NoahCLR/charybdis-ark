@@ -62,7 +62,7 @@ const PHASE_WORDS = Object.freeze({
     [PHASE.RESTORE_COMPLETE]: Object.freeze({label: "restoring complete profile", busy: "Saving the profile to both halves", writes: true}),
     [PHASE.DISCONNECT]: Object.freeze({label: "disconnecting", writes: false}),
     [PHASE.READ_COMBOS]: Object.freeze({label: "reading combos", read: "Checking active combos", busy: "Checking active combos", writes: false}),
-    [PHASE.READ_BASE_RGB]: Object.freeze({label: "reading base RGB", read: "Checking base lighting", busy: "Checking base lighting", writes: false}),
+    [PHASE.READ_BASE_RGB]: Object.freeze({label: "reading the background effect", read: "Checking the background effect", busy: "Checking the background effect", writes: false}),
     // An edit and a Revert change only the keyboard's RAM; closing the page
     // during one loses nothing saved. A Save writes flash.
     [PHASE.LIVE_EDIT]: Object.freeze({label: "sending an edit", busy: "Sending the edit to both halves", writes: false}),
@@ -95,7 +95,123 @@ const LIVE_RESULT_WORDS = Object.freeze({
     PUBLICATION_FAILED: "the keyboard could not switch to the result.",
     // Not a result: the keyboard's flags say its profile storage stopped.
     STOPPED: "the keyboard stopped saving. Restart it to continue.",
+    // Not a result Ark knows: said as one, never by its name.
+    unknown: "the keyboard refused it for a reason Ark has no words for.",
 });
+
+// The steps of one Apply (core/session/apply-progress.js), as the person
+// watching its Save sees them.
+/** @type {Readonly<Record<import("../../contracts/model.js").ApplyStep, string>>} */
+const SAVE_STEP_WORDS = Object.freeze({
+    check: "Check the keyboard",
+    backup: "Save a recovery copy",
+    upload: "Send the profile",
+    validate: "Keyboard checks the profile",
+    slave: "Copy the profile to the slave half",
+    commit: "Save it on the master half",
+    converge: "Finish the slave half",
+    verify: "Check both halves",
+});
+
+// Why an Apply stopped, in the words of the person who pressed Save
+// (apply-progress.js failureReason): the keyboard's candidate error, the
+// slave half's last answer to the split transfer (candidate status page 1)
+// and why it kept answering busy, and what Ark saw itself. A keyboard error
+// or answer not listed is said as one this Ark does not know.
+const SAVE_FAILURE_WORDS = Object.freeze({
+    /** @type {Readonly<Record<string, string>>} */
+    keyboard: Object.freeze({
+        CAPACITY_EXCEEDED: "The profile is larger than the keyboard can store.",
+        INCOMPATIBLE_SCHEMA: "The keyboard's firmware does not accept this profile format.",
+        UNSUPPORTED_DOMAIN: "The keyboard's firmware does not support part of this profile.",
+        INCOMPATIBLE_ACTION_ABI: "The profile was made for different firmware.",
+        CHECKSUM_MISMATCH: "The profile arrived damaged.",
+        STORAGE_FAILURE: "The keyboard could not store the profile.",
+        // Where it found the problem follows (PROFILE_AREAS).
+        VALIDATION_REJECTED: "The keyboard rejected the profile",
+        ACTIVATION_FAILED: "The keyboard saved the profile but could not start using it.",
+        DURABILITY_UNKNOWN: "The keyboard could not confirm whether the profile was saved.",
+        TIMEOUT: "The keyboard gave up waiting for this save.",
+        PEER_SUPERSEDED: "The slave half already had a newer profile.",
+        PEER_PREPARE_YIELDED: "The slave half was saving a profile of its own at the same time.",
+        POSTCOMMIT_AUTHORITY_LOST: "The slave half reported a newer profile after the master half saved.",
+        PEER_COMMIT_CONFLICT: "The two halves disagree about which profile is current.",
+        PEER_TRANSFER_FAILED: "The slave half could not take the profile.",
+    }),
+    unknownKeyboard: "The keyboard stopped the save for a reason this version of Ark does not know.",
+    /** @type {Readonly<Record<string, string>>} */
+    slave: Object.freeze({
+        BUSY: "The slave half kept answering that it was busy.",
+        STALE: "The slave half already had a newer profile.",
+        CONFLICT: "The slave half holds a conflicting profile.",
+        CORRUPT: "The slave half's copy was damaged.",
+        INCOMPATIBLE: "The slave half runs incompatible firmware.",
+        STORAGE_ERROR: "The slave half could not store the profile, even after trying again.",
+        VALIDATION_ERROR: "The slave half rejected the profile.",
+        DIGEST_MISMATCH: "The copy on the slave half did not match what was sent.",
+        RANGE_ERROR: "The copy to the slave half went out of order.",
+        INVALID_FRAME: "The link between the halves garbled a message.",
+    }),
+    /** @type {Readonly<Record<string, string>>} */
+    slaveBusy: Object.freeze({
+        MAILBOX_FULL: "The slave half stopped handling requests from the master half.",
+        OTHER_COPY: "The slave half was still holding an earlier, unfinished copy.",
+        NO_LEASE: "The slave half dropped the copy partway and did not take it up again.",
+        STORE_WORKING: "The slave half did not finish storing its copy.",
+        PULLING: "The slave half was fetching a profile of its own.",
+        CONVERGENCE_ONLY: "The slave half was finishing another save.",
+    }),
+    held: "A key stayed held, or a layer or pointing mode stayed locked, so the keyboard did not save. Nothing changed.",
+    heldArkWait: "A key stayed held, or a layer or pointing mode stayed locked, so the keyboard waited to save until Ark stopped waiting for it.",
+    linkSilent: "The link between the halves stopped answering.",
+    stalled: "The keyboard stopped making progress, so Ark stopped waiting for it.",
+    unexpected: "The keyboard answered in a way Ark did not expect.",
+});
+
+// What an edit says that would not fit (profile-draft-session.js propose):
+// a count the keyboard caps, by the usage table's name for it (usageCounts),
+// or the profile as a whole. Ark refuses it before the keyboard sees it, so
+// nothing is lost and the person chooses what goes.
+const PROFILE_FULL_WORDS = Object.freeze({
+    /** @type {Readonly<Record<string, (most: number) => string>>} */
+    counts: Object.freeze({
+        lightingGroups: (most) => `The keyboard holds at most ${most} LED groups. Remove one before adding another.`,
+        lightingGroupRows: (most) => `The keyboard holds at most ${most} LED overrides across layers, pointing modes, combo feedback and key feedback. Remove one before adding another.`,
+        behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
+        behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
+    }),
+    profile: "This change does not fit: the keyboard's profile is full. Remove an LED group, a behaviour, a combo or a macro first.",
+});
+
+// What an Apply or a Save cut short says (core/session/interruption.js):
+// what can honestly be said about what an Apply saved (a save is all or
+// nothing, never "part of it"), a Save cut short and what the next read
+// shows, and why, when the connection went away.
+/** @type {Readonly<Record<"none" | "decided" | "unknown", string>>} */
+const APPLY_VERDICTS = Object.freeze({
+    none: "Nothing was saved: the keyboard kept the profile it had.",
+    decided: "The keyboard had already decided to save the new profile, and finishes it by itself about 15 seconds after both halves are connected. Read the keyboard then.",
+    unknown: "Ark can't tell which profile was saved. Read the keyboard to see what it runs now.",
+});
+
+const SAVE_WORDS = Object.freeze({
+    cutShort: "Ark can't tell whether the save finished.",
+    /** @param {string | undefined} recovery where the edits were kept */
+    later: (recovery) => `${recovery ? `A recovery copy on Backups has your edits (${recovery}). ` : ""}Ark says whether they were saved once it reads the keyboard again.`,
+    saved: "The save finished: the keyboard saved your edits.",
+    unsaved: "The save did not finish: the keyboard still runs your edits, unsaved. Save them again.",
+    /** @param {string | undefined} recovery where the edits were kept */
+    gone: (recovery) => `The save did not finish, so the keyboard's unsaved edits are gone: it runs its saved profile again.${recovery ? ` The recovery copy on Backups has them (${recovery}).` : ""}`,
+});
+
+const INTERRUPTION_REASONS = Object.freeze({
+    lost: "The keyboard was disconnected or restarted.",
+    unanswered: "The keyboard stopped answering.",
+});
+
+// Words as a sentence lists them: "a", "a and b", "a, b and c".
+/** @param {readonly string[]} words */
+const listed = (words) => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
 
 // Ark's own live edit or Revert, held by the keyboard until no key is held
 // (edit status flag 8), in words the person can act on: what edit status
@@ -103,11 +219,11 @@ const LIVE_RESULT_WORDS = Object.freeze({
 // (profile-wire-v1/live-edits.md: bit 0 a key is pressed, 4 a lock, 6 a
 // modifier or one-shot, 7 a one-shot layer); other reasons are said as held
 // keys alone. `refusal` answers another edit asked for meanwhile.
-const SAFE_BOUNDARY_WORDS = Object.freeze(/** @type {const} */ ([[1 << 0, "a key"], [1 << 4, "a locked layer or pointer mode"], [1 << 6, "a modifier or one-shot"], [1 << 7, "a one-shot layer"]]));
+const SAFE_BOUNDARY_WORDS = Object.freeze(/** @type {const} */ ([[1 << 0, "a key"], [1 << 4, "a locked layer or pointing mode"], [1 << 6, "a modifier or one-shot"], [1 << 7, "a one-shot layer"]]));
 /** @param {{kind: "edit" | "revert", reasons: number, cancelling: boolean}} waiting @returns {{title: string, detail: string, refusal: string}} */
 function heldWords({kind, reasons, cancelling}) {
     const held = SAFE_BOUNDARY_WORDS.filter(([bit]) => reasons & bit).map(([, words]) => words);
-    const list = held.length > 1 ? `${held.slice(0, -1).join(", ")} and ${held[held.length - 1]}` : held[0];
+    const list = listed(held);
     const now = list ? `Held now: ${list}. ` : "";
     if (kind === "revert") return {title: "Let go of the held keys to finish reverting", detail: `${now}The keyboard puts back its saved profile the moment nothing is held; Ark waits for it.`,
         refusal: "Let go of the held keys first: the keyboard is still reverting."};
@@ -134,7 +250,7 @@ function quietWords(quietMs) {
 /** @param {number | null | undefined} [quietMs] @returns {import('../../contracts/model.js').Vocabulary['editModes']} */
 const editModeWords = (quietMs) => Object.freeze({
     0: Object.freeze({id: "apply", label: "Review and save", hint: "Waits in Ark until you review it", detail: "Edits stay in Ark's draft until you review and save them. The keyboard runs its saved profile until then."}),
-    1: Object.freeze({id: "live", label: "Live edit", hint: "Runs at once and saves itself", detail: `Edits take effect on the keyboard at once. With or without Ark, the keyboard starts saving after ${quietWords(quietMs)} with no edit and no key held; holding a key postpones it. Unplugging loses every edit since the last successful save. A failed automatic save leaves that revision unsaved.`}),
+    1: Object.freeze({id: "live", label: "Live edit", hint: "Runs at once and saves itself", detail: `Edits take effect on the keyboard at once. With or without Ark, the keyboard starts saving after ${quietWords(quietMs)} with no edit and no key held; holding a key postpones it. Unplugging loses every edit since the last successful save. A failed automatic save leaves those edits unsaved.`}),
     2: Object.freeze({id: "liveReview", label: "Live preview + save", hint: "Runs at once, save to keep", detail: "Edits take effect on the keyboard at once. Nothing is permanent until you review and save; unplugging the keyboard puts back what was saved."}),
 });
 const EDIT_MODE_WORDS = editModeWords();
@@ -148,8 +264,8 @@ const HALVES_WORDS = Object.freeze({
     agree: Object.freeze({label: "Both halves connected",
         detail: "The master and slave halves are connected and hold the same saved settings."}),
     alone: Object.freeze({label: "Slave half not found",
-        detail: "The master half can't see the slave half. Check the cable between the halves, then read the keyboard again. Until then Ark can't read or save the whole setup."}),
-    apart: Object.freeze({label: "Halves out of sync",
+        detail: "The master half can't see the slave half. Check the cable between the halves, then read the keyboard again. Until then Ark can't read or save the whole profile."}),
+    apart: Object.freeze({label: "Halves differ",
         detail: "The master and slave halves hold different saved settings, or the slave half is still copying them. Wait a moment and read the keyboard again; if it stays like this, reconnect the cable between the halves."}),
     unread: Object.freeze({label: "Not read yet",
         detail: "Ark hasn't read this keyboard yet."}),
@@ -162,7 +278,7 @@ const READ_STEP_WORDS = Object.freeze({
     layout: "Reading keys and layers",
     profile: "Reading saved lighting, behaviours and settings",
     combos: "Checking active combos",
-    baseRgb: "Checking base lighting",
+    baseRgb: "Checking the background effect",
 });
 
 /** @type {Readonly<Record<string, string>>} */
@@ -177,11 +293,32 @@ const SETTINGS_SECTIONS = Object.freeze({
     keyboardOptions: "Key swaps & typing", host: "Your computer",
 });
 
+// A Settings screen as anything but the rail names it. The rail lists
+// "Pointer" under Settings; a link, a tip or a fix that sends a person
+// there has no rail around it, so it says "Pointer settings".
+const SETTINGS_SCREENS = Object.freeze({behaviours: "Behaviour settings", combos: "Combo settings", pointer: "Pointer settings", host: "Host settings"});
+
+// Where a person finds a settings section, as a note core writes names it:
+// the Settings screen as it is named outside the rail, then the section's
+// heading ("Host settings → Your computer"), as the interface's sectionPath
+// (webview/view/settings-layout.mjs) says it.
+/** @param {keyof typeof SETTINGS_SCREENS} screen @param {keyof typeof SETTINGS_SECTIONS} section */
+const settingsPath = (screen, section) => `${SETTINGS_SCREENS[screen]} → ${SETTINGS_SECTIONS[section]}`;
+
 // A behaviour's thresholds: as its hover card lists the ones it runs on ("tap
 // / hold 200 ms"), and as a field or a note names one ("tap / hold
 // threshold"); the multi tap window is a window, not a threshold.
 /** @type {Readonly<Record<import("../../contracts/edits.js").TimingTerm, string>>} */
 const THRESHOLDS = Object.freeze({tapHoldTerm: "tap / hold", longHoldTerm: "long hold", multiTapTerm: "multi tap window"});
+
+// A word from one of the ordered lists, by the key the keyboard uses; an
+// unknown key reads as itself rather than disappearing.
+/** @param {import("../../contracts/model.js").WordList<unknown>} list @param {unknown} key @returns {string} */
+const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key ?? ""));
+
+// How a macro plays: whether it is uninterruptible, chosen or automatic.
+/** @type {import("../../contracts/model.js").WordList<"auto" | "on" | "off">} */
+const MACRO_PROTECTION = [["auto", "Automatic"], ["on", "On"], ["off", "Off"]];
 
 /** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
@@ -193,7 +330,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // The side a half reports itself as (GET 0x0D's physical half).
     physicalHalves: [[0, "left"], [1, "right"], [0xff, "side not set"]],
     macroPlayback: {setup: "setup", blocked: "blocked", unavailable: "unavailable"},
-    macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
+    macroProtection: MACRO_PROTECTION,
+    // The setting macroProtection chooses (firmware glossary "Uninterruptible
+    // playback"), as its field and Review name it, and Automatic as it says
+    // whether it plays the macro uninterruptibly now ("Automatic · on").
+    macroUninterruptible: {label: "Uninterruptible playback",
+        automatic: {on: `${word(MACRO_PROTECTION, "auto")} · on`, off: `${word(MACRO_PROTECTION, "auto")} · off`}},
     // Why a macro does not read, by the macro grammar's reason
     // (rules/macro-payload.mjs), as the step editor and core's refusals both
     // say it; a key the reason names leads the words of unknown and notHeld
@@ -217,8 +359,25 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // Each kind of macro step by its one name (glossary "Macro step"): the
     // add buttons, the step editor and the picker it opens all say it so.
     macroSteps: [["text", "Text"], ["tap", "Key or chord"], ["delay", "Delay"], ["press", "Press"], ["release", "Release"]],
+    // The same names, short, as the word under a step's tile, the editor's
+    // legend beside its mark and a screen reader before a chip say them; a
+    // key or chord step says which of the two it is.
+    macroStepTiles: {text: "text", key: "key", chord: "chord", delay: "delay", press: "press", release: "release"},
     // A host layout names its OS, since German on macOS and on Windows differ.
     hostLayouts: hostLayouts().map(/** @returns {[number, string]} */ layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
+    // How macro text types what its layout cannot, by the Unicode mode it
+    // plays with (the host OS it types for), as the macro editor says it.
+    unicodeEntry: [
+        [1, "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source."],
+        [2, "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key."],
+        [3, "Other characters use Unicode entry: use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."],
+    ],
+    // What Unicode entry needs while it is off, by host OS; any other host
+    // needs it turned on and the OS known (0).
+    unicodeEntryOff: [
+        [0, "Characters it cannot type, such as emoji, need Unicode playback on and a known host OS."],
+        [1, "Characters it cannot type, such as emoji, need the Unicode Hex Input layout."],
+    ],
     // How a hold tier runs once its threshold passes, in that tier's words: a
     // hold style that names a threshold names the tier's own, the Tap / hold
     // threshold for Hold and the Long hold threshold for Long hold. A tap tier
@@ -311,6 +470,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Hold active"],
         ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold active"],
     ],
+    // The behaviour tier each key feedback state flashes for, which marks its
+    // rows with that tier's dot, as the review does; the other states have
+    // none.
+    feedbackTiers: {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"},
     // The four tables of LED group rows, by the target an LED row edit names.
     ledTables: [["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]],
     // The lighting stages in the order the firmware paints them. A stage is
@@ -336,6 +499,11 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // other layer key reads by its whole name on one line (LAYER_KEY_VERBS:
     // "Hold Navigation", "Lock Navigation"), as layerKinds above do.
     keyCapLayerVerbs: {OSL: "one-shot", TT: "tap-toggle"},
+    // What a layer key does to its layer, in the words its name reads by
+    // ("Lock Navigation"), as the picker says them: core names keys with them
+    // (key-names.js), and a branch or combo action that acts on a layer is
+    // tagged with them. TG is a lock on this firmware (firmware D-F46).
+    layerKeyVerbs: {MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"},
     // Review's checks: each level's word, and where a check that is not new
     // in the draft comes from.
     checkLevels: {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"},
@@ -343,9 +511,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // What made a recovery copy, as its title says it. Both keyboard saves
     // read as Save (D-L72), so a title tells them apart by what was saved: a
     // whole draft (the keyboard's Apply) or the live modes' unsaved edits.
-    recoveryCauses: {apply: "Before saving a draft", restore: "Before restoring a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"},
+    recoveryCauses: {apply: "Before saving a draft", restore: "Before saving a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"},
     settingsSections: SETTINGS_SECTIONS,
-    // A profile file's settings sections, as Import's summary counts the
+    // A backup's settings sections, as Import's summary counts the
     // file's differences: by their headings, but for three. The summary
     // already names behaviour and combo rows "Behaviours" and "Combos", so
     // their sections say "settings"; Key feedback flash is counted with the
@@ -356,18 +524,16 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         lightingFeedback: "Key feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
     },
     // Why a behaviour, or a key toward a combo, does not take part
-    // (participation.js), in the words of the switch that says no; a layer's
-    // or a key's name follows the words of layer, layers and placement.
+    // (participation.js), in the words of the switch that says no, and of the
+    // screen it is on; a layer's or a key's name follows the words of layer,
+    // layers and placement.
     participationReasons: {
-        behavior: {master: "behaviours are off in Settings", layer: "Settings has behaviours off on", definition: "Use this behaviour is off",
+        behavior: {master: `behaviours are off in ${SETTINGS_SCREENS.behaviours}`, layer: `${SETTINGS_SCREENS.behaviours} has behaviours off on`, definition: "Use this behaviour is off",
             layers: "Layers it runs on leaves out", placement: "Use behaviour is off for"},
-        combo: {master: "combos are off in Settings", layer: "Settings has combos off on", definition: "Use this combo is off",
+        combo: {master: `combos are off in ${SETTINGS_SCREENS.combos}`, layer: `${SETTINGS_SCREENS.combos} has combos off on`, definition: "Use this combo is off",
             layers: "Layers it runs on leaves out", placement: "Join combos is off for"},
     },
-    // A Settings screen as anything but the rail names it. The rail lists
-    // "Pointer" under Settings; a link, a tip or a fix that sends a person
-    // there has no rail around it, so it says "Pointer settings".
-    settingsScreens: {behaviours: "Behaviour settings", combos: "Combo settings", pointer: "Pointer settings", host: "Host settings"},
+    settingsScreens: SETTINGS_SCREENS,
     // Where a switch says no, by the place it switches: one key on one layer
     // (a placement, firmware's participation policy), or a layer. The layer's
     // name follows in brackets; a key read through from another layer is
@@ -421,6 +587,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // How often a directional mode sends: once for each threshold step,
         // or once per movement: again only after a pause or moving back.
         directionOutput: [[0, "Every step"], [1, "Once per movement"]],
+        // What a direction's threshold measures, by how often the mode sends:
+        // the field after its axis ("Horizontal movement per tap").
+        directionStep: [[0, "movement per tap"], [1, "movement before it sends"]],
         modifierPolicy: [[0, "Inherit modifiers"], [1, "Ignore"], [2, "Exact shortcut"]],
         scrollFields: [
             ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
@@ -437,11 +606,6 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     comboOptions: {useOutputBehavior: "use output behaviour", mustHold: "must be held", mustTap: "tap only", ordered: "keys in order"},
 }));
 
-// A word from one of the ordered lists, by the key the keyboard uses; an
-// unknown key reads as itself rather than disappearing.
-/** @param {import("../../contracts/model.js").WordList<unknown>} list @param {unknown} key @returns {string} */
-const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key ?? ""));
-
 // The names a person reads for a layer and a pointing slot that have none of
 // their own. Layer 0 is the base layer.
 /** @param {readonly string[] | null | undefined} names @param {number} index */
@@ -456,12 +620,9 @@ const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 // Why a macro does not read, in words (rules/macro-payload.mjs).
 /** @param {{code: string, key?: string}} problem */
 const macroProblemWords = (problem) => wordedProblem(problem, VOCABULARY.macroProblems);
-// What a layer key does to its layer, in the words its name reads by ("Lock
-// Navigation"), as the picker says them: core names keys with them
-// (key-names.js), so they are not posted. TG is a lock on this firmware
-// (firmware D-F46).
+// What a layer key does to its layer, in words (VOCABULARY.layerKeyVerbs).
 /** @type {Readonly<Record<string, string>>} */
-const LAYER_KEY_VERBS = Object.freeze({MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"});
+const LAYER_KEY_VERBS = VOCABULARY.layerKeyVerbs;
 
 // A refusal from the macro grammar (core/schema/macro-payload.js), in words:
 // the schema names the grammar's reason (`problem`), and every reader of a
@@ -470,7 +631,66 @@ const LAYER_KEY_VERBS = Object.freeze({MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock
 const wordedMacroError = (error) => error instanceof Error && "problem" in error
     ? Object.assign(new Error(macroProblemWords(/** @type {{code: string, key?: string}} */ (error.problem))), {code: /** @type {{code?: unknown}} */ (error).code, problem: error.problem})
     : error;
+// A macro's Uninterruptible playback setting in words: Automatic says
+// whether it plays uninterruptibly now ("Automatic · on").
+/** @param {"auto" | "on" | "off"} protection @param {boolean} uninterruptible */
+const protectionWords = (protection, uninterruptible) => (protection === "auto"
+    ? VOCABULARY.macroUninterruptible.automatic[uninterruptible ? "on" : "off"] : word(VOCABULARY.macroProtection, protection));
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
-module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, LAYER_KEY_VERBS, wordedMacroError, modifierNames};
+// Each part of the profile as the area Review groups its changes under, by
+// the area core/schema/profile-domains.js gives it: where a refusal says the
+// keyboard found a problem.
+/** @type {Readonly<Record<import("../schema/profile-domains.js").ProfileDomain["area"], string>>} */
+const PROFILE_AREAS = Object.freeze({lighting: "Lighting", behaviours: "Behaviours", combos: "Combos", settings: "Settings", pointing: "Pointing modes", keys: "Keys", macros: "Macros"});
+
+// What a failure says to a person (interface contracts: no code or developer
+// word reaches one). Ark's own failures are sentences written for a person: a
+// plain Error, or one carrying Ark's code (SERVICE_BUSY, TIMEOUT). The
+// language's errors (a TypeError, a RangeError) and the browser's are a fault
+// in Ark or beneath it, whose text is for the diagnostics; they read as
+// `unexpected`. So is an answer from the keyboard that did not read, which
+// its protocol marks `fault: "answer"` (schema/bytes.js protocolError), as
+// does a read of the profile's bytes (schema/bytes.js answerFault): it
+// reads as `unreadable`, or as `incompatible` when the answer is in a form
+// this Ark does not support. The device service passes a failure on with its
+// name for a code when it had none, and its fault (operation-failure.js
+// publicError): "Error" for Ark's plain sentence, "TypeError" for a fault.
+const FAILURE_WORDS = Object.freeze({
+    unexpected: "Ark ran into a problem of its own. Try again, and reload the page if it keeps happening.",
+    unreadable: "The keyboard answered with something Ark could not read. Read the keyboard again; if it keeps happening, the Keyboard screen's Diagnostics say what it sent.",
+    incompatible: "The keyboard's firmware answers in a form this Ark does not read. Update both halves to current firmware.",
+});
+// The codes of an answer in a form this Ark does not support.
+const INCOMPATIBLE_ANSWERS = new Set(["INCOMPATIBLE_RESPONSE", "COMBO_INCOMPATIBLE"]);
+const ARK_CODE = /^(?!ERR_)[A-Z][A-Z0-9_]*$/;
+const LANGUAGE_ERRORS = new Set(["TypeError", "RangeError", "SyntaxError", "ReferenceError", "EvalError", "URIError", "AggregateError"]);
+/** @param {unknown} error */
+const detailsOf = (error) => /** @type {{name?: unknown, code?: unknown, message?: unknown, fault?: unknown}} */ (error && typeof error === "object" ? error : {});
+// Whether a failure's own message is one Ark wrote for a person.
+/** @param {unknown} error */
+function sayable(error) {
+    const {name, code, message, fault} = detailsOf(error);
+    if (typeof message !== "string" || !message || fault !== undefined) return false;
+    if (typeof code === "string") return (ARK_CODE.test(code) || code === "Error") && !LANGUAGE_ERRORS.has(String(name));
+    return name === undefined || name === "Error";
+}
+// The code a sentence Ark wraps a failure in may carry over from it: Ark's
+// own, else `fallback`. A fault's name (TypeError, as the device service
+// records one) or a platform's ERR_ code would make the whole sentence read
+// as a fault's.
+/** @param {unknown} error @param {string} fallback */
+function arkCode(error, fallback) {
+    const {code} = detailsOf(error);
+    return typeof code === "string" && ARK_CODE.test(code) ? code : fallback;
+}
+/** @param {unknown} error @returns {string} */
+function failureSentence(error) {
+    if (sayable(error)) return /** @type {{message: string}} */ (error).message;
+    const {code, fault} = detailsOf(error);
+    if (fault !== "answer") return FAILURE_WORDS.unexpected;
+    return INCOMPATIBLE_ANSWERS.has(String(code)) ? FAILURE_WORDS.incompatible : FAILURE_WORDS.unreadable;
+}
+
+module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};

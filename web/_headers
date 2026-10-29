@@ -2,7 +2,10 @@
 # dist/web/_headers by scripts/build-web.js. It fills in the page's policy as
 # its <meta> tag carries it, with frame-ancestors, which only a header can set,
 # and one rule for each content-hashed file it wrote. X-Robots-Tag keeps every
-# address of it, pages.dev ones included, out of search engines.
+# address of it, pages.dev ones included, out of search engines. The page opens
+# no window that needs it as opener (its links are noopener), so it keeps a
+# browsing context group of its own; HSTS keeps it on HTTPS, which WebHID needs,
+# for its own host only.
 #
 # A header named in two matching rules is sent with both values joined, so
 # Cache-Control is set by exact paths only, never under /*.
@@ -12,6 +15,8 @@
   Permissions-Policy: hid=(self)
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000
   X-Robots-Tag: noindex, nofollow
 
 # The page names this release's files, so it is asked for afresh every load.

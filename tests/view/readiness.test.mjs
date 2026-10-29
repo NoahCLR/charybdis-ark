@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {VOCABULARY} from "../../core/model/vocabulary.js";
-import {busyText, configureReady, postApplyReadText, readScreen, screenAvailable} from "../../webview/view/readiness.mjs";
+import {busyText, postApplyReadText, readScreen} from "../../webview/view/readiness.mjs";
+import {configureReady, screenAvailable} from "../../webview/view/screens.mjs";
 
 test("loading names the active read and never claims the board is ready", () => {
     assert.deepEqual(readScreen(null), {state: "loading", title: "Reading your keyboard", detail: "Looking for a keyboard"});
@@ -48,7 +49,7 @@ test("post-Apply readback names the current data instead of a generic operation"
     assert.equal(postApplyReadText(model, {step: "layout", progress: {done: 12, total: 56}}), "Reading keys and layers · 12 of 56");
     assert.equal(postApplyReadText(model, {step: "profile"}), "Reading saved lighting, behaviours and settings");
     assert.equal(postApplyReadText(model, {step: "combos"}), "Checking active combos");
-    assert.equal(postApplyReadText(model, {step: "baseRgb"}), "Checking base lighting");
+    assert.equal(postApplyReadText(model, {step: "baseRgb"}), "Checking the background effect");
 });
 
 test("a read or export names what it reads and claims nothing about saving", () => {

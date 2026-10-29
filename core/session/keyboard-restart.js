@@ -28,7 +28,7 @@
  * @typedef {NonNullable<Session["draft"]>} Draft
  */
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
-const {EDIT_MODE_WORDS} = require("../model/vocabulary");
+const {EDIT_MODE_WORDS, arkCode, failureSentence} = require("../model/vocabulary");
 const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {snapshotOf} = require("./live-profile-session");
 const {expectRestart, followKeyboard} = require("./keyboard-reconnect");
@@ -39,8 +39,6 @@ const RESTART_LABEL = "Put back the unsaved edits from before the restart";
 
 /** @param {string} message @param {string} code */
 const refusal = (message, code) => Object.assign(new Error(message), {code});
-/** @param {unknown} error */
-const messageOf = error => (error instanceof Error ? error.message : String(error)).replace(/\.$/, "");
 /** @param {string | undefined} recovery */
 const inRecovery = recovery => recovery ? ` Your unsaved edits are in the recovery copy: ${recovery}` : "";
 const UNANSWERED = " The slave half did not answer the restart: if the halves do not agree now, unplug the keyboard and plug it back in.";
@@ -80,9 +78,11 @@ async function restartKeyboard({session, draft, saveRecovery}) {
     let result;
     try {result = await service.restartKeyboard();}
     catch (error) {
-        const code = /** @type {{code?: string}} */ (error)?.code || "RESTART_FAILED";
+        const code = arkCode(error, "RESTART_FAILED");
         if (code === "UNHANDLED") throw refusal(`This keyboard's firmware cannot restart from Ark, so nothing happened. Unplug the keyboard and plug it back in.${inRecovery(recovery)}`, "RESTART_UNSUPPORTED");
-        throw refusal(`The keyboard did not restart: ${messageOf(error)}.${inRecovery(recovery)}`, code);
+        // What stopped it is said in words (failureSentence); its own text
+        // stays under it, for the diagnostics.
+        throw Object.assign(refusal(`The keyboard did not restart. ${failureSentence(error)}${inRecovery(recovery)}`, code), {cause: error});
     }
     session.restart = {deviceId: device?.id, serialNumber: device?.serialNumber || "", kept, recovery, slaveAcknowledged: result.slaveAcknowledged};
     const expected = expectRestart(session);
@@ -161,7 +161,8 @@ async function putBack(session, restart, read) {
         const back = session.draft === draft && draft.live?.unsaved && draft.current.fingerprint === kept;
         if (!sent || !back) return `Your unsaved edits were not put back: the keyboard changed meanwhile.${inRecovery(restart.recovery)}${slave}`;
     } catch (error) {
-        return `Your unsaved edits could not be put back: ${messageOf(error)}.${inRecovery(restart.recovery)}${slave}`;
+        session.service.addDiagnostic?.(`Putting back the edits from before the restart failed: ${error instanceof Error ? error.message : String(error)}`);
+        return `Your unsaved edits could not be put back. ${failureSentence(error)}${inRecovery(restart.recovery)}${slave}`;
     }
     return `${draft.live?.mode === EDIT_MODE.LIVE ? "Your unsaved edits are back on the keyboard, which saves them in a moment."
         : "Your unsaved edits are back on the keyboard, not saved yet: review and save them."}${slave}`;

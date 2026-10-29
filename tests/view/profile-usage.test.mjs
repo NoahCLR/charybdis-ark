@@ -17,7 +17,7 @@ test("the card names its source and counts each thing in its screen's words", ()
     const view = profileUsageView(usage(2000));
     assert.equal(view.source, "What the keyboard runs");
     assert.equal(profileUsageView(usage(2000, {source: "draft"})).source, "Your draft");
-    assert.equal(profileUsageView(usage(2000, {source: "demo"})).source, "The demo setup");
+    assert.equal(profileUsageView(usage(2000, {source: "demo"})).source, "The demo profile");
     assert.equal(view.free, 3088);
     assert.ok(!("areas" in view), "no storage breakdown");
     assert.deepEqual(view.counts.map((count) => [count.label, count.share, count.full]),

@@ -1,7 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {holdKeyName, whatReachesSlot} from "../../view/reach.mjs";
+import {holdKeyName, whatReachesSlot} from "../../view/pointing-reach.mjs";
 import {stageEnabled} from "../../view/lighting.mjs";
+import {keysPlacedOn} from "../../view/placements.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
 import {render, state} from "../../store.mjs";
 import {slotLight} from "../marks.mjs";
@@ -15,7 +16,7 @@ export function keysRow(model, slot, canEdit) {
         <div class="val">
             <span class="act"><span class="k">${esc(holdKeyName(slot))}</span><span class="how">hold</span></span>
             <span class="act"><span class="k">${esc(slot.keys?.lock || "")}</span><span class="how">lock</span></span>
-            <span class="note">${esc(placedOn(model, slot))}</span></div>
+            <span class="note">${esc(keysPlacedOn(whatReachesSlot(model, slot).keys))}</span></div>
         <button class="btn tiny ghost" data-act="place" ${canEdit ? "" : "disabled"}
             data-tip="Put this mode's hold key on a key you pick on the board.">Place on a key…</button>
     </div>`);
@@ -47,18 +48,4 @@ export function lightRow(model, slot) {
         state.screen = "lighting"; state.stage = "pd"; render();
     });
     return node;
-}
-
-// Counted through the slot's values rather than its names: a layout position
-// carries whatever the keyboard calls the keycode, which is a bare user keycode
-// or plain hex, not the name this app prints.
-/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot */
-function placedOn(model, slot) {
-    const counts = new Map();
-    for (const {layer} of whatReachesSlot(model, slot).keys) {
-        const name = layer.displayName || layer.name;
-        counts.set(name, (counts.get(name) || 0) + 1);
-    }
-    const places = [...counts].map(([name, count]) => `${name} · ${count} key${count === 1 ? "" : "s"}`);
-    return places.length ? `on ${places.join(", ")}` : "not placed on any layer";
 }

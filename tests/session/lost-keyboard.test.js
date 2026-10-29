@@ -9,19 +9,20 @@
 // connected, nothing it said about its edits ("saved by the keyboard") shows.
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {openPanelLoop} = require("../../core/session/panel-loop");
 const {checkLive, watchLive} = require("../../core/session/live-watch");
 const {LOST_WORDS, RECONNECT_WORDS, expectLost} = require("../../core/session/keyboard-reconnect");
-const {WATCH_MISSES} = require("../../core/session/profile-device-service");
-const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {WATCH_MISSES} = require("../../core/session/background-reads");
+const {asRead, notices, openLoop} = require("../fixtures/panel-loop");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
 
-/** @param {import("node:test").TestContext} t @param {{now?: () => number, sleep?: (ms: number) => Promise<void>}} [timing] */
-async function open(t, timing = {}) {
-    const keyboard = liveKeyboard({document: document(), mode: EDIT_MODE.LIVE});
-    const adapter = fakeKeyboardAdapter({keyboard});
+// The loop on a live keyboard in Live edit, on the fixture's clock
+// (fixtures/panel-loop.js), read once its answers can be held back.
+/** @param {import("node:test").TestContext} t */
+async function open(t) {
+    const {adapter, shell, loop, clock, send} = await openLoop(t, {keyboard: liveKeyboard({document: document(), mode: EDIT_MODE.LIVE}),
+        read: false, defaultTimeoutMs: 100, watchTimeoutMs: 50});
     const answer = adapter.onWrite;
     // `left` requests from the next one on get no answer; while `hold` is
     // set, answers wait in `held` (a menu holding back input reports).
@@ -36,18 +37,12 @@ async function open(t, timing = {}) {
         return answer(write);
     };
     const release = () => {silence.hold = false; silence.held.splice(0).forEach((send) => send());};
-    const posted = [];
-    const shell = {post: (message) => {posted.push(message);}, showError: () => {}, saveRecovery: async () => "/r.json", saveExport: async () => undefined};
-    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 100, watchTimeoutMs: 50, sleep: async () => {}, reconnect: {sleep: async () => {}, ...timing}});
-    t.after(() => loop.close());
     await loop.handleMessage({type: "refresh"});
-    const send = (message) => loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, ...message});
-    const models = () => posted.filter((message) => message.type === "model").map((message) => message.model);
-    const notices = () => posted.filter((message) => message.notice).map((message) => message.notice);
+    const models = () => shell.posted.filter((message) => message.type === "model").map((message) => asRead(shell, message).model);
     const look = () => checkLive(loop.session).catch(() => false);
     // The looks that go unanswered in a row before Ark calls the keyboard lost.
     const lose = async () => {for (let i = 0; i < WATCH_MISSES; i++) {silence.left = 1; await look();}};
-    return {keyboard, adapter, silence, release, loop, send, models, notices, look, lose};
+    return {keyboard: adapter.keyboard, adapter, silence, release, loop, clock, send, models, notices: () => notices(shell), look, lose};
 }
 
 test("a missed look is skipped: the keyboard stays connected, and the late answer is set aside", async (t) => {
@@ -86,7 +81,7 @@ test("the look pauses while the shell says a menu may be open, and resumes after
     assert.deepEqual(looks.slice(0, 2), [3, 4], "no look while paused, then one each interval");
 });
 
-test("in Live, a keyboard lost for several looks is connected and read again by itself, and its save state is not shown while it is gone", async (t) => {
+test("in Live edit, a keyboard lost for several looks is connected and read again by itself, and its save state is not shown while it is gone", async (t) => {
     const {keyboard, adapter, loop, send, models, notices, look, lose} = await open(t);
     // As on Noah's keyboard: an edit, which the keyboard then saved by itself.
     await send({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 10, keycode: "KC_X"}]});
@@ -121,14 +116,13 @@ test("a user operation the keyboard does not answer loses it at once, and it is 
 });
 
 test("a keyboard that fails again soon after Ark reconnected it is left for the person to choose", async (t) => {
-    const time = {now: 0};
-    const {adapter, loop, models, notices, lose} = await open(t, {now: () => time.now});
+    const {adapter, loop, clock, models, notices, lose} = await open(t);
     await lose();
     await loop.reconnected();
     assert.equal(models().at(-1).device.connected, true);
     const connections = adapter.connectionHistory.length;
 
-    time.now += 5000;
+    clock.pass(5000);
     await lose();
     await loop.reconnected();
     const model = models().at(-1);
@@ -140,24 +134,23 @@ test("a keyboard that fails again soon after Ark reconnected it is left for the 
     // The person connects it; a loss well after is followed again.
     await loop.handleMessage({type: "refresh"});
     assert.equal(models().at(-1).device.connected, true);
-    time.now += 60000;
+    clock.pass(60000);
     await lose();
     await loop.reconnected();
     assert.equal(models().at(-1).device.connected, true);
 });
 
 test("a keyboard that drops off USB and does not come back is waited for, then left to the person", async (t) => {
-    const time = {now: 0};
-    const {adapter, loop, models, notices} = await open(t, {now: () => time.now, sleep: async (ms) => {time.now += ms;}});
+    const {adapter, loop, clock, models, notices} = await open(t);
     adapter.devices = [];
     adapter.lastConnection().emitDisconnect(new Error("Unplugged."));
     await loop.reconnected();
     assert.equal(models().at(-1).device.connected, false);
     assert.equal(notices().at(-1), LOST_WORDS.timeout);
-    assert.ok(time.now >= 10000, "it waited the bounded time for it to come back");
+    assert.ok(clock.now() >= 10000, "it waited the bounded time for it to come back");
 });
 
-test("in Live, renaming the keyboard expects its USB restart, and it is read again under its new name", async (t) => {
+test("in Live edit, renaming the keyboard expects its USB restart, and it is read again under its new name", async (t) => {
     const {adapter, loop, send, models, notices} = await open(t);
     await send({type: "renameKeyboard", name: "Desk", expectedFingerprint: loop.session.draft.current.fingerprint});
     assert.equal(loop.session.reconnect?.name, "Desk", "the restart that takes the new name is expected");

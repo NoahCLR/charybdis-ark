@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const {builtinModules} = require("node:module");
 const path = require("node:path");
 const test = require("node:test");
 
@@ -32,6 +33,24 @@ const ALLOWED_IMPORTS = {
 const RULES = "rules";
 const RULES_IN_THE_INTERFACE = path.join("webview", "view");
 
+// The packages a layer or root may name, exactly today's: transport's node-hid
+// adapter, for Node scripts (the web build refuses it), and the shell's
+// `buffer` polyfill, which the web build injects. Anything else, a Node
+// built-in included, is refused.
+const ALLOWED_PACKAGES = {
+    transport: ["node-hid"],
+    web: ["buffer/"],
+};
+
+// The one part of the interface the shell may import: webview/view/'s pure
+// helpers, which the phone notice draws the keyboard and the footer with when
+// it shows instead of the interface. The interface never imports the shell.
+const INTERFACE_IN_THE_SHELL = RULES_IN_THE_INTERFACE;
+
+function isNodeBuiltin(specifier) {
+    return specifier.startsWith("node:") || builtinModules.includes(specifier);
+}
+
 function sourceFiles(dir, declarations = false) {
     const root = path.join(APP_ROOT, dir);
     if (!fs.existsSync(root)) {
@@ -44,18 +63,13 @@ function sourceFiles(dir, declarations = false) {
         .map((entry) => path.join(entry.parentPath || entry.path, entry.name));
 }
 
-function requiresIn(file) {
-    return Array.from(fs.readFileSync(file, "utf8").matchAll(/require\("([^"]+)"\)/g)).map((m) => m[1]);
-}
-
-function importsIn(file) {
-    return Array.from(fs.readFileSync(file, "utf8").matchAll(/\bfrom\s+(["'])([^"']+)\1/g)).map((m) => m[2]);
+function importsIn(file, source = fs.readFileSync(file, "utf8")) {
+    return Array.from(source.matchAll(/\bfrom\s+(["'])([^"']+)\1/g)).map((m) => m[2]);
 }
 
 // What a module loads when it runs: static imports and re-exports,
 // side-effect imports and require().
-function runtimeImportsIn(file) {
-    const source = fs.readFileSync(file, "utf8");
+function runtimeImportsIn(file, source = fs.readFileSync(file, "utf8")) {
     return [
         ...source.matchAll(/\bfrom\s+(["'])([^"']+)\1/g),
         ...source.matchAll(/\bimport\s+(["'])([^"']+)\1/g),
@@ -64,8 +78,29 @@ function runtimeImportsIn(file) {
 }
 
 // Every module a file names, at runtime or as a type: import() included.
-function specifiersIn(file) {
-    return [...runtimeImportsIn(file), ...typeImportsIn(file)];
+function specifiersIn(file, source = fs.readFileSync(file, "utf8")) {
+    return [...runtimeImportsIn(file, source), ...typeImportsIn(file, source)];
+}
+
+// The packages and Node built-ins a file names that its layer or root may not.
+function refusedPackagesIn(file, source = fs.readFileSync(file, "utf8")) {
+    const relative = path.relative(APP_ROOT, file).split(path.sep);
+    const allowed = ALLOWED_PACKAGES[relative[0] === "core" ? relative[1] : relative[0]] ?? [];
+    return specifiersIn(file, source).filter(target => !target.startsWith(".") && !allowed.includes(target));
+}
+
+// The relative imports between the shell and the interface that neither may
+// make: the interface naming web/, or the shell naming the interface outside
+// webview/view/. Runtime and type imports alike.
+function refusedShellImportsIn(file, source = fs.readFileSync(file, "utf8")) {
+    const from = path.relative(APP_ROOT, file).split(path.sep)[0];
+    return specifiersIn(file, source).filter(target => {
+        if (!target.startsWith(".")) return false;
+        const relative = path.relative(APP_ROOT, path.resolve(path.dirname(file), target));
+        if (from === "webview") return rootOf(file, target) === "web";
+        if (from === "web") return rootOf(file, target) === "webview" && !relative.startsWith(`${INTERFACE_IN_THE_SHELL}${path.sep}`);
+        return false;
+    });
 }
 
 // The repository folder a relative specifier lands in: a core layer by its
@@ -75,10 +110,10 @@ function rootOf(file, target) {
     return relative[0] === "core" ? relative[1] : relative[0];
 }
 
-function typeImportsIn(file) {
-    const source = fs.readFileSync(file, "utf8");
-    const expressions = Array.from(source.matchAll(/\bimport\(\s*(["'])([^"']+)\1\s*\)/g)).map(match => match[2]);
-    return /\.d\.(ts|mts|cts)$/.test(file) ? [...expressions, ...importsIn(file)] : expressions;
+// import() as a type or an expression, a template literal included.
+function typeImportsIn(file, source = fs.readFileSync(file, "utf8")) {
+    const expressions = Array.from(source.matchAll(/\bimport\(\s*(["'`])([^"'`]+)\1\s*\)/g)).map(match => match[2]);
+    return /\.d\.(ts|mts|cts)$/.test(file) ? [...expressions, ...importsIn(file, source)] : expressions;
 }
 
 test("type dependencies follow the runtime layer rules", () => {
@@ -99,6 +134,13 @@ test("type dependencies follow the runtime layer rules", () => {
             const relative = path.relative(APP_ROOT, path.resolve(path.dirname(file), target));
             assert.ok(relative.startsWith(`webview${path.sep}`) || relative.startsWith(`contracts${path.sep}`) || relative.startsWith(`${RULES}${path.sep}`), `${file} imports types outside the interface, the shared rules or posted contracts: ${target}`);
         }
+    }
+    // tsconfig.json checks core with its type tests, so they may bring in
+    // nothing core/ could lean on unseen.
+    const coreTypeTests = path.join(APP_ROOT, "tests", "types", "core.ts");
+    for (const target of specifiersIn(coreTypeTests).concat(importsIn(coreTypeTests))) {
+        const relative = path.relative(APP_ROOT, path.resolve(path.dirname(coreTypeTests), target));
+        assert.ok(target.startsWith(".") && /^(core|contracts)$/.test(relative.split(path.sep)[0]), `tests/types/core.ts imports ${target}; core's type tests import only core/ and contracts/`);
     }
 });
 
@@ -128,7 +170,7 @@ test("core layers import only downward", () => {
         const allowed = ALLOWED_IMPORTS[layer];
         assert.ok(allowed, `${file} sits in an undeclared layer: ${layer}`);
 
-        for (const target of requiresIn(file)) {
+        for (const target of runtimeImportsIn(file)) {
             if (!target.startsWith(".")) {
                 continue;
             }
@@ -142,6 +184,34 @@ test("core layers import only downward", () => {
             );
         }
     }
+});
+
+test("each layer names only its own packages, and no Node built-in", () => {
+    // Types included: a layer that names a package's types leans on it too.
+    for (const dir of ["core", RULES, "webview", "web"]) {
+        for (const file of sourceFiles(dir, true)) {
+            assert.deepEqual(refusedPackagesIn(file), [], `${path.relative(APP_ROOT, file)} names a package or Node built-in its layer may not`);
+        }
+    }
+    const planted = (where, source) => refusedPackagesIn(path.join(APP_ROOT, where), source);
+    assert.deepEqual(planted("core/schema/x.js", 'const fs = require("node:fs"); require("node-hid");'), ["node:fs", "node-hid"]);
+    assert.deepEqual(planted("core/transport/x.js", 'require("node-hid"); /** @type {import("node-hid").Device} */'), []);
+    assert.deepEqual(planted("core/model/x.js", 'import {x} from "lodash";'), ["lodash"]);
+    assert.deepEqual(planted("web/x.mjs", 'export {Buffer} from "buffer/"; import "buffer";'), ["buffer"]);
+});
+
+test("the interface never imports the shell, and the shell only the interface's view", () => {
+    for (const dir of ["webview", "web"]) {
+        for (const file of sourceFiles(dir, true)) {
+            assert.deepEqual(refusedShellImportsIn(file), [], `${path.relative(APP_ROOT, file)} crosses between the shell and the interface`);
+        }
+    }
+    const planted = (where, source) => refusedShellImportsIn(path.join(APP_ROOT, where), source);
+    assert.deepEqual(planted("webview/x.mjs", 'import {x} from "../web/phone.mjs"; /** @type {import("../web/types.js").T} */'),
+        ["../web/phone.mjs", "../web/types.js"]);
+    assert.deepEqual(planted("web/x.mjs", 'import {x} from "../webview/store.mjs"; import {y} from "../webview/ui/frame.mjs";'),
+        ["../webview/store.mjs", "../webview/ui/frame.mjs"]);
+    assert.deepEqual(planted("web/x.mjs", 'import {GEO} from "../webview/view/geometry.mjs";'), []);
 });
 
 test("the webview stays a renderer", () => {
@@ -217,15 +287,22 @@ test("nothing we author mentions the firmware repository", () => {
 test("the UI cannot touch the filesystem", () => {
     // The one rule is enforced as a capability, not as wording: whatever a
     // tooltip says, the interface must have no way to read or write a file.
-    for (const file of [...sourceFiles("webview"), ...sourceFiles(RULES)]) {
-        const text = fs.readFileSync(file, "utf8");
-        for (const capability of ['require("node:fs")', 'require("fs")', "readFileSync", "writeFileSync", "child_process"]) {
-            assert.ok(
-                !text.includes(capability),
-                `${path.relative(APP_ROOT, file)} uses ${capability}; the ported UI must stay a renderer`
-            );
-        }
+    // No Node built-in by any import, static, dynamic or require(), nor the
+    // calls themselves.
+    const capabilities = ["readFileSync", "writeFileSync", "child_process"];
+    const used = (file, text) => [...new Set([...specifiersIn(file, text).filter(isNodeBuiltin),
+        ...capabilities.filter(capability => text.includes(capability))])];
+    for (const file of [...sourceFiles("webview"), ...sourceFiles(RULES), ...sourceFiles("web")]) {
+        assert.deepEqual(used(file, fs.readFileSync(file, "utf8")), [],
+            `${path.relative(APP_ROOT, file)} reaches Node; the UI must stay a renderer`);
     }
+    const planted = path.join(APP_ROOT, "webview", "ui", "x.mjs");
+    assert.deepEqual(used(planted, 'import fs from "node:fs";'), ["node:fs"]);
+    assert.deepEqual(used(planted, 'import {spawn} from "child_process";'), ["child_process"]);
+    assert.deepEqual(used(planted, 'export * from "fs/promises"; import "os";'), ["fs/promises", "os"]);
+    assert.deepEqual(used(planted, 'const fs = await import("node:fs"); const p = await import(`path`);'), ["node:fs", "path"]);
+    assert.deepEqual(used(planted, 'const fs = require("fs");'), ["fs"]);
+    assert.deepEqual(used(planted, 'import {Buffer} from "buffer/";'), []);
 });
 
 test("every core module has a test in the matching layer", () => {

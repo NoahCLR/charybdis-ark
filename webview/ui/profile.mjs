@@ -5,8 +5,8 @@
 // what a layer holds is visible while it is named.
 //
 // A complete profile is layers, behaviours, combos, custom keys, macros,
-// pointing modes, lighting and settings. Restoring one replaces all of that, so the card counts, area
-// by area, what the file changes on the keyboard before anything is written.
+// pointing modes, lighting and settings. Importing one replaces all of that, so the sheet counts, area
+// by area, what the file changes on the keyboard before anything changes.
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as controls from "../view/controls.mjs";
@@ -28,7 +28,7 @@ export function screenProfile() {
     const canExport = canEditArea("export");
     const canImport = canEditArea("import");
     // In the demo there is no keyboard: Export saves the demo's draft,
-    // Import reviews a file against the demo setup, and nothing is recovered.
+    // Import reviews a file against the demo profile, and nothing is recovered.
     const demo = demoOf(model).active;
 
     const main = el(`<div class="main">${topbar(
@@ -50,10 +50,10 @@ export function screenProfile() {
             <div class="card-b">
                 <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg></span>
                 <h3>Import profile</h3>
-                <p class="note">${esc(demo ? "Choose or drop a complete backup here and review its differences from the demo setup first. Import replaces the demo's draft; Undo brings it back."
+                <p class="note">${esc(demo ? "Choose or drop a complete backup here and review its differences from the demo profile first. Import replaces the demo's draft; Undo brings it back."
                     : importNote(model?.draft))}</p>
                 <p class="note profile-drop-status" role="status" hidden></p>
-                <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Choose profile…</button>
+                <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Import profile…</button>
             </div>
         </div>
         <div class="card profile-action">
@@ -73,7 +73,6 @@ export function screenProfile() {
 
     const recoveries = shellOf(model).recoveries;
     if (!demo) pad.appendChild(recoveriesCard(recoveries));
-    pad.appendChild(defaultsCard());
 
     main.appendChild(content);
     // The comparison is a sheet over the screen: decide, then it closes.
@@ -81,21 +80,12 @@ export function screenProfile() {
     return main;
 }
 
-// Honest about what a backup is for: it restores onto the same firmware
+// Honest about what a backup is for: it imports onto the same firmware
 // release, which a firmware update may not keep.
-const FIRMWARE_LINE = "A backup restores onto the same firmware release; check the release notes before updating firmware.";
+const FIRMWARE_LINE = "A backup imports onto the same firmware release; check the release notes before updating firmware.";
 
 // What every recovery copy is, before where the shell keeps it.
-const RECOVERY_NOTE = "Before every save and restart, and before leaving Live edit or restoring a backup, Ark keeps a copy of what that could lose,";
-
-// Not built yet, and said so rather than half-built: Ark reads the
-// firmware’s complete defaults, but has no whole-defaults draft control yet.
-function defaultsCard() {
-    return el(`<div class="card profile-defaults">
-        <div class="card-h"><h3>Start from the compiled defaults</h3><span class="right"><span class="chip">Not yet available</span></span></div>
-        <div class="card-b"><p class="note">A draft of the setup the firmware was built with. The firmware reports its complete defaults, but Ark does not yet offer them as a whole draft. Until then, restore a backup made before your changes.</p></div>
-    </div>`);
-}
+const RECOVERY_NOTE = "Before every save and restart, and before leaving Live edit, Ark keeps a copy of what that could lose,";
 
 /** @param {HTMLElement} card */
 function wireProfileDrop(card) {
@@ -122,7 +112,7 @@ function wireProfileDrop(card) {
         card.classList.remove("drag-over");
         if (!available()) return;
         const dropped = Array.from(/** @type {DataTransfer} */ (event.dataTransfer).files);
-        if (dropped.length !== 1) {tell("Drop one profile file at a time."); return;}
+        if (dropped.length !== 1) {tell("Drop one file at a time."); return;}
         const file = dropped[0];
         if (file.size > PROFILE_FILE_MAX_BYTES) {tell(PROFILE_FILE_TOO_LARGE); return;}
         const draft = getModel()?.draft;
@@ -141,7 +131,7 @@ function wireProfileDrop(card) {
             tell("");
             post(reviewPortableProfile(text, file.name));
         } catch {
-            tell("This profile file could not be read. Try Choose profile… instead.");
+            tell("This file could not be read. Try Import profile… instead.");
         } finally {
             reading = false;
             choose.disabled = !canEditArea("import");
@@ -150,7 +140,8 @@ function wireProfileDrop(card) {
 }
 
 // The recovery copies Ark keeps before an Apply, a Save, a restart, leaving
-// Live edit or restoring a backup, each named by what made it and its keyboard.
+// Live edit or saving a backup with no draft, each named by what made it and
+// its keyboard.
 // The browser keeps them in its storage, each usable as a draft (through the
 // same comparison as a backup file), downloadable as a file, or deletable.
 /** @param {import("../../contracts/model.js").RecoveryCopy[]} recoveries */
@@ -180,7 +171,9 @@ function recoveriesCard(recoveries) {
 
 // The file against the keyboard, counted area by area: enough to decide
 // whether to take it. What each difference is waits for the draft's own
-// review, which the file becomes.
+// review, which the file becomes. With no draft (a keyboard whose profile
+// could not be read whole), taking it saves it to the keyboard at once, as
+// an Apply, after a recovery copy (core/session/panel-controls.js).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Partial<import("../../contracts/panel.js").PublishedModel["portable"]> & {review: NonNullable<import("../../contracts/panel.js").PublishedModel["portable"]["review"]>}} portable @param {boolean} busy */
 function reviewSheet(model, portable, busy) {
     const {incoming, current, fileName, differences, fits} = portable.review;
@@ -189,18 +182,18 @@ function reviewSheet(model, portable, busy) {
     const same = differences && !differences.length;
     // A file that matches the keyboard still replaces a draft's edits.
     const changesNothing = same && !pending;
-    const holds = demoOf(model).active ? "the demo setup holds" : "the keyboard runs";
+    const holds = demoOf(model).active ? "the demo profile holds" : "the keyboard runs";
     const summary = differences ? categorySummary(model, differences, {names: incoming.names}) : [];
     const counted = differences?.length
-        ? `${differences.length} difference${differences.length === 1 ? "" : "s"} from ${demoOf(model).active ? "the demo setup" : "the keyboard"}${statusBesideCount(differences) ? ` · ${statusBesideCount(differences)}` : ""}` : "";
+        ? `${differences.length} difference${differences.length === 1 ? "" : "s"} from ${demoOf(model).active ? "the demo profile" : "the keyboard"}${statusBesideCount(differences) ? ` · ${statusBesideCount(differences)}` : ""}` : "";
     const callout = !current
-        ? "An interrupted restore left an incomplete configuration, so this file cannot be compared with it. This profile replaces it; the interrupted data is kept as a diagnostic copy, so keep your original backup as well."
+        ? "An interrupted save left an incomplete profile on the keyboard, so this file cannot be compared with it. Saving this backup replaces it, and a recovery copy keeps the interrupted data; keep your original backup as well."
         : draft
             ? `${pending ? `This replaces your draft and its ${pending} change${pending === 1 ? "" : "s"}; Undo brings ${pending === 1 ? "it" : "them"} back. ` : ""}${importCallout(draft)}`
-            : "This replaces the keyboard's layout, behaviours, combos, custom keys, macros, trackball modes, lighting and settings. The previous profile is saved automatically before restoring, and both halves are verified afterwards.";
+            : "Saving this backup replaces the keyboard's keys, layers, behaviours, combos, custom keys, macros, pointing modes, lighting and settings at once, with no draft to review first. Ark saves a recovery copy of what the keyboard holds first, and checks both halves afterwards.";
     const size = fits ? fitsLine(fits) : null;
-    const node = el(`<div class="scrim import-scrim"><div class="sheet import-sheet" role="dialog" aria-modal="true" aria-label="${draft ? "Use this backup as your draft?" : "Restore this backup?"}">
-        <div class="sheet-h"><h2>${draft ? "Use this backup as your draft?" : "Restore this backup?"}</h2>
+    const node = el(`<div class="scrim import-scrim"><div class="sheet import-sheet" role="dialog" aria-modal="true" aria-label="${draft ? "Use this backup as your draft?" : "Save this backup to the keyboard?"}">
+        <div class="sheet-h"><h2>${draft ? "Use this backup as your draft?" : "Save this backup to the keyboard?"}</h2>
             ${fileName ? `<span class="right note mono">${esc(fileName)}</span>` : ""}</div>
         <div class="sheet-b stack gap-12">
             ${size ? `<p class="note import-fits${size.warn ? " warn" : ""}">${esc(size.text)}</p>` : ""}
@@ -214,7 +207,7 @@ function reviewSheet(model, portable, busy) {
         </div>
         <div class="sheet-f"><span class="right row gap-8">
             <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Cancel</button>
-            <button class="btn primary" data-act="restore" ${busy || changesNothing ? "disabled" : ""}>${draft ? "Use as draft" : "Restore backup"}</button></span></div>
+            <button class="btn primary" data-act="restore" ${busy || changesNothing ? "disabled" : ""}>${draft ? "Use as draft" : "Save to keyboard"}</button></span></div>
     </div></div>`);
     node.addEventListener("click", (event) => { if (event.target === node && !busy) post(controls.control("cancelPortableReview")); });
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restore"]')).addEventListener("click", () => post(controls.control("restorePortableProfile")));

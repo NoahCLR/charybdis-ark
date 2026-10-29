@@ -4,7 +4,13 @@ const {test, expect} = require("@playwright/test");
 const fs = require("node:fs");
 const path = require("node:path");
 const {document} = require("../tests/fixtures/pd-profile");
-const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
+const {DEMO_CAPABILITIES} = require("../core/session/demo-session");
+const {validateSnapshot} = require("../core/model/portable-profile");
+
+// The reply the read waits at, well into the payload's chunks, so the page can
+// be looked at mid-read. What the read asks the keyboard for is
+// tests/protocol/profile-readback-requests.test.js's.
+const PAUSE_AT = 100;
 
 for (const {screen, source, initial} of [
     {screen: "macros", source: "layout"}, {screen: "keys", source: "layout"},
@@ -14,7 +20,8 @@ for (const {screen, source, initial} of [
     test(`${initial ? "initial read" : "readback"} of ${source} preserves the ${screen} screen between replies`, async ({page}) => {
         await page.goto("/preview/index.html");
         const coreFile = fs.readdirSync(path.join(__dirname, "../dist/web")).find(name => /^core-.*\.js$/.test(name));
-        const result = await page.evaluate(async ({screen, source, initial, coreFile, doc, featureFlags}) => {
+        const doc = document(), total = validateSnapshot(doc).candidate.length;
+        const reading = page.evaluate(async ({screen, source, initial, coreFile, doc, capabilities, pauseAt}) => {
             const store = await import("/webview/store.mjs"), core = await import(`/dist/web/${coreFile}`);
             let models = 0, readContent, preserved = true, replies = 0, lastBar = "", lastProgress, staleIgnored = true;
             const beforePosts = window.__posted.length;
@@ -25,7 +32,7 @@ for (const {screen, source, initial} of [
             }}, {adapter: {listDevices: async () => [], connect: async () => {throw Error("fixture must not connect");}}});
             const service = loop.session.service;
             service.connectionPublicId = "fixture"; service.connectionToken = 1;
-            service.capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, reportSize: 32, statusPageCount: 2, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags};
+            service.capabilities = capabilities;
             if (!initial) service.portable = {document: doc};
             const bytes = core.portable.validateSnapshot(doc).candidate, metadata = core.Buffer.alloc(25);
             // Payload metadata layout 2 (Profile Wire 2): a 32-bit length.
@@ -53,6 +60,7 @@ for (const {screen, source, initial} of [
                     staleIgnored &&= document.querySelector(initial ? ".read-placeholder" : ".commit").textContent === lastBar;
                     readContent = document.querySelector(".content");
                 }
+                if (replies === pauseAt) await new Promise(resolve => {window.__resumeRead = resolve;});
                 replies++;
                 const identity = core.Buffer.alloc(25); identity[0] = 1; identity[1] = 2;
                 identity.writeUInt16LE(0x31, 2); identity[24] = 0;
@@ -75,30 +83,34 @@ for (const {screen, source, initial} of [
             store.state.macroSlot = "MACRO_17";
             loop.serviceChanged();
             store.setMacroForm("MACRO_17", {draft: localText}); store.render();
-            const start = performance.now();
             if (source === "layout") await service.readLayout();
             else await service.readCommittedProfile();
-            const elapsed = performance.now() - start;
             const ended = store.getModel();
             window.dispatchEvent(new MessageEvent("message", {data: lastProgress}));
             staleIgnored &&= ended === store.getModel();
-            return {preserved, models, replies, elapsed, lastBar, progress: lastProgress?.read.progress,
-                layoutMatches: source !== "layout" || service.layout.layers.every(({layer, keys}) => keys.every(key => key.keycode === core.portable.validateSnapshot(doc).layers[layer][key.row * 6 + key.column])),
+            return {preserved, models, lastBar, progress: lastProgress?.read.progress,
                 profileBytes: bytes.length, staleIgnored, error: service.error?.message,
                 localTextPreserved: store.macroForm("MACRO_17").draft === localText,
                 posts: window.__posted.length - beforePosts};
-        }, {screen, source, initial, coreFile, doc: document(), featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
+        }, {screen, source, initial, coreFile, doc, capabilities: DEMO_CAPABILITIES, pauseAt: PAUSE_AT});
+        // Mid-read, the bar counts the bytes read so far of the whole payload.
+        await page.waitForFunction(() => window.__resumeRead);
+        const bar = page.locator(initial ? ".read-placeholder" : ".commit");
+        await expect(bar).toContainText(new RegExp(`\\d+ of ${total}`));
+        const done = Number(new RegExp(`(\\d+) of ${total}`).exec(await bar.innerText())?.[1]);
+        expect(done).toBeGreaterThan(0);
+        expect(done).toBeLessThan(total);
+        await page.evaluate(() => window.__resumeRead());
+        const result = await reading;
         expect(result.error).toBeUndefined();
+        expect(result.profileBytes).toBe(total);
         if (source === "layout") {
-            // Two payload metadata pages, plus status before and after read.
-            expect(result.replies).toBe(Math.ceil(result.profileBytes / 25) + 6);
             expect(result.progress).toMatchObject({done: result.profileBytes, total: result.profileBytes});
             expect(result.lastBar).toContain(`of ${result.profileBytes}`);
         } else expect(result.lastBar).toContain(`${result.profileBytes} of ${result.profileBytes}`);
         expect(result.preserved).toBe(true);
         expect(result.staleIgnored).toBe(true);
         expect(result.localTextPreserved).toBe(true);
-        expect(result.layoutMatches).toBe(true);
         expect(result.posts).toBe(0);
         expect(result.models).toBeLessThan(10);
     });

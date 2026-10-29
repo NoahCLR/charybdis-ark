@@ -2,23 +2,37 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {RESTART_NEEDED, SAVE_IN_PROGRESS, halvesRows, productName} from "../../webview/view/keyboard-view.mjs";
 import {keyboardControl} from "../../webview/view/keyboard-menu.mjs";
+import {createRequire} from "node:module";
 
-const connected = (keyboardName, label = "Bastard Keyboards Charybdis 4x6") => ({device: {connected: true, label}, keyboardName});
+const require = createRequire(import.meta.url);
+const {openDraft, panelModel, profileDocument} = require("../fixtures/published-model.js");
+const {openDemo, panelState} = require("../../core/session/demo-session");
+const {buildPanelModel} = require("../../core/session/panel-session");
+
+// The panel's model for a connected keyboard storing `name` (the firmware's
+// built-in one when empty), which it reports over USB as `product`.
+function connected(name, product = name || "Charybdis 4x6") {
+    const {draft, state} = openDraft(profileDocument({settings: (settings) => {settings.keyboardName = name;}}));
+    return panelModel(draft, {...state, storedKeyboardName: name, devices: [{id: state.selectedDeviceId, label: product, product}]});
+}
 
 test("Product is the firmware's built-in name for a keyboard with no stored name", () => {
-    assert.equal(productName(connected({name: "", builtIn: "Charybdis 4x6", identity: "a", perName: 32})), "Charybdis 4x6");
+    assert.equal(productName(connected("")), "Charybdis 4x6");
 });
 
 test("a renamed keyboard never shows its given name as Product: the row is left out", () => {
     // The keyboard reports its given name over USB (firmware D-F25), which
     // the device label then is; the built-in name is not known.
-    assert.equal(productName(connected({name: "Noah's Charybdis", builtIn: "", identity: "a", perName: 32}, "Noah's Charybdis")), null);
-    assert.equal(productName(connected(null, "Noah's Charybdis")), null, "nor before the name is read");
+    const renamed = connected("Noah's Charybdis");
+    assert.equal(renamed.keyboardName.builtIn, "");
+    assert.equal(productName(renamed), null);
+    assert.equal(productName({...renamed, keyboardName: null}), null, "nor before the name is read");
 });
 
 test("the demo stands in for the product", () => {
-    assert.equal(productName({demo: {active: true}, device: {connected: true, label: "Demo"}, keyboardName: {name: "Charybdis - Home", builtIn: "", identity: "a", perName: 32}}),
-        "Charybdis 4x6 (demo)");
+    const session = {service: {portable: null, snapshot: () => ({connected: false, busy: false, devices: []})}};
+    openDemo(session, session.service.snapshot());
+    assert.equal(productName(buildPanelModel(session, panelState(session))), "Charybdis 4x6 (demo)");
 });
 
 const health = (extra) => ({device: {connected: true, label: "K", health: {halves: "agree", recoveryPending: false, restartNeeded: false, ...extra}}});

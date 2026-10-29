@@ -94,4 +94,36 @@ function decodeCompiledRead(text) {
     }
 }
 
-module.exports = {ProfilePayloadReader, payloadMatchesActive, encodeCompiledRead, decodeCompiledRead};
+// The compiled defaults last verified on any connection, so a reconnect does
+// not download them again; a shell that keeps them between runs (`store`)
+// spares the first read too. A reader takes them only for a keyboard whose
+// metadata names exactly those bytes. A store that fails to read or write is
+// passed over.
+class CompiledDefaults {
+    /** @param {{get(): unknown, set(value: string): unknown} | undefined} [store] */
+    constructor(store) {
+        this.store = store && typeof store.get === "function" && typeof store.set === "function" ? store : undefined;
+        /** @type {import("../protocol/types.js").PayloadRead | undefined} */
+        this.known = undefined;
+    }
+
+    // The copy a new connection's reader starts from, if any.
+    current() {
+        if (!this.known && this.store) {
+            try {this.known = decodeCompiledRead(this.store.get());} catch {}
+        }
+        return this.known;
+    }
+
+    // A reader verified these defaults; the store is written only when they
+    // differ from the copy already known.
+    /** @param {import("../protocol/types.js").PayloadRead} read */
+    keep(read) {
+        const known = this.known;
+        this.known = read;
+        if (!this.store || (known && known.metadata.digest === read.metadata.digest && known.metadata.crc32 === read.metadata.crc32 && known.bytes.equals(read.bytes))) return;
+        try {void this.store.set(encodeCompiledRead(read));} catch {}
+    }
+}
+
+module.exports = {ProfilePayloadReader, CompiledDefaults, payloadMatchesActive, encodeCompiledRead, decodeCompiledRead};

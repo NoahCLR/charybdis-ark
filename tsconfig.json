@@ -1,3 +1,7 @@
+// core/, the shared rules it runs, contracts/ and core's type tests, with Node
+// types and nothing else: this check fails if core/ leans on a type only
+// something above it brings. The type tests import only core/ and contracts/
+// (tests/layering.test.js), so they bring nothing core/ does not have.
 {
   "compilerOptions": {
     "allowJs": true,

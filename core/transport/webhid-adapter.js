@@ -54,14 +54,15 @@ class WebHidDeviceAdapter {
         } catch (cause) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.ENUMERATION_FAILED,
-                "Could not list the Charybdis Raw HID interfaces this page may open.",
+                "Ark could not list the keyboards this page may open.",
                 {cause}
             );
         }
         if (!Array.isArray(devices)) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.ENUMERATION_FAILED,
-                "WebHID getDevices() did not return an array."
+                "WebHID getDevices() did not return an array.",
+                {fault: "ark"}
             );
         }
         this.knownDevices.clear();
@@ -116,7 +117,7 @@ class WebHidDeviceAdapter {
         if (!device) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.DEVICE_NOT_FOUND,
-                `No matching Charybdis Raw HID interface was found for ${id}.`,
+                "Ark cannot find that keyboard now. Check that it is plugged in, then choose it again.",
                 {deviceId: id}
             );
         }
@@ -130,7 +131,7 @@ class WebHidDeviceAdapter {
         } catch (cause) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.CONNECT_FAILED,
-                `Could not open Charybdis Raw HID interface ${id}.`,
+                "Ark could not open the keyboard. Close any other program or Ark page using it, then try again.",
                 {cause, deviceId: id}
             );
         }
@@ -144,7 +145,7 @@ class WebHidDeviceAdapter {
             }
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.CONNECT_FAILED,
-                `Could not initialize Charybdis Raw HID interface ${id}.`,
+                "Ark could not start talking to the keyboard. Unplug it, plug it back in and try again.",
                 {cause, deviceId: id}
             );
         }
@@ -205,7 +206,7 @@ class WebHidConnectedDevice {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.INVALID_ADAPTER,
                 "WebHID returned an invalid device handle.",
-                {deviceId}
+                {deviceId, fault: "ark"}
             );
         }
         this.hid = hid;
@@ -419,10 +420,6 @@ function closeWebHidDevice(device) {
 }
 
 module.exports = {
-    WEBHID_DEVICE_FILTERS,
-    WEBHID_REPORT_ID,
-    WebHidConnectedDevice,
     WebHidDeviceAdapter,
-    isCharybdisWebHidDevice,
     normalizeWebHidInputReport,
 };

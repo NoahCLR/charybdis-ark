@@ -12,6 +12,7 @@
 
 import {vocabulary, word} from "./vocabulary.mjs";
 import {MACRO_LIMITS, macroProblemWords, readMacroPayload} from "../../rules/macro-payload.mjs";
+import {macroOfName} from "../../rules/qmk-keycodes.mjs";
 
 /** @typedef {import("./types.js").MacroStep} MacroStep */
 
@@ -25,6 +26,21 @@ export const stepKindName = (model, kind) => word(vocabulary(model).macroSteps, 
 // The button that adds a step of this kind.
 /** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} kind */
 export const addStepLabel = (model, kind) => `+ ${stepKindName(model, kind)}`;
+
+// A choice of a macro's Uninterruptible playback as its dropdown offers it:
+// Automatic says whether it plays the macro uninterruptibly now, in core's
+// words ("Automatic · on").
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {{value: string, label: string}} choice @param {boolean} uninterruptible */
+export const protectionChoiceLabel = (model, {value, label}, uninterruptible) => (value === "auto"
+    && vocabulary(model).macroUninterruptible.automatic[uninterruptible ? "on" : "off"]) || label;
+
+// A macro slot's number, read from the name its keycode goes by (MACRO_n,
+// rules/qmk-keycodes.mjs macroOfName), and null for a keycode that names no
+// slot; and its short name, where its whole name will not fit: "M3".
+/** @param {string | null | undefined} keycode */
+export const macroNumber = (keycode) => macroOfName(String(keycode ?? "")) ?? null;
+/** @param {{keycode?: string} | null | undefined} slot */
+export const macroShortName = (slot) => `M${macroNumber(slot?.keycode) ?? ""}`;
 
 // A macro's limits (rules/macro-payload.mjs): its longest delay in
 // milliseconds, and the keys it holds at once, a chord's included.
@@ -91,15 +107,10 @@ export function macroStepsInput(steps, model) {
     return {payload, error};
 }
 
-// What a slot shows on its cell. Every macro on a real keyboard tends to open
-// with the same modifier press, so the head of the payload makes them all look
+// What a slot shows on its cell, from its steps as the peek reads them
+// (macro-cache.mjs). Every macro on a real keyboard tends to open with the
+// same modifier press, so the head of the payload makes them all look
 // identical; what tells them apart is the key they actually send.
-/** @param {unknown} payload @param {(name: string) => string} [label] */
-export function macroPeek(payload, label = (name) => name) {
-    const {steps} = parseMacro(payload);
-    return macroPeekSteps(steps, label);
-}
-
 /** @param {MacroStep[]} steps @param {(name: string) => string} [label] */
 export function macroPeekSteps(steps, label = (name) => name) {
     const text = steps.filter((step) => step.kind === "text").map((step) => step.text).join("").trim();
@@ -153,8 +164,7 @@ export function unreleased(steps, aliases = {}) {
 export function macroMatches(slot, query) {
     const needle = String(query ?? "").trim().toLowerCase();
     if (!needle) return true;
-    const number = String(slot?.keycode ?? "").split("_").at(-1);
-    return [slot?.name, `M${number}`, slot?.defaultName, slot?.keycode]
+    return [slot?.name, macroShortName(slot), slot?.defaultName, slot?.keycode]
         .some((text) => String(text ?? "").toLowerCase().includes(needle));
 }
 
@@ -175,12 +185,12 @@ export function samePayload(a, b, aliases = {}) {
 
 // What a macro card's chip says its editor holds, against the draft and the
 // keyboard: an edit not kept in the draft yet, a macro the draft changed
-// (Review lists it), or the macro as read (in the demo, as the demo setup has
-// it). A playback change caused by Your computer is not a change to the macro.
+// (Review lists it), or the macro as read (in the demo, as the demo profile has
+// it). A playback change the host section caused is not a change to the macro.
 /** @param {readonly Pick<import("../../contracts/model.js").ReviewChange, "unit">[] | undefined} changes @param {string} keycode @param {boolean} local @returns {{state: "local" | "draft" | "read", dot: string, text: string}} */
 export function macroLocalState(changes, keycode, local) {
     if (local) return {state: "local", dot: "draft", text: "edited here"};
-    const unit = `macro:${keycode.replace(/^MACRO_/, "")}`;
+    const unit = `macro:${macroNumber(keycode)}`;
     return (changes || []).some((change) => change.unit === unit)
         ? {state: "draft", dot: "draft", text: "changed in draft"}
         : {state: "read", dot: "on", text: "as read"};

@@ -25,8 +25,7 @@ const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, 
     buildEditCommitRequest, buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, sendEditRequest,
     readEditProgress, readEditStatus, readEditMode, readSafeBoundaryReasons} = require("../protocol/profile-edit-v1");
 const {diffProfiles, applySplices, spliceEditFits} = require("../schema/profile-splices");
-const {PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
-const {PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-domains");
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 const {LIVE_RESULT_WORDS} = require("../model/vocabulary");
 
 
@@ -71,7 +70,7 @@ function refused(result, what, details = {}) {
     const name = EDIT_RESULT_NAMES[result] || `RESULT_${result}`;
     const stopped = result !== EDIT_RESULT.OK && Boolean((details.flags ?? 0) & (EDIT_FLAGS.STOPPED | EDIT_FLAGS.PEER_STOPPED));
     const code = stopped ? "LIVE_KEYBOARD_STOPPED" : result === EDIT_RESULT.STALE ? "LIVE_EDIT_STALE" : result === EDIT_RESULT.NOT_CLEAN ? "LIVE_EDIT_NOT_CLEAN" : "LIVE_EDIT_REFUSED";
-    const words = stopped ? LIVE_RESULT_WORDS.STOPPED : LIVE_RESULT_WORDS[name] || `the keyboard answered ${name}.`;
+    const words = stopped ? LIVE_RESULT_WORDS.STOPPED : LIVE_RESULT_WORDS[name] || LIVE_RESULT_WORDS.unknown;
     return new LiveEditError(code, `${what}: ${words}`, {result: name, ...details});
 }
 
@@ -422,4 +421,4 @@ class LiveEditCoordinator {
     }
 }
 
-module.exports = {LiveEditCoordinator, LiveEditError, TransactionIds, REQUIRED_DOMAINS, DEFAULT_TIMING};
+module.exports = {LiveEditCoordinator, TransactionIds, DEFAULT_TIMING};

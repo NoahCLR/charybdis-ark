@@ -7,14 +7,15 @@ import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {changesKept, statusBesideCount} from "../view/review.mjs";
-import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
-import {isScreenId, screenGroups} from "../view/screens.mjs";
+import {postApplyReadText} from "../view/readiness.mjs";
+import {isScreenId, screenAvailable, screenGroups} from "../view/screens.mjs";
 import {buildLine, commitUrl, githubMark, shellOf, themeLabel} from "../view/shell-panel.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 import {bindKeyboardMenu, keyboardMenu} from "./keyboard-menu.mjs";
-import {LIVE, liveSaveState, restartOffer} from "../view/edit-mode.mjs";
+import {restartOffer} from "../view/edit-mode.mjs";
+import {commitBarState} from "../view/commit-bar.mjs";
 import {ariaShortcut, shortcut} from "../view/shortcuts.mjs";
 
 // The review opens at once; the core marks it reviewed when it answers.
@@ -48,7 +49,7 @@ export function rail() {
             <button class="btn tiny ghost rail-history" data-act="history"
                 data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
             <button class="btn tiny ghost icon" data-act="undo" aria-label="Undo" aria-keyshortcuts="${ariaShortcut("Z")}" ${draft?.canUndo ? "" : "disabled"}
-                data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (${shortcut("Z")})${draft.live ? ". The keyboard takes it back at once." : ""}` : draft?.live ? `Undo the last edit (${shortcut("Z")}). The keyboard takes it back at once.` : `Undo the last edit in the draft (${shortcut("Z")}). The keyboard is not touched until you apply.`)}">↺</button>
+                data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (${shortcut("Z")})${draft.live ? ". The keyboard takes it back at once." : ""}` : draft?.live ? `Undo the last edit (${shortcut("Z")}). The keyboard takes it back at once.` : `Undo the last edit in the draft (${shortcut("Z")}). The keyboard is not touched until you save.`)}">↺</button>
             <button class="btn tiny ghost icon" data-act="redo" aria-label="Redo" aria-keyshortcuts="${ariaShortcut("Z", {shift: true})}" ${draft?.canRedo ? "" : "disabled"}
                 data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (${shortcut("Z", {shift: true})})` : `Redo the edit you just undid (${shortcut("Z", {shift: true})}).`)}">↻</button>
         </div>` : ""}
@@ -135,30 +136,29 @@ function spinner() {
     return `<span class="spin" aria-hidden="true" style="animation-delay:-${Math.round(time % 800)}ms"></span>`;
 }
 
+// The bar commitBarState names, drawn with what it does.
 export function commitBar() {
     const model = getModel();
+    const bar = commitBarState(model, state);
     const draft = model?.draft;
-    const apply = model?.apply;
-    if (!draft) return null;
+    if (!bar || !model || !draft) return null;
 
-    if (draft.busy && apply?.state === "applying") {
-        const index = apply.steps.findIndex((step) => step.state === "active");
+    if (bar.kind === "applying") {
         return el(`<div class="commit applying ap">
             <div class="ap-head"><strong>Saving to the keyboard</strong>
-                <span class="muted">step ${index + 1} of ${apply.steps.length}</span></div>
-            ${applySteps(apply)}
+                <span class="muted">step ${esc(bar.step)} of ${bar.apply.steps.length}</span></div>
+            ${applySteps(bar.apply)}
             <div class="note">The keyboard keeps running its saved profile until both halves confirm.</div></div>`);
     }
-    if (draft.busy && apply?.state === "done") {
+    if (bar.kind === "readback") {
         return el(`<div class="commit applying readback" role="status" aria-live="polite">
             ${spinner()}<strong>Saved — reading back the keyboard</strong>
             <span class="readback-detail">${esc(postApplyReadText(model, model.postApplyRead))}</span>
             <span class="readback-note">Editing resumes when this read finishes.</span></div>`);
     }
-    // A failed Apply stays on screen until it is dismissed, so where it
-    // stopped and why can be read after the fact. What was saved is core's
-    // verdict, in the words the notice starts with too.
-    if (!draft.busy && apply?.state === "failed" && state.applyDismissed !== apply.id) {
+    // What was saved is core's verdict, in the words the notice starts with too.
+    if (bar.kind === "failed") {
+        const apply = bar.apply;
         const node = el(`<div class="commit ap failed">
             <div class="ap-head"><i class="dot err"></i><strong>Save stopped at: ${esc(apply.failure?.label)}</strong></div>
             <p class="ap-reason">${esc(apply.failure?.reason)}</p>
@@ -174,10 +174,9 @@ export function commitBar() {
         return node;
     }
 
-    // Ark's own live edit or Revert, held by the keyboard until no key is
-    // held: what to let go of, and Cancel edit for an edit.
-    if (draft.busy && model?.liveWait) {
-        const wait = model.liveWait;
+    // What to let go of, and Cancel edit for an edit.
+    if (bar.kind === "held") {
+        const wait = bar.wait;
         const node = el(`<div class="commit applying held" role="status" aria-live="polite">
             <span class="n">${spinner()} <strong>${esc(wait.title)}</strong>
             <span class="muted">${esc(wait.detail)}</span></span>
@@ -186,24 +185,23 @@ export function commitBar() {
         /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="cancel-edit"]'))?.addEventListener("click", () => post(controls.abortLiveEdit()));
         return node;
     }
-    if (draft.busy) {
-        const busy = busyText(model?.device?.health?.phase, model);
+    if (bar.kind === "busy") {
         return el(`<div class="commit applying">
             <span class="n">${spinner()} <strong>Working with the keyboard</strong>
-            <span class="muted">${esc(busy.detail)}</span></span>
-            ${busy.writes ? `<span class="sep"></span>
+            <span class="muted">${esc(bar.busy.detail)}</span></span>
+            ${bar.busy.writes ? `<span class="sep"></span>
             <span class="note">the keyboard keeps running its saved profile until both halves confirm</span>` : ""}</div>`);
     }
-    if (!draft.matching) {
+    if (bar.kind === "otherKeyboard") {
         const node = el(`<div class="commit draft">
             <span class="n"><i class="dot draft"></i> <strong>Draft belongs to another keyboard</strong>
-            <span class="muted">${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} kept locally. Select that keyboard to continue${model?.device?.connected ? ", or discard the draft here" : ""}.</span></span>
+            <span class="muted">${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} kept locally. Select that keyboard to continue${model.device?.connected ? ", or discard the draft here" : ""}.</span></span>
             <span class="sep"></span>
-            ${model?.device?.connected ? '<button class="btn ghost" data-act="discard">Discard draft</button>' : ""}</div>`);
+            ${model.device?.connected ? '<button class="btn ghost" data-act="discard">Discard draft</button>' : ""}</div>`);
         /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="discard"]'))?.addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }
-    if (draft.stale && draft.live) {
+    if (bar.kind === "reread") {
         const node = el(`<div class="commit draft">
             <span class="n"><i class="dot draft"></i> <strong>${draft.connectionChanged ? "Keyboard connection changed" : "Read the keyboard again"}</strong>
             <span class="muted">the draft is what the keyboard runs, so Ark reads it again before the next edit</span></span>
@@ -212,7 +210,7 @@ export function commitBar() {
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="rebase"]')).addEventListener("click", () => post(controls.control("rebaseProfileDraft")));
         return node;
     }
-    if (draft.stale) {
+    if (bar.kind === "stale") {
         const node = el(`<div class="commit draft">
             <span class="n"><i class="dot draft"></i> <strong>${draft.connectionChanged ? "Keyboard connection changed" : "The keyboard changed"}</strong>
             <span class="muted">${draft.connectionChanged ? "Review the current keyboard before continuing" : "since this draft began"} — ${esc(changesKept(draft.changes.length))}</span></span>
@@ -223,12 +221,8 @@ export function commitBar() {
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }
-    // A keyboard that stopped saving or needs a restart, in any edit mode:
-    // Restart is the one way on.
-    const restart = restartOffer(model);
-    if (restart) return restartBar(draft, restart);
-    if (draft.live) return liveCommitBar(draft);
-    if (!draft.dirty) return null;
+    if (bar.kind === "restart") return restartBar(draft, bar.offer);
+    if (bar.kind === "saveFailed" || bar.kind === "liveEdit" || bar.kind === "livePreview") return liveCommitBar(draft, bar);
 
     // One way on: the review, where Apply lives. What the draft holds is said
     // by what happened to it, which fits where a list of areas did not. In the
@@ -240,9 +234,9 @@ export function commitBar() {
         ${statusBesideCount(draft.changes) ? `<span class="peek"><span class="note">${esc(statusBesideCount(draft.changes))}</span></span>` : ""}
         <span class="sep"></span>
         <button class="btn ghost tiny" data-act="discard"
-            data-tip="${demo ? "Put every change back to the demo setup." : "Put every change back to what the keyboard holds."} Undo (${shortcut("Z")}) brings them back.">Discard all</button>
+            data-tip="${demo ? "Put every change back to the demo profile." : "Put every change back to what the keyboard holds."} Undo (${shortcut("Z")}) brings them back.">Discard all</button>
         <button class="btn primary" data-act="review"
-            data-tip="${demo ? "See every change and what the checks find. Saving needs a keyboard; Export keeps the setup as a file." : "See every change, then write the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and save"}</button></div>`);
+            data-tip="${demo ? "See every change and what the checks find. Saving needs a keyboard; Export profile keeps it as a backup." : "See every change, then save the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and save"}</button></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="review"]')).addEventListener("click", openReview);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
     return node;
@@ -272,32 +266,32 @@ function restartBar(draft, offer) {
 // bar only says where that stands. Revert puts back what is saved (undo sends
 // the edits again). When the keyboard's own save failed, the bar says so with
 // Save again; when the halves are apart, Revert is the only way on.
-/** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft */
-function liveCommitBar(draft) {
+/** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft @param {Extract<import("../view/commit-bar.mjs").CommitBar, {kind: "saveFailed" | "liveEdit" | "livePreview"}>} bar */
+function liveCommitBar(draft, bar) {
     const live = /** @type {NonNullable<typeof draft.live>} */ (draft.live);
-    const saving = liveSaveState(draft);
-    if (saving?.kind === "failed") {
+    if (bar.kind === "saveFailed") {
+        const saving = bar.saving;
         const node = el(`<div class="commit live ${esc(saving.kind)}">
             <span class="n"><i class="dot ${esc(saving.tone)}"></i> <strong>${esc(saving.title)}</strong>
             <span class="muted">${esc(saving.detail)}</span></span>
             <span class="sep"></span>
             <button class="btn ghost tiny" data-act="revert"
-                data-tip="Put back the profile the keyboard has saved, on both halves. Nothing is written; Undo (${shortcut("Z")}) sends the edits again.">Revert</button>
+                data-tip="Put back the profile the keyboard has saved, on both halves. The saved profile stays as it is; Undo (${shortcut("Z")}) sends the edits again.">Revert</button>
             <button class="btn primary" data-act="save-again"
                 data-tip="Ask the keyboard to save these edits again, after a recovery copy of what is saved now.">Save again</button></div>`);
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="revert"]')).addEventListener("click", () => post(controls.revertDraft()));
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="save-again"]')).addEventListener("click", () => post(controls.saveDraft()));
         return node;
     }
-    if (!live.unsaved && !draft.dirty) return null;
-    if (live.mode === LIVE && !live.slaveRefused) {
+    if (bar.kind === "liveEdit") {
+        const saving = bar.saving;
         const count = draft.changes.length;
         const node = el(`<div class="commit live auto">
             <span class="n"><i class="dot draft${saving?.kind === "saving" ? " busy" : ""}"></i> <strong>${esc(saving?.title || "Not saved yet")}</strong>
             <span class="muted">${esc(saving?.detail || "")}${live.converged ? "" : " The slave half is catching up."}</span></span>
             <span class="sep"></span>
             <button class="btn ghost tiny" data-act="revert"
-                data-tip="Put back the profile the keyboard has saved. Nothing is written; Undo (${shortcut("Z")}) sends the edits again.">Revert</button>
+                data-tip="Put back the profile the keyboard has saved. The saved profile stays as it is; Undo (${shortcut("Z")}) sends the edits again.">Revert</button>
             ${count ? `<button class="btn ghost tiny" data-act="review" data-tip="See what is not saved yet, against what is saved.">${count} change${count === 1 ? "" : "s"}</button>` : ""}</div>`);
         /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="review"]'))?.addEventListener("click", openReview);
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="revert"]')).addEventListener("click", () => post(controls.revertDraft()));
@@ -313,7 +307,7 @@ function liveCommitBar(draft) {
         <span class="sep"></span>
         <button class="btn ${count && !live.slaveRefused ? "ghost tiny" : "primary"}" data-act="revert"
             data-tip="${live.slaveRefused ? `The slave half refused these edits, so they cannot be saved. Revert puts both halves back on the saved profile; Undo (${shortcut("Z")}) sends the edits again.`
-                : `Put back the profile the keyboard has saved. Nothing is written; Undo (${shortcut("Z")}) sends the edits again.`}">Revert</button>
+                : `Put back the profile the keyboard has saved. The saved profile stays as it is; Undo (${shortcut("Z")}) sends the edits again.`}">Revert</button>
         ${count && !live.slaveRefused ? `<button class="btn primary" data-act="review"
             data-tip="See every unsaved change against what is saved, then save them on both halves.">Review and save</button>` : ""}</div>`);
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="review"]'))?.addEventListener("click", openReview);

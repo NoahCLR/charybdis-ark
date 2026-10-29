@@ -9,7 +9,8 @@
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
-const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, encodeSettings} = require("../schema/settings-domain-v1");
+const {validName} = require("../schema/profile-name");
 
 /** @param {string} message @param {string} [code] */
 const fail = (message, code = "KEYBOARD_NAME_EDIT_CONFLICT") => Object.assign(new Error(message), {code});

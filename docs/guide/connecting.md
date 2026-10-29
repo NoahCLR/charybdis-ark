@@ -1,8 +1,9 @@
 # Connecting
 
 Ark talks to your Charybdis over USB. It needs the left and right halves from
-the [latest firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest),
-flashed to both halves. It works with the current firmware only.
+the [latest firmware
+release](https://github.com/NoahCLR/charybdis-4x6/releases/latest), flashed to
+both halves. It works with the current firmware only.
 
 ## Where Ark runs
 
@@ -15,8 +16,13 @@ phone it shows a short notice instead: a phone can't reach the keyboard.
 ## Reading the keyboard
 
 With no keyboard, Ark shows **Connect your keyboard**. Choose **Choose
-keyboard** and pick your Charybdis in Chrome's list. After that the page
+keyboard…** and pick your Charybdis in Chrome's list. After that the page
 connects to it by itself whenever it opens.
+
+If something goes wrong, the message beside the rail starts with **Failed:**
+and says what happened and what to do. A problem in Ark itself says only
+that, and to reload the page if it keeps happening. If the page shows **Ark
+did not finish loading**, reload it.
 
 Ark then reads the whole profile the keyboard runs: keys, layers, behaviours,
 combos, macros, pointing modes, lighting and settings. The screen says what it
@@ -44,15 +50,15 @@ The column on the left is the rail. From the top:
 - The keyboard button: the keyboard's name, its edit mode under it, and a
   dot that says how it is:
   - green: connected, both halves together
-  - orange: the slave half isn't found, or the halves disagree
+  - orange: the slave half isn't found, or the halves differ
   - red: no keyboard, or the keyboard needs a restart
   - grey: not read yet, or reconnecting
   - a hollow ring: the demo
 
   The dot pulses while Ark is reading or busy. Hover it for what it means and
   what to do: it also says when the keyboard is finishing a save, when a DPI
-  or lighting key change is still reaching both halves, and in Live edit when the
-  keyboard has saved by itself.
+  or lighting key change is still reaching both halves, and in Live edit when
+  the keyboard has saved by itself.
 
   Click the button, or press Enter or ↓ on it, for its menu. The arrow keys
   move in it and Esc closes it.
@@ -65,7 +71,7 @@ The column on the left is the rail. From the top:
     choose it again.
 
   While the keyboard is busy the button waits. With no keyboard, or in the
-  demo, its menu offers only Choose keyboard.
+  demo, its menu offers only **Choose keyboard…**.
 - The screens: **Keymap**, **Lighting**, **Macros**, **Custom keys** and
   **Pointing modes** under Configure; **Behaviours**, **Combos**, **Pointer**
   and **Host** under Settings, each showing all its settings at once;
@@ -86,23 +92,27 @@ in another tab, and takes over when that one closes. If closing or reloading
 the tab would lose something (edits not saved, or a save still
 running), the browser asks first.
 
+Use one Ark page at a time: a tab can only see the other tabs at the same
+address in the same browser and Chrome profile, so Ark open anywhere else
+would reach the same keyboard, and the two would get in each other's way.
+
 ## The demo
 
-No keyboard to hand? **Explore a demo** opens Ark on a complete setup with
-nothing connected: 16 layers, 32 pointing modes, 128 macros and 128 custom
-keys. Every screen works, and every edit shows up in Review. Only saving needs
-a keyboard.
+No keyboard to hand? **Explore a demo** opens Ark on a complete example
+profile with nothing connected: 16 layers, 32 pointing modes, 128 macros and
+128 custom keys. Every screen works, and every edit shows up in Review. Only
+saving needs a keyboard.
 
 A strip across the top says **Demo · no keyboard**. It has two buttons:
 
-- **Open a profile file…** puts one of your backups in place of the demo
-  setup.
+- **Open a backup…** puts one of your backups in place of the demo
+  profile.
 - **Leave demo** goes back to connecting a keyboard.
 
 Nothing in the demo reaches a keyboard and nothing is kept. To take what you
 made to your keyboard, export it from Review or the Backups screen, then
 import it there. If you leave with edits you haven't exported, Ark asks first
-and offers **Export…**.
+and offers **Export profile…**.
 
 The demo is offered only when no keyboard is connected.
 
@@ -129,27 +139,33 @@ Ark leaves the product out rather than repeat the title. The halves are the
 same saved settings.
 
 **Memory** shows how full the profile is. Behaviours, combos, lighting,
-pointing modes, custom keys, settings and names share one space. **In use** counts what you have set up against what the keyboard
-holds: behaviours, tap counts, combos, LED groups, LED overrides, macros,
-custom keys and pointing modes. Macro steps live in the same space, within a limit
-of their own, shown as **Macro memory**. The bar turns orange from 90%, when the next edit
-may not fit. While your draft has changes, the figures are the draft's.
+pointing modes, custom keys, settings and names share one space. **In use**
+counts what you have set up against what the keyboard holds: behaviours, tap
+counts, combos, LED groups, LED overrides, macros, custom keys and pointing
+modes. Macro steps live in the same space, within a limit of their own, shown
+as **Macro memory**. The bar turns orange from 90%, when the next edit may not
+fit. While your draft has changes, the figures are the draft's. An edit that
+would go past one of these counts, or past the shared space, is refused in the
+draft before the keyboard sees it, saying which is full and what to remove.
 
 **Built into this firmware** lists what only a new firmware build can change:
 how many layers, tap counts, macros, pointing modes and combos there are, the
 repeat ceiling and the DPI steps.
 
 **Diagnostics** holds the details of the last read and **Read keyboard**,
-which reads it again. It also shows each half's **flash pauses**: how long
-the master half and the slave half each stopped to work on their flash since
-they started. That is the longest erase of a sector, the longest write of a
-page, the most flash time in one scan, how long the last save took and how
-much of it was flash, and how many saves there have been. Hover over a figure
-for its exact microseconds. Ark reads them when you open Diagnostics, when a
-keyboard connects while it is open, and again with its **Read keyboard**; the
-slave half's arrive through the master half, so they show a moment after the
-master half's. A half with nothing to report yet says **not measured yet**.
-The demo shows sample figures.
+which reads it again. Under them are the last few things Ark noted while
+talking to the keyboard: connecting, a disconnect, an answer it set aside, and
+a failure's own error with its code, which the message beside the rail leaves
+out. It also shows each half's **flash pauses**: how long the master half and
+the slave half each stopped to work on their flash since they started. That is
+the longest erase of a sector, the longest write of a page, the most flash
+time in one scan, how long the last save took and how much of it was flash,
+and how many saves there have been. Hover over a figure for its exact
+microseconds. Ark reads them when you open Diagnostics, when a keyboard
+connects while it is open, and again with its **Read keyboard**; the slave
+half's arrive through the master half, so they show a moment after the master
+half's. A half with nothing to report yet says **not measured yet**. The demo
+shows sample figures.
 
 ## Light and dark
 

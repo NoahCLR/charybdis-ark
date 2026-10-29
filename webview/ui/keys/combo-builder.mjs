@@ -11,13 +11,13 @@ import {scrollContentTo} from "../../lib/scroll.mjs";
 import {actionLabel, canonicalKeycode, visibleKeycode} from "../../view/keyface.mjs";
 import {customKeyOf, customKeySendsNote, customKeyShortcutOnly, hasShortcut, shortcutPickLabel} from "../../view/custom-key.mjs";
 import {comboInputShown} from "../../view/combo-reach.mjs";
-import {closeComboBuilder, getModel, heldLayers, layerName, layers, post, render, state} from "../../store.mjs";
+import {closeComboBuilder, getModel, heldLayers, layers, post, render, state} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
 import {keyNameMarked} from "../marks.mjs";
-import {sentence, vocabulary} from "../../view/vocabulary.mjs";
+import {sentence, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {comboFull, comboMissing} from "../../view/combo-form.mjs";
 
 // A builder input by the name the core gave its key, as the combo table and
@@ -72,14 +72,14 @@ export function comboBuilder(canEdit, holdTerm) {
             <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window</span>
                 <div class="input-row"><span class="affix unit"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-window inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
-                    data-tip="Follow the default combo window (Settings · Combos) again, so this combo changes with it.">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
+                    data-tip="${esc(`Follow the default combo window (${vocabulary(model).settingsScreens.combos}) again, so this combo changes with it.`)}">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="field">
                 <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                     <span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions.useOutputBehavior))}</span></label>
-                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output, made))} Settings · Behaviours · Enabled and Settings · Combos · Combo outputs use behaviours must also be on.</p>
+                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output, made))} ${esc(`Enabled in ${vocabulary(model).settingsScreens.behaviours} and Combo outputs use behaviours in ${vocabulary(model).settingsScreens.combos} must also be on.`)}</p>
             </div>
             <div class="row combo-flags">
-                ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],
+                ${[["mustHold", `Fires only once its keys are held past the combo hold threshold (${vocabulary(model).settingsScreens.combos}). Released sooner, the keys type themselves.`],
                    ["mustTap", "Fires only if its keys are released before the combo hold threshold. Held longer, the keys type themselves."],
                    ["ordered", "Fires only if its keys are pressed in the order listed above."]].map(([flag, tip]) =>
                     `<label class="sw" data-tip="${esc(tip)}"><input type="checkbox" data-f="combo:${esc(state.combo.editId ?? 'new')}:${esc(flag)}" data-${esc(flag.toLowerCase())} ${form[/** @type {"mustHold" | "mustTap" | "ordered"} */ (flag)] ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions[flag]))}</span></label>`).join("")}
@@ -92,7 +92,7 @@ export function comboBuilder(canEdit, holdTerm) {
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
         </div></div>`);
 
-    /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), form, canEdit,
+    /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerCalled(layer)})), form, canEdit,
         (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => Object.assign(form, permissions), `combo:${state.combo.editId ?? "new"}:definition`, "combo"), /** @type {HTMLElement} */ (node.querySelector(".card-b")).firstChild);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () => {
         state.combo.inputs = state.combo.inputs.filter((input) => input !== button.dataset.remove);

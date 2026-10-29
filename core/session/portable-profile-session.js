@@ -9,10 +9,12 @@ const {ApplyProgress, failureReason} = require("./apply-progress");
 const {interruption} = require("./interruption");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {readEditProgress} = require("../protocol/profile-edit-v1");
-const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
-const {requireReady: checkFirmwareReady, supportsCompleteProfile, canSnapshot, canReadIdentity, identityStateFlags} = require("./firmware-support");
+const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary} = require("../model/portable-profile");
+const {requireReady: checkFirmwareReady, canSnapshot, canReadIdentity, identityStateFlags} = require("./firmware-support");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
+const {answered} = require("../schema/bytes");
+const {arkCode} = require("../model/vocabulary");
 /**
  * @typedef {import("../transport/types.js").RequestConnection} Connection
  * @typedef {import("../protocol/types.js").RequestIds} Ids
@@ -61,7 +63,7 @@ async function snapshotProfile(connection, ids, capabilities, onProgress = () =>
     requireReady(capabilities);
     if (payloadReader.connection !== connection) throw fail("PROFILE_CHANGED", "The profile reader belongs to another connection. Read the keyboard again.");
     const options = {nextRequestId: () => ids.next()};
-    onProgress("Reading the complete keyboard configuration");
+    onProgress("Reading the keyboard's complete profile");
     await requireSlave(connection, options);
     const before = await readProfileStatus(connection, options);
     if (!canSnapshot(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
@@ -70,7 +72,7 @@ async function snapshotProfile(connection, ids, capabilities, onProgress = () =>
     const defaults = await payloadReader.readCompiled({...options, onProgress: counted("Reading compiled defaults")});
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await payloadReader.readCommitted({...options, reuse: reuseReadback, onProgress: counted("Reading saved behaviours and lighting")}) : defaults;
     if (!payloadMatchesActive(active, before)
-        || fnv1a32(defaults.bytes) !== before.compiledDefaultDigest) throw fail("PROFILE_CHANGED", "The keyboard's payload did not match its active identity. Read it again before continuing.");
+        || fnv1a32(defaults.bytes) !== before.compiledDefaultDigest) throw fail("PROFILE_CHANGED", "The keyboard's profile changed while Ark read it. Read it again before continuing.");
     onProgress("Reading combos and global settings");
     const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
     onProgress("Checking the complete read");
@@ -79,7 +81,9 @@ async function snapshotProfile(connection, ids, capabilities, onProgress = () =>
     const after = await readProfileStatus(connection, options);
     if (statusKey(before) !== statusKey(after)) throw fail("PROFILE_CHANGED", "The keyboard changed during the backup. Read it again before continuing.");
     const document = createSnapshot({profile, actionAbiDigest: capabilities.actionAbiDigest});
-    validateSnapshot(document, capabilities);
+    // Made of what the keyboard sent: a check it fails is its answer not
+    // reading, never a backup's (bytes.js answered).
+    answered(() => validateSnapshot(document, capabilities));
     return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, settings), storage: heldStorage(active.bytes)};
 }
 /** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>}} [options] */
@@ -143,7 +147,7 @@ const SLAVE_BUSY_DETAIL = Object.freeze({
 /** @param {import("./types.js").CandidateSlave | null | undefined} slave @returns {{detail: string, completed?: number, total?: number}} */
 function slaveReport(slave) {
     if (!slave) return {detail: "Waiting for the slave half"};
-    if (slave.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
+    if (slave.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointing modes to finish saving"};
     const busy = slave.busyStreak >= 3 ? ` · ${SLAVE_BUSY_DETAIL[slave.busyReason] || "the slave half is busy"}` : "";
     const report = {detail: `${SLAVE_DETAIL[slave.phaseName] || "Waiting for the slave half"}${busy}`};
     if (slave.phaseName === "SENDING" || slave.phaseName === "BEGINNING") Object.assign(report, {completed: slave.transferOffset, total: slave.transferLength});
@@ -157,7 +161,8 @@ function coordinatorReport(progress, applyProgress) {
         detail: progress.adjustmentPending ? "Waiting for a DPI or lighting key change to reach both halves" : ""});
     else if (["validate", "validating", "complete"].includes(progress.phase) && !progress.operation) applyProgress.report("validate");
     else if (state === CANDIDATE_STATE.PREPARING_PEER) applyProgress.report("slave", slaveReport(progress.slave));
-    else if (state === CANDIDATE_STATE.COMMITTING) applyProgress.report("commit", {detail: "Writing the profile"});
+    // The commit step's own words say what it does (SAVE_STEP_WORDS).
+    else if (state === CANDIDATE_STATE.COMMITTING) applyProgress.report("commit");
     else if (state === CANDIDATE_STATE.CONVERGING_PEER) applyProgress.report("converge");
     else if (state === CANDIDATE_STATE.ACTIVATING) applyProgress.report("verify", {detail: "Switching to the new profile"});
 }
@@ -192,7 +197,7 @@ function withFailure(error, applyProgress, connection) {
     if (!cutShort) return Object.assign(error, fields);
     const connected = !lost && /** @type {{connected?: boolean}} */ (connection).connected !== false;
     const sentences = [failure.verdict, failure.reason, connected && error.keepConnected ? "Keep both halves connected." : "", ...(error.advice || [])];
-    return Object.assign(fail(error.code || "RESTORE_NOT_SAVED", sentences.filter(Boolean).join(" ")),
+    return Object.assign(fail(arkCode(error, "RESTORE_NOT_SAVED"), sentences.filter(Boolean).join(" ")),
         {cause: error.outcome ? error.cause : error, deviceError: error.deviceError}, fields, {verdict: failure.verdict});
 }
 // What the slave half last said, from the coordinator's error in the cause.
@@ -207,13 +212,13 @@ function slaveOf(error) {
 // it matters only if the keyboard still shows the old profile once read.
 /** @param {boolean | undefined} incomplete @param {string} recovery @param {boolean} ifOld */
 function recoveryAdvice(incomplete, recovery, ifOld) {
-    if (incomplete) return [ifOld ? "If it still shows the old profile then, restore your original complete backup again." : "Restore your original complete backup again.",
+    if (incomplete) return [ifOld ? "If it still shows the old profile then, import your original complete backup again." : "Import your original complete backup again.",
         `Interrupted data was saved for diagnosis at ${recovery}.`];
     return [ifOld ? `If it still shows the old profile then, use the copy kept before the save (${recovery}) on Backups.` : `The copy kept before the save is on Backups (${recovery}).`];
 }
 
 /** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {unknown} input @param {import("./types.js").RestoreOptions} [options] */
-async function restoreProfile(connection, ids, capabilities, input, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, sleep} = {}) {
+async function restoreProfile(connection, ids, capabilities, input, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, sleep, now = Date.now} = {}) {
     const applyProgress = new ApplyProgress(view => {
         onApplyProgress(view);
         onProgress(progressText(view));
@@ -229,7 +234,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
     }
 
     async function restoreSteps() {
-        const startedAt = Date.now();
+        const startedAt = now();
         requireReady(capabilities);
         requireReady(capabilities, true);
         const target = validateSnapshot(input, capabilities);
@@ -256,8 +261,8 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         const beforeIdentity = before.identity;
         if (!beforeIdentity) throw fail("PROFILE_IDENTITY_UNAVAILABLE", "The keyboard read did not include a stable save identity.");
         const candidate = await readCandidateStatus(connection, options);
-        if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Read the keyboard again and wait for it to finish before saving.");
-        const coordinator = new CandidateUploadCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, sleep,
+        if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished save. Read the keyboard again and wait for it to finish before saving.");
+        const coordinator = new CandidateUploadCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, sleep, now,
             readEditProgress: () => readEditProgress(connection, options),
             readSlaveStatus: readCandidateSlaveStatus,
             onProgress: progress => coordinatorReport(progress, applyProgress)});
@@ -289,7 +294,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             applyProgress.finish();
             // Both halves were just proved to hold the whole target bank.
             return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, encodeSettings(target.settings)), storage: heldStorage(target.candidate), recovery, slaveUnseen,
-                performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", profileBytes: target.candidate.length}};
+                performance: {elapsedMs: now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", profileBytes: target.candidate.length}};
         } catch (error) {
             let cancelled = false;
             if (prepared && !decisionObserved) {
@@ -301,7 +306,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             }
             // The upload cut short: nothing is saved before the commit.
             // It keeps the code it failed with: the draft needs no read.
-            if (!mutated) throw Object.assign(fail(/** @type {Failure} */ (error).code || "RESTORE_NOT_SAVED", "Nothing was saved."), {cause: error, outcome: "none"});
+            if (!mutated) throw Object.assign(fail(arkCode(error, "RESTORE_NOT_SAVED"), "Nothing was saved."), {cause: error, outcome: "none"});
             const restart = await slaveRestartGuidance(connection, options);
             // Before the commit was sent, or once the keyboard confirmed the
             // cancel, the profile it had is still the one it runs.
@@ -325,4 +330,4 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         }
     }
 }
-module.exports = {requireReady, supportsCompleteProfile, snapshotProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, slaveReport};
+module.exports = {snapshotProfile, restoreProfile, slaveReport, coordinatorReport};

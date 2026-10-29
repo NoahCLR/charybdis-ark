@@ -25,14 +25,15 @@ const {fingerprint, summary, reorderLayers} = require("../model/portable-profile
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
 const {canEdit, firmwareView} = require("./firmware-support");
-const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
+const {ProfileDraftSession} = require("./profile-draft-session");
+const {DRAFT_EDITS} = require("../model/draft-edits");
 const {buildDeviceModel, buildSnapshotModel, deviceLabels} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
 const {LOST_WORDS, RECONNECT_WORDS, RESTART_WORDS} = require("./keyboard-reconnect");
-const {BUSY_REFUSAL} = require("./profile-device-service");
+const {BUSY_REFUSAL} = require("./operation-failure");
 // Retained exports for shells that inspect the routes; never hand-maintained.
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
@@ -53,10 +54,11 @@ const WORK_ROUTES = new Set(["draft", "portable", "demo", "read"]);
 //   recoveries       [{id, name, savedAt}]: the recovery copies Backups lists
 //   build            {version, commit} the page was built from
 //   progress         what the page is doing, where it has no indicator of its own
+// A control they name is named as its button reads, "Choose keyboard…".
 const SHELL_WORDS = Object.freeze({
-    noKeyboard: "No keyboard is connected. Choose keyboard to connect one.",
-    connectHint: "Plug in your Charybdis, then pick it in Chrome's list with Choose keyboard.",
-    noneFound: "Chrome has no Charybdis this page may open yet. Choose keyboard and pick yours.",
+    noKeyboard: "No keyboard is connected. Use Choose keyboard… to connect one.",
+    connectHint: "Plug in your Charybdis, then use Choose keyboard… and pick it in Chrome's list.",
+    noneFound: "Chrome has no Charybdis this page may open yet. Use Choose keyboard… and pick yours.",
 });
 /** @param {import("./types.js").PanelShell | null | undefined} shell @returns {import("../../contracts/model.js").ShellPanel} */
 function shellModel(shell) {
@@ -318,7 +320,7 @@ function routeMessage(session, message, state) {
         // current) the app is read-only; an edit that reaches here is refused,
         // never written.
         if (!session.draft) {
-            throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to current firmware.");
+            throw new Error("This keyboard has no editable draft, so the change was not kept. Read the keyboard again; if it stays read-only, update both halves to current firmware.");
         }
         const draft = boundDraft(session, state, message, "Reconnect the keyboard this draft belongs to and wait for its current operation.");
         // Live preview + save sends the edit to the keyboard (live-edits.js);
@@ -351,7 +353,7 @@ function routeMessage(session, message, state) {
             throw new Error(BUSY_REFUSAL);
         }
         if (control.action === "select" && (!state.devices?.some((device) => device.id === deviceId) || !deviceId)) {
-            throw new Error("Choose a keyboard from the current device list.");
+            throw new Error("Choose a keyboard from the keyboard menu.");
         }
         if (control.action === "select" && deviceId !== state.selectedDeviceId) closeEditors(session, {resetForms: true});
         beginRead(session);
@@ -452,4 +454,4 @@ function portableLayersView(edit) {
         titles: edit.names.map((/** @type {string} */ _, /** @type {number} */ index) => layerName(edit.names, index)), keysFollow: edit.keysFollow !== false} : null;
 }
 
-module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, portableLayersView, shellModel, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, portableLayersView, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};

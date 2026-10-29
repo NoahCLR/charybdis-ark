@@ -13,7 +13,7 @@ export interface BranchCell {branch: number; tier: Tier}
 export interface ReachedBehavior {keycode: string; action: string; layer: Layer | null; whileHeld: boolean; cells: BranchCell[]}
 export interface ReachedCombo extends ComboRoute {via: string | null; action: string; cells: BranchCell[]}
 // For a pointing reach only: `starts`, the layers that start the mode by turning on (its link); `startVia`, by
-// keycode, the layers through which the entry's routes start it (view/reach.mjs startedRoutes).
+// keycode, the layers through which the entry's routes start it (view/pointing-reach.mjs startedRoutes).
 export interface ReachEntry {name: string; keys: ResolvedKey[]; behaviours: ReachedBehavior[]; combos: ReachedCombo[]; starts?: Layer[]; startVia?: Record<string, number>}
 export interface ReachGroup {onKeys: ReachEntry[]; fromBranches: ReachEntry[]; fromCombos: ReachEntry[]; throughKeys: ReachEntry[]; fromBranchesBelow: ReachEntry[]; fromCombosBelow: ReachEntry[]; elsewhere: string[]}
 export interface SortableReach {layer?: Layer | null; keys?: ResolvedKey[]; behaviours?: ReachedBehavior[]; combos?: ComboRoute[]}

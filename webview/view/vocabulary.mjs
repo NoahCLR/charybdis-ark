@@ -7,14 +7,14 @@
 // table does not know reads as itself rather than disappearing.
 
 /** @typedef {import("../../contracts/model.js").Vocabulary} Vocabulary */
-/** @typedef {{vocabulary?: Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
+/** @typedef {{vocabulary?: Vocabulary, pdModes?: {id: number, displayName: string, name?: string}[]}} VocabularyModel */
 
 /** @type {Vocabulary} */
-const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), readSteps: /** @type {Vocabulary["readSteps"]} */ ({}), editModes: /** @type {Vocabulary["editModes"]} */ ({}), halves: /** @type {Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], macroSteps: [], macroProblems: {}, hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {tappingTerm: "", tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholds: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdNames: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdTips: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: /** @type {Vocabulary["tiers"]} */ ({}), branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
-    colourOff: {}, feedbackOwners: [], ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []},
-    keyCapLayerVerbs: {}, checkLevels: /** @type {Vocabulary["checkLevels"]} */ ({}), checkStatuses: /** @type {Vocabulary["checkStatuses"]} */ ({}), recoveryCauses: /** @type {Vocabulary["recoveryCauses"]} */ ({}), settingsSections: {}, fileSections: {}, usageCounts: /** @type {Vocabulary["usageCounts"]} */ ({}), participationReasons: /** @type {Vocabulary["participationReasons"]} */ ({}), participationPlaces: {key: "", layer: "", keyOn: ""}, settingsScreens: {behaviours: "", combos: "", pointer: "", host: ""},
+const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), readSteps: /** @type {Vocabulary["readSteps"]} */ ({}), editModes: /** @type {Vocabulary["editModes"]} */ ({}), halves: /** @type {Vocabulary["halves"]} */ ({}), hostOs: [], physicalHalves: [], macroProtection: [], macroUninterruptible: {label: "", automatic: {on: "", off: ""}}, macroSteps: [], macroStepTiles: {text: "", key: "", chord: "", delay: "", press: "", release: ""}, macroProblems: {}, hostLayouts: [], unicodeEntry: [], unicodeEntryOff: [], tapSends: "", holdFromPress: "", timingSources: {tappingTerm: "", tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholds: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdNames: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, thresholdTips: {tapHoldTerm: "", longHoldTerm: "", multiTapTerm: ""}, holdStyles: {hold: [], long: []}, holdWithoutLongHold: [], tiers: /** @type {Vocabulary["tiers"]} */ ({}), branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+    colourOff: {}, feedbackOwners: [], feedbackTiers: {}, ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []},
+    keyCapLayerVerbs: {}, layerKeyVerbs: {}, checkLevels: /** @type {Vocabulary["checkLevels"]} */ ({}), checkStatuses: /** @type {Vocabulary["checkStatuses"]} */ ({}), recoveryCauses: /** @type {Vocabulary["recoveryCauses"]} */ ({}), settingsSections: {}, fileSections: {}, usageCounts: /** @type {Vocabulary["usageCounts"]} */ ({}), participationReasons: /** @type {Vocabulary["participationReasons"]} */ ({}), participationPlaces: {key: "", layer: "", keyOn: ""}, settingsScreens: {behaviours: "", combos: "", pointer: "", host: ""},
     pointing: {kinds: [], directions: [], diagonals: [], axes: [], invert: [], pointerLayer: [], linkLabels: {starts: "", keyTurnsOn: "", startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
-        emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
+        emptyDirection: [], directionOutput: [], directionStep: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
 /** @param {VocabularyModel | null | undefined} model */
 export const vocabulary = (model) => model?.vocabulary || NONE;
@@ -31,9 +31,30 @@ export const branchName = (model, count) => vocabulary(model).branches[count - 1
 export const stageOrder = (model) => vocabulary(model).stages;
 
 // A pointing slot's name as the core gives it: its own, or core's words for
-// one that holds nothing ("Slot 6").
+// one that holds nothing ("Slot 6"), which core publishes on every slot as
+// its displayName. A slot published without one reads by the name it
+// stores, the one place a name is made up for it here.
+/** @param {{displayName?: string, name?: string} | null | undefined} slot */
+export const slotNamed = (slot) => slot?.displayName || slot?.name || "";
+// The same for the slot with this id.
 /** @param {VocabularyModel | null | undefined} model @param {number} id */
-export const slotCalled = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.displayName || "";
+export const slotCalled = (model, id) => slotNamed((model?.pdModes || []).find((slot) => slot.id === id));
+
+// A macro slot's name as the core gives it: its own, or core's words for one
+// with none ("Macro 3"), which core publishes on every slot as its
+// defaultName. A slot the keyboard did not report reads by its keycode.
+/** @param {{name?: string, defaultName?: string, keycode?: string} | null | undefined} slot @param {string} [keycode] */
+export const macroNamed = (slot, keycode = "") => slot?.name || slot?.defaultName || slot?.keycode || keycode;
+
+// A layer's name as the core gives it: its own, or core's words for one with
+// none ("Base", "Layer 3"), which core publishes on every layer as its
+// displayName. A layer published without one reads by the name it stores,
+// the one place a name is made up for it here.
+/** @param {{displayName?: string, name?: string} | null | undefined} layer */
+export const layerCalled = (layer) => layer?.displayName || layer?.name || "";
+// The same for the layer with this index.
+/** @param {{layers?: readonly {index: number, displayName?: string, name?: string}[]} | null | undefined} model @param {number} index */
+export const layerCalledAt = (model, index) => layerCalled((model?.layers || []).find((layer) => layer.index === index));
 
 // How a tier runs, in the editor's words: a tap tier only sends, and a hold
 // style names its own tier's threshold.
@@ -66,6 +87,10 @@ export const halvesWords = (model, halves) => (halves && model?.vocabulary?.halv
 /** @param {VocabularyModel | null | undefined} model @param {number} mode @returns {{id: string, label: string, hint: string, detail: string}} */
 export const editModeWords = (model, mode) => /** @type {Readonly<Partial<Record<number, Vocabulary["editModes"][import("../../contracts/model.js").EditMode]>>>} */ (vocabulary(model).editModes)?.[mode]
     || {id: String(mode), label: `Mode ${mode}`, hint: "", detail: ""};
+
+// Names in a run of prose: "A", "A and B", "A, B and C".
+/** @param {readonly string[]} names */
+export const listed = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 
 // Words written mid-sentence, starting one: the first letter capitalised.
 /** @param {string} text */
