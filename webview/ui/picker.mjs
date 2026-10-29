@@ -245,7 +245,7 @@ export function pickerOverlay() {
                 : picker.mods.length ? modifierControls(model).filter(({value: wrap}) => picker.mods.includes(wrap)).map(({value: wrap, label}) =>
                     `<button class="chip" data-unmod="${esc(wrap)}">${esc(label)} ✕</button>`).join("")
                 : picker.layers ? "" : `<span class="note">nothing picked yet</span>`}
-            ${picker.shortcut ? layers().filter((layer) => (picker.layers || 0) & 2 ** layer.index).sort((a, b) => a.index - b.index).map((layer) =>
+            ${picker.shortcut ? layers().filter((layer) => (picker.layers || 0) & 2 ** layer.index).map((layer) =>
                 `<button class="chip" data-unlayer="${esc(layer.index)}">${esc(layerCalled(layer))} ✕</button>`).join("") : ""}
             <code class="mono pk-value">${esc(storable || "—")}</code>
             <span class="right"><button class="btn ghost" data-act="clear">Clear</button>

@@ -90,8 +90,9 @@ test("a transparent key in a layer preview opens the key answered from below", (
 
 // A view counts layers by their place in the stack, as `state.layer` and the
 // layer tabs do, and reads a layer's `index` where a mask or a switch names it
-// by bit. The two are the same number on every model core publishes: a
-// keyboard's layout as read, and a draft's, the demo's or a file's snapshot.
+// by bit. The two are the same number on every model core publishes (the
+// contract's `layers`, contracts/panel.d.ts): a keyboard's layout as read,
+// and a draft's, the demo's or a file's snapshot.
 test("a layer's place in the stack is its index on every model core publishes", () => {
     const keymap = Array.from({length: LAYERS}, () => Array(60).fill(0));
     const models = {

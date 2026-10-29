@@ -138,6 +138,7 @@ export interface PublishedModel {
     vocabulary: Vocabulary & {pickerModifiers: {bit: number; value: string; label: string}[]};
     /** The LED each key carries, by layout index, and the trackball's (core/data/charybdis-layout.js). */
     leds: {keys: number[]; trackball: number};
+    /** In index order: a layer's place in the list is its `index` (tests/view/layer-view.test.mjs). */
     layers: Layer[];
     hostLayoutLegends: Record<string, string[]> | null;
     /** `pointerCovers`: the layers the slot's key turns on that the pointer layer covers while the mode keeps it, bit n layer n (core/model/pointing-links.js). */
