@@ -26,7 +26,7 @@ test("Apply progress updates do not rebuild or post the complete panel model", (
     const apply = {id: 777, state: "applying", current: "stage", steps: [], bytes: {completed: 12, total: 120}};
     loop.session.service.reportApplyProgress(apply);
     assert.deepEqual(shell.posted, [{type: "applyProgress", apply, draftId: "draft-777", draftRevision: 3}]);
-    assert.deepEqual(loop.session.service.liveApply, apply, "full snapshots retain the latest progress");
+    assert.deepEqual(loop.session.service.snapshot().liveApply, apply, "full snapshots retain the latest progress");
 });
 
 test("read progress posts only a small operation-correlated view", async t => {
@@ -65,7 +65,7 @@ test("a keyboard storing settings in another version is not read, and is told to
     assert.equal(loop.session.draft, undefined, "no draft opens");
     assert.equal(model.load.state, "unavailable");
     assert.match(notice, /Ark supports only current firmware\. Update both halves/);
-    assert.equal(loop.session.service.layout, undefined, "nothing more is read");
+    assert.equal(loop.session.service.snapshot().layout, null, "nothing more is read");
     await loop.handleMessage({type: "updateCustomKey", keycode: "CUSTOM_KEY_1", name: "Late"});
     assert.match(last(shell).notice, /no editable draft/);
     assert.deepEqual(adapter.keyboard.mutations, []);

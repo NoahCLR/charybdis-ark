@@ -84,7 +84,7 @@ test("undo back to the saved profile reverts the keyboard; redo sends the edit a
 // An edit made by hand that puts the last change back is the same Revert.
 test("an edit that puts the saved value back reverts the keyboard", async t => {
     const {keyboard, shell, loop, key} = await open(t);
-    const original = loop.session.service.layout.layers[0].keys[12].keycode;
+    const original = loop.session.service.snapshot().layout.layers[0].keys[12].keycode;
     await key(0, 12, "KC_Y");
     assert.ok(keyboard.working);
     await key(0, 12, original);

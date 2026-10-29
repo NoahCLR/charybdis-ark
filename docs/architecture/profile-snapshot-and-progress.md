@@ -24,12 +24,17 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
 - `core/session/profile-device-service.js` owns the connection: one operation
   at a time (`runOperation`, else `SERVICE_BUSY`), each failure recorded in
   `snapshot().error` as `operation-failure.js` words it, every change
-  published as `snapshot()` (`service-snapshot.js`). Its operations past
-  connecting are grouped by what they do: `read-operations.js` (the profile
-  reads, and what the service keeps of each), `live-edit-operations.js` (the
-  working copy's edit, Save, Revert, leaving Live edit, the edit mode and a
-  restart) and `background-reads.js` (the reads between operations, and when
-  missed looks lose the keyboard). Beside it: `device-listing.js` (each
+  published as `snapshot()`. What it holds of the connection is one record,
+  `connection-state.js`, cleared as one when the connection ends and
+  published as the connection's part of `snapshot()`. Each operation past
+  connecting states in the service what it needs before it starts and what
+  it resolves with (`#operate`: refused without a keyboard, run as one
+  operation, given only what it works with); its work is grouped by what it
+  does: `read-operations.js` (the profile reads, and what the service keeps
+  of each), `live-edit-operations.js` (the working copy's edit, Save,
+  Revert, leaving Live edit, the edit mode and a restart) and
+  `background-reads.js` (the reads between operations, and when missed looks
+  lose the keyboard). Beside it: `device-listing.js` (each
   keyboard's public id and number), `request-ids.js` (each connection's
   request ids), `edit-mode-reads.js` (how edits reach the keyboard),
   `profile-reads.js` (what a profile read turns into), `restore-checks.js`

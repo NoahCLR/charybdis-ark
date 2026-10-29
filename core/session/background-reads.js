@@ -5,7 +5,7 @@ const {readFlashPauses: readHalvesFlashPauses} = require("../protocol/flash-paus
 const {publicError} = require("./operation-failure");
 const {failureSentence} = require("../model/vocabulary");
 
-/** @typedef {InstanceType<typeof import("./profile-device-service.js").ProfileDeviceService>} Service */
+/** @typedef {import("./profile-device-service.js").Operation} Operation */
 
 // The look at a live keyboard between edits (live-watch.js) is a background
 // read: Chrome on macOS holds back a page's input reports while one of its
@@ -16,8 +16,9 @@ const WATCH_TIMEOUT_MS = 3000;
 const WATCH_MISSES = 3;
 
 // The reads the device service makes between operations (the live watch's
-// look, the flash pauses; profile-device-service.js): one at a time, and an
-// operation that starts meanwhile waits for the one out to end.
+// look, the flash pauses; profile-device-service.js): one at a time, never
+// while an operation holds the keyboard, and an operation that starts
+// meanwhile waits for the one out to end.
 class BackgroundReads {
     /** @type {Promise<void> | undefined} */
     #out = undefined;
@@ -43,63 +44,53 @@ function missableConnection(connection, timeoutMs) {
 
 // Between edits, what a live keyboard says about itself: whether it saved
 // by itself, whether its own keys moved the revision, how its halves are.
-// A background read, skipped (undefined) while an operation holds the
-// keyboard. An unanswered look is skipped too, and keeps the connection;
-// WATCH_MISSES of them in a row end it as a lost keyboard.
-/** @param {Service} service @param {BackgroundReads} background */
-async function readLiveStatus(service, background) {
-    const connection = quietConnection(service, background);
-    if (!connection || !service.editMode) return undefined;
-    const missable = missableConnection(connection, service.watchTimeoutMs);
-    return background.run(async () => {try {
-        const status = await readEditStatus(missable, service.liveCoordinator().options);
-        service.missedLooks = 0;
-        if (service.connection !== connection || !connection.connected) return undefined;
+// A background read (profile-device-service.js), made only while no
+// operation holds the keyboard. An unanswered look is skipped
+// (undefined), and keeps the connection; WATCH_MISSES of them in a row end
+// it as a lost keyboard. `watch` is how long each request waits, and the
+// keyboard's name for the diagnostics.
+/** @param {Operation} op @param {{timeoutMs: number, label: string}} watch */
+async function readLiveStatus(op, {timeoutMs, label}) {
+    const state = op.state, connection = op.connection;
+    try {
+        const status = await readEditStatus(missableConnection(connection, timeoutMs), op.live().options);
+        state.missedLooks = 0;
+        if (!op.current()) return undefined;
         // The mode's write to EEPROM retried (flag 12) shows beside the switch.
-        if (service.editMode && Boolean(service.editMode.notStored) !== status.modeNotStored) {service.editMode = {...service.editMode, notStored: status.modeNotStored}; service.emitChange();}
+        if (state.editMode && Boolean(state.editMode.notStored) !== status.modeNotStored) {state.editMode = {...state.editMode, notStored: status.modeNotStored}; op.publish();}
         return status;
     } catch (error) {
         // A refused read is tried again at the next look.
-        if (/** @type {{soft?: boolean}} */ (error)?.soft && service.connection === connection) {
-            service.missedLooks++;
-            service.addDiagnostic(`${service.deviceLabel(service.connectionPublicId)} missed a status look (${service.missedLooks} in a row).`);
-            if (service.missedLooks >= WATCH_MISSES) await connection.abandon(error);
+        if (/** @type {{soft?: boolean}} */ (error)?.soft && state.connection === connection) {
+            state.missedLooks++;
+            op.say(`${label} missed a status look (${state.missedLooks} in a row).`);
+            if (state.missedLooks >= WATCH_MISSES) await connection.abandon(error);
         }
         return undefined;
-    }});
+    }
 }
 
 // Each half's flash pauses (GET 0x0D) for the Keyboard screen's
 // Diagnostics, into `flashPauses`: a background read like the watch's
-// look, false when skipped because an operation holds the keyboard or
-// another background read is out. A failure is the read's own
-// `{state: "unavailable", error}`, never the keyboard's error.
-/** @param {Service} service @param {BackgroundReads} background */
-async function readFlashPauses(service, background) {
-    const connection = quietConnection(service, background), ids = service.requestIds;
-    if (!connection || !ids) return false;
-    return background.run(async () => {
-        /** @type {import("../../contracts/model.js").FlashPausesView} */
-        let read;
-        try {read = {state: "read", ...await readHalvesFlashPauses(missableConnection(connection, service.watchTimeoutMs), ids)};}
-        catch (error) {
-            // Said as the panel says any failure; its own text goes to the diagnostics.
-            const failure = publicError(error);
-            service.addDiagnostic(`Flash pauses: ${failure.code}: ${failure.message}`);
-            read = {state: "unavailable", error: failureSentence(failure)};
-        }
-        if (service.connection !== connection || !connection.connected) return false;
-        service.flashPauses = read;
-        service.emitChange();
-        return true;
-    });
-}
-
-// The connection a background read may start on: none while an operation
-// holds the keyboard or another background read is out.
-/** @param {Service} service @param {BackgroundReads} background */
-function quietConnection(service, background) {
-    return service.busy || background.out || !service.connection?.connected || !service.requestIds ? undefined : service.connection;
+// look, each request waiting `timeoutMs`. Resolves true once read; a
+// failure is the read's own `{state: "unavailable", error}`, never the
+// keyboard's error.
+/** @param {Operation} op @param {number} timeoutMs */
+async function readFlashPauses(op, timeoutMs) {
+    const connection = op.connection, ids = op.ids;
+    /** @type {import("../../contracts/model.js").FlashPausesView} */
+    let read;
+    try {read = {state: "read", ...await readHalvesFlashPauses(missableConnection(connection, timeoutMs), ids)};}
+    catch (error) {
+        // Said as the panel says any failure; its own text goes to the diagnostics.
+        const failure = publicError(error);
+        op.say(`Flash pauses: ${failure.code}: ${failure.message}`);
+        read = {state: "unavailable", error: failureSentence(failure)};
+    }
+    if (!op.current()) return false;
+    op.state.flashPauses = read;
+    op.publish();
+    return true;
 }
 
 module.exports = {WATCH_TIMEOUT_MS, WATCH_MISSES, BackgroundReads, missableConnection, readLiveStatus, readFlashPauses};

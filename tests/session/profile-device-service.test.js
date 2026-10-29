@@ -39,7 +39,7 @@ test("Apply progress has a separate notification and cannot let a closed panel s
     assert.equal(changes, 0, "copy counters never rebuild a full snapshot");
     assert.equal(progress.length, 120);
     progress.at(-1).bytes.completed = 0;
-    assert.equal(service.liveApply.bytes.completed, 120, "the panel receives a separate progress value");
+    assert.equal(service.snapshot().liveApply.bytes.completed, 120, "the panel receives a separate progress value");
     service.onApplyProgress = () => {throw Error("panel closed");};
     assert.doesNotThrow(() => service.reportApplyProgress(view));
     service.onApplyProgress = undefined;
@@ -457,7 +457,7 @@ test("successful service restore installs the saved profile and returns normally
         const result = await service.restorePortableProfile(f.targetDocument, f.options);
         assert.equal(result.fingerprint, require("../../core/model/portable-profile").fingerprint(f.targetDocument));
         assert.equal(service.portable, result);
-        assert.equal(service.liveApply.state, "done");
+        assert.equal(service.snapshot().liveApply.state, "done");
         assert.equal(service.error, undefined);
         assert.equal(f.keyboard.events[0], "backup");
         assert.ok(f.keyboard.events.includes("decision") && f.keyboard.events.includes("activated"));
