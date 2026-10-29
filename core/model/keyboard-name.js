@@ -34,9 +34,8 @@ function keyboardNameView(snapshot, builtIn = "") {
 
 // Renames the keyboard in a copy of the snapshot's document. An empty name
 // gives the keyboard back its built-in name.
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['renameKeyboard'] & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['renameKeyboard']} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editKeyboardName(snapshot, message, capabilities) {
-    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.");
     if (typeof message.name !== "string") throw fail("A keyboard name must be text.", "KEYBOARD_NAME_INVALID");
     const name = message.name.trim();
     if (!validName(name)) throw fail(`A keyboard name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "KEYBOARD_NAME_INVALID");

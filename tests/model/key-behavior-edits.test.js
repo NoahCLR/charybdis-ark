@@ -6,7 +6,7 @@ const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 const {ACTION_ABI, actionName} = require("../../core/schema/actions");
-const {editDeviceProfile} = require("../../core/model/device-profile-edits");
+const {applyDraftEdit} = require("../../core/model/draft-editor");
 const {editKeyBehaviors} = require("../../core/model/key-behavior-edits");
 
 const payload = decodeProfileBlob(bytes).domains[1].payload;
@@ -45,7 +45,7 @@ test("behaviour creation, edit and deletion preserve unrelated rows and profile 
     assert.deepEqual(rowFor(changed, "KC_A").steps, [], "timing-only rows are valid");
     const removed = edit({type: "deleteBehavior", keycode: "KC_A"}, capabilities, changed);
     assert.deepEqual(removed, payload);
-    const document = deviceDocument(), next = editDeviceProfile(document, {type: "saveBehavior", behavior: form()}, {capabilities});
+    const document = deviceDocument(), next = applyDraftEdit({document}, {type: "saveBehavior", behavior: form()}, {capabilities});
     assert.deepEqual(payloads(next).find(domain => domain.id === 0x20).payload, added);
     assert.deepEqual(payloads(next).filter(domain => domain.id !== 0x20), payloads(document).filter(domain => domain.id !== 0x20));
     assert.deepEqual(decodeKeyBehaviorDomain(added).rows.filter(row => actionName(row.target) !== "KC_A"), original.rows);
@@ -106,7 +106,7 @@ test("invalid edits and references are rejected before upload", () => {
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, supportedDomainMask: 1}), /firmware/);
     // The keyboard's counts are the domain's, refused as it is encoded, in
     // the words the person reads.
-    const saveOn = (caps) => editDeviceProfile(deviceDocument(), {type: "saveBehavior", behavior: form()}, {capabilities: caps});
+    const saveOn = (caps) => applyDraftEdit({document: deviceDocument()}, {type: "saveBehavior", behavior: form()}, {capabilities: caps});
     assert.throws(() => saveOn({...capabilities, maxBehaviorRows: original.rowCount}), {code: "PROFILE_FULL", message: `The keyboard holds at most ${original.rowCount} behaviours. Remove one before adding another.`});
     assert.throws(() => saveOn({...capabilities, maxPopulatedBehaviorSteps: original.populatedStepCount}), /at most \d+ behaviour tap counts/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxTapStepsPerBehavior: 4}), /Tap branch index/);

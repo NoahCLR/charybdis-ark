@@ -124,10 +124,9 @@ test("every one of the 128 names can be 32 bytes of text at once", () => {
     assert.equal(settingsDomain(current.document).payload.length, SETTINGS.FIXED_SIZE + layerNames + 128 * 33 + 128 + 1, "the settings hold them all, beside 128 empty shortcuts, 128 empty custom-key names and an empty keyboard name");
 });
 
-test("stale drafts and wrong slots are rejected before a write", () => {
+test("wrong slots, empty messages and oversized macros are rejected before a write", () => {
     const current = snapshot(document());
     const message = {keycode: "MACRO_0", payload: "hello", expectedFingerprint: current.fingerprint};
-    assert.throws(() => editMacro(current, {...message, expectedFingerprint: "stale"}), /changed/);
     for (const keycode of ["MACRO_128", "MACRO_01", "KC_A", "QK_MACRO_2", "CUSTOM_KEY_2"]) assert.throws(() => editMacro(current, {...message, keycode}), /slot/);
     assert.equal(Buffer.from(profileMacros(editMacro(current, {...message, keycode: "MACRO_127"}))[127], "base64").toString(), "hello", "the last slot is a slot");
     assert.throws(() => editMacro(current, {keycode: "MACRO_0", expectedFingerprint: current.fingerprint}), /steps, its name/);

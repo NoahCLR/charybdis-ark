@@ -47,11 +47,9 @@ test("renaming the keyboard changes its name and nothing else, and is reviewed a
     assert.deepEqual(profileReview(before, snapshot(reverted)), []);
 });
 
-test("stale drafts, long or control names and non-text are refused; an unchanged name is no edit", () => {
+test("long or control names and non-text are refused; an unchanged name is no edit", () => {
     const current = snapshot(pdDocument());
     const message = {name: "Board", expectedFingerprint: current.fingerprint};
-    assert.throws(() => editKeyboardName(current, {...message, expectedFingerprint: "stale"}, capabilities), /changed/);
-    assert.throws(() => editKeyboardName(current, {name: "Board"}, capabilities), /changed/, "a message must name the draft it was drawn from");
     assert.throws(() => editKeyboardName(current, {...message, name: "x".repeat(33)}, capabilities), error => error.code === "KEYBOARD_NAME_INVALID" && /32 bytes of text/.test(error.message));
     assert.throws(() => editKeyboardName(current, {...message, name: `${"ü".repeat(16)}x`}, capabilities), error => error.code === "KEYBOARD_NAME_INVALID", "limits count bytes");
     assert.equal(validateSnapshot(editKeyboardName(current, {...message, name: "ü".repeat(16)}, capabilities)).settings.keyboardName, "ü".repeat(16));

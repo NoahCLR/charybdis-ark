@@ -51,9 +51,8 @@ const SHORTCUT_KEY_NAMES = Object.freeze(keycodes.entries()
 
 // A custom key's name, or its shortcut. Both live in the profile's settings
 // domain; a message carries one or the other.
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {(import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']) & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editCustomKey(snapshot, message, capabilities) {
-    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.");
     const slot = customKeyOfName(message.keycode);
     if (slot === undefined) throw fail("Choose a custom key the keyboard has.");
     // A message renames the key, sets its shortcut, or both at once (a key

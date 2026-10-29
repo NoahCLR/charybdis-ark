@@ -311,7 +311,6 @@ function settingsEditorView(snapshot) {
 
 /** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditOf<"updateConfigDefaults">} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editSettings(snapshot, message, capabilities) {
-    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since these settings were opened. Read the keyboard and review your changes before saving again.");
     const value = validateSnapshot(snapshot.document, capabilities);
     return editProfileDomains(value.document, {capabilities, limits: snapshot.limits}, open => {
         const settings = open("settings");

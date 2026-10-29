@@ -2,7 +2,7 @@
 const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
-const {DRAFT_EDIT_TYPES, DRAFT_EDITS, editedBy, inDomain, draftEditLabel} = require("../../core/model/draft-edits");
+const {DRAFT_EDIT_TYPES, DRAFT_EDITS, draftEditLabel} = require("../../core/model/draft-edits");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const portable = require("../../core/model/portable-profile");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
@@ -22,9 +22,12 @@ function contractTypes() {
     assert.ok(body, "contracts/edits.d.ts declares EditPayloads");
     const excluded = /export type DraftEditType = Exclude<keyof EditPayloads, ([^>]*)>/.exec(text);
     assert.ok(excluded, "contracts/edits.d.ts declares DraftEditType");
+    const then = /then\?: Extract<PanelEdit, \{type: ([^}]*)\}>/.exec(text);
+    assert.ok(then, "contracts/edits.d.ts names the edits a custom key made for a shortcut carries");
     return {
         payloads: [...body[1].matchAll(/^ {4}(\w+):/gm)].map(match => match[1]).sort(),
         notDraft: [...excluded[1].matchAll(/'(\w+)'/g)].map(match => match[1]).sort(),
+        follows: [...then[1].matchAll(/'(\w+)'/g)].map(match => match[1]).sort(),
     };
 }
 // What the interface's builders post: every message literal's type.
@@ -47,13 +50,10 @@ test("every registered edit names its editor, its words and, on the profile, its
         assert.equal("domain" in entry, entry.editor === "profile", type);
         if (entry.editor === "profile") assert.ok(["placement", "pointing", "combos", "behaviours", "lighting"].includes(entry.domain), type);
         assert.ok(typeof entry.label === "function" || (typeof entry.label === "string" && entry.label), type);
-        assert.equal(editedBy({type}, entry.editor), true, type);
-        if (entry.editor === "profile") assert.equal(inDomain({type}, entry.domain), true, type);
     }
-    for (const type of ["applyAllChanges", "constructor", "toString", ...NOT_DRAFT_EDITS]) {
-        assert.equal(DRAFT_EDITS.has(type), false, type);
-        assert.equal(editedBy({type}, "keymap") || editedBy({type}, "profile"), false, type);
-    }
+    for (const type of ["applyAllChanges", "constructor", "toString", ...NOT_DRAFT_EDITS]) assert.equal(DRAFT_EDITS.has(type), false, type);
+    assert.deepEqual(Object.keys(DRAFT_EDIT_TYPES).filter(type => "follows" in DRAFT_EDIT_TYPES[type]).sort(), contractTypes().follows,
+        "the edits that may follow a custom key made for a shortcut are the ones the contract lets it carry (D-L63)");
 });
 
 function draft() {
@@ -61,20 +61,6 @@ function draft() {
     const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
     return new ProfileDraftSession(snapshot, "test-device", {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3});
 }
-
-test("every registered edit reaches its editor, and anything else is refused as unsupported", () => {
-    for (const type of Object.keys(DRAFT_EDIT_TYPES)) {
-        const session = draft();
-        // An empty payload is refused by the editor, never by the dispatch.
-        try {session.stage({type, draftRevision: session.revision});} catch (error) {
-            assert.doesNotMatch(String(error.message), /Unsupported/, type);
-        }
-    }
-    for (const type of ["applyAllChanges", "constructor", ...NOT_DRAFT_EDITS]) {
-        const session = draft();
-        assert.throws(() => session.stage({type, draftRevision: session.revision, layer: "Layer 0", changes: []}), /Unsupported draft edit/, type);
-    }
-});
 
 test("each edit is recorded in its own words", () => {
     const session = draft(), document = session.document;

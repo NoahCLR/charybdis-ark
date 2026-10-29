@@ -14,12 +14,10 @@ const {pointingTaps} = require("./pointing-taps");
 const {linkRefusal} = require("./pointing-links");
 const {editProfileDomains} = require("./portable-profile");
 const {editKeyBehaviors} = require("./key-behavior-edits");
-const {inDomain} = require("./draft-edits");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 /**
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: import("./draft-edits.js").InDomain<"combos">}>} ComboEdit
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: import("./draft-edits.js").EditedBy<"profile">}>} ProfileEdit
- * @typedef {import("./types.js").DomainsContext & {combos?: import("./types.js").ComboRead}} EditContext
  * @typedef {import("./types.js").OpenDomain} OpenDomain
  * @typedef {Omit<import("../schema/types.js").ComboRowInput, 'inputs' | 'output'> & {inputs: import("../schema/types.js").SemanticAction[], output: import("../schema/types.js").SemanticAction}} SemanticComboRow
  * @typedef {import("../schema/types.js").RgbProfile} Rgb
@@ -118,20 +116,19 @@ function copyPdColour(rgb, source, id) {
     to.locality = from.locality;
 }
 
-// One profile edit, sent to its domain as model/draft-edits.js files it, on a
-// copy of the document.
-/** @param {import("./types.js").PortableDocument} document @param {ProfileEdit} message @param {EditContext} [context] @returns {import("./types.js").PortableDocument} */
-function editDeviceProfile(document, message, context = {}) {
-    if (inDomain(message, "combos")) return editCombos(document, message, context);
-    if (inDomain(message, "pointing") && !((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.PD_MODES)) throw invalid("Pointing mode editing needs firmware with configurable pointing slots.");
-    return editProfileDomains(document, context, open => {
-        if (inDomain(message, "placement")) editPlacement(open("settings"), message);
-        else if (inDomain(message, "pointing")) editPointing(open, message);
-        else if (inDomain(message, "behaviours")) editKeyBehaviors(open("behaviors"), message, context.capabilities);
-        else if (inDomain(message, "lighting")) editLighting(open("rgb"), message, context.limits?.brightnessMax ?? 255);
-        else throw invalid("Unsupported profile edit.");
-    });
-}
+// The edits of each profile domain, as model/draft-edits.js files them, for
+// applyDraftEdit (model/draft-editor.js). Each makes a new document of
+// `document`, checked as any other is.
+const PROFILE_EDITS = Object.freeze(/** @satisfies {{[D in import("./draft-edits.js").Domain]: (document: import("./types.js").PortableDocument, message: Extract<ProfileEdit, {type: import("./draft-edits.js").InDomain<D>}>, context: import("./types.js").DomainsContext) => import("./types.js").PortableDocument}} */ ({
+    placement: (document, message, context) => editProfileDomains(document, context, open => editPlacement(open("settings"), message)),
+    pointing: (document, message, context) => {
+        if (!((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.PD_MODES)) throw invalid("Pointing mode editing needs firmware with configurable pointing slots.");
+        return editProfileDomains(document, context, open => editPointing(open, message));
+    },
+    behaviours: (document, message, context) => editProfileDomains(document, context, open => editKeyBehaviors(open("behaviors"), message, context.capabilities)),
+    lighting: (document, message, context) => editProfileDomains(document, context, open => editLighting(open("rgb"), message, context.limits?.brightnessMax ?? 255)),
+    combos: editCombos,
+}));
 
 // Whether a key uses its layer's behaviours and joins its combos.
 /** @param {import("../schema/profile-domains-types.js").DomainModels["settings"]} settings @param {Extract<ProfileEdit, {type: import("./draft-edits.js").InDomain<"placement">}>} message */
@@ -265,12 +262,9 @@ function editLighting(rgb, message, maximumBrightness) {
 
 // A combo either follows the default window (termMs null) or has its own.
 // A form sends an empty window, or followsDefault, to follow it.
-/** @param {import("./types.js").PortableDocument} document @param {ComboEdit} message @param {EditContext} context */
+/** @param {import("./types.js").PortableDocument} document @param {ComboEdit} message @param {import("./types.js").DomainsContext} context */
 function editCombos(document, message, context) {
     if (!((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.COMBOS)) throw invalid("This firmware can read combos but cannot save them. Flash the updated firmware pair first.");
-    const read = context.combos;
-    if (read?.state !== "read") throw invalid("Read the keyboard's combos before saving.");
-    if (read.noTimer || read.customTrigger || read.customRelease || read.customRepress) throw invalid("This firmware has custom combo hooks or disabled timing that the profile editor cannot replace.");
     const nativeAction = keycodeAction;
     return editProfileDomains(document, context, open => {
         /** @type {Omit<import("../schema/types.js").ComboInput, "rows"> & {version: number, rows: SemanticComboRow[]}} */
@@ -282,7 +276,7 @@ function editCombos(document, message, context) {
             const native = keycodes.encode(name);
             if (native !== undefined) return nativeAction(native);
             if (!knownActionAbi(context.capabilities?.actionAbiDigest ?? 0)) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
-            return semanticActionForExpression(name, {layers: Array.from({length: read.layerReferences.length}, (_, id) => ({name: layerRef(id)}))});
+            return semanticActionForExpression(name, {layers: Array.from({length: LAYERS}, (_, id) => ({name: layerRef(id)}))});
         };
         const followsDefault = "followsDefault" in message && message.followsDefault === true || String("termMs" in message ? message.termMs ?? "" : "").trim() === "";
         if (message.type === "updateComboHoldTerm") {
@@ -313,4 +307,4 @@ function editCombos(document, message, context) {
     });
 }
 
-module.exports = {editDeviceProfile};
+module.exports = {PROFILE_EDITS};

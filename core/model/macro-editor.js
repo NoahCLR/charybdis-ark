@@ -91,9 +91,8 @@ function macroIndex(keycode) {
     return index;
 }
 
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateMacro'] & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateMacro']} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editMacro(snapshot, message, capabilities) {
-    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
     const index = macroIndex(message.keycode);
     if (message.payload === undefined && message.name === undefined && message.protection === undefined) throw fail("Send the macro's steps, its name or its playback protection.");
     const value = validateSnapshot(snapshot.document, capabilities);

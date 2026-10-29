@@ -76,10 +76,9 @@ test("an imported profile without custom-key names can take one name back from t
     assert.deepEqual(profileReview(keyboard, kept).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:1"]);
 });
 
-test("wrong keys, stale drafts, long names and older firmware are refused", () => {
+test("wrong keys, long names and older firmware are refused", () => {
     const current = snapshot(pdDocument());
     const message = {keycode: "CUSTOM_KEY_0", name: "Thumb", expectedFingerprint: current.fingerprint};
-    assert.throws(() => editCustomKey(current, {...message, expectedFingerprint: "stale"}, capabilities), /changed/);
     for (const keycode of ["CUSTOM_KEY_128", "CUSTOM_KEY_01", "MACRO_0", "KC_A"]) assert.throws(() => editCustomKey(current, {...message, keycode}, capabilities), /custom key/);
     assert.equal(validateSnapshot(editCustomKey(current, {...message, keycode: "CUSTOM_KEY_127"}, capabilities)).settings.customKeyNames[127], "Thumb", "the last custom key is one");
     assert.throws(() => editCustomKey(current, {...message, name: "x".repeat(33)}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID" && /32 bytes of text/.test(error.message));

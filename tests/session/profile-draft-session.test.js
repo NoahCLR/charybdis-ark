@@ -162,7 +162,7 @@ test("one draft composes every editor without changing its device snapshot", () 
     assert.equal(JSON.stringify(snapshot),original);
     assert.equal(draft.base.fingerprint,snapshot.fingerprint);
     assert.equal(validateSnapshot(draft.document).settings.values[1],175);
-    assert.equal(draft.combos().rows[0].termMs,60);
+    assert.equal(validateSnapshot(draft.document).combos.rows[0].termMs,60);
 });
 test("undo, redo, branching and no-op edits maintain one bounded history", () => {
     const {draft,snapshot} = fixture();

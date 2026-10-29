@@ -24,8 +24,9 @@ bytes, which live edits splice against.
 **Editing.** The snapshot seeds `ProfileDraftSession`
 (`session/profile-draft-session.js`): one complete document with its history.
 `session/panel-session.js` routes each message the panel posts; an edit
-reaches `stage()`, which finds its editor through `model/draft-edits.js` and
-rewrites one domain. Review (`model/profile-review.js`) and the checks
+reaches `stage()`, which makes it with `applyDraftEdit` (`model/draft-editor.js`):
+the form checked once against the draft, then the editor `model/draft-edits.js`
+names for its type. Review (`model/profile-review.js`) and the checks
 (`model/profile-checks.js`, `model/compare-findings.js`) compare the draft with
 the keyboard. `buildPanelModel` projects the draft through
 `session/device-model.js` into the model the panel draws: the profile's part
