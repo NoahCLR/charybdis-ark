@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {keyMeaning, behaviourFor} from "../../webview/view/keyface.mjs";
+import {keyMeaning} from "../../webview/view/keyface.mjs";
 import {combosForKey} from "../../webview/view/combo-reach.mjs";
-import {reachText, macroNamesOf, customKeyNamesOf, placementsOf} from "../../webview/view/reach.mjs";
+import {reachText, placementsOf} from "../../webview/view/reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 import {tabReach} from "../../webview/view/tab-reach.mjs";
-import {pointingSlotFor} from "../../webview/view/pointing-reach.mjs";
 import {customKeyNameMessage, customKeyShortcutMessage, macroMessage} from "../../webview/view/edits.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
 
@@ -28,22 +27,6 @@ const reached = (view, tab) => Object.fromEntries(tabReach(view, tab).groups.map
 /** @param {{name: string}[]} entries */
 const named = (entries) => entries.map((entry) => entry.name);
 
-test("macro and pointing-mode keycodes resolve to the slots the keyboard reported", () => {
-    const model = profile;
-    assert.deepEqual(macroNamesOf(model)("MACRO_11"), ["MACRO_11"]);
-    assert.deepEqual(macroNamesOf(model)("QK_MACRO_11"), ["MACRO_11"], "by the name the profile knows it by");
-    assert.deepEqual(macroNamesOf(model)("KC_A"), []);
-    assert.deepEqual(macroNamesOf({})("MACRO_11"), [], "which keycodes are macros' is core's (qmkKeyKinds), not read out of a name");
-    for (const name of ["MC_11", "0x770B", "0x770b"]) assert.deepEqual(macroNamesOf(model)(name), ["MACRO_11"], `${name}: any name the keycode is read by`);
-    assert.deepEqual(macroNamesOf(model)("0x7728"), ["MACRO_40"], "a slot QMK names nothing by its number");
-    for (const name of ["CUSTOM_KEY_5", "0x7F05", "0x7f05"]) assert.deepEqual(customKeyNamesOf(model)(name), ["CUSTOM_KEY_5"], `${name}: a custom key by any spelling`);
-    assert.deepEqual(customKeyNamesOf(model)("0x770B"), [], "a macro is no custom key");
-    assert.equal(pointingSlotFor(model, "PD_MODE_0").name, "Dragscroll");
-    assert.equal(pointingSlotFor(model, "PD_MODE_0_LOCK").name, "Dragscroll", "the lock keycode reaches the same slot");
-    assert.equal(pointingSlotFor(model, "PD_MODE_6").id, 6);
-    assert.equal(pointingSlotFor(model, "KC_A"), undefined);
-});
-
 test("what a key reaches is looked up by what its value means", () => {
     // The keyboard stores a behaviour target, a macro and a pointing mode as
     // plain user keycodes; every domain that refers back to them uses the
@@ -56,9 +39,6 @@ test("what a key reaches is looked up by what its value means", () => {
     assert.equal(keyMeaning(pointingKey), "PD_MODE_0");
     assert.equal(keyMeaning({keycode: "KC_A"}), "KC_A", "an ordinary key means itself");
     assert.equal(keyMeaning(undefined), "");
-    assert.equal(behaviourFor(model, keyMeaning(pointingKey)).keycode, "PD_MODE_0");
-    assert.deepEqual(macroNamesOf(model)(keyMeaning(macroKey)), ["MACRO_0"]);
-    assert.equal(pointingSlotFor(model, keyMeaning(pointingKey)).name, "Dragscroll");
     assert.deepEqual(combosForKey(model, macroKey).map((combo) => combo.badge), ["C0"],
         "a combo on the macro key still finds its key");
 });

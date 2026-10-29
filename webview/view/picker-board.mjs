@@ -1,6 +1,7 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {MODIFIER_KEYS, inBlock} from "../../rules/qmk-keycodes.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 // The ANSI board the keycode picker draws, taken from the app that ships it so
 // a second interface cannot teach a different keyboard.
 
@@ -8,7 +9,7 @@ import {MODIFIER_KEYS, inBlock} from "../../rules/qmk-keycodes.mjs";
 // model. Keep the stored value and board geometry while choosing what to draw.
 export function pickerBoardKey(/** @type {{x: number, y: number, w: number, h: number, value: string, labels: string[]}} */ source, /** @type {Model} */ model) {
   const spoken = model?.qmkKeyLabels?.[source.value];
-  const name = model?.qmkKeycodeAliases?.[source.value] || source.value;
+  const name = keyIdentity(model, source.value).name;
   const code = model?.qmkKeycodes?.find((entry) => entry.value === name)?.keycode;
   const modifier = code !== undefined && inBlock(code, MODIFIER_KEYS);
   const legend = model?.hostLayoutLegends?.[source.value];

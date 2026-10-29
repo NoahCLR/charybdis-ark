@@ -10,6 +10,7 @@ import {entriesForPickerSection, pickable, pickerSections} from "./picker-sectio
 import {macroMatches} from "./macro.mjs";
 import {shortcutModifiers, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
 import {layerFormOf, layerOfKeycode} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 
 /**
@@ -23,7 +24,7 @@ export const SEARCH_ROWS = 64;
 // A field limited to some keys names them as QMK does; a key picked under
 // another name is stored as that one.
 /** @param {Model} model @param {Picker} picker @param {string} value */
-export const pickValue = (model, picker, value) => picker.allowedKeys ? model?.qmkKeycodeAliases?.[value] || value : value;
+export const pickValue = (model, picker, value) => picker.allowedKeys ? keyIdentity(model, value).name : value;
 
 // A shortcut also takes a key that is or carries modifiers: a modifier key
 // is its button in the row, and a shifted symbol is its key with those

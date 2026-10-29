@@ -19,6 +19,7 @@ import {customKeyChoice, offeredName, shortcutLayerKinds, shortcutLayerRows, sho
 import {layerSwitchTable, switchedLayers} from "./layer-switches.mjs";
 import {vocabulary, word, layerCalled, slotNamed} from "../view/vocabulary.mjs";
 import {macroShortName} from "../view/macro.mjs";
+import {keyIdentity} from "../view/key-identity.mjs";
 
 /** @param {Model} model */
 const modifierControls = model => vocabulary(model).pickerModifiers || [];
@@ -38,7 +39,7 @@ const modifierControls = model => vocabulary(model).pickerModifiers || [];
 // output), or sends only its shortcut (a behaviour step). `comboOutput` holds
 // the pick to what a combo can send: no Tap-hold, which needs a key of its own.
 export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false, comboOutput = false}) {
-    const keys = allowedKeys ? seed.map(key => getModel()?.qmkKeycodeAliases?.[key] || key) : seed.slice();
+    const keys = allowedKeys ? seed.map(key => keyIdentity(getModel(), key).name) : seed.slice();
     const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : [];
     state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), own: mods.slice(), symbols: {}, layers: shortcut?.layers || 0, layerKind: shortcut?.layers ? shortcut.layerKind || 0 : 0, maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
     render();

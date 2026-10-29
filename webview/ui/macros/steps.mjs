@@ -40,7 +40,7 @@ export function saveSteps(slot, steps, stage = false, group = null) {
     const model = getModel();
     const {payload, error} = macroStepsInput(steps, model);
     rememberMacroEdit(slot, payload, steps, group);
-    const issues = sequenceIssues(steps, model?.qmkKeycodeAliases, key => actionLabel(model, key));
+    const issues = sequenceIssues(steps, model, key => actionLabel(model, key));
     setMacroForm(slot.keycode, {steps, draft: payload, stepError: error || issues.find(Boolean) || "", cancelBlur: false});
     const raw = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`[data-raw-payload="${slot.keycode}"]`));
     if (raw && document.activeElement !== raw) raw.value = payload;
@@ -106,7 +106,7 @@ export function sequenceEditor(model, slot, steps, canEdit) {
 /** @param {HTMLElement} node @param {import('../../../contracts/panel.js').PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps */
 function paintTiles(node, model, slot, steps) {
     const editable = node.closest("[data-macro-sequence]")?.getAttribute("data-editable") === "true";
-    const issues = sequenceIssues(steps, model.qmkKeycodeAliases, key => actionLabel(model, key));
+    const issues = sequenceIssues(steps, model, key => actionLabel(model, key));
     /** @type {string | null} */
     let dragged = null;
     const clearDrop = () => node.querySelectorAll(".drop-before, .drop-after").forEach(item => item.classList.remove("drop-before", "drop-after"));

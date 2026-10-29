@@ -1,6 +1,7 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
-import {behaviourListeningTo, canonicalKeycode, keyKindOf} from "./keyface.mjs";
+import {keyKindOf} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {timingInput} from "./timing-input.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 
@@ -22,8 +23,8 @@ export function behaviourRowAfterPreview(/** @type {string | null} */ row, /** @
 // and the board continue to describe only the core's stored draft.
 export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string} */ keycode) {
     if (!canHaveBehaviour(model, keycode)) return undefined;
-    const existing = behaviourListeningTo(model, keycode);
-    const key = existing?.keycode || canonicalKeycode(model, keycode);
+    const {listening: existing, canonical} = keyIdentity(model, keycode);
+    const key = existing?.keycode || canonical;
     const defaults = model?.behaviorEditing?.keyDefaults?.[key];
     return {...(existing || {keycode: key, steps: [], tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0",
         keepsAutoMouseAnchored: false, builtIn: defaults?.builtIn || {}}),

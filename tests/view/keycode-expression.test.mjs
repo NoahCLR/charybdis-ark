@@ -6,8 +6,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {comboOutputProblem, keyProblem, keycodeValue} from "../../webview/view/keycode-expression.mjs";
-import {compactModifierMask, keyName} from "../../webview/view/keyvalues.mjs";
-import {canonicalKeycode, visibleKeycode} from "../../webview/view/keyface.mjs";
+import {compactModifierMask} from "../../webview/view/keyvalues.mjs";
+import {visibleKeycode} from "../../webview/view/keyface.mjs";
+import {keycodeName, sameKey} from "../../webview/view/key-identity.mjs";
 
 const require = createRequire(import.meta.url);
 const {openDraft, publishedModel} = require("../fixtures/published-model");
@@ -60,7 +61,7 @@ test("every name for a macro slot stores the same keycode, which reads as MACRO_
         assert.equal(drafted(expression), 0x7703, expression);
         assert.equal(keycodeValue(model, expression), 0x7703, expression);
     }
-    assert.equal(keyName(model, 0x7703), "MACRO_3");
+    assert.equal(keycodeName(model, 0x7703), "MACRO_3");
     assert.equal(drafted("VIA_MACRO_127"), 0x777f);
     assert.equal(keyProblem(model, "VIA_MACRO_128"), "VIA_MACRO_128 is not a key this keyboard can store.");
     assert.equal(drafted("VIA_MACRO_128"), undefined);
@@ -74,8 +75,8 @@ test("a pointing key typed by its former name stores its slot's keycode, which r
         assert.equal(keycodeValue(model, expression), code, expression);
         assert.equal(drafted(expression), code, expression);
     }
-    assert.equal(keyName(model, 0x7e83), "PD_MODE_3");
-    assert.equal(keyName(model, 0x7ea3), "PD_MODE_3_LOCK");
+    assert.equal(keycodeName(model, 0x7e83), "PD_MODE_3");
+    assert.equal(keycodeName(model, 0x7ea3), "PD_MODE_3_LOCK");
 });
 
 // What the draft stores as a new combo's output, or undefined if it refuses it.
@@ -126,7 +127,7 @@ test("every wrapper spelling reads as the keycode the keyboard reads back", () =
     for (const wrapper of Object.keys(qmk.MODIFIER_WRAPPERS)) {
         const expression = `${wrapper}(KC_A)`;
         const readBack = keycodes.resolve(/** @type {number} */ (keycodes.encode(expression))).name;
-        assert.equal(canonicalKeycode(names, expression), canonicalKeycode(names, readBack), expression);
+        assert.ok(sameKey(names, expression, readBack), expression);
         assert.equal(keycodeValue(names, expression), keycodes.encode(expression), expression);
     }
 });
@@ -134,7 +135,7 @@ test("every wrapper spelling reads as the keycode the keyboard reads back", () =
 test("a stored modified key is named with wrappers core encodes back to it", () => {
     for (let code = qmk.QK.MODS.first; code <= qmk.QK.MODS.last; code++) {
         // The side flag alone holds no modifier: no pointing tap stores it.
-        const name = keyName(names, code);
+        const name = keycodeName(names, code);
         if (name.startsWith("0x") || !(qmk.modsOf(code) & 0x0f)) continue;
         assert.equal(keycodes.encode(name), code, name);
         const mods = qmk.modsOf(code);

@@ -143,15 +143,15 @@ test("incomplete steps keep their input and give a field error instead of invent
 
 test("canonical names and aliases are one key for holds, releases and chord limits", async () => {
     const {createRequire} = await import("node:module"), require = createRequire(import.meta.url);
-    const aliases = require("../../core/data/keycode-catalog.js").aliasTable();
+    const model = {qmkKeycodeAliases: require("../../core/data/keycode-catalog.js").aliasTable()};
     const keys = require("../../core/schema/macro-payload.js").macroKeycodes();
     const source = "{+KC_LGUI}{KC_A}{-KC_LEFT_GUI}";
-    const parsed = parseMacro(source, {aliases, keys});
+    const parsed = parseMacro(source, {model, keys});
     assert.equal(parsed.error, "");
-    assert.deepEqual(unreleased(parsed.steps, aliases), []);
+    assert.deepEqual(unreleased(parsed.steps, model), []);
     assert.equal(serializeMacro(parsed.steps), source, "alias identity checking preserves raw spelling");
-    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {aliases, keys}).error, /distinct/);
-    assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {aliases, keys}).error, /already held/);
+    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {model, keys}).error, /distinct/);
+    assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {model, keys}).error, /already held/);
 });
 
 test("a held key may span text the host layout types, in preview and core alike", async () => {
@@ -195,11 +195,11 @@ test("a macro's chips read it step by step, held, let go, tapped, typed and wait
 
 test("two payloads are the same macro when their keys differ only by alias", async () => {
     const {samePayload} = await import("../../webview/view/macro.mjs");
-    const aliases = {KC_LGUI: "KC_LEFT_GUI", KC_SPC: "KC_SPACE"};
-    assert.equal(samePayload("{KC_LGUI,KC_SPC}{KC_A}", "{KC_LEFT_GUI,KC_SPACE}{KC_A}", aliases), true);
-    assert.equal(samePayload("{KC_LGUI,KC_SPC}", "{KC_LEFT_GUI,KC_A}", aliases), false);
-    assert.equal(samePayload("{KC_LGUI", "{KC_LGUI", aliases), true);
-    assert.equal(samePayload("{KC_LGUI", "{KC_LEFT_GUI}", aliases), false);
+    const model = {qmkKeycodeAliases: {KC_LGUI: "KC_LEFT_GUI", KC_SPC: "KC_SPACE"}};
+    assert.equal(samePayload("{KC_LGUI,KC_SPC}{KC_A}", "{KC_LEFT_GUI,KC_SPACE}{KC_A}", model), true);
+    assert.equal(samePayload("{KC_LGUI,KC_SPC}", "{KC_LEFT_GUI,KC_A}", model), false);
+    assert.equal(samePayload("{KC_LGUI", "{KC_LGUI", model), true);
+    assert.equal(samePayload("{KC_LGUI", "{KC_LEFT_GUI}", model), false);
     assert.equal(samePayload("", undefined), true);
 });
 

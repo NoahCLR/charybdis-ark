@@ -1,7 +1,9 @@
 // @ts-check
 // The pointing modes a layer reaches, by their keys or by turning on a layer
-// that starts them (firmware D-F62), and the slot a keycode belongs to.
-import {keyMeaning, spellingsOf} from "./keyface.mjs";
+// that starts them (firmware D-F62); the slot a keycode belongs to is
+// key-identity.mjs's.
+import {keyMeaning} from "./keyface.mjs";
+import {keyIdentity, slotKeycodeNames, slotKeycodes} from "./key-identity.mjs";
 import {viewLayers} from "./layer-resolution.mjs";
 import {reachGroups, reachInView} from "./reach.mjs";
 import {comboOutput} from "./combo-reach.mjs";
@@ -54,7 +56,7 @@ export function pointingReachInView(view) {
 // pressed is startedRoutes', which knows the layers on there.
 /** @param {ViewModel} model @returns {import("./keyface-types.js").NamesOf} */
 const pointingNamesOf = (model) => (keycode) => {
-    const slot = pointingSlotFor(model, keycode);
+    const slot = keyIdentity(model, keycode).pointing;
     const turnsOn = layersTurnedOn(model, keycode);
     const started = turnsOn ? (model?.pdModes || []).filter((entry) => entry !== slot
         && (entry.linkStarts || []).some((start) => turnsOn & 2 ** start.layer)) : [];
@@ -67,7 +69,7 @@ const pointingNamesOf = (model) => (keycode) => {
 /** @param {ViewModel} model @param {string | undefined} keycode */
 function layersTurnedOn(model, keycode) {
     const table = model?.qmkKeyTurnsOn || {};
-    for (const key of spellingsOf(model, String(keycode ?? ""))) {
+    for (const key of keyIdentity(model, keycode).spellings) {
         if (Number.isInteger(table[key])) return table[key] >>> 0;
     }
     return 0;
@@ -102,7 +104,7 @@ function startedRoutes(model, entries, on) {
         const startVia = {};
         /** @param {string} keycode @param {number} held */
         const reaches = (keycode, held) => {
-            if (pointingSlotFor(model, keycode) === slot) return true;
+            if (keyIdentity(model, keycode).pointing === slot) return true;
             const mask = pointingStartsVia(model, slot, keycode, on | held);
             if (mask) startVia[keycode] = (startVia[keycode] ?? 0) | mask;
             return mask !== 0;
@@ -133,45 +135,6 @@ function withLinkStarts(model, stack, on, entries) {
     }
     return result;
 }
-
-// A layout position carries the keyboard's own name for its keycode, which for
-// a pointing mode is a bare user keycode (`QK_USER_16`) or, for a slot the
-// vocabulary does not name at all, its hex. So resolve the alias the model
-// published first, then fall back to the number: an empty slot has no name to
-// match on, and its keycodes exist regardless.
-/** @param {ViewModel} model @param {string | number | undefined} keycode */
-export function pointingSlotFor(model, keycode) {
-    const slots = model?.pdModes || [];
-    const alias = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
-    const named = slots.find((slot) => slot.keys && [slot.keys.hold, slot.keys.lock].includes(String(alias || "")));
-    if (named) return named;
-    const value = typeof keycode === "number" ? keycode : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
-    return Number.isInteger(value) ? slots.find((slot) => slotKeycodes(slot).includes(value)) : undefined;
-}
-
-// Which of a slot's two keycodes this is. Everything else about the mode is the
-// same either way, so holding it or locking it on is the only thing a route
-// has to carry beyond the slot itself.
-/** @param {ViewModel} model @param {string | number | undefined} keycode */
-export function pointingVariant(model, keycode) {
-    const alias = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
-    if (/_LOCK$/.test(String(alias))) return "lock";
-    const slot = pointingSlotFor(model, keycode);
-    const value = typeof keycode === "number" ? keycode
-        : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
-    if (slot && Number.isInteger(value) && slotKeycodes(slot)[1] === value) return "lock";
-    return "hold";
-}
-
-// The two values a slot answers to: hold and lock, as the core's key table
-// (data/pd-mode-keys.js) gives them. Matching on the numbers rather than on names matters
-// for an empty slot, whose record carries no name for the model to resolve —
-// the keycode exists on the keyboard either way.
-/** @param {PointingSlot} slot */
-export const slotKeycodes = (slot) => slot.keys ? [slot.keys.holdCode, slot.keys.lockCode] : [];
-// The same two keycodes by the names the model knows them by: hold, then lock.
-/** @param {PointingSlot} slot */
-export const slotKeycodeNames = (slot) => slot.keys ? [slot.keys.hold, slot.keys.lock] : [];
 
 // What still reaches a pointing slot. The keyboard keeps its mode keycodes
 // whatever a slot holds, so a key bound to an empty slot is inert rather than

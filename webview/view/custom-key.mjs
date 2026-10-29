@@ -8,7 +8,8 @@
 // behaviour step on another key that sends it sends the shortcut only, layers
 // included.
 import {layerCalledAt, sentence, vocabulary} from "./vocabulary.mjs";
-import {customKeyNamesOf, placementsOf} from "./reach.mjs";
+import {placementsOf} from "./reach.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
 import {compactModifierMask} from "./keyvalues.mjs";
 import {LAYERS} from "./layout.mjs";
@@ -81,11 +82,11 @@ export const customKeyInUse = (key) => Boolean(key && (key.name || key.hasBehavi
 
 // The custom key a keycode names, if it is one: one of the custom keys core
 // publishes, by its name or any other it is read by, the bare hex a combo
-// stores included (customKeyNamesOf).
+// stores included (key-identity.mjs).
 /** @param {Model} model @param {string | null | undefined} keycode */
 export const customKeyOf = (model, keycode) => {
     if (!keycode) return undefined;
-    const [name = keycode] = customKeyNamesOf(model)(keycode);
+    const name = keyIdentity(model, keycode).customKey || keycode;
     return (model?.customKeys || []).find((key) => key.keycode === name);
 };
 
@@ -221,7 +222,7 @@ export function shortcutKeyCode(model, expression) {
 // `!` is Left Shift + 1. Null for any other key.
 /** @param {Model} model @param {string} name @returns {{key: string, mods: number} | null} */
 export function shortcutModifiers(model, name) {
-    const value = model?.qmkKeycodeAliases?.[name] || name;
+    const value = keyIdentity(model, name).name;
     const code = (model?.qmkKeycodes || []).find((row) => row.value === value || row.aliases.includes(value))?.keycode;
     if (code === undefined) return null;
     if (inBlock(code, MODIFIER_KEYS)) return {key: "", mods: 1 << (code - MODIFIER_KEYS.first)};

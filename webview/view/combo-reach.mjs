@@ -1,5 +1,6 @@
 // @ts-check
-import {behaviourFor, keyFace} from "./keyface.mjs";
+import {keyFace} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {downTheStack} from "./layer-resolution.mjs";
 import {comboJoins} from "./participation.mjs";
 import {layerCalled, listed} from "./vocabulary.mjs";
@@ -68,8 +69,8 @@ export function comboBehaviours(model, combos, layer) {
     for (const combo of combos) {
         const layers = combo.outputBehaviorLayers ?? 0;
         if (!layers || (layer !== undefined && !(layers & (1 << layer)))) continue;
-        const keycode = model?.qmkKeycodeAliases?.[combo.output] || combo.output;
-        if (!behaviourFor(model, keycode)) continue;
+        const keycode = comboOutput(model, combo);
+        if (!keyIdentity(model, keycode).behaviour) continue;
         const entry = found.get(keycode) ?? {keycode, output: combo.output, shown: combo.outputDisplay || combo.output, badges: []};
         entry.badges.push(combo.badge);
         found.set(keycode, entry);
@@ -302,5 +303,4 @@ export function toggleComboInput(model, inputs, position, limit = null) {
 // for its output (`QK_MACRO_0`, `QK_USER_16`), and every domain it could reach
 // is keyed by the semantic one.
 /** @param {ViewModel} model @param {ComboView} combo */
-export const comboOutput = (model, combo) =>
-    model?.qmkKeycodeAliases?.[combo?.output] ?? combo?.output ?? "";
+export const comboOutput = (model, combo) => keyIdentity(model, combo?.output).name;

@@ -3,7 +3,7 @@ import test from "node:test";
 import {createRequire} from "node:module";
 import {keyMeaning} from "../../webview/view/keyface.mjs";
 import {tabReach} from "../../webview/view/tab-reach.mjs";
-import {holdKeyName, pointingSlotFor, pointingVariant, slotKeycodeNames, slotKeycodes, whatReachesSlot} from "../../webview/view/pointing-reach.mjs";
+import {holdKeyName, whatReachesSlot} from "../../webview/view/pointing-reach.mjs";
 import {customKeyShortcutMessage} from "../../webview/view/edits.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
@@ -31,31 +31,6 @@ const held = (/** @type {string} */ action) => ({style: "PRESS_AND_HOLD_UNTIL_RE
 // and Pinch in slots 0 to 5, every later slot empty, no macros.
 const profile = published();
 
-test("a pointing key is recognised as the keyboard names it, not only as the app labels it", () => {
-    // Layout positions carry the device's own name for the value: plain hex
-    // for a mode key, named slot or not. Both must reach the slot, or a bound
-    // key would read as an ordinary key on the board and in the hover card.
-    const model = published({keys: {0: {0: "PD_MODE_0", 1: "PD_MODE_0_LOCK", 2: "PD_MODE_6", 3: "PD_MODE_6_LOCK"}}});
-    const stored = [0, 1, 2, 3].map((layoutIndex) => keyAt(model, 0, layoutIndex).keycode);
-    assert.equal(pointingSlotFor(model, stored[0]).name, "Dragscroll");
-    assert.equal(pointingSlotFor(model, stored[1]).name, "Dragscroll");
-    assert.equal(pointingSlotFor(model, stored[2]).id, 6);
-    assert.equal(pointingSlotFor(model, stored[3]).id, 6, "the lock keycode of an unnamed slot too");
-    assert.equal(pointingSlotFor(model, keyAt(model, 0, 2).value).id, 6);
-    assert.equal(pointingSlotFor(model, "0x0041"), undefined, "an ordinary value is not a pointing key");
-});
-
-test("a pointing key holds its mode or locks it, however the keyboard names it", () => {
-    const model = published({keys: {0: {0: "PD_MODE_0", 1: "PD_MODE_0_LOCK", 2: "PD_MODE_6", 3: "PD_MODE_6_LOCK"}}});
-    const stored = [0, 1, 2, 3].map((layoutIndex) => keyAt(model, 0, layoutIndex).keycode);
-    assert.deepEqual(stored.map((keycode) => pointingVariant(model, keycode)), ["hold", "lock", "hold", "lock"], "by the keyboard's own names");
-    assert.deepEqual(["PD_MODE_0", "PD_MODE_0_LOCK"].map((keycode) => pointingVariant(model, keycode)), ["hold", "lock"], "by the app's");
-    const [hold, lock] = slotKeycodes(model.pdModes[6]);
-    assert.deepEqual([hold, lock].map((value) => pointingVariant(model, value)), ["hold", "lock"], "an empty slot's by its numbers");
-    assert.deepEqual([hold, lock].map((value) => pointingVariant(model, `0x${value.toString(16)}`)), ["hold", "lock"], "and by them in hex");
-    assert.equal(pointingVariant(model, "KC_A"), "hold", "anything else holds");
-});
-
 test("what still reaches a pointing slot is listed, so an inert key can be named", () => {
     const model = published({keys: {0: {3: "PD_MODE_0", 4: "KC_A"}, 3: {3: "PD_MODE_0_LOCK"}},
         behaviours: [
@@ -74,9 +49,6 @@ test("an empty slot's bindings are found by the keyboard's own values, not by a 
     // A cleared slot has no name for the model to resolve, so its keys arrive
     // as whatever the catalogue calls the raw value. The slot still answers to
     // the same two numbers, so that is what the lookup matches on.
-    assert.deepEqual(slotKeycodes(profile.pdModes[0]), [0x7e80, 0x7ea0], "hold and toggle for a named slot");
-    assert.deepEqual(slotKeycodes(profile.pdModes[6]), [0x7e86, 0x7ea6], "and for a numbered one");
-    assert.deepEqual(slotKeycodeNames(profile.pdModes[0]), ["PD_MODE_0", "PD_MODE_0_LOCK"], "and by name, hold then lock");
     const model = published({keys: {0: {5: "PD_MODE_6", 6: "KC_A"}},
         behaviours: [{keycode: "CUSTOM_KEY_0", steps: [{tapCount: 0, hold: held("PD_MODE_6")}]}]});
     const empty = model.pdModes[6];

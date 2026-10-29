@@ -11,7 +11,7 @@
  * @typedef {import("../../contracts/edits.js").Scalar} Scalar
  */
 
-import {macroIndex} from "./keyvalues.mjs";
+import {macroIndex} from "./key-identity.mjs";
 import {vocabulary, word} from "./vocabulary.mjs";
 
 export const KIND = {DIRECTIONAL: 1, SCROLLING: 2};

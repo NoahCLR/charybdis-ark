@@ -23,7 +23,7 @@ import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar} from "./frame.mjs";
-import {keyName} from "../view/keyvalues.mjs";
+import {keycodeName} from "../view/key-identity.mjs";
 import {customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine, sameShortcut, shortcutAct, shortcutLimitWords} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
@@ -160,7 +160,7 @@ function behaviourCard(model, key) {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function shortcutField(model, key, canEdit) {
     const identity = model?.customKeyEditing?.identity;
-    const names = key.shortcut.keys.map((code) => keyName(model, code)).filter(Boolean);
+    const names = key.shortcut.keys.map((code) => keycodeName(model, code)).filter(Boolean);
     const node = el(`<div class="field"><span>Shortcut</span>
             <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
                 data-tip="${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}, any` : "Any"} modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would. Pick… opens the keycode picker with its modifier row and its Layers section.">

@@ -13,8 +13,10 @@
 import {vocabulary, word} from "./vocabulary.mjs";
 import {MACRO_LIMITS, macroProblemWords, readMacroPayload} from "../../rules/macro-payload.mjs";
 import {macroOfName} from "../../rules/qmk-keycodes.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 
 /** @typedef {import("./types.js").MacroStep} MacroStep */
+/** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
 
 // Each kind of macro step, in the order the add buttons offer them; its one
 // name (glossary "Macro step"), which the add buttons, the step editor and
@@ -58,7 +60,7 @@ export const MAX_DELAY = MACRO_LIMITS.maxDelayMs, MAX_KEYS = MACRO_LIMITS.maxHel
 export function parseMacro(payload, options = {}) {
     const allowed = options.keys?.length ? new Set(options.keys) : null;
     const {steps, error} = readMacroPayload(String(payload ?? ""), {
-        identity: (key) => options.aliases?.[key] || key,
+        identity: (key) => keyIdentity(options.model, key).name,
         sendable: (key) => !allowed || allowed.has(key),
         textEntry: options.textEntry,
         needsEntry: (character) => options.layoutChars ? !options.layoutChars.includes(character) : /[^\x00-\x7F]/u.test(character),
@@ -142,12 +144,12 @@ export function macroChips(payload, face = (step) => ({label: describeStep(step)
 
 // Held keys that are never released leave the keyboard holding them, so the
 // preview says so rather than letting it through quietly.
-/** @param {readonly MacroStep[]} steps @param {Readonly<Record<string, string>>} [aliases] */
-export function unreleased(steps, aliases = {}) {
+/** @param {readonly MacroStep[]} steps @param {ViewModel} [model] */
+export function unreleased(steps, model) {
     /** @type {string[]} */
     const held = [];
     for (const step of steps) {
-        const keys = step.kind === "text" || step.kind === "delay" ? [] : step.keys.map(key => aliases[key] || key);
+        const keys = step.kind === "text" || step.kind === "delay" ? [] : step.keys.map(key => keyIdentity(model, key).name);
         if (step.kind === "press") held.push(...keys);
         if (step.kind === "release") for (const key of keys) {
             const at = held.indexOf(key);
@@ -169,17 +171,17 @@ export function macroMatches(slot, query) {
 }
 
 // Whether two payloads are the same macro: the same steps once every key name
-// is read through the catalogue's aliases (KC_LGUI is KC_LEFT_GUI). The draft
+// is read by the name the model knows it by (KC_LGUI is KC_LEFT_GUI). The draft
 // holds the keyboard's canonical names, so an edit typed with an alias is not
 // "local" once the draft has it. Unparseable text compares as written.
-/** @param {unknown} a @param {unknown} b @param {Readonly<Record<string, string>>} [aliases] */
-export function samePayload(a, b, aliases = {}) {
+/** @param {unknown} a @param {unknown} b @param {ViewModel} [model] */
+export function samePayload(a, b, model) {
     const left = String(a ?? ""), right = String(b ?? "");
     if (left === right) return true;
     const one = parseMacro(left), two = parseMacro(right);
     if (one.error || two.error) return false;
     /** @param {MacroStep} step @returns {MacroStep} */
-    const canonical = step => step.kind === "text" || step.kind === "delay" ? step : {...step, keys: step.keys.map(key => aliases[key] || key)};
+    const canonical = step => step.kind === "text" || step.kind === "delay" ? step : {...step, keys: step.keys.map(key => keyIdentity(model, key).name)};
     return serializeMacro(one.steps.map(canonical)) === serializeMacro(two.steps.map(canonical));
 }
 

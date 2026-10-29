@@ -68,7 +68,7 @@ test("the webview names every pointing slot's lighting row as the RGB schema doe
 });
 
 test("pointing macro identities follow the schema's complete native range", async () => {
-    const {macroIndex} = await import("../../webview/view/keyvalues.mjs");
+    const {macroIndex} = await import("../../webview/view/key-identity.mjs");
     const {isPdMacro} = require("../../core/schema/pd-mode-domain-v1");
     for (let code = 0; code <= 0xffff; code++) assert.equal(macroIndex(code) !== null, isPdMacro(code), code.toString(16));
 });

@@ -5,7 +5,8 @@
 // counts them.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {behaviourFor, behaviourTiers} from "../../view/keyface.mjs";
+import {behaviourTiers} from "../../view/keyface.mjs";
+import {keyIdentity} from "../../view/key-identity.mjs";
 import {customKeyOf, hasShortcut} from "../../view/custom-key.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {currentView, getModel, render, state} from "../../store.mjs";
@@ -27,7 +28,7 @@ export function tabCustomKeys(body, right) {
     /** @param {string} group @param {string} keycode @param {string} reachedBy */
     const row = (group, keycode, reachedBy) => {
         const key = customKeyOf(model, keycode);
-        const behaviour = key?.hasBehavior ? behaviourFor(model, keycode) : undefined;
+        const behaviour = key?.hasBehavior ? keyIdentity(model, keycode).behaviour : undefined;
         return `<tr${reachAttrs("customKeys", group, keycode)}>
             <td>${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedKeys.has(keycode) ? draftDot() : ""}</td>
             <td>${hasShortcut(key) ? `<span class="mono">${esc(key?.shortcutLabel)}</span>` : `<span class="muted">—</span>`}</td>

@@ -4,7 +4,8 @@
 // and the key whose behaviour a pick on the board opens. A screen reads them
 // through the view (view.behaviours, layer-view.mjs), which works each out
 // once.
-import {behaviourFor, keyMeaning} from "./keyface.mjs";
+import {keyMeaning} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {downTheStack} from "./layer-resolution.mjs";
 import {comboOutput} from "./combo-reach.mjs";
 import {inputOn} from "../../rules/combo-inputs.mjs";
@@ -26,7 +27,7 @@ import {inputOn} from "../../rules/combo-inputs.mjs";
 export function comboBehaviourFor(view, combo, keys) {
     const {model} = view;
     const layers = combo.outputBehaviorLayers ?? 0;
-    const row = layers ? behaviourFor(model, comboOutput(model, combo)) : undefined;
+    const row = layers ? keyIdentity(model, comboOutput(model, combo)).behaviour : undefined;
     if (!row) return undefined;
     const owner = combo.inputs?.at(-1);
     const placements = keys.filter(({position}) => owner !== undefined && inputOn(owner, position));
@@ -49,7 +50,7 @@ export function behavioursInView(view) {
         return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(row.keycode));
     };
     for (const key of view.shown) {
-        const row = behaviourFor(model, keyMeaning(key.position));
+        const row = keyIdentity(model, keyMeaning(key.position)).behaviour;
         if (row) add(row).keys.push(key);
     }
     for (const route of view.combos.inView) {
@@ -77,7 +78,7 @@ export function behaviourGroups(view) {
     /** @type {{row: BehaviorView; layer: Layer; whileHeld: boolean}[]} */
     const through = [];
     for (const {position, layer, fellThrough, whileHeld} of view.reachable) {
-        const row = behaviourFor(model, keyMeaning(position));
+        const row = keyIdentity(model, keyMeaning(position)).behaviour;
         if (!row) continue;
         if (!fellThrough) { if (!here.includes(row)) here.push(row); }
         else if (!through.some((entry) => entry.row === row)) through.push({row, layer, whileHeld});

@@ -84,10 +84,10 @@ function refreshFeedback(keycode) {
 
 /** @param {HTMLElement} card @param {Model} model @param {MacroSlot} slot */
 export function paintFeedback(card, model, slot) {
-    const form = macroForm(slot.keycode), local = form.draft !== undefined && !samePayload(form.draft, slot.payload, model?.qmkKeycodeAliases);
+    const form = macroForm(slot.keycode), local = form.draft !== undefined && !samePayload(form.draft, slot.payload, model);
     const payload = form.draft ?? slot.payload;
     const parsed = readMacro(model, slot.keycode, payload, "feedback");
-    const held = unreleased(parsed.steps, model?.qmkKeycodeAliases);
+    const held = unreleased(parsed.steps, model);
     /** @type {import("../../../contracts/messages.js").MacroValidation | null | undefined} */
     const inspection = matchingValidation(form, model, slot) ? form.validation?.validation : null;
     const error = form.stepError || parsed.error || (held.length ? `Release ${listed(held.map(key => actionLabel(model, key)))} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);

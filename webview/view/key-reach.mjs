@@ -5,13 +5,12 @@
 // or has no branches, and, on a dual-role key, the threshold its tap / hold
 // waits and what its hold does.
 
-import {behaviourFor, dualRole, keyMeaning} from "./keyface.mjs";
+import {dualRole, keyMeaning} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {behaviourRuns} from "./participation.mjs";
 import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds} from "./behavior-editor.mjs";
 import {comboBehaviours} from "./combo-reach.mjs";
 import {customKeyOf, customKeyShortcutOnly, hasShortcut} from "./custom-key.mjs";
-import {macroNamesOf} from "./reach.mjs";
-import {pointingSlotFor} from "./pointing-reach.mjs";
 import {pdColourRow} from "./lighting.mjs";
 import {vocabulary, word} from "./vocabulary.mjs";
 
@@ -52,9 +51,9 @@ export function keyReachAt(view, index) {
 /** @param {import("./keyface-types.js").LayerView} view @param {import("../../contracts/panel.js").Layer} layer @param {import("../../contracts/panel.js").Position} position @param {number} index @param {ComboView[]} [combos] */
 export function keyReach(view, layer, position, index, combos = view.combos.shownAt(index)) {
     const model = /** @type {Model} */ (view.model ?? null);
-    const meaning = keyMeaning(position);
+    const meaning = keyMeaning(position), key = keyIdentity(model, meaning);
     const custom = customKeyOf(model, meaning);
-    const slot = pointingSlotFor(model, meaning);
+    const slot = key.pointing;
     const words = vocabulary(model);
     const shown = combos.map((combo) => ({combo, use: view.combos.useAt(index, combo)}));
     const running = new Set(comboBehaviours(model, shown.filter(({use}) => use.fires).map(({combo}) => combo), layer?.index ?? 0).flatMap((run) => run.badges));
@@ -62,7 +61,7 @@ export function keyReach(view, layer, position, index, combos = view.combos.show
         ...keyBehaviour(model, layer, position),
         custom,
         shortcut: custom && hasShortcut(custom) ? custom : null,
-        macros: macroNamesOf(model)(meaning).map((keycode) => ({keycode, slot: (model?.macros || []).find((row) => row.keycode === keycode)})),
+        macros: [key.macro].filter(Boolean).map((keycode) => ({keycode, slot: (model?.macros || []).find((row) => row.keycode === keycode)})),
         pointing: slot ? {slot, kind: slot.kind ? word(words.pointing.kinds, slot.kind).toLowerCase() : "",
             paints: slot.kind ? paintsWhere(model, slot.id) : ""} : null,
         combos: shown.map(({combo, use}) => {
@@ -90,7 +89,7 @@ const paintsWhere = (model, slot) => {
 // that changes nothing on any other key, leaves out.
 /** @param {Model} model @param {import("../../contracts/panel.js").Layer | null | undefined} layer @param {import("../../contracts/panel.js").Position} position */
 export function keyBehaviour(model, layer, position) {
-    const behaviour = behaviourFor(model, keyMeaning(position));
+    const behaviour = keyIdentity(model, keyMeaning(position)).behaviour;
     const role = dualRole(model, position);
     const inert = Boolean(behaviour?.changesNothing);
     const branchless = Boolean(behaviour) && !behaviour?.steps?.length;
@@ -110,7 +109,7 @@ export function keyBehaviour(model, layer, position) {
 // threshold with it: the key waits its default, the dual-role threshold. A
 // layer-tap's hold reads as the grid's built-in Hold does: the layer action
 // the core says it holds (`holdAction`), else the layer or modifier itself.
-/** @param {Model} model @param {import("../../contracts/panel.js").Position} position @param {NonNullable<ReturnType<typeof dualRole>>} role @param {ReturnType<typeof behaviourFor>} behaviour @param {{runs: boolean, reasons: string[]}} use @param {string} inertNote @returns {BehaviourLead} */
+/** @param {Model} model @param {import("../../contracts/panel.js").Position} position @param {NonNullable<ReturnType<typeof dualRole>>} role @param {import("./keyface-types.js").KeyIdentity["behaviour"]} behaviour @param {{runs: boolean, reasons: string[]}} use @param {string} inertNote @returns {BehaviourLead} */
 function tapHold(model, position, role, behaviour, use, inertNote) {
     const row = behaviourEditorRow(model, keyMeaning(position));
     const fallback = row?.timingDefaults?.tapHoldTerm ?? model?.behaviorTimingDefaults?.tappingTerm;

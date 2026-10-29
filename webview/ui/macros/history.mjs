@@ -51,7 +51,7 @@ function restore(slot, snapshot) {
     const model = getModel(), steps = snapshot.steps;
     const encoded = steps ? macroStepsInput(steps) : null;
     const parsed = readMacro(model, slot.keycode, snapshot.payload, 'editor');
-    const stepError = encoded?.error || (steps ? parsed.error || sequenceIssues(steps, model?.qmkKeycodeAliases, key => actionLabel(model, key)).find(Boolean) : '') || '';
+    const stepError = encoded?.error || (steps ? parsed.error || sequenceIssues(steps, model, key => actionLabel(model, key)).find(Boolean) : '') || '';
     setMacroForm(slot.keycode, {draft: snapshot.payload, steps, stepFocus: steps ?? macroForm(slot.keycode).stepFocus,
         selectedStep: snapshot.selectedStep, selectionAnchor: snapshot.selectedStep, selectedSteps: snapshot.selectedSteps, stepError,
         validation: undefined, wantsStage: false, cancelBlur: false, moveNotice: ''});

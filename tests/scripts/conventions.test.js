@@ -117,7 +117,7 @@ test("markup reaches the page's HTML sinks only through its Trusted Types policy
 });
 
 test("semantic domain lookups do not use a position's stored keycode name", () => {
-    const badLookup = /(?:behaviourFor|pointingSlotFor|macroNamesOf|placementsOf)\([^;\n]*\b(?:position|pos)\.keycode\b|(?<![!=])===(?!=)\s*(?:position|pos)\.keycode\b/;
+    const badLookup = /keyIdentity\([^;\n]*\b(?:position|pos)\.keycode\)\.(?:behaviour|pointing|macro|customKey)\b|(?:macroNamesOf|placementsOf)\([^;\n]*\b(?:position|pos)\.keycode\b|(?<![!=])===(?!=)\s*(?:position|pos)\.keycode\b/;
     // inputOn accepts native or semantic combo input names: it checks both.
     // The action-use matcher also accepts native catalogue names/values.
     const compatibilityLines = [
@@ -168,6 +168,20 @@ test("only the edit gate reads whether the draft takes edits", () => {
     const violations = sources("webview").filter(file => file !== path.join("webview", "view", "edit-gate.mjs"))
         .flatMap(file => readsDraftEditable(read(file)).map(line => `${file}:${line}`));
     assert.deepEqual(violations, [], "ask editGate(model, area) in webview/view/edit-gate.mjs");
+});
+
+// Which key a spelling is, and whether two spellings are one key, is
+// keyIdentity(model, spelling) (webview/view/key-identity.mjs), which reads
+// the published alias table; every other module asks it, never the table.
+// The keycode grammar's reader (keycode-expression.mjs) takes the whole table
+// into the names an expression stores by.
+test("only the key identity reads the keycode alias table", () => {
+    const allowed = ["key-identity.mjs", "keycode-expression.mjs"].map(name => path.join("webview", "view", name));
+    const violations = sources("webview").filter(file => !allowed.includes(file)).flatMap(file => {
+        const code = uncommented(read(file));
+        return Array.from(code.matchAll(/\bqmkKeycodeAliases\b/g), match => `${file}:${lineAt(code, match.index)}`);
+    });
+    assert.deepEqual(violations, [], "ask keyIdentity(model, spelling) in webview/view/key-identity.mjs");
 });
 
 // A screen posts what a builder returns (webview/view/edits.mjs,

@@ -5,7 +5,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {keyMeaning} from "../../view/keyface.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
-import {pointingVariant, slotKeycodeNames} from "../../view/pointing-reach.mjs";
+import {keyIdentity, slotKeycodeNames} from "../../view/key-identity.mjs";
 import {linkRows} from "../../view/pointing-link.mjs";
 import {pdColourRow} from "../../view/lighting.mjs";
 import {currentView, getModel, render, state} from "../../store.mjs";
@@ -72,7 +72,7 @@ export function tabPointing(body, right) {
         const actions = [...entry.keys.map((key) => keyMeaning(key.position)),
             ...(entry.behaviours || []).map((row) => row.action), ...(entry.combos || []).map((route) => route.action)];
         const own = actions.filter((keycode) => !entry.startVia?.[keycode]);
-        const variants = [...new Set(own.map((keycode) => pointingVariant(model, keycode)))];
+        const variants = [...new Set(own.map((keycode) => keyIdentity(model, keycode).variant))];
         const lines = pointingReachLines(model, entry, variants.length > 1).map((line) => `<span class="reach-line">${line}</span>`).join("");
         return card(group, entry.name, lines, {variants, started: Boolean(entry.starts?.length) || own.length < actions.length});
     };

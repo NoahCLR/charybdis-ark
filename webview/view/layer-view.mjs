@@ -15,6 +15,7 @@
 import {reachablePositions, resolvedPositions, viewPositions} from "./layer-resolution.mjs";
 import {comboAnswers, comboBadgesAt, comboGroups, comboInputKeys, comboInputShown, comboMarks, comboUseAt, combosInView, combosOnKey, combosShownAt} from "./combo-reach.mjs";
 import {behaviourGroups, behaviourKeyAt, behaviourRouteKeys, behavioursInView} from "./behaviour-reach.mjs";
+import {once} from "./once.mjs";
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
 /** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
@@ -38,13 +39,6 @@ export function layerView(model, at, on = []) {
     return view;
 }
 
-// Work done on first read and kept; tab-reach.mjs reads its lists the same way.
-/** @template T @param {() => T} work @returns {() => T} */
-export const once = (work) => {
-    /** @type {{value: T} | null} */
-    let kept = null;
-    return () => (kept ??= {value: work()}).value;
-};
 /** @param {ResolvedKey[]} keys */
 const byIndex = (keys) => new Map(keys.map((key) => [key.position.layoutIndex, key]));
 

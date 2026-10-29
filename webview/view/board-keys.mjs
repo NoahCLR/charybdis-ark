@@ -18,7 +18,8 @@
 // marks or second line; `faces: false` leaves the marks off in any mode.
 
 import {isOff} from "../lib/colour.mjs";
-import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "./keyface.mjs";
+import {behaviourTiers, keyFace, keyMeaning} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {behaviourRuns} from "./participation.mjs";
 import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trackballLight} from "./lighting.mjs";
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
@@ -57,7 +58,7 @@ export function boardKeys(view, {mode = "light", faces = true, pdActive = null} 
         const shown = answer?.position || position;
         const from = answer?.fellThrough ? answer.layer : null;
         const face = keyFace(shown, model);
-        const behaviour = marks ? behaviourFor(model, keyMeaning(shown)) : undefined;
+        const behaviour = marks ? keyIdentity(model, keyMeaning(shown)).behaviour : undefined;
         const runs = behaviour && behaviourRuns(model, (from || layer)?.index ?? 0, shown, behaviour).runs;
         return {
             index, shown, from,

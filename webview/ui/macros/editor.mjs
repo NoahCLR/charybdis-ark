@@ -25,7 +25,7 @@ export function editor(model, slot, canEdit) {
     let steps = focusSteps(slot, form.steps ?? parsed.steps);
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
-    const dirty = form.draft !== undefined && !samePayload(payload, slot.payload, model.qmkKeycodeAliases);
+    const dirty = form.draft !== undefined && !samePayload(payload, slot.payload, model);
     const chip = macroLocalState(model.draft?.changes, slot.keycode, dirty);
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
     const wrap = el(`<div class="stack"></div>`), uninterruptible = vocabulary(model).macroUninterruptible;

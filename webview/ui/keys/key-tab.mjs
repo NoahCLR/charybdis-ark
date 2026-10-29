@@ -5,7 +5,8 @@
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {keyLed} from "../../view/lighting.mjs";
 import {sentence, slotNamed, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
-import {canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
+import {keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
+import {keyIdentity} from "../../view/key-identity.mjs";
 import {keyReachAt} from "../../view/key-reach.mjs";
 import {currentLayer, currentView, getModel, layers, openComboBuilder, positionAt, post, render, selectedPosition, showLayer, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
@@ -125,7 +126,7 @@ export function tabKey(body) {
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${gate.editable ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
             ${inherited ? "" : `<p class="note">They switch only ${esc(thisKeyOnThisLayer(model, layerCalled(source)))}. To switch a behaviour or combo off on every key, use its own Use this behaviour or Use this combo; for a whole layer, Settings.</p>`}
             <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behaviour ? "runs here" : "this key has none")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "this key can take part; each combo has its own switches too")}.</p>
-            ${customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))) ? `<p class="note">${esc(customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))))}</p>` : ""}
+            ${customKeyBypassText(customKeyOf(model, keyIdentity(model, keyMeaning(key)).canonical)) ? `<p class="note">${esc(customKeyBypassText(customKeyOf(model, keyIdentity(model, keyMeaning(key)).canonical)))}</p>` : ""}
         </div>`);
         /** @type {HTMLElement | null} */ (controls.querySelector("[data-source-layer]"))?.addEventListener("click", () => {showLayer(layers().indexOf(source)); render();});
         /** @type {NodeListOf<HTMLInputElement>} */ (controls.querySelectorAll("input")).forEach(input => input.addEventListener("change", () => post(edits.placementPolicy(source.index, key.layoutIndex,

@@ -3,13 +3,12 @@
 // grouped by route or in the view the board shows, the keys the board rings
 // for it, and the layers a macro or custom key is placed on. A tab reads it
 // through tabReach (tab-reach.mjs).
-import {behaviourFor, keyKindOf, keyMeaning} from "./keyface.mjs";
+import {keyMeaning} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {downTheStack} from "./layer-resolution.mjs";
 import {layerView} from "./layer-view.mjs";
 import {comboOutput} from "./combo-reach.mjs";
 import {comboBehaviourFor} from "./behaviour-reach.mjs";
-import {keycodeValue} from "./keycode-expression.mjs";
-import {keyName} from "./keyvalues.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("./keyface-types.js").ComboGroupEntry} ComboGroupEntry */
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
@@ -80,7 +79,7 @@ export function reachInView(view, namesOf) {
     };
     for (const key of view.shown) {
         for (const name of namesOf(keyMeaning(key.position))) add(name).keys.push(key);
-        const row = behaviourFor(model, keyMeaning(key.position));
+        const row = keyIdentity(model, keyMeaning(key.position)).behaviour;
         if (row) branchActions(row, (action, cell) => {
             for (const name of namesOf(action)) {
                 const entry = add(name);
@@ -110,17 +109,12 @@ export function reachInView(view, namesOf) {
 }
 
 // What a keycode reaches of one kind, by the name the reach lists key it by:
-// the profile's name for it (MACRO_0, CUSTOM_KEY_0) when core says it is a
-// keycode of that kind (qmkKeyKinds), under any name it is read by
-// (keyKindOf), a bare number included, and nothing for any other keycode.
-// The name is the one the keycode it stores goes by (keyName), so QK_MACRO_3,
-// MC_3 and 0x7703 are all MACRO_3.
-/** @param {ViewModel} model @param {import("../../contracts/model.js").KeyKind} kind @returns {import("./keyface-types.js").NamesOf} */
+// the profile's name for it (MACRO_0, CUSTOM_KEY_0) under any name it is read
+// by (key-identity.mjs), and nothing for any other keycode.
+/** @param {ViewModel} model @param {"macro" | "customKey"} kind @returns {import("./keyface-types.js").NamesOf} */
 const namesOfKind = (model, kind) => (keycode) => {
-    if (!keycode || keyKindOf(model, keycode) !== kind) return [];
-    const value = keycodeValue(model, keycode);
-    const named = value === undefined ? keycode : keyName(model, value);
-    return [model?.qmkKeycodeAliases?.[named] || named];
+    const name = keyIdentity(model, keycode)[kind];
+    return name ? [name] : [];
 };
 
 // The macro a keycode plays, if it plays one.

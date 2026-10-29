@@ -76,6 +76,25 @@ export interface LayerView {
         keyAt(layoutIndex: number | undefined): BehaviourKey;
     };
 }
+// Which key a spelling is (view/key-identity.mjs): `name`, the name the profile knows it by (QK_USER_16 → PD_MODE_0);
+// `canonical`, one spelling per key, however an expression is spelled; `spellings`, the names core may publish a fact
+// under; `macro` and `customKey`, the name the profile lists it by when core says it is one, or ''; `behaviour`, the row
+// keyed exactly by this spelling; `listening`, the row keyed by this key however either is spelled; `pointing`, the slot
+// it holds or locks, and `variant`, which of the two.
+export interface KeyIdentity {
+    readonly spelling: string;
+    readonly name: string;
+    readonly canonical: string;
+    readonly spellings: string[];
+    readonly kind: import('../../contracts/model.js').KeyKind | undefined;
+    readonly value: number | undefined;
+    readonly macro: string;
+    readonly customKey: string;
+    readonly behaviour: BehaviorView | undefined;
+    readonly listening: BehaviorView | undefined;
+    readonly pointing: PointingSlot | undefined;
+    readonly variant: 'hold' | 'lock';
+}
 export type NamesOf = (keycode: string | undefined) => string[];
 // `times`: sent once per press of that many; `first`: the row's own first tap, not the key's.
 export type InheritedBranch = Branch & {times?: number; first?: boolean};

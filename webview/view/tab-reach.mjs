@@ -11,7 +11,7 @@ import {GROUP_ORDER, reachRowOf} from "./reach-groups.mjs";
 import {customKeyNamesOf, macroNamesOf, reachGroups, reachInView, reachKeys} from "./reach.mjs";
 import {pointingReach, pointingReachInView} from "./pointing-reach.mjs";
 import {customKeyInUse} from "./custom-key.mjs";
-import {once} from "./layer-view.mjs";
+import {once} from "./once.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("./keyface-types.js").BehaviourReachEntry} BehaviourReachEntry */
 /** @typedef {import("./keyface-types.js").ComboReachEntry} ComboReachEntry */

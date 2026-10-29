@@ -10,7 +10,7 @@ import {esc} from "../../lib/dom.mjs";
 import {actionLabel, keyMeaning, keyName} from "../../view/keyface.mjs";
 import {placementsOf, reachText} from "../../view/reach.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
-import {pointingSlotFor} from "../../view/pointing-reach.mjs";
+import {keyIdentity} from "../../view/key-identity.mjs";
 import {customKeyOf, shortcutLayerList, shortcutLayerTag} from "../../view/custom-key.mjs";
 import {getModel, layers, render, state} from "../../store.mjs";
 import {placementChips, placementOpening, setReachGroupOpen} from "../../view/reach-groups.mjs";
@@ -188,7 +188,7 @@ function startsThrough(model, keycode, mask) {
     const custom = customKeyOf(model, keycode);
     if (custom) return ` · sends ${shortcutLayerList(custom).filter((at) => mask & 2 ** at).map((at) =>
         layerTagged(model, at, layerCalled(layersOfMask(2 ** at)[0] || null), [shortcutLayerTag(model, custom)], {inline: true})).join(", ")}`;
-    if (pointingSlotFor(model, keycode)) return ` · turns on ${layersNamed(model, layersOfMask(mask))}`;
+    if (keyIdentity(model, keycode).pointing) return ` · turns on ${layersNamed(model, layersOfMask(mask))}`;
     return "";
 }
 

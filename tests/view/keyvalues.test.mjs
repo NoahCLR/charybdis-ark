@@ -4,31 +4,7 @@ import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {buildDeviceModel} = require("../../core/session/device-model");
 const {publishedModel} = require("../fixtures/published-model.js");
-import {modifierBits, keyDisplayName, keyName, modifierNames, modifierPick, pickerModifierProblem, macroIndex, pointingMacro} from "../../webview/view/keyvalues.mjs";
-
-const model = {qmkKeycodes: [
-    {keycode: 0x0004, value: "KC_A"},
-    {keycode: 0x0006, value: "KC_C"},
-    {keycode: 0x00a9, value: "KC_VOLU"},
-    {keycode: 0x7e50, value: "PD_MODE_0"},
-]};
-
-test("a stored number is named from the keyboard's own catalogue", () => {
-    assert.equal(keyName(model, 0x00a9), "KC_VOLU");
-    assert.equal(keyName(model, 0x7e50), "PD_MODE_0");
-    assert.equal(keyName(model, 0), "", "zero means no shortcut, not a keycode");
-});
-
-test("modifier-wrapped values are unwrapped the way the keyboard encodes them", () => {
-    assert.equal(keyName(model, 0x0806), "G(KC_C)", "left GUI + C");
-    assert.equal(keyName(model, 0x0a04), "S(G(KC_A))", "left GUI + shift + A");
-    assert.equal(keyName(model, 0x1806), "RGUI(KC_C)", "the right-hand bit switches the wrappers");
-});
-
-test("an unknown value keeps its number rather than gaining an invented name", () => {
-    assert.equal(keyName(model, 0x7e61), "0x7E61");
-    assert.equal(keyName({}, 0x0004), "0x4", "with no catalogue, nothing is claimed");
-});
+import {modifierBits, keyDisplayName, modifierNames, modifierPick, pickerModifierProblem, pointingMacro} from "../../webview/view/keyvalues.mjs";
 
 test("modifier masks read back as the names the keyboard holds", () => {
     assert.deepEqual(modifierNames(buildDeviceModel(), 0), []);
@@ -82,20 +58,12 @@ test("a stored shortcut reads as the picker names it: a key's label, a macro's n
 });
 
 test("pointing macro identities use the stored slot and current profile name", () => {
-    for (const code of [0x7700, "MACRO_0", "VIA_MACRO_0", "0x7700", "30464"]) assert.equal(macroIndex(code), 0);
-    assert.equal(macroIndex("MACRO_127"), 127);
-    assert.equal(macroIndex("VIA_MACRO_127"), 127, "the former name reaches every slot");
-    // QMK's own names for the first 32 slots are the keycode catalog's, so
-    // they are read through the model core publishes.
     const catalog = publishedModel();
-    for (const code of ["QK_MACRO_0", "MC_0"]) assert.equal(macroIndex(code, catalog), 0, code);
-    assert.equal(macroIndex("MC_31", catalog), 31);
-    for (const code of [0x7780, "MACRO_128", "VIA_MACRO_128", "QK_MACRO_32", "C(MACRO_0)", "KC_A", ""]) assert.equal(macroIndex(code, catalog), null, String(code));
+    assert.deepEqual(pointingMacro(catalog, "MC_0")?.index, 0, "QMK's own name, read through the model core publishes");
     const model = {macros: [{keycode: "MACRO_0", name: "Greeting <&>", defaultName: "Macro 0", empty: true}, {keycode: "MACRO_126", name: "", defaultName: "Macro 126", empty: false}]};
     assert.deepEqual(pointingMacro(model, 0x7700), {index: 0, name: "Greeting <&>", empty: true});
     assert.deepEqual(pointingMacro(model, "MACRO_126"), {index: 126, name: "Macro 126", empty: false}, "an unnamed slot by the name core gives it");
     assert.deepEqual(pointingMacro(model, "MACRO_127"), {index: 127, name: "MACRO_127", empty: false}, "a slot the model lists none for, by its keycode");
-    assert.equal(keyName(model, 0x777f), "MACRO_127");
 });
 
 test("modifiers alone, or with a modifier key, fold into one set stored as the simplest keycode", () => {

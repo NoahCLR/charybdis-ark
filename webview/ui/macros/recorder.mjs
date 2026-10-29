@@ -136,7 +136,7 @@ export function reconcileRecording() {
         stopRecording(model, null, false);
     }
     const take = state.lastTake, taken = take && bank.find(slot => slot.keycode === take.slot);
-    if (take && !(taken && takeStands(take, taken.keycode, macroForm(taken.keycode).draft ?? taken.payload ?? "", model?.qmkKeycodeAliases))) {
+    if (take && !(taken && takeStands(take, taken.keycode, macroForm(taken.keycode).draft ?? taken.payload ?? "", model))) {
         state.lastTake = null;
     }
 }
