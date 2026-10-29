@@ -7,8 +7,9 @@ import {fileURLToPath} from "node:url";
 // Markup is built from template strings, and every value from the keyboard, a
 // file or the shell reaches it through esc() (CODING_STANDARDS.md). This reads
 // every webview module and judges each ${…} in a markup template (one with a
-// tag in it) and each value handed to el(), innerHTML, outerHTML or
-// insertAdjacentHTML. A value passes when it is
+// tag in it) and each value handed to el(), `.innerHTML =`, `.outerHTML =` or
+// `.insertAdjacentHTML(…)`, the only forms tests/scripts/conventions.test.js
+// lets a webview module set markup by. A value passes when it is
 // - esc(…), a literal, a number by construction (arithmetic, a comparison,
 //   Number(…), Math.…(…), .length, a callback's index…) or a markup template,
 //   which is judged where it is written;
@@ -35,13 +36,13 @@ const SAFE_HELPERS = {
 // Interpolations that pass for a reason the check cannot see, per module.
 /** @type {[file: string, expressions: string[], why: string][]} */
 const PASSES_ON_PURPOSE = [
-    ["webview/lib/dom.mjs", ["String(markup).trim()"], "el() itself: what callers hand it is judged at each call"],
+    ["webview/lib/dom.mjs", ["html(String(markup).trim())"], "el() itself: what callers hand it is judged at each call"],
     ["webview/ui/checks.mjs", ["show(check)", "source(check)"], "the Show and source buttons the review overlay passes in, built from escaped templates there"],
     ["webview/ui/custom-keys.mjs", ['keyFields(model, key).join("")'], "an empty slot and placedOn()'s layer chips, both markup templates"],
     ["webview/ui/device.mjs", ["value"], "kv() rows hold markup their callers escaped, as its @param says"],
     ["webview/ui/groups.mjs", ['group.rows.join("")'], "each tab's table rows, markup templates built by that tab"],
     ["webview/ui/groups.mjs", ["detail"], "a group's detail, markup its tab built: the Combos tab's selected key, named through keyNameMarked"],
-    ["webview/ui/hover.mjs", ['own.join("")', 'reachSections(model, layer, target, -1, [], {foot: false}).join("")', 'sections.join("")'], "reachSections() returns the hover card's sections, markup templates it pushes"],
+    ["webview/ui/hover-card.mjs", ['own.join("")', 'reachSections(model, layer, target, -1, [], {foot: false}).join("")', 'sections.join("")'], "reachSections() returns the hover card's sections, markup templates it pushes"],
     ["webview/ui/keys/behaviours-tab.mjs", ["note"], "viewBehaviourNote() and comboNote(): escaped layer names and marked combo keys"],
     ["webview/ui/keys/combos-tab.mjs", ["reachedBy"], "keysReach() and reachText(): marked key names and escaped layer names"],
     ["webview/ui/keys/macros-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],
@@ -49,7 +50,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/keys/pointing-tab.mjs", ["line"], "pointingReachLines(): keysReach(), branchReach(), comboReach() and layersNamed(), marked key names and escaped layer names"],
     ["webview/ui/keys/key-tab.mjs", ["stackRows(model, layer, position)"], "the layer stack's rows, markup templates joined"],
     ["webview/ui/layerbar.mjs", ["tint"], "a style attribute holding layerSwatch()'s css() colour"],
-    ["webview/ui/macros/editor.mjs", ["placedOn(model, slot)", "chips"], "layer chips, markup templates of escaped names and layer swatches"],
+    ["webview/ui/pointing/empty-slot.mjs", ["listed(parts)"], "the ways still reaching an empty slot, joined in prose (view/vocabulary.mjs listed): each a template of counts, escaped layer names and marked actions"],
     ["webview/ui/pointing/form-controls.mjs", ["options.labelHtml"], "the movement arms' labels: an arrow constant and an escaped label (pointing/movement.mjs)"],
     ["webview/ui/review-items.mjs", ['head.map(row).join("")', 'rest.map(row).join("")', "show", "discard"], "field rows from field(), and the Show and Discard buttons the review overlay builds"],
     ["webview/ui/marks.mjs", ["SCREENS.pointing.icon", "look"], "the Pointing modes screen's authored SVG icon (view/screens.mjs), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],
@@ -629,7 +630,9 @@ function analyse(files, read, {helpers = SAFE_HELPERS} = {}) {
         const callee = head.length === 1 && head[0].t === "id" && links.slice(0, -1).every((link) => "name" in link)
             ? [head[0].v, ...links.slice(0, -1).map((link) => link.name)].join(".") : null;
         if (callee === "esc" || NUMBER_CALLS.test(callee ?? "")) return true;
-        if (callee === "String") return unsafe(module, last.call).length === 0;
+        // String() and the page's Trusted Types policy (lib/dom.mjs html) pass
+        // what they are handed as it is: it is judged instead.
+        if (callee === "String" || callee === "html") return unsafe(module, last.call).length === 0;
         if (callee && helpers[callee]) return true;
         if (before && NUMBER_METHODS.has(before.name)) return true;
         if (before?.name === "join") return unsafe(module, last.call).length === 0 && joined(module, head, links.slice(0, -2));
@@ -717,6 +720,9 @@ test("the markup check catches values that are not escaped", () => {
     assert.deepEqual(sample("el(`<ul>${rows.map((row) => `<li>${row.name}</li>`).join(\"\")}</ul>`);"), ["row.name"]);
     assert.deepEqual(sample("el(`<p>${names.join(\" + \")}</p>`);"), ["names.join(\" + \")"]);
     assert.deepEqual(sample("node.insertAdjacentHTML(\"beforeend\", summary);"), ["summary"]);
+    // The Trusted Types policy hides nothing: what it is handed is judged.
+    assert.deepEqual(sample("card.innerHTML = html(`<p>${label}</p>`);"), ["label"]);
+    assert.deepEqual(sample("card.innerHTML = html(`<p>${esc(label)}</p>`);"), []);
     assert.deepEqual(sample("import {named} from \"./sibling.mjs\";\nel(`<p>${named(key)}</p>`);", "export const named = (key) => key.name;"), ["named(key)"]);
     // A parameter holds what every caller passes, so one bare argument is enough.
     assert.deepEqual(sample("const cell = (text) => `<td>${text}</td>`;\nel(`<tr>${cell(esc(a))}${cell(b)}</tr>`);"), ["text"]);

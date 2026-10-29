@@ -8,14 +8,14 @@
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 import {render, state} from "../store.mjs";
 import {draftDot} from "../view/review.mjs";
-import {GROUP_TITLES, inGroupOrder, setReachGroupOpen} from "../view/reach-groups.mjs";
+import {GROUP_TITLES, inGroupOrder, reachRowId, setReachGroupOpen} from "../view/reach-groups.mjs";
 
 // A folded group holding something the draft changed says so on its header;
 // open, its rows carry their own marks.
 // A group whose rows depend on a choice elsewhere names it after the title,
 // as markup: a key is named as every surface names it (ui/marks.mjs).
 /** @param {string} tab @param {string} id @param {number} count @param {boolean} [drafted] @param {string} [detail] */
-export function groupHeader(tab, id, count, drafted = false, detail = "") {
+function groupHeader(tab, id, count, drafted = false, detail = "") {
     const open = state.reachGroups[id];
     return `<button class="group-h" data-group-tab="${esc(tab)}" data-group="${esc(id)}" aria-expanded="${esc(open)}">
         ${DISCLOSURE}<span class="ttl">${esc(GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (id)])}${detail ? ` <span class="mono dim">· ${detail}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
@@ -23,10 +23,10 @@ export function groupHeader(tab, id, count, drafted = false, detail = "") {
 }
 
 /** @param {string} tab @param {string} id */
-export const groupOpen = (tab, id) => state.reachGroups[id];
+const groupOpen = (tab, id) => state.reachGroups[id];
 
 /** @param {HTMLElement} node */
-export const attachGroupToggles = (node) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-group-tab]")).forEach((button) =>
+const attachGroupToggles = (node) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-group-tab]")).forEach((button) =>
     button.addEventListener("click", () => {
         const id = /** @type {string} */ (button.dataset.group);
         state.reachGroups = setReachGroupOpen(state.reachGroups, id, !state.reachGroups[id]);
@@ -45,12 +45,10 @@ export const attachReachRows = (node, tab) => /** @type {NodeListOf<HTMLElement>
         render();
     }));
 
-// One thing can be listed under several routes, so a pick names the route it
-// was made from — otherwise picking it in one group would ring the keys of all
-// of them.
+// A row names the route it was picked under (reachRowId).
 /** @param {keyof import("../state.js").PanelState["reachRow"]} tab @param {string} group @param {string | number} name */
 export const reachAttrs = (tab, group, name) => {
-    const picked = `${group}:${name}`;
+    const picked = reachRowId(group, name);
     return ` data-reach="${esc(picked)}"${state.reachRow[tab] === picked ? ' data-picked="true"' : ""}`;
 };
 

@@ -9,6 +9,7 @@ const {fingerprint, validateSnapshot} = require("../../core/model/portable-profi
 const {profileMacroBudget, macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {editSettings, settingsEditorView} = require("../../core/model/settings-editor");
+const {VOCABULARY, word} = require("../../core/model/vocabulary");
 const {buildDeviceModel} = require("../../core/session/device-model");
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const settingsDomain = value => decodeProfileBlob(Buffer.from(value.profile, "base64")).domains.find(domain => domain.id === 0x40);
@@ -192,13 +193,15 @@ test("Unicode host setup persists with the profile", () => {
         current = snapshot(change({payload: "café 🙂 e\u0301 👩‍💻"}));
         const view = macroEditorView(current, capabilities);
         const {layoutChars, ...unicodeView} = view.unicode;
-        assert.deepEqual(unicodeView, {mode, enabled: true, os: mode, layout: 0, layoutFits: true, layoutName: "US"});
+        assert.deepEqual(unicodeView, {mode, enabled: true, os: mode, layout: 0, layoutFits: true, layoutName: "US", entry: word(VOCABULARY.unicodeEntry, mode)});
         assert.equal(layoutChars.length, 97);
         assert.equal(view.macros[0].payload, "café 🙂 e\u0301 👩‍💻");
         assert.equal(Buffer.from(profileMacros(current.document)[0], "base64").toString("utf8"), "café 🙂 e\u0301 👩‍💻");
     }
     const off = snapshot(setHost(0, false));
     const offView = macroEditorView(off, capabilities);
+    // Off, it says what Unicode entry needs: playback on and a known host.
+    assert.equal(offView.unicode.entry, word(VOCABULARY.unicodeEntryOff, 0));
     assert.equal(offView.macros[0].needsUnicodeSetup, true);
     assert.equal(offView.macros[0].playable, false);
     assert.throws(() => change({payload: "{+KC_A}é{-KC_A}"}), /Release ordinary keys/);

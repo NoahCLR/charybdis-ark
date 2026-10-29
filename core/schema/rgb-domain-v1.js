@@ -1,9 +1,9 @@
 // @ts-check
 "use strict";
-const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 const {LAYERS} = require("../data/charybdis-layout");
 const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
-const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError, canonical} = require("./bytes");
+const {u8: assertU8, u16: assertU16, asBytes, protocolError, canonical} = require("./bytes");
 
 /**
  * @typedef {ReturnType<typeof normalizeOptions>} Limits
@@ -12,7 +12,7 @@ const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError, canonica
  */
 const {MAX_TAP_DEPTH} = require("./profile-depth");
 
-const {PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
+const {PROFILE_BLOB_V1} = require("./profile-blob-v1");
 
 const RGB_DOMAIN_V1 = Object.freeze({
     DOMAIN_ID: PROFILE_DOMAIN_IDS.RGB,
@@ -84,7 +84,7 @@ const RGB_POINTING_MODE_IDS = Object.freeze({
     ...Object.fromEntries(Array.from({length: 24}, (_, index) => [`POINTING_MODE_${index + 8}`, index + 8])),
 });
 
-const RgbDomainProtocolError = protocolError("RgbDomainProtocolError");
+const RgbDomainProtocolError = protocolError("RgbDomainProtocolError", "ark");
 
 /** @param {import("./types.js").RgbInput} profile @param {import("./types.js").RgbOptions} [options] */
 function encodeRgbDomainV1(profile, options = {}) {
@@ -165,7 +165,7 @@ function encodeRgbDomainV1(profile, options = {}) {
 
 /** @param {unknown} value @param {import("./types.js").RgbOptions} [options] */
 function decodeRgbDomainV1(value, options = {}) {
-    const bytes = copyBytes(value, "RGB domain payload");
+    const bytes = asBytes(value, "RGB domain payload");
     const limits = normalizeOptions(options);
     if (bytes.length < RGB_DOMAIN_V1.HEADER_SIZE) {
         throw rgbError("TRUNCATED", `RGB domain needs a ${RGB_DOMAIN_V1.HEADER_SIZE}-byte header.`);
@@ -337,7 +337,7 @@ function normalizeProfile(profile, limits) {
     const keyGroupRows = normalizeGroupRows(profile.keyGroupRows, groupState, limits, "keyGroupRows", (semantic, row) => assertKeySemantic(semantic, "keyGroupRows", row), "semantic");
     const groupRowCount = layerGroupRows.length + pdModeGroupRows.length + comboGroupRows.length + keyGroupRows.length;
     if (groupRowCount > RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS) {
-        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`);
+        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`, {limit: "lightingGroupRows", most: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS});
     }
     const normalized = {
         formatVersion: RGB_DOMAIN_V1.FORMAT_VERSION,
@@ -394,7 +394,7 @@ function normalizeOptions(options = {}) {
 /** @param {readonly {id: number, leds: number[]}[]} input */
 function normalizeGroups(input) {
     if (input.length > RGB_DOMAIN_V1.MAX_GROUPS) {
-        throw rgbError("CAPACITY_EXCEEDED", `RGB group count ${input.length}; maximum is ${RGB_DOMAIN_V1.MAX_GROUPS}.`, {table: "groups"});
+        throw rgbError("CAPACITY_EXCEEDED", `RGB group count ${input.length}; maximum is ${RGB_DOMAIN_V1.MAX_GROUPS}.`, {table: "groups", limit: "lightingGroups", most: RGB_DOMAIN_V1.MAX_GROUPS});
     }
     const groupsByInputId = input.map((group, index) => {
         const leds = normalizeLeds(group?.leds, "groups", index);
@@ -592,7 +592,7 @@ function ledsToBitmap(value) {
 
 /** @param {unknown} value */
 function bitmapToLeds(value) {
-    const bitmap = copyBytes(value, "LED bitmap");
+    const bitmap = asBytes(value, "LED bitmap");
     if (bitmap.length !== RGB_DOMAIN_V1.LED_BITMAP_SIZE) throw new RangeError(`LED bitmap must be ${RGB_DOMAIN_V1.LED_BITMAP_SIZE} bytes.`);
     const leds = [];
     for (let led = 0; led < RGB_DOMAIN_V1.PHYSICAL_LED_COUNT; led += 1) {
@@ -713,12 +713,9 @@ module.exports = {
     RGB_LOCALITIES,
     RGB_POINTING_MODE_IDS,
     RGB_STAGE_BITS,
-    RGB_STAGE_MASK_ALL,
     RGB_TAP_COMMIT_MODES,
     RgbDomainProtocolError,
-    bitmapToLeds,
     createRgbDomainV1,
     decodeRgbDomainV1,
     encodeRgbDomainV1,
-    ledsToBitmap,
 };

@@ -4,14 +4,14 @@
 // live watch, and never alongside another operation.
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {PHASE} = require("../../core/model/vocabulary");
+const {FAILURE_WORDS, PHASE} = require("../../core/model/vocabulary");
 const {FLASH_PAUSES_V1} = require("../../core/protocol/flash-pauses-v1");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
 const {PULL_WAIT_MS, readFlashFigures} = require("../../core/session/flash-pauses");
-const {openPanelLoop} = require("../../core/session/panel-loop");
 const {checkLive} = require("../../core/session/live-watch");
 const {connectedService} = require("../fixtures/connected-service");
-const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {fakeKeyboard, fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {lastModel, openLoop} = require("../fixtures/panel-loop");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 
@@ -43,26 +43,12 @@ function holdPauses(adapter) {
     }};
 }
 
-function fakeShell() {
-    const shell = {
-        posted: [], errors: [],
-        post: (message) => {shell.posted.push(message);},
-        showError: (text) => {shell.errors.push(text);},
-        saveRecovery: async () => "/recovery/1.json",
-        saveExport: async () => undefined,
-    };
-    return shell;
-}
-const model = shell => shell.posted.filter(message => message.type === "model").at(-1)?.model;
-
-/** @param {import("node:test").TestContext} t @param {{keyboard?: object, waits?: number[]}} [options] */
-async function open(t, {keyboard, waits = [], read = true} = {}) {
-    const shell = fakeShell();
-    const adapter = fakeKeyboardAdapter(keyboard ? {keyboard} : {document: document()});
-    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 300, sleep: async ms => {waits.push(ms);}});
-    t.after(() => loop.close());
-    if (read) await loop.handleMessage({type: "refresh"});
-    return {shell, adapter, loop, session: loop.session, waits};
+// The loop on a read-only keyboard unless one is given, read unless `read`
+// is false; `waits` is every wait the loop asked its clock for.
+/** @param {import("node:test").TestContext} t @param {{keyboard?: object, read?: boolean}} [options] */
+async function open(t, {keyboard = fakeKeyboard({document: document()}), read = true} = {}) {
+    const opened = await openLoop(t, {keyboard, read});
+    return {...opened, waits: opened.clock.waits};
 }
 
 test("the service reads both halves into its snapshot; the slave half is not measured until the master half has pulled it", async t => {
@@ -87,7 +73,8 @@ test("a failed read is published as unavailable and keeps the connection", async
     assert.equal(await service.readFlashPauses(), true);
     const pauses = service.snapshot().flashPauses;
     assert.equal(pauses.state, "unavailable");
-    assert.match(pauses.error, /reserved byte/);
+    assert.equal(pauses.error, FAILURE_WORDS.unreadable, "said in words");
+    assert.match(service.snapshot().diagnostics.at(-1), /^Flash pauses: INVALID_FLASH_PAUSES: .*reserved byte/, "the decoder's own in the diagnostics");
     assert.equal(service.snapshot().connected, true);
     assert.equal(service.snapshot().error, null, "a diagnostic read is no failure of the keyboard");
 });
@@ -108,28 +95,31 @@ test("an operation started while the figures are out waits for them before it re
     const pauses = holdPauses(adapter);
     const reading = service.readFlashPauses();
     await pauses.out;
-    let ran = false;
-    const operation = service.runOperation(PHASE.READ_PROFILE, async () => {ran = true;});
+    // Whether the figures were still out when the operation ran.
+    let out = true, ranWhileOut = undefined;
+    const operation = service.runOperation(PHASE.READ_PROFILE, async () => {ranWhileOut = out;});
     assert.equal(service.snapshot().busy, true, "the operation holds the keyboard from the start");
     assert.equal(await service.readFlashPauses(), false, "and nothing else reads meanwhile");
-    await new Promise(resolve => setTimeout(resolve, 20));
-    assert.equal(ran, false, "not alongside the figures");
+    // Turns of the event loop pass with the figures still out, so an
+    // operation deferred to a later task would run, and be seen, meanwhile.
+    for (let turn = 0; turn < 10; turn++) await new Promise(resolve => setImmediate(resolve));
+    out = false;
     pauses.release();
     assert.equal(await reading, true);
     await operation;
-    assert.equal(ran, true);
+    assert.equal(ranWhileOut, false, "it ran once the figures were in, not alongside them");
     assert.deepEqual(pausePages(keyboard), [0, 1]);
 });
 
 test("Diagnostics opening reads both halves, gives the master half time to pull, and reads again", async t => {
     const {shell, adapter, loop, waits} = await open(t);
     assert.deepEqual(pausePages(adapter.keyboard), [], "reading the keyboard reads no figures");
-    assert.equal(model(shell).device.flashPauses, null);
+    assert.equal(lastModel(shell).device.flashPauses, null);
     await loop.handleMessage({type: "readFlashPauses"});
     assert.deepEqual(pausePages(adapter.keyboard), [0, 1, 0, 1]);
     assert.deepEqual(waits.filter(ms => ms === PULL_WAIT_MS), [PULL_WAIT_MS]);
     assert.ok(PULL_WAIT_MS > FLASH_PAUSES_V1.PULL_MS, "longer than the master half's pull interval");
-    const pauses = model(shell).device.flashPauses;
+    const pauses = lastModel(shell).device.flashPauses;
     assert.equal(pauses.master.longestEraseUs, 49045);
     assert.equal(pauses.slave.longestEraseUs, 48708);
     const published = shell.posted.filter(message => message.type === "model").map(message => message.model.device.flashPauses);
@@ -144,7 +134,7 @@ test("Read keyboard reads the figures only when it asks for them, after the keyb
     assert.deepEqual(pausePages(adapter.keyboard), [0, 1, 0, 1]);
     const last = adapter.keyboard.requests.findLastIndex(request => request[2] !== FLASH_PAUSES_V1.VALUE);
     assert.ok(last < adapter.keyboard.requests.findIndex(request => request[2] === FLASH_PAUSES_V1.VALUE), "the keyboard is read first");
-    assert.equal(model(shell).device.flashPauses.slave.saves, 1);
+    assert.equal(lastModel(shell).device.flashPauses.slave.saves, 1);
 });
 
 test("nothing is read while the panel holds the keyboard, and the second read waits for nothing that started meanwhile", async t => {
@@ -164,7 +154,7 @@ test("the demo reads nothing and shows sample figures for both halves", async t 
     assert.ok(session.demo, "the demo is open");
     await loop.handleMessage({type: "readFlashPauses"});
     assert.deepEqual(pausePages(adapter.keyboard), []);
-    const pauses = model(shell).device.flashPauses;
+    const pauses = lastModel(shell).device.flashPauses;
     assert.equal(pauses.state, "read");
     assert.equal(pauses.master.physicalHalf, 1);
     assert.equal(pauses.slave.physicalHalf, 0);

@@ -3,15 +3,15 @@
 
 const {parsePayload, encodeMacroPayload, decodeMacroPayload} = require("../schema/macro-payload");
 const {hostLayout, layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
-const {VOCABULARY, wordedMacroError} = require("./vocabulary");
+const {settingsPath, wordedMacroError} = require("./vocabulary");
 
 // What to do when the host layout cannot type a character, by effective OS.
-const HOST = VOCABULARY.settingsScreens.host;
+const HOST = settingsPath("host", "host");
 const ENTRY_SETUP = [
-    `Choose a host OS and enable Unicode playback in ${HOST} → Your computer to type it with Unicode entry.`,
-    `Choose the Unicode Hex Input layout in ${HOST} → Your computer to type it with Unicode entry.`,
-    `Enable Unicode playback in ${HOST} → Your computer to type it with Unicode entry.`,
-    `Enable Unicode playback in ${HOST} → Your computer to type it with Unicode entry.`,
+    `Choose a host OS and enable Unicode playback in ${HOST} to type it with Unicode entry.`,
+    `Choose the Unicode Hex Input layout in ${HOST} to type it with Unicode entry.`,
+    `Enable Unicode playback in ${HOST} to type it with Unicode entry.`,
+    `Enable Unicode playback in ${HOST} to type it with Unicode entry.`,
 ];
 
 // Inspection and staging use the same codec and limits. A partial or oversized

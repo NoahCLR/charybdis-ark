@@ -3,7 +3,7 @@ import {el, esc} from "../../lib/dom.mjs";
 import {canEdit as canEditArea, post} from "../../store.mjs";
 import {lightingOff} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
-import {sectionsIn} from "../settings.mjs";
+import {sectionsIn} from "../../view/settings-layout.mjs";
 import {unavailable} from "../frame.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 
@@ -16,7 +16,7 @@ export function stageBase(model) {
     const node = el(`<div class="tab-grid three"></div>`);
     const effect = sectionsIn(model, "Lighting").find((entry) => entry.id === "rgbAppearance");
     if (!effect) {
-        node.append(el(`<p class="note span">${esc(unavailable(model) || "Choose Read keyboard to load the background effect.")}</p>`));
+        node.append(el(`<p class="note span">${esc(unavailable(model) || "Choose Read keyboard to read the background effect.")}</p>`));
         return node;
     }
     const editable = canEditArea("settings");

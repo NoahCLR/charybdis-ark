@@ -2,10 +2,10 @@
 // What the Backups screen says about a chosen file: whether it fits the
 // keyboard's memory.
 
-// The largest profile file read, and what a larger one is told: core's own
+// The largest backup read, and what a larger one is told: core's own
 // (FILE_MAX_BYTES and FILE_TOO_LARGE in core/model/portable-profile.js).
 export const PROFILE_FILE_MAX_BYTES = 196608;
-export const PROFILE_FILE_TOO_LARGE = "This profile file is too large.";
+export const PROFILE_FILE_TOO_LARGE = "This file is too large for a backup.";
 
 /** @param {number} value */
 const bytes = (value) => value.toLocaleString("en-GB");

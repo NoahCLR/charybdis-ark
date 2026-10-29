@@ -22,7 +22,8 @@ On a key face:
 - Dots show the key's behaviour, one for each kind of branch it sets: tap,
   hold and long hold, in the colours the keyboard flashes. A number beside a
   dot counts branches of that kind. A key whose behaviour a switch keeps off
-  on this layer shows no dots ([Where behaviours run](behaviours.md#where-behaviours-run)).
+  on this layer shows no dots ([Where behaviours
+  run](behaviours.md#where-behaviours-run)).
 - Badges such as **C0** mark the combos that fire from the key here. A combo
   a switch keeps off, or that can't form because another of its keys can't
   join it, has no badge ([Where combos run](combos.md#where-combos-run)).
@@ -80,9 +81,9 @@ mode reads the same way everywhere, as the behaviour grid draws it: the icon,
 the name and a tag for what it does, such as **HOLD** or **LOCK**. A layer-tap
 key keeps its name ("/ / Navigation"), with the icon before the layer.
 
-### Rename & Reorder
+### Rename & reorder
 
-**Rename & Reorder**, after the last tab, opens the layer list over the
+**Rename & reorder**, after the last tab, opens the layer list over the
 board, highest first, with the base at the bottom.
 
 - Type in a name to rename a layer. Names are up to 32 bytes: a letter takes

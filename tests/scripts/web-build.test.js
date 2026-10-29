@@ -27,7 +27,9 @@ test("every file the build writes is named by its content, and the manifest besi
         fs.writeFileSync(path.join(outdir, "core-OLDRELEASE.js"), "");
         fs.writeFileSync(path.join(outdir, "manifest.json"), "{}");
         const build = {version: "1.2.3", commit: "abc123"};
-        const manifest = await buildWeb({outdir, build});
+        /** @type {Partial<Record<"worker" | "panel" | "core", string[]>>} */
+        const inputs = {};
+        const manifest = await buildWeb({outdir, build, inputs});
         assert.deepEqual(Object.keys(manifest).sort(), ["core", "panel", "shell", "styles", "worker"]);
         assert.match(manifest.core, /^core-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.shell, /^shell-[A-Z0-9]{8}\.js$/);
@@ -45,11 +47,11 @@ test("every file the build writes is named by its content, and the manifest besi
         // core/ for a browser is the core entry with the chunk it shares with the shell.
         const core = [manifest.core, ...chunks].map((file) => fs.readFileSync(path.join(outdir, file), "utf8")).join("\n");
         assert.ok(!core.includes("node-hid-adapter.js") && !/require\("(node:)?(fs|crypto|path)"\)/.test(core), "the core bundle carries no Node module");
-        assert.ok(core.includes("core/transport/webhid-adapter.js"), "the page's own adapter is the one it carries");
-        const panel = fs.readFileSync(path.join(outdir, manifest.panel), "utf8");
-        assert.ok(!panel.includes("core/"), "the panel bundle is the renderer alone");
+        assert.ok(!inputs.core?.some((file) => file.endsWith("node-hid-adapter.js")), "the core bundle takes no node-hid adapter");
+        assert.ok(inputs.core?.includes("core/transport/webhid-adapter.js"), "the page's own adapter is the one it carries");
+        assert.ok(inputs.panel?.length && !inputs.panel.some((file) => file.startsWith("core/")), "the panel bundle is the renderer alone");
         for (const rule of ["rules/layer-answers.mjs", "rules/qmk-keycodes.mjs", "rules/layer-placement.mjs", "rules/keycode-expression.mjs"]) {
-            assert.ok(core.includes(rule) && panel.includes(rule), `core and the panel each carry ${rule}`);
+            assert.ok(inputs.core?.includes(rule) && inputs.panel?.includes(rule), `core and the panel each carry ${rule}`);
         }
         assert.deepEqual(checkStaticSite(outdir, {project: root}), [], "what the build writes is ready to publish");
     } finally {
@@ -119,6 +121,8 @@ test("the page is published with its policy as a header, and only hashed files a
         assert.deepEqual(header("/*", "Permissions-Policy"), ["hid=(self)"]);
         assert.deepEqual(header("/*", "X-Content-Type-Options"), ["nosniff"]);
         assert.deepEqual(header("/*", "Referrer-Policy"), ["no-referrer"]);
+        assert.deepEqual(header("/*", "Cross-Origin-Opener-Policy"), ["same-origin"]);
+        assert.deepEqual(header("/*", "Strict-Transport-Security"), ["max-age=31536000"]);
         assert.deepEqual(header("/*", "X-Robots-Tag"), ["noindex, nofollow"]);
         assert.match(page, /<meta name="robots" content="noindex, nofollow">/);
 
@@ -162,10 +166,24 @@ test("the build fails when something would pull node-hid, its adapter or fs into
     }
 });
 
-test("the entry exports what it names, under Node as in the bundle", async () => {
+test("the entry exports what its readers use, and each is there, under Node as in the bundle", async () => {
     const core = await import("../../web/core.mjs");
+    // The shell's names (web/web-shell.mjs, web/recoveries.mjs), then the
+    // build's tests' (browser-tests/: core-exercise.js and the specs that
+    // drive the bundled core).
+    assert.deepEqual(Object.keys(core).sort(), [
+        "closingLoses", "demoUnsaved", "FILE_MAX_BYTES", "FILE_TOO_LARGE", "openPanelLoop", "recoveryFileName", "WebHidDeviceAdapter", "writingProfile",
+        "ApplyProgress", "Buffer", "buildPanelModel", "ProfileDraftSession", "startLayerEdit",
+        "comboDomain", "keyBehaviorDomain", "pdModeDomain", "portable", "profileBlob", "rgbDomain", "settingsDomain",
+    ].sort());
     const missing = Object.entries(core).filter(([, value]) => value === undefined).map(([name]) => name);
     assert.deepEqual(missing, []);
+    // Every name a browser test reads off the bundled core is exported (a
+    // mention of core.mjs itself is a file, not a name).
+    const dir = path.join(__dirname, "../../browser-tests");
+    const read = new Set(fs.readdirSync(dir).filter((name) => name.endsWith(".js"))
+        .flatMap((name) => Array.from(fs.readFileSync(path.join(dir, name), "utf8").matchAll(/(?<![\w/.])core\.(?!mjs\b)([A-Za-z_]\w*)/g), (match) => match[1])));
+    assert.deepEqual([...read].filter((name) => !(name in core)), [], "a browser test reads a name web/core.mjs does not export");
     assert.equal(core.Buffer, Buffer, "under Node the entry's Buffer is Node's own");
     assert.equal(typeof core.ProfileDraftSession, "function");
     assert.equal(typeof core.profileBlob.decodeProfileBlob, "function");

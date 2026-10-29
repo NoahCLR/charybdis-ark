@@ -68,10 +68,10 @@ test("Show goes to where each kind of item is edited", () => {
     const layers = [{index: 0}, {index: 1}, {index: 2}];
     assert.deepEqual(placeState({kind: "key", layer: 2, layoutIndex: 13}, layers), {screen: "keys", tab: "key", layer: 2, selected: 13});
     assert.equal(placeState({kind: "behaviour", keycode: "KC_ESCAPE"}).behaviourRow, "KC_ESCAPE");
-    assert.equal(placeState({kind: "macro", index: 4}).macroSlot, "MACRO_4");
-    assert.deepEqual(placeState({kind: "customKey", index: 2}), {screen: "customKeys", customKey: "CUSTOM_KEY_2"});
-    assert.ok(draftMarks([{place: {kind: "customKey", index: 2}, status: "changed"}]).customKeys.has("CUSTOM_KEY_2"));
-    assert.deepEqual(categorySummary(words, [{place: {kind: "customKey", index: 2}, status: "changed"}]).map(({category, rows}) => [category, rows]),
+    assert.equal(placeState({kind: "macro", index: 4, keycode: "MACRO_4"}).macroSlot, "MACRO_4");
+    assert.deepEqual(placeState({kind: "customKey", index: 2, keycode: "CUSTOM_KEY_2"}), {screen: "customKeys", customKey: "CUSTOM_KEY_2"});
+    assert.ok(draftMarks([{place: {kind: "customKey", index: 2, keycode: "CUSTOM_KEY_2"}, status: "changed"}]).customKeys.has("CUSTOM_KEY_2"));
+    assert.deepEqual(categorySummary(words, [{place: {kind: "customKey", index: 2, keycode: "CUSTOM_KEY_2"}, status: "changed"}]).map(({category, rows}) => [category, rows]),
         [["Keys", [{label: "Custom keys", count: 1}]]], "names and shortcuts alike");
     assert.equal(placeState({kind: "pointing", slot: 6}).pointingSlot, 6);
     assert.equal(placeState({kind: "lighting", stage: "pd"}).stage, "pd");
@@ -104,7 +104,7 @@ test("Show goes to where each kind of item is edited", () => {
 test("a removed thing keeps its mark and its Show only where it is still on screen", () => {
     const removed = (place) => ({status: "removed", place});
     assert.equal(stillShown(removed({kind: "pointing", slot: 4})), true, "a cleared slot is still a card");
-    assert.equal(stillShown(removed({kind: "macro", index: 2})), true, "an emptied macro is still a slot");
+    assert.equal(stillShown(removed({kind: "macro", index: 2, keycode: "MACRO_2"})), true, "an emptied macro is still a slot");
     assert.equal(stillShown(removed({kind: "behaviour", keycode: "KC_2"})), false, "a removed behaviour has no row left");
     assert.equal(stillShown(removed({kind: "combo", index: 1})), false);
     const marks = draftMarks([removed({kind: "pointing", slot: 4}), removed({kind: "behaviour", keycode: "KC_2"})]);
@@ -134,7 +134,7 @@ test("a profile file's differences are counted by what they configure, split as 
         at({kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"}),
         at({kind: "combo", index: 7}, {status: "removed"}), at({kind: "key", layer: 3}), at({kind: "key", layer: 0}), at({kind: "key", layer: 3}),
         at({kind: "settings", section: "keyTiming"}), at({kind: "behaviour"}, {status: "added"}), at({kind: "layers"}, {unit: "layerName:2"}),
-        at({kind: "settings"}, {unit: "settings:otherKeyOptions"}), at({kind: "macro", index: 4}), at(null, {unit: "profile", title: "Stored profile"}),
+        at({kind: "settings"}, {unit: "settings:otherKeyOptions"}), at({kind: "macro", index: 4, keycode: "MACRO_4"}), at(null, {unit: "profile", title: "Stored profile"}),
     ], {names: ["Base", "Numbers", "Symbols", "Navigation"]});
     assert.deepEqual(groups.map((group) => [group.category, group.count]),
         [["Keys", 8], ["Lighting", 7], ["Macros", 1], ["Mouse", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");

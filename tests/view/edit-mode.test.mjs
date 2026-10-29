@@ -4,17 +4,39 @@ import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, 
 import {RESTART_NEEDED} from "../../webview/view/keyboard-view.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 
-const vocabulary = {editModes: {
-    0: {id: "apply", label: "Review and save", detail: "a"}, 1: {id: "live", label: "Live edit", detail: "b"}, 2: {id: "liveReview", label: "Live preview + save", detail: "c"},
-}};
-/** @param {object} draft @param {number} mode */
-const model = (draft, mode = LIVE_REVIEW, offered = [LIVE, LIVE_REVIEW, APPLY]) => /** @type {any} */ ({vocabulary, editMode: {mode, conflict: false, offered}, draft});
+import {createRequire} from "node:module";
+
+const {openDraft, panelModel, profileDocument} = createRequire(import.meta.url)("../fixtures/published-model");
+
+// The edit mode and its words as core publishes them for a keyboard in
+// `mode`, under the draft a test describes.
+const {draft: opened, state} = openDraft(profileDocument());
+/** @type {Map<string, any>} */
+const published = new Map();
+/** @param {number} mode @param {{conflict?: boolean, notStored?: boolean}} [flags] */
+const publishedMode = (mode, {conflict = false, notStored = false} = {}) => {
+    const key = `${mode} ${conflict} ${notStored}`;
+    if (!published.has(key)) published.set(key, panelModel(opened, {...state, editMode: {mode, conflict, notStored, counter: 1, slaveMode: mode, slaveCounter: 1, slaveKnown: true, agreed: !conflict}}));
+    return published.get(key);
+};
+/** @param {object} draft @param {number} mode @param {{conflict?: boolean, notStored?: boolean}} [flags] */
+const model = (draft, mode = LIVE_REVIEW, flags = {}) => {
+    const {vocabulary, editMode} = publishedMode(mode, flags);
+    return /** @type {any} */ ({vocabulary, editMode, draft});
+};
+
+test("the edit mode a test writes over is the shape core publishes", () => {
+    assert.deepEqual(publishedMode(LIVE, {conflict: true, notStored: true}).editMode, {mode: LIVE, conflict: true, offered: [LIVE, LIVE_REVIEW, APPLY], notStored: true});
+});
 
 test("the switch offers all three modes in the order core offers them, and shows a mode it does not offer only when a keyboard reports it", () => {
     assert.deepEqual(editModeChoices(model({}))?.choices.map(choice => [choice.value, choice.label, choice.offered]),
         [[LIVE, "Live edit", true], [LIVE_REVIEW, "Live preview + save", true], [APPLY, "Review and save", true]]);
-    assert.deepEqual(editModeChoices(model({}, LIVE, [LIVE_REVIEW, APPLY]))?.choices.map(choice => [choice.label, choice.offered]), [["Live preview + save", true], ["Review and save", true], ["Live edit", false]]);
-    assert.equal(editModeChoices({...model({}), editMode: {mode: LIVE, conflict: false, offered: [LIVE, LIVE_REVIEW, APPLY], notStored: true}})?.notStored, true, "a mode the keyboard has not stored yet is flagged");
+    // Core offers every mode, so a keyboard reporting one it leaves out is
+    // written by hand, over the edit mode core publishes.
+    const live = model({}, LIVE);
+    assert.deepEqual(editModeChoices({...live, editMode: {...live.editMode, offered: [LIVE_REVIEW, APPLY]}})?.choices.map(choice => [choice.label, choice.offered]), [["Live preview + save", true], ["Review and save", true], ["Live edit", false]]);
+    assert.equal(editModeChoices(model({}, LIVE, {notStored: true}))?.notStored, true, "a mode the keyboard has not stored yet is flagged");
     assert.equal(editModeChoices({}), null);
 });
 
@@ -29,7 +51,7 @@ test("leaving Live edit asks nothing (the keyboard saves first); entering it ask
     assert.match(questionWords("sendOrDiscard", 2, {mode: LIVE_REVIEW}).detail, /runs unsaved until you save it/);
 });
 
-test("in Live the keyboard's own saving is said from its status; flags show with the one way on", () => {
+test("in Live edit the keyboard's own saving is said from its status; flags show with the one way on", () => {
     const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, quietMs: 3000, quietWords: "3 seconds"};
     /** @param {object} live */
     const draft = live => /** @type {any} */ ({live: {mode: LIVE, unsaved: false, converged: true, keyboard, ...live}});
@@ -39,7 +61,7 @@ test("in Live the keyboard's own saving is said from its status; flags show with
     assert.match(/** @type {any} */ (liveSaveState(draft({unsaved: true}))).detail, /after 3 seconds without typing/);
     assert.match(/** @type {any} */ (liveSaveState(draft({unsaved: true, keyboard: {...keyboard, quietMs: 5000, quietWords: "5 seconds"}}))).detail, /after 5 seconds without typing/);
     assert.equal(quietWords(null), "a few seconds", "no keyboard to say");
-    assert.equal(liveSaveState(draft({unsaved: true, keyboard: {...keyboard, saving: true, storagePaused: true}}))?.detail, "The keyboard writes flash once no key is held.");
+    assert.equal(liveSaveState(draft({unsaved: true, keyboard: {...keyboard, saving: true, storagePaused: true}}))?.detail, "The keyboard finishes saving once no key is held.");
     assert.equal(liveSaveState(draft({keyboard: {...keyboard, savedByKeyboard: true}}))?.title, "Saved by the keyboard");
     assert.equal(liveSaveState(draft({unsaved: true, keyboard: {...keyboard, saveFailed: true}}))?.action, "save");
     assert.equal(liveSaveState(draft({unsaved: true, slaveRefused: true, keyboard: {...keyboard, saveFailed: true}}))?.action, "revert", "the halves apart come first: Save is refused");
@@ -105,7 +127,7 @@ test("a keyboard that stopped saving outranks every other state and offers Resta
 // Under a Review and save draft too: the look between edits reads the same
 // flags, so a stopped half is said with Restart, ahead of a pending
 // adjustment, and not as a keyboard that is not ready.
-test("an Apply draft's keyboard that stopped saving says so for either half and offers Restart", () => {
+test("a Review and save draft's keyboard that stopped saving says so for either half and offers Restart", () => {
     const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, adjustmentPending: false, stopped: false, slaveStopped: false, quietMs: 3000};
     /** @param {object} flags @param {number} [count] */
     const apply = (flags, count = 2) => /** @type {any} */ ({changes: Array.from({length: count}, () => ({})), dirty: count > 0, live: null, keyboard: {...keyboard, ...flags}});
@@ -139,7 +161,7 @@ test("a keyboard that needs a restart is offered Restart in every edit mode, onc
     assert.equal(restartOffer({...needs(drafts["Live edit"]), demo: {active: true}}), null, "never in the demo");
 });
 
-test("leaving Live + review with unsaved edits asks Save or Revert; entering it with a draft asks Send or Discard", () => {
+test("leaving Live preview + save with unsaved edits asks Save or Revert; entering it with a draft asks Send or Discard", () => {
     assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}), APPLY), "saveOrRevert");
     assert.equal(switchQuestion(model({live: {unsaved: false}, dirty: false}), APPLY), null);
     assert.equal(switchQuestion(model({live: null, dirty: true}, APPLY), LIVE_REVIEW), "sendOrDiscard");
@@ -171,7 +193,7 @@ test("each question's answers post the mode with what happens to the work first"
 test("unsaved edits ask Save or Revert whichever way the mode goes, and for settling a conflict", () => {
     assert.equal(switchQuestion(model({live: {unsaved: true}}, LIVE_REVIEW), LIVE), "saveOrRevert", "the keyboard refuses any change while unsaved");
     assert.equal(switchQuestion(model({live: {unsaved: true}}, LIVE), LIVE_REVIEW), null, "except from Live, where the keyboard saves first");
-    const conflicted = {...model({live: {unsaved: false}}), editMode: {mode: LIVE_REVIEW, conflict: true, offered: [APPLY, LIVE_REVIEW]}};
+    const conflicted = model({live: {unsaved: false}}, LIVE_REVIEW, {conflict: true});
     assert.equal(switchQuestion(conflicted, LIVE_REVIEW), null, "settling with nothing unsaved switches at once");
     assert.equal(switchQuestion({...conflicted, draft: {live: {unsaved: true}}}, LIVE_REVIEW), "saveOrRevert");
     assert.match(questionWords("saveOrRevert", 1, {mode: APPLY, from: LIVE_REVIEW}).detail, /In Review and save, edits wait in Ark until you save them/);
@@ -203,8 +225,8 @@ test("history, rename and import words follow the edit mode", async () => {
 
     assert.equal(historyFooter(apply), "Going to a step changes only the draft. The keyboard is not touched until you save.");
     assert.equal(renameNote(apply), "Your computer and Chrome show this name once you save; the keyboard reconnects for a moment to take it.");
-    assert.equal(importNote(apply), "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and save it.");
-    assert.equal(importCallout(apply), "Nothing is written to the keyboard until you review and save; the review shows every change field by field.");
+    assert.equal(importNote(apply), "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing reaches the keyboard until you review and save it.");
+    assert.equal(importCallout(apply), "Nothing reaches the keyboard until you review and save; the review shows every change field by field.");
     assert.equal(historyFooter(null), historyFooter(apply), "no draft reads as Review and save");
 
     for (const draft of [live, review]) {

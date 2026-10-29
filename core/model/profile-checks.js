@@ -6,7 +6,8 @@
 // perform, and destination limits that would refuse the save.
 const {gestureTimingFindings} = require("./gesture-timing");
 const {inertBehaviorFindings} = require("./inert-behaviors");
-const {layerReach, compareFindings} = require("./layer-reach");
+const {layerReach} = require("./layer-reach");
+const {compareFindings} = require("./compare-findings");
 const {baseLighting} = require("./settings-editor");
 const {shortcutPresent} = require("../schema/settings-domain-v1");
 const {hostSettings} = require("../schema/host-settings");
@@ -15,7 +16,8 @@ const {pointingMacros} = require("./pointing-taps");
 const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {actionName} = require("../schema/actions");
-const {VOCABULARY, macroDefaultName, slotName} = require("./vocabulary");
+const {VOCABULARY, macroDefaultName, settingsPath, slotName} = require("./vocabulary");
+const {macroName} = require("../../rules/qmk-keycodes.mjs");
 
 // A behaviour step that sends a custom key sends only its shortcut (firmware
 // D-F26). The keyboard accepts a step naming a custom key without one, which
@@ -76,9 +78,9 @@ function profileFindings(decoded, destination = {}) {
         const playback = inspectMacroPlayback(payload, host);
         if (!playback.error) return;
         findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${playback.code}:${playback.error}`,
-            title: `${macroDefaultName(index)} cannot play with the settings in Your computer`,
+            title: `${macroDefaultName(index)} cannot play with the settings in ${VOCABULARY.settingsSections.host}`,
             detail: `${playback.error} The keyboard stores this macro, but pressing it does nothing.`,
-            fix: `Fix the macro or change ${VOCABULARY.settingsScreens.host} → Your computer before playing it.`, place: {kind: "macro", index}});
+            fix: `Fix the macro or change ${settingsPath("host", "host")} before playing it.`, place: {kind: "macro", index, keycode: macroName(index)}});
     });
     for (const output of pointingMacros(decoded.pdModes || [])) {
         const where = {kind: /** @type {const} */ ("pointing"), slot: output.slot};

@@ -130,6 +130,5 @@ class FakeConnectedDevice {
 }
 
 module.exports = {
-    FakeConnectedDevice,
     FakeDeviceAdapter,
 };

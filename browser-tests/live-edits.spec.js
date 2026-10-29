@@ -34,7 +34,7 @@ test("the rail says how edits reach the keyboard, and the bar says what runs uns
     await expectPost(page, {type: "revertProfileDraft"});
 });
 
-test("leaving Live + review with unsaved edits asks Save or Revert; Cancel posts nothing", async ({page}) => {
+test("leaving Live preview + save with unsaved edits asks Save or Revert; Cancel posts nothing", async ({page}) => {
     await openLive(page, "keys");
     await chooseEditMode(page, 0);
     const ask = page.locator(".sheet.edit-mode-ask");
@@ -51,7 +51,7 @@ test("leaving Live + review with unsaved edits asks Save or Revert; Cancel posts
     await expectPost(page, {type: "setEditMode", mode: 0, pending: "revert"});
 });
 
-test("going from Apply to Live + review with a draft asks Send or Discard; without one it switches at once", async ({page}) => {
+test("going from Review and save to Live preview + save with a draft asks Send or Discard; without one it switches at once", async ({page}) => {
     await page.goto("/preview/index.html");
     expect(await currentEditMode(page)).toBe(0);
     await page.evaluate(() => {window.__posted.length = 0;});
@@ -124,15 +124,17 @@ test("combos turned off by a key show beside the switch, not as a change", async
     await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });
 
+// The change goes in as the expression Playwright evaluates: the page runs
+// under Trusted Types, which refuses `new Function` on a string.
 /** @param {import("@playwright/test").Page} page @param {(model: any) => void} change */
 async function withModel(page, change) {
-    await page.evaluate(async source => {
+    await page.evaluate(`(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        new Function("model", source)(model);
+        (${change.toString()})(model);
         store.setModel(model); store.render();
         window.__posted.length = 0;
-    }, `(${change.toString()})(model)`);
+    })()`);
 }
 
 test("halves apart: the rail says so and the bar offers Revert, not Save", async ({page}) => {
@@ -227,7 +229,7 @@ test("custom keys: a name posts", async ({page}) => {
 
 // Live edit (the keyboard saves by itself): the switch into it, an edit, and
 // the bar saying what the keyboard has not saved yet, with no Save.
-test("switching into Live from Live + review asks Save or Revert; from Apply with nothing pending it switches at once", async ({page}) => {
+test("switching into Live edit from Live preview + save asks Save or Revert; from Review and save with nothing pending it switches at once", async ({page}) => {
     await openLive(page, "keys");
     // The menu lists the modes in the order the keyboard offers them, each with its words.
     const words = await page.evaluate(async () => {
@@ -248,7 +250,7 @@ test("switching into Live from Live + review asks Save or Revert; from Apply wit
     await expectPost(page, {type: "setEditMode", mode: 1});
 });
 
-test("in Live an edit posts as in Live + review, the bar has no Save, and leaving Live asks nothing", async ({page}) => {
+test("in Live edit an edit posts as in Live preview + save, the bar has no Save, and leaving Live edit asks nothing", async ({page}) => {
     await page.goto("/preview/index.html?shell=live-auto");
     await page.locator('[data-screen="pointer"]').click();
     expect(await currentEditMode(page)).toBe(1);
@@ -272,7 +274,7 @@ test("in Live an edit posts as in Live + review, the bar has no Save, and leavin
     await expectPost(page, {type: "setEditMode", mode: 2});
 });
 
-test("in Live the keyboard's own save, a failed one and halves apart each say what to do", async ({page}) => {
+test("in Live edit the keyboard's own save, a failed one and halves apart each say what to do", async ({page}) => {
     await page.goto("/preview/index.html?shell=live-auto");
     /** @param {object} keyboard @param {boolean} [unsaved] */
     const set = (keyboard, unsaved = true) => page.evaluate(async ([keyboard, unsaved]) => {
@@ -359,7 +361,7 @@ test("a keyboard that stopped saving says so, for either half, and Restart posts
 
 // The same under a Review and save draft: the look between edits reads the
 // same flags, and Restart is the one action, not Review and save.
-test("an Apply draft's keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
+test("a Review and save draft's keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
     await page.goto("/preview/index.html?shell=apply-stopped");
     const bar = page.locator(".commit.stopped");
     await expect(bar).toContainText("The keyboard stopped saving");

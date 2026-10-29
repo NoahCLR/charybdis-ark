@@ -91,10 +91,11 @@ function resolve(value) {
     if (inBlock(value, QK.LAYER_MOD)) {
         const layer = qmk.layerModLayer(value);
         const mods = modifiers(value & qmk.MOD_MASK);
+        const held = mods.map(mod => mod.label).join("+");
         if (mods.length) return {
             value, name: `LM(${layer},${mods.map(mod => `MOD_${mod.name}`).join("|")})`,
-            label: `Layer ${layer} + ${mods.map(mod => mod.label).join("+")}`,
-            group: "layer", kind: "layer-mod", layer, known: true,
+            label: `Layer ${layer} + ${held}`,
+            group: "layer", kind: "layer-mod", layer, modifiers: held, known: true,
         };
     }
 
@@ -143,13 +144,15 @@ function resolveTapHold(value) {
     if (!inBlock(value, QK.MOD_TAP)) return undefined;
     const mods = modifiers(qmk.modsOf(value));
     if (!mods.length) return undefined;
+    const held = mods.map(mod => mod.label).join("+");
     return {
         value,
         name: `MT(${mods.map(mod => `MOD_${mod.name}`).join("|")},${tapped.name})`,
-        label: `${tapped.label} / ${mods.map(mod => mod.label).join("+")}`,
+        label: `${tapped.label} / ${held}`,
         group: "modifiers",
         kind: "mod-tap",
         tap: tapped.name,
+        modifiers: held,
         known: true,
     };
 }

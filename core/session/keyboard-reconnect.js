@@ -236,4 +236,4 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
 /** @param {number} ms */
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-module.exports = {RECONNECT, RECONNECT_WORDS, LOST_WORDS, RESTART_WORDS, LOST_GUARD_MS, renamedTo, expectReconnect, expectRestart, expectLost, endReconnect, reconnectTarget, followKeyboard, awaitReconnect};
+module.exports = {RECONNECT_WORDS, LOST_WORDS, RESTART_WORDS, renamedTo, expectReconnect, expectRestart, expectLost, endReconnect, reconnectTarget, followKeyboard, awaitReconnect};

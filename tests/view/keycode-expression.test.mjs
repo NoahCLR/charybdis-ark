@@ -5,30 +5,25 @@ import {profileLayers, profileMacros, editLayers, editMacros} from "../fixtures/
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {comboOutputProblem, isPlainKey, keyProblem, keycodeValue, takesModifiers} from "../../webview/view/keycode-expression.mjs";
+import {comboOutputProblem, keyProblem, keycodeValue} from "../../webview/view/keycode-expression.mjs";
 import {compactModifierMask, keyName} from "../../webview/view/keyvalues.mjs";
 import {canonicalKeycode, visibleKeycode} from "../../webview/view/keyface.mjs";
 
 const require = createRequire(import.meta.url);
-const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
-const portable = require("../../core/model/portable-profile");
-const {buildSnapshotModel} = require("../../core/session/device-model");
+const {openDraft, publishedModel} = require("../fixtures/published-model");
 const {document: pdDocument} = require("../fixtures/pd-profile");
-const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 const qmk = require("../../rules/qmk-keycodes.mjs");
 const catalog = require("../../core/data/keycode-catalog");
 const keycodes = require("../../core/schema/keycodes");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const doc = pdDocument();
-const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
-const model = buildSnapshotModel(snapshot, capabilities, {editable: true, reason: ""});
+const model = publishedModel(doc);
 const slotOf = (layoutIndex) => CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][1];
 
 // What the draft stores for an expression on a key, or undefined if it refuses.
 function drafted(expression) {
-    const draft = new ProfileDraftSession(snapshot, "test-device", capabilities);
+    const {draft} = openDraft(doc);
     try {
         draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 5, keycode: expression}]});
     } catch { return undefined; }
@@ -85,7 +80,7 @@ test("a pointing key typed by its former name stores its slot's keycode, which r
 
 // What the draft stores as a new combo's output, or undefined if it refuses it.
 function comboDrafted(expression) {
-    const draft = new ProfileDraftSession(snapshot, "test-device", capabilities);
+    const {draft} = openDraft(doc);
     try {
         draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "addCombo", inputs: ["KC_Q", "KC_W"], output: expression, termMs: "50", holdTermMs: "200"});
     } catch { return undefined; }
@@ -109,11 +104,11 @@ test("every catalogue key the picker offers is one the draft stores, by the same
 });
 
 test("a tap with a hold is a plain key; modifiers wrap only basic or modified keys", () => {
-    assert.equal(isPlainKey(model, "KC_A"), true);
-    assert.equal(isPlainKey(model, "KC_EXLM"), false);
-    assert.equal(isPlainKey(model, "MO(1)"), false);
-    assert.equal(takesModifiers(model, "KC_EXLM"), true);
-    for (const key of ["MO(2)", "PD_MODE_0", "MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(takesModifiers(model, key), false, key);
+    // The shared grammar refuses the rest, so the draft never stores them.
+    for (const dual of ["LT(1,KC_A)", "MT(MOD_LSFT,KC_A)"]) assert.notEqual(keycodeValue(model, dual), undefined, dual);
+    for (const dual of ["LT(1,KC_EXLM)", "LT(1,MO(1))", "MT(MOD_LSFT,KC_EXLM)"]) assert.equal(keycodeValue(model, dual), undefined, dual);
+    assert.notEqual(keycodeValue(model, "LSFT(KC_EXLM)"), undefined);
+    for (const key of ["MO(2)", "PD_MODE_0", "MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(keycodeValue(model, `LSFT(${key})`), undefined, key);
 });
 
 // The interface reads QMK's keycode layout from the shared rules
@@ -151,7 +146,7 @@ test("every macro slot in QMK's macro block reads by its macro name", () => {
     const slots = qmk.QK.MACRO.last - qmk.QK.MACRO.first + 1;
     for (let slot = 0; slot < slots; slot++) {
         const stored = keycodes.resolve(qmk.QK.MACRO.first + slot).name;
-        assert.equal(visibleKeycode({qmkKeycodeAliases: {[stored]: `MACRO_${slot}`}}, stored), `MACRO_${slot}`, stored);
+        assert.equal(visibleKeycode(model, stored), `MACRO_${slot}`, stored);
         assert.equal(qmk.macroOfName(`MACRO_${slot}`), slot);
     }
     assert.equal(qmk.macroOfName(`MACRO_${slots}`), undefined);

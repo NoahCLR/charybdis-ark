@@ -1,9 +1,9 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
-import {currentLayer, layerName, layers, post, render, showLayer, state, writable} from "../../store.mjs";
+import {currentLayer, layers, post, render, showLayer, state, writable} from "../../store.mjs";
 import {layerColourRow, layerPaints, offWording} from "../../view/lighting.mjs";
-import {vocabulary, word} from "../../view/vocabulary.mjs";
+import {vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourControl, section, stack} from "./common.mjs";
@@ -23,7 +23,7 @@ export function stageLayers(model) {
         const row = layerColourRow(model, layer.index);
         const lit = row && !isOff(row.color);
         const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${index}">
-            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerName(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
+            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
             <span class="m">${esc(!row ? "not reported" : !layerPaints(row.color) ? "no colour" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModes, row.mode).toLowerCase()}`)}</span></button>`);
         item.addEventListener("click", () => { showLayer(index); render(); });
         list.append(item);
@@ -31,9 +31,9 @@ export function stageLayers(model) {
     const layer = currentLayer();
     const row = layerColourRow(model, layer?.index);
     const main = el(`<div class="tab-grid two stage-detail"></div>`);
-    const colour = section(`${layerName(layer)} colour`);
+    const colour = section(`${layerCalled(layer)} colour`);
     colour.append(colourControl(model, {
-        colour: row?.color, canEdit, title: `${layerName(layer)} layer`,
+        colour: row?.color, canEdit, title: `${layerCalled(layer)} layer`,
         ...offWording(model, "layers"),
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));

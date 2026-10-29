@@ -3,6 +3,7 @@ import test from "node:test";
 import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {buildDeviceModel} = require("../../core/session/device-model");
+const {publishedModel} = require("../fixtures/published-model.js");
 import {modifierBits, keyDisplayName, keyName, modifierNames, modifierPick, pickerModifierProblem, macroIndex, pointingMacro} from "../../webview/view/keyvalues.mjs";
 
 const model = {qmkKeycodes: [
@@ -81,10 +82,15 @@ test("a stored shortcut reads as the picker names it: a key's label, a macro's n
 });
 
 test("pointing macro identities use the stored slot and current profile name", () => {
-    for (const code of [0x7700, "MACRO_0", "VIA_MACRO_0", "QK_MACRO_0", "MC_0", "0x7700", "30464"]) assert.equal(macroIndex(code), 0);
+    for (const code of [0x7700, "MACRO_0", "VIA_MACRO_0", "0x7700", "30464"]) assert.equal(macroIndex(code), 0);
     assert.equal(macroIndex("MACRO_127"), 127);
     assert.equal(macroIndex("VIA_MACRO_127"), 127, "the former name reaches every slot");
-    for (const code of [0x7780, "MACRO_128", "VIA_MACRO_128", "QK_MACRO_32", "C(MACRO_0)", "KC_A", ""]) assert.equal(macroIndex(code), null);
+    // QMK's own names for the first 32 slots are the keycode catalog's, so
+    // they are read through the model core publishes.
+    const catalog = publishedModel();
+    for (const code of ["QK_MACRO_0", "MC_0"]) assert.equal(macroIndex(code, catalog), 0, code);
+    assert.equal(macroIndex("MC_31", catalog), 31);
+    for (const code of [0x7780, "MACRO_128", "VIA_MACRO_128", "QK_MACRO_32", "C(MACRO_0)", "KC_A", ""]) assert.equal(macroIndex(code, catalog), null, String(code));
     const model = {macros: [{keycode: "MACRO_0", name: "Greeting <&>", defaultName: "Macro 0", empty: true}, {keycode: "MACRO_126", name: "", defaultName: "Macro 126", empty: false}]};
     assert.deepEqual(pointingMacro(model, 0x7700), {index: 0, name: "Greeting <&>", empty: true});
     assert.deepEqual(pointingMacro(model, "MACRO_126"), {index: 126, name: "Macro 126", empty: false}, "an unnamed slot by the name core gives it");

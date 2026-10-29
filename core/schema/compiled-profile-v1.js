@@ -46,26 +46,27 @@ class ProfileExpressionError extends Error {
     }
 }
 
-/** @param {unknown} value @param {ExpressionModel} model @param {string} [label] @returns {import("./types.js").SemanticAction} */
-function semanticActionForExpression(value, model, label = "Action") {
+// A refusal answers what a person typed or picked, so it says so in words.
+/** @param {unknown} value @param {ExpressionModel} model @returns {import("./types.js").SemanticAction} */
+function semanticActionForExpression(value, model) {
     const expression = normalizeExpression(value);
-    if (!expression) throw compileError("UNSUPPORTED_ACTION", `${label} is empty.`, {expression});
+    if (!expression) throw compileError("UNSUPPORTED_ACTION", "Choose a key.", {expression});
     if (PD_ACTIONS[expression]) return {...PD_ACTIONS[expression]};
 
     const macro = macroOfName(expression);
     if (macro !== undefined) return {kind: PROFILE_ACTION_KINDS.MACRO, operand: macro};
-    const match = expression.match(/^CUSTOM_KEY_(\d+)$/);
-    if (match) return {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, operand: Number(match[1])};
+    const custom = customKeyOfName(expression);
+    if (custom !== undefined) return {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, operand: custom};
 
     const call = parseCall(expression);
     if (call?.name === "MO" || call?.name === "LOCK_LAYER") {
-        if (call.args.length !== 1) throw unsupportedAction(label, expression);
-        const layer = layerId(call.args[0], model, label);
+        if (call.args.length !== 1) throw unsupportedAction(expression);
+        const layer = layerId(call.args[0], model);
         return {kind: call.name === "MO" ? PROFILE_ACTION_KINDS.LAYER_MOMENTARY : PROFILE_ACTION_KINDS.LAYER_LOCK, operand: layer};
     }
 
     const numeric = resolveNativeQmkExpression(expression, model);
-    if (numeric === undefined) throw unsupportedAction(label, expression);
+    if (numeric === undefined) throw unsupportedAction(expression);
     return {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: numeric};
 }
 
@@ -107,10 +108,10 @@ function resolveNativeQmkExpression(value, model) {
     return encodeExpression(String(value ?? ""), tablesOf(model), DIALECTS.keyboard);
 }
 
-/** @param {unknown} value @param {ExpressionModel} model @param {string} label */
-function layerId(value, model, label) {
+/** @param {unknown} value @param {ExpressionModel} model */
+function layerId(value, model) {
     const id = DIALECTS.keyboard.layer(normalizeExpression(value), tablesOf(model));
-    if (id === undefined) throw compileError("UNKNOWN_LAYER", `${label} references unknown layer ${normalizeExpression(value) || "<empty>"}.`, {expression: value});
+    if (id === undefined) throw compileError("UNKNOWN_LAYER", normalizeExpression(value) ? `${normalizeExpression(value)} is not a layer this keyboard has.` : "Choose a layer.", {expression: value});
     return id;
 }
 
@@ -120,9 +121,9 @@ function parseCall(value) {
     return call && {name: call.name, args: splitArguments(call.inner, DIALECTS.keyboard.normalize)};
 }
 
-/** @param {string} label @param {string} expression */
-function unsupportedAction(label, expression) {
-    return compileError("UNSUPPORTED_ACTION", `${label} expression ${expression} cannot be represented by the stable live-profile action schema.`, {expression});
+/** @param {string} expression */
+function unsupportedAction(expression) {
+    return compileError("UNSUPPORTED_ACTION", `${expression} is not a key this keyboard can store.`, {expression});
 }
 
 /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */

@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {comboReach, publishedComboReach} = require("../../core/model/combo-reach");
+const {comboReach, comboReferenceLayers, publishedComboReach} = require("../../core/model/combo-reach");
 const {compileLayerAnswers} = require("../../core/model/layer-resolution");
 
 // A stack as the model publishes it: each layer's keys, by name, and the
@@ -29,6 +29,19 @@ test("under Combo Layer Matching a layer matches its reference layer's raw keys,
     assert.deepEqual(matched[0], {fires: true, covered: 2, held: [], keys: [
         {layer: 0, layoutIndex: 0, fellThrough: false, whileHeld: false, reference: true}, {layer: 0, layoutIndex: 1, fellThrough: false, whileHeld: false, reference: true}]});
     assert.equal(comboReach(stack, [DF], [])[1][0].fires, false, "matched on its own keys it never forms");
+});
+
+// One rule for the published model and Review's walk (layer-walk.js): the
+// profile's records, so a drafted change counts; else the keyboard's readback;
+// else each layer itself.
+test("each layer's combo reference is the profile's record, else the keyboard's readback, else the layer itself", () => {
+    const own = Array.from({length: 16}, (_, layer) => layer);
+    const stored = own.map((layer) => layer === 2 ? 0 : layer === 5 ? 3 : layer);
+    assert.deepEqual(comboReferenceLayers(stored, own), stored, "a drafted reference wins over what the keyboard reports");
+    assert.deepEqual(comboReferenceLayers(stored), stored);
+    assert.deepEqual(comboReferenceLayers(undefined, [0, 0, 1]).slice(0, 4), [0, 0, 1, 3], "without a profile the readback, and past it each layer itself");
+    assert.deepEqual(comboReferenceLayers(null, null), own);
+    assert.deepEqual(comboReferenceLayers([1.5, 4], [7]).slice(0, 2), [7, 4], "a record that is no layer falls back");
 });
 
 test("a combo whose inputs a device reports by position matches those positions", () => {
@@ -122,13 +135,37 @@ test("the reach is the one trying every hold would give, on seeded stacks", () =
     }
 });
 
+// The work a reach takes, counted rather than timed: how often it looks at a
+// combo's inputs or a key's keycode. Trying every hold of fourteen layers
+// would look at least once a hold, 2^14 times, for each combo. The reach
+// instead looks at each answer a layer's keys can give (each key's compiled
+// candidates, summed over the layers) once per combo: comparing a key with
+// two inputs by keycode and by meaning is four looks, and the answers that
+// press an input are looked at again when the keys are gathered. So the work
+// is bounded by answers × combos × 6, polynomial in the stack and the combos.
+// Measured on the two stacks below (1,680 answers, 128 combos, a bound of
+// 1,290,240): 1,198,528 and 1,106,816 looks. A reach that looked at a combo
+// once per pair of keys, or per hold, goes far past it.
+const LOOKS_PER_ANSWER = 6;
+/** @param {ReturnType<typeof stackOf>} stack @param {{inputs: string[]}[]} combos */
+function counted(stack, combos) {
+    const looks = {count: 0};
+    for (const layer of stack) layer.positions = layer.positions.map(({layoutIndex, keycode}) => ({layoutIndex, get keycode() {looks.count++; return keycode;}}));
+    return {looks, combos: combos.map(({inputs}) => ({get inputs() {looks.count++; return inputs;}}))};
+}
+// The work that bound allows: each answer a key in the stack can give, once
+// per combo, LOOKS_PER_ANSWER times.
+/** @param {ReturnType<typeof stackOf>} stack @param {unknown[]} combos */
+const allowedLooks = (stack, combos) =>
+    stack.reduce((sum, layer) => sum + layer.answers.reduce((count, answers) => count + answers.length, 0), 0) * combos.length * LOOKS_PER_ANSWER;
+
 test("a combo whose keys every lower layer repeats is found without trying every hold", () => {
     const row = Array.from({length: 56}, (_, index) => `KC_${String.fromCharCode(65 + (index % 26))}`);
     const stack = stackOf([...Array.from({length: 15}, () => row), row.map(() => "KC_TRANSPARENT")]);
-    const combos = Array.from({length: 128}, (_, index) => ({inputs: [row[index % 26], row[(index * 7 + 3) % 26 === index % 26 ? (index + 1) % 26 : (index * 7 + 3) % 26]]}));
-    const started = performance.now();
+    const {looks, combos} = counted(stack, Array.from({length: 128}, (_, index) => ({inputs: [row[index % 26], row[(index * 7 + 3) % 26 === index % 26 ? (index + 1) % 26 : (index * 7 + 3) % 26]]})));
     const reach = comboReach(stack, combos, []);
-    assert.ok(performance.now() - started < 1000, "fourteen layers to hold, 128 combos, well under a second");
+    assert.equal(allowedLooks(stack, combos), 1680 * 128 * LOOKS_PER_ANSWER, "1,680 answers its keys can give, 128 combos");
+    assert.ok(looks.count <= allowedLooks(stack, combos), `fourteen layers to hold, 128 combos: ${looks.count} looks at their inputs and keys`);
     assert.ok(reach[15].every((found) => found.fires && found.held.length === 0), "base answers them all, with nothing held");
 });
 
@@ -137,9 +174,9 @@ test("a combo whose inputs share one key on every layer is found unformable with
     // both down at once.
     const rows = Array.from({length: 15}, (_, layer) => Array.from({length: 56}, (_, position) => `KC_${position}_${layer % 2}`));
     const stack = stackOf([...rows, rows[0].map(() => "KC_TRANSPARENT")]);
-    const combos = Array.from({length: 128}, (_, index) => ({inputs: [`KC_${index % 56}_0`, `KC_${index % 56}_1`]}));
-    const started = performance.now();
+    const {looks, combos} = counted(stack, Array.from({length: 128}, (_, index) => ({inputs: [`KC_${index % 56}_0`, `KC_${index % 56}_1`]})));
     const reach = comboReach(stack, combos, []);
-    assert.ok(performance.now() - started < 1000, "fourteen layers to hold, 128 combos, well under a second");
+    assert.equal(allowedLooks(stack, combos), 1680 * 128 * LOOKS_PER_ANSWER, "1,680 answers its keys can give, 128 combos");
+    assert.ok(looks.count <= allowedLooks(stack, combos), `fourteen layers to hold, 128 combos: ${looks.count} looks at their inputs and keys`);
     assert.ok(reach[15].every((found) => !found.fires && found.covered === 1), "each covers one input at most");
 });

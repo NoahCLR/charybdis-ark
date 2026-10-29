@@ -17,7 +17,7 @@ const KEYMAP_DOMAIN_V1 = Object.freeze({
     SIZE: LAYERS * MATRIX_KEYS * 2,
 });
 
-const KeymapDomainError = protocolError("KeymapDomainError");
+const KeymapDomainError = protocolError("KeymapDomainError", "ark");
 
 // The layers as a portable document holds them: one array of 60 matrix-order
 // keycodes per layer.

@@ -8,7 +8,8 @@
 //
 // A shell passes in only what a shell has, as plain functions on `shell`:
 //
-//   shell.post(message)             delivers a message to the panel (the model)
+//   shell.post(message)             delivers a message to the panel (the catalog,
+//                                   the model), in the order posted
 //   shell.showError(text)           optional: hears each failure the panel's notice says
 //   shell.progress(title, run)      optional: runs `run` behind a progress indicator
 //   shell.saveRecovery(document, about)
@@ -33,6 +34,14 @@
 // A shell calls `watch()` once its panel is open: between edits it looks at a
 // live keyboard about once a second (live-watch.js), for the saves it makes
 // by itself and the edits its own keys make; `close()` stops it.
+//
+// What every model of a build starts from (model/profile-model.js
+// panelCatalog) is posted once, as {type: "catalog"}, before the first model,
+// and again after the panel says it is `ready`, since a panel that has loaded
+// again has lost it, as has one that loaded only after it was posted. A shell
+// that answers `ready` itself, without handleMessage, calls `ready()`. Each
+// model then leaves the catalog's fields out and says what it lays over them
+// (postedModel); the interface lays them back (webview/catalog.mjs).
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -42,6 +51,7 @@
 const {panelControl} = require("./panel-control-registry");
 const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, observeService, panelRequest, routeMessage} = require("./panel-session");
+const {panelCatalog} = require("../model/profile-model");
 const {beginRead, boundDraft, closeEditors, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
 const {awaitReconnect, endReconnect, expectLost} = require("./keyboard-reconnect");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
@@ -51,6 +61,7 @@ const {readFlashFigures} = require("./flash-pauses");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
 const {FILE_MAX_BYTES} = require("../model/portable-profile");
+const {failureSentence, sayable} = require("../model/vocabulary");
 
 // Reading a keyboard leaves the demo first (asking about unexported edits is
 // the panel's, and a message that has not asked is refused).
@@ -65,6 +76,13 @@ function openPanelLoop(shell, options) {
     let watching;
     const loop = {
         publish: () => publish(session, shell),
+        // A panel that has just loaded: the catalog, then the model.
+        ready: () => {
+            session.catalogPosted = false;
+            publish(session, shell);
+        },
+        // A shell's own failure, said and published as the loop says its own.
+        fail: /** @param {unknown} error */ (error) => fail(session, error, shell),
         serviceChanged: () => {
             // A keyboard lost unexpectedly is waited for and connected again.
             const lost = session.service.takeLost?.();
@@ -109,8 +127,55 @@ function serviceChanged(session, shell) {
 /** @param {Session} session @param {Shell} shell */
 function publish(session, shell) {
     const model = buildPanelModel(session, panelState(session));
-    void shell.post({type: "model", model, ...takeOutbox(session)});
+    if (!session.catalogPosted) {
+        session.catalogPosted = true;
+        void shell.post({type: "catalog", catalog: panelCatalog()});
+    }
+    void shell.post({type: "model", model: postedModel(model), ...takeOutbox(session)});
 }
+
+// A model as it is posted: each field the catalog holds left out, and what
+// the model lays over it in `catalogOverlay`, so a publish carries only what
+// this profile names. A field that does not start from the catalog's is
+// posted whole.
+/** @param {import("../../contracts/panel.js").PublishedModel} model @returns {import("../../contracts/panel.js").PostedModel} */
+function postedModel(model) {
+    const catalog = panelCatalog();
+    /** @type {Record<string, unknown>} */
+    const posted = {...model};
+    /** @type {Record<string, unknown>} */
+    const overlay = {};
+    for (const field of /** @type {import("../../contracts/panel.js").CatalogField[]} */ (Object.keys(catalog))) {
+        const laid = overlayOf(model[field], catalog[field]);
+        if (laid === undefined) continue;
+        delete posted[field];
+        if (laid) overlay[field] = laid;
+    }
+    return /** @type {import("../../contracts/panel.js").PostedModel} */ ({...posted, catalogOverlay: overlay});
+}
+
+// What `value` lays over the catalog's `base`, with which it shares every
+// object it leaves alone (profile-model.js): an array's entries that differ, by
+// index, or a record's keys whose value differs; null for nothing, undefined
+// when it does not start from `base` at all (an array shorter than it, a
+// record without one of its keys, anything else).
+/** @param {unknown} value @param {unknown} base @returns {[number, unknown][] | Record<string, unknown> | null | undefined} */
+function overlayOf(value, base) {
+    if (value === base) return null;
+    if (Array.isArray(base)) {
+        if (!Array.isArray(value) || value.length < base.length) return undefined;
+        /** @type {[number, unknown][]} */
+        const laid = [];
+        value.forEach((entry, index) => {if (index >= base.length || entry !== base[index]) laid.push([index, entry]);});
+        return laid.length ? laid : null;
+    }
+    if (!isRecord(base) || !isRecord(value) || Object.keys(base).some((key) => !Object.hasOwn(value, key))) return undefined;
+    const laid = Object.fromEntries(Object.entries(value).filter(([key, entry]) => !Object.hasOwn(base, key) || entry !== base[key]));
+    return Object.keys(laid).length ? laid : null;
+}
+
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
+const isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 
 // Edit/control paths publish, including the ones that decline or fail:
 // the webview waits on that reply — a combo builder closes when its edit is
@@ -118,6 +183,8 @@ function publish(session, shell) {
 // as a notice rather than as silence.
 /** @param {Session} session @param {Message | null | undefined} message @param {Shell} shell */
 async function handleMessage(session, message, shell) {
+    // A panel that says it is ready has loaded: its answer brings the catalog.
+    if (message?.type === "ready") session.catalogPosted = false;
     if (message && panelControl(message.type)?.action === "validateMacro") {
         const inspection = /** @type {Extract<Message, {type: "validateMacro"}>} */ (message);
         /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "macroValidation"}>} */
@@ -127,7 +194,7 @@ async function handleMessage(session, message, shell) {
             const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before editing this macro.");
             reply.validation = macroInputStatus(draft.current, inspection, draft.capabilities);
         } catch (error) {
-            reply.validation = {error: /** @type {import("./types.js").OperationFailure} */ (error).message, code: /** @type {import("./types.js").OperationFailure} */ (error).code || "MACRO_EDIT_CONFLICT"};
+            reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "MACRO_EDIT_CONFLICT"};
         }
         // Local inspection neither stages an edit nor emits a toast or HID.
         await shell.post(reply);
@@ -156,21 +223,40 @@ async function handleMessage(session, message, shell) {
         // panel is never left waiting on a reply.
         else publish(session, shell);
     } catch (error) {
-        const text = error instanceof Error ? error.message : String(error);
-        shell.showError?.(text);
-        // The panel says it: that is where someone looks when it seems stuck. It reads
-        // as the sentence the failure says; its code (OperationFailure.code)
-        // is for the code that handles it, not for the person. A request
-        // refused while the keyboard holds an edit for released keys is no
-        // failure: its words say what to do (live-edits.js). An Apply or Save
-        // cut short starts with its verdict (interruption.js), which says what
-        // happened better than "Failed".
-        const held = /** @type {{code?: string}} */ (error)?.code === "LIVE_EDIT_HELD";
-        const verdict = /** @type {{verdict?: unknown}} */ (error)?.verdict;
-        session.notice = held || (typeof verdict === "string" && verdict && text.startsWith(verdict)) ? text : `Failed: ${text}`;
-        session.noticeFailed = !held;
-        publish(session, shell);
+        fail(session, error, shell);
     }
+}
+
+// A failure as the panel's notice, published. The panel says it: that is
+// where someone looks when it seems stuck. It reads as the sentence the
+// failure says when Ark wrote one for a person (failureSentence, vocabulary.js);
+// its code (OperationFailure.code) is for the code that handles it, and a
+// fault's own text goes to the diagnostics instead. A request refused while
+// the keyboard holds an edit for released keys is no failure: its words say
+// what to do (live-edits.js). An Apply or Save cut short starts with its
+// verdict (interruption.js), which says what happened better than "Failed".
+/** @param {Session} session @param {unknown} error @param {Shell} shell */
+function fail(session, error, shell) {
+    const text = failureSentence(error);
+    keepFault(session, error);
+    shell.showError?.(text);
+    const held = /** @type {{code?: string}} */ (error)?.code === "LIVE_EDIT_HELD";
+    const verdict = /** @type {{verdict?: unknown}} */ (error)?.verdict;
+    session.notice = held || (typeof verdict === "string" && verdict && text.startsWith(verdict)) ? text : `Failed: ${text}`;
+    session.noticeFailed = !held;
+    publish(session, shell);
+}
+
+// The first fault in a failure or what it carries, kept in the diagnostics
+// (the device service's) for whoever looks into it.
+/** @param {Session} session @param {unknown} error */
+function keepFault(session, error) {
+    let cause = error;
+    for (let depth = 0; cause && depth < 8 && sayable(cause); depth++) cause = /** @type {{cause?: unknown}} */ (cause).cause;
+    if (!cause || sayable(cause)) return;
+    const {code, name, message} = /** @type {{code?: unknown, name?: unknown, message?: unknown}} */ (typeof cause === "object" ? cause : {});
+    const kind = [code, name].find(value => typeof value === "string" && value) || "Failure";
+    /** @type {{addDiagnostic?: (text: string) => void}} */ (session.service).addDiagnostic?.(`${kind}: ${typeof message === "string" && message || String(cause)}`);
 }
 
 // Each half's flash pauses, published as each read lands (flash-pauses.js).
@@ -237,7 +323,7 @@ async function portableMessage(session, message, shell) {
                 const where = await shell.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
                 if (where) {
                     saved();
-                    session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and save it.`;
+                    session.notice = `Demo profile exported to ${where}. Import it on your keyboard to review and save it.`;
                 }
             } else if (panelControl(message.type)?.action === "export") {
                 const file = exportedProfile(await session.service.readPortableProfile());
@@ -273,4 +359,4 @@ function exportedProfile(snapshot, now = new Date(), stem = "charybdis") {
     };
 }
 
-module.exports = {exportedProfile, openPanelLoop, FILE_MAX_BYTES};
+module.exports = {exportedProfile, openPanelLoop, postedModel};

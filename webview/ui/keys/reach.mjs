@@ -2,19 +2,21 @@
 /**
  * @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model
  */
-// What this layer reaches: the keys the board rings for the picked row, the
-// tab counts, and the "Reached by" words every reach table shares.
+// What this layer reaches: the keys the board rings for the picked row, and
+// the "Reached by" words every reach table shares.
 
 import {esc} from "../../lib/dom.mjs";
 import {actionLabel, keyMeaning, keyName} from "../../view/keyface.mjs";
-import {behaviourRouteKeys, customKeyKeycodes, macroKeycodes, macroReach, pointingReach, pointingReachInView, pointingSlotFor, reachInView, reachKeys, reachText} from "../../view/reach.mjs";
-import {customKeyOf, customKeyReach, shortcutLayerList, shortcutLayerTag} from "../../view/custom-key.mjs";
-import {comboGroups, combosInView} from "../../view/combo-reach.mjs";
+import {customKeyNamesOf, macroNamesOf, placementsOf, reachInView, reachText} from "../../view/reach.mjs";
+import {behaviourRouteKeys} from "../../view/behaviour-reach.mjs";
+import {pointingReachInView, pointingSlotFor} from "../../view/pointing-reach.mjs";
+import {customKeyOf, shortcutLayerList, shortcutLayerTag} from "../../view/custom-key.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
-import {getModel, heldLayers, layerName, layers, state} from "../../store.mjs";
-import {reachEntries} from "../../view/reach-groups.mjs";
+import {getModel, heldLayers, layers, render, state} from "../../store.mjs";
+import {pickedReachKeys, placementChips, placementOpening, setReachGroupOpen} from "../../view/reach-groups.mjs";
+import {layerSwatch} from "../layerbar.mjs";
 import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked, layerTagged, marked} from "../marks.mjs";
-import {tierName} from "../../view/vocabulary.mjs";
+import {tierName, layerCalled} from "../../view/vocabulary.mjs";
 import {behaviourRoute} from "./behaviour-selection.mjs";
 
 // The keys the board rings: the ones that reach whatever row is picked in the
@@ -22,44 +24,42 @@ import {behaviourRoute} from "./behaviour-selection.mjs";
 // sends is found on the same keys, which is the whole point of saying so.
 /** @param {Model} model */
 export function reachHighlight(model) {
-    const stack = layers(), at = state.layer;
-    /** @param {Partial<ReturnType<typeof macroReach>> & {inView?: ReturnType<typeof reachInView>}} groups @param {string} picked */
-    const found = (groups, picked) => {
-        const [group, ...rest] = String(picked).split(":");
-        const name = rest.join(":");
-        return reachEntries(groups, group).find((entry) => String(entry.name) === name);
-    };
-    if (state.tab === "behaviours") return behaviourRouteKeys(model, stack, at, state.behaviourRow || "", behaviourRoute(), heldLayers());
-    const picked = state.reachRow[/** @type {keyof typeof state.reachRow} */ (state.tab)];
-    if (!picked) return [];
-    if (state.tab === "combos") {
-        if (picked.startsWith("view:")) {
-            const entry = combosInView(model, stack, at, heldLayers()).find((row) => picked === `view:${row.combo.id}`);
-            return entry?.keys.map((key) => key.position.layoutIndex) || [];
-        }
-        const groups = comboGroups(model, stack, at);
-        const entry = [groups.onKeys, groups.throughKeys, groups.elsewhere].flat()
-            .find((row) => picked.endsWith(`:${row.combo.id}`));
-        return reachKeys(stack, at, entry);
-    }
-    if (state.tab === "macros") return reachKeys(stack, at, found(picked.startsWith("view:") ? {inView: macroView(model)} : macroReach(model, stack, at), picked),
-        picked.startsWith("view:") ? heldLayers() : null);
-    if (state.tab === "customKeys") return reachKeys(stack, at, found(picked.startsWith("view:") ? {inView: customKeyView(model)} : customKeyReach(model, stack, at), picked),
-        picked.startsWith("view:") ? heldLayers() : null);
-    if (state.tab === "pointing") return reachKeys(stack, at, found(picked.startsWith("view:") ? {inView: pointingView(model)} : pointingReach(model, stack, at), picked),
-        picked.startsWith("view:") ? heldLayers() : null);
-    return [];
+    if (state.tab === "behaviours") return behaviourRouteKeys(model, layers(), state.layer, state.behaviourRow || "", behaviourRoute(), heldLayers());
+    return pickedReachKeys(model, layers(), state.layer, heldLayers(), state.tab, state.reachRow[/** @type {keyof typeof state.reachRow} */ (state.tab)]);
 }
 
-// A tab's number counts what the selected layer stores, not the selected key
-// position or actions reached only through transparent keys on lower layers.
-/** @param {ReturnType<typeof macroReach>} reach */
-export const storedCount = (reach) =>
-    new Set([...reach.onKeys, ...reach.fromBranches, ...reach.fromCombos].map((entry) => entry.name)).size;
+// The layers a macro or custom key is placed on, each a chip in its layer
+// colour naming how it is reached there, "" where it is placed nowhere; a
+// click shows that layer in its Keymap tab (showPlacements).
+/** @param {Model} model @param {"macros" | "customKeys"} tab @param {string} keycode */
+export const placementChipsMarkup = (model, tab, keycode) => placementChips(placementsOf(model, layers(), tab, keycode)).map(({layer, at, how}) => {
+    const swatch = layerSwatch(model, layer);
+    return `<button class="layer-chip link" data-goto-layer="${esc(at)}"
+            data-tip="${esc(swatch.tip)} · reached by ${esc(how)} · show on the board">${swatch.html}
+            <span>${esc(layerCalled(layer))}</span><span class="idx">${esc(how)}</span></button>`;
+}).join("");
+
+// Each placement chip in `node` opens Keymap on its layer, in the tab for
+// what is placed, on the row of the route that reaches it there, its first
+// key picked.
+/** @param {ParentNode} node @param {"macros" | "customKeys"} tab @param {string} keycode */
+export const showPlacements = (node, tab, keycode) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-goto-layer]"))
+    .forEach((button) => button.addEventListener("click", () => openPlacement(tab, keycode, Number(button.dataset.gotoLayer))));
+/** @param {"macros" | "customKeys"} tab @param {string} keycode @param {number} at */
+function openPlacement(tab, keycode, at) {
+    const opening = placementOpening(placementsOf(getModel(), layers(), tab, keycode), keycode, at);
+    if (!opening) return;
+    Object.assign(state, {screen: "keys", tab, layer: opening.layer, placement: null});
+    if (opening.selected !== undefined) state.selected = opening.selected;
+    state.reachRow[tab] = opening.row;
+    state.reachGroups = setReachGroupOpen(state.reachGroups, opening.group, true);
+    render();
+}
+
 /** @param {Model} model */
-export const macroView = (model) => reachInView(model, layers(), state.layer, heldLayers(), macroKeycodes);
+export const macroView = (model) => reachInView(model, layers(), state.layer, heldLayers(), macroNamesOf(model));
 /** @param {Model} model */
-export const customKeyView = (model) => reachInView(model, layers(), state.layer, heldLayers(), customKeyKeycodes);
+export const customKeyView = (model) => reachInView(model, layers(), state.layer, heldLayers(), customKeyNamesOf(model));
 /** @param {Model} model */
 export const pointingView = (model) => pointingReachInView(model, layers(), state.layer, heldLayers());
 
@@ -68,7 +68,7 @@ export const pointingView = (model) => pointingReachInView(model, layers(), stat
 // the default layer always answers, any other only while it is held too.
 /** @param {{layer: import("../../../contracts/panel.js").Layer | null, whileHeld?: boolean}} entry */
 export const sourceLabel = (entry) =>
-    esc(layerName(entry.layer)) + (entry.whileHeld ? " when held" : "");
+    esc(layerCalled(entry.layer)) + (entry.whileHeld ? " when held" : "");
 
 // The keys are named as the board names them; a combo's row already names
 // its inputs, so it says only where they come from (reachText).
@@ -77,10 +77,10 @@ export const sourceLabel = (entry) =>
 /** @param {(ReturnType<typeof resolvedPositions>[number] & {reference?: boolean})[]} keys @param {{names?: boolean, branches?: (keycode: string) => string}} [options] */
 export const keysReach = (keys, {names = true, branches} = {}) => {
     const model = getModel();
-    const named = names ? [...new Set(keys.map((entry) => keyNameMarked(model, keyName(entry.position), keyMeaning(entry.position))
+    const named = names ? [...new Set(keys.map((entry) => keyNameMarked(model, keyName(entry.position, model), keyMeaning(entry.position))
         + (branches?.(keyMeaning(entry.position)) || "")))] : [];
     const sources = [...new Set(keys.filter((entry) => entry.fellThrough).map(sourceLabel))];
-    const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => esc(layerName(entry.layer))))];
+    const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => esc(layerCalled(entry.layer))))];
     return reachText({named, sources, matched}, {names});
 };
 // A behaviour that only answers through a transparent key still fires its
@@ -108,7 +108,7 @@ const cellsMarked = (model, cells) => cells
 const sendsOf = (model, entry, route, showSends) => showSends && route.action && String(entry.name) !== String(route.action)
     ? `sends ${namedKey(model, route.action)}` : "";
 /** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
-export const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
+const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
     const sent = sendsOf(model, entry, row, showSends);
     return `from ${namedKey(model, row.keycode)} · ${cellsMarked(model, row.cells)}${sent ? ` ${sent}` : ""}`
         + (row.layer ? ` · on ${sourceLabel(row)}` : "");
@@ -154,7 +154,7 @@ export const reachLabel = (model, entry, showSends = true) => {
 // whose rows often have several). Each route reads as on every reach tab: a
 // key as the board names it, with its mark and tag ("▦ Navigation `HOLD`"),
 // a behaviour's cell and a combo with what they send. A route that starts the
-// mode by turning on a layer in its link (entry.startVia, view/reach.mjs)
+// mode by turning on a layer in its link (entry.startVia, view/pointing-reach.mjs)
 // always says what it sends, since that is how it reaches the mode: a key by
 // startsThrough, a cell or combo by its keycode ("sends ▦ Navigation `HOLD`").
 // One sending the mode's own keycodes says what it sends only when the row has
@@ -193,7 +193,7 @@ export function pointingReachLines(model, entry, showSends) {
 function startsThrough(model, keycode, mask) {
     const custom = customKeyOf(model, keycode);
     if (custom) return ` · sends ${shortcutLayerList(custom).filter((at) => mask & 2 ** at).map((at) =>
-        layerTagged(model, at, layerName(layersOfMask(2 ** at)[0] || null), [shortcutLayerTag(model, custom)], {inline: true})).join(", ")}`;
+        layerTagged(model, at, layerCalled(layersOfMask(2 ** at)[0] || null), [shortcutLayerTag(model, custom)], {inline: true})).join(", ")}`;
     if (pointingSlotFor(model, keycode)) return ` · turns on ${layersNamed(model, layersOfMask(mask))}`;
     return "";
 }
@@ -205,4 +205,4 @@ export const layersOfMask = (mask) => layers().filter((layer) => mask & 2 ** lay
 // Layers by their marks, as the Pointing modes tab names a link's layers.
 /** @param {Model} model @param {import("../../../contracts/panel.js").Layer[]} list */
 export const layersNamed = (model, list) =>
-    list.map((layer) => marked(model, {kind: "layer", layer: layer.index}, layerName(layer))).join(", ");
+    list.map((layer) => marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer))).join(", ");

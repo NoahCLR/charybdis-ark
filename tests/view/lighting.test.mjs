@@ -10,16 +10,21 @@ const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
 test("mapped-key count follows the selected layer, excluding transparent and disabled keys", () => {
     const layer = {positions: [position(0, "KC_A"), position(1, "KC_B"), position(2, "KC_TRANSPARENT"),
         position(3, "KC_TRNS"), position(4, "_______"), position(5, "KC_NO"), position(6, "XXXXXXX"), position(7, "")]};
-    assert.equal(mappedKeyCount(layer), 2);
-    assert.equal(mappedKeyCount({positions: [position(0, "KC_TRANSPARENT")]}), 0);
-    assert.equal(mappedKeyCount(null), 0);
+    assert.equal(mappedKeyCount(model(), layer), 2);
+    assert.equal(mappedKeyCount(model(), {positions: [position(0, "KC_TRANSPARENT")]}), 0);
+    assert.equal(mappedKeyCount(model(), null), 0);
 });
 
-// The LED map as core publishes it (model.leds).
+// The LED map as core publishes it (model.leds), and which keys are
+// transparent or disabled (qmkKeyKinds).
 const {KEY_LEDS, TRACKBALL_LED} = createRequire(import.meta.url)("../../core/data/charybdis-layout");
+const {profileDocument, publishedModel} = createRequire(import.meta.url)("../fixtures/published-model.js");
+const {qmkKeyKinds} = publishedModel();
+const {SETTING} = createRequire(import.meta.url)("../../core/schema/settings-domain-v1");
 function model(overrides = {}) {
     return {
         leds: {keys: [...KEY_LEDS], trackball: TRACKBALL_LED},
+        qmkKeyKinds,
         rgb: {
             baseEffect: {state: "read", enabled: true, effectId: 1, previewColor: colour(140, 210, 180)},
             stages: [
@@ -262,16 +267,18 @@ test("zero brightness keeps explicit black distinct from layer pass-through and 
 // The background effect's LED classes, as the draft's Lighting · Background effect stores them.
 const baseSettings = (leds) => ({id: "rgbAppearance", area: "Lighting", stage: "base", label: "Background effect", fields: [{macro: "effectLeds", label: "LEDs", value: String(leds)}]});
 test("a base-effect LED class the effect skips stays unlit; an animated effect is drawn lit", async () => {
-    const {baseAnimated, baseReaches} = await import("../../webview/view/lighting.mjs");
-    const keysOnly = {...model(), configDefaults: [baseSettings(4)]};
-    assert.equal(baseReaches(keysOnly, 0), true);
-    assert.equal(baseReaches(keysOnly, 50), false, "a thumb key is not a main key");
-    assert.equal(baseReaches(keysOnly, undefined), false, "nor is the trackball LED");
-    assert.equal(baseReaches(model(), 50), true, "without the setting every LED is reached");
-    assert.equal(baseAnimated(model()), false);
+    const {trackballLight} = await import("../../webview/view/lighting.mjs");
+    // With no layer colours, each LED shows what the background effect does there.
+    const unlayered = model({rgb: {...model().rgb, layerColors: []}});
+    const base = {index: 0, positions: [position(0, "KC_A")]};
+    const keysOnly = {...unlayered, configDefaults: [baseSettings(4)]};
+    assert.equal(keyLight(keysOnly, base, position(0, "KC_A")).source, "base");
+    assert.equal(keyLight(keysOnly, base, position(50, "KC_SPC")).source, "off", "a thumb key is not a main key");
+    assert.equal(trackballLight(keysOnly, base).source, "off", "nor is the trackball LED");
+    assert.equal(keyLight(unlayered, base, position(50, "KC_SPC")).source, "base", "without the setting every LED is reached");
+    assert.equal(keyLight(unlayered, base, position(0, "KC_A")).source, "base", "Solid colour does not animate");
     const animated = model({rgb: {...model().rgb, layerColors: [], baseEffect: {state: "read", enabled: true, effectId: 13, hue: 10, saturation: 200, brightness: 255, previewColor: undefined}}});
-    assert.equal(baseAnimated(animated), true);
-    const light = keyLight(animated, {index: 0, positions: [position(0, "KC_A")]}, position(0, "KC_A"));
+    const light = keyLight(animated, base, position(0, "KC_A"));
     assert.equal(light.source, "animated");
     assert.ok(!isOff(light.colour), "lit, never drawn as off");
     const skipped = {...model({rgb: {...model().rgb, layerColors: []}}), configDefaults: [baseSettings(4)]};
@@ -324,7 +331,9 @@ test("a key's LED and the trackball's are the ones core publishes", () => {
 
 test("a default layer the keyboard keeps on paints nothing unless it is shown or previewed, as on the keyboard", () => {
     const m = withRgb({layerColors: [{layer: "Layer 2", layerId: 2, color: colour(170, 255, 200), mode: "ALL_KEYS"}]});
-    m.layers = [{index: 0}, {index: 1}, {index: 2, alwaysOn: true}, {index: 3}];
+    // The layers core publishes with layer 2 a default layer, which it marks alwaysOn.
+    m.layers = publishedModel(profileDocument({settings: (/** @type {any} */ domain) => { domain.values[SETTING.DEFAULT_LAYERS] |= 1 << 2; }})).layers;
+    assert.equal(m.layers[2].alwaysOn, true);
     assert.notDeepEqual(keyLight(m, {index: 3}, position(13, "KC_TRANSPARENT")).colour, colour(170, 255, 200),
         "the keyboard's lighting reads the layers that are on, not its default layers");
     assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_TRANSPARENT"), {held: [2]}).colour, colour(170, 255, 200), "previewed on, it paints");

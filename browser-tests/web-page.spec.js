@@ -13,6 +13,8 @@ const {dropFiles} = require("./profile-drop");
 const {chooseEditMode, currentEditMode, keyboardMenu} = require("./shell-page");
 const {document32: pdDocument} = require("../tests/fixtures/pointing-slots-32");
 const {CHARYBDIS_PRODUCT_ID, CHARYBDIS_VENDOR_ID, QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE_PAGE} = require("../core/transport/device-adapter");
+const {LIVE_WATCH_MS} = require("../core/session/live-watch");
+const {WATCH_TIMEOUT_MS} = require("../core/session/background-reads");
 
 const PAGE = "/dist/web/index.html";
 
@@ -133,7 +135,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     // Nothing is allowed yet: the page offers Chrome's picker, in its own words.
     const placeholder = page.locator(".read-placeholder");
     await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
-    await expect(placeholder).toContainText("pick it in Chrome's list with Choose keyboard");
+    await expect(placeholder).toContainText("use Choose keyboard… and pick it in Chrome's list");
     await expect(page.locator(".rail-build")).toHaveText(/^Ark \d{4}\.\d+\.\d+\S* · \S+$/);
     await expectBuildLink(page.locator(".rail-build"), "rail-build-mark");
     expect(await page.locator(".rail-build").getAttribute("target")).toBe(await page.locator("a.rail-build").count() ? "_blank" : null);
@@ -250,6 +252,31 @@ test("without WebHID the page says Ark needs Chrome or Edge over HTTPS", async (
 
 // The demo needs no keyboard: a browser with WebHID but nothing chosen, where
 // the fake keyboard is never asked anything.
+// The page requires Trusted Types (scripts/build-web.js): markup reaches it
+// only through the panel's policy and the worker's URL through the page's,
+// so a raw sink and any other policy are refused while the screens, a hover
+// card among them, draw without a violation.
+test("the page refuses markup that skips its Trusted Types policy, and draws without it", async ({page, context, baseURL}) => {
+    await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="explore-demo"]').click();
+    await ready(page);
+    await page.locator("[data-key]").first().hover();
+    await expect(page.locator(".hovercard")).toBeVisible();
+    // Drawn so far without a violation; what follows is refused on purpose.
+    expect(errors).toEqual([]);
+    expect(await page.evaluate(() => {
+        try {document.createElement("div").innerHTML = "<b>raw</b>"; return "taken";} catch (error) {return error.name;}
+    })).toBe("TypeError");
+    // Only the policies the page creates are allowed: an unlisted name, the
+    // default policy, which every raw sink would pass through, and a second
+    // `ark-html` are refused.
+    expect(await page.evaluate(() => ["x", "default", "ark-html"].map((name) => {
+        try {window.trustedTypes.createPolicy(name, {}); return "created";} catch (error) {return error.name;}
+    }))).toEqual(["TypeError", "TypeError", "TypeError"]);
+    expect(errors.filter((text) => !/This document requires 'TrustedHTML' assignment|Creating a TrustedTypePolicy named '(?:x|default|ark-html)' violates/.test(text))).toEqual([]);
+});
+
 test("explore the demo: edit on several screens, review with no Apply, export, open a profile file and leave", async ({page, context, baseURL}) => {
     test.setTimeout(90000);
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
@@ -567,7 +594,7 @@ test("the web shell reads, edits and Applies one profile generation without VIA"
 // reaches the keyboard at once, review compares it with what is saved, and
 // Save makes it the saved profile, with a recovery copy of what was saved
 // before.
-test("in Live + review an edit reaches the keyboard at once, and review and Save make it permanent", async ({page, context, baseURL}) => {
+test("in Live preview + save an edit reaches the keyboard at once, and review and Save make it permanent", async ({page, context, baseURL}) => {
     test.setTimeout(90000);
     const keyboard = liveKeyboard({document: pdDocument()});
     const {ownFilesOnly} = await withKeyboard(context, baseURL, 1, keyboard);
@@ -616,7 +643,7 @@ test("in Live + review an edit reaches the keyboard at once, and review and Save
 // edits, so no question), an edit runs at once, and the page shows "saved by
 // the keyboard" once the keyboard's status says so; Ark never sends Save.
 // Leaving the page then loses nothing, so it does not ask.
-test("in Live the keyboard saves an edit by itself and the page says so, without asking on leaving", async ({page, context, baseURL}) => {
+test("in Live edit the keyboard saves an edit by itself and the page says so, without asking on leaving", async ({page, context, baseURL}) => {
     test.setTimeout(90000);
     const keyboard = liveKeyboard({document: pdDocument(), autoSaveAfterReads: 2});
     const {ownFilesOnly} = await withKeyboard(context, baseURL, 1, keyboard);
@@ -659,11 +686,24 @@ test("in Live the keyboard saves an edit by itself and the page says so, without
 // Chrome on macOS holds back a page's input reports while one of its native
 // menus is open. In Live edit, a press on a select pauses the looks at the
 // keyboard until the menu closes, and answers held back for longer than any
-// timeout do not drop the keyboard.
-test("in Live a held-open menu pauses the looks, and answers held back never drop the keyboard", async ({page, context, baseURL}) => {
+// timeout do not drop the keyboard. The test waits on the watch's own turns,
+// each a wait of LIVE_WATCH_MS the page asks its sleep worker for, and on the
+// looks it sends, never on a time of its own.
+test("in Live edit a held-open menu pauses the looks, and answers held back never drop the keyboard", async ({page, context, baseURL}) => {
     test.setTimeout(60000);
     const keyboard = liveKeyboard({document: pdDocument()});
     await withKeyboard(context, baseURL, 1, keyboard);
+    await context.addInitScript(() => {
+        globalThis.__sleeps = [];
+        const post = Worker.prototype.postMessage;
+        Worker.prototype.postMessage = function (message, ...rest) {
+            if (typeof message?.ms === "number") globalThis.__sleeps.push(message.ms);
+            return post.call(this, message, ...rest);
+        };
+    });
+    // How many turns the watch has taken since `from` (an index into them).
+    const turns = (from) => page.evaluate(([from, ms]) => window.__sleeps.slice(from).filter((wait) => wait === ms).length, [from, LIVE_WATCH_MS]);
+    const sentNow = () => page.evaluate(() => window.__fakeHidSent);
     const errors = await open(page);
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
@@ -681,17 +721,23 @@ test("in Live a held-open menu pauses the looks, and answers held back never dro
     await menu.dispatchEvent("pointerdown");
     await menu.focus();
     await page.evaluate(() => window.__fakeHidHold(true));
-    const sent = await page.evaluate(() => window.__fakeHidSent);
-    await page.waitForTimeout(2500);
-    expect(await page.evaluate(() => window.__fakeHidSent), "no look while the menu may be open").toBe(sent);
+    const sent = await sentNow(), slept = await page.evaluate(() => window.__sleeps.length);
+    // Three turns asked for since: the watch woke twice with the menu open.
+    await expect.poll(() => turns(slept), {timeout: 4 * LIVE_WATCH_MS + 5000}).toBeGreaterThanOrEqual(3);
+    expect(await sentNow(), "no look while the menu may be open").toBe(sent);
 
     // It closes without a choice; looks resume while the answers are still
-    // held back past every timeout, then they arrive late.
+    // held back. A held look sends its first report and waits for it, so the
+    // next look going out means that one waited out its timeout unanswered.
     await page.mouse.move(5, 5);
-    await expect.poll(() => page.evaluate(() => window.__fakeHidSent), {timeout: 5000}).toBeGreaterThan(sent);
-    await page.waitForTimeout(4000);
+    await expect.poll(sentNow, {timeout: 5000}).toBeGreaterThan(sent);
+    const looked = await sentNow();
+    await expect.poll(sentNow, {timeout: WATCH_TIMEOUT_MS + 2 * LIVE_WATCH_MS + 5000}).toBeGreaterThan(looked);
+    // Then they arrive late, and the watch goes on: two more turns, so a
+    // look after them has finished.
+    const released = await page.evaluate(() => window.__sleeps.length);
     await page.evaluate(() => window.__fakeHidHold(false));
-    await page.waitForTimeout(2500);
+    await expect.poll(() => turns(released), {timeout: WATCH_TIMEOUT_MS + 2 * LIVE_WATCH_MS + 5000}).toBeGreaterThanOrEqual(2);
     await expect(page.locator(".read-placeholder")).toHaveCount(0);
     await expect(page.locator(".rail-keyboard .dot.ok")).toHaveCount(1);
     expect(errors).toEqual([]);

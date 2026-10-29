@@ -1,8 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, label as hsvLabel} from "../../lib/colour.mjs";
-import {getModel, layerName, layers, post, writable} from "../../store.mjs";
-import {slotCalled, vocabulary, word} from "../../view/vocabulary.mjs";
+import {getModel, layers, post, writable} from "../../store.mjs";
+import {slotCalled, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {inheritsStageColour} from "../../view/lighting.mjs";
 import {marked} from "../marks.mjs";
@@ -25,7 +25,7 @@ function ownerCell(model, target, owner) {
     const name = ownerName(model, target, owner);
     const layer = target === "layer" ? (model?.layers || []).find((entry) => entry.name === owner) : undefined;
     const slot = target === "pdMode" ? (model?.rgb.pdModeColors || []).findIndex((row) => row.pointingMode === owner) : -1;
-    const tier = target === "keyBehavior" && {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"}[owner];
+    const tier = target === "keyBehavior" ? vocabulary(model).feedbackTiers[owner] : undefined;
     /** @type {import("../../../contracts/model.js").ReviewMark | null} */
     const markOf = layer ? {kind: "layer", layer: layer.index} : slot >= 0 ? {kind: "pointing", slot} : tier ? {kind: "tier", tier} : null;
     return marked(model, markOf, name);
@@ -52,7 +52,7 @@ export function groupRowsTable(rows, target) {
 // one colour. The values are the names the core's RGB enums use.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} target @returns {readonly (readonly [string, string])[]} */
 export function rowOwners(model, target) {
-    if (target === "layer") return [...layers().map((layer) => /** @type {[string, string]} */ ([layer.name, layerName(layer)])), ["RGB_LAYER_GROUP_ALL", "All layers"]];
+    if (target === "layer") return [...layers().map((layer) => /** @type {[string, string]} */ ([layer.name, layerCalled(layer)])), ["RGB_LAYER_GROUP_ALL", "All layers"]];
     if (target === "pdMode") return [...(model?.rgb.pdModeColors || []).map((row, index) =>
         /** @type {[string, string]} */ ([row.pointingMode, slotCalled(model, index)])), ["RGB_POINTING_MODE_GROUP_ALL", "All pointing modes"]];
     if (target === "keyBehavior") return vocabulary(model).feedbackOwners;

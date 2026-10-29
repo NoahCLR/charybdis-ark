@@ -34,10 +34,10 @@ Add steps with the buttons above the sequence:
 Key steps open the keycode picker straight away. It offers only keys a macro
 can send.
 
-The sequence plays left to right as a row of tiles: ↓ press, ↑ release, a dot
-for a tap, + for a chord, and a time for a wait. Click a tile to edit it
-underneath, with **← Earlier**, **Later →** and **Remove**. Drag a tile to
-move it anywhere in the sequence.
+The sequence plays left to right as a row of tiles, each named under it:
+↓ press, ↑ release, a dot for a key, + for a chord, and a time for a delay.
+Click a tile to edit it underneath, with **← Earlier**, **Later →** and
+**Remove**. Drag a tile to move it anywhere in the sequence.
 
 Selecting works as you'd expect: click, Shift-click a range, ⌘-click (Ctrl
 off a Mac) to add one, ⌘A for all. ⌘C and ⌘V copy and paste steps, also into
@@ -52,7 +52,7 @@ your draft until it is fixed, and never loses the last good version.
 **Discard local edits** drops an edit that isn't in the draft yet. The chip
 beside it says where the macro stands: **edited here** while an edit is not in
 the draft yet, **changed in draft** once the draft changes the macro, and
-**as read** when it matches the keyboard (in the demo, the demo setup).
+**as read** when it matches the keyboard (in the demo, the demo profile).
 
 **Clear macro** empties the slot. **Place on a key…** takes you to the Keymap
 screen to put the macro on a key. Beside the title, chips name the layers
@@ -89,15 +89,15 @@ key and volume. Anything else is named under the recorder as not recorded.
 
 ## Uninterruptible playback
 
-Each macro has a playback setting:
+Each macro has an **Uninterruptible playback** setting:
 
-- **Automatic** turns protection on when your keyboard layout needs Unicode
-  entry for the macro's text.
-- **On** protects the whole macro.
+- **Automatic** turns it on when your keyboard layout needs Unicode entry for
+  the macro's text, and says after its name whether it is on or off.
+- **On** makes the whole macro play uninterruptibly.
 - **Off** lets your typing mix with it.
 
-While a protected macro plays, only the macro types. New key presses are
-ignored, not queued. Keys you were already holding are suspended: modifiers
+While a macro plays uninterruptibly, only the macro types. New key presses
+are ignored, not queued. Keys you were already holding are suspended: modifiers
 come back afterwards, but other keys need to be let go and pressed again. The
 trackball and other keyboards are not held back.
 

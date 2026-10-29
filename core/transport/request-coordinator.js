@@ -549,9 +549,5 @@ function disconnectedAfter(deviceId, cause) {
 }
 
 module.exports = {
-    DEFAULT_REQUEST_TIMEOUT_MS,
-    LATE_REPLY_MS,
-    CoordinatedDeviceConnection,
     DeviceRequestCoordinator,
-    defaultResponseMatcher,
 };

@@ -1,8 +1,9 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
-import {vocabulary} from "./vocabulary.mjs";
+import {macroNamed, vocabulary} from "./vocabulary.mjs";
 import {actionLabel, canonicalKeycode} from "./keyface.mjs";
-import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MODS, MOD_BITS, MOD_RIGHT, QK, inBlock, keyOf, macroOfName, modsOf, wrapperOf} from "../../rules/qmk-keycodes.mjs";
+import {keycodeValue} from "./keycode-expression.mjs";
+import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MODS, MOD_BITS, MOD_RIGHT, QK, inBlock, keyOf, macroName, macroOfName, modsOf, wrapperOf} from "../../rules/qmk-keycodes.mjs";
 
 // Numeric keycodes, named.
 //
@@ -16,7 +17,7 @@ const LEFT_MODS = [MODS.LCTL, MODS.LSFT, MODS.LALT, MODS.LGUI], RIGHT_MODS = [MO
 export function keyName(/** @type {Model} */ model, /** @type {number} */ code) {
     if (!code) return "";
     const macro = macroIndex(code);
-    if (macro !== null) return `MACRO_${macro}`;
+    if (macro !== null) return macroName(macro);
     const direct = (/** @type {number} */ value) => (model?.qmkKeycodes || []).find((entry) => entry.keycode === value)?.value;
     const exact = direct(code);
     if (exact) return exact;
@@ -117,22 +118,21 @@ export function pickerModifierProblem(model, picker) {
 }
 
 // The macro slot a stored keycode names (MACRO_n), including the other
-// names the writer accepts: QMK's own for the first 32 slots, and the former
-// VIA_MACRO_n.
-/** @param {string | number | null | undefined} code */
-export function macroIndex(code) {
+// names the writer accepts: the former VIA_MACRO_n, its number, and QMK's own
+// names for the first 32 slots, which are the keycode catalog's and so are
+// read through the model (keycodeValue).
+/** @param {string | number | null | undefined} code @param {Model} [model] */
+export function macroIndex(code, model) {
     const text = String(code ?? "").trim();
     const named = macroOfName(text);
     if (named !== undefined) return named;
-    const match = /^(?:QK_MACRO_|MC_)(\d+)$/.exec(text);
-    if (match && Number(match[1]) > 31) return null;
-    const value = match ? Number(match[1]) : /^(?:0x[0-9a-f]+|\d+)$/i.test(text) ? Number(text) - QK.MACRO.first : -1;
-    return Number.isInteger(value) && inBlock(QK.MACRO.first + value, QK.MACRO) ? value : null;
+    const value = /^(?:0x[0-9a-f]+|\d+)$/i.test(text) ? Number(text) : keycodeValue(model, text);
+    return value !== undefined && inBlock(value, QK.MACRO) ? value - QK.MACRO.first : null;
 }
 /** @param {Model} model @param {string | number | null | undefined} code */
 export function pointingMacro(model, code) {
-    const index = macroIndex(code);
+    const index = macroIndex(code, model);
     if (index === null) return null;
-    const slot = model?.macros?.find(slot => slot.keycode === `MACRO_${index}`);
-    return {index, name: slot?.name || slot?.defaultName || `MACRO_${index}`, empty: Boolean(slot?.empty)};
+    const slot = model?.macros?.find(slot => slot.keycode === macroName(index));
+    return {index, name: macroNamed(slot, macroName(index)), empty: Boolean(slot?.empty)};
 }

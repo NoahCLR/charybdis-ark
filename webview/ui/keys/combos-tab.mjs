@@ -8,7 +8,7 @@ import {closeComboBuilder, getModel, heldLayers, layers, openComboBuilder, rende
 import * as edits from "../../view/edits.mjs";
 import {draftMarks, draftDot} from "../../view/review.mjs";
 import {reachAttrs, reachTable} from "../groups.mjs";
-import {setReachGroupOpen} from "../../view/reach-groups.mjs";
+import {reachRowId, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {keyMeaning, keyName} from "../../view/keyface.mjs";
@@ -45,7 +45,7 @@ export function tabCombos(body, right) {
         const route = /** @type {[string, import("../../view/keyface-types.js").ComboRoute[]][]} */ ([["view", inView], ["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]])
             .find(([, entries]) => entries.some((entry) => String(entry.combo.id) === id))?.[0];
         state.pickCombo = null;
-        state.reachRow.combos = route ? `${route}:${id}` : null;
+        state.reachRow.combos = route ? reachRowId(route, id) : null;
         if (route) state.reachGroups = setReachGroupOpen(state.reachGroups, route, true);
     }
     /** @param {string} group @param {Pick<ReturnType<typeof comboGroups>["onKeys"][number], "combo">} entry @param {string} reachedBy */
@@ -55,7 +55,7 @@ export function tabCombos(body, right) {
         return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
             <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
             <td class="mono">${comboOutputMarked(model, combo)}</td>
-            <td class="mono">${esc(combo.termMs ?? "")} ms${combo.followsDefault ? ` <span class="tag" data-tip="Follows the default combo window (Settings · Combos), so it changes with it.">default</span>` : ""}</td>
+            <td class="mono">${esc(combo.termMs ?? "")} ms${combo.followsDefault ? ` <span class="tag" data-tip="${esc(`Follows the default combo window (${vocabulary(model).settingsScreens.combos}), so it changes with it.`)}">default</span>` : ""}</td>
             <td class="muted">${esc(requires)}</td>
             <td class="muted">${reachedBy}</td></tr>`;
     };
@@ -70,7 +70,7 @@ export function tabCombos(body, right) {
         .flatMap(([group, entries]) => entries.map((entry) => /** @type {[number, {group: string, entry: import("../../view/keyface-types.js").ComboGroupEntry}]} */ ([entry.combo.id, {group, entry}])));
     const routes = new Map(listed);
     const comboGroupRows = [
-        {id: "key", detail: onKey.position ? keyNameMarked(model, keyName(onKey.position), keyMeaning(onKey.position)) : "nothing answers here",
+        {id: "key", detail: onKey.position ? keyNameMarked(model, keyName(onKey.position, model), keyMeaning(onKey.position)) : "nothing answers here",
             rows: onKey.combos.map((combo) => {
                 const route = routes.get(combo.id);
                 return route ? row("key", route.entry, reachedBy(route.group, route.entry)) : row("key", {combo}, "—");

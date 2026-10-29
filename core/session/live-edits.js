@@ -27,12 +27,12 @@
  */
 const {fingerprint} = require("../model/portable-profile");
 const {EDIT_MODE, isEditMode} = require("../protocol/profile-edit-v1");
-const {EDIT_MODE_WORDS, PHASE, quietWords} = require("../model/vocabulary");
+const {EDIT_MODE_WORDS, INTERRUPTION_REASONS, PHASE, SAVE_WORDS, arkCode, failureSentence, quietWords} = require("../model/vocabulary");
 const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
 const {expectReconnect, renamedTo} = require("./keyboard-reconnect");
-const {INTERRUPTION_REASONS, SAVE_WORDS, interruption, saveResult} = require("./interruption");
+const {interruption, saveResult} = require("./interruption");
 
 /** @param {string} message @param {string} [code] */
 const refusal = (message, code = "LIVE_EDIT_REFUSED") => Object.assign(new Error(message), {code});
@@ -185,7 +185,7 @@ async function saveCutShort(session, draft, error, saveRecovery) {
     const reason = INTERRUPTION_REASONS[/** @type {"lost" | "unanswered"} */ (interruption(error))];
     const read = session.service.snapshot().connected ? saveCutShortResult(session, session.observedPortable) : "";
     return Object.assign(new Error([SAVE_WORDS.cutShort, reason, read || SAVE_WORDS.later(recovery)].join(" ")),
-        {code: codeOf(error) || "LIVE_SAVE_CUT_SHORT", cause: error, verdict: SAVE_WORDS.cutShort});
+        {code: arkCode(error, "LIVE_SAVE_CUT_SHORT"), cause: error, verdict: SAVE_WORDS.cutShort});
 }
 
 // After a Save cut short, what `read` (a live read of the same keyboard)
@@ -405,9 +405,9 @@ async function sendApplyDraft(session, kept, mode, notice) {
             back = true;
         } catch {}
         const review = EDIT_MODE_WORDS[EDIT_MODE.APPLY].label;
-        throw Object.assign(new Error(`Your draft was not sent: ${error instanceof Error ? error.message : String(error)} ${back
+        throw Object.assign(new Error(`Your draft was not sent: ${failureSentence(error)} ${back
             ? `The keyboard is back in ${review}, and your draft is kept.`
-            : `Ark could not switch back to ${review}; your draft is kept. Return the keyboard to ${review} before continuing.`}`), {code: codeOf(error) || "LIVE_EDIT_REFUSED"});
+            : `Ark could not switch back to ${review}; your draft is kept. Return the keyboard to ${review} before continuing.`}`, {cause: error}), {code: arkCode(error, "LIVE_EDIT_REFUSED")});
     }
 }
 

@@ -5,18 +5,18 @@ does on this layer and lets you change it.
 
 ## The Key tab
 
-**This key on this layer** (the layer's name follows, as in *This key on
-this layer (Number)*) shows the key's **Keycode** and what it **Does**. Change it
+**This key on this layer** (the layer's name follows, as in *This key on this
+layer (Number)*) shows the key's **Keycode** and what it **Does**. Change it
 by typing a keycode or with **Pick…**. The field takes QMK's spellings, such
 as `LCTL_T(KC_A)`, `SGUI(KC_S)` or `OSM(MOD_MEH)`, the keyboard's own names,
 such as `MACRO_3`, `LOCK_LAYER(2)` or `CUSTOM_KEY_5`, a layer by its number,
 as in `MO(2)`, and a keycode as up to four hex digits, `0x0004`. A number in
 decimal isn't a keycode, inside a call or on its own, and neither are
-spellings QMK doesn't have, such as `LAS()`, or a slot written with a
-leading zero, such as `MACRO_03`. The field
-and the picker take exactly the same keycodes. A keycode the keyboard can't
-store stays in the field with the reason under it, and nothing changes; so
-does a lock of a layer this keyboard doesn't have.
+spellings QMK doesn't have, such as `LAS()`, or a slot written with a leading
+zero, such as `MACRO_03`. The field and the picker take exactly the same
+keycodes. A keycode the keyboard can't store stays in the field with the
+reason under it, and nothing changes; so does a lock of a layer this keyboard
+doesn't have.
 
 **Where it is stored** unfolds the key's matrix row and column, layout index
 and LED index. Once open, it stays open as you select other keys.
@@ -67,7 +67,7 @@ built with are left out.
 | **Tap-hold** | `LT` | taps a key, holds the layer; pick the tap key next |
 | **Tap-toggle** | `TT` | holds the layer, or toggles it when tapped |
 | **One-shot** | `OSL` | the layer is on for the next key |
-| **Move** | `TO` | switches to the layer |
+| **Move to** | `TO` | switches to the layer |
 
 **Pointing modes** offers each mode as **Hold** (on while the key is down) or
 **Toggle** (on until pressed again).
@@ -119,14 +119,14 @@ click one again to take it out. A symbol such as `!` is its key with Shift,
 and a shortcut has one set of modifiers, so that Shift is held for the whole
 shortcut: `!` then `a` sends Shift + 1 + A, which types "!A". Taking a symbol
 out takes its Shift with it, unless another symbol still needs it or you
-turned Shift on yourself. A shortcut holds at most six keys, one media
-key and one system key, since the computer reads one of each at a time: the
-picker says so under the keys and keeps **Use shortcut** off until the choice
-fits. A media key in a shortcut plays wherever the shortcut is sent: behind a
+turned Shift on yourself. A shortcut holds at most six keys, one media key and
+one system key, since the computer reads one of each at a time: the picker
+says so under the keys and keeps **Use shortcut** off until the choice fits. A
+media key in a shortcut plays wherever the shortcut is sent: behind a
 behaviour, from a bypassed key or as a combo's output. Here left and right
-modifiers mix freely, so Left Ctrl + Right Option + K is fine. Its **Layers** section switches on the layers the shortcut turns on, as
-many as you like, and **Turns them on as** says how, all of them alike, as a
-layer key would:
+modifiers mix freely, so Left Ctrl + Right Option + K is fine. Its **Layers**
+section switches on the layers the shortcut turns on, as many as you like, and
+**Turns them on as** says how, all of them alike, as a layer key would:
 
 - **Hold**, as `MO()`: Left Cmd + Navigation + Extra holds Command and both
   layers while you hold the key. They go off when you let go, unless a lock,
@@ -147,9 +147,9 @@ Tap-toggle and one-shot keys are layer keys like `TT()` and `OSL()`: their
 layers are on from every press, even with a behaviour on the key, and they
 wait the dual-role tap / hold threshold. With the other kinds, a behaviour on
 the key sends the shortcut where it leaves a tap or a hold empty, so a lock or
-a move happens from either. The base layer and the default layers are always on, so
-their rows are dimmed and say so. Modifiers alone, a key alone or layers alone
-are a shortcut too. **Clear** removes it.
+a move happens from either. The base layer and the default layers are always
+on, so their rows are dimmed and say so. Modifiers alone, a key alone or
+layers alone are a shortcut too. **Clear** removes it.
 
 **What it does** says whether the key sends its shortcut, its behaviour, both
 or nothing yet, and holds the same behaviour editor as the Keymap screen. It

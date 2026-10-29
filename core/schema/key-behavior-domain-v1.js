@@ -1,8 +1,8 @@
 // @ts-check
 "use strict";
-const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 const {LAYERS} = require("../data/charybdis-layout");
-const {u8: assertU8, u16: assertU16, asBytes: copyBytes, canonical} = require("./bytes");
+const {u8: assertU8, u16: assertU16, asBytes, canonical} = require("./bytes");
 
 /**
  * @typedef {{tapIndex: number, tap?: ReturnType<typeof normalizeAction>, hold?: ReturnType<typeof normalizeHold>, longHold?: ReturnType<typeof normalizeHold>}} NormalizedStep
@@ -12,7 +12,6 @@ const {DEFAULT_TAP_DEPTH, MAX_TAP_DEPTH} = require("./profile-depth");
 const {
     PROFILE_ACTION_KINDS,
     PROFILE_BLOB_V1,
-    PROFILE_DOMAIN_IDS,
     ProfileBlobProtocolError,
     decodeDomainEnvelope,
     decodeSemanticAction,
@@ -70,7 +69,7 @@ function encodeKeyBehaviorDomain(value = {}, options = {}) {
         throw new TypeError("Key-behavior domain must provide a rows array.");
     }
     if (value.rows.length > limits.maxRows) {
-        throw behaviorError("CAPACITY_EXCEEDED", `Key-behavior row count exceeds ${limits.maxRows}.`);
+        throw behaviorError("CAPACITY_EXCEEDED", `Key-behavior row count exceeds ${limits.maxRows}.`, {limit: "behaviours", most: limits.maxRows});
     }
 
     const rows = value.rows.map((row, rowIndex) => normalizeRow(row, limits, options.actionLimits, rowIndex));
@@ -83,7 +82,7 @@ function encodeKeyBehaviorDomain(value = {}, options = {}) {
 
     const populatedStepCount = rows.reduce((total, row) => total + row.steps.length, 0);
     if (populatedStepCount > limits.maxPopulatedSteps) {
-        throw behaviorError("CAPACITY_EXCEEDED", `Populated key-behavior step count exceeds ${limits.maxPopulatedSteps}.`);
+        throw behaviorError("CAPACITY_EXCEEDED", `Populated key-behavior step count exceeds ${limits.maxPopulatedSteps}.`, {limit: "behaviourSteps", most: limits.maxPopulatedSteps});
     }
     const encodedRows = rows.map((row) => encodeRow(row));
     const size = KEY_BEHAVIOR_DOMAIN_V1.HEADER_SIZE + encodedRows.reduce((total, row) => total + row.length, 0);
@@ -105,7 +104,7 @@ function encodeKeyBehaviorDomain(value = {}, options = {}) {
 
 /** @param {unknown} value @param {import("./types.js").BehaviorOptions} [options] */
 function decodeKeyBehaviorDomain(value, options = {}) {
-    const bytes = copyBytes(value, "Key-behavior payload");
+    const bytes = asBytes(value, "Key-behavior payload");
     const limits = normalizeLimits(options.limits || options);
     if (bytes.length < KEY_BEHAVIOR_DOMAIN_V1.HEADER_SIZE) {
         throw behaviorError("TRUNCATED", "Key-behavior payload is missing its four-byte header.");

@@ -12,6 +12,7 @@ const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
 const {LAYERS} = require("../data/charybdis-layout");
 const {behaviorPlacementProblem} = require("./profile-placement");
 const {profileDepthOptions} = require("../schema/profile-depth");
+const {VOCABULARY} = require("./vocabulary");
 
 /**
  * @typedef {import("../schema/types.js").SemanticAction} Action
@@ -34,6 +35,11 @@ function integer(value, max, label, optional = false) {
     if (!Number.isInteger(result) || result < 0 || result > max) throw invalid(`${label} must be between 0 and ${max}.`);
     return result;
 }
+
+// A behaviour's own timing as a refusal starts with it ("Tap / hold
+// threshold must be…"), in the vocabulary's words.
+/** @param {import("../../contracts/edits.js").TimingTerm} term */
+const timingName = (term) => VOCABULARY.thresholdNames[term].charAt(0).toUpperCase() + VOCABULARY.thresholdNames[term].slice(1);
 
 /** @param {Buffer} payload @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editKeyBehaviors(payload, message, capabilities = {}) {
@@ -177,9 +183,9 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         if (typeof enabled !== "boolean") throw invalid("The behaviour must be enabled or disabled.");
         const row = {
             target: previous?.target ?? target,
-            tapHoldTerm: integer(form.tapHoldTerm, 65535, "Tap/hold time", true),
-            longHoldTerm: integer(form.longHoldTerm, 65535, "Long-hold time", true),
-            multiTapTerm: integer(form.multiTapTerm, 65535, "Multi-tap time", true),
+            tapHoldTerm: integer(form.tapHoldTerm, 65535, timingName("tapHoldTerm"), true),
+            longHoldTerm: integer(form.longHoldTerm, 65535, timingName("longHoldTerm"), true),
+            multiTapTerm: integer(form.multiTapTerm, 65535, timingName("multiTapTerm"), true),
             keepsAutoMouseAnchored: anchored,
             enabled,
             allowedLayers: integer(form.allowedLayers ?? previous?.allowedLayers ?? (2 ** layerCount - 1), 2 ** layerCount - 1, "Allowed layers"),

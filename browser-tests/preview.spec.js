@@ -19,10 +19,10 @@ for (const shell of ["", "?shell=demo"]) {
         });
         await expect(card).toHaveClass(/drag-over/);
         expect(await dropFiles(page, [file, file])).toBe(true);
-        await expect(card.locator('[role="status"]')).toHaveText("Drop one profile file at a time.");
+        await expect(card.locator('[role="status"]')).toHaveText("Drop one file at a time.");
         await expect(card).not.toHaveClass(/drag-over/);
         await dropFiles(page, [{...file, text: "x".repeat(262145)}]);
-        await expect(card.locator('[role="status"]')).toHaveText("This profile file is too large.");
+        await expect(card.locator('[role="status"]')).toHaveText("This file is too large for a backup.");
         await page.evaluate(() => {
             const text = File.prototype.text;
             File.prototype.text = () => Promise.reject(new Error("unreadable"));
@@ -365,7 +365,7 @@ test("the demo's controls post their messages", async ({page}) => {
     // a browser without WebHID still offers it.
     await page.goto("/preview/index.html?shell=none");
     const placeholder = page.locator(".read-placeholder");
-    await expect(placeholder.locator('[data-act="choose-keyboard"]')).toHaveText("Choose keyboard");
+    await expect(placeholder.locator('[data-act="choose-keyboard"]')).toHaveText("Choose keyboard…");
     await clear();
     await placeholder.locator('[data-act="explore-demo"]').click();
     await expect.poll(posted).toEqual([{type: "openDemo"}]);

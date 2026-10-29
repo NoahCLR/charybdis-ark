@@ -7,23 +7,21 @@
 // The model already resolved each position to a display label; this adds the
 // layer-tap hint, the behaviour tiers and the combo badges, and nothing else.
 
-import {MODIFIER_WRAPPERS, MODS, MOD_BITS, MOD_RIGHT, macroOfName} from "../../rules/qmk-keycodes.mjs";
+import {MODIFIER_WRAPPERS, MODS, MOD_BITS, MOD_RIGHT} from "../../rules/qmk-keycodes.mjs";
 import {keyMeaning} from "../../rules/combo-inputs.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 
-const TRANSPARENT = new Set(["KC_TRANSPARENT", "KC_TRNS", "_______"]);
-const DISABLED = new Set(["KC_NO", "XXXXXXX"]);
-
 // A layer key's second line is in the vocabulary's words (keyCapLayerVerbs),
-// and which keys act on a layer, and how, is core's (qmkKeyLayerForms), so
-// every caller passes the model it has; one that reads only `kind` or `main`
-// says so by passing null.
+// and which keys act on a layer, and how, is core's (qmkKeyLayerForms), as is
+// which key is transparent or disabled (qmkKeyKinds), so every caller passes
+// the model it has.
 /** @param {ViewModel} model @returns {import("./keyface-types.js").KeyFace} */
 export function keyFace(/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position, model) {
     if (!position) return {main: "", sub: "", kind: "none"};
     const keycode = position.keycode || "";
-    if (TRANSPARENT.has(keycode)) return {main: "▽", sub: "", kind: "transparent"};
-    if (DISABLED.has(keycode)) return {main: "", sub: "", kind: "disabled"};
+    const kind = keyKindOf(model, keycode);
+    if (kind === "transparent") return {main: "▽", sub: "", kind};
+    if (kind === "disabled") return {main: "", sub: "", kind};
     const form = layerFormOf(model, position);
     const layerTap = form === "LT";
     const verb = form && form !== "LT" ? vocabulary(model).keyCapLayerVerbs[form] : undefined;
@@ -51,11 +49,42 @@ export function keyFace(/** @type {import("../../contracts/panel.js").Position |
 /** @param {ViewModel} model @param {string} keycode @returns {number | null} */
 export function layerOfKeycode(model, keycode) {
     const layers = model?.qmkKeyLayers || {};
-    const name = String(keycode ?? "");
-    for (const key of [name, model?.qmkKeycodeAliases?.[name], canonicalKeycode(model, name)]) {
-        if (key && Number.isInteger(layers[key])) return layers[key];
+    for (const key of spellingsOf(model, String(keycode ?? ""))) {
+        if (Number.isInteger(layers[key])) return layers[key];
     }
     return null;
+}
+
+// The names core may publish a fact about a keycode under, in the order a
+// table keyed by them is read: as written, the name the core knows it by
+// (QK_USER_31 → LOCK_LAYER(3), KC_TRNS → KC_TRANSPARENT), however the
+// expression is spelled (canonicalKeycode), and a bare number as core keys
+// one (0x7f00 → 0x7F00).
+/** @param {ViewModel} model @param {string} name @returns {string[]} */
+export const spellingsOf = (model, name) =>
+    [name, model?.qmkKeycodeAliases?.[name] ?? "", canonicalKeycode(model, name), hexSpelling(name)].filter(Boolean);
+
+// What a table core keys by keycode name says of a keycode, read under each
+// of its spellings in turn (spellingsOf), a bare number however it is cased
+// included. Undefined when it says nothing.
+/** @template T @param {Readonly<Record<string, T>> | null | undefined} table @param {ViewModel} model @param {string} name @returns {T | undefined} */
+const factOf = (table, model, name) => {
+    for (const spelled of spellingsOf(model, name)) if (table?.[spelled]) return table[spelled];
+    return undefined;
+};
+
+// What a key, or a keycode by name, is where the interface treats it apart
+// from other keys, as core publishes it (qmkKeyKinds, from
+// core/model/key-names.js keyKind): transparent, disabled, a macro's or a
+// custom key's, read under the stored name, the profile's name for it, or
+// however the expression is spelled. Undefined for any other key.
+/** @param {ViewModel} model @param {Position | string | null | undefined} key @returns {import("../../contracts/model.js").KeyKind | undefined} */
+export function keyKindOf(model, key) {
+    for (const name of typeof key === "string" ? [key] : [key?.keycode, key?.semantic]) {
+        const kind = name ? factOf(model?.qmkKeyKinds, model, name) : undefined;
+        if (kind) return kind;
+    }
+    return undefined;
 }
 
 // What a key, or a keycode by name, does to the layer it acts on, as core
@@ -64,13 +93,23 @@ export function layerOfKeycode(model, keycode) {
 // expression is spelled. Undefined for any other key.
 /** @param {ViewModel} model @param {Position | string | null | undefined} key @returns {import("../../contracts/model.js").LayerForm | undefined} */
 export function layerFormOf(model, key) {
-    const forms = model?.qmkKeyLayerForms || {};
     for (const name of typeof key === "string" ? [key] : [key?.keycode, key?.semantic]) {
-        if (!name) continue;
-        for (const spelled of [name, model?.qmkKeycodeAliases?.[name], canonicalKeycode(model, name)]) if (spelled && forms[spelled]) return forms[spelled];
+        const form = name ? factOf(model?.qmkKeyLayerForms, model, name) : undefined;
+        if (form) return form;
     }
     return undefined;
 }
+
+// The modifiers a layer-mod (LM) holds with its layer, in the words its name
+// ends in, as core publishes them (qmkKeyLayerMods, from
+// core/model/key-names.js layerModWords). Undefined for any other key.
+/** @param {ViewModel} model @param {string} keycode @returns {string | undefined} */
+export const layerModsOf = (model, keycode) => keycode ? factOf(model?.qmkKeyLayerMods, model, keycode) : undefined;
+// The key a layer-tap (LT) taps, by the name its own name starts with, as
+// core publishes it (qmkKeyLayerTaps, from core/model/key-names.js
+// layerTapWords). Undefined for any other key.
+/** @param {ViewModel} model @param {string} keycode @returns {string | undefined} */
+export const layerTapOf = (model, keycode) => keycode ? factOf(model?.qmkKeyLayerTaps, model, keycode) : undefined;
 
 // A dual-role key's two halves: what a tap sends, and what a hold does — hold
 // a layer on, or a modifier. Null for any other key.
@@ -85,9 +124,9 @@ export function dualRole(model, position) {
 // A key by its whole name, for anything that is not a key cap. A cap shows what
 // fits — "F" over "Navigation" — and the name is the core's for the keycode,
 // "F / Navigation" (core/model/key-names.js).
-/** @param {Position | null | undefined} position */
-export function keyName(position) {
-    const face = keyFace(position, null);
+/** @param {Position | null | undefined} position @param {ViewModel} model */
+export function keyName(position, model) {
+    const face = keyFace(position, model);
     if (face.kind === "transparent") return "Transparent";
     if (face.kind === "disabled" || face.kind === "none") return "Unmapped";
     return position?.editLabel || face.main || position?.keycode || "";
@@ -110,7 +149,7 @@ export {keyMeaning};
 /** @param {ViewModel} model @param {string} name */
 export const visibleKeycode = (model, name) => {
     const semantic = model?.qmkKeycodeAliases?.[name] || "";
-    if (/^MACRO_\d+$/.test(semantic) && macroOfName(semantic) !== undefined) return semantic;
+    if (semantic && model?.qmkKeyKinds?.[semantic] === "macro") return semantic;
     return semantic && /^0x[0-9a-f]+$/i.test(name) ? semantic : name || "";
 };
 
@@ -125,11 +164,10 @@ export function actionNaming(model, name) {
 // How a keycode name is spoken in prose: the label the keyboard's own
 // vocabulary gives it, so a behaviour row, a reach line and the key cap all
 // call one key the same thing. Names the vocabulary does not cover — a device
-// action outside the advertised ABI — keep their numeric identity.
+// action outside the advertised ABI — keep their numeric identity. A name is
+// read under each of its spellings, so 0x7f00 reads as the custom key it is.
 /** @param {ViewModel} model @param {string} name */
-export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
-    || model?.qmkKeyLabels?.[model?.qmkKeycodeAliases?.[name] ?? ""]
-    || String(name ?? "");
+export const actionLabel = (model, name) => (name ? factOf(model?.qmkKeyLabels, model, String(name)) : undefined) || String(name ?? "");
 
 // What a behaviour cell reads as in the grid: the name a person knows the key
 // by, so it says "#", "Shift+Enter" and "Hold Numbers" where the keyboard
@@ -140,7 +178,7 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 /** @param {ViewModel} model @param {import("../../contracts/panel.js").Branch | null | undefined} branch */
 export function cellLabel(model, branch) {
     const action = String(branch?.action ?? "");
-    if (/^CUSTOM_KEY_\d+$/.test(action) && branch?.label) return branch.label;
+    if (keyKindOf(model, action) === "customKey" && branch?.label) return branch.label;
     const named = actionLabel(model, action);
     return named !== action ? named : branch?.label || action;
 }
@@ -159,6 +197,11 @@ const wrapperMods = (wrapper) => {
     const bits = Object.hasOwn(MODIFIER_WRAPPERS, wrapper) ? MODIFIER_WRAPPERS[wrapper] : undefined;
     return bits === undefined ? undefined : MOD_ORDER.filter((mod) => (MODS[mod] & MOD_RIGHT) === (bits & MOD_RIGHT) && MODS[mod] & bits & MOD_BITS);
 };
+// A number as the keyboard names a value it has no name for, the way core
+// keys it: 0x7f00 and 0x7F00 are both 0x7F00 (core/schema/keycodes.js). Any
+// other name stays as it is.
+/** @param {string} name */
+const hexSpelling = (name) => /^0x[0-9a-f]+$/i.test(name) ? `0x${Number(name).toString(16).toUpperCase().padStart(4, "0")}` : name;
 export function canonicalKeycode(/** @type {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} */ model, /** @type {string} */ expression) {
     let text = String(expression ?? "").replace(/\s+/g, "");
     /** @type {Set<string>} */
@@ -167,7 +210,8 @@ export function canonicalKeycode(/** @type {Partial<import("../../contracts/pane
         held.forEach((mod) => mods.add(mod));
         text = match[2];
     }
-    const inner = text.replace(/[A-Za-z_][A-Za-z0-9_]*/g, (name) => model?.qmkKeycodeAliases?.[name] ?? name);
+    const aliases = model?.qmkKeycodeAliases;
+    const inner = text.replace(/0x[0-9A-Fa-f]+\b|[A-Za-z_][A-Za-z0-9_]*/g, (name) => aliases?.[name] ?? aliases?.[hexSpelling(name)] ?? name);
     return MOD_ORDER.filter((mod) => mods.has(mod)).reduceRight((wrapped, mod) => `${mod}(${wrapped})`, inner);
 }
 

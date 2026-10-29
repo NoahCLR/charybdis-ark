@@ -1,53 +1,60 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {withAnswers} from "../fixtures/layer-answers.mjs";
+import {createRequire} from "node:module";
 import {resolvedPositions, reachablePositions, viewPositions} from "../../webview/view/layer-resolution.mjs";
-import {pointingReach} from "../../webview/view/reach.mjs";
+import {pointingReach} from "../../webview/view/pointing-reach.mjs";
+import * as edits from "../../webview/view/edits.mjs";
+
+const require = createRequire(import.meta.url);
+const {profileDocument, publishedModel} = require("../fixtures/published-model.js");
+const {SETTING} = require("../../core/schema/settings-domain-v1");
+
+// The answers among these layout indexes: the profile's other keys are empty.
+const at = (entries, ...indexes) => entries.filter((entry) => indexes.includes(entry.position.layoutIndex));
+const named = (entry) => entry.layer.displayName;
 
 test("a transparent key can be answered by any layer below that is held with this one", () => {
     // The real stack: Base, Numbers, Symbols, with LT(NUM,SPC) on a thumb and
     // LT(SYM,J) on the other hand, so {Base, Numbers, Symbols} is a real hold.
-    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
-    const stack = withAnswers([
-        {index: 0, name: "Base", positions: [at(0, "KC_8"), at(1, "KC_RIGHT_ALT"), at(2, "MACRO_0")]},
-        {index: 1, name: "Numbers", positions: [at(0, "KC_P7"), at(1, "KC_NO"), at(2, "KC_TRANSPARENT")]},
-        {index: 2, name: "Symbols", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT"), at(2, "KC_TRANSPARENT")]},
-    ]);
+    // Base's Right Alt holds pointing mode 4 (Arrow).
+    const hold = edits.saveBehaviour({keycode: "KC_RIGHT_ALT", steps: []},
+        {change: {tapCount: 0, kind: "hold", branch: edits.cellBranch("hold", {action: "PD_MODE_4", style: "PRESS_AND_HOLD_UNTIL_RELEASE"})}});
+    const model = publishedModel(profileDocument({keys: {
+        0: {0: "KC_8", 1: "KC_RIGHT_ALT", 2: "MACRO_0"},
+        1: {0: "KC_P7", 1: "KC_NO", 2: "KC_TRANSPARENT"},
+        2: {0: "KC_TRANSPARENT", 1: "KC_TRANSPARENT", 2: "KC_TRANSPARENT"},
+    }}), {edits: [hold]});
+    const stack = model.layers;
 
     // Symbols alone: the default layer answers everything.
-    assert.deepEqual(resolvedPositions(stack, 2, []).map((entry) => entry.position.keycode),
+    assert.deepEqual(at(resolvedPositions(stack, 2, []), 0, 1, 2).map((entry) => entry.position.semantic),
         ["KC_8", "KC_RIGHT_ALT", "MACRO_0"]);
     // Symbols with Numbers held: Numbers wins where it has a key, KC_NO included.
-    assert.deepEqual(resolvedPositions(stack, 2, [1]).map((entry) => entry.position.keycode),
-        ["KC_P7", "KC_NO", "MACRO_0"], "and its transparent position still falls to Base");
+    assert.deepEqual(at(resolvedPositions(stack, 2, [1]), 0, 1, 2).map((entry) => entry.position.semantic),
+        ["KC_KP_7", "KC_NO", "MACRO_0"], "and its transparent position still falls to Base");
 
     // Both are real, so both are reachable, each named with what it needs.
     const reachable = reachablePositions(stack, 2);
-    const atZero = reachable.filter((entry) => entry.position.layoutIndex === 0);
-    assert.deepEqual(atZero.map((entry) => [entry.position.keycode, entry.layer.name, entry.whileHeld]),
-        [["KC_P7", "Numbers", true], ["KC_8", "Base", false]],
+    assert.deepEqual(at(reachable, 0).map((entry) => [entry.position.keycode, named(entry), entry.whileHeld]),
+        [["KC_KP_7", "Numbers", true], ["KC_8", "Base", false]],
         "Numbers answers only while held; Base always does");
 
     // An intermediate KC_NO is one real outcome — the key does nothing while
     // Numbers is held — but it takes nothing away, because dropping Numbers
     // leaves Base answering. It names nothing, so no group ever lists it.
-    assert.deepEqual(reachable.filter((entry) => entry.position.layoutIndex === 1)
-        .map((entry) => [entry.position.keycode, entry.whileHeld]),
+    assert.deepEqual(at(reachable, 1).map((entry) => [entry.position.keycode, entry.whileHeld]),
         [["KC_NO", true], ["KC_RIGHT_ALT", false]]);
-    const model = {keyBehaviors: [{keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, hold: {action: "PD_MODE_4"}}]}],
-        pdModes: [{id: 4, name: "Arrow", kind: 1, keys: {hold: "PD_MODE_4", lock: "PD_MODE_4_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}]};
     assert.deepEqual(pointingReach(model, stack, 2).fromBranchesBelow.map((entry) => entry.name), ["4"],
         "so the behaviour on Base is reached, and the mode its branch sends with it");
 });
 
 test("a view has only the layers on in it: base joins a preview, never a layer shown alone", () => {
-    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
-    const stack = withAnswers([
-        {index: 0, name: "Base", positions: [at(0, "KC_A"), at(1, "KC_B")]},
-        {index: 1, name: "Numbers", positions: [at(0, "KC_1"), at(1, "KC_TRANSPARENT")]},
-        {index: 2, name: "Symbols", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT")]},
-    ]);
-    const answers = (resolve, top, held) => resolve(stack, top, held).map((key) => `${key.position.keycode} from ${key.layer.name}`);
+    const stack = publishedModel(profileDocument({keys: {
+        0: {0: "KC_A", 1: "KC_B"},
+        1: {0: "KC_1", 1: "KC_TRANSPARENT"},
+        2: {0: "KC_TRANSPARENT", 1: "KC_TRANSPARENT"},
+    }})).layers;
+    const answers = (resolve, top, held) => at(resolve(stack, top, held), 0, 1).map((key) => `${key.position.keycode} from ${named(key)}`);
     assert.deepEqual(answers(viewPositions, 1, []), ["KC_1 from Numbers"], "Numbers alone: its transparent key answers nothing");
     assert.deepEqual(answers(viewPositions, 2, []), [], "Symbols alone is all transparent");
     assert.deepEqual(answers(viewPositions, 0, []), ["KC_A from Base", "KC_B from Base"], "base shown alone is base");
@@ -58,12 +65,12 @@ test("a view has only the layers on in it: base joins a preview, never a layer s
 });
 
 test("resolution consumes published facts, including native transparency whose name is unknown", () => {
-    const stack = withAnswers([
-        {index: 0, positions: [{layoutIndex: 7, keycode: "KC_A", value: 4}]},
-        {index: 1, positions: [{layoutIndex: 7, keycode: "0x0001", value: 1}]},
-    ]);
-    assert.equal(resolvedPositions(stack, 1)[0].position.keycode, "KC_A");
-    assert.equal(reachablePositions(stack, 1)[0].layer, stack[0]);
+    const stack = publishedModel(profileDocument({keys: {0: {7: "KC_A"}, 1: {7: "KC_TRANSPARENT"}}})).layers;
+    // Resolution reads the published answers, never the key's name.
+    const transparent = stack[1].positions.find((position) => position.layoutIndex === 7);
+    transparent.keycode = "0x0001";
+    assert.equal(at(resolvedPositions(stack, 1), 7)[0].position.keycode, "KC_A");
+    assert.equal(at(reachablePositions(stack, 1), 7)[0].layer, stack[0]);
     assert.deepEqual(resolvedPositions([{positions: [{layoutIndex: 7, keycode: "KC_A"}]}], 0), [],
         "an incomplete model supplies no inferred resolution facts");
 });
@@ -71,16 +78,19 @@ test("resolution consumes published facts, including native transparency whose n
 // A keyboard can keep default layers on beside base (QMK's default layer
 // state); core marks them alwaysOn, and they answer without being held.
 test("a default layer the keyboard keeps on answers without being held, like base", () => {
-    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
-    const stack = withAnswers([
-        {index: 0, name: "Base", positions: [at(0, "KC_A"), at(1, "KC_B")]},
-        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_1")]},
-        {index: 2, name: "Colemak", alwaysOn: true, positions: [at(0, "KC_Q"), at(1, "KC_TRANSPARENT")]},
-        {index: 3, name: "Top", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT")]},
-    ]);
-    assert.deepEqual(resolvedPositions(stack, 3).map((entry) => [entry.position.keycode, entry.layer.name, entry.whileHeld]),
+    const stack = publishedModel(profileDocument({
+        keys: {
+            0: {0: "KC_A", 1: "KC_B"},
+            1: {0: "KC_TRANSPARENT", 1: "KC_1"},
+            2: {0: "KC_Q", 1: "KC_TRANSPARENT"},
+            3: {0: "KC_TRANSPARENT", 1: "KC_TRANSPARENT"},
+        },
+        settings: (settings) => {settings.values[SETTING.DEFAULT_LAYERS] = 1 | (1 << 2); settings.names[2] = "Colemak"; settings.names[3] = "Top";},
+    })).layers;
+    assert.equal(stack[2].alwaysOn, true);
+    assert.deepEqual(at(resolvedPositions(stack, 3), 0, 1).map((entry) => [entry.position.keycode, named(entry), entry.whileHeld]),
         [["KC_Q", "Colemak", false], ["KC_B", "Base", false]], "the default layer answers with nothing held");
-    assert.deepEqual(reachablePositions(stack, 3).filter((entry) => entry.layer.name === "Colemak").map((entry) => entry.whileHeld), [false]);
-    assert.deepEqual(viewPositions(stack, 3).map((entry) => entry.position.keycode), [], "a layer shown alone is the view by itself");
-    assert.deepEqual(viewPositions(stack, 3, [1]).map((entry) => entry.position.keycode), ["KC_Q", "KC_1"], "held with another, the default layer joins as base does");
+    assert.deepEqual(at(reachablePositions(stack, 3), 0, 1).filter((entry) => named(entry) === "Colemak").map((entry) => entry.whileHeld), [false]);
+    assert.deepEqual(at(viewPositions(stack, 3), 0, 1).map((entry) => entry.position.keycode), [], "a layer shown alone is the view by itself");
+    assert.deepEqual(at(viewPositions(stack, 3, [1]), 0, 1).map((entry) => entry.position.keycode), ["KC_Q", "KC_1"], "held with another, the default layer joins as base does");
 });

@@ -39,7 +39,7 @@ test("a recovery copy is named by what made it and the keyboard it came from", (
     const savedAt = "2026-10-18T07:12:00Z";
     // A whole-profile save (the keyboard's Apply) and a live Save are both
     // Save to a person (D-L72); the titles tell which one the copy came before.
-    const titles = {apply: "Before saving a draft", restore: "Before restoring a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"};
+    const titles = {apply: "Before saving a draft", restore: "Before saving a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"};
     for (const [cause, words] of Object.entries(titles)) {
         assert.match(copyTitle(model, {cause, keyboard: "Charybdis - Home", savedAt}), new RegExp(`^${words} · Charybdis - Home · 18 Oct 2026, \\d\\d:\\d\\d$`), cause);
     }

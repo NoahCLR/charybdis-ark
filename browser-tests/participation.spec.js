@@ -1,7 +1,19 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {compileLayerAnswers} = require("../core/model/layer-resolution");
+const {demoDocument, openDraft, panelModel} = require("../tests/fixtures/published-model");
+
+// What core publishes for the demo profile saved with `edits` (a fresh draft
+// on it, so no key reads as drafted), as the shell posts it, shown on `layer`.
+async function publish(page, edits, layer) {
+    const {draft, state} = openDraft(openDraft(demoDocument(), {edits}).draft.document);
+    const model = panelModel(draft, state);
+    await page.evaluate(async ({model, layer}) => {
+        const store = await import("/webview/store.mjs");
+        store.setModel(model); store.showLayer(layer); store.render();
+    }, {model, layer});
+    return model;
+}
 
 test("participation controls post placements, shared definitions and master/source-layer settings", async ({page}) => {
     const errors = [];
@@ -56,25 +68,8 @@ test("participation controls post placements, shared definitions and master/sour
 test("a transparent late-layer key explains its source and opens that placement", async ({page}) => {
     await page.goto("/preview/index.html");
     await page.locator('[data-screen="keys"]').click();
-    const model = await page.evaluate(async () => {
-        const store = await import("/webview/store.mjs");
-        const model = structuredClone(store.getModel());
-        const key = model.layers[15].positions[0];
-        Object.assign(key, {keycode: "KC_TRNS", semantic: "KC_TRNS", value: 1, display: "Transparent"});
-        return model;
-    });
-    // This fixture changes a native layout value, so republish the same core
-    // facts the production core regenerates after accepting that edit.
-    const answers = compileLayerAnswers(model.layers.map(layer => {
-        const codes = [];
-        for (const key of layer.positions) codes[key.layoutIndex] = key.value;
-        return codes;
-    }));
-    model.layers.forEach((layer, at) => { layer.answers = answers[at]; });
-    await page.evaluate(async model => {
-        const store = await import("/webview/store.mjs");
-        store.setModel(model); store.showLayer(15); store.render();
-    }, model);
+    // Layer 15's first key made transparent, so a lower layer answers it.
+    const model = await publish(page, [{type: "updateLayoutKeys", layer: "Layer 15", changes: [{layoutIndex: 0, keycode: "KC_TRNS"}]}], 15);
     await expect(page.locator('[data-source-layer]')).toBeVisible();
     await expect(page.locator('.bench-body')).toContainText("This key is transparent on this layer");
     await expect(page.locator('[data-use-behavior]')).toHaveCount(0);
@@ -107,40 +102,23 @@ test("a key whose behaviour is switched off for it on this layer shows no dots t
     page.on("pageerror", error => errors.push(error.message));
     await page.goto("/preview/index.html");
     await page.locator('[data-screen="keys"]').click();
-    // A Base key with a behaviour that has branches, then the same model with
-    // Use behaviour off for that key on Base.
+    // A Base key with a behaviour that has branches, then the same profile
+    // with Use behaviour off for that key on Base.
+    await publish(page, [], 0);
     const found = await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const {behaviourFor, keyMeaning} = await import("/webview/view/keyface.mjs");
         const model = store.getModel();
         const key = model.layers[0].positions.find(position => position.row !== undefined && behaviourFor(model, keyMeaning(position))?.steps?.length);
         store.showLayer(0); store.state.tab = "key"; store.state.selected = key.layoutIndex; store.render();
-        return {index: key.layoutIndex, placement: key.row * 6 + key.column, name: model.layers[0].displayName || model.layers[0].name};
+        return {index: key.layoutIndex, keycode: key.semantic || key.keycode, name: model.layers[0].displayName || model.layers[0].name};
     });
     const key = page.locator(`g.kc[data-key="${found.index}"]`);
     await expect(key.locator("circle").first()).toBeAttached();
     // The same keycode on a second layer, so one placement can be switched
-    // off while the other keeps its behaviour. This fixture changes a native
-    // layout value, so republish the facts the core regenerates after it.
-    const model = await page.evaluate(async ({index, placement}) => {
-        const store = await import("/webview/store.mjs");
-        const model = structuredClone(store.getModel());
-        const base = model.layers[0].positions.find(position => position.layoutIndex === index);
-        const other = model.layers[1].positions.find(position => position.layoutIndex === index);
-        Object.assign(other, {keycode: base.keycode, semantic: base.semantic, value: base.value, display: base.display});
-        model.participation.layers[0].bypass = [placement];
-        return model;
-    }, found);
-    const answers = compileLayerAnswers(model.layers.map(layer => {
-        const codes = [];
-        for (const key of layer.positions) codes[key.layoutIndex] = key.value;
-        return codes;
-    }));
-    model.layers.forEach((layer, at) => { layer.answers = answers[at]; });
-    await page.evaluate(async model => {
-        const store = await import("/webview/store.mjs");
-        store.setModel(model); store.showLayer(1); store.render();
-    }, model);
+    // off while the other keeps its behaviour.
+    await publish(page, [{type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: found.index, keycode: found.keycode}]},
+        {type: "updatePlacementPolicy", layer: 0, layoutIndex: found.index, useBehavior: false, joinCombos: true}], 1);
     await expect(key.locator("circle").first()).toBeAttached();
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");

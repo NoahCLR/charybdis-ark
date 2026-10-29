@@ -67,14 +67,12 @@ async function inputs() {
     blobs.push({name: "schema 1 profile", hex: older.toString("hex"), rejects: "INCOMPATIBLE_SCHEMA"});
 
     const edits = await import("../webview/view/edits.mjs");
-    const {ACTION_ABI} = require("../core/schema/actions");
-    const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
+    // A keyboard on current firmware, as the demo's is (D-L64).
+    const {DEMO_CAPABILITIES} = require("../core/session/demo-session");
     const draft = {
         document: pdDocument(),
         deviceId: "web-build-charybdis",
-        capabilities: {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI, featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS,
-            responseVersion: 2, reportSize: 32, brightnessMax: 255, maxProfilePayload: 65504, maxBehaviorRows: 128, maxPopulatedBehaviorSteps: 640,
-            maxCombos: 128, maxComboInputs: 16, maxTapStepsPerBehavior: 5, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32, macroBytes: 10327},
+        capabilities: DEMO_CAPABILITIES,
         messages: [
             edits.setKey("Layer 1", 27, "KC_B"),
             {type: "updateConfigDefaults", sectionId: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1400"}, {macro: "snipingDpi", value: "200"}]},

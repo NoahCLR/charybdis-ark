@@ -42,7 +42,8 @@ test("a restore that starts re-reads the keyboard's status, even when it fails",
 });
 
 test("a profile with a misplaced action is refused, naming it, before recovery or any write", async t => {
-    const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
+    const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+    const {PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
     const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
     const base = document();
     const blob = decodeProfileBlob(Buffer.from(base.profile, "base64"));

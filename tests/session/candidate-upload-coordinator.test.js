@@ -3,7 +3,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
+const {encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
 const {
     CANDIDATE_ADMISSION,
     CANDIDATE_ERROR,
@@ -21,6 +22,7 @@ const {
     FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS,
     candidateStatusStallTimeoutMs,
 } = require("../../core/session/candidate-upload-coordinator");
+const {testClock} = require("../fixtures/panel-loop");
 
 // Every candidate publishes with the VIA store generation it is bound to.
 
@@ -709,7 +711,7 @@ test("default status stall timing scales and gives slave-half preparation its un
 });
 
 test("observable split state progress renews the stall deadline", async () => {
-    let now = 0;
+    const clock = testClock();
     const harness = new CandidateFirmwareHarness({
         splitBarrier: true,
         prepareReads: 2,
@@ -720,24 +722,22 @@ test("observable split state progress renews the stall deadline", async () => {
     const client = new CandidateUploadCoordinator(harness, {
         pollIntervalMs: 1,
         statusStallTimeoutMs: 2,
-        now: () => now,
-        async sleep(milliseconds) {
-            now += milliseconds;
-        },
+        now: clock.now,
+        sleep: clock.sleep,
     });
     const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
     const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
     assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
-    assert.equal(now > 2, true);
+    assert.equal(clock.now() > 2, true);
 });
 
 test("the copy to the slave half moving on keeps a long slave-half preparation alive, and reaches progress", async () => {
     const run = async (readSlaveStatus) => {
-        let now = 0;
+        const clock = testClock();
         const slaveOffsets = [];
         const harness = new CandidateFirmwareHarness({splitBarrier: true, prepareReads: 12, commitReads: 1, convergenceReads: 1, activationReads: 1});
         const client = new CandidateUploadCoordinator(harness, {
-            pollIntervalMs: 1, statusStallTimeoutMs: 3, now: () => now, async sleep(ms) { now += ms; },
+            pollIntervalMs: 1, statusStallTimeoutMs: 3, now: clock.now, sleep: clock.sleep,
             readSlaveStatus, onProgress: (progress) => { if (progress.slave) slaveOffsets.push(progress.slave.transferOffset); },
         });
         const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});

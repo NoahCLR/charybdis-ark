@@ -20,9 +20,8 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   [interface contracts](docs/spec/interface-contracts.md#shared-rule-ownership).
 - A firmware decision that depends only on the profile is computed in core
   and published; the interface interprets what is posted (D-L73). A firmware
-  rule the page has to run as a person clicks lives once in `rules/`, takes
-  primitives, and is imported by whichever of core and `webview/view/` runs
-  it.
+  rule the page has to run as a person clicks lives once in `rules/`, as
+  [the shared rules](docs/architecture/README.md#the-layers) say.
 - A fact is imported from its home, which
   [Facts and their homes](docs/architecture/README.md#facts-and-their-homes)
   names: a limit, a keycode or keycode range, the layer count and a layer
@@ -104,8 +103,8 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
   `docs/architecture/`. Verification runs, counts and dated progress belong
   in commit messages, not docs.
 - A change to what a person sees or does updates its page in `docs/guide/`
-  and, when a capability changes, `README.md`. The README stays a short pitch in Noah's
-  voice; development material goes in `docs/development.md`.
+  and, when a capability changes, `README.md`. The README stays a short
+  pitch in Noah's voice; development material goes in `docs/development.md`.
 - Names in code, interface text and docs use `GLOSSARY.md`'s terms, never the
   words it lists to avoid.
 
@@ -113,17 +112,18 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 
 | Rule | Check |
 | --- | --- |
-| `core/` layers import one way, type imports included; `contracts/` is inert and imports only itself | `tests/layering.test.js` |
+| `core/` layers import one way, type imports included, and no layer, `rules/`, the interface or the shell names a Node built-in or a package beyond its list (node-hid in `transport/`, `buffer` in `web/`), types included; `contracts/` is inert and imports only itself | `tests/layering.test.js` |
 | `rules/` imports only `rules/`, uses no DOM or Node, and loads with `require()`; core runs it only from `schema/` up, the interface only from `webview/view/`, the shell never | `tests/layering.test.js`, `tsconfig.rules.json` |
-| The interface imports nothing from `core/`, types included, and cannot touch the filesystem | `tests/layering.test.js` |
+| The interface imports nothing from `core/`, types included, and no Node built-in by any import; it never imports `web/`, and the shell imports only `webview/view/` of it | `tests/layering.test.js` |
 | The runtime never reads the firmware repository: no `keymap.c`, `config.h`, `rgb_config.c` or QMK paths in `core/`, `rules/`, `webview/` or `web/` | `tests/layering.test.js` |
 | The device service takes its adapter from its caller, with no default; the web build refuses node-hid and its adapter | `tests/session/profile-device-service.test.js`, `tests/scripts/web-build.test.js` |
 | Every `core/` module has a test in the matching `tests/` layer, and every `rules/` module one in `tests/rules/` | `tests/layering.test.js` |
-| Every source module starts with `// @ts-check`; the strict type checks pass | `tests/scripts/conventions.test.js`, `npm run typecheck` |
+| Every source module starts with `// @ts-check` and is in a type-check configuration; the strict type checks pass | `tests/scripts/conventions.test.js`, `tests/scripts/syntax-coverage.test.js`, `npm run typecheck` |
 | Screens author no colour literals | `tests/scripts/conventions.test.js` |
-| A QMK keycode number from `0x2000` to `0x7fff` is written only in `rules/qmk-keycodes.mjs`, `core/data/user-keycodes.js` and the interface's pinned copy of the layer-lock block | `tests/scripts/conventions.test.js` |
+| Markup reaches an HTML sink only in the interface, as `.innerHTML =`, `.outerHTML =` or `.insertAdjacentHTML(…)` handed one `html(…)` call, `webview/lib/dom.mjs`'s Trusted Types policy for markup (D-L74), the forms the escape check judges; a sink is named no other way (a quoted name, a key, `Object.assign`), and no module uses a sink no policy passes (`setHTMLUnsafe`, `DOMParser`, `createContextualFragment`, `document.write`, `srcdoc`, `importScripts`), and only `web/page.mjs` starts a worker | `tests/scripts/conventions.test.js`, the browser suite on the built page and the preview, both under Trusted Types |
+| A QMK keycode number from `0x2000` to `0x7fff` is written only in `rules/qmk-keycodes.mjs`, `core/data/user-keycodes.js` and the interface's pinned copy of the layer-lock block, in hex or, where it meets a name that says code, in decimal | `tests/scripts/conventions.test.js` |
 | No layer mask is written as `0xffff` or `(1 << 16) - 1`, and no layer count as `16` (`{length: 16}`, `new Array(16)`, a comparison or default), outside their homes and pinned copies; the exceptions say why | `tests/scripts/conventions.test.js` |
-| The interface keeps no table of words of its own, of three or more entries: phrases by key, `{label, what}` records by key, or `[id, phrase]` pairs; the exceptions say why | `tests/scripts/conventions.test.js` |
+| The interface keeps no table of words of its own: three or more phrases by key or `{label, what}` records by key, or two or more `[id, phrase]` pairs, in a list or a `Map`; the exceptions say why | `tests/scripts/conventions.test.js` |
 | Semantic lookups never use a position's stored keycode name | `tests/scripts/conventions.test.js` |
 | Only `webview/store.mjs` reads the draft's `editable`; every other webview module asks `canEdit(area)` or `writable()` | `tests/scripts/conventions.test.js` |
 | No webview module posts an object literal: `post()` and `postLeavingDemo()` take a builder's output or a message the store hands back | `tests/scripts/conventions.test.js` |
@@ -135,6 +135,7 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | No screen names a key or action as plain text | `tests/view/key-names-marked.test.mjs` |
 | Every value interpolated into webview markup, or handed to `el()` or an HTML setter, is escaped, a number by construction or markup a checked template made; the exceptions say why | `tests/view/markup-escaped.test.mjs` |
 | Every file Ark ships parses | `scripts/syntax-coverage.js` (in `npm run check`) |
+| The published site carries its Content Security Policy as a header and in the page, its Trusted Types allow-list exactly the page's policies, and the opener policy and HSTS on every file | `scripts/check-static-site.js`, `tests/scripts/web-build.test.js` |
 | The vendored keycode catalog reproduces from `upstream/qmk/` | `npm run keycodes -- --check` |
 | `upstream/` files match their pinned sources | `tests/scripts/upstream.test.js`, `npm run upstream -- --check` |
 | Ordinary checks, the preview and the catalog need no sibling checkout | `tests/scripts/upstream.test.js` (no relative path leaves the repository); CI's `check` job, which checks out Ark alone |

@@ -2,16 +2,17 @@
 
 **Adjust, Review, Keep.**
 
-Ark is the editor for [my Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6).
-Plug the keyboard in and you see exactly what is on it, because everything Ark
-shows comes from the keyboard itself. Change it and save it back to both
-halves. No C, no reflash, no firmware checkout.
+Ark is the editor for [my Charybdis 4x6
+firmware](https://github.com/NoahCLR/charybdis-4x6). Plug the keyboard in and
+you see exactly what is on it, because everything Ark shows comes from the
+keyboard itself. Change it and save it back to both halves. No C, no reflash,
+no firmware checkout.
 
 ## Try the demo first
 
 The quickest way to see what Ark does is to use it. Open
 **<https://ark.ncleroy.dev>** and choose **Explore a demo**: Ark opens on a
-complete setup exported from a real keyboard, with 16 layers, 32 pointing
+complete profile exported from a real keyboard, with 16 layers, 32 pointing
 modes, 128 macros and 128 custom keys, and no keyboard connected. Every screen
 works and every edit shows up in Review; only saving needs a keyboard.
 
@@ -60,9 +61,9 @@ edits in Ark until you review and save them.
 Whichever you pick, every edit goes into one draft with undo, redo and a full
 history. **Review** lists every change and checks what your layers let you
 reach, so you don't lock yourself into a layer with no way back. Saving keeps
-a recovery copy first and writes both halves as one complete profile.
+a recovery copy first and saves both halves as one complete profile.
 
-**Export profile** saves your whole setup as one file and **Import profile**
+**Export profile** keeps your whole profile as one backup and **Import profile**
 brings it back, through the same review.
 
 ## Install
@@ -70,9 +71,9 @@ brings it back, through the same review.
 Open **<https://ark.ncleroy.dev>** in Chrome or Edge on your computer. Nothing
 to install: Ark is a web page.
 
-The keyboard needs both halves from the
-[latest firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest).
-Ark works with current firmware only.
+The keyboard needs both halves from the [latest firmware
+release](https://github.com/NoahCLR/charybdis-4x6/releases/latest). Ark works
+with current firmware only.
 
 ## Learn more
 

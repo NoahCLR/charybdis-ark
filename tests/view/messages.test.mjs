@@ -122,9 +122,9 @@ test("a notice the core marks as a failure is shown as one, whatever its first w
     receive({type: "model", model, notice: said, failed: true});
     assert.equal(state.error, said);
     assert.equal(state.notice, "");
-    receive({type: "model", model, notice: "Read the layout and committed profile generation 7."});
+    receive({type: "model", model, notice: "Read the keyboard's saved profile, generation 7."});
     assert.equal(state.error, "");
-    assert.equal(state.notice, "Read the layout and committed profile generation 7.");
+    assert.equal(state.notice, "Read the keyboard's saved profile, generation 7.");
     receive({type: "model", model, notice: "Failed: The keyboard did not answer."});
     assert.equal(state.error, "Failed: The keyboard did not answer.");
 });

@@ -7,8 +7,8 @@
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect, trackballLed} from "../view/lighting.mjs";
-import {slotCalled, stageOrder} from "../view/vocabulary.mjs";
-import {canEdit as canEditArea, currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers} from "../store.mjs";
+import {listed, slotCalled, stageOrder, layerCalled} from "../view/vocabulary.mjs";
+import {canEdit as canEditArea, currentLayer, getModel, layers, post, render, state, writable, heldLayers} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
@@ -18,7 +18,7 @@ import {draftDot, draftMarks} from "../view/review.mjs";
 import {localityLabel} from "./lighting/common.mjs";
 import {stageBody} from "./lighting/stage-body.mjs";
 import {durationControl} from "./duration.mjs";
-import {sectionsIn} from "./settings.mjs";
+import {sectionsIn} from "../view/settings-layout.mjs";
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} id */
 const stageBit = (model, id) => (model?.rgb?.stages || []).find((stage) => stage.id === id)?.bit;
@@ -28,7 +28,7 @@ export function screenLighting() {
     if (!model?.rgb?.stages) {
         return el(`<div class="main">${topbar("Lighting", "Nothing read yet.")}
             <div class="content"><div class="pad"><div class="screen-stub"><h3>No lighting read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's lighting.")}</p></div></div></div></div>`);
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's lighting.")}</p></div></div></div></div>`);
     }
     const onGroups = state.stage === "groups";
     const layer = currentLayer();
@@ -64,8 +64,8 @@ export function screenLighting() {
         <b>${onGroups ? "LED selector" : "Preview"}</b>
         <span class="board-foot-text">${onGroups
             ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerName(layer))}${heldLayers().some((at) => at > 0) && !onGroups
-                ? ` with ${esc(heldLayers().filter((at) => at > 0).reverse().map((at) => layerName(layers()[at])).join(", "))} on`
+            : `${esc(layerCalled(layer))}${heldLayers().some((at) => at > 0) && !onGroups
+                ? ` with ${esc(listed(heldLayers().filter((at) => at > 0).reverse().map((at) => layerCalled(layers()[at]))))} on`
                 : ""} over the background effect${preview
                 ? ` · ${esc(slotName(model, state.pointingSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
                 : ""}`}</span>

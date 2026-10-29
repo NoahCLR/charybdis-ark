@@ -192,6 +192,16 @@ export type ModelReviewPlace = Exclude<import('../../contracts/model.js').Review
 export interface ModelReviewChange extends Omit<import('../../contracts/model.js').ReviewChange, 'place' | 'unit'> {unit: string; place?: ModelReviewPlace | null}
 
 /** Presentation/edit inputs describe received facts without importing session or wire modules. */
+/** A profile's domains as read, decoded by the schema. */
+export interface ReadDomains {
+    rgb?: import('../schema/types.js').RgbProfile;
+    keyBehaviors?: {rows: import('../schema/types.js').BehaviorRow[]};
+    settings?: import('../schema/types.js').SettingsDomain;
+    pdModes?: import('../schema/types.js').PointingSlot[];
+    combos?: ReturnType<typeof import('../schema/combo-domain-v1.js').decodeComboDomain>;
+}
+/** A key of a layer as read: where it sits, its keycode and what that resolves to. */
+export interface LayoutKey {layoutIndex: number; row: number; column: number; keycode: number; resolved: import('../data/types.js').ResolvedKeycode}
 export interface PendingProfileRead {
     state?: 'unread' | 'reading' | 'unavailable';
     error?: {message: string; code?: string};

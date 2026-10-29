@@ -5,7 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const {PROFILE_DOMAIN_VERSIONS, decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const {decodeComboDomain, encodeComboDomain} = require("../../core/schema/combo-domain-v1");

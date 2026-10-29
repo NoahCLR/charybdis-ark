@@ -88,4 +88,4 @@ function reorderShortcutRefusal(before, after, moved, keysFollow) {
     return `This move would have ${keyWords(after, found.slot)}'s shortcut turn on ${layerName(after.names, found.layer)}, ${what}. ${instead}`;
 }
 
-module.exports = {shortcutLayerReason, shortcutLayerTargets, shortcutRefusal, settingsShortcutRefusal, reorderShortcutRefusal};
+module.exports = {shortcutLayerTargets, shortcutRefusal, settingsShortcutRefusal, reorderShortcutRefusal};

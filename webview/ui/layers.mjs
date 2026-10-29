@@ -18,14 +18,14 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as controls from "../view/controls.mjs";
-import {el, esc} from "../lib/dom.mjs";
+import {el, esc, watchPressOutside} from "../lib/dom.mjs";
 import {mappedKeyCount} from "../view/lighting.mjs";
 import {NAME_TIP} from "../view/names.mjs";
 import {countNameBytes} from "./title-name.mjs";
 import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 
-/** @type {((event: PointerEvent) => void) | null} */
-let dismiss = null;   // the outside-click listener for the open panel
+/** @type {(() => void) | null} */
+let stopWatching = null;   // stops the open panel's outside-press watch
 
 // Adds the trigger after the layer tabs and, while it is open, the panel
 // above them. Both sit on the tabs' wrapper, not inside the strip, which
@@ -41,7 +41,7 @@ export function attachLayersControl(bar) {
     const trigger = el(`<button class="layer-edit" aria-haspopup="dialog" aria-expanded="${Boolean(state.layersOpen)}"
         data-tip="Rename layers and change their order: a higher layer wins over the ones under it.">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 13V3M2.5 5.5 5 3l2.5 2.5M11 3v10M8.5 10.5 11 13l2.5-2.5"/></svg>
-        <span>Rename &amp; Reorder</span></button>`);
+        <span>Rename &amp; reorder</span></button>`);
     trigger.addEventListener("click", () => {
         if (state.layersOpen) discardLayers();
         else state.layersOpen = true;
@@ -55,7 +55,7 @@ export function attachLayersControl(bar) {
 
     const panel = el(`<div class="layerpanel" role="dialog" aria-label="Layers"></div>`);
     if (!portable.layers) {
-        panel.append(el(`<p class="note">${esc(canEdit ? "Reading the layer stack…"
+        panel.append(el(`<p class="note">${esc(canEdit ? "Reading the layers…"
             : "Connect a keyboard with complete-profile firmware to rename or reorder its layers.")}</p>`));
         // One request per opening: the stack is read from the keyboard, or
         // lifted from the draft when one is open.
@@ -123,7 +123,7 @@ function editor(model, portable, busy) {
     order.forEach((layerId) => {
         const position = portable.layers.order.indexOf(layerId);
         const layer = layers().find((entry) => entry.index === layerId);
-        const mapped = mappedKeyCount(layer);
+        const mapped = mappedKeyCount(model, layer);
         const base = position === 0;
         const label = portable.layers?.titles[layerId] ?? "";
         const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${esc(layerId)}">
@@ -232,7 +232,7 @@ function dragRow(event, list, id, drop) {
     window.addEventListener("pointercancel", onUp);
 }
 
-export function closeLayers() {
+function closeLayers() {
     closeDismiss();
     state.layersOpen = false;
     state.layersAsked = false;
@@ -247,18 +247,16 @@ export function discardLayers() {
 }
 
 function closeDismiss() {
-    if (!dismiss) return;
-    document.removeEventListener("pointerdown", dismiss, true);
-    dismiss = null;
+    stopWatching?.();
+    stopWatching = null;
 }
 
+// A press outside the panel and its trigger drops what it holds.
 /** @param {HTMLElement} panel @param {HTMLElement} trigger */
 function watchOutside(panel, trigger) {
     closeDismiss();
-    dismiss = (event) => {
-        if (panel.contains(/** @type {Node | null} */ (event.target)) || trigger.contains(/** @type {Node | null} */ (event.target))) return;
+    stopWatching = watchPressOutside([panel, trigger], () => {
         discardLayers();
         render();
-    };
-    document.addEventListener("pointerdown", dismiss, true);
+    });
 }

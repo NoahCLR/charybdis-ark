@@ -20,7 +20,7 @@ function checkItem(model, check, show, source, demo) {
 
 // The section, or nothing when the walk found nothing. Saving is what makes
 // the edits permanent, in every edit mode (D-L72).
-/** @param {import("../view/vocabulary.mjs").VocabularyModel | null | undefined} model @param {readonly import("../../contracts/model.js").Check[]} checks @param {(check: import("../../contracts/model.js").Check) => string} show @param {(check: import("../../contracts/model.js").Check) => string} [source] @param {boolean} [demo] in the demo, what the draft started from is the demo setup */
+/** @param {import("../view/vocabulary.mjs").VocabularyModel | null | undefined} model @param {readonly import("../../contracts/model.js").Check[]} checks @param {(check: import("../../contracts/model.js").Check) => string} show @param {(check: import("../../contracts/model.js").Check) => string} [source] @param {boolean} [demo] in the demo, what the draft started from is the demo profile */
 export function checksSection(model, checks, show, source = () => "", demo = false) {
     const groups = checkGroups(checks, {demo});
     if (!groups.length) return "";

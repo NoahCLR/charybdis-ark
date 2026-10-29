@@ -15,7 +15,9 @@ const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES, KEY_BEHAVIOR_TIER_FIELDS} = require("../schema/key-behavior-domain-v1");
 const {PD_AXIS, PD_KIND} = require("../schema/pd-mode-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
-const {VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, modifierNames} = require("./vocabulary");
+const {VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
+const {macroName} = require("../../rules/qmk-keycodes.mjs");
+const {customKeyName} = require("../data/user-keycodes");
 
 /**
  * @typedef {import("../schema/types.js").SemanticAction} Action
@@ -301,8 +303,6 @@ function lightingRecords(value) {
     const groups = new Map(r.groups.map(group => [group.id, group]));
     /** @type {[string, Field][]} */
     const fields = r.groups.map(group => [`group:${group.id}`, {label: `Group ${group.id}`, text: `LEDs ${group.leds.join(", ")}`, key: group.leds.join(",")}]);
-    /** @type {Record<string, string>} */
-    const TIER_SEMANTICS = {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"};
     /** @template {{color: import("../schema/types.js").Hsv, groupId: number}} T @param {string} table @param {T[]} rows @param {(row: T) => string} owner @param {(row: T) => Mark | undefined} ownerMark */
     const overrides = (table, rows, owner, ownerMark) => rows.forEach((row, i) => {
         const group = groups.get(row.groupId), leds = group ? `Group ${group.id} · ${group.leds.length} LED${group.leds.length === 1 ? "" : "s"}` : `Group ${row.groupId}`;
@@ -315,7 +315,7 @@ function lightingRecords(value) {
     overrides("comboGroupRows", r.comboGroupRows, () => "combos", () => ({kind: "combo"}));
     overrides("keyGroupRows", r.keyGroupRows, row => nameIn(V.feedbackOwners, rgbEnums.RGB_KEY_SEMANTICS, row.semantic), row => {
         const name = Object.entries(rgbEnums.RGB_KEY_SEMANTICS).find(([, id]) => id === row.semantic)?.[0];
-        const tier = name === undefined ? undefined : TIER_SEMANTICS[name];
+        const tier = name === undefined ? undefined : V.feedbackTiers[name];
         return tier ? {kind: "tier", tier} : undefined;
     });
     record("rgb:groups", "LED overrides", "groups", fields);
@@ -420,10 +420,9 @@ function profileReview(before, after, capabilities) {
     macrosA.macros.forEach((_, i) => {
         /** @param {Macros["macros"][number]} macro @returns {Fields} */
         const fields = (macro) => new Map(/** @type {[string, Field][]} */ ([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"],
-            ["Uninterruptible playback", {key: macro.protection,
-                text: macro.protection === "auto" ? `${word(VOCABULARY.macroProtection, macro.protection)} · ${macro.uninterruptible ? "on" : "off"}` : word(VOCABULARY.macroProtection, macro.protection)}]]));
+            [VOCABULARY.macroUninterruptible.label, {key: macro.protection, text: protectionWords(macro.protection, macro.uninterruptible)}]]));
         const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
-        item("Macros", `macro:${i}`, `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
+        item("Macros", `macro:${i}`, `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
     });
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
@@ -452,13 +451,13 @@ function profileReview(before, after, capabilities) {
                         detail: `${layout.name} · ${typing}${host.macosIso ? " · ISO" : " · ANSI"}`}]] : []),
                     ["Playback", playback.error || "Ready to play"],
                     ...(macro.protection === "auto"
-                        ? [["Uninterruptible playback", playback.typing.some(route => route.method !== "layout") ? "Automatic · on" : "Automatic · off"]] : []),
+                        ? [[VOCABULARY.macroUninterruptible.label, protectionWords("auto", playback.typing.some(route => route.method !== "layout"))]] : []),
                 ]));
             };
             // The effect belongs to Host, so discarding it restores Host and
             // preserves independently edited macro text and names.
-            item("Macros", "settings:host", `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · Your computer settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
-            /** @type {Change} */ (items.at(-1)).note = `Playback changes because of ${VOCABULARY.settingsScreens.host} → Your computer. Discard it together with that change.`;
+            item("Macros", "settings:host", `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · ${VOCABULARY.settingsSections.host} settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index, keycode: macroName(index)}, [true, true]);
+            /** @type {Change} */ (items.at(-1)).note = `Playback changes because of ${settingsPath("host", "host")}. Discard it together with that change.`;
         });
     }
     // A custom key is its name and shortcut here; what its behaviour adds is
@@ -474,7 +473,7 @@ function profileReview(before, after, capabilities) {
         const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
         /** @param {string} name @param {import("../schema/types.js").CustomKeyShortcut} shortcut */
         const exists = (name, shortcut) => Boolean(name || shortcutPresent(shortcut));
-        item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i},
+        item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
             [exists(old, shortcutA), exists(next, shortcutB)]);
     });
     // The keyboard's own name, edited on Settings' Keyboard card. Empty is the

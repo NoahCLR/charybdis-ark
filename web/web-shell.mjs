@@ -23,11 +23,26 @@ export const BLOCKED = Object.freeze({
         detail: "One tab holds the keyboard at a time. Keep working in the other Ark tab, or close it: this tab takes over when it does."}),
 });
 
-// A chosen file is held to the portable document's byte ceiling.
-export const PROFILE_FILE_LIMIT = FILE_MAX_BYTES;
-export const THEME_KEY = "charybdis-ark.theme";
+// What the page says when the panel's own file did not load (web/page.mjs),
+// in place of a blank page. Text goes in as text, never as markup.
+export const LOAD_FAILED = Object.freeze({title: "Ark did not finish loading",
+    detail: "Part of the page could not be loaded. Reload the page to try again."});
+/** @param {Pick<Document, "createElement">} document @param {Pick<Element, "replaceChildren">} root */
+export function showLoadFailure(document, root) {
+    const notice = document.createElement("main"), title = document.createElement("h1"), detail = document.createElement("p");
+    notice.className = "load-failure";
+    title.textContent = LOAD_FAILED.title;
+    detail.textContent = LOAD_FAILED.detail;
+    notice.append(title, detail);
+    root.replaceChildren(notice);
+    return notice;
+}
+
+const THEME_KEY = "charybdis-ark.theme";
 export const COMPILED_DEFAULTS_KEY = "charybdis-ark.compiled-defaults";
 const LOCK = "charybdis-ark.keyboard";
+// What a recovery copy that has gone from the browser's storage is told.
+const GONE = "That recovery copy is no longer in this browser.";
 
 // A saved choice wins; otherwise the system's setting.
 /** @param {string | null | undefined} saved @param {boolean} prefersLight @returns {"light" | "dark"} */
@@ -49,7 +64,8 @@ export function leaving(session) {
 /** @param {Pick<File, "size" | "text" | "name"> | undefined} file */
 export async function readProfileFile(file) {
     if (!file) return undefined;
-    if (file.size > PROFILE_FILE_LIMIT) throw new Error(FILE_TOO_LARGE);
+    // A chosen file is held to the backup's byte ceiling.
+    if (file.size > FILE_MAX_BYTES) throw new Error(FILE_TOO_LARGE);
     return {text: await file.text(), name: file.name};
 }
 
@@ -101,7 +117,12 @@ export function startWebShell(env) {
     // A live keyboard's own saves and key adjustments show up between edits,
     // looked for only while the page can hear the answer (native-popups.mjs).
     loop.watch({paused: nativePopups(document).paused});
-    const panel = connectPanel({receive, gesture, target: window});
+    // A message whose handling failed still gets its answer, a notice; the
+    // fault itself goes to the console for whoever looks into it.
+    const panel = connectPanel({receive, gesture, target: window, failed: (error) => {
+        console.error(error);
+        loop.fail(error);
+    }});
 
     // Chrome opens its picker and file chooser only inside the click, so they
     // start here, before the message reaches the loop; the loop then waits
@@ -147,49 +168,46 @@ export function startWebShell(env) {
                 return loop.publish();
             case "downloadRecovery": {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
-                if (copy) download(document, window, copy.name, copy.text);
-                else Object.assign(loop.session, {notice: "Failed: That recovery copy is no longer in this browser.", noticeFailed: true});
+                if (!copy) return loop.fail(new Error(GONE));
+                download(document, window, copy.name, copy.text);
                 return loop.publish();
             }
             // A recovery copy opens as a backup file does: its comparison
             // with the keyboard first, then Use as draft.
             case "useRecovery": {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
-                if (!copy) {
-                    Object.assign(loop.session, {notice: "Failed: That copy is no longer in this browser.", noticeFailed: true});
-                    return loop.publish();
-                }
+                if (!copy) return loop.fail(new Error(GONE));
                 const draft = loop.session.draft;
                 return loop.handleMessage({type: "reviewPortableProfile", text: copy.text, name: copy.name, ...(draft ? {draftId: draft.id, draftRevision: draft.revision} : {})});
             }
             case "deleteRecovery": {
-                await recoveries.delete(message.id).catch(() => {Object.assign(loop.session, {notice: "Failed: That copy could not be deleted.", noticeFailed: true});});
+                const deleted = await recoveries.delete(message.id).then(() => true, () => false);
                 recoveryList = await recoveries.list().catch(() => recoveryList);
-                return loop.publish();
+                return deleted ? loop.publish() : loop.fail(new Error("That recovery copy could not be deleted."));
             }
             case "chooseKeyboard": {
                 const failure = await picking;
                 picking = undefined;
                 if (failure === undefined) return loop.publish();
-                if (failure) {
-                    if (failure.code === "CANCELLED") loop.session.notice = "No keyboard was chosen.";
-                    else Object.assign(loop.session, {notice: `Failed: ${failure.message}`, noticeFailed: true});
+                if (failure?.code === "CANCELLED") {
+                    loop.session.notice = "No keyboard was chosen.";
                     return loop.publish();
                 }
+                if (failure) return loop.fail(failure);
                 // The chosen keyboard lists first; select it by that, so the
                 // read opens it even while another one is connected. Choosing
                 // from the demo leaves it, as the panel asked; the read does that.
-                await loop.session.service.enumerate();
+                // Listing fails while a read or Apply holds the keyboard, and
+                // says so.
+                try {await loop.session.service.enumerate();}
+                catch (error) {return loop.fail(error);}
                 const chosen = loop.session.service.snapshot().devices[0]?.id;
                 const leave = message.discardDemo === true ? {discardDemo: true} : {};
                 return loop.handleMessage(chosen ? {type: "selectDevice", deviceId: chosen, ...leave} : {type: "refresh", ...leave});
             }
             case "forgetKeyboard": {
                 const service = loop.session.service;
-                if (service.snapshot().busy) {
-                    loop.session.notice = "Wait for the keyboard to finish before disconnecting it.";
-                    return loop.publish();
-                }
+                if (service.snapshot().busy) return loop.fail(new Error("Wait for the keyboard to finish before disconnecting it."));
                 await service.disconnect();
                 await adapter.forget();
                 loop.session.notice = "Disconnected. This page will not open that keyboard again until you choose it.";
@@ -197,7 +215,9 @@ export function startWebShell(env) {
             }
             case "ready": case "refresh": case "selectDevice":
                 await holding;
-                if (blocked) return loop.publish();
+                // A tab that reaches no keyboard reads none, but a panel that
+                // has loaded still gets the catalog before its model.
+                if (blocked) return message.type === "ready" ? loop.ready() : loop.publish();
                 return loop.handleMessage(message);
             default:
                 return loop.handleMessage(message);
@@ -210,6 +230,8 @@ export function startWebShell(env) {
     // is always either the connected one or in the selector. The demo stays
     // the demo; its selector still follows.
     let following = false;
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let lookAgain;
     async function followAllowed() {
         const service = loop.session.service;
         if (following || blocked || !hid) return loop.publish();
@@ -217,9 +239,13 @@ export function startWebShell(env) {
         // name; the loop waits for that one (keyboard-reconnect.js) and must
         // not have another connected in its place.
         if (loop.session.reconnect) return loop.publish();
-        // A running read or Apply lists the keyboards itself; look again after it.
+        // A running read or Apply lists the keyboards itself; look again after
+        // it, once however many keyboards came and went meanwhile.
         if (service.snapshot().busy) {
-            setTimeout(() => void followAllowed(), 500);
+            lookAgain ??= setTimeout(() => {
+                lookAgain = undefined;
+                void followAllowed();
+            }, 500);
             return;
         }
         following = true;

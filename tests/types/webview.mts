@@ -112,7 +112,8 @@ function panelBoundary(model: PublishedModel, reply: PanelResponse) {
 void panelBoundary;
 
 import {keyFace} from '../../webview/view/keyface.mjs';
-import {macroReach, reachKeys, macroPlacements, namedAction} from '../../webview/view/reach.mjs';
+import {macroReach, reachKeys, macroPlacements} from '../../webview/view/reach.mjs';
+import {namedAction} from '../../webview/view/named-action.mjs';
 import {comboGroups, combosOnLayer} from '../../webview/view/combo-reach.mjs';
 import {reachEntries} from '../../webview/view/reach-groups.mjs';
 import type {ReviewSummary} from '../../contracts/model.js';

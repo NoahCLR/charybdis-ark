@@ -318,7 +318,7 @@ test("interrupted apply retains the full target and can review against an incomp
     draft.observe({incomplete:true,fingerprint:"incomplete:device",document:{format:"charybdis-recovery-capture"}},"board");
     draft.rebase(draft.revision);
     assert.equal(draft.base.fingerprint,"incomplete:device"); assert.equal(draft.current.fingerprint,target);
-    assert.match(draft.view({}).changes[0].fields[0].before,/Interrupted configuration/);
+    assert.match(draft.view({}).changes[0].fields[0].before,/Interrupted profile/);
     await draft.apply({...service,restorePortableProfile:async(document,options)=>{assert.equal(options.expectedFingerprint,"incomplete:device");return draft.current;}},draft.revision,()=>"recovery");
     assert.equal(draft.dirty,false);
 });
@@ -466,7 +466,7 @@ test("a key edited on a swapped layer is its own item, and each discard keeps th
     draft.discard(draft.revision,groupOf(draft,"layerOrder"));
     assert.deepEqual(units(draft),["layout:3:0"],"the order goes back, the key stays on Navigation");
     assert.deepEqual(draft.current.summary.names,snapshot.summary.names);
-    assert.equal(draft.view({}).undoLabel,"Put the layer order back");
+    assert.equal(draft.view({}).undoLabel,"Put the layer priority back");
 });
 test("a swap and a rename are two items, and discarding one keeps the other", () => {
     const {draft,snapshot} = fixture();
@@ -636,4 +636,51 @@ test("undoing and redoing a reorder brings a custom key's shortcut layers back e
     assert.equal(draft.current.fingerprint, snapshot.fingerprint);
     draft.redo(draft.revision);
     assert.deepEqual(shortcuts(), moved);
+});
+
+// Stages edits until the draft refuses one, and returns the refusal.
+function refusal(draft, edit, most) {
+    for (let index = 0; index < most; index++) {
+        try {stage(draft, edit(index));} catch (refused) {return refused;}
+    }
+    assert.fail(`no refusal after ${most} edits`);
+}
+
+test("an edit past a count the keyboard caps is refused in words, by that count, before the keyboard sees it", () => {
+    const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
+    const {RGB_DOMAIN_V1} = require("../../core/schema/rgb-domain-v1");
+    const {validateSnapshot} = require("../../core/model/portable-profile");
+    // Each new LED set is a group of its own, until the keyboard's cap.
+    const groups = refusal(fixture().draft, led => ({type: "saveRgbReusableLedGroup", group: {ledIndices: [led]}}), 58);
+    assert.equal(groups.code, "PROFILE_FULL");
+    assert.equal(failureSentence(groups), PROFILE_FULL_WORDS.counts.lightingGroups(RGB_DOMAIN_V1.MAX_GROUPS));
+    assert.match(failureSentence(groups), /at most 16 LED groups/, "in the words the usage table counts them in");
+    assert.equal(groups.cause.code, "CAPACITY_EXCEEDED", "the format's own refusal stays beneath, for the diagnostics");
+    // Colouring two reused groups on every layer, over and over, adds an LED
+    // override each time: removing a behaviour or a macro frees none.
+    const overrides = refusal(fixture().draft, index => ({type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [index % 2], h: 0, s: 255, v: 100}}), 80);
+    assert.equal(failureSentence(overrides), PROFILE_FULL_WORDS.counts.lightingGroupRows(RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS));
+    assert.match(failureSentence(overrides), /at most 32 LED overrides/);
+    // A behaviour past the keyboard's rows names behaviours alone.
+    const {snapshot, caps} = fixture();
+    const rows = validateSnapshot(snapshot.document).behaviors.rows.length;
+    const keys = ["KC_A", "KC_B", "KC_C", "KC_D"];
+    const behaviours = refusal(new ProfileDraftSession(snapshot, "board", {...caps, maxBehaviorRows: rows + 2}),
+        index => ({type: "saveBehavior", behavior: {keycode: keys[index], steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_X"}}]}}), keys.length);
+    assert.equal(failureSentence(behaviours), PROFILE_FULL_WORDS.counts.behaviours(rows + 2));
+});
+
+test("an edit past the profile as a whole says the profile is full, and any other refusal is left as it is", () => {
+    const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
+    const {draft} = fixture();
+    const edit = {type: "saveRgbReusableLedGroup", group: {ledIndices: [0]}, draftRevision: draft.revision};
+    // As the profile blob refuses one too large, naming no count of its own.
+    draft.proposed = () => {throw Object.assign(new Error("Profile blob is 70000 bytes; maximum is 65535."), {code: "CAPACITY_EXCEEDED"});};
+    assert.throws(() => draft.propose(edit), error => error.code === "PROFILE_FULL" && failureSentence(error) === PROFILE_FULL_WORDS.profile);
+    // A count the words do not know is the profile as a whole, too.
+    draft.proposed = () => {throw Object.assign(new Error("Some table is full."), {code: "CAPACITY_EXCEEDED", limit: "constructor", most: 1});};
+    assert.throws(() => draft.propose(edit), error => failureSentence(error) === PROFILE_FULL_WORDS.profile);
+    const conflict = Object.assign(new Error("Read the keyboard before editing."), {code: "PROFILE_DRAFT_CONFLICT"});
+    draft.proposed = () => {throw conflict;};
+    assert.throws(() => draft.propose(edit), error => error === conflict);
 });

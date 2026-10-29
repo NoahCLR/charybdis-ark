@@ -59,13 +59,37 @@ test("a finished Apply shows every step done", () => {
 
 test("the reason is the keyboard's own when it gave one, else the slave half's last answer", () => {
     assert.equal(failureReason({deviceError: {name: "VALIDATION_REJECTED", domainId: 0x20, rowIndex: 4}}),
-        "The keyboard rejected the profile in key behaviours, row 5.");
-    assert.equal(failureReason({status: {error: {name: "STORAGE_FAILURE"}}}), "The keyboard could not write its storage.");
-    assert.equal(failureReason({deviceError: {name: "SOMETHING_NEW"}}), "The keyboard reported SOMETHING_NEW.");
+        "The keyboard rejected the profile in Behaviours, row 5.");
+    assert.equal(failureReason({status: {error: {name: "STORAGE_FAILURE"}}}), "The keyboard could not store the profile.");
+    assert.equal(failureReason({deviceError: {name: "SOMETHING_NEW"}}), "The keyboard stopped the save for a reason this version of Ark does not know.",
+        "a reason Ark has no words for is never said by its name");
     assert.equal(failureReason({message: "made no observable progress"}, {lastStatusName: "BUSY"}), "The slave half kept answering that it was busy.");
     assert.equal(failureReason({message: "made no observable progress"}, {lastStatusName: "OK", transportFailureCount: 3}), "The link between the halves stopped answering.");
     assert.equal(failureReason({code: "RESTORE_VERIFY_FAILED", message: "The keyboard did not confirm the imported profile on both halves."}),
         "The keyboard did not confirm the imported profile on both halves.", "Ark's own sentence is said as it is");
+});
+
+// Where the keyboard found the problem is the area Review names, for every
+// part of the profile; a part this Ark does not know is not named, never by
+// its number.
+test("a rejected profile names the area the keyboard found the problem in, never a domain number", () => {
+    const {PROFILE_DOMAINS} = require("../../core/schema/profile-domains");
+    const {PROFILE_AREAS} = require("../../core/model/vocabulary");
+    for (const domain of PROFILE_DOMAINS) {
+        assert.equal(failureReason({deviceError: {name: "VALIDATION_REJECTED", domainId: domain.id, rowIndex: 0xffff}}),
+            `The keyboard rejected the profile in ${PROFILE_AREAS[domain.area]}.`, domain.name);
+    }
+    assert.equal(failureReason({deviceError: {name: "VALIDATION_REJECTED", domainId: 0x40, rowIndex: 2}}), "The keyboard rejected the profile in Settings, row 3.");
+    assert.equal(failureReason({deviceError: {name: "VALIDATION_REJECTED", domainId: 0x90, rowIndex: 2}}), "The keyboard rejected the profile.");
+    assert.equal(failureReason({deviceError: {name: "VALIDATION_REJECTED", domainId: 0xff}}), "The keyboard rejected the profile.");
+});
+
+// A fault in Ark during a save is no sentence for a person: its text stays in
+// the diagnostics, and the reason says so plainly.
+test("a fault in Ark under a save reads as a plain sentence, never its own text", () => {
+    const {FAILURE_WORDS} = require("../../core/model/vocabulary");
+    assert.equal(failureReason(new TypeError("Cannot read properties of undefined (reading 'id')")), FAILURE_WORDS.unexpected);
+    assert.equal(failureReason(Object.assign(new Error("x is not a function"), {code: "TypeError"})), FAILURE_WORDS.unexpected, "as the device service passes it on");
 });
 
 test("each verdict is the bar's sentence, and an unknown one says Ark can't tell", () => {
@@ -92,12 +116,34 @@ test("a lost connection is the reason, ahead of anything the slave half last sai
 test("the coordinators' own words never reach a person", () => {
     const stalled = code => ({name: "CandidateUploadError", code, message: `Candidate ${code} made no observable progress within its firmware-aware wait window.`});
     // Ark's wait for the commit ran out while the keyboard waited for keys.
-    assert.match(failureReason(stalled("COMMIT_OUTCOME_AMBIGUOUS"), {waitingSafeBoundary: true}), /^A key stayed held, or a layer or pointer mode stayed locked/);
+    assert.match(failureReason(stalled("COMMIT_OUTCOME_AMBIGUOUS"), {waitingSafeBoundary: true}), /^A key stayed held, or a layer or pointing mode stayed locked/);
     for (const code of ["COMMIT_OUTCOME_AMBIGUOUS", "VALIDATION_OUTCOME_AMBIGUOUS", "MAILBOX_BUSY", "INVALID_COMMIT_STATE", "UPLOAD_FAILED"]) {
         const reason = failureReason(stalled(code), null);
         assert.doesNotMatch(reason, /Candidate|candidate|mutation|ambiguous|wait window|decision|commit/, reason);
         assert.match(reason, /^The keyboard /);
     }
+});
+
+// A coordinator's error carries what stopped it in `cause`: Ark's own
+// sentence is said, a fault in Ark is Ark's problem, an answer that did not
+// read is the keyboard's; only what the coordinator saw the keyboard answer
+// itself is the keyboard's unexpected answer.
+test("a coordinator's error is said by what it carried, never blaming the keyboard for Ark", () => {
+    const {FAILURE_WORDS, SAVE_FAILURE_WORDS} = require("../../core/model/vocabulary");
+    const coordinator = (code, cause) => Object.assign(new Error(`Candidate ${code}.`), {name: "CandidateUploadError", code, ...(cause === undefined ? {} : {cause})});
+    const changed = Object.assign(new Error("The keyboard changed before the save could start."), {code: "KEYBOARD_NOT_READY"});
+    for (const code of ["INVALID_CANDIDATE", "UPLOAD_FAILED", "COMMIT_FAILED"]) {
+        assert.equal(failureReason(coordinator(code, changed), null), changed.message, `${code}: Ark's own sentence`);
+        assert.equal(failureReason(coordinator(code, new RangeError("Offset is outside the bounds of the DataView")), null), FAILURE_WORDS.unexpected, `${code}: a fault in Ark`);
+    }
+    assert.equal(failureReason(coordinator("UPLOAD_FAILED", coordinator("INVALID_CANDIDATE", changed)), null), changed.message, "through a coordinator's error it wrapped");
+    const transportFault = Object.assign(new Error("The adapter answered a report it was never sent."), {name: "LiveLinkTransportError", code: "INVALID_ADAPTER", fault: "ark"});
+    assert.equal(failureReason(coordinator("UPLOAD_FAILED", transportFault), null), FAILURE_WORDS.unexpected, "a fault in Ark beneath the transport");
+    const unread = Object.assign(new Error("Candidate acknowledgement is 3 bytes short."), {name: "ProfileCandidateProtocolError", code: "MALFORMED_RESPONSE", fault: "answer"});
+    assert.equal(failureReason(coordinator("PROTOCOL_ERROR", unread), null), FAILURE_WORDS.unreadable, "an answer that did not read");
+    assert.equal(failureReason(coordinator("KEYBOARD_NOT_READY"), null), SAVE_FAILURE_WORDS.unexpected, "what the keyboard answered the coordinator itself");
+    const mismatch = Object.assign(new Error("Report id mismatch."), {name: "LiveLinkTransportError", code: "RESPONSE_MATCH_FAILED"});
+    assert.equal(failureReason(coordinator("UPLOAD_FAILED", mismatch), null), SAVE_FAILURE_WORDS.unexpected, "the keyboard's answer the transport could not match");
 });
 
 test("a copy that stopped on the slave half names its answer", () => {

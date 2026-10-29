@@ -11,7 +11,7 @@ const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_I
 const {hostLayouts} = require("../data/host-layouts");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
-const {layerName, VOCABULARY} = require("./vocabulary");
+const {layerName, PROFILE_AREAS, VOCABULARY} = require("./vocabulary");
 // Each section's heading, and the thresholds' names, are the vocabulary's.
 const SECTION = VOCABULARY.settingsSections, THRESHOLD = VOCABULARY.thresholdNames;
 /** @param {string} words */
@@ -93,7 +93,7 @@ const sections = [
     {id: "autoMouse", label: SECTION.autoMouse, area: "Mouse", fields: [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
         layer("pointerLayer", SETTING.AUTO_MOUSE_LAYER, "Pointer layer", "The layer that moving the trackball turns on when Auto-mouse is on."),
-        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
+        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", `How long the layer stays active after movement. The lighting fade keeps its share of it (${PROFILE_AREAS.lighting} → ${SECTION.automouseFade}).`, {min: 1}),
         number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update auto-mouse. Higher values ignore closely spaced movement events."}),
         number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can activate auto-mouse."),
         number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to activate auto-mouse. Higher values require more movement.", {unit: undefined}),
@@ -243,7 +243,7 @@ function settingsSections(snapshot, settings) {
     // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: SECTION.comboSettings,
         layerGroup: {label: "On these layers", hint: "A key can be part of a combo only when the layer it comes from is on here."}, fields:
-        [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keymap · Combos."), keyboardKeys: true},
+        [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keymap → Combos."), keyboardKeys: true},
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
                 hint: "Off, combos still fire but use their normal output action. A key pressed on its own still uses its behaviour where its participation allows. A bypassed custom key sends its shortcut, or nothing if it has none."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});

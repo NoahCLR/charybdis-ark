@@ -11,8 +11,9 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
-import {el, esc} from "../lib/dom.mjs";
-import {getModel, layerName, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
+import {el, esc, html} from "../lib/dom.mjs";
+import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
+import {layerCalled} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
@@ -26,10 +27,6 @@ import {fieldParts, isLayerSwitch, sectionsOn} from "../view/settings-layout.mjs
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {import("../../contracts/panel.js").PresentedSection} Section */
 /** @typedef {import("../../contracts/panel.js").PresentedField} Field */
-
-// The sections a screen draws, by the area the keyboard's model files them in.
-/** @param {Model | null} model @param {string} area */
-export const sectionsIn = (model, area) => (model?.configDefaults || []).filter((section) => section.area === area);
 
 export const screenBehaviours = () => settingsScreen("behaviours", "Behaviours",
     "How long a key waits to tell a tap from a hold, and the layers on which keys use their behaviours.");
@@ -52,7 +49,7 @@ function settingsScreen(screen, title, subtitle) {
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!sections.length) {
         pad.appendChild(el(`<div class="screen-stub"><h3>No settings read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's settings.")}</p></div>`));
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's settings.")}</p></div>`));
     }
     // Why nothing here can be edited, said once; while the keyboard is busy
     // the draft bar already says what it is doing.
@@ -104,7 +101,7 @@ function referenceCard(model, section, canEdit) {
         const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}">
             <span class="txt">${layerCell(model, field, layer)}</span>
             <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
-            ${layers().map((entry) => `<option value="${esc(entry.name)}" ${field.value === entry.name ? "selected" : ""}>${esc(entry.displayName || entry.name)}</option>`).join("")}</select></label>`);
+            ${layers().map((entry) => `<option value="${esc(entry.name)}" ${field.value === entry.name ? "selected" : ""}>${esc(layerCalled(entry))}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (cell.querySelector("select")).addEventListener("change", submit);
         grid.appendChild(cell);
     }
@@ -193,7 +190,7 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
     // A section QMK owns whole says so once, by its title, not on every row.
     if (section.fields.length > 1 && section.fields.every((field) => field.keyboardKeys)) {
         node.querySelectorAll(".rows .kk-mark").forEach((mark) => mark.remove());
-        node.querySelector(":scope > .card-h > h3")?.insertAdjacentHTML("afterend", keyboardKeysMark(section.fields[0]));
+        node.querySelector(":scope > .card-h > h3")?.insertAdjacentHTML("afterend", html(keyboardKeysMark(section.fields[0])));
     }
     return node;
 }
@@ -202,7 +199,7 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
 // mark, as everywhere a layer is named (D-L31).
 /** @param {Model | null} model @param {Field} field @param {import("../../contracts/panel.js").Layer | undefined} layer */
 const layerCell = (model, field, layer) => layer
-    ? marked(model, {kind: "layer", layer: layer.index}, layerName(layer))
+    ? marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer))
     : marked(model, field.governs, field.label);
 
 // A section's one-per-layer switches as one row of layers (layer-switches.mjs).
@@ -256,7 +253,7 @@ function fieldRow(field, canEdit, submit, slot, durations) {
     }
     if (field.kind === "layer") {
         const node = el(`<select class="input" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${editable ? "" : "disabled"}>
-            ${layers().map((layer) => `<option value="${esc(layer.name)}" ${field.value === layer.name ? "selected" : ""}>${esc(layer.displayName || layer.name)}</option>`).join("")}</select>`);
+            ${layers().map((layer) => `<option value="${esc(layer.name)}" ${field.value === layer.name ? "selected" : ""}>${esc(layerCalled(layer))}</option>`).join("")}</select>`);
         node.addEventListener("change", submit);
         control.appendChild(node);
         return row;

@@ -7,13 +7,13 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {actionLabel, behaviourGridSteps, cellLabel, impliedBranch, inheritedBranch} from "../../view/keyface.mjs";
-import {getModel, layerName, layers, post, render, state, canEdit as canEditArea} from "../../store.mjs";
+import {getModel, layers, post, render, state, canEdit as canEditArea} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
-import {behaviourTimingChecks} from "../../view/checks.mjs";
+import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
 import {behaviourChangesNothing, behaviourHasTiming, behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
 import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot} from "../marks.mjs";
-import {branchName, sentence, styleWord, tierName, vocabulary, word} from "../../view/vocabulary.mjs";
+import {branchName, sentence, styleWord, tierName, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {cellEditor} from "./cell-editor.mjs";
 import {sectionPath} from "../../view/settings-layout.mjs";
 import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
@@ -30,7 +30,7 @@ const TIMING_ORDER = ["multiTapTerm", "tapHoldTerm", "longHoldTerm"];
 const styleLabel = (kind, style) => styleWord(getModel(), kind, style || "");
 
 // An empty timing field falls back to the keyboard's own default, which it
-// reports and Settings · Behaviours · Tap & hold timing edits — so the note
+// reports and Behaviour settings → Tap & hold timing edits — so the note
 // names both, the path and the thresholds in their owners' words.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {EditorBehavior} behaviour */
 function timingDefaultsNote(model, behaviour) {
@@ -46,7 +46,7 @@ function timingDefaultsNote(model, behaviour) {
 // The cell open in this behaviour's grid: one opened in another behaviour's
 // editor, on this screen or another, stays closed here.
 /** @param {EditorBehavior} behaviour */
-export const openCell = (behaviour) => state.cellRow === behaviour.keycode ? state.cell : null;
+const openCell = (behaviour) => state.cellRow === behaviour.keycode ? state.cell : null;
 
 // What the head says about a behaviour that is not stored yet, or that changes
 // nothing (firmware D-F27 "Rows without steps"). On a plain key a timing does
@@ -155,7 +155,7 @@ export function behaviourEditor(behaviour) {
                 <input type="checkbox" data-f="behaviour:${esc(behaviour.keycode)}:anchor" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">Keeps the pointer layer on</span></label>
         </div>
-        ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
+        ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>Timing ${esc(checkLevelWord(model, check.level).toLowerCase())}.</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="bgrid">
             <span></span>
             ${TIERS.map((kind) => `<div class="btier">${tierDot(model, kind)}${esc(tierName(model, kind))}</div>`).join("")}
@@ -199,7 +199,7 @@ export function behaviourEditor(behaviour) {
     /** @type {HTMLInputElement | null} */ (node.querySelector("[data-anchor]"))?.addEventListener("change", commit);
     // Whether the behaviour runs, and where, leads; the pointer-layer switch
     // sits at the end of the row.
-    /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).prepend(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit && !switchesIdle, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
+    /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).prepend(definitionControls(layers().map(layer => ({...layer, label: layerCalled(layer)})), behaviour, canEdit && !switchesIdle, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
         const message = edits.saveBehaviour(behaviour, permissions, model?.profileIdentity);
         if (message) post(message);
     }, `behaviour:${behaviour.keycode}:definition`, "behaviour"));

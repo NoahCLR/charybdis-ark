@@ -54,9 +54,12 @@ const NATIVE_PACKAGES = ["node-hid"];
 const PACKAGES = {core: ["buffer", "base64-js", "ieee754"], panel: [], worker: []};
 
 // The page's policy: scripts, styles and the worker from the page's own origin,
-// the panel's inline style attributes, and no connection anywhere.
+// the panel's inline style attributes, and no connection anywhere. Its HTML
+// sinks take markup only through the panel's one policy (webview/lib/dom.mjs
+// html) and the worker's URL only through the page's (web/page.mjs).
 const POLICY = ["default-src 'none'", "script-src 'self'", "worker-src 'self'", "style-src 'self'",
-    "style-src-attr 'unsafe-inline'", "connect-src 'none'", "base-uri 'none'", "form-action 'none'"];
+    "style-src-attr 'unsafe-inline'", "connect-src 'none'", "base-uri 'none'", "form-action 'none'",
+    "require-trusted-types-for 'script'", "trusted-types ark-html ark-worker"];
 // Only a header can say who may frame the page; in a <meta> tag Chrome ignores
 // it and says so in the console.
 const HEADER_ONLY_POLICY = ["frame-ancestors 'none'"];
@@ -118,7 +121,7 @@ function outputsOf(metafile, outdir) {
  * @param {string} outdir
  * @param {Omit<import("esbuild").BuildOptions, "metafile"> & {metafile?: true}} [options]
  */
-async function bundle(name, entryPoints, outdir, options = {}) {
+async function bundled(name, entryPoints, outdir, options = {}) {
     const result = await esbuild.build({
         absWorkingDir: APP_ROOT,
         entryPoints,
@@ -128,14 +131,23 @@ async function bundle(name, entryPoints, outdir, options = {}) {
         platform: "browser",
         target: TARGET,
         entryNames: "[name]-[hash]",
+        // Minified for the wire; names are kept, so an error's stack and a
+        // class's name still read as they do in the source.
+        minify: true,
+        keepNames: true,
+        legalComments: "eof",
         metafile: true,
         logLevel: "silent",
         plugins: [browserOnly],
         ...options,
     });
     checkInputs(result.metafile, name);
-    return outputsOf(result.metafile, outdir);
+    return {names: outputsOf(result.metafile, outdir), inputs: Object.keys(result.metafile.inputs)};
 }
+
+// The written file for each entry, by the entry's name.
+/** @param {Parameters<typeof bundled>} args */
+const bundle = async (...args) => (await bundled(...args)).names;
 
 // What the page says it was built from.
 /** @param {NodeJS.ProcessEnv} [env] @returns {import("../contracts/model.js").BuildInfo} */
@@ -182,16 +194,20 @@ const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => `
 // Builds into `outdir`, emptied first so no earlier release's file lingers, and
 // returns the manifest it wrote.
 /** @param {import("./build-types.js").WebBuildOptions} [options] */
-async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir), entries = {core: "web/core.mjs", shell: "web/page.mjs"}, build = buildInfo()} = {}) {
+async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir), entries = {core: "web/core.mjs", shell: "web/page.mjs"}, build = buildInfo(), inputs} = {}) {
     fs.rmSync(outdir, {recursive: true, force: true});
     fs.rmSync(manifestFile, {force: true});
     fs.mkdirSync(outdir, {recursive: true});
-    const worker = await bundle("worker", {worker: "web/sleep-worker.js"}, outdir, {format: "iife"});
-    const panel = await bundle("panel", {panel: "webview/app.mjs", styles: "webview/styles.css"}, outdir);
+    // The source files each bundle took, for a caller that asks: minified
+    // output no longer names them.
+    /** @param {keyof typeof PACKAGES} name @param {{names: Record<string, string>, inputs: string[]}} result */
+    const take = (name, result) => {if (inputs) inputs[name] = result.inputs; return result.names;};
+    const worker = take("worker", await bundled("worker", {worker: "web/sleep-worker.js"}, outdir, {format: "iife"}));
+    const panel = take("panel", await bundled("panel", {panel: "webview/app.mjs", styles: "webview/styles.css"}, outdir));
     const manifest = {
         ...worker,
         ...panel,
-        ...await bundle("core", entries, outdir, {
+        ...take("core", await bundled("core", entries, outdir, {
             inject: [path.join(APP_ROOT, "web", "buffer.mjs")],
             splitting: true,
             chunkNames: "chunk-[hash]",
@@ -201,7 +217,7 @@ async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir)
                 __ARK_SLEEP_WORKER__: JSON.stringify(`./${worker.worker}`),
                 __ARK_PANEL__: JSON.stringify(`./${panel.panel}`),
             },
-        }),
+        })),
     };
     if (manifest.shell) {
         const names = {...manifest, version: build.version, commit: build.commit, csp: pagePolicy()};

@@ -4,7 +4,8 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, heldLayers, layerName, layers, previewing, render, showLayer, state, toggleLayerOn} from "../store.mjs";
+import {getModel, heldLayers, layers, previewing, render, showLayer, state, toggleLayerOn} from "../store.mjs";
+import {layerCalled} from "../view/vocabulary.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
@@ -18,7 +19,7 @@ export function layerSwatch(model, layer, className = "") {
     const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
     return {
         html: `<span class="${className ? `${esc(className)} ` : ""}swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
-        tip: `${layerName(layer)} · ${lit ? hsvLabel(row.color) : "no layer colour"}`,
+        tip: `${layerCalled(layer)} · ${lit ? hsvLabel(row.color) : "no layer colour"}`,
         colour: lit ? css(row.color) : null,
     };
 }
@@ -52,7 +53,7 @@ export function layerBar(trailing = "") {
         const tint = on && swatch.colour ? ` style="--tab-tint:${swatch.colour}"` : "";
         return `<button class="layer-tab${on ? " on" : ""}"${tint} role="tab" data-layer="${index}" aria-selected="${state.layer === index}"
             data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? " · changed in your draft" : ""}${esc(how)}">${swatch.html}
-            <span>${esc(layerName(layer))}</span>${layerName(layer) === layer.name ? "" : `<span class="idx">${esc(layer.index)}</span>`}${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
+            <span>${esc(layerCalled(layer))}</span>${layerCalled(layer) === layer.name ? "" : `<span class="idx">${esc(layer.index)}</span>`}${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
     const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div></div>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-layer]")).forEach((button) => button.addEventListener("click", (event) => {

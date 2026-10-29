@@ -9,12 +9,13 @@
 // item knows how to go to its editor.
 
 import {screenOfSection} from "./settings-layout.mjs";
-import {stageOrder, vocabulary} from "./vocabulary.mjs";
+import {listed, stageOrder, vocabulary} from "./vocabulary.mjs";
 
 // The order areas are read in, as the rail lists the screens they live on.
-export const AREAS = ["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
+const AREAS = ["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
+// An area's place in that order; one the rail does not list comes last.
 /** @param {string} area */
-const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
+export const areaRank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 
 // Items by area, in rail order, and within an area as blocks in the order the
 // core listed them. A group whose items span areas is shown in each area as
@@ -39,11 +40,11 @@ export function reviewBlocks(changes) {
         if (!blocks.has(key)) {
             const group = change.group === null || change.group === undefined ? {size: 1, areas: new Set([change.area])} : /** @type {{size: number, areas: Set<string>}} */ (reach.get(change.group));
             blocks.set(key, {group: change.group, title: change.groupTitle || null, area: change.area, size: group.size,
-                elsewhere: [...group.areas].filter((area) => area !== change.area).sort((left, right) => rank(left) - rank(right)), items: []});
+                elsewhere: [...group.areas].filter((area) => area !== change.area).sort((left, right) => areaRank(left) - areaRank(right)), items: []});
         }
         blocks.get(key)?.items.push(change);
     });
-    return [...sections.keys()].sort((left, right) => rank(left) - rank(right)).map((area) => {
+    return [...sections.keys()].sort((left, right) => areaRank(left) - areaRank(right)).map((area) => {
         const blocks = [.../** @type {Map<number | string, import("./types.js").ReviewBlock>} */ (sections.get(area)).values()];
         return {area, blocks, count: blocks.reduce((total, block) => total + block.items.length, 0)};
     });
@@ -70,7 +71,7 @@ export const statusBesideCount = (changes) => changes.every((change) => change.s
 // the lighting stages, in paint order, and the settings sections are named as
 // the vocabulary words them (`stages`, `fileSections`). Core words an
 // unnamed layer's name (ProfileSummary.names).
-export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
+const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
 // A custom key's name is counted with the keys, where its behaviour is too.
 // Each settings section's category and its row's place there; its words are
 // the vocabulary's (tests/view/review.test.mjs holds the two to one set).
@@ -147,8 +148,6 @@ export const discardLabel = (block) => block.size === 1 ? "Discard" : block.size
 export const groupNote = (block) => block.items.length === block.size
     ? `${block.size} changes, discarded together`
     : `${block.items.length} of ${block.size} here, the rest in ${listed(block.elsewhere)} · discarded together`;
-/** @param {readonly string[]} names */
-const listed = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 
 // Where an item is edited, as the state that shows it. Nothing for an item
 // with no editor of its own. `reveal` names the element the next render
@@ -166,8 +165,8 @@ export function placeState(place, layers = []) {
         // Which group lists a combo depends on the layer shown, so the combo is
         // asked for by id and the tab picks it where it finds it.
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};
-        case "macro": return {screen: "macros", macroSlot: `MACRO_${place.index}`};
-        case "customKey": return {screen: "customKeys", customKey: `CUSTOM_KEY_${place.index}`};
+        case "macro": return {screen: "macros", macroSlot: place.keycode};
+        case "customKey": return {screen: "customKeys", customKey: place.keycode};
         case "pointing": return {screen: "pointing", pointingSlot: place.slot, pdKind: null, pdTaps: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
         // A section is edited on the screen that draws it: a lighting stage
@@ -224,8 +223,8 @@ function computeMarks(changes) {
             marks.layers.add(place.layer);
         } else if (place.kind === "behaviour") marks.behaviours.add(place.keycode);
         else if (place.kind === "combo") marks.combos.add(place.index);
-        else if (place.kind === "macro") marks.macros.add(`MACRO_${place.index}`);
-        else if (place.kind === "customKey") marks.customKeys.add(`CUSTOM_KEY_${place.index}`);
+        else if (place.kind === "macro") marks.macros.add(place.keycode);
+        else if (place.kind === "customKey") marks.customKeys.add(place.keycode);
         else if (place.kind === "pointing") marks.pointing.add(place.slot);
         else if (place.kind === "lighting") {
             if (place.stage) marks.lighting.add(place.stage);

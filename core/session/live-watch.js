@@ -21,7 +21,7 @@
 // look that raced with one (the draft moved meanwhile) is dropped. It pauses
 // while the shell says it may not be answered (`paused`): a web page whose
 // menu is open, or which is hidden. A look that goes unanswered is skipped
-// (profile-device-service.js).
+// (background-reads.js).
 
 const {retryRead} = require("./live-edits");
 const {observePortable} = require("./panel-session");

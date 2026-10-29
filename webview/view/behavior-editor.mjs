@@ -1,26 +1,27 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
-import {behaviourListeningTo, canonicalKeycode, keyFace, keyMeaning} from "./keyface.mjs";
+import {behaviourListeningTo, canonicalKeycode, keyKindOf, keyMeaning} from "./keyface.mjs";
 import {resolvedPositions} from "./layer-resolution.mjs";
 import {timingInput} from "./timing-input.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 
+// Every key may have a behaviour but a transparent or disabled one, as core
+// says which those are (qmkKeyKinds), however it is spelled.
 export function canHaveBehaviour(/** @type {Model} */ model, /** @type {string} */ keycode) {
-    const key = canonicalKeycode(model, keycode);
-    return Boolean(key) && !["KC_NO", "XXXXXXX", "KC_TRANSPARENT", "KC_TRNS", "_______"].includes(key)
-        && !/^0x0*[01]$/i.test(key);
+    const kind = keyKindOf(model, String(keycode ?? ""));
+    return Boolean(keycode) && kind !== "transparent" && kind !== "disabled";
 }
 
 // The key a board position opens in Behaviours. Rows are keyed by keycode, so
 // a transparent position follows the key that answers it from below, through
 // the layers held in a preview and the base layer, which is always on, and
 // names the layer that supplies it. With nothing mapped below it stays the
-// stored key.
+// stored key. Which key answers is core's (each layer's answers): a key that
+// is not transparent answers itself.
 export function behaviourKeyAt(/** @type {import("../../contracts/panel.js").Layer[]} */ stack, /** @type {number} */ at, /** @type {number[]} */ held, /** @type {number | undefined} */ index) {
     const own = (stack[at]?.positions || []).find((position) => position.layoutIndex === index);
-    if (keyFace(own, null).kind !== "transparent") return {keycode: keyMeaning(own), from: null};
-    const answer = resolvedPositions(stack, at, held).find((entry) => entry.position.layoutIndex === index);
-    return answer ? {keycode: keyMeaning(answer.position), from: answer.layer} : {keycode: keyMeaning(own), from: null};
+    const answer = own && resolvedPositions(stack, at, held).find((entry) => entry.position.layoutIndex === index);
+    return answer?.fellThrough ? {keycode: keyMeaning(answer.position), from: answer.layer} : {keycode: keyMeaning(own), from: null};
 }
 
 // The row Behaviours shows once the previewed layers change. A row opened from
@@ -46,8 +47,8 @@ export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string
 }
 
 // The words naming where each timing field's default comes from, as the core
-// says it per key (device-model.js behaviorDefaults); without it, the
-// placeholder says only "default".
+// says it per key (core/model/profile-model.js behaviorDefaults); without it,
+// the placeholder says only "default".
 /** @param {Model} model @param {import("../../contracts/panel.js").KeyBehaviorDefaults["timingSources"]} sources @returns {Partial<Record<TimingName, string>>} */
 function timingWords(model, sources) {
     const words = vocabulary(model).timingSources;

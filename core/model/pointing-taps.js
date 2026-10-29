@@ -6,7 +6,7 @@
 
 const {PD_KIND, isPdTapKey, pdTapProblem, isPdMacro, PD_MACROS} = require("../schema/pd-mode-domain-v1");
 const catalog = require("../data/keycode-catalog");
-const {QK} = require("../../rules/qmk-keycodes.mjs");
+const {QK, macroName} = require("../../rules/qmk-keycodes.mjs");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {VOCABULARY} = require("./vocabulary");
 
@@ -41,7 +41,7 @@ function pointingMacros(slots) {
 function pointingTapKeys() {
     /** @param {(code: number) => boolean} keep */
     const names = keep => catalog.entries().filter(entry => keep(entry.value)).flatMap(entry => [entry.name, ...entry.aliases]);
-    return {plain: [...names(code => code > 0 && !pdTapProblem(code)), ...Array.from({length: MACRO_DOMAIN_V1.SLOTS}, (_, index) => `MACRO_${index}`)], modified: names(code => code > 0 && code <= QK.MODS.last && isPdTapKey(code | 0x100))};
+    return {plain: [...names(code => code > 0 && !pdTapProblem(code)), ...Array.from({length: MACRO_DOMAIN_V1.SLOTS}, (_, index) => macroName(index))], modified: names(code => code > 0 && code <= QK.MODS.last && isPdTapKey(code | 0x100))};
 }
 
 module.exports = {pointingTaps, pointingTapKeys, pointingMacros};

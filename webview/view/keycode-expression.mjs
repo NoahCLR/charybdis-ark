@@ -59,20 +59,6 @@ export function keycodeValue(model, expression) {
     }, DIALECTS.keyboard);
 }
 
-// Whether a keycode is a plain key, the only kind a tap with a hold can send.
-/** @param {Model} model @param {string} expression */
-export const isPlainKey = (model, expression) => {
-    const value = keycodeValue(model, expression);
-    return value !== undefined && value <= QK.BASIC.last;
-};
-
-// Whether modifiers can wrap a keycode: a plain or already-modified key.
-/** @param {Model} model @param {string} expression */
-export const takesModifiers = (model, expression) => {
-    const value = keycodeValue(model, expression);
-    return value !== undefined && value <= QK.MODS.last;
-};
-
 // What is wrong with a layout key expression, in words, or "" when the draft
 // takes it. Layer keycodes are checked by the shared layer placement rule
 // (rules/layer-placement.mjs), as the keyboard checks a saved profile: a layer

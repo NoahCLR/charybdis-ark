@@ -6,7 +6,8 @@
 // per switch. Each switch keeps its own field identity, so a search still
 // finds a single layer and a reordered layer keeps its switch.
 import {el, esc} from "../lib/dom.mjs";
-import {layerName, layers} from "../store.mjs";
+import {layers} from "../store.mjs";
+import {layerCalled} from "../view/vocabulary.mjs";
 import {marked} from "./marks.mjs";
 
 /**
@@ -20,7 +21,7 @@ import {marked} from "./marks.mjs";
 /** @param {Model | null} model @param {number} index @param {string} label */
 function layerNamed(model, index, label) {
     const layer = layers().find((candidate) => candidate.index === index);
-    return layer ? marked(model, {kind: "layer", layer: layer.index}, layerName(layer))
+    return layer ? marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer))
         : marked(model, index >= 0 ? {kind: "layer", layer: index} : undefined, label);
 }
 

@@ -97,14 +97,23 @@ export interface Vocabulary {
     editModes: Readonly<Record<EditMode, Readonly<{id: EditModeId; label: string; hint: string; detail: string}>>>;
     halves: Readonly<Record<HalvesId, Readonly<{label: string; detail: string}>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];
+    /** The key a host layout's third level is typed with: "Option" or "AltGr". */
+    thirdLevel?: string;
     hostOs: WordList<number>;
     physicalHalves: WordList<number>;
     macroPlayback?: Readonly<Record<string, string>>;
     macroProtection: WordList<'auto' | 'on' | 'off'>;
+    /** The setting macroProtection chooses, by its name, and Automatic as it says whether it plays uninterruptibly now ("Automatic · on"). */
+    macroUninterruptible: Readonly<{label: string; automatic: Readonly<{on: string; off: string}>}>;
     macroSteps: WordList<MacroStepKind>;
+    /** A step's short name under its tile and in the legend: a key or chord step says which it is. */
+    macroStepTiles: Readonly<Record<Exclude<MacroStepKind, 'tap'> | 'key' | 'chord', string>>;
     /** Why a macro does not read in the step editor, by the macro grammar's reason code (rules/macro-payload.mjs). */
     macroProblems: Readonly<Record<string, string>>;
     hostLayouts: WordList<number>;
+    /** How macro text types what its layout cannot, by the Unicode mode it plays with. */
+    unicodeEntry: WordList<number>;
+    unicodeEntryOff: WordList<number>;
     holdStyles: {hold: WordList<string>; long: WordList<string>};
     holdWithoutLongHold: WordList<string>;
     tapSends: string;
@@ -124,11 +133,15 @@ export interface Vocabulary {
     /** What storing HSV(0, 0, 0) does, by lighting stage (or `groups`, a group row): Turn off's tip and the note once stored. */
     colourOff: Readonly<Record<string, {offTip: string; offNote?: string}>>;
     feedbackOwners: WordList<string>;
+    /** The behaviour tier each key feedback state flashes for, by its RGB_KEY_SEMANTICS name; the others have none. */
+    feedbackTiers: Readonly<Partial<Record<string, Tier>>>;
     ledTables: WordList<string>;
     stages: readonly {id: string; label: string; bit?: number}[];
     customKeys: {alwaysOn: {base: string; default: string}; layerKinds: WordList<number>};
     /** A layer key's second line on its cap, by its QMK function (MO, TG…). */
     keyCapLayerVerbs: Readonly<Record<string, string>>;
+    /** What each layer key does to its layer, in the words its name reads by ("Hold", "Lock"), by its form; LT and LM have none. */
+    layerKeyVerbs: Readonly<Partial<Record<LayerForm, string>>>;
     checkLevels: Readonly<Record<FindingLevel, string>>;
     checkStatuses: Readonly<Record<Check['status'], string>>;
     recoveryCauses: Readonly<Record<RecoveryCause, string>>;
@@ -156,6 +169,7 @@ export interface Vocabulary {
         linkEnds: WordList<number>;
         emptyDirection: WordList<number>;
         directionOutput: WordList<number>;
+        directionStep: WordList<number>;
         modifierPolicy: WordList<number>;
         scrollFields: WordList<string>;
         heldModifiers: string;
@@ -181,7 +195,8 @@ export type FindingPlace =
     | {kind: 'behaviour'; keycode: string}
     | {kind: 'combo'; index: number}
     | {kind: 'pointing'; slot: number}
-    | {kind: 'macro'; index: number}
+    /** `keycode`: the slot's name, as the Macros screen picks it. */
+    | {kind: 'macro'; index: number; keycode: string}
     | {kind: 'settings'; area?: string; section?: string; stage?: string};
 export interface Finding {
     kind: string;
@@ -221,11 +236,14 @@ export interface ProfileKeyNames {
 }
 /** What a layer key does to its layer, by QMK's function (and LOCK_LAYER, this keyboard's lock). */
 export type LayerForm = 'MO' | 'TG' | 'TO' | 'TT' | 'OSL' | 'DF' | 'PDF' | 'LT' | 'LM' | 'LOCK_LAYER';
+/** What a keycode is, where the interface treats it apart from other keys (core/model/key-names.js keyKind). */
+export type KeyKind = 'transparent' | 'disabled' | 'macro' | 'customKey';
 export interface NamedKey {name: string; native: string; code: number; label: string}
 
 export type ReviewPlace = FindingPlace
     | {kind: 'layers'; layers?: number[]}
-    | {kind: 'customKey'; index: number}
+    /** `keycode`: the key's name, as the Custom keys screen picks it. */
+    | {kind: 'customKey'; index: number; keycode: string}
     | {kind: 'lighting'; stage?: string | null; layer?: number; slot?: number};
 export interface ReviewChange {
     area: string;

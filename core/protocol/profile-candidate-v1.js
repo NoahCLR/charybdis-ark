@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {u8: assertU8, u16: assertU16, u32: assertU32, asBytes: copyBytes, protocolError, zeroRange} = require("../schema/bytes");
+const {u8: assertU8, u16: assertU16, u32: assertU32, asBytes, protocolError, zeroRange} = require("../schema/bytes");
 
 const {profileDomain, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 const {requestHandled} = require("./raw-hid-unhandled");
@@ -125,7 +125,7 @@ const CANDIDATE_ADMISSION_NAMES = Object.freeze(Object.fromEntries(
     Object.entries(CANDIDATE_ADMISSION).map(([name, value]) => [value, name])
 ));
 
-const ProfileCandidateProtocolError = protocolError("ProfileCandidateProtocolError");
+const ProfileCandidateProtocolError = protocolError("ProfileCandidateProtocolError", "answer");
 
 class CandidateTransactionIdSequence {
     /** @param {number} [start] */
@@ -174,7 +174,7 @@ function buildCandidateBeginRequest(transactionId, metadata) {
 function buildCandidateChunkRequest(transactionId, offset, value) {
     const normalizedTransactionId = assertU16(transactionId, "Candidate transaction id", {nonzero: true});
     const normalizedOffset = assertU32(offset, "Candidate chunk offset");
-    const bytes = copyBytes(value, "Candidate chunk");
+    const bytes = asBytes(value, "Candidate chunk");
     if (bytes.length < 1 || bytes.length > PROFILE_CANDIDATE_V1.CHUNK_MAX) {
         throw new RangeError(`Candidate chunk must contain 1 through ${PROFILE_CANDIDATE_V1.CHUNK_MAX} bytes.`);
     }
@@ -505,7 +505,7 @@ async function readCandidateSlaveStatus(connection, options = {}) {
 /** @overload @param {Uint8Array} value @param {import("./types.js").CandidateBlobOptions} options @returns {import("./types.js").CandidateMetadata} */
 /** @param {Uint8Array} value @param {Partial<import("./types.js").CandidateBlobOptions>} [options] @returns {import("./types.js").CandidateMetadata} */
 function candidateMetadataForBlob(value, options = {}) {
-    const blob = copyBytes(value, "Candidate profile blob");
+    const blob = asBytes(value, "Candidate profile blob");
     const storeFormatVersion = options.storeFormatVersion ?? PROFILE_CANDIDATE_V1.STORE_FORMAT;
     const maximum = options.capabilities?.maxProfilePayload ?? PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE;
     if (blob.length > maximum) throw new RangeError(`Candidate profile blob exceeds the keyboard's ${maximum}-byte capacity.`);
@@ -522,7 +522,7 @@ function candidateMetadataForBlob(value, options = {}) {
         ? derivedDomains
         : assertDomainMask(options.requestedDomains);
     if (requestedDomains !== derivedDomains) {
-        throw candidateProtocolError(
+        throw requestError(
             "DOMAIN_MASK_MISMATCH",
             `Requested domain mask 0x${requestedDomains.toString(16)} does not match blob domains 0x${derivedDomains.toString(16)}.`,
             {derivedDomains, requestedDomains}
@@ -579,7 +579,7 @@ function normalizeCandidateMetadata(metadata) {
 /** @param {number} major @param {number} minor */
 function assertCurrentSchema(major, minor) {
     if (major !== PROFILE_CANDIDATE_V1.SCHEMA_MAJOR || minor !== PROFILE_CANDIDATE_V1.SCHEMA_MINOR) {
-        throw candidateProtocolError("INCOMPATIBLE_SCHEMA", `Candidates use profile schema ${PROFILE_CANDIDATE_V1.SCHEMA_MAJOR}.${PROFILE_CANDIDATE_V1.SCHEMA_MINOR}; this blob is ${major}.${minor}.`);
+        throw requestError("INCOMPATIBLE_SCHEMA", `Candidates use profile schema ${PROFILE_CANDIDATE_V1.SCHEMA_MAJOR}.${PROFILE_CANDIDATE_V1.SCHEMA_MINOR}; this blob is ${major}.${minor}.`);
     }
 }
 
@@ -626,24 +626,23 @@ function assertZeroRange(buffer, start, end, label) {
 function candidateProtocolError(code, message, details) {
     return new ProfileCandidateProtocolError(code, message, details);
 }
+// A request Ark builds that it cannot send: Ark's fault, not the keyboard's
+// answer (core/model/vocabulary.js failureSentence).
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
+function requestError(code, message, details) {
+    return Object.assign(candidateProtocolError(code, message, details), {fault: "ark"});
+}
 
 module.exports = {
-    PEER_BUSY_REASON_NAMES,
-    PEER_STORE_STATE_NAMES,
-    PEER_TRANSFER_OWNER_NAMES,
-    PEER_ADMISSION_NAMES,
     CANDIDATE_ADMISSION,
-    CANDIDATE_ADMISSION_NAMES,
     CANDIDATE_ERROR,
     CANDIDATE_ERROR_NAMES,
     CANDIDATE_OPERATION,
     CANDIDATE_STATE,
     CANDIDATE_STATE_NAMES,
-    CANDIDATE_STATUS_FLAGS,
     CandidateRequestIdSequence,
     CandidateTransactionIdSequence,
     PROFILE_CANDIDATE_V1,
-    ProfileCandidateProtocolError,
     buildCandidateAbortRequest,
     buildCandidateBeginRequest,
     buildCandidateChunkRequest,
@@ -659,9 +658,6 @@ module.exports = {
     normalizeCandidateMetadata,
     readCandidateStatus,
     CANDIDATE_PEER_PHASE,
-    CANDIDATE_PEER_PHASE_NAMES,
-    SPLIT_STATUS_NAMES,
     buildCandidateSlaveStatusRequest,
-    decodeCandidateSlaveStatusResponse,
     readCandidateSlaveStatus,
 };

@@ -21,6 +21,9 @@ function sourceFiles(root) {
 
 /** @param {string} root */
 function syntaxCoverage(root) {
+    // The compiler lists real paths, so a root reached through a link
+    // (macOS's /tmp) is compared by its real path too.
+    root = fs.realpathSync(root);
     const script = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts.typecheck;
     const configs = Array.from(script.matchAll(/tsc -p ([\w.-]+)/g), match => match[1]);
     if (!configs.length) throw new Error("No TypeScript checks found in scripts.typecheck.");

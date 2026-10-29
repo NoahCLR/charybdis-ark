@@ -48,14 +48,14 @@ function groupBuilder(model, canEdit) {
         <button class="btn primary" data-act="keep" ${canEdit && (draft.source || picked) ? "" : "disabled"}
             data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Keep row in draft</button>
         <button class="btn ghost" data-act="save" ${canEdit && picked ? "" : "disabled"}
-            data-tip="${picked ? "Store the picked LEDs as a group other rows can point at. Groups are numbered by the LEDs they hold, so the others may renumber." : "Pick LEDs on the board first, then save them as a group."}">Save selection as a group</button></div>`);
+            data-tip="${picked ? "Store the picked LEDs as a group other rows can point at. Groups are numbered by the LEDs they hold, so the others may renumber." : "Pick LEDs on the board first, then make them a group."}">Make a group from the selection</button></div>`);
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => {
         post(edits.ledRow(draft, ledIndices(model), state.rowColour));
     });
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="save"]')).addEventListener("click", () =>
         post(edits.saveLedGroup(ledIndices(model))));
     node.append(actions);
-    node.append(el(`<p class="note">Rows are applied in device order, so a later row wins on the LEDs it shares.</p>`));
+    node.append(el(`<p class="note">Rows paint in the order the keyboard stores them, so a later row wins on the LEDs it shares.</p>`));
     return node;
 }
 

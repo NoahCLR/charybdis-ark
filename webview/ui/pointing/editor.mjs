@@ -1,13 +1,14 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {NAME_TIP} from "../../view/names.mjs";
-import {vocabulary} from "../../view/vocabulary.mjs";
+import {slotNamed} from "../../view/vocabulary.mjs";
+import {sectionPath} from "../../view/settings-layout.mjs";
 import {KIND, dpiOptions, readConfig, scrollStarter, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
 import {post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {mark} from "../marks.mjs";
 import {words} from "./common.mjs";
-import {holdKeyName} from "../../view/reach.mjs";
+import {holdKeyName} from "../../view/pointing-reach.mjs";
 import {formControls} from "./form-controls.mjs";
 import {countNameBytes} from "../title-name.mjs";
 import {movement} from "./movement.mjs";
@@ -33,7 +34,7 @@ export function editor(model, slot, canEdit, slots) {
     const head = el(`<div class="card">
         <div class="card-h">
             <span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>
-            <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${esc(slot.id)} · ${esc(holdKeyName(slot))}</span>
+            <h3>${esc(slotNamed(slot))}</h3><span class="tag">slot ${esc(slot.id)} · ${esc(holdKeyName(slot))}</span>
             <span class="right">
                 ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${esc(disabled)}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
@@ -55,7 +56,7 @@ export function editor(model, slot, canEdit, slots) {
         // The slot is staged once a field of the new form is changed.
         {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(/** @type {HTMLSelectElement} */ (event.target).value)}; render(); }}));
     headBody.append(select("Pointer speed while active", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
-        {tip: `Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in ${vocabulary(model).settingsScreens.pointer} → Pointer speed.`}));
+        {tip: `Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}));
     // Its light, beside the mark that shows it.
     headBody.append(lightRow(model, slot));
     wrap.append(head);
@@ -64,7 +65,7 @@ export function editor(model, slot, canEdit, slots) {
     wrap.append(movement(model, slot, scrolling, controls), startCard(model, slot, canEdit, controls), advancedControls(model, slot, scrolling, controls));
 
     stageCurrent = () => {
-        const {config, pending} = settleTaps(slot, readConfig(slot, form));
+        const {config, pending} = settleTaps(slot, readConfig(slot, form, model), model);
         const holding = Object.keys(pending).length > 0;
         const held = Boolean(state.pdTaps);
         state.pdTaps = Object.keys(pending).length ? {slot: slot.id, rows: pending} : null;

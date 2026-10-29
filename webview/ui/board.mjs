@@ -25,6 +25,7 @@ import {comboBadgesAt} from "../view/combo-reach.mjs";
 import {behaviourRuns} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trackballLight} from "../view/lighting.mjs";
+import {layerCalled} from "../view/vocabulary.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
@@ -129,7 +130,7 @@ export function board(model, layer, options = {}) {
         const squeeze = (fit) => fit.squeeze ? ` textLength="${esc(fit.squeeze)}" lengthAdjust="spacingAndGlyphs"` : "";
 
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"
-            aria-label="${esc(keyMeaning(shown))} at index ${esc(index)}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
+            aria-label="${esc(keyMeaning(shown))} at index ${esc(index)}${from ? `, from ${esc(layerCalled(from))}` : ""}"${transform}>
             <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}

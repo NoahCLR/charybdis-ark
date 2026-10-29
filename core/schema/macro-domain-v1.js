@@ -29,7 +29,7 @@ const MACRO_DOMAIN_V1 = Object.freeze({
     PROTECT: 0x05,
 });
 
-const MacroDomainError = protocolError("MacroDomainError");
+const MacroDomainError = protocolError("MacroDomainError", "ark");
 
 // The canonical domain's size for these macros: each macro and its terminator.
 /** @param {readonly Uint8Array[]} macros */

@@ -10,17 +10,36 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
 
 - The shell (`web/web-shell.mjs`) supplies its device adapter, recovery copies
   (each kept with what made it and the keyboard's name, which
-  `core/session/recovery-copy.js` puts in its file name), file choosers, downloads, progress, a store for compiled defaults and a
-  sleep that tab throttling cannot slow.
-- `core/session/panel-loop.js` hands each message to
-  `routeMessage` (`core/session/panel-session.js`), runs `panel-controls.js` or `live-edits.js` and publishes
-  the model with the session's outbox (notice, `resetDraftForms`).
+  `core/session/recovery-copy.js` puts in its file name), file choosers,
+  downloads, progress, a store for compiled defaults and a sleep that tab
+  throttling cannot slow.
+- `core/session/panel-loop.js` hands each message to `routeMessage`
+  (`core/session/panel-session.js`), runs `panel-controls.js` or
+  `live-edits.js` and publishes the model with the session's outbox (notice,
+  `resetDraftForms`). What every model of the build starts from goes to the
+  panel once, as the catalog, before the first model and after each `ready`;
+  each model leaves it out and says what it lays over it, and
+  `webview/catalog.mjs` lays it back
+  ([the posting contract](../spec/interface-contracts.md#snapshot-model-and-device-model)).
 - `core/session/profile-device-service.js` owns the connection: one operation
   at a time (`runOperation`, else `SERVICE_BUSY`), each failure recorded in
-  `snapshot().error`, every change published as `snapshot()`.
+  `snapshot().error` as `operation-failure.js` words it, every change
+  published as `snapshot()` (`service-snapshot.js`). Its operations past
+  connecting are grouped by what they do: `read-operations.js` (the profile
+  reads, and what the service keeps of each), `live-edit-operations.js` (the
+  working copy's edit, Save, Revert, leaving Live edit, the edit mode and a
+  restart) and `background-reads.js` (the reads between operations, and when
+  missed looks lose the keyboard). Beside it: `device-listing.js` (each
+  keyboard's public id and number), `request-ids.js` (each connection's
+  request ids), `edit-mode-reads.js` (how edits reach the keyboard),
+  `profile-reads.js` (what a profile read turns into), `restore-checks.js`
+  (what a restore refuses before it sends anything) and
+  `profile-payload-reader.js` (the payload reads, and the compiled defaults
+  kept across connections and runs).
 - Below it: `portable-profile-session.js` (Review and save snapshot, Apply),
   `live-profile-session.js`, `live-edit-coordinator.js` and
-  `candidate-upload-coordinator.js`.
+  `candidate-upload-coordinator.js`, which judges each candidate status it
+  reads with `candidate-status.js`.
 - `core/transport/request-coordinator.js` sends one request at a time; a
   timeout closes the connection, except for a background look (below).
 
@@ -35,7 +54,8 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
    key turned off (GET `0x22`) and edit progress. An edit the keyboard is
    still receiving is aborted, its transaction id retired.
 3. `readKeyboardProfile` takes one snapshot: live (below) when the keyboard is
-   not in Review and save or still runs unsaved live edits, else `snapshotProfile`.
+   not in Review and save or still runs unsaved live edits, else
+   `snapshotProfile`.
 4. If the snapshot fails, the independent reads (`readLayout`,
    `readCommittedProfile`, `readBaseRgb`, `readCombos`) still run for
    diagnostics, and no editable draft opens.
@@ -99,8 +119,8 @@ with its document, origin, label, time and layer order.
   import, another keyboard), the session sets `resetDraftForms` and each field
   in `STATE_FIELDS` (`webview/store.mjs`) does what it declares.
 - The draft lives only in the open session; when leaving the web page asks
-  first is in the
-  [interface contracts](../spec/interface-contracts.md#draft-binding-and-panel-controls).
+  first is in the [interface
+  contracts](../spec/interface-contracts.md#draft-binding-and-panel-controls).
 
 ## Apply
 
@@ -151,8 +171,9 @@ answered BUSY while a DPI or lighting key change awaits publication waits
 within the status budget and says so; any frame waits while a live edit or
 save holds admission.
 
-What is said about an Apply or a Save cut short comes from one place,
-`interruption.js`. Its three verdicts (`APPLY_VERDICTS`: none, decided,
+What is said about an Apply or a Save cut short comes from one place: its
+words in `core/model/vocabulary.js`, and when it applies in
+`interruption.js`. The three verdicts (`APPLY_VERDICTS`: none, decided,
 unknown) go out as `apply.failure.verdict`, which the bar draws, and every
 notice about an Apply cut short (from the upload on, or at any step by a lost
 connection or a keyboard that stopped answering) starts with the same
@@ -187,32 +208,33 @@ against the firmware's candidate transaction and validator.
 
 [D-L65](../adr/0065-live-and-review-edits-reach-the-keyboard-at-once.md),
 [D-L66](../adr/0066-in-live-the-keyboard-saves-by-itself.md) and
-[D-L67](../adr/0067-a-stopped-keyboard-says-so-and-ark-restarts-it.md);
-for the person, the [guide](../guide/review-and-save.md#edit-modes). The
-keyboard stores its edit mode (firmware D-F32), and `refresh` reads it; when
-it cannot, Ark uses Apply's reads until the next `refresh`. Live preview +
-save (the mode of a keyboard never set) and Live edit open the draft on the keyboard's
+[D-L67](../adr/0067-a-stopped-keyboard-says-so-and-ark-restarts-it.md); for
+the person, the [guide](../guide/review-and-save.md#edit-modes). The keyboard
+stores its edit mode (firmware D-F32), and `refresh` reads it; when it cannot,
+Ark uses Apply's reads until the next `refresh`. Live preview + save (the mode
+of a keyboard never set) and Live edit open the draft on the keyboard's
 working copy. All modes share the draft, review, checks and history.
 
 ### Reading a live keyboard
 
 `snapshotLive` (`live-profile-session.js`) reads a pair. It waits for the edit
 status to go idle (no edit being received, checked or waiting for a held key;
-`LIVE_EDIT_PENDING` after 600 polls 50 ms apart) and for a running save,
-the keyboard's own or Save, to end (status flag 6; `LIVE_SAVE_PENDING` after
-as long). It reads the working copy (GET `0x21`; a page that no longer fits
-reads its page 0 again, as a payload read does) and checks its session,
-revision and saved generation, then the saved profile it began from (GET
-`0x04`, or the compiled defaults over generation 0). With nothing unsaved and
-the saved record running, the working copy's bytes serve as the saved bytes
-once they pass that record's fresh metadata (`sameAs`). Combos, toggles and
-the edit status follow. Any move refuses that read as `PROFILE_CHANGED` (a
-saved profile that moved under every payload attempt, `GENERATION_UNSTABLE`,
-counts too), and the pair is read again, three times in all, before the read fails
-`PROFILE_CHANGED` ("kept changing"). In Live edit a rename restarts USB before the
-keyboard's own save, so the follow-back read is where that save lands. Both documents come from stored bytes
-alone (`materializeStored`, no readback overlay), and the working copy's
-exact bytes are kept: every live edit is a splice against them.
+`LIVE_EDIT_PENDING` after 600 polls 50 ms apart) and for a running save, the
+keyboard's own or Save, to end (status flag 6; `LIVE_SAVE_PENDING` after as
+long). It reads the working copy (GET `0x21`; a page that no longer fits reads
+its page 0 again, as a payload read does) and checks its session, revision and
+saved generation, then the saved profile it began from (GET `0x04`, or the
+compiled defaults over generation 0). With nothing unsaved and the saved
+record running, the working copy's bytes serve as the saved bytes once they
+pass that record's fresh metadata (`sameAs`). Combos, toggles and the edit
+status follow. Any move refuses that read as `PROFILE_CHANGED` (a saved
+profile that moved under every payload attempt, `GENERATION_UNSTABLE`, counts
+too), and the pair is read again, three times in all, before the read fails
+`PROFILE_CHANGED` ("kept changing"). In Live edit a rename restarts USB before
+the keyboard's own save, so the follow-back read is where that save lands.
+Both documents come from stored bytes alone (`materializeStored`, no readback
+overlay), and the working copy's exact bytes are kept: every live edit is a
+splice against them.
 
 `ProfileDraftSession.observeLive` keeps the history only while the keyboard
 vouches for it (same session and revision, same saved and current
@@ -253,7 +275,7 @@ again once it moves on. While it waits the coordinator reads edit status page
 2 each 50 ms and reports `{kind, reasons, cancelling}` through `onWaiting`; the
 service publishes it as `liveWaiting`, and the panel model as `liveWait`, in
 `heldWords` (`core/model/vocabulary.js`): "Let go of the held keys to finish
-the edit", naming a key, a locked layer or pointer mode, a modifier or
+the edit", naming a key, a locked layer or pointing mode, a modifier or
 one-shot, or a one-shot layer. **Cancel edit** (`abortLiveEdit`, registry
 phase `within`, the one control the busy guard lets through) has the
 coordinator send the edit's abort at its next look; aborted, `post` resolves
@@ -273,14 +295,14 @@ confirms it as the edit's step instead of starting the history again; in
 Live edit, a saved profile that is exactly that edit is the keyboard's own save.
 
 `sendWhenFree` retries a BUSY begin, Save, Revert or mode change for 3 s, 30 s
-while the slave half is catching up, and 120 s while a save runs (Live edit's own
-starts 3 s after the last edit). It stops at once when the halves are apart,
-the slave half is absent or a half has stopped. A refusal reads the keyboard
-again (`reread`); refusals that leave the working copy untouched (too
+while the slave half is catching up, and 120 s while a save runs (Live edit's
+own starts 3 s after the last edit). It stops at once when the halves are
+apart, the slave half is absent or a half has stopped. A refusal reads the
+keyboard again (`reread`); refusals that leave the working copy untouched (too
 large, halves apart) need no read. STALE means the keyboard moved first,
 usually an adjustment key: Ark reads again and asks for the edit again,
-without a failure. A lost answer closes the connection; the next
-read shows whether the edit landed, and no edit is replayed.
+without a failure. A lost answer closes the connection; the next read shows
+whether the edit landed, and no edit is replayed.
 
 ### Save and Revert
 
@@ -303,8 +325,8 @@ them (`saveCutShortResult`). A read of another keyboard forgets it.
 
 ### Live edit, and looking between edits
 
-In Live edit the keyboard saves 3 s after the last edit with no key held, with or
-without Ark, which starts no timer. Save is refused until that save fails;
+In Live edit the keyboard saves 3 s after the last edit with no key held, with
+or without Ark, which starts no timer. Save is refused until that save fails;
 **Save again** then saves after a recovery copy, with no review, since every
 edit was checked before it was sent.
 
@@ -325,63 +347,63 @@ back input reports then, and while hidden (`web/native-popups.mjs`).
   itself. What is saved moves to what runs; the history stays.
 - A revision, session or mode Ark did not make: Ark reads the pair again, as
   news.
-- Under a Review and save draft: a key adjustment the keyboard has saved is read again;
-  the first look compares with the snapshot's saved generation and origin.
-  Until then the draft keeps what the keyboard says of itself
+- Under a Review and save draft: a key adjustment the keyboard has saved is
+  read again; the first look compares with the snapshot's saved generation and
+  origin. Until then the draft keeps what the keyboard says of itself
   (`observeApplyStatus`) and publishes it as `draft.keyboard`, so the rail's
   keyboard dot says an adjustment is pending, and the bar that a half stopped
   saving, in Review and save too.
 - A read refused `PROFILE_CHANGED` is retried, up to three times per draft.
 - A live draft whose follow-back read failed that way stays bound to the old
-  device id or connection. When the keyboard connected now names the
-  draft's edit session, it is the same keyboard on the same boot: the draft
-  follows it (`followSession`) and the look reads it again, within the same
-  bound. Another session (another keyboard, or a restart) ends the retry. The follow-back itself says its read failed (`awaitReconnect` takes
-  a read that is not ready as failed).
+  device id or connection. When the keyboard connected now names the draft's
+  edit session, it is the same keyboard on the same boot: the draft follows it
+  (`followSession`) and the look reads it again, within the same bound.
+  Another session (another keyboard, or a restart) ends the retry. The
+  follow-back itself says its read failed (`awaitReconnect` takes a read that
+  is not ready as failed).
 - A notice never carries a decoder's text: an answer that did not decode
-  says so, and the diagnostics keep the detail (`failureWords`,
-  `panel-controls.js`).
+  says so, and the diagnostics keep the detail (`failureSentence`,
+  `core/model/vocabulary.js`; `answerFault`, `core/schema/bytes.js`).
 
 ### Switching edit modes
 
 `setEditMode` (`live-edits.js`) settles work first, as the keyboard refuses a
-mode change with unsaved edits. Leaving Live edit asks nothing: `flush` waits for
-a running save and, before each Save, reads the actual saved profile (an
-automatic save may have moved it) and saves its recovery copy. Leaving
-Live preview + save with unsaved edits needs Save or Revert. Entering a live
-mode from a dirty Review and save draft needs Send live (checks confirmed) or
-Discard; Send live keeps that draft until the keyboard confirms the edit; on
-a refusal it tries to switch back to Review and save and keeps the draft, stale until
-read again. A failure leaves the mode as it was; after a change the draft
-starts from a fresh read.
+mode change with unsaved edits. Leaving Live edit asks nothing: `flush` waits
+for a running save and, before each Save, reads the actual saved profile (an
+automatic save may have moved it) and saves its recovery copy. Leaving Live
+preview + save with unsaved edits needs Save or Revert. Entering a live mode
+from a dirty Review and save draft needs Send live (checks confirmed) or
+Discard; Send live keeps that draft until the keyboard confirms the edit; on a
+refusal it tries to switch back to Review and save and keeps the draft, stale
+until read again. A failure leaves the mode as it was; after a change the
+draft starts from a fresh read.
 
 ### A stopped keyboard and Restart
 
-A stopped half outranks every other state the keyboard reports, and refusals then fail
-`LIVE_KEYBOARD_STOPPED`. `restartKeyboard` (`keyboard-restart.js`) saves the
-unsaved working copy (read, or else the draft's copy) as a recovery copy
-first, and restarts only once it is saved. It then expects the keyboard to
-drop off USB, follows it back, reads it once it has finished starting
+A stopped half outranks every other state the keyboard reports, and refusals
+then fail `LIVE_KEYBOARD_STOPPED`. `restartKeyboard` (`keyboard-restart.js`)
+saves the unsaved working copy (read, or else the draft's copy) as a recovery
+copy first, and restarts only once it is saved. It then expects the keyboard
+to drop off USB, follows it back, reads it once it has finished starting
 (`keyboard-starting.js`,
 [D-L70](../adr/0070-a-keyboard-is-read-once-it-has-started.md)), and
-`putBackAfterRestart` sends the kept edits as one unsaved live edit. Under
-a Review and save draft there is nothing to keep: the draft stays as it is, and takes
-the new connection when the keyboard still holds what the draft began from
-(`followRestart`), so its history is not lost to a review against the
+`putBackAfterRestart` sends the kept edits as one unsaved live edit. Under a
+Review and save draft there is nothing to keep: the draft stays as it is, and
+takes the new connection when the keyboard still holds what the draft began
+from (`followRestart`), so its history is not lost to a review against the
 keyboard. `putBackAfterRestart` then looks at the edit status at once, since
 the read says nothing of it, so a keyboard that stopped again is told apart.
 Apply of a draft whose keyboard said it stopped is refused as stopped before
-any recovery copy or write. Ark offers
-Restart only when the keyboard says it stopped, or that its slave half never
-confirmed a cancelled save (`health.restartNeeded`), in any edit mode, as one
-bar (`restartOffer`).
+any recovery copy or write. Ark offers Restart only when the keyboard says it
+stopped, or that its slave half never confirmed a cancelled save
+(`health.restartNeeded`), in any edit mode, as one bar (`restartOffer`).
 
 ## Backups
 
 A backup is the snapshot's `document`
 ([D-L15](../adr/0015-a-backup-is-the-complete-effective-configuration.md));
-its envelope is in [`core/README.md`](../../core/README.md#backups). Export reads the keyboard again
-(`readPortableProfile`) and writes what it runs: the working copy in a live
-mode, never the draft. A reviewed import becomes one draft edit (one live
-edit in a live mode); on a keyboard with no editable draft it is written at
-once through Apply's path, recovery copy first.
+its envelope is in [`core/README.md`](../../core/README.md#backups). Export
+reads the keyboard again (`readPortableProfile`) and writes what it runs: the
+working copy in a live mode, never the draft. A reviewed import becomes one
+draft edit (one live edit in a live mode); on a keyboard with no editable
+draft it is written at once through Apply's path, recovery copy first.

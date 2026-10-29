@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createMacroReader} from "../../webview/view/macro-cache.mjs";
-import {parseMacro, macroPeek, macroPeekSteps} from "../../webview/view/macro.mjs";
+import {parseMacro, macroPeekSteps} from "../../webview/view/macro.mjs";
 import {withStepFocus} from "../../webview/view/macro-focus.mjs";
 import {createRequire} from "node:module";
 const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
@@ -50,7 +50,7 @@ test("cached peek steps keep the existing text, chord and held-key preference an
     const read = createMacroReader(), model = {};
     for (const payload of [" text ", "{KC_A,KC_B}", "{+KC_A}", "{120}", "{bad", ""]) {
         const steps = read(model, "MACRO_0", payload, "peek").steps;
-        assert.equal(macroPeekSteps(steps, key => `named ${key}`), macroPeek(payload, key => `named ${key}`));
+        assert.equal(macroPeekSteps(steps, key => `named ${key}`), macroPeekSteps(parseMacro(payload).steps, key => `named ${key}`));
     }
     const steps = read(model, "MACRO_0", "{KC_A}", "peek").steps;
     assert.equal(macroPeekSteps(steps, () => "Old label"), "Old label");

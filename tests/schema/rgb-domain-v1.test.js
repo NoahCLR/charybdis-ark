@@ -13,12 +13,12 @@ const {
     encodeRgbDomainV1,
 } = require("../../core/schema/rgb-domain-v1");
 const {
-    PROFILE_DOMAIN_IDS,
     crc32,
     decodeProfileBlob,
     encodeProfileBlob,
     fnv1a32,
 } = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
 
 function fixture() {
     const semantic = JSON.parse(fs.readFileSync(path.join(__dirname, "../fixtures/rgb-domain-v1.json"), "utf8"));

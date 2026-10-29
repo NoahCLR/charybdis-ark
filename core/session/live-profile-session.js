@@ -16,6 +16,7 @@ const {requireReady: checkReady} = require("./firmware-support");
 /** @type {(capabilities: Partial<import("./types.js").DeviceCapabilities> | null | undefined, writing?: boolean) => asserts capabilities is Partial<import("./types.js").DeviceCapabilities>} */
 const requireReady = checkReady;
 const {fnv1a32, PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
+const {answered} = require("../schema/bytes");
 
 /** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
@@ -51,7 +52,9 @@ function liveKeyboardStatus(status, saveMark = -1) {
 /** @param {import("./types.js").DeviceCapabilities} capabilities @param {Buffer} stored @param {Buffer} defaults */
 function snapshotOf(capabilities, stored, defaults) {
     const document = createSnapshot({profile: materializeStored(stored, defaults), actionAbiDigest: capabilities.actionAbiDigest});
-    validateSnapshot(document, capabilities);
+    // Made of what the keyboard sent: a check it fails is its answer not
+    // reading, never a backup's (bytes.js answered).
+    answered(() => validateSnapshot(document, capabilities));
     return {document, fingerprint: fingerprint(document), summary: summary(document), incomplete: /** @type {const} */ (false)};
 }
 

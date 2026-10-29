@@ -7,14 +7,13 @@
 // (view/pointing-config.mjs linkRecord) and posted with the rest of it.
 import {el, esc} from "../../lib/dom.mjs";
 import {LINK_ENDS} from "../../view/pointing-config.mjs";
+import {listed} from "../../view/vocabulary.mjs";
 import {linkIgnored, linkRows, pointerLayerCovers} from "../../view/pointing-link.mjs";
 import {layerSwitchTable, switchedLayers} from "../layer-switches.mjs";
 import {words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
-/** @param {string[]} names */
-const listed = (names) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {FormControls} controls */
 export function startCard(model, slot, canEdit, {form, disabled}) {

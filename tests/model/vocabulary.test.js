@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {VOCABULARY, EDIT_MODE_WORDS, editModeWords, heldWords, quietWords, word, layerName, slotName, branchName, modifierNames} = require("../../core/model/vocabulary");
+const {VOCABULARY, EDIT_MODE_WORDS, editModeWords, heldWords, listed, quietWords, word, layerName, slotName, branchName, modifierNames} = require("../../core/model/vocabulary");
 const rgb = require("../../core/schema/rgb-domain-v1");
 const pd = require("../../core/schema/pd-mode-domain-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../../core/schema/key-behavior-domain-v1");
@@ -27,6 +27,7 @@ test("every stored enum value has a word", () => {
     assert.deepEqual(Object.keys(VOCABULARY.pointing.linkInert).sort(), ["default", "pointer"], "each layer a link ignores, in the editor's row");
     coversNumbers(VOCABULARY.pointing.emptyDirection, pd.PD_EMPTY_DIRECTION, "empty direction");
     coversNumbers(VOCABULARY.pointing.directionOutput, pd.PD_DIRECTION_OUTPUT, "directional output");
+    coversNumbers(VOCABULARY.pointing.directionStep, pd.PD_DIRECTION_OUTPUT, "what a direction's threshold measures, by directional output");
     coversNumbers(VOCABULARY.pointing.scrollAxes, pd.PD_SCROLL_AXES, "scroll axes");
     coversNumbers(VOCABULARY.pointing.modifierPolicy, pd.PD_MODIFIERS, "modifier policy");
     coversNumbers(VOCABULARY.customKeys.layerKinds, require("../../core/schema/settings-domain-v1").SHORTCUT_LAYER_KINDS, "how a custom key's shortcut turns its layers on");
@@ -42,11 +43,25 @@ test("every stored enum value has a word", () => {
 test("checks, recovery copies, thresholds, key caps and pointing shortcuts keep their words", () => {
     assert.deepEqual(VOCABULARY.checkLevels, {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"});
     assert.deepEqual(VOCABULARY.checkStatuses, {new: "new", existing: "on the keyboard", fixed: "fixed"});
-    assert.deepEqual(VOCABULARY.recoveryCauses, {apply: "Before saving a draft", restore: "Before restoring a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"});
+    assert.deepEqual(VOCABULARY.recoveryCauses, {apply: "Before saving a draft", restore: "Before saving a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"});
     assert.deepEqual(VOCABULARY.thresholds, {tapHoldTerm: "tap / hold", longHoldTerm: "long hold", multiTapTerm: "multi tap window"});
     assert.deepEqual(VOCABULARY.keyCapLayerVerbs, {OSL: "one-shot", TT: "tap-toggle"});
     assert.deepEqual(VOCABULARY.pointing.directions.map(([, words]) => words), ["Left", "Right", "Up", "Down"]);
     assert.deepEqual(VOCABULARY.pointing.diagonals.map(([, words]) => words), ["Up-left", "Up-right", "Down-left", "Down-right"]);
+});
+
+// A macro step's short name is its kind's name from macroSteps, so a tile, its
+// legend and the step editor's title never name one step two ways ("Delay"
+// under a "wait" tile).
+test("a macro step's short name is the step editor's name for it", () => {
+    const named = Object.fromEntries(VOCABULARY.macroSteps);
+    for (const kind of ["text", "delay", "press", "release"]) assert.equal(VOCABULARY.macroStepTiles[kind], named[kind].toLowerCase(), kind);
+    assert.equal(`${VOCABULARY.macroStepTiles.key} or ${VOCABULARY.macroStepTiles.chord}`, named.tap.toLowerCase(), "a key or chord step is one or the other");
+});
+
+// Every host OS the keyboard can type Unicode for has its way of entry said.
+test("every Unicode mode has its entry words", () => {
+    assert.deepEqual(VOCABULARY.unicodeEntry.map(([mode]) => mode), VOCABULARY.hostOs.map(([os]) => os).filter(Boolean));
 });
 
 test("Import's summary names only settings sections the keyboard's model publishes", () => {
@@ -86,6 +101,19 @@ test("one rule names an unnamed layer, slot, branch and modifier set", () => {
 
 test("macro playback statuses have one set of presentation words", () => {
     assert.deepEqual(VOCABULARY.macroPlayback, {setup: "setup", blocked: "blocked", unavailable: "unavailable"});
+});
+
+// The firmware glossary's word for the setting (never "protected playback"),
+// and Automatic said with whether it plays uninterruptibly now, built from
+// Automatic's own word so the dropdown and Review agree.
+test("a macro's Uninterruptible playback is named once, and Automatic says whether it is on", () => {
+    const {protectionWords} = require("../../core/model/vocabulary");
+    assert.equal(VOCABULARY.macroUninterruptible.label, "Uninterruptible playback");
+    assert.deepEqual(VOCABULARY.macroUninterruptible.automatic, {on: "Automatic · on", off: "Automatic · off"});
+    assert.equal(protectionWords("auto", true), "Automatic · on");
+    assert.equal(protectionWords("auto", false), "Automatic · off");
+    assert.equal(protectionWords("on", false), word(VOCABULARY.macroProtection, "on"), "a chosen setting says only its word");
+    assert.equal(protectionWords("off", true), "Off");
 });
 
 
@@ -131,7 +159,7 @@ test("device phase identities are independent of their existing display labels",
     assert.notEqual(PHASE.READ_LAYOUT, PHASE_WORDS[PHASE.READ_LAYOUT].label);
     assert.notEqual(PHASE.RESTORE_COMPLETE, PHASE_WORDS[PHASE.RESTORE_COMPLETE].label);
     assert.equal(PHASE_WORDS[PHASE.READ_COMBOS].read, "Checking active combos");
-    assert.equal(PHASE_WORDS[PHASE.READ_BASE_RGB].read, "Checking base lighting");
+    assert.equal(PHASE_WORDS[PHASE.READ_BASE_RGB].read, "Checking the background effect");
 });
 
 test("every state of the two halves has a label and words saying what to do", () => {
@@ -143,14 +171,14 @@ test("every state of the two halves has a label and words saying what to do", ()
     assert.match(VOCABULARY.halves.alone.detail, /cable between the halves/);
 });
 
-test("Live's quiet interval is the one the keyboard reports, 3 seconds until it has", () => {
+test("Live edit's quiet interval is the one the keyboard reports, 3 seconds until it has", () => {
     assert.equal(quietWords(5000), "5 seconds");
     assert.equal(quietWords(1000), "1 second");
     assert.equal(quietWords(undefined), "3 seconds");
     assert.equal(quietWords(0), "3 seconds", "nothing reported");
     assert.match(editModeWords(5000)[1].detail, /after 5 seconds with no edit/);
     assert.match(EDIT_MODE_WORDS[1].detail, /after 3 seconds with no edit/);
-    assert.equal(editModeWords(5000)[0].detail, EDIT_MODE_WORDS[0].detail, "only Live's words carry it");
+    assert.equal(editModeWords(5000)[0].detail, EDIT_MODE_WORDS[0].detail, "only Live edit's words carry it");
 });
 
 // Page 2's safe-boundary bits that a person lets go of are named; the rest
@@ -158,7 +186,7 @@ test("Live's quiet interval is the one the keyboard reports, 3 seconds until it 
 test("an edit held for released keys says what to let go of, and a Revert says it too", () => {
     const edit = heldWords({kind: "edit", reasons: 1 | 1 << 4 | 1 << 6 | 1 << 7, cancelling: false});
     assert.equal(edit.title, "Let go of the held keys to finish the edit");
-    assert.match(edit.detail, /^Held now: a key, a locked layer or pointer mode, a modifier or one-shot and a one-shot layer\. /);
+    assert.match(edit.detail, /^Held now: a key, a locked layer or pointing mode, a modifier or one-shot and a one-shot layer\. /);
     assert.equal(heldWords({kind: "edit", reasons: 1 << 9, cancelling: false}).detail, "The keyboard takes the edit the moment nothing is held; Ark waits for it.", "a combo is not named");
     assert.equal(heldWords({kind: "edit", reasons: 1, cancelling: true}).title, "Cancelling the edit");
     const revert = heldWords({kind: "revert", reasons: 1, cancelling: false});
@@ -171,4 +199,25 @@ test("a layer key's cap has a second line exactly when core counts the key dual-
     const {LAYER_FORMS} = require("../../rules/qmk-keycodes.mjs");
     for (const [form, base] of Object.entries(LAYER_FORMS)) assert.equal(Object.hasOwn(VOCABULARY.keyCapLayerVerbs, form), dualRole(base | 1), form);
     assert.deepEqual(Object.keys(VOCABULARY.keyCapLayerVerbs).filter((form) => !Object.hasOwn(LAYER_FORMS, form)), [], "only layer forms have a cap verb");
+});
+
+test("every layer key that acts on its layer alone has the words its name reads by", () => {
+    const {LAYER_FORMS} = require("../../rules/qmk-keycodes.mjs");
+    assert.deepEqual(Object.keys(VOCABULARY.layerKeyVerbs).sort(), [...Object.keys(LAYER_FORMS), "LOCK_LAYER"].sort(),
+        "every layer form but a layer-tap's and a layer-mod's, which a tap or modifiers go with");
+    assert.deepEqual([VOCABULARY.layerKeyVerbs.MO, VOCABULARY.layerKeyVerbs.TG, VOCABULARY.layerKeyVerbs.LOCK_LAYER], ["Hold", "Lock", "Lock"]);
+});
+
+test("each key feedback state a behaviour tier flashes for is marked with that tier", () => {
+    const names = Object.keys(rgb.RGB_KEY_SEMANTICS);
+    assert.ok(Object.keys(VOCABULARY.feedbackTiers).every((name) => names.includes(name)), "only feedback states have a tier");
+    assert.deepEqual(Object.values(VOCABULARY.feedbackTiers).sort(), Object.keys(VOCABULARY.tiers).sort(), "one state per tier");
+    assert.deepEqual(VOCABULARY.feedbackTiers, {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"});
+});
+
+test("a list reads as a sentence lists it", () => {
+    assert.equal(listed([]), "");
+    assert.equal(listed(["Base"]), "Base");
+    assert.equal(listed(["Base", "Number"]), "Base and Number");
+    assert.equal(listed(["Base", "Number", "Symbol"]), "Base, Number and Symbol");
 });

@@ -20,6 +20,7 @@ import {durationMilliseconds, durationValue} from "../../webview/view/duration.m
 import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, SHIPPED_SCROLL, dpiOptions, scrollStarter, modeDpi, newMode, readConfig, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
+const {publishedModel} = require("../fixtures/published-model.js");
 const {SETTING} = require("../../core/schema/settings-domain-v1");
 const {customKeyCode} = require("../../core/data/user-keycodes");
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -683,6 +684,21 @@ test("a pointing slot is posted whole, with its shortcuts as names", () => {
     const after = decoded(draft).pdModes[1];
     assert.equal(after.thresholdY, 70, "the edited threshold reached the profile");
     assert.ok(after.directions.up.keycode > 0, "and the named shortcut became the keyboard's own value");
+});
+
+// A macro sent from a direction carries no modifiers, under whatever name it
+// is typed: QMK's own for the first 32 slots is the catalog's, read through
+// the model.
+test("a direction's macro shortcut posts with no modifiers, by any of its names", () => {
+    const draft = session();
+    const slot = decoded(draft).pdModes[1];
+    const typed = (keycode, model) => readConfig(slot, formOf({kind: KIND.DIRECTIONAL, name: "Volume", dpi: "0",
+        "dir:up": keycode, "dirPolicy:up": MODIFIER_POLICY.MASK, "dirMask:up": 2}), model).directions.up;
+    const model = publishedModel();
+    for (const keycode of ["MACRO_3", "QK_MACRO_3", "MC_3"]) {
+        assert.deepEqual(typed(keycode, model), {keycode, modifierPolicy: MODIFIER_POLICY.INHERIT, mask: 0}, keycode);
+    }
+    assert.deepEqual(typed("KC_A", model), {keycode: "KC_A", modifierPolicy: MODIFIER_POLICY.MASK, mask: 2}, "any other key keeps what it leaves out");
 });
 
 // The How it starts card's link: the layers that start the mode, the layers its key

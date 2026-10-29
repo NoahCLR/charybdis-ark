@@ -13,11 +13,12 @@ const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains")
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {SETTINGS, SHORTCUT_KEY_LIMITS, validName, validShortcutKey, shortcutStoreRefusal, shortcutIdentity, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity, encodeSettings} = require("../schema/settings-domain-v1");
+const {validName} = require("../schema/profile-name");
 const {shortcutLayerTargets, shortcutRefusal} = require("./shortcut-layers");
 const keycodes = require("../data/keycode-catalog");
 const {knownActionAbi} = require("../schema/actions");
-const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
+const {CUSTOM_KEY_SLOTS, customKeyCode, customKeyName, customKeyOfName} = require("../data/user-keycodes");
 /** @param {string} message @param {string} [code] */
 const fail = (message, code = "CUSTOM_KEY_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
@@ -33,7 +34,7 @@ function customKeyEditorView(snapshot, capabilities) {
     const names = settings.customKeyNames;
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     return {identity: snapshot.fingerprint,
-        keys: names.map((name, slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: customKeyCode(slot), name, hasBehavior: behaved.has(slot),
+        keys: names.map((name, slot) => ({slot, keycode: customKeyName(slot), code: customKeyCode(slot), name, hasBehavior: behaved.has(slot),
             shortcut: {...settings.customKeyShortcuts[slot], keys: [...settings.customKeyShortcuts[slot].keys]}})),
         // Each name may be 32 bytes of text; the profile as a whole has a ceiling.
         names: {perName: SETTINGS.NAME_MAX_BYTES},
@@ -53,9 +54,8 @@ const SHORTCUT_KEY_NAMES = Object.freeze(keycodes.entries()
 /** @param {import("./types.js").CompleteSnapshot} snapshot @param {(import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']) & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editCustomKey(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.");
-    const match = /^CUSTOM_KEY_(\d+)$/.exec(message.keycode || "");
-    const slot = match ? Number(match[1]) : -1;
-    if (!match || slot >= CUSTOM_KEY_SLOTS || String(slot) !== match[1]) throw fail("Choose a custom key the keyboard has.");
+    const slot = customKeyOfName(message.keycode);
+    if (slot === undefined) throw fail("Choose a custom key the keyboard has.");
     // A message renames the key, sets its shortcut, or both at once (a key
     // made for a shortcut the picker could not store as a keycode).
     const renaming = "name" in message && message.name !== undefined;
@@ -91,4 +91,4 @@ function editCustomKey(snapshot, message, capabilities) {
     return document;
 }
 
-module.exports = {customKeyEditorView, editCustomKey, customKeysSupported};
+module.exports = {customKeyEditorView, editCustomKey};

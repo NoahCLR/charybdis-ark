@@ -263,7 +263,7 @@ test("links and auto-sniping layers survive export, import, layer rename and reo
 test("the model publishes the layers that start each mode and what each keycode turns on", () => {
     // The Keys workbench reads which layers reach a mode from these, never
     // from a keycode or a link itself (core/model/pointing-links.js linkStarts,
-    // core/model/layer-reach.js keycodeLayersOn).
+    // core/model/layer-effects.js keycodeLayersOn).
     const {draft, stage, caps} = fixture();
     stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30, linkedLayers: 1 << 3, linkTurnsOn: 1 << 5, linkEnds: 1,
         directions: {left: {keycode: "KC_LEFT"}, right: {keycode: "KC_RIGHT"}}}});

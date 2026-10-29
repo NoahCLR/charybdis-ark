@@ -290,8 +290,12 @@ for (const [name, shell] of Object.entries(shells)) {
     const web = name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "live-held" ? buildModel(shell, {live: true, held: true}) : name === "apply-stopped" ? buildModel(shell, {stopped: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
+// The preview requires Trusted Types as the web page does (scripts/build-web.js
+// POLICY), with the panel's policy alone, so a screen whose markup skips it
+// fails here too. The stand-in shell below starts no script by URL.
 const page = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'; trusted-types ark-html">
 <title>Charybdis Ark — preview</title>
 <link rel="stylesheet" href="../webview/styles.css?built=${Date.now()}">
 <script>

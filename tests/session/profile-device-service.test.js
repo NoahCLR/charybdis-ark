@@ -7,16 +7,13 @@ const test = require("node:test");
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {CANDIDATE_ERROR, CANDIDATE_OPERATION, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
-const {
-    ProfileRequestIdSequence,
-    ProfileDeviceService,
-    evaluateProfileCompatibility,
-    evaluateLiveMutationCompatibility,
-} = require("../../core/session/profile-device-service");
+const {ProfileDeviceService} = require("../../core/session/profile-device-service");
+const {evaluateProfileCompatibility, evaluateLiveMutationCompatibility} = require("../../core/session/firmware-support");
 const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
 const {document} = require("../fixtures/pd-profile");
 const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {connectedService} = require("../fixtures/connected-service");
+const {testClock} = require("../fixtures/panel-loop");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 
 test("the device service talks only through the adapter its caller passes", async () => {
@@ -80,7 +77,7 @@ test("a restore to firmware on another base is refused before recovery or any wr
 
 test("an editor read and a restore attach the same device facts and rebuild the editor views", async t => {
     const {fixture} = require("../fixtures/portable-restore");
-    const {editorViews} = require("../../core/session/device-model");
+    const {editorViews} = require("../../core/model/profile-model");
     const f = fixture(), {service} = await connectedService(t, {keyboard: f.keyboard});
     const facts = ({limits, options, hostOs}) => ({limits, options, hostOs});
     const views = () => {const {settingsView, macroView, customKeyView} = service.snapshot(); return {settingsView, macroView, customKeyView};};
@@ -448,20 +445,6 @@ test("request ids advance across refreshes and reject a delayed duplicate", asyn
     assert.ok(refreshed.diagnostics.some((entry) => entry.includes("unexpected Raw HID report")));
 });
 
-test("request id allocation wraps from 255 to 1 without emitting zero", () => {
-    const ids = new ProfileRequestIdSequence(0xfe);
-    assert.deepEqual([ids.next(), ids.next(), ids.next(), ids.next()], [0xfe, 0xff, 1, 2]);
-    assert.throws(() => new ProfileRequestIdSequence(0), /1 through 255/);
-});
-
-test("the layout read counts only keys the app cannot name", () => {
-    const {unnamedKeyCount} = require("../../core/session/profile-device-service");
-    const keycodes = require("../../core/schema/keycodes");
-    const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
-    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x67df11b3}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
-    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");
-});
-
 // Exercise the actual service after the transaction succeeds, rather than a
 // stubbed restore method in the panel's Apply tests.
 test("successful service restore installs the saved profile and returns normally", async () => {
@@ -489,7 +472,8 @@ test("standalone export reads the current keyboard without replacing its editor 
     const {fixture} = require("../fixtures/portable-restore");
     const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
     const f = fixture(), adapter = fakeKeyboardAdapter({keyboard: f.keyboard});
-    const service = new ProfileDeviceService({adapter, defaultTimeoutMs: 200, sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const service = new ProfileDeviceService({adapter, defaultTimeoutMs: 200, now, sleep});
     try {
         await service.enumerate(); await service.connect(service.devices[0].id);
         const editor = await service.readKeyboardProfile();
@@ -505,50 +489,6 @@ test("standalone export reads the current keyboard without replacing its editor 
             assert.deepEqual(service.snapshot()[field], state[field], `${field} is still the editor read`);
         }
     } finally {await service.close();}
-});
-
-test("keyboards without a serial number are numbered by their id, the number first", async () => {
-    const {ProfileDeviceService: Service} = require("../../core/session/profile-device-service");
-    const {FakeDeviceAdapter: Fake} = require("../../core/transport/fake-device-adapter");
-    const one = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis (4x6) Splinky"}]})});
-    await one.enumerate();
-    assert.deepEqual(one.snapshot().devices.map((device) => device.label), ["Charybdis (4x6) Splinky"], "alone, no number");
-    const two = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis (4x6) Splinky"}, {id: "b", product: "Charybdis (4x6) Splinky"}]})});
-    await two.enumerate();
-    assert.deepEqual(two.snapshot().devices.map((device) => device.label), ["Keyboard 1 · Charybdis (4x6) Splinky", "Keyboard 2 · Charybdis (4x6) Splinky"]);
-    const serial = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis", serialNumber: "E4"}, {id: "b", product: "Charybdis", serialNumber: "DE"}]})});
-    await serial.enumerate();
-    assert.deepEqual(serial.snapshot().devices.map((device) => device.label), ["Charybdis · E4", "Charybdis · DE"]);
-    const alone = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis", serialNumber: "E4"}]})});
-    await alone.enumerate();
-    assert.deepEqual(alone.snapshot().devices.map((device) => device.label), ["Charybdis"], "a serial number only tells two of the same name apart");
-});
-
-test("keyboards with names of their own are listed by them, numbered only where two read alike", async () => {
-    const {ProfileDeviceService: Service} = require("../../core/session/profile-device-service");
-    const {FakeDeviceAdapter: Fake} = require("../../core/transport/fake-device-adapter");
-    const adapter = new Fake({devices: [{id: "a", product: "Work board"}, {id: "b", product: "Charybdis (4x6) Splinky"}, {id: "c", product: "Charybdis (4x6) Splinky"}]});
-    const service = new Service({adapter});
-    await service.enumerate();
-    assert.deepEqual(service.snapshot().devices.map((device) => device.label), ["Work board", "Keyboard 2 · Charybdis (4x6) Splinky", "Keyboard 3 · Charybdis (4x6) Splinky"]);
-    // One reconnects under a new name: nothing reads alike any more.
-    adapter.devices = [{id: "a", product: "Work board"}, {id: "b", product: "Charybdis (4x6) Splinky"}, {id: "d", product: "Home board"}];
-    await service.enumerate();
-    assert.deepEqual(service.snapshot().devices.map((device) => device.label), ["Work board", "Charybdis (4x6) Splinky", "Home board"]);
-});
-
-test("a replugged keyboard takes back the number that came free, so two keyboards are always 1 and 2", async () => {
-    const {ProfileDeviceService: Service} = require("../../core/session/profile-device-service");
-    const {FakeDeviceAdapter: Fake} = require("../../core/transport/fake-device-adapter");
-    const adapter = new Fake({devices: [{id: "a", product: "Charybdis"}, {id: "b", product: "Charybdis"}]});
-    const service = new Service({adapter});
-    const labels = async () => {await service.enumerate(); return service.snapshot().devices.map((device) => device.label);};
-    assert.deepEqual(await labels(), ["Keyboard 1 · Charybdis", "Keyboard 2 · Charybdis"]);
-    adapter.devices = [{id: "b", product: "Charybdis"}];
-    assert.deepEqual(await labels(), ["Charybdis"], "alone, no number");
-    // Replugged, a keyboard is a new device to the browser.
-    adapter.devices = [{id: "b", product: "Charybdis"}, {id: "c", product: "Charybdis"}];
-    assert.deepEqual(await labels(), ["Keyboard 2 · Charybdis", "Keyboard 1 · Charybdis"], "the one still listed keeps its number");
 });
 
 test("an incompatible base is read only through capabilities, even for direct diagnostic reads", async t => {
@@ -581,7 +521,8 @@ test("compiled defaults download once across reconnects, and across runs where t
     const keyboard = liveKeyboard({document: require("../fixtures/portable-profile").document()});
     const compiledChunks = () => keyboard.requests.filter(r => r[0] === 0x08 && r[2] === PROFILE_PAYLOAD_V1.COMPILED_VALUE && (r[4] | r[5] << 8) > 0).length;
     const store = {value: /** @type {unknown} */ ("not a stored copy"), sets: 0, get() {return this.value;}, /** @param {string} value */ set(value) {this.value = value; this.sets++;}};
-    const {service, id} = await connectedService(t, {keyboard}, {sleep: async () => {}, compiledDefaults: store});
+    const {now, sleep} = testClock();
+    const {service, id} = await connectedService(t, {keyboard}, {now, sleep, compiledDefaults: store});
     await service.readKeyboardProfile();
     assert.ok(compiledChunks() > 0, "an unreadable stored copy is ignored: the defaults download");
     assert.equal(store.sets, 1);
@@ -590,7 +531,7 @@ test("compiled defaults download once across reconnects, and across runs where t
     await service.connect(id);
     await service.readKeyboardProfile();
     assert.equal(compiledChunks(), 0, "a reconnect reuses them");
-    const {service: reopened} = await connectedService(t, {keyboard}, {sleep: async () => {}, compiledDefaults: store});
+    const {service: reopened} = await connectedService(t, {keyboard}, {now, sleep, compiledDefaults: store});
     keyboard.requests.length = 0;
     await reopened.readKeyboardProfile();
     assert.equal(compiledChunks(), 0, "Ark opened again reuses the shell's copy");

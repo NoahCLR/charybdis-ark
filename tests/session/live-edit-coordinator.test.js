@@ -9,17 +9,19 @@ const {validateSnapshot} = require("../../core/model/portable-profile");
 const {LiveEditCoordinator, TransactionIds, DEFAULT_TIMING} = require("../../core/session/live-edit-coordinator");
 const {EDIT_MODE, EDIT_RESULT} = require("../../core/protocol/profile-edit-v1");
 const {PROFILE_ACTIVE_KIND} = require("../../core/protocol/profile-wire-v1");
+const {testClock} = require("../fixtures/panel-loop");
 
 /** @param {import("node:test").TestContext} t @param {object} [options] */
 async function live(t, options = {}) {
     const keyboard = liveKeyboard({document: document(), ...options});
-    const connected = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const connected = await connectedService(t, {keyboard}, {now, sleep});
     return {...connected, keyboard};
 }
 /** @param {(layers: number[][]) => void} change */
 const target = change => {const next = document(); editLayers(next, change); return Buffer.from(next.profile, "base64");};
 
-test("Live + review reads the working copy and the saved profile as one pair", async t => {
+test("Live preview + save reads the working copy and the saved profile as one pair", async t => {
     const {service, keyboard} = await live(t);
     assert.equal(service.snapshot().editMode.mode, EDIT_MODE.LIVE_REVIEW);
     let read = await service.readKeyboardProfile();
@@ -73,7 +75,8 @@ test("an edit waits for the slave half before it says both halves hold it", asyn
     keyboard.faults.slaveLag = 3;
     const result = await service.postLiveEdit({from: read.live.working, to: target(layers => {layers[1][0] = 0x08;}), defaults: read.live.defaults, identity: read.live});
     assert.equal(result.converged, true);
-    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, sleep: async () => {}, timing: {slaveMs: -1}});
+    const {now, sleep} = testClock();
+    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now, sleep, timing: {slaveMs: -1}});
     keyboard.faults.slaveLag = 50;
     const late = await coordinator.post({from: result.bytes, to: target(layers => {layers[1][1] = 0x09;}), defaults: read.live.defaults, identity: result, capacity: 130048});
     assert.equal(late.converged, false, "an edit the slave half has not taken yet is not shown as applied on both");
@@ -119,12 +122,9 @@ test("Save writes the working copy as the saved profile; Revert puts the saved o
 // run)` runs `run` once the clock has passed `ms`.
 /** @param {Awaited<ReturnType<typeof live>>["service"]} service */
 function clocked(service) {
-    const clock = {ms: 0}, due = /** @type {{at: number, run: () => void}[]} */ ([]);
-    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now: () => clock.ms, sleep: async ms => {
-        clock.ms += ms;
-        for (const job of due.filter(job => clock.ms >= job.at)) {due.splice(due.indexOf(job), 1); job.run();}
-    }});
-    return {coordinator, clock, at: (/** @type {number} */ at, /** @type {() => void} */ run) => {due.push({at, run});}};
+    const clock = testClock();
+    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now: clock.now, sleep: clock.sleep});
+    return {coordinator, clock, at: clock.at};
 }
 const ABORT = 0x24;
 
@@ -141,7 +141,7 @@ test("an edit held by a key waits for the release with no limit, says what holds
     const seen = [];
     const to = target(layers => {layers[0][3] = 0x05;});
     const result = await coordinator.post({from: read.live.working, to, defaults: read.live.defaults, identity: read.live, capacity: 130048}, {onWaiting: waiting => {seen.push(waiting);}});
-    assert.ok(clock.ms >= 13000, "it waited for the release");
+    assert.ok(clock.now() >= 13000, "it waited for the release");
     assert.equal(result.revision, read.live.revision + 1);
     assert.ok(result.bytes.equals(keyboard.working));
     assert.equal(result.cancelled, undefined);
@@ -195,7 +195,7 @@ test("a checking phase that never ends still times out after the short limit", a
     keyboard.faults.checking = true;
     await assert.rejects(coordinator.post({from: read.live.working, to: target(layers => {layers[0][5] = 0x07;}), defaults: read.live.defaults, identity: read.live, capacity: 130048}),
         {code: "LIVE_EDIT_PENDING", message: /has not finished the edit/});
-    assert.ok(clock.ms > DEFAULT_TIMING.editMs && clock.ms < DEFAULT_TIMING.editMs + 1000, "the short limit, not an endless wait");
+    assert.ok(clock.now() > DEFAULT_TIMING.editMs && clock.now() < DEFAULT_TIMING.editMs + 1000, "the short limit, not an endless wait");
 });
 
 test("a Revert held by a key waits for the release the same way, and is not cancelled", async t => {
@@ -211,7 +211,7 @@ test("a Revert held by a key waits for the release the same way, and is not canc
     /** @type {unknown[]} */
     const seen = [];
     const reverted = await coordinator.revert(edited, {onWaiting: waiting => {seen.push(waiting);}});
-    assert.ok(clock.ms >= 9000);
+    assert.ok(clock.now() >= 9000);
     assert.equal(reverted.unsaved, false);
     assert.equal(keyboard.working, null);
     assert.deepEqual(asked, [false], "the keyboard refuses to abort its own Revert");
@@ -271,7 +271,10 @@ test("transaction ids skip one still being received and any an earlier connectio
 });
 
 /** @param {Awaited<ReturnType<typeof live>>} connected @param {Partial<import("../../core/session/live-edit-coordinator").DEFAULT_TIMING>} [timing] */
-const coordinatorOf = ({service}, timing = {}) => new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, sleep: async () => {}, timing});
+const coordinatorOf = ({service}, timing = {}) => {
+    const {now, sleep} = testClock();
+    return new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now, sleep, timing});
+};
 // An edit begun on the keyboard by someone else (or by Ark on a lost
 // connection), never finished.
 /** @param {ReturnType<typeof liveKeyboard>} keyboard @param {number} transactionId */
@@ -336,7 +339,8 @@ test("Ark records the bytes it sent and checks the keyboard holds a profile of t
     await assert.rejects(service.postLiveEdit({from: read.live.working, to: target(layers => {layers[2][2] = 0x04;}), defaults: read.live.defaults, identity: read.live}),
         {code: "LIVE_EDIT_MISMATCH"});
     // A replacement records the bytes it sent as they are.
-    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now, sleep});
     const fresh = await service.readKeyboardProfile();
     await service.revertWorkingCopy(fresh.live);
     const clean = await service.readKeyboardProfile();
@@ -354,7 +358,7 @@ test("a save waiting for a quiet keyboard on the slave half says so", async t =>
     const original = service.emitChange.bind(service);
     service.emitChange = () => {seen.push(service.portableProgress); original();};
     assert.equal((await service.saveWorkingCopy(edited)).saved, true);
-    assert.ok(seen.includes("Waiting for a quiet keyboard to write flash"));
+    assert.ok(seen.includes("Waiting for a quiet keyboard to save"));
 });
 
 test("a mode the keyboard could not store yet is said; an unreadable mode is read again later", async t => {
@@ -372,7 +376,7 @@ test("a mode the keyboard could not store yet is said; an unreadable mode is rea
     assert.notEqual(service.snapshot().runtime, null, "the toggles are read in Apply too");
 });
 
-test("flushing (leaving Live) waits for the keyboard's own save, saves what is left, and looks again after a key adjustment", async t => {
+test("flushing (leaving Live edit) waits for the keyboard's own save, saves what is left, and looks again after a key adjustment", async t => {
     const {keyboard, service} = await live(t, {mode: EDIT_MODE.LIVE});
     const read = await service.readKeyboardProfile();
     keyboard.externalEdit(target(layers => {layers[0][9] = 0x06;}));
@@ -448,7 +452,7 @@ test("a queued keyboard adjustment is decoded and blocks new mutations until it 
 });
 
 
-test("leaving Live waits for a queued key adjustment even before it becomes unsaved", async t => {
+test("leaving Live edit waits for a queued key adjustment even before it becomes unsaved", async t => {
     const {service, keyboard} = await live(t, {mode: EDIT_MODE.LIVE});
     keyboard.raised.adjustmentPending = true;
     let polls = 0;

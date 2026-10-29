@@ -123,6 +123,17 @@ export interface RgbView {
     keyBehaviorFeedbackLedGroups: LedRow[];
 }
 export interface BaseRgbView {state: string; message?: string; enabled?: boolean; effectId?: number; hue?: number; saturation?: number; brightness?: number; speed?: number; readAt?: string; effectName?: string; brightnessPercent?: number; previewColor?: Colour}
+/** The fields every model of a build starts from, posted once as the catalog (core/model/profile-model.js panelCatalog). */
+export type CatalogField = 'vocabulary' | 'leds' | 'qmkKeycodes' | 'qmkKeyLabels' | 'qmkKeycodeAliases' | 'qmkKeyShortLabels' | 'qmkKeyKinds' | 'qmkKeycodeSource' | 'qmkSpellings';
+/** What every model of a build starts from: the keycode catalogue as the picker reads it, the words for stored values and what no profile changes. */
+export type PanelCatalog = Pick<PublishedModel, CatalogField>;
+/** What a model lays over the catalog, by field: an array's entries that differ, by index (past the catalog's end, those it adds), or a record's keys whose value differs. A field it lays nothing over is absent. */
+export type CatalogOverlay = {[F in CatalogField]?: PublishedModel[F] extends (infer E)[] ? [number, E][] : PublishedModel[F] extends object ? Partial<PublishedModel[F]> : never};
+/**
+ * A model as the panel loop posts it (core/session/panel-loop.js): without the catalog's fields, which `catalogOverlay` says how to lay over
+ * the catalog, except a field that does not start from the catalog's, posted whole. A model with no `catalogOverlay` is whole (the preview's).
+ */
+export type PostedModel = PublishedModel | (Omit<PublishedModel, CatalogField> & Partial<PanelCatalog> & {catalogOverlay: CatalogOverlay});
 export interface PublishedModel {
     vocabulary: Vocabulary & {pickerModifiers: {bit: number; value: string; label: string}[]};
     /** The LED each key carries, by layout index, and the trackball's (core/data/charybdis-layout.js). */
@@ -150,7 +161,8 @@ export interface PublishedModel {
     macroNameSpace: {perName: number} | null;
     macroBank: {capacity: number; stored: number; free: number; available: number; slots: number; reserveTaps: number} | null;
     hostSettings: {selected: number; detected: number; effective: number; unicodeEnabled: boolean; unicodeMode: number; layout: number; layoutFits: boolean; macosIso: boolean} | null;
-    macroUnicode: {mode: number; enabled?: boolean; os?: number; layout?: number; layoutFits?: boolean; layoutName?: string; layoutChars?: string};
+    /** `entry`: what Unicode entry does for text the layout cannot type, or what it needs while off. */
+    macroUnicode: {mode: number; enabled?: boolean; os?: number; layout?: number; layoutFits?: boolean; layoutName?: string; layoutChars?: string; entry?: string};
     macroProtectionChoices: {value: 'auto' | 'on' | 'off'; label: string}[];
     macroEditing: {identity: string; writable: boolean};
     behaviorTimingDefaults: Record<string, string>;
@@ -176,8 +188,14 @@ export interface PublishedModel {
     qmkKeyLayers: Record<string, number>;
     /** Keycode name → what it does to that layer, by QMK's function, beside qmkKeyLayers (model/key-names.js keyLayerForm). */
     qmkKeyLayerForms: Record<string, import("./model.js").LayerForm>;
-    /** The layers each keycode turns on as the key pressed, bit n layer n, by every name it is read under; a keycode that turns none on is absent (core/model/layer-reach.js keycodeLayersOn). */
+    /** Keycode name → the modifiers a layer-mod (LM) holds with its layer, in the host's words, as its label ends: "Shift" (model/key-names.js layerModWords). */
+    qmkKeyLayerMods: Record<string, string>;
+    /** Keycode name → the key a layer-tap (LT) taps, by its name in this profile, as its label starts: "/" (model/key-names.js layerTapWords). */
+    qmkKeyLayerTaps: Record<string, string>;
+    /** The layers each keycode turns on as the key pressed, bit n layer n, by every name it is read under; a keycode that turns none on is absent (core/model/layer-effects.js keycodeLayersOn). */
     qmkKeyTurnsOn: Record<string, number>;
+    /** What each keycode is that the interface treats apart from other keys, by every name it is read under: the stored name, the catalogue's other names, the profile's and the keyboard's hex (model/key-names.js keyKind). */
+    qmkKeyKinds: Record<string, import("./model.js").KeyKind>;
     qmkKeyShortLabels: Record<string, string>;
     qmkKeycodeAliases: Record<string, string>;
     qmkKeycodeSource: string;

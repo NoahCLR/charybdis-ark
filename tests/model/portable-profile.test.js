@@ -37,11 +37,13 @@ test("a backup from older firmware is refused, never upgraded: the keyboard stor
     // pointing-mode evidence older backups carried.
     assert.throws(() => validateSnapshot({...source, version: 1}), older);
     for (const actionAbiDigest of [0x837cf479, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0xf79c6151]) assert.throws(() => validateSnapshot({...source, actionAbiDigest}), older);
-    assert.throws(() => validateSnapshot({...source, pdModeSource: {version: 1}}), /unsupported fields/);
-    assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 8)}), /unsupported fields/);
+    assert.throws(() => validateSnapshot({...source, pdModeSource: {version: 1}}), {code: "INVALID_PORTABLE_PROFILE", message: /holds more than a backup from current firmware/});
+    assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 8)}), {code: "INVALID_PORTABLE_PROFILE", message: /holds more than a backup from current firmware/});
     const truncated = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     truncated.domains.find(d => d.id === 96).payload = Buffer.alloc(480);
-    assert.throws(() => validateSnapshot({...source, profile: encodeProfileBlob(truncated).toString("base64")}), /1,?920|1920/);
+    // Said as a damaged file; the decoder's own words are its cause, for the diagnostics.
+    assert.throws(() => validateSnapshot({...source, profile: encodeProfileBlob(truncated).toString("base64")}),
+        (error) => error.code === "INVALID_PORTABLE_PROFILE" && /damaged/.test(error.message) && /1,?920|1920/.test(error.cause?.message));
     // A current envelope around a retired domain version.
     const blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     const raw = Buffer.from(source.profile, "base64");
@@ -209,9 +211,9 @@ test("Make base keeps an existing old-base colour, while overlay reorders keep e
 
 test("partial, incompatible, over-capacity and malformed profiles fail before restore", () => {
     const source = document();
-    assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 4)}), /unsupported fields/);
-    assert.throws(() => validateSnapshot({...source, profile: source.profile + "!"}), /profile data/);
-    assert.throws(() => validateSnapshot(source, {compiledLayerCount: 16, supportedDomainMask: 15, actionAbiDigest: 1}), /vocabulary/);
+    assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 4)}), {code: "INVALID_PORTABLE_PROFILE", message: /holds more than a backup from current firmware/});
+    assert.throws(() => validateSnapshot({...source, profile: source.profile + "!"}), {code: "INVALID_PORTABLE_PROFILE", message: /profile in this file is damaged/});
+    assert.throws(() => validateSnapshot(source, {compiledLayerCount: 16, supportedDomainMask: 15, actionAbiDigest: 1}), {code: "INVALID_PORTABLE_PROFILE", message: /firmware cannot take this profile/});
     assert.throws(() => reorderLayers(source, [1, 1, 2, 3, 4, 5, 6, 7]), /every layer once/);
 });
 module.exports = {settings, document};
@@ -346,6 +348,29 @@ test("a delay with more digits than the longest delay is refused by the model al
     const {MACRO_LIMITS} = require("../../rules/macro-payload.mjs");
     const padded = Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${"0".repeat(String(MACRO_LIMITS.maxDelayMs).length)}1|`)]);
     assert.equal(decodeMacroPayload(padded), "{000001}");
-    assert.throws(() => validateMacro(padded), {code: "INVALID_PORTABLE_PROFILE", message: "Invalid macro delay."});
+    assert.throws(() => validateMacro(padded), {code: "INVALID_PORTABLE_PROFILE", message: "A macro in this profile has a delay the keyboard cannot play."});
     assert.doesNotThrow(() => validateMacro(Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${MACRO_LIMITS.maxDelayMs}|`)])));
+});
+
+// What a refused profile says is read by a person: plain words about what is
+// wrong with it, never a codec's, and the same code for the code that acts on it.
+test("a refused profile says what is wrong with it in plain words, under its stable code", () => {
+    const {QK} = require("../../rules/qmk-keycodes.mjs");
+    const said = (run) => {
+        try {run();} catch (error) {
+            assert.equal(error.code, "INVALID_PORTABLE_PROFILE");
+            return error.message;
+        }
+        assert.fail("refused");
+    };
+    // MO(20): a layer key past the keyboard's layers, refused when the layers move.
+    const beyond = editLayers(document(), layers => {layers[1][0] = QK.MOMENTARY.first + 20;});
+    const words = [
+        said(() => reorderLayers(beyond, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])),
+        said(() => validateSnapshot({...document(), profile: "!"})),
+        said(() => validateSnapshot({...document(), extra: 1})),
+        said(() => validateSnapshot(document(), {compiledLayerCount: 8, supportedDomainMask: 127, actionAbiDigest: document().actionAbiDigest})),
+    ];
+    assert.equal(words[0], "A key in this profile reaches a layer the keyboard does not have.");
+    for (const sentence of words) assert.doesNotMatch(sentence, /layer bank|layer-mod|portable profile|action vocabulary|domain|RGB|Invalid|Unbalanced|Unsupported/, sentence);
 });

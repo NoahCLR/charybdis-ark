@@ -192,7 +192,7 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
     // Mode, then a column for each part of the link, headed in the words the
     // vocabulary gives them.
     await expect(pane(page).locator("thead th")).toHaveText(["Slot", "Mode", "Started by", "Ends when", "Its key turns on", "Reached by", ""]);
-    await expect(cell(here, 1)).toHaveText("Directional · 400 DPI");
+    await expect(cell(here, 1)).toHaveText("Directional keys / shortcuts · 400 DPI");
     // The pointer layer is in the link but ignored, said with the card's reason.
     await expect(cell(here, 2)).toHaveText(/^Navigation, Pointer ignored$/);
     await expect(cell(here, 2).locator(".kind-icon.layer")).toHaveCount(2);

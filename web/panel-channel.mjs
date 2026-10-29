@@ -10,12 +10,20 @@
 // each message while the panel's click handler is still running. Chrome opens
 // its keyboard picker and file chooser only from a click, so the shell starts
 // them there; the message itself still reaches `receive` later, like any other.
+//
+// No failure of `receive` is dropped: whatever it throws or rejects with goes
+// to `failed`, which the shell turns into a notice (the console's, without one).
 
-/** @param {{receive: (message: import("../contracts/messages.js").PanelRequest) => unknown, gesture?: (message: import("../contracts/messages.js").PanelRequest) => unknown, target?: Pick<EventTarget, "dispatchEvent">}} options */
-export function connectPanel({receive, gesture = () => {}, target = globalThis}) {
+/** @param {{receive: (message: import("../contracts/messages.js").PanelRequest) => unknown, gesture?: (message: import("../contracts/messages.js").PanelRequest) => unknown, failed?: (error: unknown) => unknown, target?: Pick<EventTarget, "dispatchEvent">}} options */
+export function connectPanel({receive, gesture = () => {}, failed = (error) => console.error(error), target = globalThis}) {
     const channel = new MessageChannel();
     const panelPort = channel.port1, shellPort = channel.port2;
-    shellPort.onmessage = (event) => receive(event.data);
+    shellPort.onmessage = (event) => {
+        new Promise((resolve) => resolve(receive(event.data))).catch((error) => {
+            // Saying it may fail too, when what failed was publishing.
+            try {failed(error);} catch (also) {console.error(also);}
+        });
+    };
     panelPort.onmessage = (event) => target.dispatchEvent(new MessageEvent("message", {data: event.data}));
     /** @type {unknown} */
     let state;

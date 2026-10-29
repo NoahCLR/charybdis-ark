@@ -131,10 +131,15 @@ The **LED groups** tab paints single LEDs, over a stage's own colour.
    all of them), and its colour.
 3. **Keep row in draft**.
 
-**Save selection as a group** keeps the selected LEDs as a reusable group for
-other rows; with nothing selected there is nothing to save. Groups are
-numbered by the LEDs they hold, so saving or removing one can renumber the
-others; every row keeps its LEDs. **Used by** lists the tables and owners
-whose rows use a group, and a group in use cannot be removed. Rows apply in
-order, so a later row wins on an LED they share. A row whose colour is turned
-off takes its stage's colour.
+**Make a group from the selection** keeps the selected LEDs as a reusable
+group for other rows; with nothing selected there is nothing to group.
+Groups are numbered by the LEDs they hold, so making or removing one can
+renumber the others; every row keeps its LEDs. **Used by** lists the tables
+and owners whose rows use a group, and a group in use cannot be removed. Rows
+apply in order, so a later row wins on an LED they share. A row whose colour
+is turned off takes its stage's colour.
+
+The keyboard holds at most 16 groups and 32 rows across every stage's table
+(the **LED groups** and **LED overrides** under **Memory** on the Keyboard
+screen). Making one more is refused in the draft, saying which is full, before
+the keyboard sees it; remove one first.

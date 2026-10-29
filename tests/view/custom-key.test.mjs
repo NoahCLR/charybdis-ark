@@ -1,11 +1,19 @@
 import test from "node:test";
-import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
-import {customKeyInUse, customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, sameShortcut, shortcutKeyCode, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickModifier, shortcutPickLabel, shortcutPickMods, shortcutPickProblem, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice, shortcutLayerRows, shortcutLayerList, shortcutWhen, shortcutLayerTag, shortcutLayerUnder, shortcutLayerKinds, LAYER_KIND} from "../../webview/view/custom-key.mjs";
-import * as custom_keyViews from "../../webview/view/custom-key.mjs";
-import {publishedFor} from "../fixtures/combo-reach.mjs";
-// The combo views read the reach core publishes for the stack they are given.
-const customKeyReach = publishedFor(custom_keyViews.customKeyReach);
+import {createRequire} from "node:module";
+import {customKeyInUse, customKeyBypassText, customKeyReach, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, sameShortcut, shortcutKeyCode, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickModifier, shortcutPickLabel, shortcutPickMods, shortcutPickProblem, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice, shortcutLayerRows, shortcutLayerList, shortcutWhen, shortcutLayerTag, shortcutLayerUnder, shortcutLayerKinds, LAYER_KIND} from "../../webview/view/custom-key.mjs";
+import {customKeyNameMessage, customKeyShortcutMessage} from "../../webview/view/edits.mjs";
+import {published as publishedProfile} from "../fixtures/published-behaviours.mjs";
+
+const require = createRequire(import.meta.url);
+const {SETTING} = require("../../core/schema/settings-domain-v1");
+
+// What core publishes for the test profile (published-behaviours.mjs) with
+// layer 5 named Extra.
+/** @param {Parameters<typeof publishedProfile>[0]} [described] @returns {any} */
+const published = ({settings, ...described} = {}) => publishedProfile({...described, settings: (domain) => { domain.names[5] = "Extra"; settings?.(domain); }});
+// Custom key 4 as core publishes it with this shortcut.
+const withShortcut = (/** @type {any} */ shortcut) => published({edits: [customKeyShortcutMessage("CUSTOM_KEY_4", shortcut)]}).customKeys[4];
 
 const key = (slot, shortcut = {mods: 0, keys: [], layers: 0, layerKind: 0}, shortcutLabel = "", hasBehavior = false) =>
     ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior, shortcut, shortcutLabel});
@@ -24,11 +32,24 @@ const model = {
     ],
 };
 
+test("the custom keys these tests build are shaped as core publishes them", () => {
+    // Most tests here read a hand-built catalogue and custom keys; core
+    // publishes the same fields for the same shortcuts.
+    for (const built of [model.customKeys[1], {...model.customKeys[2], hasBehavior: false}]) {
+        const core = withShortcut(built.shortcut);
+        assert.deepEqual(Object.keys(built).filter((field) => !(field in core)), [], "no field core does not publish");
+        assert.deepEqual([core.shortcut, core.shortcutLabel], [built.shortcut, built.shortcutLabel]);
+    }
+});
+
 test("a shortcut is modifiers, a key, or both; neither is none", () => {
     assert.deepEqual(model.customKeys.map(hasShortcut), [false, true, true]);
     assert.equal(customKeyOf(model, "CUSTOM_KEY_1"), model.customKeys[1]);
     assert.equal(customKeyOf(model, "KC_A"), undefined);
     assert.equal(customKeyOf(model, "CUSTOM_KEY_9"), undefined, "a key the model does not list");
+    const keys = published();
+    for (const name of ["CUSTOM_KEY_1", "0x7F01", "0x7f01"]) assert.equal(customKeyOf(keys, name), keys.customKeys[1], `${name}: by any name core reads it under, a combo's bare hex included`);
+    assert.equal(customKeyOf(keys, "LSFT(CUSTOM_KEY_1)"), undefined, "a wrapped custom key is not the key itself");
 });
 
 test("what a custom key does says its shortcut, its behaviour on top, both, or nothing", () => {
@@ -48,13 +69,14 @@ test("what a custom key does says its shortcut, its behaviour on top, both, or n
 
 test("the hover card says what a custom key sends, short where its behaviour says the rest", () => {
     // A shortcut has its own section, so the header says nothing of it.
-    assert.equal(customKeyHeadline(model.customKeys[1]), "");
+    assert.equal(customKeyHeadline(model.customKeys[1]), null);
     assert.equal(shortcutWhen(model.customKeys[1]), "Held while the key is held, tapped when it is tapped");
     assert.equal(shortcutWhen(model.customKeys[2]), "Where its behaviour leaves a tap or hold empty");
     assert.deepEqual(shortcutLayerList({...model.customKeys[1], shortcut: {mods: 0, keys: [], layers: 0b101000, layerKind: 0}}), [3, 5], "its layers, lowest first");
-    assert.equal(customKeyHeadline({...model.customKeys[0], hasBehavior: true}), "No shortcut");
-    assert.match(customKeyHeadline(model.customKeys[0]), /sends nothing/);
-    assert.equal(customKeyHeadline(undefined), "");
+    assert.deepEqual(customKeyHeadline({...model.customKeys[0], hasBehavior: true}), {text: "No shortcut", quiet: true});
+    assert.match(customKeyHeadline(model.customKeys[0])?.text ?? "", /sends nothing/);
+    assert.equal(customKeyHeadline(model.customKeys[0])?.quiet, false);
+    assert.equal(customKeyHeadline(undefined), null);
     // A step or a combo output whose behaviour does not run sends the
     // shortcut only, never the key's own behaviour (firmware D-F26).
     assert.equal(customKeyShortcutOnly(model.customKeys[2]), "sends its shortcut, Left Ctrl + Left Shift + Left Alt + Left GUI");
@@ -191,9 +213,9 @@ test("modifiers no keycode can hold are offered as an unused custom key's shortc
     assert.equal(offeredName(picking, {mods: 0xff, keys: [0x0e], layers: 0, layerKind: 0}), "", "too long even short: left empty");
     // The first custom key that does nothing yet: no name, behaviour or
     // shortcut, and on no layer.
-    const keys = [0, 1, 2, 3].map((slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: slot === 0 ? "Thumb" : "", hasBehavior: slot === 1, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}, shortcutLabel: ""}));
-    const stack = withAnswers([{index: 0, name: "Base", positions: [{layoutIndex: 0, keycode: "QK_USER_2", semantic: "CUSTOM_KEY_2", display: "CUSTOM_KEY_2"}]}]);
-    assert.equal(unusedCustomKey({...picking, customKeys: keys, keyBehaviors: [], combos: [], qmkKeycodeAliases: {}}, stack)?.keycode, "CUSTOM_KEY_3");
+    const used = published({keys: {0: {0: "CUSTOM_KEY_2"}}, behaviours: [{keycode: "CUSTOM_KEY_1", steps: [{tapCount: 1, tap: {action: "KC_X"}}]}],
+        edits: [customKeyNameMessage("CUSTOM_KEY_0", "Thumb")]});
+    assert.equal(unusedCustomKey(used, used.layers)?.keycode, "CUSTOM_KEY_3");
 });
 
 test("a custom key that already holds the shortcut is used rather than another made", () => {
@@ -209,7 +231,7 @@ test("a match with a behaviour is offered beside a new key where the behaviour w
     const both = (slot, hasBehavior) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: `K${slot}`, hasBehavior, shortcut: {mods: 0x88, keys: [], layers: 0, layerKind: 0}, shortcutLabel: "Left GUI + Right GUI"});
     const free = (slot) => ({...key(slot), name: ""});
     const choose = (keys, runsBehaviour) => {
-        const choice = customKeyChoice({customKeys: keys, keyBehaviors: [], combos: [], qmkKeycodeAliases: {}}, {mods: 0x88, keys: [], layers: 0, layerKind: 0}, withAnswers([]), {runsBehaviour});
+        const choice = customKeyChoice({customKeys: keys, keyBehaviors: [], combos: [], qmkKeycodeAliases: {}}, {mods: 0x88, keys: [], layers: 0, layerKind: 0}, [], {runsBehaviour});
         return {existing: choice.existing?.keycode, withBehaviour: choice.withBehaviour, spare: choice.spare?.keycode};
     };
     assert.deepEqual(choose([both(1, true), both(2, false), free(3)], true), {existing: "CUSTOM_KEY_2", withBehaviour: false, spare: undefined}, "one that does only this is used");
@@ -228,24 +250,17 @@ test("a custom key is in use once it is named, sends a shortcut or has a behavio
 });
 
 test("the Custom keys tab groups a layer's custom keys the ways a macro is reached, and leaves empty slots out", () => {
-    const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
-    const model = {
-        customKeys: [0, 1, 2, 3, 4].map((slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, name: slot < 4 ? `Key ${slot}` : "",
-            hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}})),
-        qmkKeycodeAliases: {QK_USER_2: "CUSTOM_KEY_2"},
-        keyBehaviors: [{keycode: "KC_A", enabled: true, allowedLayers: 0xffff, steps: [{tapCount: 1, tap: {style: "TAP_SENDS", action: "CUSTOM_KEY_3"}}]}],
-        combos: [{id: 0, badge: "C1", inputs: ["KC_B", "KC_C"], output: "QK_USER_2"}],
-    };
-    const stack = withAnswers([
-        {index: 0, name: "Base", positions: [at(0, "QK_USER_0", "CUSTOM_KEY_0"), at(1, "KC_B"), at(2, "KC_C"), at(3, "KC_A")]},
-        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "QK_USER_1", "CUSTOM_KEY_1"), at(2, "KC_NO"), at(3, "KC_NO")]},
-    ]);
+    const model = published({keys: {0: {0: "CUSTOM_KEY_0", 1: "KC_B", 2: "KC_C", 3: "KC_A"}, 1: {0: "KC_TRANSPARENT", 1: "CUSTOM_KEY_1", 2: "KC_NO", 3: "KC_NO"}},
+        combos: [{inputs: ["KC_B", "KC_C"], output: "CUSTOM_KEY_2"}],
+        behaviours: [{keycode: "KC_A", steps: [{tapCount: 1, tap: {style: "TAP_SENDS", action: "CUSTOM_KEY_3"}}]}],
+        edits: [0, 1, 2, 3].map((slot) => customKeyNameMessage(`CUSTOM_KEY_${slot}`, `Key ${slot}`))});
+    const stack = model.layers;
     const names = (entries) => entries.map((entry) => entry.name);
     const base = customKeyReach(model, stack, 0);
     assert.deepEqual(names(base.onKeys), ["CUSTOM_KEY_0"]);
     assert.deepEqual(names(base.fromCombos), ["CUSTOM_KEY_2"], "a combo on Base's keys sends it");
     assert.deepEqual(names(base.fromBranches), ["CUSTOM_KEY_3"], "a behaviour step on Base sends it");
-    assert.deepEqual(base.elsewhere, ["CUSTOM_KEY_1"], "unreachable from Base; the unnamed empty slot 4 is no key at all");
+    assert.deepEqual(base.elsewhere, ["CUSTOM_KEY_1"], "unreachable from Base; the unnamed empty slots are no keys at all");
     const numbers = customKeyReach(model, stack, 1);
     assert.deepEqual(names(numbers.onKeys), ["CUSTOM_KEY_1"]);
     assert.deepEqual(names(numbers.throughKeys), ["CUSTOM_KEY_0"], "a transparent key falls through to Base's");
@@ -271,9 +286,11 @@ test("a shortcut of layers alone holds them on, and says so", () => {
 // says so: locks, moves to, tap-toggles or one-shots them, and keys held as
 // before.
 test("a shortcut's layers say how it turns them on, wherever the shortcut is described", () => {
-    const words = {customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: [[0, "Hold"], [1, "Lock"], [2, "Move to"], [3, "Tap-toggle"], [4, "One-shot"]]}};
-    const alone = (layerKind) => ({slot: 4, keycode: "CUSTOM_KEY_4", code: 0x7f04, name: "", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0b101000, layerKind},
-        shortcutLabel: `${["", "Lock ", "Move to ", "Tap-toggle ", "One-shot "][layerKind]}Navigation + Extra`, shortcutKeys: [], shortcutLayerNames: ["Navigation", "Extra"]});
+    const profile = published();
+    const words = profile.vocabulary;
+    // Custom key 4 holding Navigation and Extra, turned on each way.
+    const kinds = [0, 1, 2, 3, 4].map((layerKind) => withShortcut({layers: 0b101000, layerKind}));
+    const alone = (/** @type {number} */ layerKind) => kinds[layerKind];
     assert.deepEqual([0, 1, 2, 3, 4].map((kind) => customKeyShortcutLine(alone(kind))), [
         "Holds Navigation + Extra on: held while the key is held, tapped when it is tapped.",
         "Locks Navigation + Extra: pressing the key locks its layers on, or off again once all are on.",
@@ -290,19 +307,19 @@ test("a shortcut's layers say how it turns them on, wherever the shortcut is des
     assert.deepEqual([3, 4].map((kind) => customKeyBypassText(alone(kind))), [
         "With its behaviour bypassed or off, this custom key holds its shortcut's layers on while held, Navigation + Extra; tapping it 5 times locks them.",
         "With its behaviour bypassed or off, this custom key holds its shortcut's layers on while held, Navigation + Extra; a tap turns them on for the next key."]);
-    assert.match(customKeyBypassText({...alone(4), shortcut: {mods: 0x02, keys: [], layers: 0b1000, layerKind: 4}, shortcutLabel: "Left Shift + One-shot Navigation"}),
+    assert.match(customKeyBypassText(withShortcut({mods: 0x02, layers: 0b1000, layerKind: 4})),
         /sends its shortcut, Left Shift \+ One-shot Navigation; a tap turns it on for the next key\.$/);
     assert.equal(customKeyBypassText(alone(1)), "With its behaviour bypassed or off, this custom key locks its shortcut's layers, Navigation + Extra.");
     assert.equal(customKeySendsNote({customKeys: [alone(1)]}, "CUSTOM_KEY_4"), "Custom key · locks Navigation + Extra");
     // With keys, it sends them, its layers named by their kind; a lock still
     // holds its keys while the key is held.
-    const keyed = {...alone(1), shortcut: {mods: 0x08, keys: [], layers: 0b1000, layerKind: 1}, shortcutLabel: "Left GUI + Lock Navigation", shortcutKeys: ["Left GUI"], shortcutLayerNames: ["Navigation"]};
+    const keyed = withShortcut({mods: 0x08, layers: 0b1000, layerKind: 1});
     assert.equal(customKeyShortcutLine(keyed), "Sends Left GUI + Lock Navigation: its keys held while the key is held; pressing the key locks its layers on, or off again once all are on.");
     // The hover card: each layer's tag, what they do, and when.
     assert.deepEqual([0, 1, 2, 3, 4].map((kind) => shortcutLayerTag({vocabulary: words}, alone(kind))), ["hold", "lock", "move to", "tap-toggle", "one-shot"]);
     assert.deepEqual([0, 1, 2, 3, 4].map((kind) => shortcutLayerUnder(alone(kind))), ["layers · on while the shortcut is held", "layers · locks them on, or off when all are on",
         "layers · locks them alone", "layers · held while held; 5 taps lock them", "layers · held while held; a tap turns them on for the next key"]);
-    assert.equal(shortcutLayerUnder({...alone(1), shortcut: {mods: 0, keys: [], layers: 0b1000, layerKind: 1}}), "layer · locks it on, or off when it is on");
+    assert.equal(shortcutLayerUnder(withShortcut({layers: 0b1000, layerKind: 1})), "layer · locks it on, or off when it is on");
     assert.deepEqual([0, 1, 2].map((kind) => shortcutWhen(alone(kind))), ["Held while the key is held, tapped when it is tapped", "When the key is pressed", "When the key is pressed"]);
     assert.equal(shortcutWhen(keyed), "Held while the key is held, tapped when it is tapped", "its keys are held");
     // Under a behaviour, tap-toggle and one-shot layers are still on from
@@ -317,17 +334,16 @@ test("a shortcut's layers say how it turns them on, wherever the shortcut is des
     assert.match(customKeyDoes(behaved(3)), /a tap or hold the behaviour leaves empty tap-toggles Navigation \+ Extra, and its layers are on from every press of the key\.$/);
     // The picker offers each kind by its layer key's verb, and a kind with no
     // layers is a hold.
-    assert.deepEqual(shortcutLayerKinds({vocabulary: words}).map(({kind, label}) => [kind, label]), words.customKeys.layerKinds);
+    assert.deepEqual(shortcutLayerKinds({vocabulary: words}).map(({kind, label}) => [kind, label]), [[0, "Hold"], [1, "Lock"], [2, "Move to"], [3, "Tap-toggle"], [4, "One-shot"]]);
     assert.deepEqual(shortcutPick(model, {mods: [], keys: [], layers: 0b1000, layerKind: LAYER_KIND.MOVE}), {mods: 0, keys: [], layers: 0b1000, layerKind: 2});
     assert.deepEqual(shortcutPick(model, {mods: [], keys: ["KC_K"], layers: 0, layerKind: LAYER_KIND.LOCK}), {mods: 0, keys: [0x0e], layers: 0, layerKind: 0});
-    const picking = {layers: [{index: 3, name: "Navigation", displayName: "Navigation"}], vocabulary: {...words, modifiers: [[0x08, "Left GUI"]]}};
-    assert.equal(shortcutPickLabel(picking, {mods: 0x08, keys: [], layers: 0b1000, layerKind: 4}), "Left GUI + One-shot Navigation");
+    assert.equal(shortcutPickLabel(profile, {mods: 0x08, keys: [], layers: 0b1000, layerKind: 4}), "Left GUI + One-shot Navigation");
 });
 
 test("the shortcut picker's layer rows dim the layers that are always on, and its label names the layers lowest first", () => {
-    const layers = [3, 0, 5].map((index) => ({index, name: ["Base", "", "", "Navigation", "", "Extra"][index], displayName: ["Base", "", "", "Navigation", "", "Extra"][index]}));
-    const picking = {layers, vocabulary: {customKeys: {alwaysOn: {base: "base layer, always on", default: "default layer, always on"}}, modifiers: [[0x08, "Left GUI"]]},
-        customKeyShortcutLayers: [{layer: 0, refusal: "Base is the base layer: it is always on, so a shortcut cannot turn it on.", alwaysOn: "base"}, {layer: 3, refusal: "", alwaysOn: ""}, {layer: 5, refusal: "Extra is a default layer: it is always on, so a shortcut cannot turn it on.", alwaysOn: "default"}]};
+    // Extra a default layer as well as Base; the tabs list Navigation, Base and Extra in that order.
+    const profile = published({settings: (domain) => { domain.values[SETTING.DEFAULT_LAYERS] |= 1 << 5; }});
+    const picking = {...profile, layers: [3, 0, 5].map((index) => profile.layers[index])};
     const rows = shortcutLayerRows(picking, 0b1000);
     assert.deepEqual(rows.map((row) => [row.layer, row.on, row.unusable, row.why]), [[3, true, false, ""], [0, false, true, "base layer, always on"], [5, false, true, "default layer, always on"]], "in the tab order");
     assert.match(rows[1].tip, /^Base is the base layer/);

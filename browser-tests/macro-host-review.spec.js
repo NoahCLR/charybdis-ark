@@ -5,20 +5,19 @@ const {test, expect} = require("@playwright/test");
 const {openPreview} = require("./shell-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildSnapshotModel} = require("../core/session/device-model");
-const {draftBinding} = require("../core/session/panel-session-state");
+// The panel's whole model for the draft, published as the shell posts it.
+const {connectedState, panelModel} = require("../tests/fixtures/published-model");
 
 for (const theme of ["dark", "light"]) {
     test(`changing Host updates stored macros and reviews the effect (${theme})`, async ({page}) => {
         const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["café", "{+KC_A}é{-KC_A}", "hello", "{KC_A}"]);
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
-        const connection = {connected: true, selectedDeviceId: "board", capabilities};
+        const state = connectedState(capabilities);
         const publish = async () => {
-            const patch = {...buildSnapshotModel(draft.current, draft.capabilities, draftBinding({draft}, connection), connection), draft: {...draft.view(connection), ...draftBinding({draft}, connection)}};
-            await page.evaluate(async patch => {
+            await page.evaluate(async model => {
                 const store = await import("/webview/store.mjs");
-                store.setModel({...store.getModel(), ...patch}); store.render();
-            }, patch);
+                store.setModel(model); store.render();
+            }, panelModel(draft, state));
         };
         await openPreview(page, theme);
         await publish();

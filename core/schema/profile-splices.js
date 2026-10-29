@@ -11,10 +11,14 @@
 // reading them back.
 const {decodeProfileBlob, encodeProfileBlob} = require("./profile-blob-v1");
 
+// The most splices one profile edit carries; the wire's limit
+// (protocol/profile-edit-v1.js) is this one.
 const MAX_SPLICES = 8;
 
+// Splices are Ark's own, made from its draft: a refusal names their bytes, so
+// it is Ark's fault (schema/bytes.js protocolError).
 /** @param {string} code @param {string} message */
-const fail = (code, message) => Object.assign(new Error(message), {code});
+const fail = (code, message) => Object.assign(new Error(message), {code, fault: "ark"});
 
 /** @typedef {{domainId: number, offset: number, remove: number, insert: number, create?: boolean, drop?: boolean}} Splice */
 /** @typedef {{splices: Splice[], stream: Buffer}} SpliceEdit */
@@ -105,4 +109,4 @@ function applySplices(from, {splices, stream}, {versions = {}} = {}) {
 /** @param {number} fromLength @param {number} toLength @param {number} insertTotal @param {number} capacity */
 const spliceEditFits = (fromLength, toLength, insertTotal, capacity) => insertTotal + Math.max(fromLength, toLength) <= capacity;
 
-module.exports = {MAX_SPLICES, diffProfiles, applySplices, spliceEditFits};
+module.exports = {diffProfiles, applySplices, spliceEditFits, MAX_SPLICES};

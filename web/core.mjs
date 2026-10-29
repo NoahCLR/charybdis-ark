@@ -2,56 +2,28 @@
 // What the web shell needs from core/, as one module: the web build bundles
 // this file (scripts/build-web.js) and the page imports the bundle.
 //
-// Exporting more is a line here. The codecs come as namespaces, so a name two
-// modules share stays reachable under each.
+// It exports what a reader of it uses: the shell (web-shell.mjs,
+// recoveries.mjs), and the build's own tests, which run the bundled codecs and
+// a draft against Node's (browser-tests/core-exercise.js). Exporting more is a
+// line here, and a name in tests/scripts/web-build.test.js. The codecs come as
+// namespaces, so a name two modules share stays reachable under each.
 
-export {
-    ProfileDeviceService,
-    PROFILE_DOMAIN_FLAGS,
-    REQUIRED_PROFILE_DOMAIN_MASK,
-    REQUIRED_LIVE_MUTATION_FEATURES,
-    evaluateProfileCompatibility,
-    evaluateLiveMutationCompatibility,
-} from "../core/session/profile-device-service.js";
-export {ProfileDraftSession, DRAFT_EDITS} from "../core/session/profile-draft-session.js";
-export {
-    DRAFT_CONTROLS,
-    PORTABLE_MESSAGES,
-    applyLayerEdit,
-    buildPanelModel,
-    discardDraftForDevice,
-    layerEditDocument,
-    observePortable,
-    observeService,
-    routeMessage,
-    startLayerEdit,
-} from "../core/session/panel-session.js";
-export {takeOutbox} from "../core/session/panel-session-state.js";
-export {readKeyboard, draftControl, portableControl, rereadKeyboard} from "../core/session/panel-controls.js";
-export {exportedProfile, openPanelLoop} from "../core/session/panel-loop.js";
-export {DEMO_CAPABILITIES, demoUnsaved, openDemo} from "../core/session/demo-session.js";
+export {openPanelLoop} from "../core/session/panel-loop.js";
+export {writingProfile} from "../core/session/panel-control-registry.js";
+export {demoUnsaved} from "../core/session/demo-session.js";
 export {closingLoses} from "../core/session/live-edits.js";
 export {recoveryFileName} from "../core/session/recovery-copy.js";
-export {validateSnapshot} from "../core/session/portable-profile-session.js";
-export {APPLY_STEPS, ApplyProgress, failureReason} from "../core/session/apply-progress.js";
-export {DEFAULT_REQUEST_TIMEOUT_MS, DeviceRequestCoordinator} from "../core/transport/request-coordinator.js";
-export {
-    LIVE_LINK_ERROR_CODES,
-    LiveLinkTransportError,
-    RAW_HID_REPORT_SIZE,
-    assertDeviceAdapter,
-    liveLinkError,
-    normalizeDeviceDescriptors,
-    normalizeRawHidReport,
-} from "../core/transport/device-adapter.js";
-export {WEBHID_DEVICE_FILTERS, WebHidDeviceAdapter} from "../core/transport/webhid-adapter.js";
-export {PHASE, PHASE_WORDS, VOCABULARY, word, layerName} from "../core/model/vocabulary.js";
+export {WebHidDeviceAdapter} from "../core/transport/webhid-adapter.js";
 export {FILE_MAX_BYTES, FILE_TOO_LARGE} from "../core/model/portable-profile.js";
+
+// What the build's tests stage a draft and build the panel model with, and
+// the progress they report through it.
+export {ProfileDraftSession} from "../core/session/profile-draft-session.js";
+export {ApplyProgress} from "../core/session/apply-progress.js";
+export {buildPanelModel, startLayerEdit} from "../core/session/panel-session.js";
 
 import * as portable from "../core/model/portable-profile.js";
 export {portable};
-import * as actions from "../core/schema/actions.js";
-export {actions};
 import * as profileBlob from "../core/schema/profile-blob-v1.js";
 export {profileBlob};
 import * as rgbDomain from "../core/schema/rgb-domain-v1.js";
@@ -64,12 +36,9 @@ import * as settingsDomain from "../core/schema/settings-domain-v1.js";
 export {settingsDomain};
 import * as pdModeDomain from "../core/schema/pd-mode-domain-v1.js";
 export {pdModeDomain};
-import * as keycodes from "../core/data/keycode-catalog.js";
-export {keycodes};
 
 // The Buffer core/ runs on: Node's own under Node, the `buffer` package in the
-// bundle (web/buffer.mjs). A shell turns device bytes into one with it.
+// bundle (web/buffer.mjs). The build's tests read the bytes they compare with
+// it.
 const NodeOrBundledBuffer = Buffer;
 export {NodeOrBundledBuffer as Buffer};
-
-export {CONTROLS, panelControl, writingProfile} from "../core/session/panel-control-registry.js";

@@ -26,13 +26,8 @@ export type DraftEdit = Extract<import('../../contracts/edits.js').PanelEdit, {t
 
 export type DeviceCapabilities = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeCapabilityPages>;
 export type ProfileStatus = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeStatusPages>;
-export interface ReadDomains {
-    rgb?: import('../schema/types.js').RgbProfile;
-    keyBehaviors?: {rows: import('../schema/types.js').BehaviorRow[]};
-    settings?: import('../schema/types.js').SettingsDomain;
-    pdModes?: import('../schema/types.js').PointingSlot[];
-    combos?: ReturnType<typeof import('../schema/combo-domain-v1.js').decodeComboDomain>;
-}
+/** The profile's domains as read, which the profile model presents (model/types.d.ts). */
+export type ReadDomains = import('../model/types.js').ReadDomains;
 export interface CommittedRead {
     state?: 'unread' | 'reading' | 'unavailable' | 'read';
     source?: string;
@@ -47,7 +42,7 @@ export interface CommittedRead {
     schema?: {major: number; minor: number};
     domainIds?: number[];
 }
-export interface LayoutKey {layoutIndex: number; row: number; column: number; keycode: number; resolved: import('../data/types.js').ResolvedKeycode}
+export type LayoutKey = import('../model/types.js').LayoutKey;
 export type LayoutRead = PendingRead | {state: 'read'; progress?: import('../../contracts/model.js').CountedProgress | null; readAt?: string; catalog?: ReturnType<typeof import('../data/keycode-catalog.js').metadata>; layers: {layer: number; keys: LayoutKey[]}[]};
 /** Readback facts consumed by presentation, including partially loaded devices. */
 export interface DeviceModelInput {
@@ -74,6 +69,8 @@ export interface DeviceModelInput {
     runtime?: import('../protocol/types.js').RuntimeRead | null;
     /** Each half's flash pauses as last read (GET 0x0D); null until read on this connection. */
     flashPauses?: import('../../contracts/model.js').FlashPausesView | null;
+    /** The device service's diagnostics log, oldest first and bounded (profile-device-service.js addDiagnostic). */
+    diagnostics?: string[];
 }
 
 export type CandidateStatus = Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus>>;
@@ -124,7 +121,10 @@ export interface RestoreOptions {
     baseSnapshot?: ReadSnapshot;
     onProgress?: (text: string) => void;
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;
+    /** The wait between polls; the timer's when omitted. */
     sleep?: (ms: number) => Promise<void>;
+    /** The clock the save and its upload are timed on; Date.now when omitted. */
+    now?: () => number;
 }
 export interface OperationFailure extends Error {code?: string; cause?: OperationFailure; progress?: CandidateProgress; deviceError?: CandidateStatus["error"]}
 
@@ -137,7 +137,6 @@ export interface PanelDeviceState extends DeviceModelInput, Omit<DraftDeviceCont
     /** Ark's own live edit or Revert the keyboard holds until no key is held, while it waits. */
     liveWaiting?: LiveWaiting | null;
     operationId?: number;
-    diagnostics?: string[];
 }
 /** Why the open draft takes no edit now, or '' when it does (panel-session-state.js draftBinding). */
 export type DraftBlock = import('../../contracts/panel.js').DraftBlock;
@@ -169,6 +168,8 @@ export interface PortableReview {document: import('../model/types.js').PortableD
 export interface PanelShell extends ProfileChooser {words?: Record<string, string>; panel?: () => Partial<import('../../contracts/model.js').ShellPanel>}
 export interface PanelSession extends DemoSession {
     shell?: PanelShell;
+    /** The panel holds the catalog the loop posted (panel-loop.js); a panel that says it is ready has lost it. */
+    catalogPosted?: boolean;
     portableBusy?: boolean;
     portableReview?: PortableReview;
     portableLayers?: LayerEditState;
@@ -277,6 +278,8 @@ export interface ControlService extends DraftApplyService {
     connect(id: string): Promise<unknown>;
     disconnect(): Promise<unknown>;
     refresh(): Promise<unknown>;
+    /** Adds a line to the device service's diagnostics log (profile-device-service.js). */
+    addDiagnostic?(message: string): void;
     /** Waits until the keyboard has finished starting, within `deadline` (keyboard-starting.js). */
     awaitStarted?(options?: {deadline?: number}): Promise<{started: boolean; deadline: number; late: boolean}>;
     readLayout(): Promise<unknown>;
@@ -334,11 +337,12 @@ export type DeviceServiceTransport =
 export type DeviceServiceOptions = DeviceServiceTransport & DeviceServiceSettings;
 export interface DeviceServiceSettings {
     defaultTimeoutMs?: number;
-    /** How long each request of a background look waits (profile-device-service.js). */
+    /** How long each request of a background look waits (background-reads.js). */
     watchTimeoutMs?: number;
     requestIdStart?: number;
+    /** The shell's wait between polls (the page's sleep worker, which a hidden tab does not slow); the timer's when omitted. It always settles: the page's falls back to its timer when the worker fails (web/sleep.mjs). */
     sleep?: (ms: number) => Promise<void>;
-    /** The clock a live edit's waits are measured on; Date.now when omitted. */
+    /** The clock a live edit's waits and a save's upload are measured on; Date.now when omitted. */
     now?: () => number;
     readCandidateStatus?: typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus;
     onChange?: (state?: PanelDeviceState) => void;

@@ -22,7 +22,6 @@ import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./frame.mjs";
 import {editor} from "./macros/editor.mjs";
-export {receiveMacroValidation} from "./macros/validation.mjs";
 
 export function screenMacros() {
     const model = getModel();
@@ -41,7 +40,7 @@ export function screenMacros() {
     if (!bank.length) {
         pad.classList.remove("library");
         pad.appendChild(el(`<div class="screen-stub"><h3>No macro banks read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's macros.")}</p></div>`));
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's macros.")}</p></div>`));
         main.appendChild(content);
         return main;
     }

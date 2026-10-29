@@ -37,10 +37,11 @@ npm run preview               # interface changes: drive a new control to prove 
 npm run test:browser          # interface changes
 ```
 
-A wire, schema or codec change also runs the compatibility bridge
-(`npm run test:compat`, Docker running). The vault's `verify` is the handoff
-gate and runs all of these against the pins. Name the checks that ran and any
-skipped; [Developing Ark](docs/development.md) has the rest.
+A wire, schema or codec change, a macro domain's limits or sizing included,
+also runs the compatibility bridge (`npm run test:compat`, Docker running).
+The vault's `verify` is the handoff gate and runs all of these against the
+pins. Name the checks that ran and any skipped; [Developing
+Ark](docs/development.md) has the rest.
 
 ## Guardrails no check covers
 
@@ -65,8 +66,10 @@ skipped; [Developing Ark](docs/development.md) has the rest.
 - [`docs/adr/`](docs/adr/): decisions (D-L<n>); read those touching the area
   before changing behaviour or architecture.
 - [`docs/spec/`](docs/spec/): contracts, such as the interface's; firmware's
-  specs are under [`upstream/firmware/docs/spec/`](upstream/firmware/docs/spec/README.md)
-  and its words in [`upstream/firmware/GLOSSARY.md`](upstream/firmware/GLOSSARY.md).
+  specs are under
+  [`upstream/firmware/docs/spec/`](upstream/firmware/docs/spec/README.md) and
+  its words in
+  [`upstream/firmware/GLOSSARY.md`](upstream/firmware/GLOSSARY.md).
 - [`docs/architecture/`](docs/architecture/README.md): the layers, where new
   work goes, and the flows that cross them.
 - [Facts and their homes](docs/architecture/README.md#facts-and-their-homes):
@@ -80,12 +83,15 @@ skipped; [Developing Ark](docs/development.md) has the rest.
 ### Issue tracker
 
 Issues live in the private work-queue vault beside this checkout, whose
-`_agents/tracker.md` maps every tracker operation. See `docs/agents/issue-tracker.md`.
+`_agents/tracker.md` maps every tracker operation. See
+`docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Triage roles are the vault's `status` and `kind` values. See `docs/agents/triage-labels.md`.
+Triage roles are the vault's `status` and `kind` values. See
+`docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: `GLOSSARY.md` and `docs/adr/` at the root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` and `docs/adr/` at the root. See
+`docs/agents/domain.md`.

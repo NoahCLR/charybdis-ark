@@ -1,7 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {snapshotProfile, restoreProfile, fingerprint, validateSnapshot} = require("../../core/session/portable-profile-session");
+const {snapshotProfile, restoreProfile} = require("../../core/session/portable-profile-session");
+const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {PROFILE_CANDIDATE_V1: C, CANDIDATE_ERROR: E} = require("../../core/protocol/profile-candidate-v1");
@@ -11,7 +12,7 @@ const {capabilities, fixture} = require("../fixtures/portable-restore");
 const {document32: document, backup32, CAPABILITIES_32} = require("../fixtures/pointing-slots-32");
 const {profileMacros, editLayers, editMacros} = require("../fixtures/profile-document");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
-const {APPLY_VERDICTS} = require("../../core/session/interruption");
+const {APPLY_VERDICTS} = require("../../core/model/vocabulary");
 const candidateMutations = f => f.keyboard.mutations.filter(r => [7, 9].includes(r[0]));
 const payloadReads = f => f.keyboard.requests.filter(r => r[0] === 8 && [4, 5, 6].includes(r[2]));
 function assertTarget(f) {
@@ -22,10 +23,11 @@ function assertTarget(f) {
         [C.VALUE_BEGIN, C.VALUE_STREAM_CHUNK, C.VALUE_CHUNK, C.VALUE_REUSE, C.VALUE_VALIDATE, C.VALUE_COMMIT, C.VALUE_ABORT].includes(r[2])), "only Profile Wire candidate commands are written");
     assert.ok(f.keyboard.requests.every(r => ![0x01, 0x02, 0x0c, 0x0e, 0x11, 0x12].includes(r[0])), "no VIA reads");
 }
-function stall(f, t, extra = {}) {
-    t.mock.timers.enable({apis: ["Date"], now: 0});
+// A commit the keyboard never finishes, each wait two minutes on the
+// fixture's clock, so the upload's deadline passes.
+function stall(f, extra = {}) {
     Object.assign(f.keyboard.faults, {stallCommit: true, ...extra});
-    f.options.sleep = async () => t.mock.timers.tick(120000);
+    f.options.sleep = async () => f.clock.pass(120000);
 }
 // What a person reads about an Apply cut short: its verdict first, whole
 // sentences, none of the transport's or the coordinators' words.
@@ -56,7 +58,8 @@ test("restore saves recovery first, uploads one candidate and verifies one gener
     assert.deepEqual([...new Set(views.map(view => view.current))], ["check", "backup", "upload", "validate", "slave", "converge", "verify"]);
     assert.equal(views.at(-1).state, "done");
     assert.equal(result.fingerprint, fingerprint(f.targetDocument));
-    assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", profileBytes: f.target.candidate.length});
+    // Timed on the fixture's clock, which only its waits move.
+    assert.deepEqual(result.performance, {elapsedMs: f.clock.waits.reduce((sum, ms) => sum + ms, 0), baseSource: "device-read", profileBytes: f.target.candidate.length});
     assert.equal(result.status.activeGeneration, 5);
     assert.equal(result.status.committedGeneration, 5);
     assert.equal(result.status.slaveGeneration, 5);
@@ -69,6 +72,17 @@ test("restore uses the shell's sleep for candidate polling", async () => {
     const f = fixture(), waits = [];
     f.options.sleep = async ms => {assert.ok(ms > 0); waits.push(ms);};
     await f.restore(); assert.ok(waits.length > 0); assertTarget(f);
+});
+test("restore and its upload keep time by the shell's clock, never the wall's", async () => {
+    // A clock stopped far from the wall's: the save is timed at nothing, and
+    // the upload reads its deadlines off the same clock.
+    const f = fixture(), asked = [];
+    f.options.now = () => {asked.push(0); return 1e12;};
+    f.options.sleep = async () => {};
+    const result = await f.restore();
+    assert.equal(result.performance.elapsedMs, 0);
+    assert.ok(asked.length > 2, "the upload reads the same clock as the save");
+    assertTarget(f);
 });
 test("restore verifies and reuses the reviewed snapshot without rereading payload bytes", async () => {
     const f = fixture(); f.options.baseSnapshot = await f.snapshot(); f.keyboard.requests.length = 0;
@@ -122,28 +136,42 @@ test("validation refusal cancels the candidate before commit and leaves the old 
     assert.equal(f.keyboard.events.at(-1), "aborted");
     assert.deepEqual(f.keyboard.active, validateSnapshot(f.source).candidate);
 });
-test("a failure carries its real slave-half BUSY reason and the step where it happened", async t => {
-    const f = fixture(), views = []; stall(f, t); f.options.onApplyProgress = view => views.push(view);
+// A Save is never "writing" to a person (glossary, Save): the commit step
+// says itself in the Save step's own words, with nothing after them.
+test("the keyboard committing reads as the commit step's own words", () => {
+    const {coordinatorReport} = require("../../core/session/portable-profile-session");
+    const {ApplyProgress} = require("../../core/session/apply-progress");
+    const {CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
+    const {SAVE_STEP_WORDS} = require("../../core/model/vocabulary");
+    const progress = new ApplyProgress();
+    coordinatorReport({phase: "committing", status: {state: CANDIDATE_STATE.COMMITTING}}, progress);
+    const view = progress.view();
+    assert.equal(view.current, "commit");
+    assert.equal(view.steps.find(step => step.id === "commit")?.label, SAVE_STEP_WORDS.commit);
+    assert.equal(view.detail, "");
+});
+test("a failure carries its real slave-half BUSY reason and the step where it happened", async () => {
+    const f = fixture(), views = []; stall(f); f.options.onApplyProgress = view => views.push(view);
     await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && error.step === "slave"
         && error.stepLabel === "Copy the profile to the slave half" && error.reason === "The slave half stopped handling requests from the master half." && error.saved === "none");
     assert.equal(views.at(-1).state, "failed"); assert.equal(views.at(-1).failure.step, "slave");
 });
-test("a sent commit the keyboard cancels is reported as not saved", async t => {
-    const f = fixture(); stall(f, t);
+test("a sent commit the keyboard cancels is reported as not saved", async () => {
+    const f = fixture(); stall(f);
     await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && saysVerdict(error, "none") && error.cause?.code === "COMMIT_OUTCOME_AMBIGUOUS"
         && /^Nothing was saved: the keyboard kept the profile it had\. The slave half stopped handling requests from the master half\.$/.test(error.message));
     assert.equal(f.keyboard.durable, false); assert.equal(f.keyboard.events.at(-1), "aborted");
 });
-test("a sent commit without a confirmed cancel keeps its recovery copy and unknown outcome", async t => {
-    const f = fixture(); stall(f, t, {abortRejected: true});
+test("a sent commit without a confirmed cancel keeps its recovery copy and unknown outcome", async () => {
+    const f = fixture(); stall(f, {abortRejected: true});
     await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && saysVerdict(error, "unknown") && error.message.includes("/recovery.json")
         && /Keep both halves connected\./.test(error.message), "still connected, the keyboard needs both halves to finish");
     assert.equal(f.keyboard.events.at(-1), "abort refused");
 });
-test("unconfirmed slave-half cleanup adds restart guidance; unreadable status loses only that hint", async t => {
-    const f = fixture(); stall(f, t, {cleanupPending: true});
+test("unconfirmed slave-half cleanup adds restart guidance; unreadable status loses only that hint", async () => {
+    const f = fixture(); stall(f, {cleanupPending: true});
     await assert.rejects(f.restore(), error => error.code === "RESTORE_NOT_SAVED" && saysVerdict(error, "none") && /Unplug the USB cable from the master half \(not the cable between the halves\)/.test(error.message));
-    const g = fixture(); g.keyboard.faults.stallCommit = true; g.options.sleep = f.options.sleep;
+    const g = fixture(); stall(g);
     g.keyboard.faults.beforeRequest = (r, keyboard) => {if (keyboard.events.includes("aborted") && r[0] === 8 && r[2] === 2) throw Error("unreadable");};
     await assert.rejects(g.restore(), error => error.code === "RESTORE_NOT_SAVED" && !/Unplug/.test(error.message));
 });
@@ -354,7 +382,8 @@ test("a complete snapshot preserves Unicode bank bytes", async () => {
     const invalid = decodeProfileBlob(Buffer.from(malformed.profile, "base64"));
     invalid.domains.find(d => d.id === 112).payload = Buffer.concat([Buffer.from([0xc0, 0xaf]), Buffer.alloc(128)]);
     malformed.profile = encodeProfileBlob(invalid).toString("base64");
-    assert.throws(() => validateSnapshot(malformed), /valid|UTF-8/);
+    // Said as a damaged file; the decoder's own words are its cause, for the diagnostics.
+    assert.throws(() => validateSnapshot(malformed), (error) => /damaged/.test(error.message) && /valid|UTF-8/.test(error.cause?.message));
 });
 
 

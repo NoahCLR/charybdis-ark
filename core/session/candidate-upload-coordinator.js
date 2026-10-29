@@ -38,6 +38,8 @@ const {
 
 const {candidateTransferPlan} = require("../protocol/candidate-transfer-plan");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
+const {copyBytes} = require("../schema/bytes");
+const {COMMIT_IN_PROGRESS_STATES, statusRejects, operationMismatchReason, operationStatusCouldBeOurs, canSafelyResubmit, commitIsComplete, cloneStatus} = require("./candidate-status");
 
 const DEFAULT_POLL_INTERVAL_MS = 10;
 const DEFAULT_MAX_BUSY_RESUBMISSIONS = 3;
@@ -55,14 +57,6 @@ const DEFAULT_STATUS_TIMEOUT_SAFETY_MS = 1000;
 // per scan. Real scan and validation latency still need hardware acceptance.
 const VALIDATION_BYTES_PER_STEP = 4;
 const DEFAULT_VALIDATION_STEP_ALLOWANCE_MS = 5;
-
-/** @type {readonly number[]} */
-const COMMIT_IN_PROGRESS_STATES = Object.freeze([
-    CANDIDATE_STATE.PREPARING_PEER,
-    CANDIDATE_STATE.COMMITTING,
-    CANDIDATE_STATE.CONVERGING_PEER,
-    CANDIDATE_STATE.ACTIVATING,
-]);
 
 const UPLOAD_PHASE = Object.freeze({
     PREFLIGHT: "preflight",
@@ -782,101 +776,10 @@ class CandidateUploadCoordinator {
 
 /** @param {Status} status @param {Context} context @param {Details} operationDetails */
 function assertSuccessfulOperationStatus(status, context, operationDetails) {
-    if (status.error.id !== CANDIDATE_ERROR.NONE || status.state === CANDIDATE_STATE.REJECTED || status.state === CANDIDATE_STATE.AUTHORITY_FAILED) {
-        throw deviceRejection(status, context);
-    }
+    if (statusRejects(status)) throw deviceRejection(status, context);
     assertCandidateIdentity(status, context);
-    switch (context.operation) {
-        case CANDIDATE_OPERATION.BEGIN:
-            if (status.state !== CANDIDATE_STATE.RECEIVING
-                || status.nextOffset !== 0
-                || status.payloadLength !== beginMetadata(operationDetails).payloadLength
-                || status.digest !== beginMetadata(operationDetails).digest) {
-                throw operationStatusMismatch(status, context, "begin metadata/state did not match");
-            }
-            break;
-        case CANDIDATE_OPERATION.REUSE:
-        case CANDIDATE_OPERATION.CHUNK: {
-            const expectedOffset = mutationEnd(operationDetails);
-            const expectedState = expectedOffset === status.payloadLength
-                ? CANDIDATE_STATE.COMPLETE
-                : CANDIDATE_STATE.RECEIVING;
-            if (status.nextOffset !== expectedOffset || status.state !== expectedState) {
-                throw operationStatusMismatch(status, context, `next offset ${status.nextOffset} did not equal ${expectedOffset}`);
-            }
-            break;
-        }
-        case CANDIDATE_OPERATION.VALIDATE:
-            if (!(/** @type {number[]} */ ([CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED])).includes(status.state)) {
-                throw operationStatusMismatch(status, context, `validation entered state ${status.state}`);
-            }
-            break;
-        case CANDIDATE_OPERATION.COMMIT:
-            if (![...COMMIT_IN_PROGRESS_STATES, CANDIDATE_STATE.IDLE].includes(status.state)) {
-                throw operationStatusMismatch(status, context, `commit entered state ${status.state}`);
-            }
-            break;
-        case CANDIDATE_OPERATION.ABORT:
-            if (status.state !== CANDIDATE_STATE.IDLE) {
-                throw operationStatusMismatch(status, context, `abort entered state ${status.state}`);
-            }
-            break;
-        default:
-            throw operationStatusMismatch(status, context, "unknown operation");
-    }
-}
-
-/** @param {Status} status @param {Context} context @param {Details} operationDetails */
-function operationStatusCouldBeOurs(status, context, operationDetails) {
-    if (status.transactionId !== context.transactionId) return false;
-    if (status.error.id !== CANDIDATE_ERROR.NONE) return true;
-    switch (context.operation) {
-        case CANDIDATE_OPERATION.BEGIN:
-            return status.payloadLength === beginMetadata(operationDetails).payloadLength
-                && status.digest === beginMetadata(operationDetails).digest;
-        case CANDIDATE_OPERATION.REUSE:
-        case CANDIDATE_OPERATION.CHUNK:
-            return !status.mailboxPending && status.nextOffset === mutationEnd(operationDetails);
-        case CANDIDATE_OPERATION.VALIDATE:
-            return (/** @type {number[]} */ ([CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED, CANDIDATE_STATE.REJECTED])).includes(status.state);
-        case CANDIDATE_OPERATION.COMMIT:
-            return [...COMMIT_IN_PROGRESS_STATES, CANDIDATE_STATE.IDLE, CANDIDATE_STATE.REJECTED, CANDIDATE_STATE.AUTHORITY_FAILED].includes(status.state);
-        case CANDIDATE_OPERATION.ABORT:
-            return status.state === CANDIDATE_STATE.IDLE;
-        default:
-            return false;
-    }
-}
-
-/** @param {Status} status @param {Context} context @param {Details} operationDetails */
-function canSafelyResubmit(status, context, operationDetails) {
-    if (status.mailboxPending) return false;
-    if (context.operation === CANDIDATE_OPERATION.ABORT) {
-        return status.state === CANDIDATE_STATE.IDLE || status.transactionId === context.transactionId;
-    }
-    if (status.poisoned) return false;
-    switch (context.operation) {
-        case CANDIDATE_OPERATION.BEGIN:
-            return status.state === CANDIDATE_STATE.IDLE;
-        case CANDIDATE_OPERATION.REUSE:
-        case CANDIDATE_OPERATION.CHUNK: {
-            if (status.transactionId !== context.transactionId
-                || !(/** @type {number[]} */ ([CANDIDATE_STATE.RECEIVING, CANDIDATE_STATE.COMPLETE])).includes(status.state)) {
-                return false;
-            }
-            const end = mutationEnd(operationDetails);
-            return status.nextOffset === operationDetails.offset || status.nextOffset === end;
-        }
-        case CANDIDATE_OPERATION.VALIDATE:
-            return status.transactionId === context.transactionId && status.state === CANDIDATE_STATE.COMPLETE;
-        case CANDIDATE_OPERATION.COMMIT:
-            // A finished COMMIT is confirmed from status (commitIsComplete),
-            // not resubmitted.
-            return status.transactionId === context.transactionId
-                && [CANDIDATE_STATE.VALIDATED, ...COMMIT_IN_PROGRESS_STATES].includes(status.state);
-        default:
-            return false;
-    }
+    const reason = operationMismatchReason(status, context.operation, operationDetails);
+    if (reason) throw operationStatusMismatch(status, context, reason);
 }
 
 /** @param {Status} status @param {Context} context */
@@ -889,14 +792,6 @@ function assertCandidateIdentity(status, context) {
             {status, safeToRetry: false}
         );
     }
-}
-
-/** @param {Status} status @param {Context} context */
-function commitIsComplete(status, context) {
-    return status.state === CANDIDATE_STATE.IDLE
-        && status.lastOperation === CANDIDATE_OPERATION.COMMIT
-        && status.transactionId === context.transactionId
-        && status.digest === context.expectedDigest;
 }
 
 /** @param {CommitContext} context */
@@ -1084,14 +979,6 @@ function cloneProgress(progress) {
     };
 }
 
-/** @param {Status} status @returns {Status} */
-function cloneStatus(status) {
-    return {
-        ...status,
-        error: status.error ? {...status.error} : status.error,
-    };
-}
-
 /** @param {string} code @param {string} message @param {Context} context @param {FailureDetails} [details] */
 function uploadError(code, message, context, details = {}) {
     return new CandidateUploadError(code, message, {
@@ -1134,27 +1021,16 @@ function assertIdSequence(value, label) {
     }
 }
 
-/** @param {unknown} value @param {string} label */
-function copyBytes(value, label) {
-    if (!(value instanceof Uint8Array)) {
-        throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    }
-    return Buffer.from(value);
-}
-
 /** @param {number} milliseconds @returns {Promise<void>} */
 function defaultSleep(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 module.exports = {
-    DEFAULT_MAX_BUSY_RESUBMISSIONS,
-    DEFAULT_POLL_INTERVAL_MS,
     FIRMWARE_HOST_PRECOMMIT_TIMEOUT_MS,
     FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS,
     CandidateUploadCoordinator,
     CandidateUploadError,
-    UPLOAD_PHASE,
     candidateStatusStallTimeoutMs,
 };
 
@@ -1172,14 +1048,4 @@ function assertTransferContext(context) {
 function assertCommitContext(context) {
     assertOperationContext(context);
     if (context.expectedDigest === undefined) throw new TypeError("Candidate commit requires its expected digest.");
-}
-/** @param {Details} details */
-function beginMetadata(details) {
-    if (!details.metadata) throw new TypeError("Candidate begin requires its validated metadata.");
-    return details.metadata;
-}
-/** @param {Details} details */
-function mutationEnd(details) {
-    if (details.offset === undefined || details.length === undefined) throw new TypeError("Candidate range requires its offset and length.");
-    return details.offset + details.length;
 }

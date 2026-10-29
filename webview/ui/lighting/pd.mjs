@@ -3,7 +3,7 @@ import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
 import {post, render, state, writable} from "../../store.mjs";
 import {offWording, POINTING_MODE_IDS, pdColourRow} from "../../view/lighting.mjs";
-import {slotCalled as slotName, vocabulary} from "../../view/vocabulary.mjs";
+import {slotCalled as slotName, slotNamed, vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourControl, localityLabel, section, stack} from "./common.mjs";
@@ -22,7 +22,7 @@ export function stagePointing(model) {
         const row = pdColourRow(model, slot.id);
         const lit = row && !isOff(row.color);
         const item = el(`<button class="rowitem ${slot.id === state.pointingSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${esc(slot.id)}">
-            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
+            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slotNamed(slot))}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
             <span class="m">${esc(!row ? "not reported" : lit ? localityLabel(row.locality).toLowerCase() : "no colour")}</span></button>`);
         item.addEventListener("click", () => { state.pointingSlot = slot.id; render(); });
         list.append(item);

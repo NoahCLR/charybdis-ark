@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 import test from "node:test";
-import {answeringCandidate, answersUnder} from "../../rules/layer-answers.mjs";
+import {answeringCandidate} from "../../rules/layer-answers.mjs";
 
 // A transparent key on layer 3, over a key on layer 2, a transparent one on
 // layer 1 and a key on base, compiled as core compiles it: layer 2 answers
 // while on, and base while on with layer 2 off.
 const candidates = [{layer: 2, active: 4, blocked: 0}, {layer: 0, active: 1, blocked: 4}];
+
+// Whether one candidate answers, alone in its list.
+const answersUnder = (candidate, active) => answeringCandidate([candidate], active) === candidate;
 
 test("a candidate answers while its layer is on and no higher answering layer is", () => {
     assert.equal(answersUnder(candidates[1], 1), true);

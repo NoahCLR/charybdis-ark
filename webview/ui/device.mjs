@@ -46,7 +46,7 @@ export function screenDevice() {
     const restart = !demo && health?.restartNeeded ? `<div class="callout danger-note" role="alert"><strong>${esc(RESTART_NEEDED.label)}.</strong>
         ${esc(RESTART_NEEDED.detail)}
         <ol class="steps">${RESTART_NEEDED.steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol></div>` : "";
-    const earlier = !demo && health?.earlierFormat ? `<p class="note">A saved profile uses an earlier format or test layout that this firmware does not read, so the keyboard runs its compiled defaults. Saving writes your profile in the current format.</p>` : "";
+    const earlier = !demo && health?.earlierFormat ? `<p class="note">A saved profile uses an earlier format or test layout that this firmware does not read, so the keyboard runs its compiled defaults. Save keeps your profile on the keyboard in the current format.</p>` : "";
     const saving = !demo && health?.recoveryPending ? `<p class="note">${esc(SAVE_IN_PROGRESS.detail)}</p>` : "";
     const halves = halvesRows(model).map((half) => `<span class="half ${half.ok ? "ok" : "warn"}">${esc(half.half)} (${esc(half.side)}) ${half.ok ? "✓" : "!"}<span class="note"> ${esc(half.words)}</span></span>`).join("");
     const product = productName(model);

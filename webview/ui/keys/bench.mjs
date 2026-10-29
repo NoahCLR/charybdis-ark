@@ -3,7 +3,10 @@
 // and the macros, custom keys and pointing modes this layer reaches.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {behaviourGroups, macroReach, pointingReach} from "../../view/reach.mjs";
+import {behaviourGroups} from "../../view/behaviour-reach.mjs";
+import {macroReach} from "../../view/reach.mjs";
+import {pointingReach} from "../../view/pointing-reach.mjs";
+import {storedCount} from "../../view/reach-groups.mjs";
 import {comboGroups} from "../../view/combo-reach.mjs";
 import {customKeyReach} from "../../view/custom-key.mjs";
 import {mappedKeyCount} from "../../view/lighting.mjs";
@@ -19,7 +22,6 @@ import {tabCustomKeys} from "./custom-keys-tab.mjs";
 import {tabKey} from "./key-tab.mjs";
 import {tabMacros} from "./macros-tab.mjs";
 import {tabPointing} from "./pointing-tab.mjs";
-import {storedCount} from "./reach.mjs";
 
 /** @type {{id: "key" | "behaviours" | "combos" | "macros" | "customKeys" | "pointing", label: string}[]} */
 const TABS = [
@@ -36,7 +38,7 @@ export function bench() {
     const layer = currentLayer();
     /** @type {Record<string, string>} */
     const counts = {
-        key: String(mappedKeyCount(layer)),
+        key: String(mappedKeyCount(model, layer)),
         behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(behaviourGroups(model, layers(), state.layer))),
         combos: String(comboGroups(model, layers(), state.layer).onKeys.length),
         macros: String(storedCount(macroReach(model, layers(), state.layer))),

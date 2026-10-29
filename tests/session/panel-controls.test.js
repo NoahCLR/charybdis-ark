@@ -7,6 +7,7 @@ const {buildPanelModel, observeService} = require("../../core/session/panel-sess
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
+const {FAILURE_WORDS} = require("../../core/model/vocabulary");
 
 const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
@@ -56,7 +57,7 @@ test("reading the keyboard connects, reads in dependency order and says what it 
     const session = {service};
     assert.equal(await readKeyboard(session, undefined, shell()), true);
     assert.deepEqual(service.calls, ["enumerate", "refresh", "readKeyboardProfile"]);
-    assert.match(session.notice, /committed profile generation 7/);
+    assert.match(session.notice, /saved profile, generation 7/);
     const empty = {service: fakeService({snapshot: () => ({devices: []})})};
     assert.equal(await readKeyboard(empty, undefined, shell()), false);
     assert.match(empty.notice, /Chrome has no Charybdis this page may open yet/);
@@ -70,28 +71,29 @@ test("a failed committed-profile read keeps the layout and the optional reads, a
     const state = {connected: true, selectedDeviceId: "kb", devices: [device], capabilities,
         layout: {state: "read", layers: []}, committed: {state: "reading"}, error: null};
     const service = fakeService({snapshot: () => state, capabilities: state.capabilities,
-        readKeyboardProfile: async () => {throw new Error("interrupted");},
-        readCommittedProfile: async () => {state.error = {code: "TIMEOUT", message: "no answer"}; throw new Error("no answer");}});
+        readKeyboardProfile: async () => {throw new Error("The read was interrupted.");},
+        readCommittedProfile: async () => {state.error = {code: "TIMEOUT", message: "The keyboard did not answer."}; throw new Error("The keyboard did not answer.");}});
     service.calls.length = 0;
     const session = {service};
     assert.equal(await readKeyboard(session, undefined, shell()), false);
     assert.deepEqual(service.calls, ["enumerate", "refresh", "readLayout", "readBaseRgb", "readCombos"]);
-    assert.equal(session.notice, "The keyboard profile could not be read: no answer. Macros and global settings could not be read: interrupted");
+    assert.equal(session.notice, "The keyboard profile could not be read. The keyboard did not answer. Macros and global settings could not be read. The read was interrupted.");
 });
 
 // The decoder's own text (which chunk, how many bytes) is for the
-// diagnostics; a notice says in words that an answer did not decode.
+// diagnostics; a notice says in words that an answer did not decode. A
+// decoder marks its errors so (schema/bytes.js protocolError).
 test("a read whose answer did not decode says so in words, never in the decoder's", async () => {
-    const decodeError = () => Object.assign(new Error("Chunk 258 returned 1 bytes where 3 were expected."), {code: "MALFORMED_RESPONSE"});
+    const decodeError = () => Object.assign(new Error("Chunk 258 returned 1 bytes where 3 were expected."), {code: "MALFORMED_RESPONSE", fault: "answer"});
     const state = {connected: true, selectedDeviceId: "kb", devices: [device], capabilities,
         layout: {state: "read", layers: []}, committed: {state: "reading"}, error: null};
     const service = fakeService({snapshot: () => state, capabilities: state.capabilities,
         readKeyboardProfile: async () => {throw decodeError();},
-        readCommittedProfile: async () => {state.error = {code: "MALFORMED_RESPONSE", message: decodeError().message}; throw decodeError();}});
+        readCommittedProfile: async () => {state.error = {code: "MALFORMED_RESPONSE", message: decodeError().message, fault: "answer"}; throw decodeError();}});
     const session = {service};
     assert.equal(await readKeyboard(session, undefined, shell()), false);
     assert.doesNotMatch(session.notice, /Chunk|bytes where/);
-    assert.match(session.notice, /^The keyboard profile could not be read: the keyboard answered with something Ark could not decode \(see the diagnostics\)\. Macros and global settings could not be read: the keyboard answered/);
+    assert.equal(session.notice, `The keyboard profile could not be read. ${FAILURE_WORDS.unreadable} Macros and global settings could not be read. ${FAILURE_WORDS.unreadable}`);
 });
 
 test("a keyboard not on current firmware is read no further, and told to update", async () => {
@@ -220,11 +222,11 @@ test("a failed post-Apply read clears its progress stage and is said after the s
     const session = sessionWithDraft();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     session.draft.review(session.draft.revision);
-    session.service.readCommittedProfile = async () => {throw new Error("readback interrupted");};
+    session.service.readCommittedProfile = async () => {throw new Error("The readback was interrupted.");};
     await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
     assert.equal(session.postApplyReadStep, undefined);
     assert.equal(session.applyRunning, false);
-    assert.match(session.notice, /^Complete profile saved to both halves and verified\. Reading the keyboard again failed: readback interrupted\. Recovery copy: \/recovery\/1\.json$/);
+    assert.match(session.notice, /^Complete profile saved to both halves and verified\. Reading the keyboard again failed\. The readback was interrupted\. Recovery copy: \/recovery\/1\.json$/);
 });
 
 test("a destination blocker refuses Apply before recovery or HID", async () => {
@@ -318,7 +320,7 @@ test("layer edits and imports are kept in the draft; without one they restore to
     const changed = new ProfileDraftSession(snapshot(), "kb", capabilities);
     changed.stage({type: "updateMacro", keycode: "MACRO_2", payload: "hello", draftRevision: changed.revision});
     await portableControl(session, {type: "choosePortableProfile"}, {chooseProfile: async () => JSON.stringify(changed.document)});
-    assert.deepEqual(buildPanelModel(session, session.service.snapshot()).portable.review.differences, [{unit: "macro:2", title: "Macro 2", status: "added", place: {kind: "macro", index: 2}}],
+    assert.deepEqual(buildPanelModel(session, session.service.snapshot()).portable.review.differences, [{unit: "macro:2", title: "Macro 2", status: "added", place: {kind: "macro", index: 2, keycode: "MACRO_2"}}],
         "each difference by what it is, what happened and where it is edited, without its fields");
     await portableControl(session, {type: "cancelPortableReview"});
     assert.equal(session.portableReview, undefined);

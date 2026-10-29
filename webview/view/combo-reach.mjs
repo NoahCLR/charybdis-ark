@@ -2,6 +2,7 @@
 import {behaviourFor, keyFace} from "./keyface.mjs";
 import {downTheStack, resolvedPositions, viewPositions} from "./layer-resolution.mjs";
 import {comboJoins} from "./participation.mjs";
+import {layerCalled, listed} from "./vocabulary.mjs";
 import {comboInputIsKey as inputIsKey, comboKeysAmong, comboTouches, inputOn, inputPressed} from "../../rules/combo-inputs.mjs";
 /** @typedef {import("../../contracts/panel.js").ComboView} ComboView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
@@ -105,9 +106,9 @@ function comboUses(model, stack, at, held, combo, keys) {
     /** @param {typeof judged[number]} row */
     const keyOnLayer = ({input, layer}) => {
         const supplier = stack.find((candidate) => candidate.index === layer);
-        return `${combo.inputDisplays?.[(combo.inputs || []).indexOf(input)] || input} on ${supplier?.displayName || supplier?.name || ""}`;
+        return `${combo.inputDisplays?.[(combo.inputs || []).indexOf(input)] || input} on ${layerCalled(supplier)}`;
     };
-    const blockedWords = `its other key${blocking.length === 1 ? "" : "s"} ${blocking.map(keyOnLayer).join(", ")} cannot join it, so it never forms`;
+    const blockedWords = `its other key${blocking.length === 1 ? "" : "s"} ${listed(blocking.map(keyOnLayer))} cannot join it, so it never forms`;
     return new Map(judged.map(({key, joins, reasons}) => [key.position.layoutIndex,
         joins && !chord ? {fires: false, reasons: [blockedWords]} : {fires: joins, reasons}]));
 }
@@ -327,9 +328,9 @@ export function combosOnKey(model, stack, at, held, layoutIndex) {
 // again therefore counts as added. A position nothing answers, or a disabled
 // key, is not an input, and none joins once the combo has `limit` inputs, the
 // keyboard's combo input limit.
-/** @param {string[]} inputs @param {Position | null | undefined} position @param {number | null} [limit] */
-export function toggleComboInput(inputs, position, limit = null) {
-    if (!position || keyFace(position, null).kind === "disabled") return inputs;
+/** @param {ViewModel} model @param {string[]} inputs @param {Position | null | undefined} position @param {number | null} [limit] */
+export function toggleComboInput(model, inputs, position, limit = null) {
+    if (!position || keyFace(position, model).kind === "disabled") return inputs;
     if (inputs.some((name) => inputOn(name, position))) return inputs.filter((name) => !inputOn(name, position));
     return limit && inputs.length >= limit ? inputs : [...inputs, position.keycode];
 }
