@@ -4,8 +4,9 @@
 // the core, which answers with a new model. The draft lives on that side too,
 // so what is drawn is always what would be applied.
 
-import {behaviourKeyAt, behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
+import {behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
 import {layersOn, toggleLayer} from "./view/layer-set.mjs";
+import {layerView} from "./view/layer-view.mjs";
 import {initialReachGroups} from "./view/reach-groups.mjs";
 import {leaving} from "./view/demo.mjs";
 import {afterDraftChange, initialState, kept, resets, resetsTo} from "./view/state-fields.mjs";
@@ -184,11 +185,14 @@ export function post(message) {
 }
 
 export const layers = () => getModel()?.layers || [];
+// The view the board shows: the picked layer with the layers previewed on
+// under it that are still worth previewing (view/layer-set.mjs), and whether
+// any are, when the board shows what the keyboard answers with rather than
+// what the layer stores. Every screen asks it what answers, what shows and
+// what is reached, rather than passing the layer and the preview
+// (view/layer-view.mjs).
+export const currentView = () => layerView(getModel(), state.layer, layersOn(state.layer, state.layersOn, layers().length));
 export const currentLayer = () => layers()[state.layer] || layers()[0];
-// The layers previewed on under the current one, and whether any are: the board
-// then shows what the keyboard answers with, not what the layer stores.
-export const heldLayers = () => layersOn(state.layer, state.layersOn, layers().length);
-export const previewing = () => heldLayers().length > 0;
 // A plain pick shows one layer; ⌘-click adds or removes one from the preview.
 /** @param {number} index */
 export function showLayer(index) {
@@ -197,9 +201,9 @@ export function showLayer(index) {
 }
 /** @param {number} index */
 export function toggleLayerOn(index) {
-    const selectedKey = () => behaviourKeyAt(layers(), state.layer, heldLayers(), selectedPosition()?.layoutIndex).keycode;
+    const selectedKey = () => currentView().behaviours.keyAt(selectedPosition()?.layoutIndex).keycode;
     const before = selectedKey();
-    const next = toggleLayer(state.layer, heldLayers(), index);
+    const next = toggleLayer(state.layer, currentView().held, index);
     state.layer = next.top;
     state.layersOn = next.on;
     const row = behaviourRowAfterPreview(state.behaviourRow, before, selectedKey());

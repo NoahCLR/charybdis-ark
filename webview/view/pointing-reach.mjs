@@ -19,12 +19,13 @@ import {linkStartHolds} from "../../rules/pointing-link-starts.mjs";
  * (its link, firmware D-F62) reaches it by turning on: On this layer, with no
  * key at all, and wherever a route turns that layer on (startedRoutes).
  */
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {import("./keyface-types.js").ReachGroup} */
-export const pointingReach = (model, stack, at) => {
+/** @param {import("./keyface-types.js").LayerView} view @returns {import("./keyface-types.js").ReachGroup} */
+export const pointingReach = (view) => {
+    const {model, stack, at} = view;
     // A slot with no movement cannot be activated, so it is not a mode this
     // layer is missing either.
     const all = (model?.pdModes || []).filter((slot) => slot.kind).map((slot) => String(slot.id));
-    const reach = reachGroups(model, stack, at, pointingNamesOf(model), all);
+    const reach = reachGroups(view, pointingNamesOf(model), all);
     const layer = stack[at]?.index ?? at, on = 2 ** layer;
     /** @param {ReachEntry[]} entries */
     const kept = (entries) => startedRoutes(model, entries, on);
@@ -40,11 +41,12 @@ export const pointingReach = (model, stack, at) => {
  * every mode a layer in view starts. A layer shown alone is the view by
  * itself; the layers always on join once layers are held, as in viewPositions.
  */
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held */
-export function pointingReachInView(model, stack, at, held) {
-    const view = viewLayers(stack, at, held);
-    const on = view.reduce((mask, layer) => mask | 2 ** layer, 0);
-    return withLinkStarts(model, stack, view, startedRoutes(model, reachInView(model, stack, at, held, pointingNamesOf(model)), on));
+/** @param {import("./keyface-types.js").LayerView} view */
+export function pointingReachInView(view) {
+    const {model, stack} = view;
+    const layers = viewLayers(stack, view.at, view.held);
+    const on = layers.reduce((mask, layer) => mask | 2 ** layer, 0);
+    return withLinkStarts(model, stack, layers, startedRoutes(model, reachInView(view, pointingNamesOf(model)), on));
 }
 
 // What may reach a pointing mode: its own keycodes, and any keycode that turns

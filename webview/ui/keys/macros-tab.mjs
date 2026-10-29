@@ -4,19 +4,20 @@
 // does.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {macroReach} from "../../view/reach.mjs";
-import {getModel, layers, render, state} from "../../store.mjs";
+import {macroNamesOf, macroReach, reachInView} from "../../view/reach.mjs";
+import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
-import {macroView, reachLabel} from "./reach.mjs";
+import {reachLabel} from "./reach.mjs";
 import {actionMarked, macroSteps} from "../marks.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabMacros(body, right) {
     const model = getModel();
     const slots = model?.macros || [];
-    const reach = {...macroReach(model, layers(), state.layer), inView: macroView(model)};
+    const view = currentView();
+    const reach = {...macroReach(view), inView: reachInView(view, macroNamesOf(model))};
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Macros screen</button>`);
     open.addEventListener("click", () => { state.screen = "macros"; render(); });

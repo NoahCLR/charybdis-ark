@@ -114,7 +114,7 @@ void panelBoundary;
 import {keyFace} from '../../webview/view/keyface.mjs';
 import {macroReach, reachKeys, macroPlacements} from '../../webview/view/reach.mjs';
 import {namedAction} from '../../webview/view/named-action.mjs';
-import {comboGroups, combosOnLayer} from '../../webview/view/combo-reach.mjs';
+import {layerView} from '../../webview/view/layer-view.mjs';
 import {reachEntries} from '../../webview/view/reach-groups.mjs';
 import type {ReviewSummary} from '../../contracts/model.js';
 import type {Position} from '../../contracts/panel.js';
@@ -122,10 +122,11 @@ import type {Position} from '../../contracts/panel.js';
 function rendererViews(model: PublishedModel, position: Position) {
     const face = keyFace(position, model);
     const kind: 'none' | 'transparent' | 'disabled' | 'layer' | 'key' = face.kind;
-    const behaviors = macroReach(model, model.layers, 0);
-    const combos = comboGroups(model, model.layers, 0);
+    const view = layerView(model, 0);
+    const behaviors = macroReach(view);
+    const combos = view.combos.groups;
     const names: string[] = reachEntries(behaviors, 'here').map(entry => entry.name);
-    const comboKeys: number[] = reachKeys(model.layers, 0, combos.onKeys[0]);
+    const comboKeys: number[] = reachKeys(view, combos.onKeys[0]);
     const summary: ReviewSummary = {unit: 'behavior:KC_A', title: 'A', status: 'changed', place: {kind: 'behaviour'}};
     // @ts-expect-error A key face receives the stored name, not a numeric wire keycode.
     keyFace({layoutIndex: 0, keycode: 4}, model);
@@ -136,8 +137,8 @@ function rendererViews(model: PublishedModel, position: Position) {
     // @ts-expect-error Reached keys retain their typed position rather than an unrestricted object.
     reachEntries(behaviors, 'here')[0].keys[0].position.slot;
     // @ts-expect-error The empty combo-map branch still stores typed combos.
-    combosOnLayer(null, [], 0).set(0, ['KC_A']);
-    const routeName: string = macroPlacements(model, model.layers, 'MACRO_0')[0].routes[0].entry.name;
+    layerView(null, 0).combos.marks.keys.set(0, ['KC_A']);
+    const routeName: string = macroPlacements(model, 'MACRO_0')[0].routes[0].entry.name;
     const action = namedAction(model, 'PD_MODE_0');
     if (action?.kind === 'pointing') {
         const slot: number = action.slot.id;

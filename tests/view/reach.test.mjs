@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {keyMeaning, behaviourFor} from "../../webview/view/keyface.mjs";
-import {combosInView, combosForKey} from "../../webview/view/combo-reach.mjs";
+import {combosForKey} from "../../webview/view/combo-reach.mjs";
 import {reachKeys, reachText, macroNamesOf, customKeyNamesOf, reachInView, macroPlacements, customKeyPlacements, placementsOf, macroReach} from "../../webview/view/reach.mjs";
-import {behavioursInView, behaviourGroups, behaviourRouteKeys} from "../../webview/view/behaviour-reach.mjs";
+import {layerView} from "../../webview/view/layer-view.mjs";
 import {pointingReach, pointingSlotFor} from "../../webview/view/pointing-reach.mjs";
 import {customKeyNameMessage, customKeyShortcutMessage, macroMessage} from "../../webview/view/edits.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
@@ -61,38 +61,35 @@ test("the view follows the exact previewed stack while the layer groups stay str
     const model = published({keys: {0: {0: "KC_A", 1: "KC_B", 2: "MACRO_0"}, 1: {0: "KC_C", 1: "KC_TRANSPARENT", 2: "KC_NO"}, 2: {0: "KC_TRANSPARENT", 1: "KC_TRANSPARENT", 2: "KC_TRANSPARENT"}},
         combos: [{inputs: ["KC_A", "KC_B"], output: "MACRO_2"}, {inputs: ["KC_C", "KC_B"], output: "MACRO_3"}],
         behaviours: [{keycode: "KC_B", steps: [{tapCount: 0, tap: {action: "MACRO_1"}}]}, {keycode: "KC_C", steps: [{tapCount: 0, hold: held("PD_MODE_4")}]}]});
-    const stack = model.layers;
-    const macroNames = (/** @type {number[]} */ held) => reachInView(model, stack, 2, held, macroNamesOf(model)).map((entry) => entry.name);
-    assert.deepEqual(behaviourGroups(model, stack, 2).here, [], "nothing is stored on Symbols");
+    const macroNames = (/** @type {number[]} */ held) => reachInView(layerView(model, 2, held), macroNamesOf(model)).map((entry) => entry.name);
+    assert.deepEqual(layerView(model, 2).behaviours.groups.here, [], "nothing is stored on Symbols");
     // Shown alone, Symbols is the whole view, and every key on it is
     // transparent or empty: base is not on until layers are previewed together.
-    assert.deepEqual(behavioursInView(model, stack, 2, []), [], "nothing on Symbols alone");
-    assert.deepEqual(combosInView(model, stack, 2, []), []);
+    assert.deepEqual(layerView(model, 2).behaviours.inView, [], "nothing on Symbols alone");
+    assert.deepEqual(layerView(model, 2).combos.inView, []);
     assert.deepEqual(macroNames([]), []);
-    assert.deepEqual(behavioursInView(model, stack, 2, [0]).map((entry) => entry.row.keycode), ["KC_B"], "with base previewed on");
-    assert.deepEqual(behavioursInView(model, stack, 2, [1]).map((entry) => entry.row.keycode), ["KC_C", "KC_B"]);
-    assert.deepEqual(combosInView(model, stack, 2, [0]).map((entry) => entry.combo.id), [0]);
-    assert.deepEqual(combosInView(model, stack, 2, [1]).map((entry) => entry.combo.id), [1],
+    assert.deepEqual(layerView(model, 2, [0]).behaviours.inView.map((entry) => entry.row.keycode), ["KC_B"], "with base previewed on");
+    assert.deepEqual(layerView(model, 2, [1]).behaviours.inView.map((entry) => entry.row.keycode), ["KC_C", "KC_B"]);
+    assert.deepEqual(layerView(model, 2, [0]).combos.inView.map((entry) => entry.combo.id), [0]);
+    assert.deepEqual(layerView(model, 2, [1]).combos.inView.map((entry) => entry.combo.id), [1],
         "a combo's inputs must coexist in this activation");
     assert.deepEqual(macroNames([0]), ["MACRO_1", "MACRO_0", "MACRO_2"]);
     assert.deepEqual(macroNames([1]), ["MACRO_1", "MACRO_3"]);
-    const modes = (/** @type {number[]} */ held) => reachInView(model, stack, 2, held,
-        (/** @type {string} */ keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; });
+    const modes = (/** @type {number[]} */ held) => reachInView(layerView(model, 2, held), (/** @type {string} */ keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; });
     assert.deepEqual(modes([]), []);
     assert.deepEqual(modes([1]).map((entry) => entry.name), ["4"], "a visible behaviour's branch reaches the mode");
-    const branch = reachInView(model, stack, 2, [1], macroNamesOf(model)).find((entry) => entry.name === "MACRO_1");
-    assert.deepEqual(reachKeys(stack, 2, branch, [1]), [1], "the view route rings only visible source keys");
-    assert.deepEqual(behaviourRouteKeys(model, stack, 2, "KC_C", "view", [1]), [0]);
-    assert.deepEqual(behaviourRouteKeys(model, stack, 2, "KC_C", "view", []), []);
+    const branch = reachInView(layerView(model, 2, [1]), macroNamesOf(model)).find((entry) => entry.name === "MACRO_1");
+    assert.deepEqual(reachKeys(layerView(model, 2, [1]), branch, true), [1], "the view route rings only visible source keys");
+    assert.deepEqual(layerView(model, 2, [1]).behaviours.routeKeys("KC_C", "view"), [0]);
+    assert.deepEqual(layerView(model, 2).behaviours.routeKeys("KC_C", "view"), []);
 });
 
 test("a macro fired from a behaviour branch is reached, though no key shows it", () => {
     const model = published({keys: {0: {0: "KC_ESCAPE", 1: "MACRO_0", 2: "KC_B"}, 1: {0: "KC_TRANSPARENT", 1: "KC_TRANSPARENT", 2: "KC_NO"}},
         behaviours: [{keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "MACRO_1"}}]}, {keycode: "KC_B", steps: [{tapCount: 0, longHold: held("MACRO_2")}]}],
         edits: ["{KC_A}", "{KC_B}", "{KC_C}"].map((payload, n) => macroMessage(`MACRO_${n}`, payload))});
-    const stack = model.layers;
 
-    const base = macroReach(model, stack, 0);
+    const base = macroReach(layerView(model, 0));
     assert.deepEqual(base.onKeys.map((entry) => entry.name), ["MACRO_0"], "the only macro a key carries");
     assert.deepEqual(base.throughKeys, [], "the base layer has nothing under it to fall through to");
     assert.deepEqual(base.fromBranches.map((entry) => entry.name), ["MACRO_1", "MACRO_2"],
@@ -103,7 +100,7 @@ test("a macro fired from a behaviour branch is reached, though no key shows it",
     assert.deepEqual(base.fromBranchesBelow, [], "nothing lies under the base layer to reach a behaviour through");
     assert.deepEqual(base.elsewhere, [], "an empty slot is not a macro this layer is missing");
 
-    const above = macroReach(model, stack, 1);
+    const above = macroReach(layerView(model, 1));
     assert.deepEqual(above.onKeys, [], "no key on Numbers carries a macro itself");
     assert.deepEqual(above.throughKeys.map((entry) => entry.name), ["MACRO_0"],
         "a transparent key lets the macro key underneath answer");
@@ -119,12 +116,11 @@ test("a thing reached several ways is listed under each of them", () => {
     const model = published({keys: {0: {0: "KC_ESCAPE", 1: "MACRO_1", 2: "KC_X"}, 1: {0: "KC_ESCAPE", 1: "KC_TRANSPARENT", 2: "KC_B"}},
         behaviours: [{keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "MACRO_0"}}]}, {keycode: "KC_B", steps: [{tapCount: 1, tap: {action: "MACRO_1"}}]}],
         edits: ["{KC_A}", "{KC_B}"].map((payload, n) => macroMessage(`MACRO_${n}`, payload))});
-    const stack = model.layers;
 
     // MACRO_1 sits on a key below and is also fired by KC_B, a behaviour
     // mapped on Numbers itself. Both are real ways to reach it, so both are
     // answered — each entry carrying only the route it is filed under.
-    const above = macroReach(model, stack, 1);
+    const above = macroReach(layerView(model, 1));
     assert.deepEqual(above.onKeys, [], "no macro keycode is on a key of Numbers");
     assert.deepEqual(above.fromBranches.map((entry) => entry.name).sort(), ["MACRO_0", "MACRO_1"]);
     assert.deepEqual(above.throughKeys.map((entry) => entry.name), ["MACRO_1"],
@@ -146,9 +142,9 @@ test("reach lists read down the stack, the default layer first", () => {
     }, behaviours: ["KC_A", "KC_B", "KC_C"].map(behaviourOn), edits: [0, 1, 2].map((n) => macroMessage(`MACRO_${n}`, "{KC_A}"))});
     const stack = model.layers;
 
-    assert.deepEqual(macroReach(model, stack, 3).throughKeys.map((entry) => entry.keys[0].layer.displayName),
+    assert.deepEqual(macroReach(layerView(model, 3)).throughKeys.map((entry) => entry.keys[0].layer.displayName),
         ["Base", "Numbers", "Symbols"], "macros answered lower in the stack come first");
-    assert.deepEqual(behaviourGroups(model, stack, 3).through.map((entry) => entry.layer.displayName),
+    assert.deepEqual(layerView(model, 3).behaviours.groups.through.map((entry) => entry.layer.displayName),
         ["Base", "Numbers", "Symbols"], "and so do behaviours");
 });
 
@@ -162,10 +158,9 @@ test("a branch route names every cell that sends it, once", () => {
             {keycode: "KC_Q", steps: [{tapCount: 0, longHold: held("PD_MODE_3")}, {tapCount: 1, hold: held("PD_MODE_3"), tap: {action: "PD_MODE_3_LOCK"}}]},
             {keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, tap: {action: "PD_MODE_3_LOCK"}}]},
         ]});
-    const stack = model.layers;
     const names = (/** @type {string} */ keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; };
 
-    const [zoom] = reachInView(model, stack, 0, [], names);
+    const [zoom] = reachInView(layerView(model, 0), names);
     assert.deepEqual(zoom.behaviours.map(({action, cells}) => [action, cells]), [
         ["PD_MODE_3", [{branch: 1, tier: "long"}, {branch: 2, tier: "hold"}]],
         ["PD_MODE_3_LOCK", [{branch: 2, tier: "tap"}]],
@@ -173,7 +168,7 @@ test("a branch route names every cell that sends it, once", () => {
     assert.deepEqual(zoom.combos.map(({via, action, cells}) => [via, action, cells]), [["KC_RIGHT_ALT", "PD_MODE_3_LOCK", [{branch: 1, tier: "tap"}]]],
         "a combo through a behaviour names the cell of that behaviour");
 
-    const groups = pointingReach(model, stack, 0);
+    const groups = pointingReach(layerView(model, 0));
     assert.deepEqual(groups.fromBranches[0].behaviours.map(({cells}) => cells),
         [[{branch: 1, tier: "long"}, {branch: 2, tier: "hold"}], [{branch: 2, tier: "tap"}]], "the grouped routes carry the same cells");
     assert.deepEqual(groups.fromCombos[0].combos.map(({cells}) => cells), [[{branch: 1, tier: "tap"}]]);
@@ -189,19 +184,18 @@ test("a combo reaches the macro it sends, and what a behaviour it sends reaches"
         behaviours: [{keycode: "CUSTOM_KEY_0", steps: [{tapCount: 1, hold: held("MACRO_1")}]}],
         edits: ["{KC_A}", "{KC_B}", "{KC_C}"].map((payload, n) => macroMessage(`MACRO_${n}`, payload))});
     const model = published(described(true));
-    const stack = model.layers;
     assert.notEqual(model.combos[0].output, "MACRO_0", "the combo's output is the keyboard's name for the value");
 
-    const base = macroReach(model, stack, 0);
+    const base = macroReach(layerView(model, 0));
     assert.deepEqual(base.fromCombos.map((entry) => entry.name), ["MACRO_0", "MACRO_1"]);
     assert.deepEqual(base.fromCombos[0].combos.map((route) => [route.combo.badge, route.via, route.action]),
         [["C0", null, "MACRO_0"]], "sent by the combo itself, matched by meaning rather than the catalogue name");
     assert.deepEqual(base.fromCombos[1].combos.map((route) => [route.combo.badge, route.via, route.action]),
         [["C1", "CUSTOM_KEY_0", "MACRO_1"]], "sent by a branch of the behaviour the combo fires");
     assert.deepEqual(base.elsewhere, ["MACRO_2"], "a combo's macro is no longer called unreachable");
-    assert.deepEqual(reachKeys(stack, 0, base.fromCombos[0]).sort(), [0, 1], "the board rings the keys chorded to fire it");
+    assert.deepEqual(reachKeys(layerView(model, 0), base.fromCombos[0]).sort(), [0, 1], "the board rings the keys chorded to fire it");
 
-    const above = macroReach(model, stack, 1);
+    const above = macroReach(layerView(model, 1));
     assert.deepEqual(above.fromCombos, [], "on Numbers C0 needs the transparent J, so it is not this layer's own");
     assert.deepEqual(above.fromCombosBelow.map((entry) => entry.name), ["MACRO_0"]);
     assert.deepEqual(above.elsewhere, ["MACRO_1", "MACRO_2"], "C1 needs L, and Numbers stores 1 there");
@@ -210,10 +204,10 @@ test("a combo reaches the macro it sends, and what a behaviour it sends reaches"
     // (tests/model/participation.test.js says when).
     const bypassed = published(described(false));
     assert.equal(bypassed.combos[1].outputBehaviorLayers, 0);
-    assert.deepEqual(behaviourGroups(bypassed, bypassed.layers, 0).combos, []);
-    assert.deepEqual(behavioursInView(bypassed, bypassed.layers, 0).filter((entry) => entry.combos.length), []);
-    assert.deepEqual(macroReach(bypassed, bypassed.layers, 0).fromCombos.map((entry) => entry.name), ["MACRO_0"], "a bypassed output retains the directly sent macro");
-    assert.deepEqual(reachInView(bypassed, bypassed.layers, 0, [], macroNamesOf(bypassed)).map((entry) => entry.name), ["MACRO_0"]);
+    assert.deepEqual(layerView(bypassed, 0).behaviours.groups.combos, []);
+    assert.deepEqual(layerView(bypassed, 0).behaviours.inView.filter((entry) => entry.combos.length), []);
+    assert.deepEqual(macroReach(layerView(bypassed, 0)).fromCombos.map((entry) => entry.name), ["MACRO_0"], "a bypassed output retains the directly sent macro");
+    assert.deepEqual(reachInView(layerView(bypassed, 0), macroNamesOf(bypassed)).map((entry) => entry.name), ["MACRO_0"]);
 });
 
 test("cold macro placement lookup avoids combinations of layers that cannot change combo answers", () => {
@@ -222,8 +216,8 @@ test("cold macro placement lookup avoids combinations of layers that cannot chan
         const model = published({keys, combos});
         let reads = 0;
         // The published layers, counting each read of their keys.
-        const stack = model.layers.map((/** @type {any} */ layer) => Object.defineProperty({...layer}, "positions", {get() { reads++; return layer.positions; }}));
-        const placements = macroPlacements(model, stack, "MACRO_0");
+        const counted = {...model, layers: model.layers.map((/** @type {any} */ layer) => Object.defineProperty({...layer}, "positions", {get() { reads++; return layer.positions; }}))};
+        const placements = macroPlacements(counted, "MACRO_0");
         assert.equal(placements.length, combos.length ? 16 : 0);
         assert.ok(reads < 1000, `cold lookup read layers ${reads} times`);
     }
@@ -235,7 +229,7 @@ test("a macro's layers are the ones that hold a way to it themselves", () => {
         behaviours: [{keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "MACRO_2"}}]}],
         edits: [1, 2, 3, 10].map((n) => macroMessage(`MACRO_${n}`, "{KC_A}"))});
     const stack = model.layers;
-    const summary = (/** @type {string} */ keycode) => macroPlacements(model, stack, keycode)
+    const summary = (/** @type {string} */ keycode) => macroPlacements(model, keycode)
         .map((entry) => [entry.layer.displayName, entry.at, entry.routes.map((route) => [route.group, route.keys.sort()])]);
 
     assert.deepEqual(summary("MACRO_1"), [["Base", 0, [["here", [0, 2]]]], ["Symbols", 2, [["here", [1]]]]],
@@ -245,15 +239,14 @@ test("a macro's layers are the ones that hold a way to it themselves", () => {
     assert.deepEqual(summary("MACRO_3"), [["Symbols", 2, [["combos", [0, 2]]]]],
         "a combo firing from that layer's keys sends it");
     assert.deepEqual(summary("MACRO_10"), [], "MACRO_1 does not match MACRO_10");
-    assert.deepEqual(macroPlacements(model, undefined, "MACRO_1"), []);
+    assert.deepEqual(macroPlacements({...model, layers: undefined}, "MACRO_1"), []);
 });
 
 test("a custom key's layers are the ones where a key carries it or a combo sends it", () => {
     const model = published({keys: {0: {0: "CUSTOM_KEY_0", 1: "KC_B", 2: "KC_C"}, 1: {0: "KC_TRANSPARENT", 1: "CUSTOM_KEY_1", 2: "KC_NO"}},
         combos: [{inputs: ["KC_B", "KC_C"], output: "CUSTOM_KEY_2"}],
         edits: [0, 1, 2].map((slot) => customKeyNameMessage(`CUSTOM_KEY_${slot}`, `Key ${slot}`))});
-    const stack = model.layers;
-    const summary = (/** @type {string} */ keycode) => customKeyPlacements(model, stack, keycode)
+    const summary = (/** @type {string} */ keycode) => customKeyPlacements(model, keycode)
         .map((entry) => [entry.layer.displayName, entry.at, entry.routes.map((route) => [route.group, route.keys.sort()])]);
     assert.deepEqual(summary("CUSTOM_KEY_0"), [["Base", 0, [["here", [0]]]]], "Numbers only falls through to Base's");
     assert.deepEqual(summary("CUSTOM_KEY_1"), [["Numbers", 1, [["here", [1]]]]]);
@@ -262,10 +255,10 @@ test("a custom key's layers are the ones where a key carries it or a combo sends
 
 test("a macro or custom key is placed by the Keymap tab that lists it", () => {
     const model = published({keys: {0: {0: "MACRO_1", 1: "CUSTOM_KEY_0"}}});
-    assert.deepEqual(placementsOf(model, model.layers, "macros", "MACRO_1"), macroPlacements(model, model.layers, "MACRO_1"));
-    assert.deepEqual(placementsOf(model, model.layers, "customKeys", "CUSTOM_KEY_0"), customKeyPlacements(model, model.layers, "CUSTOM_KEY_0"));
-    assert.deepEqual(placementsOf(model, model.layers, "customKeys", "CUSTOM_KEY_0").map((entry) => entry.at), [0]);
-    assert.deepEqual(placementsOf(model, model.layers, "macros", "CUSTOM_KEY_0"), [], "a tab finds only its own kind");
+    assert.deepEqual(placementsOf(model, "macros", "MACRO_1"), macroPlacements(model, "MACRO_1"));
+    assert.deepEqual(placementsOf(model, "customKeys", "CUSTOM_KEY_0"), customKeyPlacements(model, "CUSTOM_KEY_0"));
+    assert.deepEqual(placementsOf(model, "customKeys", "CUSTOM_KEY_0").map((entry) => entry.at), [0]);
+    assert.deepEqual(placementsOf(model, "macros", "CUSTOM_KEY_0"), [], "a tab finds only its own kind");
 });
 
 test("a custom key is placed wherever it is sent, unnamed and with nothing but a shortcut, or by a behaviour step", () => {
@@ -273,7 +266,7 @@ test("a custom key is placed wherever it is sent, unnamed and with nothing but a
         behaviours: [{keycode: "KC_A", steps: [{tapCount: 1, tap: {action: "CUSTOM_KEY_1"}}]}],
         edits: [customKeyShortcutMessage("CUSTOM_KEY_0", {mods: 0x41, keys: [0x0e]})]});
     assert.equal(model.customKeys[0].name, "", "unnamed");
-    const groups = (/** @type {string} */ keycode) => customKeyPlacements(model, model.layers, keycode).map((entry) => entry.routes.map((route) => route.group));
+    const groups = (/** @type {string} */ keycode) => customKeyPlacements(model, keycode).map((entry) => entry.routes.map((route) => route.group));
     assert.deepEqual(groups("CUSTOM_KEY_0"), [["here"]], "an unnamed key with only a shortcut is placed");
     assert.deepEqual(groups("CUSTOM_KEY_1"), [["branches"]], "a behaviour step sending it places it");
 });

@@ -82,9 +82,9 @@ export const customKeyInUse = (key) => Boolean(key && (key.name || key.hasBehavi
 // Custom keys, grouped the ways a layer reaches them, as macros are: a key
 // carrying one, a transparent key letting a lower one, a behaviour branch
 // sending one (which sends its shortcut only, D-L63), or a combo sending one.
-/** @param {Model} model @param {import("../../contracts/panel.js").Layer[]} stack @param {number} at */
-export const customKeyReach = (model, stack, at) => reachGroups(model, stack, at, customKeyNamesOf(model),
-    (model?.customKeys || []).filter(customKeyInUse).map((key) => key.keycode));
+/** @param {import("./keyface-types.js").LayerView} view */
+export const customKeyReach = (view) => reachGroups(view, customKeyNamesOf(view.model),
+    (view.model?.customKeys || []).filter(customKeyInUse).map((key) => key.keycode));
 
 // The custom key a keycode names, if it is one: one of the custom keys core
 // publishes, by its name or any other it is read by, the bare hex a combo
@@ -398,9 +398,9 @@ export const customKeyWithShortcut = (model, shortcut, {runsBehaviour = true} = 
 
 // The custom key such an offer takes: the first that does nothing yet, with no
 // name, behaviour or shortcut and on no layer or combo.
-/** @param {Model} model @param {import("../../contracts/panel.js").Layer[]} stack */
-export const unusedCustomKey = (model, stack) => (model?.customKeys || []).find((key) =>
-    !key.name && !key.hasBehavior && !hasShortcut(key) && !customKeyPlacements(model, stack, key.keycode).length);
+/** @param {Model} model */
+export const unusedCustomKey = (model) => (model?.customKeys || []).find((key) =>
+    !key.name && !key.hasBehavior && !hasShortcut(key) && !customKeyPlacements(model, key.keycode).length);
 
 // What the picker offers for a shortcut no keycode holds (D-L63). A custom key
 // with exactly that shortcut is used if it does only that. Where the field
@@ -409,13 +409,13 @@ export const unusedCustomKey = (model, stack) => (model?.customKeys || []).find(
 // a behaviour step sends only the shortcut and never chains another
 // behaviour, so there any match is used as it is. With no match, an unused
 // key is made it.
-/** @param {Model} model @param {{mods: number, keys: readonly number[]}} shortcut @param {import("../../contracts/panel.js").Layer[]} stack @param {{runsBehaviour?: boolean}} [options] */
-export function customKeyChoice(model, shortcut, stack, {runsBehaviour = true} = {}) {
+/** @param {Model} model @param {{mods: number, keys: readonly number[]}} shortcut @param {{runsBehaviour?: boolean}} [options] */
+export function customKeyChoice(model, shortcut, {runsBehaviour = true} = {}) {
     const plain = customKeyWithShortcut(model, shortcut, {runsBehaviour});
     // A step sends only the shortcut, so a match's behaviour never runs there.
     if (plain) return {existing: plain, withBehaviour: false, spare: undefined};
     const behaved = runsBehaviour ? customKeyWithShortcut(model, shortcut, {runsBehaviour: false}) : undefined;
-    return {existing: behaved, withBehaviour: Boolean(behaved), spare: unusedCustomKey(model, stack)};
+    return {existing: behaved, withBehaviour: Boolean(behaved), spare: unusedCustomKey(model)};
 }
 
 // The name it gets: the shortcut in words if that fits a name, else written

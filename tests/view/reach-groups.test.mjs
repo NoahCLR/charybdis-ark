@@ -7,6 +7,7 @@ import {customKeyPlacements, macroPlacements, macroReach} from "../../webview/vi
 import {pointingReach} from "../../webview/view/pointing-reach.mjs";
 import {customKeyReach} from "../../webview/view/custom-key.mjs";
 import {macroMessage} from "../../webview/view/edits.mjs";
+import {layerView} from "../../webview/view/layer-view.mjs";
 
 const {profileDocument, publishedModel} = createRequire(import.meta.url)("../fixtures/published-model.js");
 
@@ -15,7 +16,6 @@ const {profileDocument, publishedModel} = createRequire(import.meta.url)("../fix
 const T = "KC_TRANSPARENT";
 const model = publishedModel(profileDocument({keys: {0: {0: "MACRO_0", 1: "KC_J", 2: "KC_K", 3: "CUSTOM_KEY_0", 4: "PD_MODE_0"}, 1: {0: T, 1: T, 2: T, 3: T, 4: T}},
     combos: [{inputs: ["KC_J", "KC_K"], output: "MACRO_1"}]}), {edits: [macroMessage("MACRO_0", "{KC_A}"), macroMessage("MACRO_1", "{KC_B}")]});
-const stack = model.layers;
 
 test("every reach group has a title and a place in the one order", () => {
     assert.deepEqual(Object.keys(GROUP_TITLES).sort(), [...GROUP_ORDER].sort());
@@ -59,7 +59,7 @@ test("a picked row names the group it was picked under and what it lists", () =>
 
 test("a picked row rings the keys of the route it was picked under", () => {
     /** @param {number} at @param {number[]} held @param {string} tab @param {string | null} picked */
-    const rings = (at, held, tab, picked) => pickedReachKeys(model, stack, at, held, tab, picked);
+    const rings = (at, held, tab, picked) => pickedReachKeys(layerView(model, at, held), tab, picked);
     assert.deepEqual(rings(0, [], "macros", "here:MACRO_0"), [0]);
     assert.deepEqual(rings(0, [], "macros", "combos:MACRO_1"), [1, 2], "the chord of the combo sending it");
     assert.deepEqual(rings(1, [], "macros", "through:MACRO_0"), [0], "the transparent key it falls through");
@@ -80,11 +80,11 @@ test("a picked row rings the keys of the route it was picked under", () => {
 });
 
 test("a tab counts what the layer stores, not what it reaches under a transparent key", () => {
-    assert.equal(storedCount(macroReach(model, stack, 0)), 2, "a macro on a key and one a combo sends");
-    assert.equal(storedCount(macroReach(model, stack, 1)), 0, "Numbers stores none of them");
-    assert.equal(storedCount(customKeyReach(model, stack, 0)), 1);
-    assert.equal(storedCount(pointingReach(model, stack, 0)), 1);
-    assert.equal(storedCount(pointingReach(model, stack, 1)), 0);
+    assert.equal(storedCount(macroReach(layerView(model, 0))), 2, "a macro on a key and one a combo sends");
+    assert.equal(storedCount(macroReach(layerView(model, 1))), 0, "Numbers stores none of them");
+    assert.equal(storedCount(customKeyReach(layerView(model, 0))), 1);
+    assert.equal(storedCount(pointingReach(layerView(model, 0))), 1);
+    assert.equal(storedCount(pointingReach(layerView(model, 1))), 0);
     assert.equal(storedCount({onKeys: [{name: "A"}], fromBranches: [{name: "A"}], fromCombos: [{name: "B"}]}), 2, "one thing reached two ways counts once");
 });
 
@@ -92,14 +92,14 @@ test("a macro's or custom key's layers read as chips saying how each reaches it,
     // Two keys carry MACRO_2 on Base and a combo on its keys sends it.
     const placed = publishedModel(profileDocument({keys: {0: {0: "MACRO_2", 1: "MACRO_2", 2: "KC_J", 3: "KC_K"}},
         combos: [{inputs: ["KC_J", "KC_K"], output: "MACRO_2"}]}), {edits: [macroMessage("MACRO_2", "{KC_A}")]});
-    const placements = macroPlacements(placed, placed.layers, "MACRO_2");
+    const placements = macroPlacements(placed, "MACRO_2");
     assert.deepEqual(placementChips(placements).map(({at, how}) => [at, how]), [[0, "key ×2 · combo"]]);
     assert.deepEqual(placementOpening(placements, "MACRO_2", 0), {layer: 0, selected: 0, group: "here", row: "here:MACRO_2"},
         "the first route's row, with its first key picked");
     assert.equal(placementOpening(placements, "MACRO_2", 1), null, "a layer it is not placed on opens nothing");
     // A custom key reached on Numbers only through Base's key, under a
     // transparent one, is placed on Base alone, by its one key.
-    const custom = customKeyPlacements(model, stack, "CUSTOM_KEY_0");
+    const custom = customKeyPlacements(model, "CUSTOM_KEY_0");
     assert.deepEqual(placementChips(custom).map(({layer, at, how}) => [layer.index, at, how]), [[0, 0, "key"]]);
     assert.deepEqual(placementOpening(custom, "CUSTOM_KEY_0", 0), {layer: 0, selected: 3, group: "here", row: reachRowId("here", "CUSTOM_KEY_0")});
 });

@@ -5,6 +5,7 @@ import {keyMeaning} from "../../webview/view/keyface.mjs";
 import {reachKeys} from "../../webview/view/reach.mjs";
 import {holdKeyName, pointingReach, pointingReachInView, pointingSlotFor, pointingVariant, slotKeycodeNames, slotKeycodes, whatReachesSlot} from "../../webview/view/pointing-reach.mjs";
 import {customKeyShortcutMessage} from "../../webview/view/edits.mjs";
+import {layerView} from "../../webview/view/layer-view.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
 
 const require = createRequire(import.meta.url);
@@ -96,7 +97,7 @@ test("a branch keeps which of a pointing mode's two keycodes it sends", () => {
     // slot is right for saying which mode is reached, but the row has to keep
     // the difference or holding and toggling read the same.
     const model = published({keys: {0: {50: "PD_MODE_0"}}, behaviours: [{keycode: "PD_MODE_0", steps: [{tapCount: 0, hold: held("PD_MODE_0_LOCK")}]}]});
-    const reach = pointingReach(model, model.layers, 0);
+    const reach = pointingReach(layerView(model, 0));
 
     assert.deepEqual(reach.onKeys.map((entry) => entry.name), ["0"], "the key holds the mode");
     assert.deepEqual(reach.fromBranches.map((entry) => entry.name), ["0"], "and its own behaviour toggles it");
@@ -107,7 +108,7 @@ test("a branch keeps which of a pointing mode's two keycodes it sends", () => {
 
 test("a combo reaches the pointing mode it sends", () => {
     const model = published({keys: {0: {0: "KC_J", 1: "KC_K"}}, combos: [{inputs: ["KC_J", "KC_K"], output: "PD_MODE_0"}], slots: onlySlots([0])});
-    const reach = pointingReach(model, model.layers, 0);
+    const reach = pointingReach(layerView(model, 0));
     assert.deepEqual(reach.fromCombos.map((entry) => entry.name), ["0"]);
     assert.deepEqual(reach.elsewhere, []);
 });
@@ -134,25 +135,24 @@ test("a layer that starts a pointing mode reaches it on that layer, with no key"
     const model = published({keys: {0: {0: "KC_A"}, 1: {0: "PD_MODE_6"}, 2: {0: "KC_A"}, 3: {0: "PD_MODE_6"}, [pointer]: {0: "KC_A"}},
         slots: slotsOf([4, 5, 6], linkedMode(4, "Arrow", {linkedLayers: 1 << 3}), linkedMode(5, "Zoom", {linkedLayers: 1 << pointer}),
             linkedMode(6, "Scroll", {linkedLayers: (1 << 1) | (1 << 2)}))});
-    const stack = model.layers;
     assert.deepEqual(model.pdModes[5].linkStarts, [], "the pointer layer starts nothing");
 
-    const top = pointingReach(model, stack, 3);
+    const top = pointingReach(layerView(model, 3));
     assert.deepEqual(top.onKeys.map((entry) => entry.name), ["6", "4"], "the key here, then the modes the layer starts");
     assert.deepEqual(top.onKeys.map((entry) => entry.starts?.map((layer) => layer.index)), [undefined, [3]]);
     assert.equal(top.onKeys[1].keys.length, 0, "a started mode rings no key");
     assert.deepEqual(top.elsewhere, ["5"]);
-    assert.deepEqual(pointingReach(model, stack, pointer).onKeys, [], "a layer the keyboard ignores in a link starts nothing");
-    const numbers = pointingReach(model, stack, 1).onKeys;
+    assert.deepEqual(pointingReach(layerView(model, pointer)).onKeys, [], "a layer the keyboard ignores in a link starts nothing");
+    const numbers = pointingReach(layerView(model, 1)).onKeys;
     assert.deepEqual(numbers.map((entry) => [entry.name, entry.keys.length, entry.starts?.map((layer) => layer.index)]), [["6", 1, [1]]],
         "a mode on a key here that the layer also starts names both");
-    assert.deepEqual(pointingReach(model, stack, 2).onKeys.map((entry) => entry.name), ["6"]);
-    assert.deepEqual(pointingReach(model, stack, 0).elsewhere, ["4", "5", "6"]);
+    assert.deepEqual(pointingReach(layerView(model, 2)).onKeys.map((entry) => entry.name), ["6"]);
+    assert.deepEqual(pointingReach(layerView(model, 0)).elsewhere, ["4", "5", "6"]);
 
-    assert.deepEqual(pointingReachInView(model, stack, 2, []).map((entry) => entry.name), ["6"], "a layer shown alone starts its mode");
-    assert.deepEqual(pointingReachInView(model, stack, 2, [3]).map((entry) => [entry.name, entry.starts?.map((layer) => layer.index)]),
+    assert.deepEqual(pointingReachInView(layerView(model, 2)).map((entry) => entry.name), ["6"], "a layer shown alone starts its mode");
+    assert.deepEqual(pointingReachInView(layerView(model, 2, [3])).map((entry) => [entry.name, entry.starts?.map((layer) => layer.index)]),
         [["4", [3]], ["6", [2]]], "in a view, every layer on starts its mode, in slot order");
-    assert.deepEqual(pointingReachInView(model, stack, 2, [1]).map((entry) => [entry.name, entry.starts?.map((layer) => layer.index)]),
+    assert.deepEqual(pointingReachInView(layerView(model, 2, [1])).map((entry) => [entry.name, entry.starts?.map((layer) => layer.index)]),
         [["6", [1, 2]]], "a mode started by two layers both in view lists both");
 });
 
@@ -167,10 +167,9 @@ test("a key that turns on a layer starting a pointing mode reaches the mode", ()
         behaviours: [{keycode: "KC_B", steps: [{tapCount: 0, hold: held("TG(3)")}]}],
         slots: slotsOf([4, 5], linkedMode(4, "Arrow", {linkedLayers: 1 << 3}), linkedMode(5, "Zoom", {linkTurnsOn: 1 << 3})),
         edits: [turningOn("CUSTOM_KEY_2", 1 << 3)]});
-    const stack = model.layers;
     for (const keycode of ["MO(3)", "TG(3)", "TO(3)", "CUSTOM_KEY_2", "PD_MODE_5"]) assert.equal(model.qmkKeyTurnsOn[keycode], 1 << 3, `core publishes what ${keycode} turns on`);
 
-    const reach = pointingReach(model, stack, 0);
+    const reach = pointingReach(layerView(model, 0));
     const arrow = reach.onKeys.find((entry) => entry.name === "4");
     assert.deepEqual(arrow?.keys.map((key) => keyMeaning(key.position)), ["MO(3)", "CUSTOM_KEY_2", "PD_MODE_5"],
         "a layer key, a custom key's layers and another mode's key start it; DF and another layer do not");
@@ -178,7 +177,7 @@ test("a key that turns on a layer starting a pointing mode reaches the mode", ()
     assert.deepEqual(reach.fromBranches.find((entry) => entry.name === "4")?.behaviours.map((row) => row.action), ["TG(3)"]);
     assert.deepEqual(reach.fromCombos.find((entry) => entry.name === "4")?.combos.map((route) => route.action), ["TO(3)"]);
     assert.deepEqual(reach.onKeys.find((entry) => entry.name === "5")?.startVia, undefined, "Zoom's own key holds Zoom");
-    assert.deepEqual(reachKeys(stack, 0, arrow), [0, 1, 7], "the board rings the keys that turn the layer on");
+    assert.deepEqual(reachKeys(layerView(model, 0), arrow), [0, 1, 7], "the board rings the keys that turn the layer on");
 });
 
 test("a route reaches a mode its layer starts only while no layer ending that start is on", () => {
@@ -189,15 +188,14 @@ test("a route reaches a mode its layer starts only while no layer ending that st
     const model = published({keys: {0: {0: "MO(2)", 1: "CUSTOM_KEY_1"}, 1: {0: "MO(2)", 1: "KC_TRNS"}, 2: {0: "MO(2)", 1: "KC_TRNS"}, 3: {0: "MO(2)", 1: "KC_TRNS"}},
         slots: slotsOf([4], linkedMode(4, "Arrow", {linkedLayers: 1 << 2, linkEnds: PD_LINK_ENDS.HIGHER_LAYER})),
         edits: [turningOn("CUSTOM_KEY_1", (1 << 2) | (1 << 5))]});
-    const stack = model.layers;
     assert.ok(model.pdModes[4].linkStarts[0].ends & (1 << 3), "a higher layer ends a start from layer 2");
 
-    const base = pointingReach(model, stack, 0).onKeys.find((entry) => entry.name === "4");
+    const base = pointingReach(layerView(model, 0)).onKeys.find((entry) => entry.name === "4");
     assert.deepEqual(base?.keys.map((key) => key.position.keycode), ["MO(2)"], "MO(2) on Base starts it; a key also turning on a higher layer ends it");
-    assert.deepEqual(pointingReach(model, stack, 1).onKeys.map((entry) => entry.name), ["4"], "on a layer below the starting layer");
-    assert.deepEqual(pointingReach(model, stack, 3).onKeys, [], "on a higher layer, which ends it");
-    assert.ok(pointingReach(model, stack, 3).elsewhere.includes("4"));
-    assert.deepEqual(pointingReachInView(model, stack, 1, [3]).map((entry) => entry.name), [], "a view with a higher layer on ends it");
-    assert.deepEqual(pointingReachInView(model, stack, 2, []).map((entry) => entry.name), ["4"], "the starting layer shown alone starts it");
-    assert.deepEqual(pointingReachInView(model, stack, 2, [3]), [], "and not with a higher layer held");
+    assert.deepEqual(pointingReach(layerView(model, 1)).onKeys.map((entry) => entry.name), ["4"], "on a layer below the starting layer");
+    assert.deepEqual(pointingReach(layerView(model, 3)).onKeys, [], "on a higher layer, which ends it");
+    assert.ok(pointingReach(layerView(model, 3)).elsewhere.includes("4"));
+    assert.deepEqual(pointingReachInView(layerView(model, 1, [3])).map((entry) => entry.name), [], "a view with a higher layer on ends it");
+    assert.deepEqual(pointingReachInView(layerView(model, 2)).map((entry) => entry.name), ["4"], "the starting layer shown alone starts it");
+    assert.deepEqual(pointingReachInView(layerView(model, 2, [3])), [], "and not with a higher layer held");
 });

@@ -11,7 +11,6 @@ export interface BoardOptions {
     drafted?: ReadonlySet<number | undefined> | null;
     faces?: boolean;
     trackball?: boolean;
-    held?: number[];
     picking?: boolean;
     onKey?: (index: number) => void;
     onOpen?: (index: number) => void;

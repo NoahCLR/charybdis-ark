@@ -5,21 +5,22 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {keyMeaning} from "../../view/keyface.mjs";
 import {reachInView} from "../../view/reach.mjs";
-import {pointingReach, pointingVariant, slotKeycodeNames} from "../../view/pointing-reach.mjs";
+import {pointingReach, pointingReachInView, pointingVariant, slotKeycodeNames} from "../../view/pointing-reach.mjs";
 import {linkRows} from "../../view/pointing-link.mjs";
 import {pdColourRow} from "../../view/lighting.mjs";
-import {getModel, layers, render, state} from "../../store.mjs";
+import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
 import {mark, slotNamedWithKeycodes} from "../marks.mjs";
 import {slotNamed, vocabulary, word} from "../../view/vocabulary.mjs";
-import {layersNamed, layersOfMask, pointingReachLines, pointingView} from "./reach.mjs";
+import {layersNamed, layersOfMask, pointingReachLines} from "./reach.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabPointing(body, right) {
     const model = getModel();
-    const reach = {...pointingReach(model, layers(), state.layer), inView: pointingView(model)};
+    const view = currentView();
+    const reach = {...pointingReach(view), inView: pointingReachInView(view)};
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Pointing modes screen</button>`);
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });

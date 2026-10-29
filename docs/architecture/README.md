@@ -81,6 +81,11 @@ Around the core:
 - A rule about what something means on screen (a colour, a key face, a
   locality): `webview/view/`, with a test. A screen or component:
   `webview/ui/`.
+- A question about the layers the board shows (which key answers, what the
+  view shows, the combos and behaviours it reaches): asked of the view
+  value, `webview/view/layer-view.mjs`, which a screen takes from
+  `currentView()` in `webview/store.mjs` rather than passing the model, the
+  layer and the preview to each function.
 
 ## Facts and their homes
 

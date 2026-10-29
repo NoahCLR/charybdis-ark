@@ -3,14 +3,12 @@
 // and the macros, custom keys and pointing modes this layer reaches.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {behaviourGroups} from "../../view/behaviour-reach.mjs";
 import {macroReach} from "../../view/reach.mjs";
 import {pointingReach} from "../../view/pointing-reach.mjs";
 import {storedCount} from "../../view/reach-groups.mjs";
-import {comboGroups} from "../../view/combo-reach.mjs";
 import {customKeyReach} from "../../view/custom-key.mjs";
 import {mappedKeyCount} from "../../view/lighting.mjs";
-import {currentLayer, getModel, layers, render, selectedPosition, state} from "../../store.mjs";
+import {currentLayer, currentView, getModel, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {keepInView} from "../layerbar.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
@@ -35,15 +33,16 @@ const TABS = [
 
 export function bench() {
     const model = getModel();
+    const view = currentView();
     const layer = currentLayer();
     /** @type {Record<string, string>} */
     const counts = {
         key: String(mappedKeyCount(model, layer)),
-        behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(behaviourGroups(model, layers(), state.layer))),
-        combos: String(comboGroups(model, layers(), state.layer).onKeys.length),
-        macros: String(storedCount(macroReach(model, layers(), state.layer))),
-        customKeys: String(storedCount(customKeyReach(model, layers(), state.layer))),
-        pointing: String(storedCount(pointingReach(model, layers(), state.layer))),
+        behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(view.behaviours.groups)),
+        combos: String(view.combos.groups.onKeys.length),
+        macros: String(storedCount(macroReach(view))),
+        customKeys: String(storedCount(customKeyReach(view))),
+        pointing: String(storedCount(pointingReach(view))),
     };
     // A tab whose list holds something the draft changed says so.
     const marks = draftMarks(model?.draft?.changes);

@@ -10,8 +10,7 @@ import {el, esc} from "../../lib/dom.mjs";
 import {scrollContentTo} from "../../lib/scroll.mjs";
 import {actionLabel, canonicalKeycode, visibleKeycode} from "../../view/keyface.mjs";
 import {customKeyOf, customKeySendsNote, customKeyShortcutOnly, hasShortcut, shortcutPickLabel} from "../../view/custom-key.mjs";
-import {comboInputShown} from "../../view/combo-reach.mjs";
-import {closeComboBuilder, getModel, heldLayers, layers, post, render, state} from "../../store.mjs";
+import {closeComboBuilder, currentView, getModel, layers, post, render, state} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {timingInput} from "../../view/timing-input.mjs";
@@ -29,7 +28,7 @@ export const comboInputLabel = (model, name) => actionLabel(model, name);
 export function comboBuilder(canEdit, holdTerm) {
     const model = getModel();
     /** @param {string} name */
-    const shown = (name) => comboInputShown(model, layers(), state.layer, heldLayers(), name);
+    const shown = (name) => currentView().combos.inputShown(name);
     const editing = state.combo.editId !== null;
     const original = (model?.combos || []).find((combo) => combo.id === state.combo.editId);
     const form = state.combo.form;

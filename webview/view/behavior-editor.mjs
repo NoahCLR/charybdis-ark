@@ -1,7 +1,6 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
-import {behaviourListeningTo, canonicalKeycode, keyKindOf, keyMeaning} from "./keyface.mjs";
-import {resolvedPositions} from "./layer-resolution.mjs";
+import {behaviourListeningTo, canonicalKeycode, keyKindOf} from "./keyface.mjs";
 import {timingInput} from "./timing-input.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 
@@ -10,18 +9,6 @@ import {vocabulary} from "./vocabulary.mjs";
 export function canHaveBehaviour(/** @type {Model} */ model, /** @type {string} */ keycode) {
     const kind = keyKindOf(model, String(keycode ?? ""));
     return Boolean(keycode) && kind !== "transparent" && kind !== "disabled";
-}
-
-// The key a board position opens in Behaviours. Rows are keyed by keycode, so
-// a transparent position follows the key that answers it from below, through
-// the layers held in a preview and the base layer, which is always on, and
-// names the layer that supplies it. With nothing mapped below it stays the
-// stored key. Which key answers is core's (each layer's answers): a key that
-// is not transparent answers itself.
-export function behaviourKeyAt(/** @type {import("../../contracts/panel.js").Layer[]} */ stack, /** @type {number} */ at, /** @type {number[]} */ held, /** @type {number | undefined} */ index) {
-    const own = (stack[at]?.positions || []).find((position) => position.layoutIndex === index);
-    const answer = own && resolvedPositions(stack, at, held).find((entry) => entry.position.layoutIndex === index);
-    return answer?.fellThrough ? {keycode: keyMeaning(answer.position), from: answer.layer} : {keycode: keyMeaning(own), from: null};
 }
 
 // The row Behaviours shows once the previewed layers change. A row opened from

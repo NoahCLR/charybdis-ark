@@ -7,17 +7,19 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {behaviourFor, behaviourTiers} from "../../view/keyface.mjs";
 import {customKeyOf, customKeyReach, hasShortcut} from "../../view/custom-key.mjs";
-import {getModel, layers, render, state} from "../../store.mjs";
+import {customKeyNamesOf, reachInView} from "../../view/reach.mjs";
+import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
 import {actionMarked, tierDot} from "../marks.mjs";
-import {customKeyView, reachLabel} from "./reach.mjs";
+import {reachLabel} from "./reach.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabCustomKeys(body, right) {
     const model = getModel();
-    const reach = {...customKeyReach(model, layers(), state.layer), inView: customKeyView(model)};
+    const view = currentView();
+    const reach = {...customKeyReach(view), inView: reachInView(view, customKeyNamesOf(model))};
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Custom keys screen</button>`);
     open.addEventListener("click", () => { state.screen = "customKeys"; render(); });

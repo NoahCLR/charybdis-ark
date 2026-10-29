@@ -6,10 +6,8 @@ import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {keyLed} from "../../view/lighting.mjs";
 import {sentence, slotNamed, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
-import {comboUseAt, combosAt} from "../../view/combo-reach.mjs";
 import {pointingSlotFor} from "../../view/pointing-reach.mjs";
-import {resolvedPositions} from "../../view/layer-resolution.mjs";
-import {currentLayer, getModel, heldLayers, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable} from "../../store.mjs";
+import {currentLayer, currentView, getModel, layers, openComboBuilder, positionAt, post, render, selectedPosition, showLayer, state, writable} from "../../store.mjs";
 import {behaviourRuns, participationAt, thisKeyOnThisLayer} from "../../view/participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
@@ -23,24 +21,25 @@ import {pickKeycodeFor} from "./key-edits.mjs";
 /** @param {HTMLElement} body */
 export function tabKey(body) {
     const model = getModel();
+    const view = currentView();
     const layer = currentLayer();
     const position = selectedPosition();
     const followed = behaviourKey(position?.layoutIndex);
     const behaviour = behaviourFor(model, followed.keycode);
     const behaviourOpen = canHaveBehaviour(model, followed.keycode);
-    const combos = position ? combosAt(model, layers(), state.layer, position.layoutIndex) : [];
+    const combos = position ? view.alone.combos.shownAt(position.layoutIndex) : [];
     const slot = pointingSlotFor(model, keyMeaning(position));
     // The key the keyboard answers with here, and the layer that supplies it:
     // its switches there decide what runs (firmware's participation policy).
-    const answer = position && resolvedPositions(layers(), state.layer, heldLayers()).find(entry => entry.position.layoutIndex === position.layoutIndex);
+    const answer = position && view.answerAt(position.layoutIndex);
     const behaviourUse = answer ? behaviourRuns(model, answer.layer.index, answer.position, behaviour) : {runs: Boolean(behaviour), reasons: []};
     /** @param {string[]} reasons */
     const notUsed = (reasons) => ` · <span class="dim">not used: ${esc(reasons.join("; "))}</span>`;
-    // The combos listed are the layer's own (combosAt), with nothing held, so
-    // they are judged in that view; the behaviour follows the key that answers.
+    // The combos listed are the layer's own, with nothing held, so they are
+    // judged in that view; the behaviour follows the key that answers.
     /** @param {import("../../../contracts/panel.js").ComboView} combo */
     const comboNotUsed = (combo) => {
-        const use = comboUseAt(model, layers(), state.layer, [], position?.layoutIndex ?? -1, combo);
+        const use = view.alone.combos.useAt(position?.layoutIndex ?? -1, combo);
         return use.fires ? "" : notUsed(use.reasons);
     };
 
@@ -60,7 +59,7 @@ export function tabKey(body) {
                     <dt>LED index</dt><dd>${esc(keyLed(model, position?.layoutIndex) ?? "—")}</dd>
                 </dl></details>
             </div>
-            ${answeredBelow(layer, position)}
+            ${answeredBelow(view, position)}
             ${writable() ? "" : `<div class="unavailable key-unavailable">${esc(unavailable(model))}</div>`}
         </section>
         <section>
@@ -180,11 +179,10 @@ function stackRows(model, layer, position) {
 
 // In a layer preview, the selected key may be answered by a layer below: say
 // so, and that what is set here is stored on this layer and wins over it.
-/** @param {import("../../../contracts/panel.js").Layer} layer @param {import("../../../contracts/panel.js").Position | undefined} position */
-function answeredBelow(layer, position) {
-    if (!previewing() || !position) return "";
-    const answer = resolvedPositions(layers(), state.layer, heldLayers())
-        .find((entry) => entry.position.layoutIndex === position.layoutIndex);
+/** @param {import("../../view/keyface-types.js").LayerView} view @param {import("../../../contracts/panel.js").Position | undefined} position */
+function answeredBelow({previewing, answerAt, layer}, position) {
+    if (!previewing || !position) return "";
+    const answer = answerAt(position.layoutIndex);
     if (!answer?.fellThrough) return "";
     return `<p class="note answered-below">In this preview <b>${esc(layerCalled(answer.layer))}</b> answers here
         with ${keyNameMarked(getModel(), keyName(answer.position, getModel()), keyMeaning(answer.position))}, through a transparent key. A keycode set here

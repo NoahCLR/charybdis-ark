@@ -3,14 +3,15 @@
 // show for this layer, draws the legend on top in whichever of black or white
 // stays readable, and marks what each key reaches.
 //
-// With layers previewed on under it (`held`, positions in the stack), each key
+// It draws one view of the stack (view/layer-view.mjs): the layer on top, and
+// with layers previewed on under it (`held`, places in the stack), each key
 // shows what the keyboard would answer with instead of what this layer stores:
 // a transparent key shows the key of the highest layer below that is on. Its
 // cap is frosted like any transparent key's, since this layer is glass there
 // and the key is seen through it; its legend stays sharp, and the light it
 // shows is the answering layer's, so its colour names that layer. It wears the
 // answering key's behaviour dots and the badges of the combos it fires in this
-// preview (combosInPreview). Selection and
+// preview (view.combos.badgesAt). Selection and
 // edits still name this layer's own position.
 //
 // Dots and badges mark only what runs: a behaviour or combo that a switch
@@ -21,24 +22,21 @@
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
-import {comboBadgesAt} from "../view/combo-reach.mjs";
 import {behaviourRuns} from "../view/participation.mjs";
-import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trackballLight} from "../view/lighting.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer | undefined} layer @param {import("./surface-types.js").BoardOptions} [options] */
-export function board(model, layer, options = {}) {
+/** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
+export function board(view, options = {}) {
     const {selected, mode = "light", picks = [], reach = [], pdActive = null, drafted = null,
-        faces = true, trackball = false, held = [], onKey, onOpen, onSwap, onTrackball} = options;
+        faces = true, trackball = false, onKey, onOpen, onSwap, onTrackball} = options;
+    const model = /** @type {import("../../contracts/panel.js").PublishedModel | null} */ (view.model ?? null);
+    const {layer, held, stack} = view;
     const positions = layer?.positions || [];
-    const stack = model?.layers || [];
     const heldIds = held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
-    const answering = layer && held.length && mode !== "leds"
-        ? new Map(resolvedPositions(stack, stack.indexOf(layer), held).map((entry) => [entry.position.layoutIndex, entry]))
-        : null;
+    const answering = layer && held.length && mode !== "leds";
     const feedbackOn = stageEnabled(model, "key");
     const comboColour = model?.rgb?.comboFeedback?.color;
     const comboLit = stageEnabled(model, "combo") && comboColour && !isOff(comboColour);
@@ -47,7 +45,7 @@ export function board(model, layer, options = {}) {
     for (const position of positions) {
         const index = position.layoutIndex;
         const visual = keyVisual(index);
-        const answer = answering?.get(index);
+        const answer = answering ? view.answerAt(index) : undefined;
         const shown = answer?.position || position;
         const from = answer?.fellThrough ? answer.layer : null;
         const face = keyFace(shown, model);
@@ -74,7 +72,7 @@ export function board(model, layer, options = {}) {
         const showMarks = faces && mode !== "leds";
         const behaviour = showMarks ? behaviourFor(model, keyMeaning(shown)) : undefined;
         const tiers = behaviour && behaviourRuns(model, (from || layer)?.index ?? 0, shown, behaviour).runs ? behaviourTiers(behaviour) : [];
-        const combos = showMarks ? comboBadgesAt(model, stack, layer?.index ?? 0, held, index) : [];
+        const combos = showMarks ? view.combos.badgesAt(index) : [];
         const sub = mode === "leds" ? "" : face.sub;
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: combos.length > 0, sub: Boolean(sub)});

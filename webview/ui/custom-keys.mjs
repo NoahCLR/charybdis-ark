@@ -132,7 +132,7 @@ const keyFields = (model, key) => {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
 function behaviourCard(model, key) {
     const behaviour = behaviourEditorRow(model, key.keycode);
-    const placements = customKeyPlacements(model, layers(), key.keycode);
+    const placements = customKeyPlacements(model, key.keycode);
     const placed = placements.length > 0;
     const card = el(`<div class="card custom-key-behaviour">
         <div class="card-h"><h3>What it does</h3>

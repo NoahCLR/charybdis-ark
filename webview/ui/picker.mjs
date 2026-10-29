@@ -218,7 +218,7 @@ export function pickerOverlay() {
         : fold ? ("shortcut" in fold && (model?.customKeyShortcutKeys || []).length ? fold.shortcut : null) : shortcutOffer(model, picker);
     // A pick that cannot be stored shows no value: the problem line says why.
     const storable = problem || offer ? "" : value;
-    const {existing, withBehaviour, spare} = offer ? customKeyChoice(model, offer, layers(), {runsBehaviour: picker.customKeyRuns !== "shortcut"})
+    const {existing, withBehaviour, spare} = offer ? customKeyChoice(model, offer, {runsBehaviour: picker.customKeyRuns !== "shortcut"})
         : {existing: undefined, withBehaviour: false, spare: undefined};
     /** @param {import("../../contracts/panel.js").CustomKey} key */
     const keyWords = (key) => `Custom key ${key.slot}${key.name ? ` · ${key.name}` : ""}`;

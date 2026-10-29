@@ -10,7 +10,6 @@
 
 import {customKeyNamesOf, macroNamesOf, macroReach, reachInView, reachKeys} from "./reach.mjs";
 import {pointingReach, pointingReachInView} from "./pointing-reach.mjs";
-import {comboGroups, combosInView} from "./combo-reach.mjs";
 import {customKeyReach} from "./custom-key.mjs";
 
 /** @type {Readonly<Record<string, string>>} */
@@ -91,22 +90,23 @@ export const storedCount = (reach) =>
 // The keys the board rings for the row picked in a tab (`picked`, its
 // reachRowId): the keys that reach whatever it lists, by the route it was
 // picked under. A row On this view rings only the keys of the layers on in
-// the view (`held`); a combo is found by its id under any group. The
-// Behaviours tab picks its rows its own way (behaviourRouteKeys).
-/** @param {import("./keyface-types.js").ViewModel} model @param {import("../../contracts/panel.js").Layer[]} stack @param {number} at @param {number[]} held @param {string} tab @param {string | null | undefined} picked */
-export function pickedReachKeys(model, stack, at, held, tab, picked) {
+// the view; a combo is found by its id under any group. The Behaviours tab
+// picks its rows its own way (view.behaviours.routeKeys).
+/** @param {import("./keyface-types.js").LayerView} view @param {string} tab @param {string | null | undefined} picked */
+export function pickedReachKeys(view, tab, picked) {
     if (!picked) return [];
     const {group, name} = reachRowOf(picked);
     const inView = group === "view";
+    const {model} = view;
     if (tab === "combos") {
-        if (inView) return combosInView(model, stack, at, held).find((row) => String(row.combo.id) === name)?.keys.map((key) => key.position.layoutIndex) || [];
-        const groups = comboGroups(model, stack, at);
-        return reachKeys(stack, at, [groups.onKeys, groups.throughKeys, groups.elsewhere].flat().find((row) => String(row.combo.id) === name));
+        if (inView) return view.combos.inView.find((row) => String(row.combo.id) === name)?.keys.map((key) => key.position.layoutIndex) || [];
+        const groups = view.combos.groups;
+        return reachKeys(view, [groups.onKeys, groups.throughKeys, groups.elsewhere].flat().find((row) => String(row.combo.id) === name));
     }
-    const reach = tab === "macros" ? (inView ? {inView: reachInView(model, stack, at, held, macroNamesOf(model))} : macroReach(model, stack, at))
-        : tab === "customKeys" ? (inView ? {inView: reachInView(model, stack, at, held, customKeyNamesOf(model))} : customKeyReach(model, stack, at))
-        : tab === "pointing" ? (inView ? {inView: pointingReachInView(model, stack, at, held)} : pointingReach(model, stack, at))
+    const reach = tab === "macros" ? (inView ? {inView: reachInView(view, macroNamesOf(model))} : macroReach(view))
+        : tab === "customKeys" ? (inView ? {inView: reachInView(view, customKeyNamesOf(model))} : customKeyReach(view))
+        : tab === "pointing" ? (inView ? {inView: pointingReachInView(view)} : pointingReach(view))
         : null;
     if (!reach) return [];
-    return reachKeys(stack, at, reachEntries(reach, group).find((entry) => String(entry.name) === name), inView ? held : null);
+    return reachKeys(view, reachEntries(reach, group).find((entry) => String(entry.name) === name), inView);
 }

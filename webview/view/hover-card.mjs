@@ -7,7 +7,7 @@
 import {behaviourFor, dualRole, keyMeaning} from "./keyface.mjs";
 import {behaviourRuns} from "./participation.mjs";
 import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds} from "./behavior-editor.mjs";
-import {comboBehaviours, comboUseAt, combosAt} from "./combo-reach.mjs";
+import {comboBehaviours} from "./combo-reach.mjs";
 import {customKeyOf, customKeyShortcutOnly, hasShortcut} from "./custom-key.mjs";
 import {macroNamesOf} from "./reach.mjs";
 import {pointingSlotFor} from "./pointing-reach.mjs";
@@ -25,19 +25,19 @@ import {vocabulary, word} from "./vocabulary.mjs";
 // and that key again as `shortcut` when its shortcut section shows; each
 // macro it plays, with the slot the keyboard reported, if any; the pointing
 // mode it runs, by the slot, the words for its kind and where its colour
-// paints; and `combos`, those on its layer at this position unless the
+// paints; and `combos`, those `view` marks at this position unless the
 // caller passes the ones it badges, each with whether it fires from this key
 // in `view` (the layer shown and those previewed under it), whether it runs
 // its output's behaviour, and the shortcut a custom key it sends sends
 // instead. `layer` supplies the key; `index` is where it sits, -1 for none.
-/** @param {Model} model @param {import("../../contracts/panel.js").Layer} layer @param {import("../../contracts/panel.js").Position} position @param {number} index @param {ComboView[]} [combos] @param {{at: number, held: number[]}} [view] */
-export function keyReach(model, layer, position, index, combos, view = {at: layer?.index ?? 0, held: []}) {
-    const stack = model?.layers || [];
+/** @param {import("./keyface-types.js").LayerView} view @param {import("../../contracts/panel.js").Layer} layer @param {import("../../contracts/panel.js").Position} position @param {number} index @param {ComboView[]} [combos] */
+export function keyReach(view, layer, position, index, combos = view.combos.shownAt(index)) {
+    const model = /** @type {Model} */ (view.model ?? null);
     const meaning = keyMeaning(position);
     const custom = customKeyOf(model, meaning);
     const slot = pointingSlotFor(model, meaning);
     const words = vocabulary(model);
-    const shown = (combos ?? combosAt(model, stack, layer?.index ?? 0, index)).map((combo) => ({combo, use: comboUseAt(model, stack, view.at, view.held, index, combo)}));
+    const shown = combos.map((combo) => ({combo, use: view.combos.useAt(index, combo)}));
     const running = new Set(comboBehaviours(model, shown.filter(({use}) => use.fires).map(({combo}) => combo), layer?.index ?? 0).flatMap((run) => run.badges));
     return {
         ...keyBehaviour(model, layer, position),

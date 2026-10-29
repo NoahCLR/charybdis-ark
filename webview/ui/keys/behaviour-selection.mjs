@@ -2,8 +2,7 @@
 // Which behaviour the Behaviours tab has open, and how it was reached. The
 // board, the workbench tabs and the Key tab's link all select through here.
 
-import {heldLayers, layers, state} from "../../store.mjs";
-import {behaviourKeyAt} from "../../view/behavior-editor.mjs";
+import {currentView, state} from "../../store.mjs";
 
 // The group the picked behaviour was picked in, while it is still the picked
 // one. A behaviour selected any other way — a fresh one, a moved one, the Key
@@ -15,7 +14,7 @@ export const behaviourRoute = () =>
 // The key a board position opens in Behaviours: a transparent key follows the
 // key answered from below.
 /** @param {number | undefined} index */
-export const behaviourKey = (index) => behaviourKeyAt(layers(), state.layer, heldLayers(), index);
+export const behaviourKey = (index) => currentView().behaviours.keyAt(index);
 
 /** @param {string} keycode */
 export function selectBehaviourKey(keycode) {

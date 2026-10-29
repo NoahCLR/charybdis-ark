@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 import {customKeyInUse, customKeyBypassText, customKeyReach, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, sameShortcut, shortcutKeyCode, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickModifier, shortcutPickLabel, shortcutPickMods, shortcutPickProblem, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice, shortcutLayerRows, shortcutLayerList, shortcutWhen, shortcutLayerTag, shortcutLayerUnder, shortcutLayerKinds, LAYER_KIND} from "../../webview/view/custom-key.mjs";
 import {customKeyNameMessage, customKeyShortcutMessage} from "../../webview/view/edits.mjs";
+import {layerView} from "../../webview/view/layer-view.mjs";
 import {published as publishedProfile} from "../fixtures/published-behaviours.mjs";
 
 const require = createRequire(import.meta.url);
@@ -215,7 +216,7 @@ test("modifiers no keycode can hold are offered as an unused custom key's shortc
     // shortcut, and on no layer.
     const used = published({keys: {0: {0: "CUSTOM_KEY_2"}}, behaviours: [{keycode: "CUSTOM_KEY_1", steps: [{tapCount: 1, tap: {action: "KC_X"}}]}],
         edits: [customKeyNameMessage("CUSTOM_KEY_0", "Thumb")]});
-    assert.equal(unusedCustomKey(used, used.layers)?.keycode, "CUSTOM_KEY_3");
+    assert.equal(unusedCustomKey(used)?.keycode, "CUSTOM_KEY_3");
 });
 
 test("a custom key that already holds the shortcut is used rather than another made", () => {
@@ -231,7 +232,7 @@ test("a match with a behaviour is offered beside a new key where the behaviour w
     const both = (slot, hasBehavior) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: `K${slot}`, hasBehavior, shortcut: {mods: 0x88, keys: [], layers: 0, layerKind: 0}, shortcutLabel: "Left GUI + Right GUI"});
     const free = (slot) => ({...key(slot), name: ""});
     const choose = (keys, runsBehaviour) => {
-        const choice = customKeyChoice({customKeys: keys, keyBehaviors: [], combos: [], qmkKeycodeAliases: {}}, {mods: 0x88, keys: [], layers: 0, layerKind: 0}, [], {runsBehaviour});
+        const choice = customKeyChoice({customKeys: keys, keyBehaviors: [], combos: [], qmkKeycodeAliases: {}}, {mods: 0x88, keys: [], layers: 0, layerKind: 0}, {runsBehaviour});
         return {existing: choice.existing?.keycode, withBehaviour: choice.withBehaviour, spare: choice.spare?.keycode};
     };
     assert.deepEqual(choose([both(1, true), both(2, false), free(3)], true), {existing: "CUSTOM_KEY_2", withBehaviour: false, spare: undefined}, "one that does only this is used");
@@ -254,14 +255,13 @@ test("the Custom keys tab groups a layer's custom keys the ways a macro is reach
         combos: [{inputs: ["KC_B", "KC_C"], output: "CUSTOM_KEY_2"}],
         behaviours: [{keycode: "KC_A", steps: [{tapCount: 1, tap: {style: "TAP_SENDS", action: "CUSTOM_KEY_3"}}]}],
         edits: [0, 1, 2, 3].map((slot) => customKeyNameMessage(`CUSTOM_KEY_${slot}`, `Key ${slot}`))});
-    const stack = model.layers;
     const names = (entries) => entries.map((entry) => entry.name);
-    const base = customKeyReach(model, stack, 0);
+    const base = customKeyReach(layerView(model, 0));
     assert.deepEqual(names(base.onKeys), ["CUSTOM_KEY_0"]);
     assert.deepEqual(names(base.fromCombos), ["CUSTOM_KEY_2"], "a combo on Base's keys sends it");
     assert.deepEqual(names(base.fromBranches), ["CUSTOM_KEY_3"], "a behaviour step on Base sends it");
     assert.deepEqual(base.elsewhere, ["CUSTOM_KEY_1"], "unreachable from Base; the unnamed empty slots are no keys at all");
-    const numbers = customKeyReach(model, stack, 1);
+    const numbers = customKeyReach(layerView(model, 1));
     assert.deepEqual(names(numbers.onKeys), ["CUSTOM_KEY_1"]);
     assert.deepEqual(names(numbers.throughKeys), ["CUSTOM_KEY_0"], "a transparent key falls through to Base's");
 });

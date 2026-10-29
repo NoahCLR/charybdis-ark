@@ -8,7 +8,7 @@ import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect, trackballLed} from "../view/lighting.mjs";
 import {listed, slotCalled, stageOrder, layerCalled} from "../view/vocabulary.mjs";
-import {canEdit as canEditArea, currentLayer, getModel, layers, post, render, state, writable, heldLayers} from "../store.mjs";
+import {canEdit as canEditArea, currentLayer, currentView, getModel, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
@@ -31,6 +31,7 @@ export function screenLighting() {
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's lighting.")}</p></div></div></div></div>`);
     }
     const onGroups = state.stage === "groups";
+    const view = currentView();
     const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
         "Lighting",
@@ -46,10 +47,9 @@ export function screenLighting() {
     const card = el(`<div class="board-card"></div>`);
     const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
         ? pdColourRow(model, state.pointingSlot) : null;
-    card.appendChild(board(model, layer, {
+    card.appendChild(board(onGroups ? view.alone : view, {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
-        held: onGroups ? [] : heldLayers(),
         picks: state.ledPicks,
         trackball: state.trackball,
         pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: pdTrigger(model, layer, state.pointingSlot)?.layoutIndex} : null,
@@ -64,8 +64,8 @@ export function screenLighting() {
         <b>${onGroups ? "LED selector" : "Preview"}</b>
         <span class="board-foot-text">${onGroups
             ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerCalled(layer))}${heldLayers().some((at) => at > 0) && !onGroups
-                ? ` with ${esc(listed(heldLayers().filter((at) => at > 0).reverse().map((at) => layerCalled(layers()[at]))))} on`
+            : `${esc(layerCalled(layer))}${view.held.some((at) => at > 0) && !onGroups
+                ? ` with ${esc(listed(view.held.filter((at) => at > 0).reverse().map((at) => layerCalled(view.stack[at]))))} on`
                 : ""} over the background effect${preview
                 ? ` · ${esc(slotName(model, state.pointingSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
                 : ""}`}</span>

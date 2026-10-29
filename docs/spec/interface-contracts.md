@@ -60,9 +60,10 @@ layers in view reach:
   only once layers are previewed together, as the layer bar shows base on; a
   layer shown alone is the view by itself, and its transparent keys answer
   nothing there (what they fall through to is under **Through a transparent
-  key**). The view is `viewPositions`; what the keyboard does, with base and
-  its default layers always on (each published layer's `alwaysOn`), stays
-  `resolvedPositions`, and a key they answer needs nothing held: the hover
+  key**). The view is `viewPositions` (a layer view's `shown`); what the
+  keyboard does, with base and its default layers always on (each published
+  layer's `alwaysOn`), stays `resolvedPositions` (its `answers`), and a key
+  they answer needs nothing held: the hover
   card's fall-through, a selected transparent key opening the behaviour from
   below, and picking a combo input on the board. A combo is in the view only
   when that activation holds all its inputs, matched on the Combo layer
@@ -74,7 +75,7 @@ layers in view reach:
   `tests/view/reach.test.mjs`, `tests/view/combo-reach.test.mjs`).
 - On the board, a transparent key answered from below wears that key's
   behaviour dots and the badges of the combos it fires in the view
-  (`combosInPreview`); under Combo layer matching nothing from below adds a
+  (`view.combos.badgesAt`); under Combo layer matching nothing from below adds a
   badge (`tests/view/combo-reach.test.mjs`).
 - Which combos fire from each layer, under which smallest hold and on which
   keys, is core's (`core/model/combo-reach.js`), published per layer as
@@ -243,7 +244,8 @@ here: its home and tests are in
 | The commit bar: which bar the frame shows over the draft (an Apply running, its read back, a failed one until dismissed, a held live edit, other work, a draft from another keyboard or one the keyboard changed under, a restart, the live modes', the review), drawn by `webview/ui/frame.mjs` | `webview/view/commit-bar.mjs` (`commitBarState`) | `tests/view/commit-bar.test.mjs`, `browser-tests/live-edits.spec.js`, `browser-tests/apply-progress.spec.js` |
 | The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, and what a search finds (at most `SEARCH_ROWS` keycodes), drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs` |
 | The hover card's behaviour row: whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold, drawn by `webview/ui/hover-card.mjs` and placed by `webview/ui/hover.mjs` | `webview/view/hover-card.mjs` (`keyBehaviour`) | `tests/view/hover-card.test.mjs`, `browser-tests/participation.spec.js` |
-| A reach row picked in a Keymap tab: its id (`group:name`, `reachRowId`), and the keys the board rings for it by the route it was picked under | `webview/view/reach-groups.mjs` (`pickedReachKeys`), `webview/view/behaviour-reach.mjs` (`behaviourRouteKeys`) | `tests/view/reach-groups.test.mjs`, `tests/view/behaviour-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
+| One view of the layer stack: the layer the board shows and the layers previewed with it, by their place in the stack, which is each published layer's `index`; what answers and what shows at each key in it, and the combos and behaviours it reaches, each worked out once per model and view. Screens ask the current one (`currentView()`, `webview/store.mjs`) rather than passing the layer and the preview | `webview/view/layer-view.mjs` (`layerView`, read through `view.answerAt`, `view.shownAt`, `view.combos`, `view.behaviours`) | `tests/view/layer-view.test.mjs`, `tests/view/combo-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs` |
+| A reach row picked in a Keymap tab: its id (`group:name`, `reachRowId`), and the keys the board rings for it by the route it was picked under | `webview/view/reach-groups.mjs` (`pickedReachKeys`), `webview/view/behaviour-reach.mjs` (`behaviourRouteKeys`, read as `view.behaviours.routeKeys`) | `tests/view/reach-groups.test.mjs`, `tests/view/behaviour-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
 | Device facts, the review sheet, the unsaved-demo dialog; the app keeps routing, rendering, focus and scroll, and window keys | `webview/ui/device.mjs`, `webview/ui/review-overlay.mjs`, `webview/ui/leave-demo.mjs` | (no test) |
 
 ### Number entry

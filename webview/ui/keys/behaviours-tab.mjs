@@ -7,8 +7,7 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {actionLabel, behaviourTiers} from "../../view/keyface.mjs";
-import {behaviourGroups, behavioursInView} from "../../view/behaviour-reach.mjs";
-import {currentLayer, getModel, heldLayers, layers, previewing, render, selectedPosition, state} from "../../store.mjs";
+import {currentLayer, currentView, getModel, render, selectedPosition, state} from "../../store.mjs";
 import {layerCalled} from "../../view/vocabulary.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
@@ -22,13 +21,13 @@ import {sourceLabel} from "./reach.mjs";
 // The combos that send a behaviour, by badge and chord; one that needs a
 // transparent key names the layer answering for it. Markup, as every row's
 // note is, so the chord's keys carry their layer marks.
-/** @param {Pick<ReturnType<typeof behavioursInView>[number], "combos">} entry */
+/** @param {Pick<import("../../view/keyface-types.js").BehaviourInView, "combos">} entry */
 const comboNote = (entry) => entry.combos.map(({combo, keys}) => {
     const sources = [...new Set(keys.filter((key) => key.fellThrough)
         .map((key) => esc(layerCalled(key.layer)) + (key.whileHeld ? " when held" : "")))];
     return `combo ${esc(combo.badge)} · ${comboInputsMarked(getModel(), combo)}${sources.length ? ` · on ${sources.join(", ")}` : ""}`;
 }).join(", ");
-/** @param {ReturnType<typeof behavioursInView>[number]} entry */
+/** @param {import("../../view/keyface-types.js").BehaviourInView} entry */
 const viewBehaviourNote = (entry) => {
     const indexes = [...new Set(entry.keys.map((key) => key.position.layoutIndex))];
     const sources = [...new Set(entry.keys.filter((key) => key.fellThrough).map((key) => esc(layerCalled(key.layer))))];
@@ -49,15 +48,16 @@ function followedBelow(behaviour) {
     const model = getModel();
     const name = actionMarked(model, behaviour.keycode);
     return `<p class="note beh-note">The selected key on <b>${esc(layerCalled(currentLayer()))}</b> is transparent,
-        so ${previewing() ? "in this preview " : ""}<b>${esc(layerCalled(followed.from))}</b> answers with ${name}. A behaviour belongs to its keycode:
+        so ${currentView().previewing ? "in this preview " : ""}<b>${esc(layerCalled(followed.from))}</b> answers with ${name}. A behaviour belongs to its keycode:
         this is ${name}’s, and a change here applies wherever ${name} is pressed, not only at this position.</p>`;
 }
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabBehaviours(body, right) {
     const model = getModel();
-    const {here, through, combos, combosBelow, elsewhere} = behaviourGroups(model, layers(), state.layer);
-    const inView = behavioursInView(model, layers(), state.layer, heldLayers());
+    const view = currentView();
+    const {here, through, combos, combosBelow, elsewhere} = view.behaviours.groups;
+    const inView = view.behaviours.inView;
     if (!state.behaviourRow) selectBehaviourKey(behaviourKey(selectedPosition()?.layoutIndex).keycode);
     const behaviour = behaviourEditorRow(model, state.behaviourRow || "");
 
