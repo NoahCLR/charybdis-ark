@@ -90,6 +90,11 @@ Around the core:
   entries and empty words, the tab's count, the keys a picked row rings):
   `tabReach(view, tab)`, `webview/view/tab-reach.mjs`. A tab draws its rows
   from it; a new tab or group gets its lists and words there.
+- What that view shows at each key of the board (the key that answers, the
+  layer supplying it, its light, dots and badges): `boardKeys(view)`,
+  `webview/view/board-keys.mjs`; `webview/ui/board.mjs` only draws it. What
+  reaches one key, for the hover card and the Key tab: `keyReachAt(view,
+  index)`, `webview/view/key-reach.mjs`.
 
 ## Facts and their homes
 

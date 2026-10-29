@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {keyBehaviour, keyReach} from "../../webview/view/hover-card.mjs";
+import {keyBehaviour, keyReach, keyReachAt} from "../../webview/view/key-reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 import {customKeyShortcutMessage, macroMessage} from "../../webview/view/edits.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
@@ -102,4 +102,28 @@ test("a key's combos say whether they fire here, run their output's behaviour, o
     assert.deepEqual(combos, [["C0", true, true, ""], ["C1", true, false, "sends its shortcut, Left Ctrl + Right Alt + K"], ["C2", false, false, ""]]);
     assert.ok(reachOf(14).combos[2].use.reasons.length, "a combo that does not fire says why");
     assert.deepEqual(keyReach(layerView(reaching, 0), reaching.layers[0], reaching.layers[0].positions[0], -1, []).combos, [], "the combos a caller passes are the ones shown");
+});
+
+// C's row runs only on Numbers; Numbers is transparent at index 0 and holds
+// C at index 1, over Base's C at both.
+const stacked = published({keys: {0: {0: "KC_C", 1: "KC_C"}, 1: {0: "KC_TRANSPARENT", 1: "KC_C"}},
+    behaviours: [{keycode: "KC_C", allowedLayers: NUMBERS, steps: [tapX]}]});
+
+test("a key the layer stores reaches what it does itself, pressed or not", () => {
+    const reach = keyReachAt(layerView(stacked, 1), 1);
+    assert.ok(reach);
+    assert.deepEqual([reach.position.keycode, reach.answer?.fellThrough, reach.through], ["KC_C", false, null]);
+    assert.equal(reach.pressed, reach.own);
+    assert.deepEqual([reach.own.behaviour?.keycode, reach.own.use.runs], ["KC_C", true]);
+});
+
+test("a transparent key reaches what the key answering it from below does, judged on the layer that supplies it", () => {
+    const reach = keyReachAt(layerView(stacked, 1), 0);
+    assert.ok(reach);
+    assert.equal(reach.own.behaviour, undefined, "the layer's own key has none");
+    assert.equal(reach.answer?.layer, stacked.layers[0], "with nothing previewed, Base answers");
+    assert.equal(reach.pressed, reach.through);
+    assert.deepEqual([reach.through?.behaviour?.keycode, reach.through?.use.runs], ["KC_C", false], "C's row does not run on Base");
+    assert.ok(reach.through?.use.reasons.length, "and says why");
+    assert.equal(keyReachAt(layerView(stacked, 1), 99), null, "a position the layer does not have reaches nothing");
 });

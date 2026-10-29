@@ -2,7 +2,7 @@
 // The board's hover card: everything a key reaches, without clicking and
 // without leaving the layer you are reading. webview/ui/hover.mjs places it;
 // what it reaches, and what its behaviour row says, is
-// webview/view/hover-card.mjs's.
+// webview/view/key-reach.mjs's.
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {esc} from "../lib/dom.mjs";
@@ -10,7 +10,7 @@ import {actionNaming, keyMeaning, keyName, visibleKeycode} from "../view/keyface
 import {comboBehaviours, comboInputIsKey} from "../view/combo-reach.mjs";
 import {customKeyHeadline, customKeyOf, customKeyShortcutOnly, shortcutLayerList, shortcutLayerTag, shortcutLayerUnder, shortcutWhen} from "../view/custom-key.mjs";
 import {behaviourThresholds, styleDetail} from "../view/behavior-editor.mjs";
-import {keyReach} from "../view/hover-card.mjs";
+import {keyReach, keyReachAt} from "../view/key-reach.mjs";
 import {stageEnabled} from "../view/lighting.mjs";
 import {currentView, getModel, positionAt} from "../store.mjs";
 import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, layerTagged, macroSteps, marked, sends, sendsKind, tierDot} from "./marks.mjs";
@@ -23,13 +23,13 @@ import {modifierKey} from "../view/shortcuts.mjs";
 export function hoverCard(index) {
     const model = getModel();
     const view = currentView();
-    const layer = view.layer;
-    const position = positionAt(layer, index);
-    if (!layer || !position) return "";
-    const own = reachSections(view.alone, layer, position, index);
+    const reach = keyReachAt(view, index);
+    if (!reach) return "";
+    const {position} = reach;
+    const own = reachSections(reach.own, position);
     return `<div class="hc-head"><div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span>
         <span class="hc-pill">index ${esc(index)}</span></div>
-        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code>${headline(model, keyMeaning(position))}</div>${own.join("")}${seenThrough(view, index)}`;
+        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code>${headline(model, keyMeaning(position))}</div>${own.join("")}${seenThrough(view, reach)}`;
 }
 
 // One card per behaviour the key's combos run, as the key that behaviour
@@ -47,7 +47,7 @@ export function behaviourCards(index) {
         return `<div class="hovercard hc-side"${tint ? ` style="--combo:${tint}"` : ""}><div class="hc-head"><div class="hc-eyebrow">Combo behaviour</div><div class="hc-title"><span class="t">${keyNameMarked(model, run.shown, run.keycode)}</span>
             <span class="hc-badges">${run.badges.map((badge) => comboBadge(model, badge)).join("")}</span></div>
             <code class="hc-code">${esc(visibleKeycode(model, run.output))}</code>${headline(model, run.keycode)}
-            <div class="hc-sub hc-foot">Runs when ${esc(run.badges.join(" or "))} fires.</div></div>${reachSections(view, layer, target, -1, [], {foot: false}).join("")}</div>`;
+            <div class="hc-sub hc-foot">Runs when ${esc(run.badges.join(" or "))} fires.</div></div>${reachSections(keyReach(view, layer, target, -1, []), target, {foot: false}).join("")}</div>`;
     });
     if (runs.length > SIDE_CARDS) cards.push(`<div class="hc-more">+${runs.length - SIDE_CARDS} more behaviour${runs.length - SIDE_CARDS === 1 ? "" : "s"} run by this key's combos</div>`);
     return cards.join("");
@@ -58,13 +58,12 @@ const SIDE_CARDS = 3;
 // that is on: the default layer, or a layer previewed under this one. The card
 // reads the viewed layer's own key first, then what the answering key does, as
 // the keyboard would run it — the same answer the board draws.
-/** @param {import("../view/keyface-types.js").LayerView} view @param {number} index */
-function seenThrough(view, index) {
+/** @param {import("../view/keyface-types.js").LayerView} view @param {NonNullable<ReturnType<typeof keyReachAt>>} reach */
+function seenThrough(view, {answer, through}) {
     const model = getModel();
-    const answer = view.answerAt(index);
-    if (!answer?.fellThrough) return "";
+    if (!answer || !through) return "";
     const from = answer.layer, position = answer.position;
-    const sections = reachSections(view, from, position, index);
+    const sections = reachSections(through, position);
     return `<div class="hc-through"><div class="hc-sect">
             <div class="hc-h">Falls through to ${marked(model, {kind: "layer", layer: from.index}, layerCalled(from))}</div>
             <div class="hc-flow"><span class="hc-name">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span>
@@ -73,15 +72,12 @@ function seenThrough(view, index) {
         ${sections.join("")}</div>`;
 }
 
-// What one stored key reaches, as webview/view/hover-card.mjs keyReach decides
-// it: its behaviour, macros, pointing mode and the combos `view` marks at this
-// position — its layer's own, shown alone, or, for a key seen through a
-// preview, the combos the board badges it with there. Empty when it reaches
-// none of them.
-/** @param {import("../view/keyface-types.js").LayerView} view @param {import("../../contracts/panel.js").Layer} layer @param {import("../../contracts/panel.js").Position} position @param {number} index @param {import("../../contracts/panel.js").ComboView[]} [combos] @param {{foot?: boolean}} [options] */
-function reachSections(view, layer, position, index, combos, {foot = true} = {}) {
+// What one stored key, `position`, reaches, as webview/view/key-reach.mjs
+// keyReach decides it: its behaviour, macros, pointing mode and combos. Empty
+// when it reaches none of them.
+/** @param {ReturnType<typeof keyReach>} reach @param {import("../../contracts/panel.js").Position} position @param {{foot?: boolean}} [options] */
+function reachSections(reach, position, {foot = true} = {}) {
     const model = getModel();
-    const reach = keyReach(view, layer, position, index, combos);
     const {behaviour, role, use, inertNote, lead, branches: showBranches, custom} = reach;
     const lit = stageEnabled(model, "key");
     const sections = [];

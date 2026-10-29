@@ -1,8 +1,9 @@
 // @ts-check
-// What the hover card says of one key (webview/ui/hover-card.mjs draws it):
-// what it reaches, and of its behaviour row whether the row runs here,
-// changes nothing or has no branches, and, on a dual-role key, the threshold
-// its tap / hold waits and what its hold does.
+// What reaches one key, and what it uses: the one answer the hover card
+// (webview/ui/hover-card.mjs) and the Key tab (webview/ui/keys/key-tab.mjs)
+// both draw. Of its behaviour row, whether the row runs here, changes nothing
+// or has no branches, and, on a dual-role key, the threshold its tap / hold
+// waits and what its hold does.
 
 import {behaviourFor, dualRole, keyMeaning} from "./keyface.mjs";
 import {behaviourRuns} from "./participation.mjs";
@@ -19,6 +20,24 @@ import {vocabulary, word} from "./vocabulary.mjs";
  * @typedef {{kind: "tapHold", term: {ms: string}, holdAction: string, note: string} | {kind: "off"} | {kind: "inert"} | null} BehaviourLead
  * @typedef {import("../../contracts/panel.js").ComboView} ComboView
  */
+
+// What reaches the key at layout `index` on the layer `view` shows, or null
+// where the layer has no position: `own`, the layer's own key shown alone;
+// `answer`, the key the keyboard answers with when it is pressed (core's,
+// with base and its default layers always on, and the layers previewed); and
+// `through`, when that key falls through a transparent one, what the
+// answering key reaches in `view`, judged on the layer that supplies it.
+// `pressed` is whichever of the two runs when the key is pressed.
+/** @param {import("./keyface-types.js").LayerView} view @param {number} index */
+export function keyReachAt(view, index) {
+    const layer = view.layer;
+    const position = (layer?.positions || []).find((key) => key.layoutIndex === index);
+    if (!layer || !position) return null;
+    const own = keyReach(view.alone, layer, position, index);
+    const answer = view.answerAt(index);
+    const through = answer?.fellThrough ? keyReach(view, answer.layer, answer.position, index) : null;
+    return {position, own, answer, through, pressed: through ?? own};
+}
 
 // Everything one stored key reaches, each part present only when the card
 // shows its section: its behaviour row (keyBehaviour); the custom key it is,

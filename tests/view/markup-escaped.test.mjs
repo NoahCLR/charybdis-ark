@@ -42,7 +42,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/device.mjs", ["value"], "kv() rows hold markup their callers escaped, as its @param says"],
     ["webview/ui/groups.mjs", ['group.rows.join("")'], "each tab's table rows, markup templates built by that tab"],
     ["webview/ui/groups.mjs", ["detail"], "a group's detail, markup its tab built: the Combos tab's selected key, named through keyNameMarked"],
-    ["webview/ui/hover-card.mjs", ['own.join("")', 'reachSections(view, layer, target, -1, [], {foot: false}).join("")', 'sections.join("")'], "reachSections() returns the hover card's sections, markup templates it pushes"],
+    ["webview/ui/hover-card.mjs", ['own.join("")', 'reachSections(keyReach(view, layer, target, -1, []), target, {foot: false}).join("")', 'sections.join("")'], "reachSections() returns the hover card's sections, markup templates it pushes"],
     ["webview/ui/keys/behaviours-tab.mjs", ["note"], "viewBehaviourNote() and comboNote(): escaped layer names and marked combo keys"],
     ["webview/ui/keys/combos-tab.mjs", ["reachedBy"], "keysReach() and reachText(): marked key names and escaped layer names"],
     ["webview/ui/keys/macros-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],

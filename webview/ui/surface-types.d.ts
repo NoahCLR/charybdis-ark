@@ -19,7 +19,7 @@ export interface BoardOptions {
 }
 export type BoardNode = HTMLElement & {justDragged?: boolean};
 export interface KeyDrag {x: number; y: number; moved: boolean; target: SVGGElement | null}
-export interface TrackballOptions {mode: string; pdActive: LightOptions['pdActive'] | null; held: number[]; trackball: boolean; clickable: boolean}
+export interface TrackballOptions {mode: string; trackball: boolean; clickable: boolean}
 export type PresentedSlot = PublishedModel['pdModes'][number];
 export interface FieldOptions {unit?: string; wide?: boolean; tip?: string}
 export interface SelectOptions {inline?: boolean; tip?: string; onChange?: (event: Event) => void}
