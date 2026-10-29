@@ -7,20 +7,21 @@ import {keyLed} from "../../view/lighting.mjs";
 import {sentence, slotNamed, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
 import {keyReachAt} from "../../view/key-reach.mjs";
-import {currentLayer, currentView, getModel, layers, openComboBuilder, positionAt, post, render, selectedPosition, showLayer, state, writable} from "../../store.mjs";
+import {currentLayer, currentView, getModel, layers, openComboBuilder, positionAt, post, render, selectedPosition, showLayer, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {participationAt, thisKeyOnThisLayer} from "../../view/participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
 import {keyProblem} from "../../view/keycode-expression.mjs";
 import {actionMarked, comboBadge, comboOutputMarked, keyNameMarked, layerIconOff, mark, marked} from "../marks.mjs";
 import {customKeyBypassText, customKeyOf} from "../../view/custom-key.mjs";
-import {unavailable} from "../frame.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {pickKeycodeFor} from "./key-edits.mjs";
 
 /** @param {HTMLElement} body */
 export function tabKey(body) {
     const model = getModel();
+    const gate = editGate(model, "keys");
     const view = currentView();
     const layer = currentLayer();
     const position = selectedPosition();
@@ -42,8 +43,8 @@ export function tabKey(body) {
         <section>
             <div class="sect-h"><h4>${esc(sentence(thisKeyOnThisLayer(model, layerCalled(layer))))}</h4></div>
             <div class="field"><span>Keycode</span>
-                <div class="input-row"><input class="input mono" id="keycodeField" data-f="key:${esc(layer.index)}:${esc(position?.layoutIndex)}:keycode" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
-                <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
+                <div class="input-row"><input class="input mono" id="keycodeField" data-f="key:${esc(layer.index)}:${esc(position?.layoutIndex)}:keycode" value="${esc(keyMeaning(position))}" ${gate.editable ? "" : "disabled"}>
+                <button class="btn" data-act="pick" ${gate.editable ? "" : "disabled"}>Pick…</button></div></div>
             <div class="key-details">
                 <dl class="kv"><dt>Does</dt><dd>${position ? keyNameMarked(model, keyName(position, model), keyMeaning(position)) : "—"}</dd></dl>
                 <details class="key-more" ${state.keyDetailsOpen ? "open" : ""}><summary class="note">${DISCLOSURE}Where it is stored</summary>
@@ -55,7 +56,7 @@ export function tabKey(body) {
                 </dl></details>
             </div>
             ${answeredBelow(view, position)}
-            ${writable() ? "" : `<div class="unavailable key-unavailable">${esc(unavailable(model))}</div>`}
+            ${gate.editable ? "" : `<div class="unavailable key-unavailable">${esc(gate.why)}</div>`}
         </section>
         <section>
             <div class="sect-h"><h4>This key on every layer</h4></div>
@@ -120,8 +121,8 @@ export function tabKey(body) {
         const controls = el(`<div class="stack key-participation">
             <div class="sect-h"><h4>Behaviour and combos for ${esc(inherited ? `${vocabulary(model).participationPlaces.keyOn} ${layerCalled(source)}` : thisKeyOnThisLayer(model, layerCalled(source)))}</h4></div>
             ${inherited ? `<p class="note">This key is transparent on this layer (${esc(layerCalled(layer))}), so its switches on ${esc(layerCalled(source))} decide.</p><button class="btn tiny" data-source-layer>Open this key on ${esc(layerCalled(source))}</button>` : `
-            <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
-            <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
+            <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${gate.editable ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
+            <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${gate.editable ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
             ${inherited ? "" : `<p class="note">They switch only ${esc(thisKeyOnThisLayer(model, layerCalled(source)))}. To switch a behaviour or combo off on every key, use its own Use this behaviour or Use this combo; for a whole layer, Settings.</p>`}
             <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behaviour ? "runs here" : "this key has none")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "this key can take part; each combo has its own switches too")}.</p>
             ${customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))) ? `<p class="note">${esc(customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))))}</p>` : ""}

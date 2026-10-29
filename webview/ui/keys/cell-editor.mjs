@@ -6,7 +6,8 @@
 // how it runs, and its repeat rate.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {getModel, post, render, state, canEdit as canEditArea} from "../../store.mjs";
+import {getModel, post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
 import {branchName, holdStyles, tierName} from "../../view/vocabulary.mjs";
@@ -22,7 +23,7 @@ export function cellEditor(behaviour, step, kind) {
     // choice survives renders until an action carries it to the draft.
     const pending = !branch && state.cellHow?.cell === cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
     const shown = branch || pending;
-    const canEdit = canEditArea("behaviours");
+    const canEdit = editGate(getModel(), "behaviours").editable;
     const node = el(`<div class="cell-editor">
         <div class="ce-head"><span class="tag">${esc(branchName(getModel(), step.tapCount + 1))}</span><h4>${esc(tierName(getModel(), kind))}</h4>
             <span class="note">${kind === "tap" ? "A tap tier fires on release, so it has no hold style." : "Runs once this tier's threshold passes."}</span>

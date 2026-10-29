@@ -1,7 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
-import {canEdit as canEditArea, post, render, state, writable} from "../../store.mjs";
+import {post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {offWording, stageEnabled} from "../../view/lighting.mjs";
 import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -16,7 +17,7 @@ function flashInterval(model) {
     const flash = sectionsIn(model, "Lighting").find((entry) => entry.id === "lightingFeedback");
     const field = flash?.fields[0];
     if (!flash || !field) return el(`<span></span>`);
-    const editable = canEditArea("settings") && !field.readOnly;
+    const editable = editGate(model, "settings").editable && !field.readOnly;
     const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
     const node = el(`<label class="field" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}"><span>${esc(label)}</span>
         <span class="affix unit"><input class="input mono" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span>
@@ -40,7 +41,7 @@ const SEMANTIC_ROWS = [
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageKey(model) {
     const node = el(`<div></div>`);
-    const canEdit = writable();
+    const canEdit = editGate(model, "lighting").editable;
 
     /** @type {Partial<import("../../../contracts/edits.js").KeyFeedback<import("../../../contracts/edits.js").Colour>>} */
     const feedback = model.rgb.keyBehaviorFeedback || {};

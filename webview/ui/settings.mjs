@@ -12,9 +12,10 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
 import {el, esc, html} from "../lib/dom.mjs";
-import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
+import {getModel, layers, post, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
-import {topbar, unavailable} from "./frame.mjs";
+import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 import {githubMark} from "../view/shell-panel.mjs";
@@ -42,19 +43,19 @@ export const screenHost = () => settingsScreen("host", "Host",
 function settingsScreen(screen, title, subtitle) {
     const model = getModel();
     const sections = sectionsOn(model?.configDefaults || [], screen);
-    const canEdit = canEditArea("settings");
+    const gate = editGate(model, "settings"), canEdit = gate.editable;
     const main = el(`<div class="main">${topbar(title, subtitle)}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!sections.length) {
         pad.appendChild(el(`<div class="screen-stub"><h3>No settings read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's settings.")}</p></div>`));
+            <p class="note">${esc(gate.why || "Choose Read keyboard to read this keyboard's settings.")}</p></div>`));
     }
     // Why nothing here can be edited, said once; while the keyboard is busy
     // the draft bar already says what it is doing.
-    else if (!canEdit && !model?.draft?.busy) {
-        pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model) || "These settings cannot be edited right now.")}</div>`));
+    else if (!canEdit && !gate.quiet) {
+        pad.appendChild(el(`<div class="unavailable">${esc(gate.why || "These settings cannot be edited right now.")}</div>`));
     }
     // A section the keyboard has not filled in yet (Key swaps before its
     // options are read) still shows, to say why it is empty.
@@ -122,7 +123,7 @@ function comboTimingRow(model, entry) {
     const hold = entry.id === "hold";
     const value = hold ? readback.holdTermMs : readback.defaultTermMs;
     const stored = String(value ?? "");
-    const editable = canEditArea("combos");
+    const editable = editGate(model, "combos").editable;
     const hint = entry.hint;
     const row = el(`<div class="setrow" data-tip="${esc(hint)}" data-timing="${esc(entry.id)}">
         <div><div class="nm">${esc(entry.label)}</div>

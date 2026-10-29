@@ -4,7 +4,8 @@
 // of the selected key's behaviour, and only there.
 
 import {behaviourGridSteps, keyFace, keyName, visibleKeycode} from "../../view/keyface.mjs";
-import {currentLayer, getModel, positionAt, post, render, state, writable, canEdit as canEditArea} from "../../store.mjs";
+import {currentLayer, getModel, positionAt, post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {holdStyles} from "../../view/vocabulary.mjs";
@@ -36,7 +37,7 @@ export function keysShortcut(event) {
     event.preventDefault();
     /** @param {ReturnType<typeof edits.layoutKeys>} message */
     const store = (message) => {
-        if (writable() && message.changes[0].keycode !== position.keycode) post(message);
+        if (editGate(getModel(), "keys").editable && message.changes[0].keycode !== position.keycode) post(message);
     };
     if (action === "clear") {
         if (keyFace(position, getModel()).kind !== "transparent") store(edits.clearKey(layer.name, position.layoutIndex));
@@ -71,10 +72,10 @@ function cellShortcut(action) {
     /** @param {import("../../../contracts/edits.js").BehaviorBranch | null} next */
     const change = (next) => saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: next});
     if (action === "clear") {
-        if (branch && canEditArea("behaviours")) change(null);
+        if (branch && editGate(getModel(), "behaviours").editable) change(null);
     } else if (action === "copy") {
         if (branch) { state.keyClipboard = {keycode: branch.action, label: branch.action}; navigator.clipboard?.writeText(branch.action).catch(() => {}); render(); }
-    } else if (state.keyClipboard && canEditArea("behaviours")) {
+    } else if (state.keyClipboard && editGate(getModel(), "behaviours").editable) {
         const pending = state.cellHow?.cell === state.cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
         /** @type {Pick<import("../../../contracts/edits.js").BehaviorBranch, "style" | "repeatHz">} */
         const how = branch || pending || {style: /** @type {import("../../../contracts/edits.js").BranchStyle | undefined} */ (holdStyles(getModel(), kind)[0]?.[0])};

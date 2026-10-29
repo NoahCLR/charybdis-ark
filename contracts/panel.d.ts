@@ -78,7 +78,7 @@ export interface ProfileSummary {layers: number; behaviors: number; combos: numb
 export type DraftBlock = '' | 'no-draft' | 'other-keyboard' | 'disconnected' | 'connection-changed' | 'unsupported' | 'stale' | 'busy';
 export interface DraftView {
     id: string; revision: number; dirty: boolean; stale: boolean; connectionChanged: boolean; connected: boolean; matching: boolean; busy: boolean;
-    /** Whether core takes an edit to this draft now (core/session/panel-session-state.js draftBinding); the interface's canEdit reads it. */
+    /** Whether core takes an edit to this draft now (core/session/panel-session-state.js draftBinding); the interface's editGate reads it. */
     editable: boolean;
     /** Why it does not, or '' when it does. */
     reason: DraftBlock;

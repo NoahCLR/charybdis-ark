@@ -11,11 +11,12 @@
 import {el, esc} from "../lib/dom.mjs";
 import {KIND} from "../view/pointing-config.mjs";
 import {whatReachesSlot} from "../view/pointing-reach.mjs";
-import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
+import {getModel, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import {mark} from "./marks.mjs";
 import {slotNamed, word} from "../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {topbar, unavailable} from "./frame.mjs";
+import {topbar} from "./frame.mjs";
 import {axisLabel, words} from "./pointing/common.mjs";
 import {editor} from "./pointing/editor.mjs";
 import {emptySlot} from "./pointing/empty-slot.mjs";
@@ -27,7 +28,7 @@ const FULL_CARD_SLOTS = 8;
 export function screenPointing() {
     const model = getModel();
     const slots = model?.pdModes || [];
-    const canEdit = canEditArea("pointing");
+    const gate = editGate(model, "pointing");
 
     const main = el(`<div class="main">${topbar(
         "Pointing modes",
@@ -39,7 +40,7 @@ export function screenPointing() {
     if (!model || !slots.length) {
         pad.classList.remove("pd-page");
         pad.appendChild(el(`<div class="screen-stub"><h3>No pointing modes read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's pointing modes.")}</p></div>`));
+            <p class="note">${esc(gate.why || "Choose Read keyboard to read this keyboard's pointing modes.")}</p></div>`));
         main.appendChild(content);
         return main;
     }
@@ -65,7 +66,7 @@ export function screenPointing() {
     pad.appendChild(list);
 
     const slot = slots.find((row) => row.id === state.pointingSlot) || slots[0];
-    pad.appendChild(slot.kind ? editor(model, slot, canEdit, slots) : emptySlot(model, slot, canEdit, slots));
+    pad.appendChild(slot.kind ? editor(model, slot, gate.editable, slots) : emptySlot(model, slot, slots));
     main.appendChild(content);
     return main;
 }

@@ -22,7 +22,8 @@ import {el, esc, watchPressOutside} from "../lib/dom.mjs";
 import {mappedKeyCount} from "../view/lighting.mjs";
 import {NAME_TIP} from "../view/names.mjs";
 import {countNameBytes} from "./title-name.mjs";
-import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
+import {getModel, layers, post, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 
 /** @type {(() => void) | null} */
 let stopWatching = null;   // stops the open panel's outside-press watch
@@ -36,7 +37,7 @@ export function attachLayersControl(bar) {
     /** @type {Partial<import("../../contracts/panel.js").PublishedModel["portable"]>} */
     const portable = model?.portable || {};
     const busy = Boolean(portable.busy);
-    const canEdit = canEditArea("layers");
+    const canEdit = editGate(model, "layers").editable;
 
     const trigger = el(`<button class="layer-edit" aria-haspopup="dialog" aria-expanded="${Boolean(state.layersOpen)}"
         data-tip="Rename layers and change their order: a higher layer wins over the ones under it.">

@@ -1,10 +1,10 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {canEdit as canEditArea, post} from "../../store.mjs";
+import {post} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {lightingOff} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
 import {sectionsIn} from "../../view/settings-layout.mjs";
-import {unavailable} from "../frame.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 
 // The background effect is QMK's own RGB Matrix effect: drawn first, under
@@ -14,12 +14,13 @@ import {colourControl, section, stack} from "./common.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageBase(model) {
     const node = el(`<div class="tab-grid three"></div>`);
+    const gate = editGate(model, "settings");
     const effect = sectionsIn(model, "Lighting").find((entry) => entry.id === "rgbAppearance");
     if (!effect) {
-        node.append(el(`<p class="note span">${esc(unavailable(model) || "Choose Read keyboard to read the background effect.")}</p>`));
+        node.append(el(`<p class="note span">${esc(gate.why || "Choose Read keyboard to read the background effect.")}</p>`));
         return node;
     }
-    const editable = canEditArea("settings");
+    const editable = gate.editable;
     /** @param {string} macro */
     const field = (macro) => effect.fields.find((entry) => entry.macro === macro);
     /** @param {Record<string, string | undefined>} values */

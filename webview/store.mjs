@@ -216,12 +216,6 @@ export const positionAt = (layer, index) =>
 export const selectedPosition = () => positionAt(currentLayer(), state.selected)
     || (currentLayer()?.positions || [])[0];
 
-// Editing is only offered where the keyboard says it is possible; everywhere
-// else the control stays visible and disabled, with the reason. Whether the
-// draft takes an edit is core's to say (`draft.editable`), so what is offered
-// is what the core accepts; the demo's draft, with no keyboard, takes them too.
-export const writable = () => Boolean(getModel()?.draft?.editable);
-
 // Posts a message that leaves the demo (or replaces its file), asking first
 // when that would lose edits not exported (view/demo.mjs leaving()).
 /** @param {import("../contracts/messages.js").PanelCommand} message */
@@ -234,25 +228,4 @@ export function postLeavingDemo(message) {
     state.leaveDemo = leave;
     state.overlay = "leaveDemo";
     render();
-}
-
-// Whether an area can be edited now, decided in one place: every edit goes
-// into the draft, so the draft must be this keyboard's, current and idle, and
-// the area's own capability must hold. Exporting only reads the keyboard.
-/** @type {Record<string, (model: import("../contracts/panel.js").PublishedModel | null) => boolean>} */
-const AREA_CAPABILITY = {
-    behaviours: (model) => Boolean(model?.behaviorEditing?.writable),
-    settings: (model) => Boolean(model?.settingsEditing?.writable),
-    macros: (model) => Boolean(model?.macroEditing?.writable),
-    customKeys: (model) => Boolean(model?.customKeyEditing?.writable),
-    pointing: (model) => Boolean(model?.pdModeEditing?.writable),
-    combos: (model) => model?.comboReadback?.writable !== false,
-    layers: (model) => Boolean(model?.portable?.available && !model.portable.busy),
-    import: (model) => Boolean(model?.portable?.available && !model.portable.busy),
-};
-/** @param {string} area */
-export function canEdit(area) {
-    const model = getModel();
-    if (area === "export") return Boolean(model?.portable?.available && !model.portable.busy);
-    return writable() && (AREA_CAPABILITY[area] ? AREA_CAPABILITY[area](model) : true);
 }

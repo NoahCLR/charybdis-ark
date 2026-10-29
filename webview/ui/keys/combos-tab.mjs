@@ -3,7 +3,8 @@
 // builder beside the table.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {closeComboBuilder, currentView, getModel, openComboBuilder, render, state, canEdit as canEditArea} from "../../store.mjs";
+import {closeComboBuilder, currentView, getModel, openComboBuilder, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {draftMarks, draftDot} from "../../view/review.mjs";
 import {reachAttrs, reachTable} from "../groups.mjs";
@@ -19,7 +20,7 @@ import {keysReach} from "./reach.mjs";
 export function tabCombos(body, right) {
     const model = getModel();
     const combos = model?.combos || [];
-    const canEdit = canEditArea("combos");
+    const canEdit = editGate(model, "combos").editable;
 
     right.replaceChildren();
     const toggle = el(`<button class="btn tiny" ${canEdit ? "" : "disabled"}>${state.combo.open ? "Close builder" : "New combo"}</button>`);

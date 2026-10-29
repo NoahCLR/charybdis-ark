@@ -7,7 +7,8 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {actionLabel, behaviourGridSteps, cellLabel, impliedBranch, inheritedBranch} from "../../view/keyface.mjs";
-import {getModel, layers, post, render, state, canEdit as canEditArea} from "../../store.mjs";
+import {getModel, layers, post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
@@ -66,7 +67,7 @@ function storageNotes(behaviour) {
 export function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
-    const canEdit = canEditArea("behaviours");
+    const canEdit = editGate(model, "behaviours").editable;
     // Timing waits for a branch on a plain key; the switches wait for anything
     // they could turn on or off.
     const timingIdle = !behaviour.steps.length && behaviour.timingAlone === false;

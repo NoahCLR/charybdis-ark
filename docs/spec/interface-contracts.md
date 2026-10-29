@@ -243,6 +243,7 @@ here: its home and tests are in
 | Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on ([more](#shortcut-layers)) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
 | The rail's keyboard button and its menu ([more](#the-rails-keyboard-menu)) | `webview/view/keyboard-menu.mjs`, `webview/ui/keyboard-menu.mjs` | `tests/view/keyboard-menu.test.mjs`, `browser-tests/preview.spec.js`, `browser-tests/live-edits.spec.js` |
 | The commit bar: which bar the frame shows over the draft (an Apply running, its read back, a failed one until dismissed, a held live edit, other work, a draft from another keyboard or one the keyboard changed under, a restart, the live modes', the review), drawn by `webview/ui/frame.mjs` | `webview/view/commit-bar.mjs` (`commitBarState`) | `tests/view/commit-bar.test.mjs`, `browser-tests/live-edits.spec.js`, `browser-tests/apply-progress.spec.js` |
+| Whether an area takes an edit now: the draft core binds (`draft.editable`) and the area's own capability, Export only the keyboard; and what a screen says when it does not, or nothing while the draft is busy, which the commit bar says | `webview/view/edit-gate.mjs` (`editGate`) | `tests/view/edit-gate.test.mjs`, `tests/scripts/conventions.test.js` |
 | The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, and what a search finds (at most `SEARCH_ROWS` keycodes), drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs` |
 | What reaches one key and what it uses, which the hover card and the Key tab both draw: the layer's own key shown alone, the key answering it from below, and of its behaviour row whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold; drawn by `webview/ui/hover-card.mjs` (placed by `webview/ui/hover.mjs`) and `webview/ui/keys/key-tab.mjs` | `webview/view/key-reach.mjs` (`keyReachAt`, `keyReach`, `keyBehaviour`) | `tests/view/key-reach.test.mjs`, `browser-tests/participation.spec.js` |
 | What the board shows at each key and on the trackball: the key that answers in the view and the layer supplying it, glass or solid, its light, the dots and badges of what runs there, and in the LED selector each LED's index; drawn by `webview/ui/board.mjs` | `webview/view/board-keys.mjs` (`boardKeys`, `boardTrackball`) | `tests/view/board-keys.test.mjs`, `browser-tests/marks.spec.js`, `browser-tests/participation.spec.js`, `browser-tests/lighting-controls.spec.js` |
@@ -567,8 +568,9 @@ only an operation stands in the way. The demo's draft is bound to the demo
   opens import and layer reviews, answers macro inspection and routes Apply
   only for a bound draft, and Apply checks again as it writes
   (`tests/session/panel-loop.test.js`, `tests/session/panel-session.test.js`).
-  `writable()` under `canEdit` reads the published `draft.editable`
-  (`tests/view/messages.test.mjs`).
+  `editGate(model, area)` (`webview/view/edit-gate.mjs`) reads the published
+  `draft.editable`, and each area's own capability with it
+  (`tests/view/edit-gate.test.mjs`).
 - Panel controls are registered once in `CONTROLS`
   (`core/session/panel-control-registry.js`): route, draft identity, binding
   rule, demo policy, phase and action. History and local macro inspection run
@@ -956,7 +958,7 @@ and the firmware serves the effective name as its USB product string
   one by its stored name, adding a serial or number only where two labels
   match (`tests/session/device-model.test.js`).
 - The Keyboard screen's title is the name (`titleName`), following
-  `canEdit("settings")`, with the built-in name as placeholder
+  `editGate(model, "settings")`, with the built-in name as placeholder
   (`browser-tests/settings-screens.spec.js`). It posts trimmed; core refuses
   more than 32 bytes or control characters (`tests/view/edits.test.mjs`,
   `tests/model/keyboard-name.test.js`).

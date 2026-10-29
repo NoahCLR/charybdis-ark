@@ -34,10 +34,10 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 - The words for a value the keyboard stores live in `core/model/vocabulary.js`
   and reach the interface as `model.vocabulary`; a screen holds no
   enum-to-words table of its own (see **Checked**).
-- Whether an area can be edited is `canEdit(area)` in `webview/store.mjs`,
-  which reads the published `draft.editable` (no other module reads it; see
-  **Checked**). Core decides it once, with `draftBinding` (D-L60); nothing
-  else recomputes it.
+- Whether an area can be edited is `editGate(model, area)` in
+  `webview/view/edit-gate.mjs`, which reads the published `draft.editable`
+  and says why not (no other module reads it; see **Checked**). Core decides
+  it once, with `draftBinding` (D-L60); nothing else recomputes it.
 - Types are strict at the existing seams (D-L59). Internal types sit beside
   their owning layer; `contracts/` holds only what crosses the panel.
 - A union in `contracts/` that a runtime value also lists is tied to it: a
@@ -125,7 +125,7 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | No layer mask is written as `0xffff` or `(1 << 16) - 1`, and no layer count as `16` (`{length: 16}`, `new Array(16)`, a comparison or default), outside their homes and pinned copies; the exceptions say why | `tests/scripts/conventions.test.js` |
 | The interface keeps no table of words of its own: three or more phrases by key or `{label, what}` records by key, or two or more `[id, phrase]` pairs, in a list or a `Map`; the exceptions say why | `tests/scripts/conventions.test.js` |
 | Semantic lookups never use a position's stored keycode name | `tests/scripts/conventions.test.js` |
-| Only `webview/store.mjs` reads the draft's `editable`; every other webview module asks `canEdit(area)` or `writable()` | `tests/scripts/conventions.test.js` |
+| Only `webview/view/edit-gate.mjs` reads the draft's `editable`; every other webview module asks `editGate(model, area)` | `tests/scripts/conventions.test.js` |
 | No webview module posts an object literal: `post()` and `postLeavingDemo()` take a builder's output or a message the store hands back | `tests/scripts/conventions.test.js` |
 | Every stored enum value has a word | `tests/model/vocabulary.test.js` |
 | A draft edit type agrees across `core/model/draft-edits.js`, `contracts/edits.d.ts` and `webview/view/edits.mjs` | `tests/model/draft-edits.test.js` |

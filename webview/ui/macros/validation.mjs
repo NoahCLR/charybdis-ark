@@ -7,7 +7,8 @@ import {macroLocalState, samePayload, unreleased} from "../../view/macro.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {actionLabel} from "../../view/keyface.mjs";
 import {listed, vocabulary} from "../../view/vocabulary.mjs";
-import {canEdit as canEditArea, getModel, macroForm, post, setMacroForm, state} from "../../store.mjs";
+import {getModel, macroForm, post, setMacroForm, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {sectionPath} from "../../view/settings-layout.mjs";
 // Input remains local until the core has inspected this exact payload under
@@ -17,7 +18,7 @@ let nextInspection = 0;
 const pendingInspections = new Map();
 /** @param {Model} model @param {MacroSlot} slot */
 const inspectionContext = (model, slot) => JSON.stringify([model?.draft?.id, model?.draft?.revision,
-    model?.macroUnicode, slot?.bytes, model?.macroBank?.free, canEditArea("macros")]);
+    model?.macroUnicode, slot?.bytes, model?.macroBank?.free, editGate(getModel(), "macros").editable]);
 /** @param {import("../../state.js").MacroForm} form @param {Model} model @param {MacroSlot} slot */
 export const matchingValidation = (form, model, slot) => form.validation != null && form.validation.payload === form.draft &&
     form.validation.context === inspectionContext(model, slot);
@@ -28,7 +29,7 @@ function currentSlot(keycode) { return getModel()?.macros?.find(slot => slot.key
 /** @param {MacroSlot} slot */
 export function requestInspection(slot) {
     const form = macroForm(slot.keycode), model = getModel();
-    if (form.draft === undefined || form.stepError || !canEditArea("macros")) return;
+    if (form.draft === undefined || form.stepError || !editGate(getModel(), "macros").editable) return;
     const context = inspectionContext(model, slot);
     const pending = pendingInspections.get(slot.keycode);
     if (pending?.context === context && pending.payload === form.draft && pending.requestId === form.requestId) return;
@@ -55,7 +56,7 @@ export function inspectEdit(slot, stage) {
 /** @param {MacroSlot} slot */
 function keepValidated(slot) {
     const model = getModel(), form = macroForm(slot.keycode);
-    if (!canEditArea("macros") || slot.available === false || !form.wantsStage || form.stepError || state.recording || !matchingValidation(form, model, slot) || form.validation?.validation.error) return;
+    if (!editGate(getModel(), "macros").editable || slot.available === false || !form.wantsStage || form.stepError || state.recording || !matchingValidation(form, model, slot) || form.validation?.validation.error) return;
     setMacroForm(slot.keycode, {wantsStage: false});
     if (form.draft !== slot.payload) post(edits.macroMessage(slot.keycode, form.draft ?? slot.payload, model?.macroEditing?.identity));
 }

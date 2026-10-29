@@ -1,7 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
-import {currentLayer, layers, post, render, showLayer, state, writable} from "../../store.mjs";
+import {currentLayer, layers, post, render, showLayer, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {layerColourRow, layerPaints, offWording} from "../../view/lighting.mjs";
 import {vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
@@ -12,7 +13,7 @@ import {groupRowsTable} from "./led-rows.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageLayers(model) {
     const node = el(`<div></div>`);
-    const canEdit = writable();
+    const canEdit = editGate(model, "lighting").editable;
     const marks = draftMarks(model?.draft?.changes);
 
     node.className = "tab-split";

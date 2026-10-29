@@ -137,8 +137,8 @@ test("the page's backup chooser holds a file to the backup's byte limit", () => 
 const uncommented = source => source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, comment => comment.replace(/[^\n]/g, " "));
 const lineAt = (source, index) => source.slice(0, index).split("\n").length;
 
-// Whether an area takes edits is the store's canEdit(area) and writable(),
-// which read the published draft.editable; every other module asks them,
+// Whether an area takes edits is editGate(model, area) (webview/view/edit-gate.mjs),
+// which reads the published draft.editable; every other module asks it,
 // never the draft.
 const draftEditable = [
     /\bdraft\s*(?:\?\.|\.)\s*editable\b/g,
@@ -157,17 +157,17 @@ test("the editable check catches a module reading the draft", () => {
         "const {\n    editable,\n    busy\n} = model.draft;", "const {draft: {\n    editable}} = model;", "const on = model.draft\n    .editable;"]) {
         assert.equal(readsDraftEditable(sample).length, 1, sample);
     }
-    for (const sample of ["const editable = canEdit(\"settings\");", "const editable = writable() && !field.readOnly;",
-        "export function durationControl(field, editable, submit) {", "// reads draft.editable through the store",
-        "/* draft.editable */ const on = writable();"]) {
+    for (const sample of ["const editable = editGate(model, \"settings\").editable;", "const editable = gate.editable && !field.readOnly;",
+        "export function durationControl(field, editable, submit) {", "// reads draft.editable through the edit gate",
+        "/* draft.editable */ const on = editGate(model, \"keys\").editable;"]) {
         assert.deepEqual(readsDraftEditable(sample), [], sample);
     }
 });
 
-test("only the store reads whether the draft takes edits", () => {
-    const violations = sources("webview").filter(file => file !== path.join("webview", "store.mjs"))
+test("only the edit gate reads whether the draft takes edits", () => {
+    const violations = sources("webview").filter(file => file !== path.join("webview", "view", "edit-gate.mjs"))
         .flatMap(file => readsDraftEditable(read(file)).map(line => `${file}:${line}`));
-    assert.deepEqual(violations, [], "ask canEdit(area) or writable() in webview/store.mjs");
+    assert.deepEqual(violations, [], "ask editGate(model, area) in webview/view/edit-gate.mjs");
 });
 
 // A screen posts what a builder returns (webview/view/edits.mjs,

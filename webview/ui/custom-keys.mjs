@@ -18,10 +18,11 @@ import {el, esc} from "../lib/dom.mjs";
 import {placementsOf} from "../view/reach.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {titleName, attachTitleName} from "./title-name.mjs";
-import {canEdit as canEditArea, getModel, layers, post, render, state, writable} from "../store.mjs";
+import {getModel, layers, post, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {topbar, unavailable} from "./frame.mjs";
+import {topbar} from "./frame.mjs";
 import {keyName} from "../view/keyvalues.mjs";
 import {customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine, sameShortcut, shortcutAct, shortcutLimitWords} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";
@@ -34,7 +35,7 @@ export function screenCustomKeys() {
     const model = getModel();
     const keys = model?.customKeys || [];
     const key = keys.find((row) => row.keycode === state.customKey) || keys[0];
-    const canEdit = canEditArea("customKeys");
+    const gate = editGate(model, "customKeys"), canEdit = gate.editable;
 
     const main = el(`<div class="main">${topbar(
         "Custom keys",
@@ -46,7 +47,7 @@ export function screenCustomKeys() {
     if (!keys.length) {
         pad.classList.remove("library");
         pad.appendChild(el(`<div class="screen-stub"><h3>No custom keys read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's custom keys.")}</p></div>`));
+            <p class="note">${esc(gate.why || "Choose Read keyboard to read this keyboard's custom keys.")}</p></div>`));
         main.appendChild(content);
         return main;
     }
@@ -98,7 +99,7 @@ function editor(model, key, canEdit) {
             label: "Custom key name", perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName, canEdit})}
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
             <span class="right row actions">
-                <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
+                <button class="btn tiny ghost" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">${keyFields(model, key).join("")}</div></div>`);
     attachTitleName(card, {stored: key.name, perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName,
         rename: (name) => post(edits.customKeyNameMessage(key.keycode, name, model?.customKeyEditing?.identity))});

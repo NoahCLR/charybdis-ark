@@ -95,6 +95,11 @@ Around the core:
   `webview/view/board-keys.mjs`; `webview/ui/board.mjs` only draws it. What
   reaches one key, for the hover card and the Key tab: `keyReachAt(view,
   index)`, `webview/view/key-reach.mjs`.
+- Whether an area takes an edit now, and what to say when it does not (or
+  nothing, while the draft is busy): `editGate(model, area)`,
+  `webview/view/edit-gate.mjs`. A screen disables its controls by it and
+  draws its words, or its own sentence where it has none; a new area gets
+  its rule there.
 
 ## Facts and their homes
 

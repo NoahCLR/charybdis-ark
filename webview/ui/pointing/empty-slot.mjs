@@ -3,8 +3,8 @@ import {el, esc} from "../../lib/dom.mjs";
 import {KIND, newMode, scrollStarter} from "../../view/pointing-config.mjs";
 import {holdKeyName, whatReachesSlot} from "../../view/pointing-reach.mjs";
 import {post} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
-import {unavailable} from "../frame.mjs";
 import {actionMarked, mark} from "../marks.mjs";
 import {listed} from "../../view/vocabulary.mjs";
 
@@ -19,8 +19,9 @@ function inertNote(model, slot) {
     return `<div class="unavailable">${listed(parts)} still reach this slot. The keyboard refuses to activate an empty slot, so they do nothing until it is configured — they do not need to be removed first.</div>`;
 }
 
-/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
-export function emptySlot(model, slot, canEdit, slots) {
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {import("../surface-types.js").PresentedSlot[]} slots */
+export function emptySlot(model, slot, slots) {
+    const gate = editGate(model, "pointing"), canEdit = gate.editable;
     const sources = slots.filter((row) => row.kind);
     const node = el(`<div class="pd-editor stack"><div class="card">
         <div class="card-h"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span><h3>Slot ${esc(slot.id)} is empty</h3>
@@ -38,7 +39,7 @@ export function emptySlot(model, slot, canEdit, slots) {
                 ${sources.map((row) => `<option value="${esc(row.id)}">Slot ${esc(row.id)} · ${esc(row.name)}</option>`).join("")}</select></label>
             <button class="btn" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
             : ""}
-        ${canEdit || model?.draft?.busy ? "" : `<div class="unavailable">${esc(unavailable(model) || "This slot cannot be edited right now.")}</div>`}
+        ${canEdit || gate.quiet ? "" : `<div class="unavailable">${esc(gate.why || "This slot cannot be edited right now.")}</div>`}
     </div></div></div>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-new]")).forEach((button) => button.addEventListener("click", () =>
         post(edits.pdMode(slot.id, newMode(slot, Number(button.dataset.new), scrollStarter(slots)), model.profileIdentity))));
