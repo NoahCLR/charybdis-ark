@@ -184,8 +184,9 @@ keyboard again and shows the new value. That is not an error.
   is now. **Discard draft** starts over from the keyboard. Until you choose
   one, the editing screens say the keyboard changed since the draft began
   and point to the bar.
-- In the live modes, an edit you make just as a key changed the keyboard is
-  not sent. Ark reads the keyboard; make the edit again.
+- In the live modes, the draft shows what the keyboard runs now, and its
+  history starts again there. An edit you make just as a key changed the
+  keyboard is not sent. Ark reads the keyboard; make the edit again.
 
 **Keyboard adjustment pending** means such a change is still waiting to reach
 both halves. Release any held keys. The keyboard's dot in the rail says it on

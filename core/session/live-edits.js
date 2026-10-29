@@ -209,7 +209,7 @@ function saveCutShortResult(session, read) {
 async function reread(session) {
     needRead(session);
     if (!session.service.snapshot().connected) return;
-    if (await readAndFollow(session) && takeNews(session, "changedElsewhere")) session.notice = CHANGED_ELSEWHERE;
+    if (takeNews(session, "changedElsewhere", await readAndFollow(session))) session.notice = CHANGED_ELSEWHERE;
 }
 
 // A posted edit, in Live preview + save: the same editors stage it, the

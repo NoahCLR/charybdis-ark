@@ -10,7 +10,7 @@ const {replaceDomain} = require("../../core/schema/profile-domains");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {document} = require("../fixtures/pd-profile");
 const {editMacros} = require("../fixtures/profile-document");
-const {openLoop} = require("../fixtures/panel-loop");
+const {lastMessage, openLoop} = require("../fixtures/panel-loop");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document: liveDocument} = require("../fixtures/portable-profile");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
@@ -85,16 +85,16 @@ test("reading again follows the read, and a failed read leaves the draft stale w
     const session = sessionOn(connected(), [elsewhere, () => {throw moved();}, () => {throw moved();}, snapshot, () => {throw new Error("No answer.");}]);
     followRead(session, snapshot(), connected());
     const draft = /** @type {ProfileDraftSession} */ (session.draft);
-    assert.equal(await readAndFollow(session), true);
+    const read = await readAndFollow(session);
     assert.equal(draft.current.fingerprint, elsewhere().fingerprint, "the draft follows what was read");
-    assert.equal(session.observedPortable, session.service.portable);
+    assert.equal(session.observedPortable, read, "and the read it followed is what it resolves");
     // A read the keyboard moved under is retried, a bounded number of times.
-    assert.equal(await readAndFollow(session), false, "a failed read resolves, it never rejects");
+    assert.equal(await readAndFollow(session), undefined, "a failed read resolves, it never rejects");
     assert.equal(draft.stale, true);
     assert.equal(retryPending(session, draft), true);
-    assert.equal(await readAndFollow(session), false);
+    assert.equal(await readAndFollow(session), undefined);
     assert.deepEqual(session.liveReadRetry, {draftId: draft.id, attempts: 2});
-    assert.equal(await readAndFollow(session), true);
+    assert.ok(await readAndFollow(session));
     assert.equal(session.liveReadRetry, undefined, "a read that worked ends the retries");
     for (let attempt = 0; attempt < LIVE_READ_RETRIES; attempt++) readFailed(session, moved());
     assert.equal(retryPending(session, draft), false, "after the last, reading again is the person's");
@@ -102,7 +102,7 @@ test("reading again follows the read, and a failed read leaves the draft stale w
     endRetries(session);
     readFailed(session, moved());
     assert.equal(retryPending(session, draft), true);
-    assert.equal(await readAndFollow(session), false);
+    assert.equal(await readAndFollow(session), undefined);
     assert.equal(retryPending(session, draft), false);
     assert.equal(draft.stale, true);
     endRetries(session);
@@ -159,7 +159,9 @@ test("a draft no read opened is replaced by the next complete read", () => {
 });
 
 // A live keyboard tells the draft what a person should hear; that waits
-// until the read that says it takes it, once.
+// until whoever made the read that told it takes it, once. The loop's change
+// notice follows each read before the read resolves, so these also hold for
+// news the notice heard first.
 /** @param {import("node:test").TestContext} t */
 const live = t => openLoop(t, {keyboard: liveKeyboard({document: liveDocument()})});
 
@@ -169,26 +171,46 @@ test("a working copy changed without Ark is news for the draft, said once", asyn
     const draft = session.draft;
     const layers = validateSnapshot({...liveDocument(), profile: keyboard.working.toString("base64")}).layers; layers[3][3] = 0x04;
     keyboard.externalEdit(replaceDomain(keyboard.working, 0x60, () => encodeKeymapDomain(layers)));
-    assert.equal(await readAndFollow(session), true);
+    const read = await readAndFollow(session);
     assert.equal(session.draft, draft);
     assert.equal(draft.history.length, 1, "the draft starts again from what the keyboard runs");
-    assert.equal(takeNews(session, "restarted"), undefined, "taking one kind leaves the other");
-    assert.equal(takeNews(session, "changedElsewhere"), true);
-    assert.equal(takeNews(session, "changedElsewhere"), undefined, "said once");
+    assert.equal(takeNews(session, "restarted", read), undefined, "taking one kind leaves the other");
+    assert.equal(takeNews(session, "changedElsewhere", read), true);
+    assert.equal(takeNews(session, "changedElsewhere", read), undefined, "said once");
 });
 
 test("a restart over unsaved edits is news for the draft that saw them, kept or gone", async t => {
     const {keyboard, session, key} = await live(t);
     await key(0, 8, "KC_T");
     keyboard.replug();
-    assert.equal(await readAndFollow(session), true);
+    const read = await readAndFollow(session);
     assert.equal(session.draft.dirty, false, "the keyboard runs what it saved");
-    assert.deepEqual(takeNews(session, "restarted"), {kept: false, mode: EDIT_MODE.LIVE_REVIEW});
-    assert.equal(takeNews(session, "restarted"), undefined);
+    assert.deepEqual(takeNews(session, "restarted", read), {kept: false, mode: EDIT_MODE.LIVE_REVIEW});
+    assert.equal(takeNews(session, "restarted", read), undefined);
     // News is the draft's: another draft in its place hears none of it.
     await key(0, 9, "KC_S");
     keyboard.replug();
-    await readAndFollow(session);
+    const lost = await readAndFollow(session);
     session.draft = new ProfileDraftSession(snapshot(), "kb", capabilities);
-    assert.equal(takeNews(session, "restarted"), undefined);
+    assert.equal(takeNews(session, "restarted", lost), undefined);
+});
+
+test("news is the read's that told it: a later read never says it", async t => {
+    const {keyboard, session, shell, loop, key, look} = await live(t);
+    await key(0, 14, "KC_F");
+    const layers = validateSnapshot({...liveDocument(), profile: keyboard.working.toString("base64")}).layers; layers[3][3] = 0x04;
+    // The live watch reads the keyboard another app changed, and says so
+    // itself; Read keyboard afterwards has nothing to add about it.
+    keyboard.externalEdit(replaceDomain(keyboard.working, 0x60, () => encodeKeymapDomain(layers)));
+    assert.equal(await look(), true);
+    assert.match(lastMessage(shell).notice, /changed by itself/);
+    await loop.handleMessage({type: "refresh"});
+    assert.doesNotMatch(lastMessage(shell).notice, /history starts again/);
+    // Nor does any later read say what an earlier one told.
+    layers[3][3] = 0x05;
+    keyboard.externalEdit(replaceDomain(keyboard.working, 0x60, () => encodeKeymapDomain(layers)));
+    const told = await readAndFollow(session);
+    const later = await readAndFollow(session);
+    assert.equal(takeNews(session, "changedElsewhere", later), undefined);
+    assert.equal(takeNews(session, "changedElsewhere", told), true, "the read that told it still says it");
 });

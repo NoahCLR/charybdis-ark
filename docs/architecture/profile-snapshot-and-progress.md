@@ -272,11 +272,15 @@ fingerprints), also over a new connection, or when it shows exactly the edit
 Ark sent last (below). Anything else starts again from
 the keyboard and says why, as what `observe` returns: a new session is a
 restart, after which unsaved edits are gone or were saved first
-(`restarted`); a moved revision is `changedElsewhere`. That news waits with
-the draft until a read that says it takes it (`takeNews`, `draft-follow.js`):
-Read keyboard says both, and the read after a refused or lost live edit says
-a change made elsewhere. `follow` keeps the draft on the same keyboard listed
-under a new device id after a rename, by its session.
+(`restarted`); a moved revision is `changedElsewhere`. That news is the
+read's that told it, kept with the draft for whoever made that read, who
+takes it by the read (`takeNews`, `draft-follow.js`), even when the change
+notice followed the read first: Read keyboard says both of its read's, and
+the read after a refused or lost live edit says a change made elsewhere. A
+later read never says an earlier one's, which by then is no longer so (the
+live watch says a change it read in its own words). `follow` keeps the
+draft on the same keyboard listed under a new device id after a rename, by
+its session.
 
 ### A live edit
 

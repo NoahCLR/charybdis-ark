@@ -133,7 +133,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     if (macroFailure) session.notice += macroFailure;
     // A live keyboard that restarted (a replug, a lost connection) since Ark
     // knew of unsaved edits: in Live edit it may have saved them first.
-    const restarted = takeNews(session, "restarted");
+    const restarted = takeNews(session, "restarted", portable);
     // A Save cut short says what became of its edits, which also tells the restart.
     const saveResult = saveCutShortResult(session, portable);
     if (saveResult) {
@@ -148,7 +148,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
             : restarted.mode === EDIT_MODE.LIVE ? " The keyboard restarted before it saved your last edits, so those are gone: it runs what it saved."
             : " The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";
     }
-    if (takeNews(session, "changedElsewhere")) session.notice += ` ${CHANGED_ELSEWHERE}`;
+    if (takeNews(session, "changedElsewhere", portable)) session.notice += ` ${CHANGED_ELSEWHERE}`;
     const ready = Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
         && hasCurrentLayers(state.capabilities) && portable && !portable.incomplete);
     // After a restart Ark asked for, the edits it kept go back to the keyboard.

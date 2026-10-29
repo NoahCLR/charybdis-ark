@@ -179,8 +179,8 @@ export interface PanelSession extends DemoSession {
     acceptedEdit?: ReturnType<NonNullable<DemoSession['draft']>['stage']>;
     /** The failed reads the live watch has retried for a stale draft (draft-follow.js). */
     liveReadRetry?: {draftId: string; attempts: number};
-    /** What reads a draft followed told that is not said yet (draft-follow.js takeNews). */
-    readNews?: ReadNews & {draftId: string};
+    /** What the read a draft last heard news from told that is not said yet, with that read (draft-follow.js takeNews). */
+    readNews?: ReadNews & {draftId: string; read: import('../model/types.js').ProfileSnapshot};
     /** What the live watch last saw of a keyboard under a Review and save draft (live-watch.js). */
     applyWatch?: {draftId: string; session: number; revision: number; savedGeneration: number};
     /** A live edit waiting on its trap check (plan answer 2): sent on confirmLiveEdit, dropped on cancelLiveEdit. */

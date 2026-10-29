@@ -13,8 +13,8 @@
 //   followService    a service notice: the draft follows the latest read and
 //                    the connection it came over
 //   followRead       a read opens the draft, or the open one follows it
-//   readAndFollow    the keyboard read again, and followed; a failure leaves
-//                    the draft stale
+//   readAndFollow    the keyboard read again, and followed, resolving the
+//                    read; a failure leaves the draft stale
 //   takeRead         a given draft takes a read itself (one Ark put back or
 //                    followed to the keyboard's new device id)
 //   replaceFromRead  a new draft from a read, in place of the open one
@@ -25,12 +25,14 @@
 //                    counts toward the live watch's retries
 //   retryPending     whether the live watch reads a stale draft again
 //   endRetries       the retries end: reading again is the person's
-//   takeNews         what a followed read told that is not said yet, once
+//   takeNews         what a given read told that is not said yet, once
 //
 // A read can tell what a person should hear (ProfileDraftSession.observe): a
 // live keyboard that restarted over unsaved edits, or whose working copy
-// changed without Ark. That waits as the open draft's news until the read
-// that says it takes it, so a notice-driven follow loses nothing.
+// changed without Ark. That is the news of the read that told it, kept with
+// the open draft for whoever made that read: the operation takes it by the
+// read it made, so a notice that followed the read first loses nothing, and
+// no later read says what an earlier one told (by then it is no longer so).
 
 /**
  * @typedef {import("./types.js").PanelModelSession} ModelSession
@@ -48,12 +50,11 @@ const {replaceDraft, setDraft} = require("./panel-session-state");
 // after reads the keyboard moved under.
 const LIVE_READ_RETRIES = 3;
 
-// What `draft` was told, kept with what it was told before and not said.
-/** @param {Pick<ModelSession, "readNews">} session @param {Draft} draft @param {News | undefined} told */
-function remember(session, draft, told) {
-    if (!told) return;
-    const unsaid = session.readNews?.draftId === draft.id ? session.readNews : {draftId: draft.id};
-    session.readNews = {...unsaid, ...told};
+// What `read` told `draft`, in place of what an earlier read told: that is
+// no later read's to say.
+/** @param {Pick<ModelSession, "readNews">} session @param {Draft} draft @param {Read} read @param {News | undefined} told */
+function remember(session, draft, read, told) {
+    if (told) session.readNews = {...told, draftId: draft.id, read};
 }
 
 // A complete read of a supported keyboard opens the draft, or refreshes the
@@ -75,7 +76,7 @@ function followRead(session, read, state) {
         if (session.draft.live || !session.draft.dirty) setDraft(session, new ProfileDraftSession(read, state.selectedDeviceId, state.capabilities, state.connectionToken));
         else session.draft.needsRead = true;
     } else if (!session.draft) setDraft(session, new ProfileDraftSession(read, state.selectedDeviceId, state.capabilities, state.connectionToken));
-    else remember(session, session.draft, session.draft.observe(read, state.selectedDeviceId, state.connectionToken, state.capabilities));
+    else remember(session, session.draft, read, session.draft.observe(read, state.selectedDeviceId, state.connectionToken, state.capabilities));
     session.observedPortable = read;
 }
 
@@ -88,18 +89,19 @@ function followService(session, state) {
 }
 
 // Read the keyboard as a Refresh does and let the draft follow: it follows,
-// or changes kind when the keyboard's mode did. True when it was read; a read
-// that failed leaves the draft stale (readFailed) and resolves false.
-/** @param {Session} session */
+// or changes kind when the keyboard's mode did. Resolves the read, whose news
+// the caller may take; a read that failed leaves the draft stale (readFailed)
+// and resolves undefined.
+/** @param {Session} session @returns {Promise<Read | undefined>} */
 async function readAndFollow(session) {
     try {
         const read = await session.service.readKeyboardProfile();
         followRead(session, read, session.service.snapshot());
         session.liveReadRetry = undefined;
-        return true;
+        return read;
     } catch (error) {
         readFailed(session, error);
-        return false;
+        return undefined;
     }
 }
 
@@ -108,7 +110,7 @@ async function readAndFollow(session) {
 /** @param {Session} session @param {Draft} draft @param {Read} read */
 function takeRead(session, draft, read) {
     const state = session.service.snapshot();
-    remember(session, draft, draft.observe(read, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined));
+    remember(session, draft, read, draft.observe(read, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined));
     session.observedPortable = read;
 }
 
@@ -170,12 +172,13 @@ function endRetries(session) {
     session.liveReadRetry = undefined;
 }
 
-// What reads the open draft followed told of `kind`, not said yet; taking it
-// says it, so the next read does not say it again.
-/** @template {keyof News} K @param {Pick<ModelSession, "draft" | "readNews">} session @param {K} kind @returns {News[K] | undefined} */
-function takeNews(session, kind) {
+// What `read` (the read the caller made) told the open draft of `kind`, not
+// said yet; taking it says it, so it is not said again. A read that failed
+// (none) told nothing, and an earlier read's news is not this read's.
+/** @template {keyof News} K @param {Pick<ModelSession, "draft" | "readNews">} session @param {K} kind @param {Read | null | undefined} read @returns {News[K] | undefined} */
+function takeNews(session, kind, read) {
     const news = session.readNews;
-    if (!news || news.draftId !== session.draft?.id) return undefined;
+    if (!news || news.read !== read || news.draftId !== session.draft?.id) return undefined;
     const told = news[kind];
     session.readNews = {...news, [kind]: undefined};
     return told;
