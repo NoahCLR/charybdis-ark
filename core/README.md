@@ -39,7 +39,8 @@ each status says of the operation sent: `session/candidate-status.js`) and
 `protocol/profile-candidate-v1.js`. In the live modes,
 `session/live-edits.js` computes each target with the same editors and sends
 it through the service's `postLiveEdit`; `session/live-edit-coordinator.js`
-splices it per domain (`schema/profile-splices.js`), and
+sends the edit `liveEditPlan` (`schema/profile-splices.js`) makes of it, its
+splices per domain or the whole profile, and
 `session/live-watch.js` looks at the keyboard between edits.
 
 ## The panel loop

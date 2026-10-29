@@ -258,8 +258,9 @@ layer change goes through `proposeLive` (`live-edits.js`):
    Revert; as an edit it would leave an "unsaved" copy of the saved bytes,
    which Live edit would save as a new generation.
 4. `LiveEditCoordinator.post` sends begin, one splice per changed domain, the
-   inserted bytes and commit, as one revision. Splices that do not fit beside
-   the profile are refused `LIVE_EDIT_TOO_LARGE`, except that an import, put
+   inserted bytes and commit, as one revision; what it sends is the plan
+   `liveEditPlan` (`schema/profile-splices.js`) makes from the working copy
+   and the target. Splices that do not fit beside the profile are refused `LIVE_EDIT_TOO_LARGE`, except that an import, put
    back, Send live or restart put-back goes as a whole replacement when
    nothing is unsaved. It waits for this half to finish, checks the active
    length against the bytes it recorded (`LIVE_EDIT_MISMATCH`), then waits
