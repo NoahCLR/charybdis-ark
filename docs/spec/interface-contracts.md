@@ -572,6 +572,14 @@ only an operation stands in the way. The demo's draft is bound to the demo
   `editGate(model, area)` (`webview/view/edit-gate.mjs`) reads the published
   `draft.editable`, and each area's own capability with it
   (`tests/view/edit-gate.test.mjs`).
+- An edit names the draft it was built from (`expectedBase`, or a domain's
+  `expectedFingerprint`), and core refuses it once the draft is another. A
+  form is drawn again from every model, so it names the newest. The keycode
+  picker stays open across models: what it chose whole (a custom key's
+  shortcut, a custom key made for a cell) names the draft as it posts, and a
+  row drawn before it opened (a behaviour cell's, `then` included) names the
+  draft it was drawn from, so it is refused rather than overwrite a newer edit
+  (`browser-tests/picker-identity.spec.js`).
 - Panel controls are registered once in `CONTROLS`
   (`core/session/panel-control-registry.js`): route, draft identity, binding
   rule, demo policy, phase and action. History and local macro inspection run

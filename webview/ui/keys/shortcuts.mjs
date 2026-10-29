@@ -70,7 +70,7 @@ function cellShortcut(action) {
     if (!step || !behaviour || state.cellRow !== behaviour.keycode) return false;
     const branch = step[TIER_FIELDS[kind]];
     /** @param {import("../../../contracts/edits.js").BehaviorBranch | null} next */
-    const change = (next) => saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: next});
+    const change = (next) => saveBehaviour(document, behaviour, model?.profileIdentity, {tapCount: step.tapCount, kind, branch: next});
     if (action === "clear") {
         if (branch && editGate(getModel(), "behaviours").editable) change(null);
     } else if (action === "copy") {

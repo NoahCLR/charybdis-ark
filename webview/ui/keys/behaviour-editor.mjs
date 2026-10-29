@@ -190,7 +190,7 @@ export function behaviourEditor(behaviour) {
     if (state.retarget?.from === behaviour.keycode) node.append(retargetPrompt(behaviour));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="remove"]'))?.addEventListener("click", () =>
         post(edits.deleteBehaviour(behaviour.keycode, model?.profileIdentity)));
-    const commit = () => saveBehaviour(node, behaviour);
+    const commit = () => saveBehaviour(node, behaviour, model?.profileIdentity);
     /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-term]")).forEach((input) => input.addEventListener("change", () => {
         const term = /** @type {import("../../../contracts/edits.js").TimingTerm} */ (input.dataset.term);
         input.dataset.stored = behaviourTimingEdit(input.value, behaviourTimingField(behaviour, term));

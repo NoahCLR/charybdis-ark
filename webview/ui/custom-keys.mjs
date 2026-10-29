@@ -156,10 +156,11 @@ function behaviourCard(model, key) {
 // The key's shortcut, set in the keycode picker as any key is on the Keys
 // screen: a key from those the keyboard accepts, and the modifiers in the
 // picker's row, here left and right mixed. Each change posts the whole
-// shortcut; Clear posts none.
+// shortcut; Clear posts none. The picker stays open while new models arrive,
+// and what it posts is its own whole choice, so it names the draft, and is
+// weighed against the key, as they are when it is posted.
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function shortcutField(model, key, canEdit) {
-    const identity = model?.customKeyEditing?.identity;
     const names = key.shortcut.keys.map((code) => keycodeName(model, code)).filter(Boolean);
     const node = el(`<div class="field"><span>Shortcut</span>
             <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
@@ -169,13 +170,14 @@ function shortcutField(model, key, canEdit) {
                 data-tip="No shortcut: the key does only what its behaviour says.">Clear</button></div>
             <span class="note">${esc(customKeyShortcutLine(key))}</span></div>`);
     /** @param {import("../../contracts/panel.js").CustomKeyShortcut} shortcut */
-    const save = (shortcut) => post(edits.customKeyShortcutMessage(key.keycode, shortcut, identity));
+    const save = (shortcut) => post(edits.customKeyShortcutMessage(key.keycode, shortcut, getModel()?.customKeyEditing?.identity));
     /** @type {HTMLElement} */ (node.querySelector('[data-act="clear-shortcut"]')).addEventListener("click", () => save({mods: 0, keys: [], layers: 0, layerKind: 0}));
     /** @type {HTMLElement} */ (node.querySelector('[data-act="pick-shortcut"]')).addEventListener("click", () => openPicker({
         title: "Shortcut", context: key.name || `Custom key ${key.slot}`,
         seed: names, allowedKeys: model?.customKeyShortcutKeys || [], shortcut: {mods: key.shortcut.mods, layers: key.shortcut.layers, layerKind: key.shortcut.layerKind},
         onShortcut: (shortcut) => {
-            if (!sameShortcut(shortcut, key.shortcut)) save(shortcut);
+            const now = getModel()?.customKeys?.find((row) => row.keycode === key.keycode) || key;
+            if (!sameShortcut(shortcut, now.shortcut)) save(shortcut);
         },
     }));
     return node;
