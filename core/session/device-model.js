@@ -223,4 +223,8 @@ function deviceLabels(devices) {
         : devices[index].serialNumber ? `${base} · ${devices[index].serialNumber}` : `Keyboard ${devices[index].number ?? index + 1} · ${base}`);
 }
 
-module.exports = {buildDeviceModel, buildSnapshotModel, deviceLabels, deviceSummary, halvesConverged, keyboardLabel};
+// The keyboard the service selected, as it lists it.
+/** @template {{id: string}} D @param {{devices?: readonly D[], selectedDeviceId?: string | null}} state @returns {D | undefined} */
+const selectedDevice = (state) => state.devices?.find((entry) => entry.id === state.selectedDeviceId);
+
+module.exports = {buildDeviceModel, buildSnapshotModel, deviceLabels, deviceSummary, halvesConverged, keyboardLabel, selectedDevice};

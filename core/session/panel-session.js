@@ -28,7 +28,8 @@ const {profileUsage} = require("../model/profile-usage");
 const {canEdit, firmwareView} = require("./firmware-support");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {DRAFT_EDITS} = require("../model/draft-edits");
-const {buildDeviceModel, buildSnapshotModel, deviceLabels} = require("./device-model");
+const {buildDeviceModel, buildSnapshotModel, deviceLabels, selectedDevice} = require("./device-model");
+const {keptFor} = require("./kept");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft} = require("./panel-session-state");
 
@@ -89,7 +90,7 @@ function discardDraftForDevice(session, state, snapshot) {
 // keyboard is read, so none is described.
 /** @param {ModelSession} session @param {State} state @returns {ReturnType<typeof buildDeviceModel> & import("./types.js").PanelModelExtras} */
 function buildPanelModel(session, state) {
-    const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
+    const device = selectedDevice(state);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
     const supported = canEdit(state.capabilities);
     const binding = draftBinding(session, state);
@@ -163,7 +164,7 @@ function buildPanelModel(session, state) {
             fits: fileFits(session.portableReview.document, state.capabilities)} : null,
         layers: portableLayersView(session.portableLayers),
         usage: usageOf(session, state, draft),
-        putBack: session.beforeApply && session.beforeApply.deviceId === state.selectedDeviceId ? session.beforeApply.savedAt : null,
+        putBack: keptFor(session, "beforeApply", state)?.savedAt ?? null,
     };
     if (!draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     // A read is ready while its draft could be edited once whatever runs now

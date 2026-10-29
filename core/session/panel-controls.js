@@ -37,7 +37,8 @@ const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, saveCutShortResult, setEdit
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
 const {startingTimeout} = require("./keyboard-starting");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
-const {keyboardLabel} = require("./device-model");
+const {keyboardLabel, selectedDevice} = require("./device-model");
+const {forget, keptFor, keptForAny, remember} = require("./kept");
 
 // Ark reads only current firmware; the compatibility diagnostics say what
 // this keyboard's firmware lacks.
@@ -142,7 +143,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
         if (session.reconnect) session.reconnect.after = [session.reconnect.after, saveResult].filter(Boolean).join(" ");
     }
     // A restart Ark asked for kept the edits itself and says what became of them.
-    else if (restarted && !session.restart) {
+    else if (restarted && !keptForAny(session, "restart")) {
         session.notice += restarted.kept ? " The keyboard restarted since Ark last read it and kept your edits: it saved them first."
             : restarted.mode === EDIT_MODE.LIVE ? " The keyboard restarted before it saved your last edits, so those are gone: it runs what it saved."
             : " The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";
@@ -151,7 +152,7 @@ async function readKeyboard(session, selectedDeviceId, shell = {}) {
     const ready = Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
         && hasCurrentLayers(state.capabilities) && portable && !portable.incomplete);
     // After a restart Ark asked for, the edits it kept go back to the keyboard.
-    if (ready && session.restart) await putBackAfterRestart(session);
+    if (ready) await putBackAfterRestart(session);
     return ready;
 }
 
@@ -229,8 +230,8 @@ const DRAFT_ACTIONS = Object.freeze({
     // The success state's way back: the copy saved before the last Apply
     // becomes the draft, one undoable step, reviewed and applied as any edit.
     putBack: liveOr("putBack", ({draft, revision, session}) => {
-        const before = session.beforeApply;
-        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before a save on this keyboard to put back.");
+        const before = keptFor(session, "beforeApply", session.service.snapshot(), draft.deviceId);
+        if (!before) throw new Error("There is no copy from before a save on this keyboard to put back.");
         draft.replace(before.document, revision, "edit", "Put back what the keyboard had before the save", LAYER_IDENTITY);
         session.resetDraftForms = true;
     }),
@@ -251,7 +252,8 @@ const DRAFT_ACTIONS = Object.freeze({
                 () => draft.apply(service, revision, async (document) => {if (document.format === "charybdis-profile") saved = /** @type {import("../model/types.js").PortableDocument} */ (document); return (recovery = await recoveryFor(shell, session, "apply")(document));}));
             session.resetDraftForms = true;
             // What the keyboard held before, for "Put back what it had".
-            session.beforeApply = saved ? {document: saved, deviceId: draft.deviceId, savedAt: new Date().toISOString()} : undefined;
+            if (saved) remember(session, "beforeApply", {document: saved, savedAt: new Date().toISOString()}, service.snapshot(), draft.deviceId);
+            else forget(session, "beforeApply");
             session.notice = await storedProfile(session, {before, result, copy: `Recovery copy: ${recovery}`, onStep: (step) => {
                 readStep(step);
                 service.emitChange?.();
@@ -377,7 +379,7 @@ function requireReview(value) {
 const recoveryFor = (shell, session, cause) => (document) => {
     if (typeof shell.saveRecovery !== "function") throw new TypeError("shell.saveRecovery is not a function");
     const state = session.service.snapshot();
-    const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
+    const device = selectedDevice(state);
     return shell.saveRecovery(document, {cause, keyboard: keyboardLabel({...state, device})});
 };
 

@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const {draftControl, portableControl, readKeyboard} = require("../../core/session/panel-controls");
 const {buildPanelModel} = require("../../core/session/panel-session");
 const {followRead} = require("../../core/session/draft-follow");
+const {keptFor} = require("../../core/session/kept");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
@@ -165,12 +166,13 @@ test("after Apply, Put back makes what the keyboard held before it the draft, on
     draft.review(draft.revision);
     await assert.rejects(draftControl(session, {type: "putBackProfile", draftRevision: draft.revision}, h), /no copy from before a save/);
     await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
-    assert.ok(session.beforeApply, "the copy saved before Apply is kept for Put back");
-    assert.deepEqual(session.beforeApply.document, h.saved[0]);
-    assert.equal(buildPanelModel(session, session.service.snapshot()).portable.putBack, session.beforeApply.savedAt);
+    const kept = keptFor(session, "beforeApply", session.service.snapshot());
+    assert.ok(kept, "the copy saved before Apply is kept for Put back");
+    assert.deepEqual(kept.document, h.saved[0]);
+    assert.equal(buildPanelModel(session, session.service.snapshot()).portable.putBack, kept.savedAt);
     // The fake keyboard saves the target itself; stand in what a real one held.
     const before = snapshot().document;
-    session.beforeApply.document = before;
+    kept.document = before;
     await draftControl(session, {type: "putBackProfile", draftRevision: session.draft.revision}, h);
     assert.equal(fingerprint(session.draft.document), fingerprint(before));
     const view = session.draft.view(session.service.snapshot());

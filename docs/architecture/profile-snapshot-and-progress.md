@@ -127,6 +127,14 @@ with its document, origin, label, time and layer order.
   when the connection changes or a read finds the keyboard changed; Apply
   then refuses until **Review against the keyboard** (`rebase`) compares it
   with a fresh read.
+- Beside the draft, the session keeps a few records for one keyboard until a
+  read of it says what became of them (`kept.js`): the unsaved edits a
+  restart Ark asked for puts back, a Save cut short, and what the keyboard
+  held before the last Apply. Each is for the device id it was made on; a
+  restart's and a Save cut short's also for the same serial number, and
+  during the follow-back each one starts. A follow-back that finds the
+  keyboard under a new device id moves the draft and every record with it
+  (`followKeyboard`).
 - Each edit message names `draftId` and the draft revision; an older one is
   refused.
 - An incomplete form keeps its state in the interface until kept. When the
@@ -336,8 +344,8 @@ again instead of trusting its cached saved profile.
 
 A save the connection cut short may or may not have finished, and a restart
 loses the unsaved edits: Ark says "Ark can't tell whether the save
-finished.", keeps the edits as a second recovery copy and records
-`saveCutShort`. The next read of that keyboard (Read keyboard, also when
+finished.", keeps the edits as a second recovery copy and keeps
+`saveCutShort` for that keyboard (`kept.js`). The next read of that keyboard (Read keyboard, also when
 Ark follows it back; by its serial number when it returns under a new device
 id) says what it shows: saved, still unsaved, or gone with the copy that has
 them (`saveCutShortResult`). A read of another keyboard forgets it.

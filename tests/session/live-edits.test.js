@@ -10,6 +10,7 @@ const {document} = require("../fixtures/portable-profile");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {EDIT_MODE, EDIT_RESULT, PROFILE_EDIT_V1} = require("../../core/protocol/profile-edit-v1");
 const {STARTING} = require("../../core/session/keyboard-starting");
+const {keptForAny} = require("../../core/session/kept");
 const EDIT_VALUE_SAVE = PROFILE_EDIT_V1.VALUE_SAVE;
 
 // The loop on a live keyboard (in Live preview + save unless `options` say).
@@ -325,7 +326,7 @@ for (const [when, saves, moves] of /** @type {const} */ ([["before it saved", fa
     if (saves) assert.match(said, /The save finished: the keyboard saved your edits\.$/);
     else assert.match(said, /The save did not finish, so the keyboard's unsaved edits are gone: it runs its saved profile again\. The recovery copy on Backups has them \(\/recovery\/2\.json\)\.$/);
     assert.doesNotMatch(said, /restarted since Ark last read it/, "the Save's result is said once, not beside the restart's");
-    assert.equal(loop.session.saveCutShort, undefined, "said once");
+    assert.equal(keptForAny(loop.session, "saveCutShort"), undefined, "said once");
 });
 
 test("leaving Live preview + save with unsaved edits asks Save or Revert first", async t => {

@@ -33,6 +33,7 @@ const {replaceDraft} = require("./panel-session-state");
 const {keepStale, needRead, readAndFollow, replaceFromRead, takeNews, takeRead} = require("./draft-follow");
 const {expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {interruption, saveResult} = require("./interruption");
+const {forget, keptFor, remember} = require("./kept");
 
 /** @param {string} message @param {string} [code] */
 const refusal = (message, code = "LIVE_EDIT_REFUSED") => Object.assign(new Error(message), {code});
@@ -178,9 +179,7 @@ async function saveCutShort(session, draft, error, saveRecovery) {
     /** @type {string | undefined} */
     let recovery;
     try {recovery = await saveRecovery(draft.current.document);} catch {}
-    const state = session.service.snapshot();
-    const serialNumber = (state.devices || []).find(device => device.id === draft.deviceId)?.serialNumber || "";
-    session.saveCutShort = {deviceId: draft.deviceId, serialNumber, edits: draft.current.fingerprint, recovery};
+    remember(session, "saveCutShort", {edits: draft.current.fingerprint, recovery}, session.service.snapshot(), draft.deviceId);
     await reread(session);
     const reason = INTERRUPTION_REASONS[/** @type {"lost" | "unanswered"} */ (interruption(error))];
     const read = session.service.snapshot().connected ? saveCutShortResult(session, session.observedPortable) : "";
@@ -191,19 +190,15 @@ async function saveCutShort(session, draft, error, saveRecovery) {
 // After a Save cut short, what `read` (a live read of the same keyboard)
 // shows became of the edits, said once; "" until there is one. A restarted
 // keyboard may come back under a new device id: it is the same one by its
-// serial number, or because Ark followed it back (keyboard-reconnect.js).
+// serial number, or because Ark followed it back (kept.js).
 // A read of another keyboard forgets the Save, which it cannot tell about.
 /** @param {Session} session @param {import("../model/types.js").ProfileSnapshot | undefined} read */
 function saveCutShortResult(session, read) {
-    const cut = session.saveCutShort;
-    if (!cut || !read) return "";
-    const state = session.service.snapshot();
-    const serialNumber = (state.devices || []).find(device => device.id === state.selectedDeviceId)?.serialNumber || "";
-    const same = state.selectedDeviceId === cut.deviceId || (Boolean(cut.serialNumber) && serialNumber === cut.serialNumber)
-        || session.reconnect?.lost !== undefined;
-    if (!same) {session.saveCutShort = undefined; return "";}
+    if (!read) return "";
+    const cut = keptFor(session, "saveCutShort", session.service.snapshot());
+    if (!cut) {forget(session, "saveCutShort"); return "";}
     const said = saveResult(cut, /** @type {Parameters<typeof saveResult>[1]} */ (read));
-    if (said) session.saveCutShort = undefined;
+    if (said) forget(session, "saveCutShort");
     return said;
 }
 
@@ -239,8 +234,8 @@ const LIVE_ACTIONS = Object.freeze({
     },
     putBack: ({draft, revision, session}) => {
         draft.assertRevision(revision);
-        const before = session.beforeApply;
-        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before a save on this keyboard to put back.");
+        const before = keptFor(session, "beforeApply", session.service.snapshot(), draft.deviceId);
+        if (!before) throw new Error("There is no copy from before a save on this keyboard to put back.");
         return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before the save", origin: "edit", order: LAYER_IDENTITY}, {replaceWhenLarge: true});
     },
     // Discard all is Revert: the keyboard runs its saved profile again, and

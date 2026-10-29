@@ -189,14 +189,10 @@ export interface PanelSession extends DemoSession {
     applyRunning?: boolean;
     postApplyReadStep?: import('../../contracts/messages.js').ReadStep;
     reconnect?: ExpectedReconnect;
-    /** A Save cut short (live-edits.js): the edits' fingerprint and where Ark kept them, until a read says what became of them. */
-    saveCutShort?: {deviceId: string; serialNumber: string; edits: string; recovery?: string};
     /** When Ark last connected a lost keyboard again by itself (keyboard-reconnect.js). */
     lostAt?: number;
-    /** What the keyboard held before the last successful Apply, for "Put back what it had". */
-    beforeApply?: {document: import('../model/types.js').PortableDocument; deviceId: string | null | undefined; savedAt: string};
-    /** A restart Ark asked for (keyboard-restart.js): the unsaved edits it keeps to send back once the keyboard is read again, and their recovery copy. */
-    restart?: {deviceId: string | null | undefined; serialNumber: string; kept?: import('../model/types.js').PortableDocument; recovery?: string; slaveAcknowledged: boolean};
+    /** What Ark keeps for one keyboard until a read of it says what became of it (kept.js). */
+    kept?: KeptRecords;
     service: DemoSession['service'] & {portable?: import('../model/types.js').ProfileSnapshot | null};
 }
 /** Model publication reads portable data without invoking device operations. */
@@ -333,6 +329,18 @@ export type EditorRead =
     | {kind: 'read'; portable?: undefined; failure: unknown};
 /** A keyboard whose connection was lost unexpectedly: what it was, and what happened. */
 export interface LostKeyboard {deviceId: string; serialNumber: string; product: string; otherDevices: readonly {id: string; product?: string}[]; what: string; /** It left a request unanswered: Ark closed the connection, the keyboard stayed. */ unanswered: boolean}
+/** What Ark keeps for one keyboard (kept.js), by kind. */
+export interface KeptValues {
+    /** A restart Ark asked for (keyboard-restart.js): the unsaved edits it keeps to send back once the keyboard is read again, and their recovery copy. */
+    restart: {kept?: import('../model/types.js').PortableDocument; recovery?: string; slaveAcknowledged: boolean};
+    /** A Save cut short (live-edits.js): the edits' fingerprint and where Ark kept them. */
+    saveCutShort: {edits: string; recovery?: string};
+    /** What the keyboard held before the last successful Apply, for "Put back what it had". */
+    beforeApply: {document: import('../model/types.js').PortableDocument; savedAt: string};
+}
+export type KeptKind = keyof KeptValues;
+/** Each record with the keyboard it is for: its device id, and its serial number where that names it (kept.js). */
+export type KeptRecords = {[K in KeptKind]?: KeptValues[K] & {deviceId: string | null | undefined; serialNumber: string}};
 /** A renamed keyboard the panel waits to see again (keyboard-reconnect.js). */
 export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string; /** Restarted because Ark asked, rather than renamed. */ restart?: boolean; /** Said after how the wait ended: what followed the read. */ after?: string}
 export interface ControlShell extends PanelShell {

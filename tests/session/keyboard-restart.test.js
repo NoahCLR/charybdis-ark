@@ -18,6 +18,7 @@ const {PROFILE_ACTIVE_KIND, ProfileWireProtocolError} = require("../../core/prot
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {replaceDomain} = require("../../core/schema/profile-domains");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
+const {keptForAny} = require("../../core/session/kept");
 
 /** @param {import("node:test").TestContext} t @param {{mode?: number, recoveryFails?: boolean, comesBack?: boolean, boot?: Parameters<ReturnType<typeof booting>["boot"]>[0], newId?: boolean, serial?: boolean}} [options] */
 async function open(t, {mode = EDIT_MODE.LIVE_REVIEW, recoveryFails = false, comesBack = true, boot, newId = false, serial = true} = {}) {
@@ -214,7 +215,7 @@ test("firmware without restart answers unhandled: nothing happens, and the recov
     await send({type: "restartKeyboard"});
     assert.equal(keyboard.restarting.restarts, 0);
     assert.equal(loop.session.reconnect, undefined);
-    assert.equal(loop.session.restart, undefined);
+    assert.equal(keptForAny(loop.session, "restart"), undefined);
     const said = notices(shell).at(-1);
     assert.match(said, /firmware cannot restart from Ark, so nothing happened\. Unplug the keyboard/);
     assert.match(said, /recovery copy: \/recovery\/1\.json/);
