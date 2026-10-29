@@ -39,7 +39,6 @@ test("saving a group refuses one with no LEDs, new or edited", () => {
 const {decodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");
 const {fixturePages, retiredPages} = require("../fixtures/device-combos");
-const {assertEffectiveCombos} = require("../../core/model/device-profile-edits");
 const readOf = pages => ({state: "read", ...decodeComboPages(pages[0], pages.slice(1))});
 const pages = fixturePages();
 const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0x67df11b3}, combos: readOf(pages)};
@@ -97,17 +96,13 @@ test("a combo follows the default window until it has its own, and the default i
 test("retired combo readback never becomes an editable table", () => {
     assert.throws(() => readOf(retiredPages(1)), {code: "COMBO_INCOMPATIBLE"});
 });
-test("Cmd+N from the combo picker saves and verifies as a standard modified key", () => {
+test("Cmd+N from the combo picker saves as a standard modified key", () => {
     const message = {type: "saveCombo", id: 0, inputs: ["G(KC_C)", "G(KC_V)"], output: "G(KC_N)", termMs: "50"};
     // Standard shortcuts do not depend on the keyboard's custom action ABI.
     const edited = editDeviceProfile(bytes, message, {...context, capabilities: {supportedDomainMask: 7, actionAbiDigest: 0}});
     const row = comboRows(edited)[0];
     assert.deepEqual(row.output, {kind: 1, flags: 0, operand: 0x0811});
     assert.deepEqual(row.inputs.map(action => action.operand), [0x0806, 0x0819]);
-    const read = {...context.combos, rows: context.combos.rows.map((row, id) => id ? row : {...row, inputs: [0x0806, 0x0819], output: 0x0811, termMs: 50, followsDefault: false, mustHold: false, mustTap: false, ordered: false})};
-    assert.doesNotThrow(() => assertEffectiveCombos(edited, read));
-    // A window equal to the default is still its own: it does not follow a changed default.
-    assert.throws(() => assertEffectiveCombos(edited, context.combos), /running combo/);
     assert.deepEqual(comboRows(edited)[1], comboRows(editDeviceProfile(bytes, {type: "updateComboHoldTerm", holdTermMs: 200}, context))[1]);
     for (const original of decodeProfileBlob(bytes).domains) {
         assert.deepEqual(decodeProfileBlob(edited).domains.find(domain => domain.id === original.id).payload, original.payload);
@@ -123,16 +118,6 @@ test("combo edits refuse unsupported firmware, incomplete reads, invalid inputs 
     assert.throws(() => editDeviceProfile(bytes, {...message, inputs: ["KC_A", "KC_B"], output: "KC_NO"}, context), /callback/);
     assert.throws(() => editDeviceProfile(bytes, {type: "deleteCombo", id: 99}, context), /index/);
 });
-test("save verification requires the running combo table to match the saved domain", () => {
-    const next = editDeviceProfile(bytes, {type: "updateComboHoldTerm", holdTermMs: 300}, context);
-    assert.throws(() => assertEffectiveCombos(next, context.combos), /running combo/);
-    assert.throws(() => assertEffectiveCombos(next, null), /could not be verified/);
-    assert.doesNotThrow(() => assertEffectiveCombos(next, {...context.combos, holdTermMs: 300}));
-    const retimed = editDeviceProfile(bytes, {type: "updateComboDefaultWindow", defaultTermMs: 70}, context);
-    assert.throws(() => assertEffectiveCombos(retimed, context.combos), /running combo/);
-    assert.doesNotThrow(() => assertEffectiveCombos(retimed, {...context.combos, defaultTermMs: 70, rows: context.combos.rows.map(row => ({...row, termMs: 70}))}));
-});
-
 test("auto-mouse save encodes all three policies exactly and keeps the chosen end colour", () => {
     const names = ["FOLLOW_REAL_DESTINATION", "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "END_COLOR_ON_ALL_KEYS"];
     for (const [mode, name] of names.entries()) {
@@ -140,14 +125,5 @@ test("auto-mouse save encodes all three policies exactly and keeps the chosen en
         assert.deepEqual(rgb(edited).automouseFade, {mode, endColor: {h: 179, s: 255, v: 199}});
         assert.deepEqual(rgb(edited).layerColors, rgb(bytes).layerColors);
         assert.deepEqual(rgb(edited).pdModeColors, rgb(bytes).pdModeColors);
-    }
-});
-
-test("effective combo verification includes definition enable and allowed source layers", () => {
-    const current = editDeviceProfile(bytes, {type: "updateComboHoldTerm", holdTermMs: 300}, context);
-    const read = {...context.combos, holdTermMs: 300};
-    assert.doesNotThrow(() => assertEffectiveCombos(current, read));
-    for (const patch of [{enabled: false}, {allowedLayers: 32767}, {useOutputBehavior: false}]) {
-        assert.throws(() => assertEffectiveCombos(current, {...read, rows: read.rows.map((row, index) => index ? row : {...row, ...patch})}), /running combo/);
     }
 });

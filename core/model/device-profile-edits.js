@@ -8,7 +8,7 @@ const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RG
 const catalog = require("../data/keycode-catalog");
 const keycodes = require("../schema/keycodes");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {COMBO_LIMITS, decodeComboDomain, encodeComboDomain, runningComboRows} = require("../schema/combo-domain-v1");
+const {COMBO_LIMITS, decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {keycodeAction, knownActionAbi, layerRef, momentaryCall} = require("../schema/actions");
 const {comboPlacementProblem} = require("./profile-placement");
 const {pointingTaps} = require("./pointing-taps");
@@ -332,18 +332,4 @@ function editCombos(bytes, message, context) {
     return encodeProfileBlob(profile);
 }
 
-// The stored table against what the keyboard now runs: every window as it
-// resolves, which combos follow the default, and the shared values.
-/** @param {Buffer} bytes @param {import("./types.js").ComboRead | null | undefined} read */
-function assertEffectiveCombos(bytes, read) {
-    const profile = decodeProfileBlob(bytes);
-    const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
-    if (!domain) return;
-    if (read?.state !== "read") throw invalid("The profile was saved, but the running combos could not be verified. Choose Read keyboard before retrying.");
-    const table = decodeComboDomain(domain.payload);
-    const expected = runningComboRows(table);
-    const shared = table.defaultTermMs === read.defaultTermMs && table.holdTermMs === read.holdTermMs;
-    if (!shared || expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return row.useOutputBehavior !== (actual.useOutputBehavior ?? true) || (/** @type {const} */ (["id", "output", "termMs", "followsDefault", "mustHold", "mustTap", "ordered", "enabled", "allowedLayers"])).some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
-}
-
-module.exports = {editDeviceProfile, assertEffectiveCombos};
+module.exports = {editDeviceProfile};
