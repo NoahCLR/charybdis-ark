@@ -94,26 +94,6 @@ test("profile verification reads fresh committed bytes, reuses immutable default
     } finally {await loop.close();}
 });
 
-// After Apply the layout step downloads and checks the saved profile; the
-// profile step right after takes those bytes while the keyboard still names
-// them, so the readback downloads the saved profile once, not twice.
-test("the read after a save downloads the saved profile once", async () => {
-    const {rereadKeyboard} = require("../../core/session/panel-controls");
-    const source = document32(), shell = recordingShell(), adapter = fakeKeyboardAdapter({document: source});
-    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 200});
-    const chunks = value => adapter.keyboard.requests.filter(request => request[0] === 0x08 && request[2] === value && (request[4] || request[5])).length;
-    const count = Math.ceil(validateSnapshot(source).candidate.length / 25);
-    try {
-        await loop.handleMessage({type: "ready"});
-        const service = loop.session.service, before = chunks(4);
-        await rereadKeyboard(service);
-        assert.equal(chunks(4) - before, count);
-        assert.equal(service.snapshot().committed.state, "read");
-        await service.readCommittedProfile();
-        assert.equal(chunks(4) - before, count * 2, "a read on its own still downloads");
-    } finally {await loop.close();}
-});
-
 test("the fake keyboard refuses a write with the unhandled echo and records it", () => {
     const {fakeKeyboard} = require("../fixtures/fake-keyboard");
     const keyboard = fakeKeyboard({document: document32()});

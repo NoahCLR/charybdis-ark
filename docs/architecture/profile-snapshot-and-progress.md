@@ -50,7 +50,9 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
 
 ## Complete snapshots and integrity
 
-`readKeyboard` (`panel-controls.js`) runs in this order:
+The editor's read, `readForEditor` (the service), runs in this order, each
+step its own operation; `readKeyboard` (`panel-controls.js`) says what it
+found:
 
 1. List keyboards and connect; each connection gets a new `connectionToken`.
 2. `refresh` reads capabilities; a keyboard not on the current base
@@ -170,7 +172,8 @@ for the person, the [guide](../guide/review-and-save.md#saving).
    generation, this transaction, no conflict and, when the slave half is
    visible, its matching generation. A slave half that dropped out after
    confirming is reported as out of sight. The draft resets to the result, and
-   `rereadKeyboard` reads layout, profile (`reuse`), combos and base lighting.
+   the service's `readBack` reads layout, profile (`reuse`), combos and base
+   lighting; `storedProfile` (`panel-controls.js`) says the save after it.
 
 `withFailure` pins a failure to its step, the keyboard's reason
 (`failureReason`) and what was saved. Before the commit, or after a cancel the
@@ -334,7 +337,7 @@ again instead of trusting its cached saved profile.
 A save the connection cut short may or may not have finished, and a restart
 loses the unsaved edits: Ark says "Ark can't tell whether the save
 finished.", keeps the edits as a second recovery copy and records
-`saveCutShort`. The next read of that keyboard (`readKeyboard`, also when
+`saveCutShort`. The next read of that keyboard (Read keyboard, also when
 Ark follows it back; by its serial number when it returns under a new device
 id) says what it shows: saved, still unsaved, or gone with the copy that has
 them (`saveCutShortResult`). A read of another keyboard forgets it.

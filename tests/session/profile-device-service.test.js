@@ -15,6 +15,7 @@ const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {connectedService} = require("../fixtures/connected-service");
 const {testClock} = require("../fixtures/panel-loop");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
+const {PHASE} = require("../../core/model/vocabulary");
 
 test("the device service talks only through the adapter its caller passes", async () => {
     // The page passes WebHID's; a Node script passes the node-hid adapter
@@ -509,6 +510,115 @@ test("a retired capability layout gets the update notice without any profile rea
     const scanned = await service.enumerate();
     await assert.rejects(service.connect(scanned.devices[0].id), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Update both halves/});
     assert.ok(adapter.lastConnection().writes.every(report => report[0] === 8 && report[2] === 1));
+});
+
+// The editor's read (readForEditor): what it resolves with, and what the
+// service published on the way, over the fake keyboard.
+/** @param {Partial<import("../fixtures/types.js").FakeKeyboardOptions>} [keyboard] */
+function editorRead(keyboard = {}) {
+    const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+    const {now, sleep} = testClock(), phases = new Set();
+    const adapter = fakeKeyboardAdapter({document: require("../fixtures/portable-profile").document(), ...keyboard});
+    const service = new ProfileDeviceService({adapter, defaultTimeoutMs: 200, now, sleep, onChange: snapshot => {phases.add(snapshot.phase);}});
+    return {service, adapter, phases};
+}
+
+test("the editor's read connects the first keyboard listed and reads its complete profile, and nothing on its own", async t => {
+    const {service, phases} = editorRead(); t.after(() => service.close());
+    const shown = [];
+    const read = await service.readForEditor(undefined, {progress: (step, work) => {shown.push(step); return work();}});
+    assert.equal(read.kind, "read");
+    assert.equal(read.failure, undefined);
+    assert.equal(service.portable, read.portable, "the editors follow what it read");
+    const state = service.snapshot();
+    assert.equal(state.connected, true);
+    assert.equal(state.selectedDeviceId, state.devices[0].id);
+    assert.deepEqual(shown, ["complete"]);
+    for (const phase of [PHASE.ENUMERATE, PHASE.CONNECT, PHASE.REFRESH, PHASE.STARTING, PHASE.READ_COMPLETE]) assert.ok(phases.has(phase), phase);
+    for (const phase of [PHASE.READ_LAYOUT, PHASE.READ_PROFILE, PHASE.READ_COMBOS, PHASE.READ_BASE_RGB]) assert.ok(!phases.has(phase), `no ${phase} of its own`);
+});
+
+test("the editor's read finds no keyboard, or refuses one no longer listed", async t => {
+    const empty = new ProfileDeviceService({adapter: new FakeDeviceAdapter({devices: []})}); t.after(() => empty.close());
+    assert.deepEqual(await empty.readForEditor(), {kind: "none"});
+    assert.equal(empty.snapshot().connected, false);
+    const {service} = editorRead(); t.after(() => service.close());
+    await assert.rejects(service.readForEditor("gone"), {message: "The selected keyboard is no longer available. Choose a keyboard from the keyboard menu."});
+    assert.equal(service.snapshot().connected, false);
+});
+
+test("the editor's read keeps the connected keyboard while it is listed, unless another is chosen, and lets it go once it is not", async t => {
+    const {service, adapter} = editorRead(); t.after(() => service.close());
+    await service.readForEditor();
+    const first = service.snapshot();
+    adapter.devices = [{...adapter.devices[0], id: "other", serialNumber: "FAKE-2"}, ...adapter.devices];
+    await service.readForEditor();
+    assert.equal(service.snapshot().connectionToken, first.connectionToken, "still listed, behind another: kept");
+    const other = /** @type {{id: string}} */ (service.snapshot().devices.find(device => device.serialNumber === "FAKE-2")).id;
+    await service.readForEditor(other);
+    const chosen = service.snapshot();
+    assert.equal(chosen.selectedDeviceId, other, "the one chosen, connected");
+    adapter.devices = adapter.devices.slice(1);
+    await service.readForEditor();
+    const listed = service.snapshot();
+    assert.equal(listed.selectedDeviceId, first.selectedDeviceId, "the one listed, connected");
+    assert.notEqual(listed.connectionToken, chosen.connectionToken);
+});
+
+test("the editor's read of a keyboard not on current firmware reads no profile", async t => {
+    const {service, adapter} = serviceHarness({schemaMajor: 3}); t.after(() => service.close());
+    assert.deepEqual(await service.readForEditor(), {kind: "firmware"});
+    assert.ok(adapter.lastConnection().writes.every(report => report[2] === 1), "capabilities only");
+    // A keyboard whose stored profile only newer firmware reads is told so
+    // by the complete read, and not read on its own.
+    const stored = editorRead({settingsVersion: 7}); t.after(() => stored.service.close());
+    const read = await stored.service.readForEditor();
+    assert.equal(read.kind, "firmware");
+    assert.equal(read.kind === "firmware" && read.failure?.code, "FIRMWARE_UPDATE_REQUIRED");
+    assert.ok(!stored.phases.has(PHASE.READ_LAYOUT));
+});
+
+test("a failed complete read is told first, then the keyboard's parts are read on their own, a failed profile read included", async t => {
+    const {service, adapter, phases} = editorRead({slaveKnown: false}); t.after(() => service.close());
+    const shown = [], told = [];
+    const read = await service.readForEditor(undefined, {
+        failed: error => {told.push([/** @type {{code?: string}} */ (error).code, service.snapshot().layout]);},
+        progress: (step, work) => {
+            shown.push(step);
+            // The saved profile stops answering once the layout is read.
+            if (step === "profile") adapter.keyboard.answer = report => {const unhandled = Buffer.from(report); unhandled[0] = 0xff; return [unhandled];};
+            return work();
+        },
+    });
+    assert.equal(read.kind, "read");
+    assert.equal(read.portable, undefined, "no editable profile");
+    assert.equal(/** @type {{code?: string}} */ (read.failure).code, "KEYBOARD_NOT_READY");
+    assert.deepEqual(told, [["KEYBOARD_NOT_READY", null]], "told before any part is read");
+    assert.deepEqual(shown, ["complete", "layout", "profile"]);
+    const state = service.snapshot();
+    assert.equal(state.layout?.state, "read");
+    assert.notEqual(state.committed?.state, "read");
+    assert.ok(state.error, "the profile's failure stays in the snapshot");
+    for (const phase of [PHASE.READ_COMBOS, PHASE.READ_BASE_RGB]) assert.ok(phases.has(phase), `${phase} after the failed profile read`);
+});
+
+// After Apply the layout step downloads and checks the saved profile; the
+// profile step right after takes those bytes while the keyboard still names
+// them, so the readback downloads the saved profile once, not twice.
+test("the read after a save says each step, reads every part again, and downloads the saved profile once", async t => {
+    const {validateSnapshot} = require("../../core/model/portable-profile");
+    const source = require("../fixtures/pointing-slots-32").document32();
+    const {service, keyboard} = await connectedService(t, {document: source});
+    const chunks = () => keyboard.requests.filter(request => request[0] === 0x08 && request[2] === PROFILE_PAYLOAD_V1.VALUE && (request[4] || request[5])).length;
+    const count = Math.ceil(validateSnapshot(source).candidate.length / 25), before = chunks();
+    const steps = [];
+    await service.readBack(step => {steps.push(step);});
+    assert.deepEqual(steps, ["layout", "profile", "combos", "baseRgb"]);
+    const state = service.snapshot();
+    assert.deepEqual([state.layout?.state, state.committed?.state, state.combos?.state, state.baseRgb?.state], ["read", "read", "read", "read"]);
+    assert.equal(chunks() - before, count);
+    await service.readCommittedProfile();
+    assert.equal(chunks() - before, count * 2, "a read on its own still downloads");
 });
 
 // The firmware's compiled defaults are the same bytes until it is flashed

@@ -116,9 +116,7 @@ function fakeService(extra = {}) {
     const service = {
         calls, capabilities, portable: snapshot(),
         snapshot: () => state,
-        enumerate: record("enumerate"), connect: record("connect"), refresh: record("refresh"),
-        readLayout: record("readLayout"), readCommittedProfile: record("readCommittedProfile"),
-        readBaseRgb: record("readBaseRgb"), readCombos: record("readCombos"),
+        readForEditor: record("readForEditor", async () => ({kind: "read", portable: await service.readKeyboardProfile()})),
         readKeyboardProfile: record("readKeyboardProfile", () => service.portable),
         readPortableProfile: record("readPortableProfile", () => service.portable),
         close: record("close"),
@@ -219,12 +217,11 @@ test("a keyboard that never answers becomes a failure notice and a shell error",
     await loop.close();
 });
 
-test("a read connects, reads in order and publishes what it read", async () => {
+test("a read publishes what it read", async () => {
     const shell = fakeShell();
     const service = fakeService();
     const loop = openPanelLoop(shell, {service});
     await loop.handleMessage({type: "ready"});
-    assert.deepEqual(service.calls, ["enumerate", "refresh", "readKeyboardProfile"]);
     assert.deepEqual(shell.posted.map((message) => message.type), ["catalog", "model"], "one answer, after the catalog");
     assert.match(last(shell).notice, /saved profile, generation 7/);
     assert.equal(loop.session.readReady, true);
@@ -506,28 +503,6 @@ test("a retained dirty draft adopts the reconnected keyboard's capabilities at r
     await loop.handleMessage({type: "updateMacro", draftId: draft.id, draftRevision: draft.revision,
         keycode: "MACRO_0", payload: "a".repeat(600)});
     assert.equal(last(shell).model.macros[0].payload.length, 600);
-});
-
-test("a read lets go of a keyboard that left the list and connects the one listed", async () => {
-    const shell = fakeShell();
-    const chosen = {...device, id: "chosen"};
-    const service = fakeService();
-    service.snapshot().devices = [chosen];
-    service.connect = async (id) => {service.calls.push(`connect ${id}`);};
-    const loop = openPanelLoop(shell, {service});
-    await loop.handleMessage({type: "refresh"});
-    assert.deepEqual(service.calls.slice(0, 2), ["enumerate", "connect chosen"]);
-    await loop.close();
-});
-
-test("a read keeps the connected keyboard while it is still listed", async () => {
-    const shell = fakeShell();
-    const service = fakeService();
-    service.snapshot().devices = [{...device, id: "other"}, device];
-    const loop = openPanelLoop(shell, {service});
-    await loop.handleMessage({type: "refresh"});
-    assert.ok(!service.calls.includes("connect"), "the connected keyboard stays chosen");
-    await loop.close();
 });
 
 // What every model of a build starts from goes to the panel once, as the

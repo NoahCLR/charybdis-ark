@@ -11,7 +11,7 @@ const {PHASE} = require("../model/vocabulary");
  * @typedef {import("../../contracts/model.js").PhaseId} PhaseId
  * @typedef {InstanceType<typeof import("./connection-state.js").ConnectionState>} State
  */
-const {requireReady, evaluateProfileCompatibility} = require("./firmware-support");
+const {canEdit, requireReady, evaluateProfileCompatibility} = require("./firmware-support");
 const {restoreProfile} = require("./portable-profile-session");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {ProfilePayloadReader, CompiledDefaults} = require("./profile-payload-reader");
@@ -27,7 +27,7 @@ const {flushWorkingCopy, postLiveEdit, readWorkingCopy, restartKeyboard, revertW
 const {readCandidateStatus} = require("../protocol/profile-candidate-v1");
 const {PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus} = require("../protocol/profile-wire-v1");
 const {firmwareUpdateRequired} = require("../schema/profile-blob-v1");
-const {STARTING, STARTING_CODE, STARTING_WORDS, hasStarted, stillStarting} = require("./keyboard-starting");
+const {STARTING, STARTING_CODE, STARTING_WORDS, hasStarted, isStartingTimeout, readOnceStarted, stillStarting} = require("./keyboard-starting");
 const {LiveEditCoordinator, TransactionIds} = require("./live-edit-coordinator");
 
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
@@ -68,7 +68,8 @@ const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // grouped with others by what it does, each given only the operation: the
 // profile reads (read-operations.js), the working copy's
 // (live-edit-operations.js) and the reads between operations
-// (background-reads.js).
+// (background-reads.js). Two sequences chain operations of its own: the
+// editor's read (`readForEditor`) and the read after a save (`readBack`).
 //
 // What it holds is published as `snapshot()`, through `onChange`, so the
 // panel draws the keyboard as the service last saw it, failures included.
@@ -323,6 +324,82 @@ class ProfileDeviceService {
     #readComplete(options) {
         return this.#operate(PHASE.READ_COMPLETE, {requires: "Connect the keyboard and wait for the current operation to finish.", idle: true, returns: "verified profile"},
             op => readCompleteProfile(op, options));
+    }
+
+    // The editor's read, as Read keyboard and every read Ark follows back
+    // make it, each step its own operation: list the keyboards, connect
+    // `deviceId` (the first listed when none is given) unless it is the one
+    // connected, read its capabilities, wait until it has finished starting
+    // and read its complete profile, read again while it changes under the
+    // read (keyboard-starting.js). A keyboard not on current firmware is read
+    // no further. A failed complete read is told to `failed`, then falls back
+    // to the independent reads, so a partly readable keyboard still gets its
+    // diagnostics; their failures stay in the snapshot. `progress` runs the
+    // slow steps behind the shell's indicator. Resolves with what it found:
+    //
+    //   {kind: "none"}                no keyboard is listed
+    //   {kind: "firmware", failure?}  not current firmware: its capabilities
+    //                                 say so, or its stored profile does
+    //   {kind: "starting"}            it never finished starting
+    //   {kind: "read", portable}      its complete profile
+    //   {kind: "read", failure}       the complete read failed; the
+    //                                 independent reads ran
+    //
+    // Any other failure (listing, connecting, refreshing, the wait, the
+    // layout) rejects.
+    /** @param {string} [deviceId] @param {import("./types.js").EditorReadHooks} [hooks] @returns {Promise<import("./types.js").EditorRead>} */
+    async readForEditor(deviceId, {progress = (_step, work) => work(), failed} = {}) {
+        await this.enumerate();
+        const devices = this.devices;
+        /** @param {string | undefined} id */
+        const listed = id => devices.some(device => device.id === id);
+        if (!devices.length) return {kind: "none"};
+        if (deviceId && !listed(deviceId)) throw new Error("The selected keyboard is no longer available. Choose a keyboard from the keyboard menu.");
+        // A keyboard that left the list is let go: on the web page, choosing
+        // another keyboard lists only that one, and reading connects it.
+        const connected = this.state.connectionPublicId;
+        if (!this.state.connected || !listed(connected) || (deviceId && connected !== deviceId)) await this.connect(deviceId || devices[0].id);
+        await this.refresh();
+        if (!canEdit(this.capabilities)) return {kind: "firmware"};
+        let started;
+        try {started = await this.awaitStarted();}
+        catch (error) {
+            if (isStartingTimeout(error)) return {kind: "starting"};
+            throw error;
+        }
+        try {return {kind: "read", portable: await progress("complete", () => readOnceStarted(this, started, () => this.readKeyboardProfile()))};}
+        catch (error) {
+            if (isStartingTimeout(error)) return {kind: "starting"};
+            if (/** @type {{code?: string}} */ (error).code === "FIRMWARE_UPDATE_REQUIRED") return {kind: "firmware", failure: /** @type {Error} */ (error)};
+            failed?.(error);
+            // A failed complete read never opens an editable draft. (The
+            // base lighting is read before the combos here, after them in
+            // readBack: neither depends on the other.)
+            await progress("layout", () => this.readLayout());
+            await progress("profile", () => this.readCommittedProfile()).catch(() => {});
+            await this.readBaseRgb();
+            await this.readCombos();
+            return {kind: "read", failure: error};
+        }
+    }
+
+    // After the keyboard stored a new profile, everything the panel shows of
+    // it is read again, each step its own operation, in the order the reads
+    // depend on; `onStep` hears each step as it starts. The layout comes from
+    // the saved profile, downloaded and checked: the fresh read of what the
+    // keyboard stored. The profile step takes those bytes again while the
+    // keyboard still names exactly them (`reuse`). Rejects with what failed,
+    // as the layout and profile reads do.
+    /** @param {(step: import("../../contracts/messages.js").ReadStep) => void} [onStep] */
+    async readBack(onStep = () => {}) {
+        onStep("layout");
+        await this.readLayout();
+        onStep("profile");
+        await this.readCommittedProfile({reuse: true});
+        onStep("combos");
+        await this.readCombos();
+        onStep("baseRgb");
+        await this.readBaseRgb();
     }
 
     // Always ends disconnected and resolves; a failure to close the handle

@@ -2,7 +2,7 @@
 const {profileLayers, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {draftControl, portableControl, readKeyboard, rereadKeyboard} = require("../../core/session/panel-controls");
+const {draftControl, portableControl, readKeyboard} = require("../../core/session/panel-controls");
 const {buildPanelModel} = require("../../core/session/panel-session");
 const {followRead} = require("../../core/session/draft-follow");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
@@ -17,7 +17,9 @@ const snapshot = () => {
 };
 const device = {id: "kb", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"};
 
-// A device service that records what it is asked, in order.
+// A device service that records what it is asked. Its editor read finds the
+// complete profile and its read after a save says each step; what each reads
+// is the service's (profile-device-service.test.js).
 function fakeService(extra = {}) {
     const calls = [];
     const record = (name, value) => async (...args) => { calls.push(name); return typeof value === "function" ? value(...args) : value; };
@@ -26,9 +28,8 @@ function fakeService(extra = {}) {
     const service = {
         calls, capabilities, portable: snapshot(),
         snapshot: () => state,
-        enumerate: record("enumerate"), connect: record("connect"), refresh: record("refresh"),
-        readLayout: record("readLayout"), readCommittedProfile: record("readCommittedProfile"),
-        readBaseRgb: record("readBaseRgb"), readCombos: record("readCombos"),
+        readForEditor: record("readForEditor", () => ({kind: "read", portable: service.portable})),
+        readBack: record("readBack", (onStep = () => {}) => {for (const step of ["layout", "profile", "combos", "baseRgb"]) onStep(step);}),
         readKeyboardProfile: record("readKeyboardProfile", () => service.portable),
         readPortableProfile: record("readPortableProfile", () => service.portable),
         restorePortableProfile: record("restorePortableProfile", async (doc, options) => {
@@ -53,31 +54,40 @@ function sessionWithDraft() {
 }
 const stage = (session, change) => session.draft.stage({draftId: session.draft.id, draftRevision: session.draft.revision, ...change});
 
-test("reading the keyboard connects, reads in dependency order and says what it read", async () => {
+test("reading the keyboard says what it read, or that there is none", async () => {
     const service = fakeService();
     const session = {service};
     assert.equal(await readKeyboard(session, undefined, shell()), true);
-    assert.deepEqual(service.calls, ["enumerate", "refresh", "readKeyboardProfile"]);
     assert.match(session.notice, /saved profile, generation 7/);
-    const empty = {service: fakeService({snapshot: () => ({devices: []})})};
+    const empty = {service: fakeService({readForEditor: async () => ({kind: "none"})})};
     assert.equal(await readKeyboard(empty, undefined, shell()), false);
     assert.match(empty.notice, /Chrome has no Charybdis this page may open yet/);
-    const failed = {service: fakeService({readKeyboardProfile: async () => {throw new Error("interrupted");}})};
+    const failed = {service: fakeService({readForEditor: async () => ({kind: "read", failure: new Error("interrupted")})})};
     assert.equal(await readKeyboard(failed, undefined, shell()), false);
     assert.match(failed.notice, /Macros and global settings could not be read/);
-    assert.deepEqual(failed.service.calls, ["enumerate", "refresh", "readLayout", "readCommittedProfile", "readBaseRgb", "readCombos"]);
+});
+
+test("the read's slow steps run behind the shell's progress, in the shell's words", async () => {
+    const titles = [];
+    const progress = async (title, work) => {titles.push(title); return work();};
+    const service = fakeService({readForEditor: async (_id, hooks) => {
+        for (const step of ["complete", "layout", "profile"]) await hooks.progress(step, async () => {});
+        return {kind: "read", failure: new Error("interrupted")};
+    }});
+    await readKeyboard({service}, undefined, {...shell(), progress});
+    assert.deepEqual(titles, ["Reading the keyboard's complete profile", "Reading keys and layers", "Reading the keyboard's saved profile"]);
 });
 
 test("a failed committed-profile read keeps the layout and the optional reads, and says what failed", async () => {
     const state = {connected: true, selectedDeviceId: "kb", devices: [device], capabilities,
         layout: {state: "read", layers: []}, committed: {state: "reading"}, error: null};
     const service = fakeService({snapshot: () => state, capabilities: state.capabilities,
-        readKeyboardProfile: async () => {throw new Error("The read was interrupted.");},
-        readCommittedProfile: async () => {state.error = {code: "TIMEOUT", message: "The keyboard did not answer."}; throw new Error("The keyboard did not answer.");}});
-    service.calls.length = 0;
+        readForEditor: async () => {
+            state.error = {code: "TIMEOUT", message: "The keyboard did not answer."};
+            return {kind: "read", failure: new Error("The read was interrupted.")};
+        }});
     const session = {service};
     assert.equal(await readKeyboard(session, undefined, shell()), false);
-    assert.deepEqual(service.calls, ["enumerate", "refresh", "readLayout", "readBaseRgb", "readCombos"]);
     assert.equal(session.notice, "The keyboard profile could not be read. The keyboard did not answer. Macros and global settings could not be read. The read was interrupted.");
 });
 
@@ -89,35 +99,32 @@ test("a read whose answer did not decode says so in words, never in the decoder'
     const state = {connected: true, selectedDeviceId: "kb", devices: [device], capabilities,
         layout: {state: "read", layers: []}, committed: {state: "reading"}, error: null};
     const service = fakeService({snapshot: () => state, capabilities: state.capabilities,
-        readKeyboardProfile: async () => {throw decodeError();},
-        readCommittedProfile: async () => {state.error = {code: "MALFORMED_RESPONSE", message: decodeError().message, fault: "answer"}; throw decodeError();}});
+        readForEditor: async () => {
+            state.error = {code: "MALFORMED_RESPONSE", message: decodeError().message, fault: "answer"};
+            return {kind: "read", failure: decodeError()};
+        }});
     const session = {service};
     assert.equal(await readKeyboard(session, undefined, shell()), false);
     assert.doesNotMatch(session.notice, /Chunk|bytes where/);
     assert.equal(session.notice, `The keyboard profile could not be read. ${FAILURE_WORDS.unreadable} Macros and global settings could not be read. ${FAILURE_WORDS.unreadable}`);
 });
 
-test("a keyboard not on current firmware is read no further, and told to update", async () => {
-    for (const older of [{...capabilities, supportedDomainMask: 3}, {...capabilities, protocol: {major: 1, minor: 0}, schema: {major: 3, minor: 0}}, {...capabilities, protocol: {major: 2, minor: 1}}]) {
-        const service = fakeService({capabilities: older});
-        const session = {service};
-        assert.equal(await readKeyboard(session, undefined, shell()), false);
-        assert.deepEqual(service.calls, ["enumerate", "refresh"]);
-        assert.match(session.notice, /the only one Ark supports\. Update both halves/);
-    }
-    // Firmware with every feature that stores an older domain version is told
-    // so by the complete snapshot, and its profile is not read independently.
-    const stored = fakeService({readKeyboardProfile: async () => {throw Object.assign(new Error("stores its profile in a format Ark does not read"), {code: "FIRMWARE_UPDATE_REQUIRED"});}});
-    const session = {service: stored};
+test("a keyboard not on current firmware is told to update", async () => {
+    const service = fakeService({readForEditor: async () => ({kind: "firmware"})});
+    const session = {service};
     assert.equal(await readKeyboard(session, undefined, shell()), false);
-    assert.deepEqual(stored.calls, ["enumerate", "refresh"]);
-    assert.equal(session.notice, "stores its profile in a format Ark does not read");
+    assert.match(session.notice, /the only one Ark supports\. Update both halves/);
+    // Firmware with every feature that stores an older domain version is told
+    // so by the complete snapshot, in its words.
+    const failure = Object.assign(new Error("stores its profile in a format Ark does not read"), {code: "FIRMWARE_UPDATE_REQUIRED"});
+    const stored = {service: fakeService({readForEditor: async () => ({kind: "firmware", failure})})};
+    assert.equal(await readKeyboard(stored, undefined, shell()), false);
+    assert.equal(stored.notice, "stores its profile in a format Ark does not read");
 });
 
 test("a failed device read fails the whole read with its own error", async () => {
-    const service = fakeService({refresh: async () => {throw Object.assign(new Error("lost"), {code: "DISCONNECTED"});}});
+    const service = fakeService({readForEditor: async () => {throw Object.assign(new Error("lost"), {code: "DISCONNECTED"});}});
     await assert.rejects(readKeyboard({service}, undefined, shell()), {code: "DISCONNECTED"});
-    assert.deepEqual(service.calls, ["enumerate"]);
 });
 
 test("rebasing against an incomplete recovery capture retains the authored draft", async () => {
@@ -133,13 +140,6 @@ test("rebasing against an incomplete recovery capture retains the authored draft
     assert.equal(draft.view(session.service.snapshot()).reviewed, true);
 });
 
-test("the read after a save reuses the saved bytes only in the step right after the layout's", async () => {
-    const calls = [];
-    const step = name => async (...args) => {calls.push([name, ...args]);};
-    await rereadKeyboard({readLayout: step("readLayout"), readCommittedProfile: step("readCommittedProfile"), readCombos: step("readCombos"), readBaseRgb: step("readBaseRgb")});
-    assert.deepEqual(calls, [["readLayout"], ["readCommittedProfile", {reuse: true}], ["readCombos"], ["readBaseRgb"]]);
-});
-
 test("apply writes a recovery copy through the shell, then reads the keyboard again", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = shell();
     const readSteps = [];
@@ -150,7 +150,7 @@ test("apply writes a recovery copy through the shell, then reads the keyboard ag
     await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
     assert.equal(h.saved.length, 1);
     assert.deepEqual(h.made, [{cause: "apply", keyboard: "Bastard Keyboards Charybdis 4x6"}], "named for the Apply and the keyboard it came from");
-    assert.deepEqual(session.service.calls, ["restorePortableProfile", "readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);
+    assert.deepEqual(session.service.calls, ["restorePortableProfile", "readBack"]);
     assert.deepEqual(readSteps, [["layout", true], ["profile", true], ["combos", true], ["baseRgb", true]]);
     assert.equal(session.postApplyReadStep, undefined, "the readback state clears when Apply finishes");
     assert.equal(session.applyRunning, false, "a later operation is not drawn as this Apply's readback");
@@ -183,7 +183,7 @@ test("an Apply that renames the keyboard expects it to reconnect, and a readback
     for (const name of ["Desk", device.product]) for (const interrupted of [false, true]) {
         const session = sessionWithDraft(), expecting = [];
         session.service.expectReconnect = (on) => {expecting.push(on);};
-        if (interrupted) session.service.readCommittedProfile = async () => {session.service.snapshot().connected = false; throw new Error("The keyboard disconnected while its profile was being read.");};
+        if (interrupted) session.service.readBack = async () => {session.service.snapshot().connected = false; throw new Error("The keyboard disconnected while its profile was being read.");};
         stage(session, {type: "renameKeyboard", name});
         session.draft.review(session.draft.revision);
         await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
@@ -210,7 +210,7 @@ test("restoring a named backup over an incomplete read expects the safe USB rest
     const session = {service, portableReview: {before, document: named}};
     const expecting = [];
     service.expectReconnect = (on) => {expecting.push(on);};
-    service.readCommittedProfile = async () => {service.snapshot().connected = false; throw new Error("USB restarted");};
+    service.readBack = async () => {service.snapshot().connected = false; throw new Error("USB restarted");};
     await portableControl(session, {type: "restorePortableProfile"}, shell());
     assert.equal(session.reconnect?.name, "Desk");
     assert.deepEqual(expecting, [true]);
@@ -223,7 +223,7 @@ test("a failed post-Apply read clears its progress stage and is said after the s
     const session = sessionWithDraft();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     session.draft.review(session.draft.revision);
-    session.service.readCommittedProfile = async () => {throw new Error("The readback was interrupted.");};
+    session.service.readBack = async () => {throw new Error("The readback was interrupted.");};
     await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
     assert.equal(session.postApplyReadStep, undefined);
     assert.equal(session.applyRunning, false);
@@ -329,7 +329,7 @@ test("layer edits and imports are kept in the draft; without one they restore to
     const bare = {service: fakeService()}, h = shell();
     bare.portableReview = {document: document(), before: bare.service.portable};
     await portableControl(bare, {type: "restorePortableProfile"}, h);
-    assert.deepEqual(bare.service.calls, ["restorePortableProfile", "readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);
+    assert.deepEqual(bare.service.calls, ["restorePortableProfile", "readBack"]);
     assert.match(bare.notice, /Recovery copy: \/recovery\/1\.json/);
     assert.deepEqual(h.made, [{cause: "restore", keyboard: "Bastard Keyboards Charybdis 4x6"}], "named for the restore");
 });
@@ -385,10 +385,4 @@ test("the layer panel's keys-follow toggle decides whether layer keys are renumb
     };
     assert.deepEqual(await moveLayer4Down(true), [0x5221, 0x5262], "following: MO(4) becomes MO(1), TG(1) becomes TG(2)");
     assert.deepEqual(await moveLayer4Down(false), [0x5224, 0x5261], "not following: both keep their numbers");
-});
-
-test("a re-read after a save follows the order the reads depend on", async () => {
-    const service = fakeService();
-    await rereadKeyboard(service);
-    assert.deepEqual(service.calls, ["readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);
 });

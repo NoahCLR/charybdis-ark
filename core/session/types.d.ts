@@ -272,8 +272,8 @@ export type LiveSnapshot = import('../model/types.js').CompleteSnapshot & import
 export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profile-session.js').restoreProfile>> & import('../model/types.js').SnapshotFacts;
 /**
  * The device service as the panel's controls use it. A failed operation
- * rejects (and leaves its error in `snapshot().error`); `readCombos` and
- * `readBaseRgb` are optional reads that never reject.
+ * rejects (and leaves its error in `snapshot().error`); the editor's read
+ * resolves with what it found, a keyboard it read no further included.
  */
 export interface ControlService extends DraftApplyService {
     capabilities?: Partial<DeviceCapabilities> | null;
@@ -281,17 +281,13 @@ export interface ControlService extends DraftApplyService {
     portable?: import('../model/types.js').ProfileSnapshot | null;
     snapshot(): PanelDeviceState & {devices: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[]};
     enumerate(): Promise<unknown>;
-    connect(id: string): Promise<unknown>;
     disconnect(): Promise<unknown>;
-    refresh(): Promise<unknown>;
     /** Adds a line to the device service's diagnostics log (profile-device-service.js). */
     addDiagnostic?(message: string): void;
-    /** Waits until the keyboard has finished starting, within `deadline` (keyboard-starting.js). */
-    awaitStarted?(options?: {deadline?: number}): Promise<{started: boolean; deadline: number; late: boolean}>;
-    readLayout(): Promise<unknown>;
-    readCommittedProfile(options?: {reuse?: boolean}): Promise<unknown>;
-    readCombos(): Promise<unknown>;
-    readBaseRgb(): Promise<unknown>;
+    /** The editor's read: connect, refresh, wait for the start, then the complete profile or, failing it, the independent reads (profile-device-service.js). */
+    readForEditor(deviceId?: string, hooks?: EditorReadHooks): Promise<EditorRead>;
+    /** Everything the panel shows, read again after a save; rejects with what failed. */
+    readBack(onStep?: (step: import('../../contracts/messages.js').ReadStep) => void): Promise<void>;
     readKeyboardProfile(): Promise<CompleteReadSnapshot>;
     readPortableProfile(options?: {forRestore?: false; reuseReadback?: boolean}): Promise<CompleteReadSnapshot>;
     readPortableProfile(options: {forRestore: true; reuseReadback?: boolean}): Promise<ReadSnapshot>;
@@ -321,6 +317,20 @@ export interface ControlService extends DraftApplyService {
     /** The keyboard the connection was last lost to unexpectedly, once (keyboard-reconnect.js). */
     takeLost?(): LostKeyboard | undefined;
 }
+/** The editor read's slow steps, each run behind the shell's progress indicator. */
+export type EditorReadStep = 'complete' | 'layout' | 'profile';
+export interface EditorReadHooks {
+    progress?: <T>(step: EditorReadStep, work: () => Promise<T>) => Promise<T>;
+    /** The complete read failed with `error`; the independent reads run next. */
+    failed?: (error: unknown) => void;
+}
+/** What the editor's read found (`readForEditor`). */
+export type EditorRead =
+    | {kind: 'none'}
+    | {kind: 'starting'}
+    | {kind: 'firmware'; failure?: Error}
+    | {kind: 'read'; portable: CompleteReadSnapshot; failure?: undefined}
+    | {kind: 'read'; portable?: undefined; failure: unknown};
 /** A keyboard whose connection was lost unexpectedly: what it was, and what happened. */
 export interface LostKeyboard {deviceId: string; serialNumber: string; product: string; otherDevices: readonly {id: string; product?: string}[]; what: string; /** It left a request unanswered: Ark closed the connection, the keyboard stayed. */ unanswered: boolean}
 /** A renamed keyboard the panel waits to see again (keyboard-reconnect.js). */

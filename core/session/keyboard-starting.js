@@ -6,7 +6,7 @@
 // which profile runs: until then its profile status reports the active
 // profile pending (active kind 3, flag 7 set, firmware D-F61), and for a
 // moment more the halves have not yet agreed. Read then, it fails. So before
-// the editor's read of a keyboard (readKeyboard: every read Ark follows back,
+// the editor's read of a keyboard (readForEditor: every read Ark follows back,
 // and Read keyboard), Ark polls profile status until the keyboard has
 // finished starting, for at most STARTING.WAIT_MS (D-L70):
 //

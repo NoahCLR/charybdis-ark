@@ -76,7 +76,7 @@ function acceptLayout(op, layers) {
 // others readable (profile-reads.js committedRead).
 // `reuse`: a read made right after one that downloaded and checked the
 // saved profile may take those bytes again, only while the keyboard's
-// fresh metadata still names exactly them (rereadKeyboard). Otherwise the
+// fresh metadata still names exactly them (readBack). Otherwise the
 // saved bytes always download.
 /** @param {Operation} op @param {{reuse?: boolean}} [options] */
 async function readCommittedProfile(op, {reuse = false} = {}) {
