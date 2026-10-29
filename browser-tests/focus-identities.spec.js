@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openControls, publishAccepted} = require("./control-preview");
+const {openControls, publishAccepted, clearPosts, posted} = require("./control-preview");
 
 async function identityProblems(page) {
     return page.locator("input, select, textarea").evaluateAll(nodes => {
@@ -93,6 +93,51 @@ test("Pointing name preserves focus and caret across an accepted edit", async ({
     expect(await previous.evaluate(node => node.isConnected)).toBe(false);
     await expect(input).toBeFocused();
     expect(await input.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([2, 5]);
+});
+
+// A name commits on Enter or blur, so a model arriving while it is typed (the
+// live watch reading the keyboard, say) must not throw the typing away.
+test("a name typed but not yet confirmed survives a redraw that renders the same name", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await title.click();
+    await title.fill("Desk 777");
+    await title.evaluate(node => node.setSelectionRange(2, 4));
+    const previous = await title.elementHandle();
+    await publishAccepted(page, [], undefined);
+    expect(await previous.evaluate(node => node.isConnected)).toBe(false);
+    await expect(title).toBeFocused();
+    await expect(title).toHaveValue("Desk 777");
+    expect(await title.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([2, 4]);
+    await clearPosts(page);
+    await title.press("Enter");
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "renameKeyboard", name: "Desk 777"})]);
+});
+
+test("a name typed on after such a redraw is renamed once", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await title.click();
+    await title.fill("Desk 777");
+    await publishAccepted(page, [], undefined);
+    await title.press("End");
+    await title.pressSequentially("8");
+    await clearPosts(page);
+    await title.press("Enter");
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "renameKeyboard", name: "Desk 7778"})]);
+});
+
+test("a redraw that renders a different name drops the typed text for the new name", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await title.click();
+    await title.fill("Desk 777");
+    await publishAccepted(page, ["keyboardName", "name"], "Travel");
+    await expect(title).toBeFocused();
+    await expect(title).toHaveValue("Travel");
+    await clearPosts(page);
+    await title.press("Enter");
+    expect(await posted(page)).toEqual([]);
 });
 
 test("picker search has a unique identity beside its underlying editor", async ({page}) => {

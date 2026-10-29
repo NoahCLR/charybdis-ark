@@ -6,8 +6,13 @@
 // data-f identity authored on every form control. Other focusable elements
 // keep their existing authored hooks. Afterwards the matching control gets
 // focus back, with its caret where it was.
+//
+// A text field commits on change, so what is typed into it is only on screen
+// until then. The redraw keeps that text when it draws the field with the
+// same value as before, and still commits it when the field is left; when it
+// draws another value, an edit landed and that value wins.
 
-/** @typedef {{selector: string, index: number, unique: boolean, caret: [number, number | null] | null}} CapturedFocus */
+/** @typedef {{selector: string, index: number, unique: boolean, caret: [number, number | null] | null, typed: {value: string, rendered: string} | null}} CapturedFocus */
 /** @typedef {HTMLElement & {selectionStart?: number | null, selectionEnd?: number | null, setSelectionRange?: (start: number, end: number | null) => void}} FocusControl */
 
 const ACTION_NAMES = [
@@ -32,7 +37,9 @@ export function captureFocus(root) {
     const index = matches.indexOf(active);
     /** @type {CapturedFocus["caret"]} */
     const caret = typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd ?? null] : null;
-    return {selector, index, unique, caret};
+    const text = caret && unique && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) ? active : null;
+    const typed = text && text.value !== text.defaultValue ? {value: text.value, rendered: text.defaultValue} : null;
+    return {selector, index, unique, caret, typed};
 }
 
 /** @param {Element} root @param {CapturedFocus | null} captured */
@@ -50,6 +57,16 @@ export function restoreFocus(root, captured) {
         }
     }
     target.focus({preventScroll: true});
+    const typed = captured.typed;
+    if (typed && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) && target.defaultValue === typed.rendered) {
+        target.value = typed.value;
+        // Text set from code is no longer typed, so the browser would not
+        // commit it on blur. The change is sent here instead, unless more
+        // was typed and the browser sends its own.
+        target.addEventListener("blur", () => {
+            if (target.value === typed.value) target.dispatchEvent(new Event("change", {bubbles: true}));
+        }, {once: true});
+    }
     if (captured.caret && typeof target.setSelectionRange === "function") {
         try { target.setSelectionRange(...captured.caret); } catch { /* a number input has no caret */ }
     }

@@ -814,7 +814,10 @@ escaped payload (D-L26), in `webview/ui/macros/`.
 - `webview/lib/focus.mjs` saves the identity and text selection before a
   render and restores them only when exactly one match remains
   (`browser-tests/focus-identities.spec.js`). A disclosure around the
-  restored field stays open (no test).
+  restored field stays open (no test). Text typed into the field and not yet
+  committed is kept when the render draws the field with the same value as
+  before; a different value means an edit landed, and it replaces the typing
+  (`browser-tests/focus-identities.spec.js`).
 - Macro steps get local IDs that `webview/view/macro-focus.mjs` carries
   through edits and reorders; they never reach the payload
   (`tests/view/macro-focus.test.mjs`).
