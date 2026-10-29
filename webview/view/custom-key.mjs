@@ -209,8 +209,7 @@ export function customKeyBypassText(key) {
 export function shortcutKeyCode(model, expression) {
     const name = String(expression ?? "").trim();
     if (!name || !(model?.customKeyShortcutKeys || []).includes(name)) return null;
-    const entry = (model?.qmkKeycodes || []).find((row) => row.value === name || row.aliases.includes(name));
-    return entry ? entry.keycode : null;
+    return keyIdentity(model, name).entry?.keycode ?? null;
 }
 
 // A catalogue key that is or carries modifiers is a shortcut too, though its
@@ -222,8 +221,7 @@ export function shortcutKeyCode(model, expression) {
 // `!` is Left Shift + 1. Null for any other key.
 /** @param {Model} model @param {string} name @returns {{key: string, mods: number} | null} */
 export function shortcutModifiers(model, name) {
-    const value = keyIdentity(model, name).name;
-    const code = (model?.qmkKeycodes || []).find((row) => row.value === value || row.aliases.includes(value))?.keycode;
+    const code = keyIdentity(model, name).entry?.keycode;
     if (code === undefined) return null;
     if (inBlock(code, MODIFIER_KEYS)) return {key: "", mods: 1 << (code - MODIFIER_KEYS.first)};
     const mods = compactModifierMask(code);

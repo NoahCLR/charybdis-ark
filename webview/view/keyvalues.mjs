@@ -48,9 +48,7 @@ export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ 
 export function modifierPick(model, {keys = [], mods = []}) {
     const controls = vocabulary(model).pickerModifiers || [];
     const wrapped = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
-    /** @param {string} name */
-    const entryOf = (name) => (model?.qmkKeycodes || []).find((entry) => entry.value === keyIdentity(model, name).name || entry.aliases?.includes(name));
-    const code = keys[0] ? entryOf(keys[0])?.keycode : undefined;
+    const code = keys[0] ? keyIdentity(model, keys[0]).entry?.keycode : undefined;
     const keyBit = code !== undefined && inBlock(code, MODIFIER_KEYS) ? 1 << (code - MODIFIER_KEYS.first) : 0;
     if (keys.length && !keyBit) return null;
     const mask = wrapped | keyBit;
@@ -84,8 +82,7 @@ export function pickerModifierProblem(model, picker) {
         return "Only keyboard keys take modifiers here. Send this key on its own, or clear the modifiers.";
     }
     let mask = picker.mods.reduce((bits, wrapper) => bits | ((vocabulary(model).pickerModifiers || []).find(entry => entry.value === wrapper)?.bit ?? 0), 0);
-    const selected = keyIdentity(model, picker.keys[0]).name;
-    const code = model?.qmkKeycodes?.find(entry => entry.value === selected)?.keycode;
+    const code = keyIdentity(model, picker.keys[0]).entry?.keycode;
     if (code !== undefined) mask |= compactModifierMask(code);
     return (mask & MODIFIER_KEY_SIDES.LEFT) && (mask & MODIFIER_KEY_SIDES.RIGHT)
         ? "A keycode can hold left modifiers or right modifiers together. Choose modifiers from one side." : "";

@@ -30,6 +30,17 @@ test("a spelling reads by the name the profile knows it by, and a name nothing k
     assert.deepEqual(Object.entries(model.qmkKeycodeAliases).filter(([, name]) => !name), []);
 });
 
+test("a key's catalogue entry is found by its name or any alias the catalogue lists", () => {
+    const model = publishedModel();
+    const enter = model.qmkKeycodes.find((/** @type {{value: string}} */ row) => row.value === "KC_ENTER");
+    assert.ok(enter);
+    assert.equal(keyIdentity(model, "KC_ENTER").entry, enter);
+    assert.equal(keyIdentity(model, "KC_ENT").entry, enter, "an alias");
+    assert.equal(keyIdentity(model, "NOT_A_KEY").entry, undefined);
+    // A model whose alias table lacks a spelling still finds the entry that lists it.
+    assert.equal(keyIdentity({qmkKeycodes: [enter]}, "KC_ENT").entry?.keycode, enter.keycode);
+});
+
 test("one key is one canonical spelling, however its expression is spelled", () => {
     const model = {qmkKeycodeAliases: {KC_C: "KC_C", KC_ENT: "KC_ENTER", KC_ENTER: "KC_ENTER", KC_SLSH: "KC_SLASH", KC_SLASH: "KC_SLASH"}};
     assert.equal(keyIdentity(model, "KC_ENT").canonical, "KC_ENTER");

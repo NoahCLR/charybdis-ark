@@ -63,6 +63,10 @@ function identityOf(model, spelling) {
         return undefined;
     });
     const value = once(() => keycodeValue(model, spelling));
+    // The keyboard's catalogue entry for the key, by the name the profile
+    // knows it by or any alias it lists, as written or as that name.
+    const entry = once(() => (model?.qmkKeycodes || []).find((row) => row.value === name || row.value === spelling
+        || row.aliases?.includes(spelling) || row.aliases?.includes(name)));
     // The name the profile lists a key of this kind by (MACRO_3,
     // CUSTOM_KEY_0) when core says it is one, under any name it is read by:
     // the name the value it stores goes by, so QK_MACRO_3, MC_3 and 0x7703
@@ -89,6 +93,7 @@ function identityOf(model, spelling) {
         get spellings() { return spellings(); },
         get kind() { return kind(); },
         get value() { return value(); },
+        get entry() { return entry(); },
         get macro() { return macro(); },
         get customKey() { return customKey(); },
         get behaviour() { return behaviour(); },

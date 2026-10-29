@@ -88,6 +88,7 @@ export interface KeyIdentity {
     readonly spellings: string[];
     readonly kind: import('../../contracts/model.js').KeyKind | undefined;
     readonly value: number | undefined;
+    readonly entry: import('../../contracts/panel.js').CatalogEntry | undefined;
     readonly macro: string;
     readonly customKey: string;
     readonly behaviour: BehaviorView | undefined;
