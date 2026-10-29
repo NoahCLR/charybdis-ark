@@ -600,3 +600,18 @@ test("what each key is, by every name, is the catalog's for a profile on current
     assert.equal(posted.qmkKeyKinds, empty.qmkKeyKinds, "so its kinds are posted whole");
     assert.deepEqual(withCatalog(posted, catalog), empty);
 });
+
+// Keyboards that come and go while an operation runs are looked at again
+// once it ends; a loop closed before then looks no more.
+test("a closed panel loop does not look at the keyboards again after a running operation", async t => {
+    t.mock.timers.enable({apis: ["setTimeout"]});
+    let enumerated = 0;
+    const loop = openPanelLoop(fakeShell(), {service: fakeService({enumerate: async () => {enumerated++;}})});
+    loop.session.service.snapshot().busy = true;
+    await loop.keyboardsChanged();
+    await loop.close();
+    loop.session.service.snapshot().busy = false;
+    t.mock.timers.tick(1000);
+    await new Promise(setImmediate);
+    assert.equal(enumerated, 0);
+});

@@ -134,6 +134,8 @@ function openPanelLoop(shell, options) {
         },
         close: () => {
             if (session.reconnect) endReconnect(session, session.reconnect);
+            clearTimeout(allowed.lookAgain);
+            allowed.lookAgain = undefined;
             void watching?.stop();
             watching = undefined;
             return session.service.close();
