@@ -242,24 +242,17 @@ async function cutShortApply() {
 }
 
 // `--device` renders the interface against the keyboard that is plugged in,
-// read-only, the way the shell builds its model. Fixture data cannot show what a
-// real profile does to a surface — every naming inconsistency found so far came
-// from looking at this.
+// read-only, the way the shell builds its model: read as Read keyboard reads
+// it (`readForEditor`). Fixture data cannot show what a real profile does to a
+// surface — every naming inconsistency found so far came from looking at this.
 async function deviceModel() {
     const {ProfileDeviceService} = require("../core/session/profile-device-service");
     const {NodeHidDeviceAdapter} = require("../core/transport/node-hid-adapter");
     const service = new ProfileDeviceService({adapter: new NodeHidDeviceAdapter(), onChange: () => {}});
     try {
-        await service.enumerate();
-        const devices = service.snapshot().devices;
-        if (!devices.length) throw new Error("no Charybdis Raw HID interface found");
-        await service.connect(devices[0].id);
-        await service.refresh();
-        await service.readLayout();
-        await service.readCommittedProfile();
-        await service.readBaseRgb();
-        await service.readCombos();
-        if (require("../core/session/firmware-support").canEdit(service.capabilities)) await service.readKeyboardProfile();
+        const read = await service.readForEditor();
+        if (read.kind === "none") throw new Error("no Charybdis Raw HID interface found");
+        if (read.kind === "starting") throw new Error("the keyboard did not finish starting");
 
         // Exactly the model the panel would build for this keyboard.
         /** @type {import("../core/session/types.js").PanelSession} */
