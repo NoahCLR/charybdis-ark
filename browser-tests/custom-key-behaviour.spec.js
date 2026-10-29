@@ -223,7 +223,7 @@ test("Show on the Keys screen shows a layer that reaches the key", async ({page}
     const layout = await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const {customKeyPlacements} = await import("/webview/view/reach.mjs");
-        const reaching = customKeyPlacements(store.getModel(), store.layers(), "CUSTOM_KEY_0").map((entry) => entry.at);
+        const reaching = customKeyPlacements(store.getModel(), "CUSTOM_KEY_0").map((entry) => entry.at);
         const free = store.layers().map((_, at) => at).find((at) => !reaching.includes(at));
         return {reaching, free};
     });
