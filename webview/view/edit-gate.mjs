@@ -9,6 +9,7 @@
 
 import {demoOf} from "./demo.mjs";
 import {shellOf} from "./shell-panel.mjs";
+import {vocabulary} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel} Model
@@ -43,17 +44,21 @@ const TAKES_EDITS = {
 };
 
 // What stands in the way of the keyboard's data, said plainly where the
-// control is, whatever the area: no keyboard, nothing read, no draft, another
-// keyboard's draft or a stale one. '' for the rest (a new connection, an
-// operation running, the area's own capability); a screen then says its own
-// sentence, or nothing.
+// control is, whatever the area: no keyboard, firmware Ark does not support,
+// nothing read, no draft, another keyboard's draft, or a stale one or one
+// read over an earlier connection, both reviewed against the keyboard. ''
+// for the rest (an operation running, which the commit bar says; the area's
+// own capability); a screen then says its own sentence, or nothing.
+// Unsupported firmware comes before what it leaves unread or unmatched: core
+// reads no further and publishes its draft as unmatched (D-L64).
 /** @param {Model | null | undefined} model */
 function blocked(model) {
     if (!model?.device?.connected && !demoOf(model).active) return shellOf(model).blocked?.title || shellOf(model).words.noKeyboard || "";
+    if (model?.draft?.reason === "unsupported" || model?.firmware?.readable === false) return vocabulary(model).firmwareUpdate;
     if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";
     if (!model?.draft) return "The keyboard's complete profile could not be read, so edits cannot be drafted here. Read the keyboard again.";
     if (!model.draft.matching) return "The local draft belongs to another keyboard. Select it again or discard the draft here.";
-    if (model.draft.stale) return "Review the draft against the current keyboard before editing further.";
+    if (model.draft.stale || model.draft.reason === "connection-changed") return "Review the draft against the current keyboard before editing further.";
     return "";
 }
 

@@ -325,6 +325,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     phases: PHASE_WORDS,
     readSteps: READ_STEP_WORDS,
     halves: HALVES_WORDS,
+    // Why nothing can be edited on a keyboard whose firmware Ark does not
+    // support (D-L64), where the control is: the words a refused read says.
+    firmwareUpdate: "This keyboard's firmware is not current, and Ark supports only current firmware. Update both halves, then read the keyboard again.",
     editModes: EDIT_MODE_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
     // The side a half reports itself as (GET 0x0D's physical half).

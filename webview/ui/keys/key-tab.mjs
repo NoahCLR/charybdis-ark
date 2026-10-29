@@ -57,7 +57,7 @@ export function tabKey(body) {
                 </dl></details>
             </div>
             ${answeredBelow(view, position)}
-            ${gate.editable ? "" : `<div class="unavailable key-unavailable">${esc(gate.why)}</div>`}
+            ${gate.editable || !gate.why ? "" : `<div class="unavailable key-unavailable">${esc(gate.why)}</div>`}
         </section>
         <section>
             <div class="sect-h"><h4>This key on every layer</h4></div>

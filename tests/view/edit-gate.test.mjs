@@ -19,6 +19,7 @@ const NO_DRAFT = "The keyboard's complete profile could not be read, so edits ca
 const OTHER_KEYBOARD = "The local draft belongs to another keyboard. Select it again or discard the draft here.";
 const STALE = "Review the draft against the current keyboard before editing further.";
 const NO_KEYBOARD = "No keyboard is connected. Use Choose keyboard… to connect one.";
+const UNSUPPORTED = "This keyboard's firmware is not current, and Ark supports only current firmware. Update both halves, then read the keyboard again.";
 
 // What core publishes for a draft on this keyboard, with the state the panel
 // answers to written over as each reason would leave it; `needsRead` makes
@@ -51,10 +52,10 @@ test("each reason core gives closes every area that edits the draft, and says wh
         ["busy", published({busy: true}), "", true, false],
         ["stale", published({}, {needsRead: true}), STALE, false, true],
         ["stale and busy", published({busy: true}, {needsRead: true}), STALE, true, false],
-        ["connection-changed", published({connectionToken: 7}), "", false, true],
+        ["connection-changed", published({connectionToken: 7}), STALE, false, true],
         ["disconnected", published({connected: false, capabilities: null}), NO_KEYBOARD, false, false],
         ["other-keyboard", published({selectedDeviceId: "other", devices: [...state.devices, {id: "other", label: "Other"}]}), NOTHING_READ, false, true],
-        ["unsupported", published({capabilities: {...DEMO_CAPABILITIES, actionAbiDigest: 0}}), NOTHING_READ, false, false],
+        ["unsupported", published({capabilities: {...DEMO_CAPABILITIES, actionAbiDigest: 0}}), UNSUPPORTED, false, false],
         ["no-draft", buildPanelModel({service: {portable: null}}, state), NOTHING_READ, false, true],
     ];
     for (const [reason, model, why, quiet, exported] of reasons) {
@@ -63,7 +64,7 @@ test("each reason core gives closes every area that edits the draft, and says wh
     }
 });
 
-test("its words follow the model, in order: no keyboard, nothing read, no draft, another keyboard's, a stale one", () => {
+test("its words follow the model, in order: no keyboard, unsupported firmware, nothing read, no draft, another keyboard's, a stale one", () => {
     const why = (/** @type {any} */ model) => editGate(model, "keys").why;
     const gone = published({connected: false, capabilities: null});
     assert.equal(why({...gone, shell: {...gone.shell, blocked: {title: "Ark is open in another tab", detail: "One tab holds the keyboard."}}}),
@@ -75,6 +76,14 @@ test("its words follow the model, in order: no keyboard, nothing read, no draft,
     assert.equal(why({...other, layers: open.layers}), OTHER_KEYBOARD);
     assert.equal(why({...buildPanelModel({service: {portable: null}}, state), layers: open.layers}), NO_DRAFT);
     assert.equal(why({...published({}, {needsRead: true}), layers: []}), NOTHING_READ, "nothing read comes before a stale draft");
+    // Firmware Ark does not support is said before what it leaves unread or
+    // unmatched (panel-session.js publishes its draft as unmatched).
+    const unsupported = published({capabilities: {...DEMO_CAPABILITIES, actionAbiDigest: 0}});
+    assert.equal(why({...unsupported, layers: open.layers}), UNSUPPORTED, "unsupported firmware comes before another keyboard's draft");
+    assert.equal(why({...unsupported, draft: undefined, layers: []}), UNSUPPORTED, "and before nothing read, with no draft open");
+    assert.equal(why({...gone, firmware: unsupported.firmware}), NO_KEYBOARD, "no keyboard comes first");
+    // A new connection is reviewed as a stale draft is.
+    assert.equal(why({...open, draft: {...open.draft, editable: false, reason: "connection-changed"}}), STALE);
     assert.deepEqual(editGate(null, "keys"), {editable: false, quiet: false, why: ""}, "before the first model there is nothing to say");
 });
 

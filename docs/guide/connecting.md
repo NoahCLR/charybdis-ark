@@ -35,8 +35,8 @@ once it has. If it hasn't after 15 seconds, Ark says so; read it again in a
 moment, or unplug it and plug it back in.
 
 If the keyboard runs older firmware, Ark stops there and tells you to update
-both halves. Nothing on the keyboard changes. The Keyboard screen links to the
-firmware release.
+both halves, and every control that edits says so too. Nothing on the
+keyboard changes. The Keyboard screen links to the firmware release.
 
 If Ark can show the keyboard but can't read its complete profile, the editing
 screens say **Keyboard not ready for edits** and offer **Read keyboard** to

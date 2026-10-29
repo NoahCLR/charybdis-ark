@@ -183,7 +183,8 @@ keyboard again and shows the new value. That is not an error.
   **Review against the keyboard** compares your draft with the keyboard as it
   is now. **Discard draft** starts over from the keyboard. Until you choose
   one, the editing screens say the keyboard changed since the draft began
-  and point to the bar.
+  and point to the bar. A keyboard that reconnects while the draft has edits
+  is held the same way, and its controls ask you to review the draft too.
 - In the live modes, an edit you make just as a key changed the keyboard is
   not sent. Ark reads the keyboard; make the edit again.
 

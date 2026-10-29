@@ -571,7 +571,14 @@ only an operation stands in the way. The demo's draft is bound to the demo
   (`tests/session/panel-loop.test.js`, `tests/session/panel-session.test.js`).
   `editGate(model, area)` (`webview/view/edit-gate.mjs`) reads the published
   `draft.editable`, and each area's own capability with it
-  (`tests/view/edit-gate.test.mjs`).
+  (`tests/view/edit-gate.test.mjs`). Its `why` says, in this order: no
+  keyboard, firmware Ark does not support (`draft.reason` `unsupported` or
+  `firmware.readable` false, in `vocabulary.firmwareUpdate`), nothing read, no
+  draft, another keyboard's draft, and a stale draft or one read over an
+  earlier connection (`connection-changed`), both in the same words. It says
+  nothing while the draft is `busy` (`quiet`; the commit bar says it) or for
+  an area's own capability; a screen then says its own sentence or nothing,
+  never an empty box.
 - Panel controls are registered once in `CONTROLS`
   (`core/session/panel-control-registry.js`): route, draft identity, binding
   rule, demo policy, phase and action. History and local macro inspection run
