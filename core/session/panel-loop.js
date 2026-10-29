@@ -35,6 +35,21 @@
 // live keyboard about once a second (live-watch.js), for the saves it makes
 // by itself and the edits its own keys make; `close()` stops it.
 //
+// What the shell's browser says about keyboards, it hands over as verbs:
+//
+//   chose(picked, request)          its keyboard picker closed: `picked` is what
+//                                   the adapter's requestDevice settled with,
+//                                   `request` the panel's chooseKeyboard
+//   forget(letGo)                   Disconnect: let go of the keyboard, then
+//                                   `letGo()` takes back the page's permission
+//                                   to open it, and the keyboards are followed
+//   keyboardsChanged()              a keyboard the page may open came or went
+//   reviewProfile({text, name})     a profile the shell holds (a recovery copy),
+//                                   opened for review as Import opens a file
+//
+// A shell whose panel() says it is `blocked` reaches no keyboard, so
+// keyboardsChanged() only publishes.
+//
 // What every model of a build starts from (model/profile-model.js
 // panelCatalog) is posted once, as {type: "catalog"}, before the first model,
 // and again after the panel says it is `ready`, since a panel that has loaded
@@ -75,6 +90,7 @@ function openPanelLoop(shell, options) {
     const waiting = {timing: {sleep: device.sleep, ...timing}, running: /** @type {Promise<void> | undefined} */ (undefined)};
     /** @type {ReturnType<typeof watchLive> | undefined} */
     let watching;
+    const allowed = {following: false, lookAgain: /** @type {ReturnType<typeof setTimeout> | undefined} */ (undefined)};
     const loop = {
         publish: () => publish(session, shell),
         // A panel that has just loaded: the catalog, then the model.
@@ -94,6 +110,22 @@ function openPanelLoop(shell, options) {
         handleMessage: /** @param {unknown} posted */ async (posted) => {
             await handleMessage(session, panelRequest(posted), shell);
             followReconnect(session, shell, waiting);
+        },
+        /** @param {Promise<unknown>} picked @param {{discardDemo?: unknown}} [request] */
+        chose: (picked, {discardDemo} = {}) => choseKeyboard(session, picked, discardDemo === true ? {discardDemo: true} : {}, shell, loop.handleMessage),
+        /** @param {() => Promise<unknown>} letGo */
+        forget: async (letGo) => {
+            if (session.service.snapshot().busy) return fail(session, new Error("Wait for the keyboard to finish before disconnecting it."), shell);
+            await session.service.disconnect();
+            await letGo();
+            session.notice = "Disconnected. This page will not open that keyboard again until you choose it.";
+            return loop.keyboardsChanged();
+        },
+        keyboardsChanged: () => followAllowed(session, shell, allowed, loop.handleMessage),
+        /** @param {{text: string, name?: string}} file */
+        reviewProfile: ({text, name}) => {
+            const draft = session.draft;
+            return loop.handleMessage({type: "reviewPortableProfile", text, name, ...(draft ? {draftId: draft.id, draftRevision: draft.revision} : {})});
         },
         // Settles when a wait for a renamed keyboard ends, at once without one.
         reconnected: () => waiting.running || Promise.resolve(),
@@ -265,6 +297,59 @@ function keepFault(session, error) {
 async function diagnose(session, shell) {
     const sleep = session.service.sleep;
     if (!await readFlashFigures(session, {publish: () => publish(session, shell), ...(sleep ? {sleep} : {})})) publish(session, shell);
+}
+
+// Chrome's picker allowed a keyboard: it lists first, so it is selected by
+// that and the read opens it even while another one is connected. Choosing
+// from the demo leaves it, as the panel asked; the read does that. Listing
+// fails while a read or Apply holds the keyboard, and says so.
+/** @param {Session} session @param {Promise<unknown>} picked @param {{discardDemo?: true}} leave @param {Shell} shell @param {(message: Message) => Promise<void>} handle */
+async function choseKeyboard(session, picked, leave, shell, handle) {
+    try {await picked;}
+    catch (error) {
+        if (/** @type {{code?: unknown}} */ (error)?.code !== "CANCELLED") return fail(session, error, shell);
+        session.notice = "No keyboard was chosen.";
+        return publish(session, shell);
+    }
+    try {await session.service.enumerate();}
+    catch (error) {return fail(session, error, shell);}
+    const chosen = session.service.snapshot().devices[0]?.id;
+    return handle(chosen ? {type: "selectDevice", deviceId: chosen, ...leave} : {type: "refresh", ...leave});
+}
+
+// What the page shows follows the keyboards it may open. Plugging in an
+// allowed keyboard, unplugging one or disconnecting one lists them again,
+// and with none open the first one left is connected: an allowed keyboard
+// is always either the connected one or in the selector. The demo stays
+// the demo; its selector still follows.
+/** @param {Session} session @param {Shell} shell @param {{following: boolean, lookAgain: ReturnType<typeof setTimeout> | undefined}} allowed @param {(message: Message) => Promise<void>} handle @returns {Promise<void>} */
+async function followAllowed(session, shell, allowed, handle) {
+    const service = session.service;
+    if (allowed.following || shell.panel?.().blocked) return publish(session, shell);
+    // A keyboard renamed by a save drops off and comes back under its new
+    // name; the loop waits for that one (keyboard-reconnect.js) and must
+    // not have another connected in its place.
+    if (session.reconnect) return publish(session, shell);
+    // A running read or Apply lists the keyboards itself; look again after
+    // it, once however many keyboards came and went meanwhile.
+    if (service.snapshot().busy) {
+        allowed.lookAgain ??= setTimeout(() => {
+            allowed.lookAgain = undefined;
+            void followAllowed(session, shell, allowed, handle);
+        }, 500);
+        return;
+    }
+    allowed.following = true;
+    try {
+        await service.enumerate();
+        const state = service.snapshot();
+        if (!state.connected && state.devices.length && !session.demo) return await handle({type: "refresh"});
+        publish(session, shell);
+    } catch {
+        publish(session, shell);
+    } finally {
+        allowed.following = false;
+    }
 }
 
 // After a save that renamed the keyboard, or after losing it, wait for it to

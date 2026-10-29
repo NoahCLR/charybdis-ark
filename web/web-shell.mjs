@@ -81,7 +81,7 @@ export function startWebShell(env) {
     let recoveryList = [];
     /** @type {string | null} */
     let progress = null;
-    /** @type {Promise<(Error & {code?: string}) | null> | undefined} */
+    /** @type {Promise<unknown> | undefined} */
     let picking;
     /** @type {ReturnType<typeof readProfileFile> | undefined} */
     let choosing;
@@ -130,7 +130,8 @@ export function startWebShell(env) {
     /** @param {import("../contracts/messages.js").PanelRequest} message */
     function gesture(message) {
         if (message?.type === "chooseKeyboard" && hid && !blocked) {
-            picking = adapter.requestDevice().then(() => null, (error) => error);
+            picking = adapter.requestDevice();
+            picking.catch(() => {});
         }
         if (message?.type === "choosePortableProfile" || message?.type === "openDemoProfile") {
             choosing = chooseFile(document);
@@ -177,8 +178,7 @@ export function startWebShell(env) {
             case "useRecovery": {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
                 if (!copy) return loop.fail(new Error(GONE));
-                const draft = loop.session.draft;
-                return loop.handleMessage({type: "reviewPortableProfile", text: copy.text, name: copy.name, ...(draft ? {draftId: draft.id, draftRevision: draft.revision} : {})});
+                return loop.reviewProfile(copy);
             }
             case "deleteRecovery": {
                 const deleted = await recoveries.delete(message.id).then(() => true, () => false);
@@ -186,33 +186,13 @@ export function startWebShell(env) {
                 return deleted ? loop.publish() : loop.fail(new Error("That recovery copy could not be deleted."));
             }
             case "chooseKeyboard": {
-                const failure = await picking;
+                const picked = picking;
                 picking = undefined;
-                if (failure === undefined) return loop.publish();
-                if (failure?.code === "CANCELLED") {
-                    loop.session.notice = "No keyboard was chosen.";
-                    return loop.publish();
-                }
-                if (failure) return loop.fail(failure);
-                // The chosen keyboard lists first; select it by that, so the
-                // read opens it even while another one is connected. Choosing
-                // from the demo leaves it, as the panel asked; the read does that.
-                // Listing fails while a read or Apply holds the keyboard, and
-                // says so.
-                try {await loop.session.service.enumerate();}
-                catch (error) {return loop.fail(error);}
-                const chosen = loop.session.service.snapshot().devices[0]?.id;
-                const leave = message.discardDemo === true ? {discardDemo: true} : {};
-                return loop.handleMessage(chosen ? {type: "selectDevice", deviceId: chosen, ...leave} : {type: "refresh", ...leave});
+                // A tab that opened no picker has nothing to read.
+                return picked ? loop.chose(picked, message) : loop.publish();
             }
-            case "forgetKeyboard": {
-                const service = loop.session.service;
-                if (service.snapshot().busy) return loop.fail(new Error("Wait for the keyboard to finish before disconnecting it."));
-                await service.disconnect();
-                await adapter.forget();
-                loop.session.notice = "Disconnected. This page will not open that keyboard again until you choose it.";
-                return followAllowed();
-            }
+            case "forgetKeyboard":
+                return loop.forget(() => adapter.forget());
             case "ready": case "refresh": case "selectDevice":
                 await holding;
                 // A tab that reaches no keyboard reads none, but a panel that
@@ -224,47 +204,14 @@ export function startWebShell(env) {
         }
     }
 
-    // What the page shows follows what Chrome lets it open. Plugging in an
-    // allowed keyboard, unplugging one or disconnecting one lists them again,
-    // and with none open the first one left is connected: an allowed keyboard
-    // is always either the connected one or in the selector. The demo stays
-    // the demo; its selector still follows.
-    let following = false;
-    /** @type {ReturnType<typeof setTimeout> | undefined} */
-    let lookAgain;
-    async function followAllowed() {
-        const service = loop.session.service;
-        if (following || blocked || !hid) return loop.publish();
-        // A keyboard renamed by a save drops off and comes back under its new
-        // name; the loop waits for that one (keyboard-reconnect.js) and must
-        // not have another connected in its place.
-        if (loop.session.reconnect) return loop.publish();
-        // A running read or Apply lists the keyboards itself; look again after
-        // it, once however many keyboards came and went meanwhile.
-        if (service.snapshot().busy) {
-            lookAgain ??= setTimeout(() => {
-                lookAgain = undefined;
-                void followAllowed();
-            }, 500);
-            return;
-        }
-        following = true;
-        try {
-            await service.enumerate();
-            const state = service.snapshot();
-            if (!state.connected && state.devices.length && !loop.session.demo) return await loop.handleMessage({type: "refresh"});
-            loop.publish();
-        } catch {
-            loop.publish();
-        } finally {
-            following = false;
-        }
-    }
+    // What the page shows follows what Chrome lets it open: plugging in an
+    // allowed keyboard or unplugging one lists them again (the loop's
+    // keyboardsChanged).
     if (hid) {
         // After every listener on the event, so a keyboard that left has
         // already let go of its connection.
         /** @param {"connect" | "disconnect"} type */
-        const follow = (type) => hid.addEventListener(type, () => setTimeout(() => void holding.then(followAllowed), 0));
+        const follow = (type) => hid.addEventListener(type, () => setTimeout(() => void holding.then(loop.keyboardsChanged), 0));
         follow("connect");
         follow("disconnect");
     }

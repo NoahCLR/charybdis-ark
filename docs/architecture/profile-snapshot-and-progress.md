@@ -21,6 +21,12 @@ and [Profile Wire](../../upstream/firmware/docs/spec/profile-wire-v1/README.md).
   each model leaves it out and says what it lays over it, and
   `webview/catalog.mjs` lays it back
   ([the posting contract](../spec/interface-contracts.md#snapshot-model-and-device-model)).
+  What the browser says about keyboards reaches it as verbs, so the shell
+  only wires WebHID's events, its picker and Disconnect to them: `chose`
+  reads the keyboard just picked, `forget` lets go of one, and
+  `keyboardsChanged` lists the keyboards the page may open again and
+  connects the first when none is open. `reviewProfile` opens a recovery
+  copy for review as Import opens a file.
 - `core/session/profile-device-service.js` owns the connection: one operation
   at a time (`runOperation`, else `SERVICE_BUSY`), each failure recorded in
   `snapshot().error` as `operation-failure.js` words it, every change

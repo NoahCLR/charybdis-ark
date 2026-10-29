@@ -8,7 +8,6 @@ import {workerSleep} from "../web/sleep.mjs";
 import {BLOCKED, COMPILED_DEFAULTS_KEY, LOAD_FAILED, compiledDefaultsStore, initialTheme, leaving, readProfileFile, showLoadFailure, startWebShell} from "../web/web-shell.mjs";
 import {listed} from "../web/recoveries.mjs";
 import {CHARYBDIS_PRODUCT_ID, CHARYBDIS_VENDOR_ID, QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE_PAGE} from "../core/transport/device-adapter.js";
-import {FAILURE_WORDS} from "../core/model/vocabulary.js";
 import {FILE_MAX_BYTES} from "../core/model/portable-profile.js";
 
 // A MessageChannel delivers on a later task, but not within any fixed time: a
@@ -168,24 +167,11 @@ test("choosing a keyboard whose list cannot be read says so, and the panel hears
     } finally {await shell.close();}
 });
 
-test("a fault in the shell reads as plain words, its own text kept for the diagnostics", async () => {
-    const shell = page();
-    try {
-        shell.loop.session.service.enumerate = async () => {throw new TypeError("Cannot read properties of undefined (reading 'id')");};
-        shell.api.postMessage({type: "chooseKeyboard"});
-        await delivered(shell.models);
-        const {notice} = shell.models.at(-1);
-        assert.equal(notice, `Failed: ${FAILURE_WORDS.unexpected}`);
-        assert.doesNotMatch(notice, /properties|undefined/);
-        assert.match(shell.loop.session.service.snapshot().diagnostics.at(-1), /^TypeError: Cannot read properties of undefined/);
-    } finally {await shell.close();}
-});
-
 test("a request the shell's own code fails is still answered with a notice", async () => {
     const shell = page();
     try {
         await quietly(async (said) => {
-            shell.loop.session.service.disconnect = async () => {throw new Error("The keyboard could not be let go.");};
+            shell.loop.forget = async () => {throw new Error("The keyboard could not be let go.");};
             shell.api.postMessage({type: "forgetKeyboard"});
             await delivered(shell.models);
             assert.equal(shell.models.at(-1).notice, "Failed: The keyboard could not be let go.");
@@ -194,33 +180,20 @@ test("a request the shell's own code fails is still answered with a notice", asy
     } finally {await shell.close();}
 });
 
-test("keyboards coming and going while the keyboard is busy are looked at once, after it", async (t) => {
+// The loop follows the keyboards the page may open (panel-loop-keyboards.test.js);
+// the shell hands it each one plugged in or unplugged, after the event's
+// other listeners.
+test("each keyboard plugged in or unplugged reaches the loop, after the event", async () => {
     const shell = page();
-    // The shell's timers on a test clock; what they start runs before the
-    // next turn of the event loop.
-    t.mock.timers.enable({apis: ["setTimeout"]});
-    const after = async (ms) => {
-        t.mock.timers.tick(ms);
-        await new Promise((resolve) => setImmediate(resolve));
-    };
     try {
-        const service = shell.loop.session.service, snapshot = service.snapshot.bind(service);
-        let busy = true, listed = 0;
-        service.snapshot = () => ({...snapshot(), busy});
-        service.enumerate = async () => {listed++;};
-        for (let event = 0; event < 5; event++) shell.fire(event % 2 ? "disconnect" : "connect");
-        await after(0);
-        for (let look = 0; look < 3; look++) await after(500);
-        assert.equal(listed, 0, "nothing is listed while it is busy");
-        busy = false;
-        await after(500);
-        assert.equal(listed, 1, "one look, not one per event");
-        await after(5000);
-        assert.equal(listed, 1, "and none after it");
-    } finally {
-        t.mock.timers.reset();
-        await shell.close();
-    }
+        let changed = 0;
+        shell.loop.keyboardsChanged = async () => {changed++;};
+        shell.fire("connect");
+        shell.fire("disconnect");
+        assert.equal(changed, 0, "not inside the event");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        assert.equal(changed, 2);
+    } finally {await shell.close();}
 });
 
 test("the theme starts from a saved choice, then the system's", () => {
