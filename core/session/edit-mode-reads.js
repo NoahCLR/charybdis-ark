@@ -9,14 +9,16 @@ const {EDIT_MODE, readEditMode, readEditProgress, readRuntime} = require("../pro
 // it into its connection state (profile-device-service.js): at each status
 // refresh and before a complete read.
 
-// The edit mode, or why it is not known (ConnectionState.editModeFailed).
+// The edit mode, or why it is not known (connection-state.js `mode`): an
+// unknown one is said.
 /** @param {Operation} op */
 async function readServiceEditMode(op) {
     const state = op.state;
     try {
-        state.editModeRead(await readEditMode(op.connection, {nextRequestId: op.nextRequestId}));
+        state.mode({read: await readEditMode(op.connection, {nextRequestId: op.nextRequestId})});
     } catch (error) {
-        if (state.editModeFailed(error)) op.say("The keyboard's edit mode could not be read; Ark tries again.");
+        state.mode({failed: error});
+        if (state.editModeUnknown) op.say("The keyboard's edit mode could not be read; Ark tries again.");
     }
 }
 
@@ -28,10 +30,10 @@ async function readLiveFacts(op) {
     const state = op.state;
     if (state.editModeUnknown) await readServiceEditMode(op);
     if (!state.editMode) return;
-    try {state.runtime = await readRuntime(op.connection, {nextRequestId: op.nextRequestId});} catch {}
+    try {state.keep({runtime: await readRuntime(op.connection, {nextRequestId: op.nextRequestId})});} catch {}
     try {
         const progress = await readEditProgress(op.connection, {nextRequestId: op.nextRequestId});
-        state.modeNotStored(progress.modeNotStored);
+        state.mode({notStored: progress.modeNotStored});
     } catch {}
 }
 
@@ -45,8 +47,9 @@ async function readsLive(op) {
     if (state.editModeUnknown) await readServiceEditMode(op);
     if (!state.editMode) return false;
     if (state.editMode.mode !== EDIT_MODE.APPLY) return true;
-    state.status = await readProfileStatus(op.connection, {nextRequestId: op.nextRequestId});
-    return state.status.activeKind === PROFILE_ACTIVE_KIND.WORKING;
+    const status = await readProfileStatus(op.connection, {nextRequestId: op.nextRequestId});
+    state.keep({status});
+    return status.activeKind === PROFILE_ACTIVE_KIND.WORKING;
 }
 
 module.exports = {readServiceEditMode, readLiveFacts, readsLive};

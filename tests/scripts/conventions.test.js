@@ -249,31 +249,49 @@ test("only the draft editor runs an editor's edit", () => {
     assert.deepEqual(violations, [], "make a draft edit with applyDraftEdit in core/model/draft-editor.js");
 });
 
-// The edit mode the device service holds is written only by ConnectionState
-// (core/session/connection-state.js), whose methods say what each read or set
-// means for it.
-const EDIT_MODE_WRITE = /\.\s*editMode(?:Unknown)?\s*(?:=|\?\?=|\|\|=|&&=)(?!=)|\[\s*["'`]editMode(?:Unknown)?["'`]\s*\]\s*=(?!=)/g;
-const writesEditMode = source => {
+// What the device service holds of a connection is written only by
+// core/session/connection-state.js, through the writer held for the
+// connection, whose methods say what each read means for it: everything it
+// reads back or publishes, but for the two plain fields with one writer
+// each (the apply's steps and the live watch's missed looks). Its getters
+// refuse a write at run time and in the type check; this catches one in a
+// file neither reaches, such as a browser test's fixture. rules/ and the
+// interface never reach core (tests/layering.test.js), so hold none to write.
+const {ConnectionState, Held} = require("../../core/session/connection-state");
+const HELD_FIELDS = [...new Set([ConnectionState.prototype, Held.prototype].flatMap(prototype => Object.entries(Object.getOwnPropertyDescriptors(prototype))
+    .filter(([, descriptor]) => descriptor.get).map(([name]) => name)).concat(Object.keys(new ConnectionState().published())))]
+    .filter(name => name !== "liveApply" && name !== "missedLooks");
+// What a module writes through: the state, its writer, or a name it binds
+// the writer to (`const held = state.of()`).
+const HELD_ALIAS = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[\w$]+\s*\.\s*)*state\s*\.\s*of\s*\(\s*\)/g;
+/** @param {string[]} receivers */
+const heldWrite = receivers => new RegExp(`\\b(?:${receivers.join("|")})\\s*(?:\\.\\s*of\\s*\\(\\s*\\))?\\s*(?:\\.\\s*(?:${HELD_FIELDS.join("|")})\\b|\\[\\s*["'\`](?:${HELD_FIELDS.join("|")})["'\`]\\s*\\])\\s*(?:=|\\?\\?=|\\|\\|=|&&=|\\+=|-=|\\+\\+|--)(?!=)`, "g");
+const writesHeld = source => {
     const code = uncommented(source);
-    return Array.from(code.matchAll(EDIT_MODE_WRITE), match => lineAt(code, match.index));
+    const aliases = Array.from(code.matchAll(HELD_ALIAS), match => match[1]);
+    return Array.from(code.matchAll(heldWrite(["state", ...new Set(aliases)])), match => lineAt(code, match.index));
 };
 
-test("the edit mode check catches a module writing it", () => {
+test("the connection state check catches a module writing what it holds", () => {
     for (const sample of ["state.editMode = undefined;", "if (state.editMode) state.editMode = {...state.editMode, mode};",
-        "op.state.editModeUnknown = true;", "state.editModeUnknown ||= failed;", 'state["editMode"] = read;']) {
-        assert.equal(writesEditMode(sample).length, 1, sample);
+        "op.state.editModeUnknown = true;", "state.editModeUnknown ||= failed;", 'state["editMode"] = read;', "service.state.connection = {connected: true};",
+        "state.of().capabilities = capabilities;", "op.state.layout = {state: \"reading\"};", "state.portableProgress = \"\";",
+        "const held = state.of(); held.capabilities = caps;", "let writer = op.state.of();\nwriter.status = status;"]) {
+        assert.equal(writesHeld(sample).length, 1, sample);
     }
     for (const sample of ["if (state.editMode === undefined) return;", "const editMode = mode ? {mode: mode.mode} : null;",
-        "state.editModeRead(read);", "// state.editMode = undefined", "editMode: this.editMode ? {...this.editMode} : null,"]) {
-        assert.deepEqual(writesEditMode(sample), [], sample);
+        "state.mode({read});", "// state.editMode = undefined", "editMode: this.editMode ? {...this.editMode} : null,",
+        "state.of().liveApply = view;", "state.missedLooks++;", "store.state.screen = \"keys\";", "state.keep({status});",
+        "const held = state.of(); held.liveApply = view; held.keep({status});", "const held = other(); held.capabilities = caps;"]) {
+        assert.deepEqual(writesHeld(sample), [], sample);
     }
 });
 
-test("only ConnectionState writes the edit mode", () => {
-    const violations = ["core", "rules", "webview", "web", "scripts"].flatMap(sources).map(posix)
+test("only connection-state.js writes what the device service holds of a connection", () => {
+    const violations = ["core", "web", "scripts", "browser-tests"].flatMap(sources).map(posix)
         .filter(file => file !== "core/session/connection-state.js")
-        .flatMap(file => writesEditMode(read(file)).map(line => `${file}:${line}`));
-    assert.deepEqual(violations, [], "write it through a ConnectionState method in core/session/connection-state.js");
+        .flatMap(file => writesHeld(read(file)).map(line => `${file}:${line}`));
+    assert.deepEqual(violations, [], "write it through the connection's writer, ConnectionState.of() (core/session/connection-state.js)");
 });
 
 // A screen posts what a builder returns (webview/view/edits.mjs,

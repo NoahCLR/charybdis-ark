@@ -41,6 +41,16 @@ test("a restore that starts re-reads the keyboard's status, even when it fails",
     assert.equal(refreshed, 1, "the health strip is read again rather than left at its pre-apply value");
 });
 
+test("a restore refused before its first write reads no status after it", async t => {
+    const {service, keyboard} = await connectedService(t, {brightnessMax: 100});
+    let refreshed = 0;
+    const refresh = service.refreshStatus.bind(service);
+    service.refreshStatus = async () => {refreshed++; return refresh();};
+    await assert.rejects(service.restorePortableProfile(document(), {saveRecovery: refuseRecovery}), /brightness.*limit of 100/);
+    assert.deepEqual(keyboard.mutations, []);
+    assert.equal(refreshed, 0, "the refusal changed nothing, so the status read before it still holds");
+});
+
 test("a profile with a misplaced action is refused, naming it, before recovery or any write", async t => {
     const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
     const {PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");

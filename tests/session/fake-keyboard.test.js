@@ -87,7 +87,6 @@ test("profile verification reads fresh committed bytes, reuses immutable default
         assert.equal(service.snapshot().error.code, "PAYLOAD_CORRUPT");
         adapter.keyboard.answer = originalAnswer;
         await service.disconnect();
-        assert.equal(service.state.payloadReader, undefined);
         await loop.handleMessage({type: "refresh"});
         assert.equal(chunks(5), count, "a new connection reuses the defaults verified before: metadata only");
         assert.deepEqual(adapter.keyboard.mutations, []);

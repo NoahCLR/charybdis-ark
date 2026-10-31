@@ -92,7 +92,10 @@ it; the optional reads (base RGB, combos) never reject and record
 
 The class runs each operation, and holds what it knows of the connection as
 one record, `session/connection-state.js`, cleared when the connection ends
-and published in `snapshot()`. Each operation past connecting states in the
+and published in `snapshot()`. Only that module writes it: each operation is
+given the writer for the connection it started on, whose methods say what a
+read means for the record and keep nothing once that connection is lost or
+replaced. Each operation past connecting states in the
 class what it needs before it starts and what it resolves with; its work is
 grouped by what it does, each given only the operation, never the service:
 the profile reads in `session/read-operations.js`, the working copy's in

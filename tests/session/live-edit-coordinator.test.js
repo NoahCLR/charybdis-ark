@@ -356,7 +356,7 @@ test("a save waiting for a quiet keyboard on the slave half says so", async t =>
     keyboard.faults.savePauses = 3;
     const seen = [];
     const original = service.emitChange.bind(service);
-    service.emitChange = () => {seen.push(service.state.portableProgress); original();};
+    service.emitChange = () => {seen.push(service.snapshot().portableProgress); original();};
     assert.equal((await service.saveWorkingCopy(edited)).saved, true);
     assert.ok(seen.includes("Waiting for a quiet keyboard to save"));
 });
@@ -370,7 +370,7 @@ test("a mode the keyboard could not store yet is said; an unreadable mode is rea
     await service.disconnect();
     await service.connect(id);
     assert.equal(service.snapshot().editMode, null, "an unreadable mode is unknown, not fatal");
-    assert.equal(service.state.editModeUnknown, true);
+    assert.equal(service.state.of().editModeUnknown, true);
     await service.readKeyboardProfile();
     assert.equal(service.snapshot().editMode.mode, EDIT_MODE.APPLY, "read again before the next read");
     assert.notEqual(service.snapshot().runtime, null, "the toggles are read in Apply too");

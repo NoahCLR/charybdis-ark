@@ -55,13 +55,13 @@ async function readLiveStatus(op, {timeoutMs, label}) {
     try {
         const status = await readEditStatus(missableConnection(connection, timeoutMs), op.live().options);
         state.missedLooks = 0;
-        if (!op.current()) return undefined;
+        if (!state.current) return undefined;
         // The mode's write to EEPROM retried (flag 12) shows beside the switch.
-        if (state.modeNotStored(status.modeNotStored)) op.publish();
+        if (state.mode({notStored: status.modeNotStored})) op.publish();
         return status;
     } catch (error) {
         // A refused read is tried again at the next look.
-        if (/** @type {{soft?: boolean}} */ (error)?.soft && state.connection === connection) {
+        if (/** @type {{soft?: boolean}} */ (error)?.soft && state.current) {
             state.missedLooks++;
             op.say(`${label} missed a status look (${state.missedLooks} in a row).`);
             if (state.missedLooks >= WATCH_MISSES) await connection.abandon(error);
@@ -87,8 +87,7 @@ async function readFlashPauses(op, timeoutMs) {
         op.say(`Flash pauses: ${failure.code}: ${failure.message}`);
         read = {state: "unavailable", error: failureSentence(failure)};
     }
-    if (!op.current()) return false;
-    op.state.flashPauses = read;
+    if (!op.state.keep({flashPauses: read})) return false;
     op.publish();
     return true;
 }
