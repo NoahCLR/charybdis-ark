@@ -4,19 +4,18 @@
 // does.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {macroReach} from "../../view/reach.mjs";
-import {getModel, layers, render, state} from "../../store.mjs";
+import {tabReach} from "../../view/tab-reach.mjs";
+import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
-import {reachEntries} from "../../view/reach-groups.mjs";
-import {macroView, reachLabel} from "./reach.mjs";
+import {reachLabel} from "./reach.mjs";
 import {actionMarked, macroSteps} from "../marks.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabMacros(body, right) {
     const model = getModel();
     const slots = model?.macros || [];
-    const reach = {...macroReach(model, layers(), state.layer), inView: macroView(model)};
+    const reach = tabReach(currentView(), "macros");
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Macros screen</button>`);
     open.addEventListener("click", () => { state.screen = "macros"; render(); });
@@ -32,29 +31,10 @@ export function tabMacros(body, right) {
             <td class="muted">${reachedBy}</td>
             <td class="reach-edit">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;
     };
-    /** @type {{id: string, rows: string[], empty: string, drafted?: boolean, ids?: string[]}[]} */
-    const groups = [
-        {id: "view", rows: reach.inView.map((entry) => row("view", entry.name, reachLabel(model, entry))),
-            empty: "No macro is reached by the layers in this view."},
-        {id: "here", rows: reach.onKeys.map((entry) => row("here", entry.name, reachLabel(model, entry))),
-            empty: "No macro keycode is placed on this layer."},
-        {id: "through", rows: reach.throughKeys.map((entry) => row("through", entry.name, reachLabel(model, entry))),
-            empty: "No transparent key falls through to a macro key."},
-        {id: "branches", rows: reach.fromBranches.map((entry) => row("branches", entry.name, reachLabel(model, entry))),
-            empty: "No behaviour mapped on this layer sends a macro."},
-        {id: "combos", rows: reach.fromCombos.map((entry) => row("combos", entry.name, reachLabel(model, entry))),
-            empty: "No combo on this layer sends a macro."},
-        {id: "belowBranches", rows: reach.fromBranchesBelow.map((entry) => row("belowBranches", entry.name, reachLabel(model, entry))),
-            empty: "No behaviour under a transparent key sends a macro."},
-        {id: "belowCombos", rows: reach.fromCombosBelow.map((entry) => row("belowCombos", entry.name, reachLabel(model, entry))),
-            empty: "No combo that needs a transparent key sends a macro."},
-        {id: "elsewhere", rows: reach.elsewhere.map((keycode) => row("elsewhere", keycode, "not reached from this layer")),
-            empty: "Every stored macro is reached from this layer."},
-    ];
-
     // A folded group holding a changed macro says so on its header.
-    for (const group of groups) group.drafted = (group.id === "elsewhere" ? reach.elsewhere : reachEntries(reach, group.id).map((entry) => entry.name))
-        .some((keycode) => changedMacros.has(keycode));
+    const groups = reach.groups.map(({id, empty, entries}) => ({id, empty,
+        rows: entries.map((entry) => row(id, entry.name, id === "elsewhere" ? "not reached from this layer" : reachLabel(model, entry))),
+        drafted: entries.some((entry) => changedMacros.has(entry.name))}));
     const node = reachTable("macros", groups, [["Slot", "24%"], ["Steps", "44%"], ["Reached by", "24%"], ["", "8%"]]);
     attachReachRows(node, "macros");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editmacro]")).forEach((button) => button.addEventListener("click", () => {

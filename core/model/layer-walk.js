@@ -2,11 +2,11 @@
 "use strict";
 
 // The walk over the layer states a profile can reach from a keyboard at rest
-// (layer-reach.js): the profile in the walk's terms, what each state offers,
-// the compact symbolic walk, and the bounded walk over explicit states when
-// that one cannot decide.
+// (layer-reach.js): the profile in the walk's terms, and one answer
+// (walkLayers) whichever walk found it: the compact symbolic walk, or the
+// bounded walk over explicit states when that one cannot decide.
 
-const {ALL_LAYERS, CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, layersAbove, matrixPosition} = require("../data/charybdis-layout");
+const {ALL_LAYERS, CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, layersAbove, layersOfMask, matrixPosition} = require("../data/charybdis-layout");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {SETTING, alwaysOnLayers} = require("../schema/settings-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
@@ -25,8 +25,8 @@ const {comboReferenceLayers} = require("./combo-reach");
  * @typedef {import("../schema/types.js").BehaviorRow} BehaviorRow
  * @typedef {ReturnType<typeof profileFacts>} Facts
  * @typedef {OfferedEffect & {when: Condition}} Transition
- * @typedef {Extract<import("./types.js").LayerAnalysisResult<Transition>, {reachedLayers: number}> & {symbolic: true, cache: Map<number, OfferedEffect[]>, reachableCombos: Set<number>, parent?: undefined, edges?: undefined, home?: undefined, affectedLayers?: number, uncertainty?: undefined}} SymbolicWalk
- * @typedef {import("./types.js").BoundedLayerWalk | SymbolicWalk} Walk
+ * @typedef {import("./types.js").LayerWalk} LayerWalk
+ * @typedef {import("./types.js").LayerStateGraph} LayerStateGraph
  */
 const TRANSPARENT = 0x0001;
 const NOTHING = 0x0000;
@@ -165,8 +165,8 @@ function offers(facts, active, cache) {
 // on active layers. A transparent overlay contributes no condition at all;
 // independently available layer controls therefore share one decision rather
 // than expanding every hold/lock combination.
-/** @param {Facts} facts @returns {SymbolicWalk | Extract<import("./types.js").LayerAnalysisResult<Transition>, {reachedLayers?: undefined}>} */
-function compactWalk(facts) {
+/** @param {Facts} facts @param {import("./types.js").LayerAnalysisLimits} [limits] @returns {LayerWalk | {reachabilityComplete: false, affectedLayers: number}} */
+function compactWalk(facts, limits) {
     /** @type {Transition[]} */
     const transitions = [];
     /** @type {Condition[]} */
@@ -231,11 +231,12 @@ function compactWalk(facts) {
     if (facts.pointer !== undefined && facts.pointer < LAYERS) transitions.push({kind: "hold", layer: facts.pointer,
         when: {all: [{off: pointerStrip(facts)}, ...facts.endedStarts.map(({layer, ends}) => ({not: {on: bit(layer), off: ends}}))]},
         from: {trackball: true}, how: `Move the trackball, which turns on ${layerName(facts.names, facts.pointer)}`});
-    const result = analyzeLayerStates({always: facts.always, transitions, queries, trapLimit: MAX_TRAPS});
-    if (!result.complete && !result.reachabilityComplete) return result;
-    return {...result, symbolic: /** @type {const} */ (true),
+    const result = analyzeLayerStates({always: facts.always, transitions, queries, trapLimit: MAX_TRAPS, limits});
+    if (!result.complete && !result.reachabilityComplete) return {reachabilityComplete: false, affectedLayers: result.affectedLayers};
+    return {reachabilityComplete: true, escapeComplete: result.complete, affectedLayers: result.complete ? 0 : result.affectedLayers,
+        reachedLayers: result.reachedLayers, effects: result.effects,
         reachableCombos: new Set(comboQueries.filter(({query}) => result.queries[query]).map(({index}) => index)),
-        cache: new Map([...result.witnesses].map(active => [active, offers(facts, active, new Map())]))};
+        traps: result.complete ? result.traps : [], trapCount: result.complete ? result.trapCount : 0};
 }
 
 // A state is its locks and the layers held on top, a layer set each.
@@ -267,10 +268,69 @@ function step(state, effect) {
     }
 }
 
+// The bounded walk's answer, in the compact walk's shape. `affectedLayers`
+// are the layers the compact walk could not settle, named while this one
+// cannot either.
+/** @param {Facts} facts @param {number} affectedLayers @returns {LayerWalk} */
+function boundedWalk(facts, affectedLayers) {
+    const graph = explore(facts);
+    const {cache, parent, complete} = graph;
+    /** @type {Set<number>} */
+    const reachableCombos = new Set();
+    if (complete) for (const active of cache.keys()) {
+        const present = comboCodes(facts, active);
+        for (const combo of facts.combos) if (combo.inputs.every(code => (present.get(code) || []).some(layer => combo.allowedLayers & bit(layer)))) reachableCombos.add(combo.index);
+    }
+    return {reachabilityComplete: complete, escapeComplete: complete, affectedLayers: complete ? 0 : affectedLayers,
+        reachedLayers: [...parent.keys()].reduce((mask, state) => mask | locksOf(state) | heldOf(state), facts.always),
+        effects: [...cache.values()].flat(), reachableCombos,
+        ...(complete ? smallestTraps(graph) : {traps: [], trapCount: 0})};
+}
+
+// How to get from rest to a state, in steps a person takes; releases are not
+// steps.
+/** @param {LayerStateGraph["parent"]} parent @param {number} state */
+function pathTo(parent, state) {
+    /** @type {WalkEffect[]} */
+    const steps = [];
+    for (let at = parent.get(state); at; at = parent.get(at.from)) if (at.effect.kind !== "release") steps.unshift(at.effect);
+    return steps;
+}
+
+// A set of locks is a trap once every key is let go and Base cannot be
+// reached from it; the way in is the lock that first leaves a state that
+// could still get home. Only the smallest are named, as the compact walk
+// names them: a trap with unrelated locks added needs no other repair.
+/** @param {LayerStateGraph} graph @returns {Pick<LayerWalk, "traps" | "trapCount">} */
+function smallestTraps({edges, parent, home}) {
+    /** @param {number} locks */
+    const trapped = (locks) => parent.has(stateOf(locks, 0)) && !home.has(stateOf(locks, 0));
+    /** @type {Map<number, {from: number, effect: WalkEffect}>} */
+    const found = new Map();
+    /** @param {number} state */
+    const depth = (state) => pathTo(parent, state).length;
+    for (const [from, out] of edges) {
+        if (trapped(locksOf(from))) continue;
+        for (const {to, effect} of out) {
+            const locks = locksOf(to);
+            if (effect.kind === "release" || !trapped(locks)) continue;
+            const known = found.get(locks);
+            if (!known || depth(from) < depth(known.from)) found.set(locks, {from, effect});
+        }
+    }
+    /** @type {[number, {from: number, effect: WalkEffect}][]} */
+    const sorted = [];
+    for (const entry of [...found].sort(([a], [b]) => layersOfMask(a).length - layersOfMask(b).length || a - b)) {
+        if (!sorted.some(([mask]) => (entry[0] & mask) === mask)) sorted.push(entry);
+    }
+    return {trapCount: sorted.length, traps: sorted.slice(0, MAX_TRAPS).map(([locks, entry]) => ({locks,
+        effect: entry.effect, path: [...pathTo(parent, entry.from), entry.effect]}))};
+}
+
 // Walks every state reachable from rest. `edges` keeps, for each state, where
 // each effect leads; `parent` the first way each state was reached.
-/** @param {Facts} facts @returns {import("./types.js").BoundedLayerWalk} */
-function boundedWalk(facts) {
+/** @param {Facts} facts @returns {LayerStateGraph} */
+function explore(facts) {
     // What one key holds is let go together, while any of it is still held
     // (another hold that shared a layer may have let that one go), once a
     // state reached can make that hold, as the symbolic walk does: walked
@@ -285,13 +345,13 @@ function boundedWalk(facts) {
     }
 }
 
-/** @param {Facts} facts @param {ReadonlySet<number>} holds @returns {import("./types.js").BoundedLayerWalk} */
+/** @param {Facts} facts @param {ReadonlySet<number>} holds @returns {LayerStateGraph} */
 function walkWith(facts, holds) {
     /** @type {Map<number, OfferedEffect[]>} */
     const cache = new Map();
-    /** @type {import("./types.js").BoundedLayerWalk['edges']} */
+    /** @type {LayerStateGraph['edges']} */
     const edges = new Map();
-    /** @type {import("./types.js").BoundedLayerWalk['parent']} */
+    /** @type {LayerStateGraph['parent']} */
     const parent = new Map([[0, null]]);
     const queue = [0];
     let edgeCount = 0, complete = true;
@@ -327,4 +387,13 @@ function walkWith(facts, holds) {
     return {cache, edges, parent, home, complete};
 }
 
-module.exports = {TRANSPARENT, NOTHING, MAX_TRAPS, profileFacts, comboCodes, compactWalk, boundedWalk, stateOf, locksOf, heldOf, highest};
+// The walk the review reads: the compact walk, or the bounded walk once that
+// cannot establish reachability within its budget (`limits`,
+// layer-state-graph.js).
+/** @param {Facts} facts @param {{limits?: import("./types.js").LayerAnalysisLimits}} [options] @returns {LayerWalk} */
+function walkLayers(facts, {limits} = {}) {
+    const compact = compactWalk(facts, limits);
+    return compact.reachabilityComplete ? compact : boundedWalk(facts, compact.affectedLayers);
+}
+
+module.exports = {TRANSPARENT, NOTHING, MAX_TRAPS, profileFacts, walkLayers, highest};

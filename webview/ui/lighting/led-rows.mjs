@@ -1,7 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, label as hsvLabel} from "../../lib/colour.mjs";
-import {getModel, layers, post, writable} from "../../store.mjs";
+import {getModel, layers, post} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {slotCalled, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {inheritsStageColour} from "../../view/lighting.mjs";
@@ -41,7 +42,7 @@ export function groupRowsTable(rows, target) {
             <td class="mono">${esc(row.ledGroup)} · ${row.ledIndices.length} LED${row.ledIndices.length === 1 ? "" : "s"}</td>
             <td><span class="led-swatch ${inheritsStageColour(row.color) ? "swatch-off" : ""}" style="${inheritsStageColour(row.color) ? "" : `background:${css(row.color)}`}"></span>
                 <code class="dim">${esc(hsvLabel(row.color))}</code>${inheritsStageColour(row.color) ? ` <span class="note">inherits the stage colour</span>` : ""}</td>
-            <td class="t-act"><button class="btn tiny ghost" data-remove="${index}" ${writable() ? "" : "disabled"}>Remove</button></td></tr>`).join("")}</tbody></table>`);
+            <td class="t-act"><button class="btn tiny ghost" data-remove="${index}" ${editGate(model, "lighting").editable ? "" : "disabled"}>Remove</button></td></tr>`).join("")}</tbody></table>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () =>
         post(edits.deleteLedRow(target, Number(button.dataset.remove)))));
     return node;

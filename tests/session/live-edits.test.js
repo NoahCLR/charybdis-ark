@@ -10,6 +10,7 @@ const {document} = require("../fixtures/portable-profile");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {EDIT_MODE, EDIT_RESULT, PROFILE_EDIT_V1} = require("../../core/protocol/profile-edit-v1");
 const {STARTING} = require("../../core/session/keyboard-starting");
+const {keptForAny} = require("../../core/session/kept");
 const EDIT_VALUE_SAVE = PROFILE_EDIT_V1.VALUE_SAVE;
 
 // The loop on a live keyboard (in Live preview + save unless `options` say).
@@ -84,7 +85,7 @@ test("undo back to the saved profile reverts the keyboard; redo sends the edit a
 // An edit made by hand that puts the last change back is the same Revert.
 test("an edit that puts the saved value back reverts the keyboard", async t => {
     const {keyboard, shell, loop, key} = await open(t);
-    const original = loop.session.service.layout.layers[0].keys[12].keycode;
+    const original = loop.session.service.snapshot().layout.layers[0].keys[12].keycode;
     await key(0, 12, "KC_Y");
     assert.ok(keyboard.working);
     await key(0, 12, original);
@@ -223,11 +224,46 @@ test("a refused edit is said, and the draft is read again from the keyboard", as
     assert.equal(session.draft.current.fingerprint, shown, "the refused edit is not shown as made");
 });
 
+test("an edit that finds the keyboard restarted over unsaved edits says so with the read it made, and Read keyboard does not again", async t => {
+    const {keyboard, shell, loop, key} = await open(t);
+    await key(0, 3, "KC_Z");
+    keyboard.replug();
+    await key(0, 4, "KC_Q");
+    assert.match(lastMessage(shell).notice, /^Not sent: .* The keyboard restarted since Ark last read it, so its unsaved edits are gone/);
+    await loop.handleMessage({type: "refresh"});
+    assert.doesNotMatch(lastMessage(shell).notice, /restarted/);
+});
+
+test("a Save or Revert that fails on a keyboard restarted over unsaved edits says the restart after the failure", async t => {
+    for (const type of ["revertProfileDraft", "saveProfileDraft"]) {
+        const {keyboard, shell, loop, key, send} = await open(t);
+        await key(0, 3, "KC_Z");
+        await send({type: "reviewProfileDraft"});
+        keyboard.replug();
+        await send({type, confirmChecks: true});
+        assert.match(lastMessage(shell).notice, /^Failed: The keyboard did not (revert|save): .* The keyboard restarted since Ark last read it, so its unsaved edits are gone/, type);
+        await loop.handleMessage({type: "refresh"});
+        assert.doesNotMatch(lastMessage(shell).notice, /restarted/, type);
+    }
+});
+
+test("a Save that fails on a working copy changed without Ark says that after the failure, and Read keyboard does not again", async t => {
+    const {keyboard, shell, loop, key, send} = await open(t);
+    await key(0, 3, "KC_Z");
+    await send({type: "reviewProfileDraft"});
+    const edited = validateSnapshot({...document(), profile: keyboard.working.toString("base64")}).layers; edited[3][3] = 0x04;
+    keyboard.externalEdit(require("../fixtures/profile-document").withPayload(keyboard.working, "keymap", () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(edited)));
+    await send({type: "saveProfileDraft", confirmChecks: true});
+    assert.match(lastMessage(shell).notice, /^Failed: .* The keyboard's unsaved edits are not what Ark last saw/);
+    await loop.handleMessage({type: "refresh"});
+    assert.doesNotMatch(lastMessage(shell).notice, /not what Ark last saw/);
+});
+
 test("a stale edit (another client, a key adjustment) is not sent, and the keyboard is read again as news, not a failure", async t => {
     const {keyboard, shell, session, key} = await open(t);
     const other = Buffer.from(document().profile, "base64");
     const changed = validateSnapshot(document()).layers; changed[2][0] = 0x04;
-    keyboard.externalEdit(require("../../core/schema/profile-domains").replaceDomain(other, 0x60, () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
+    keyboard.externalEdit(require("../fixtures/profile-document").withPayload(other, "keymap", () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
     await key(0, 5, "KC_W");
     assert.match(lastMessage(shell).notice, /^Not sent: the keyboard changed by itself/);
     assert.deepEqual(shell.errors, [], "no failure is raised");
@@ -325,7 +361,7 @@ for (const [when, saves, moves] of /** @type {const} */ ([["before it saved", fa
     if (saves) assert.match(said, /The save finished: the keyboard saved your edits\.$/);
     else assert.match(said, /The save did not finish, so the keyboard's unsaved edits are gone: it runs its saved profile again\. The recovery copy on Backups has them \(\/recovery\/2\.json\)\.$/);
     assert.doesNotMatch(said, /restarted since Ark last read it/, "the Save's result is said once, not beside the restart's");
-    assert.equal(loop.session.saveCutShort, undefined, "said once");
+    assert.equal(keptForAny(loop.session, "saveCutShort"), undefined, "said once");
 });
 
 test("leaving Live preview + save with unsaved edits asks Save or Revert first", async t => {
@@ -564,7 +600,7 @@ test("a working copy changed without Ark is said, and the draft starts again fro
     const {keyboard, session, key, loop, shell} = await open(t);
     await key(0, 14, "KC_F");
     const edited = validateSnapshot({...document(), profile: keyboard.working.toString("base64")}).layers; edited[3][3] = 0x04;
-    keyboard.externalEdit(require("../../core/schema/profile-domains").replaceDomain(keyboard.working, 0x60, () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(edited)));
+    keyboard.externalEdit(require("../fixtures/profile-document").withPayload(keyboard.working, "keymap", () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(edited)));
     await loop.handleMessage({type: "refresh"});
     assert.match(lastMessage(shell).notice, /not what Ark last saw/);
     assert.equal(session.draft.history.length, 1);
@@ -709,7 +745,7 @@ test("Send live keeps the original Review and save draft when a stale send also 
         if (!raced && report[0] === 0x07 && report[2] === 0x20) {
             raced = true;
             const changed = validateSnapshot(document()).layers; changed[2][0] = 0x04;
-            keyboard.externalEdit(require("../../core/schema/profile-domains").replaceDomain(keyboard.saved, 0x60, () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
+            keyboard.externalEdit(require("../fixtures/profile-document").withPayload(keyboard.saved, "keymap", () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
         }
         return answer(report);
     };

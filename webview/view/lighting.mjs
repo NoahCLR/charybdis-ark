@@ -6,7 +6,7 @@
 // from the draft, because the draft is what the model carries.
 
 import {GEO, inLocality, trackballInLocality} from "./geometry.mjs";
-import {pointingSlotFor} from "./pointing-reach.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {keyKindOf, keyMeaning} from "./keyface.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 import {OFF, inheritsStageColour, layerPaints, ledColour} from "../../rules/led-light.mjs";
@@ -115,7 +115,7 @@ export function pdTrigger(model, layer, slotId) {
     const stack = model?.layers || [];
     const order = [layer, ...stack.filter((row) => row !== layer)].filter(Boolean);
     for (const row of order) {
-        const found = (row?.positions || []).find((position) => pointingSlotFor(model, keyMeaning(position))?.id === slotId);
+        const found = (row?.positions || []).find((position) => keyIdentity(model, keyMeaning(position)).pointing?.id === slotId);
         if (found) return {layoutIndex: found.layoutIndex, layer: /** @type {number} */ (row?.index)};
     }
     return null;

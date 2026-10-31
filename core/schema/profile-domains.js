@@ -69,22 +69,4 @@ const domainCodec = key => codecs[key];
 /** @type {readonly ProfileDomain[]} */
 const DOCUMENT_PROFILE_DOMAINS = Object.freeze(PROFILE_DOMAINS.filter(domain => domain.document === "profile"));
 
-// The envelopes for the models given, in canonical order: a document's
-// profile blob and its candidate both contain all seven.
-/** @param {Partial<import("./profile-domains-types.js").DomainModels>} models @param {DomainOptions} [options] */
-function encodeProfileDomains(models, options = {}) {
-    /** @template {import("./profile-domains-types.js").DomainKey} K @param {K} key */
-    const encode = key => domainCodec(key).encode(/** @type {import("./profile-domains-types.js").DomainModels[K]} */ (models[key]), options);
-    return PROFILE_DOMAINS.filter(domain => models[domain.key] !== undefined).map(domain => ({id: domain.id, version: domain.version, payload: encode(domain.key)}));
-}
-
-// Rewrite an envelope payload while retaining its identity and the other
-// domains. Callers choose how to edit the payload; the blob keeps its own
-// canonical ordering, capacity and version checks.
-/** @param {Uint8Array} bytes @param {number} id @param {(payload: Buffer) => Buffer} change @param {(profile: import("./types.js").BlobInput) => Buffer} [encode] @returns {Buffer} */
-function replaceDomain(bytes, id, change, encode = require("./profile-blob-v1").encodeProfileBlob) {
-    const blob = require("./profile-blob-v1").decodeProfileBlob(bytes);
-    return encode({...blob, domains: blob.domains.map(domain => domain.id === id ? {...domain, payload: change(domain.payload)} : domain)});
-}
-
-module.exports = {PROFILE_DOMAINS, DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK, profileDomain, domainCodec, encodeProfileDomains, replaceDomain};
+module.exports = {PROFILE_DOMAINS, DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK, profileDomain, domainCodec};

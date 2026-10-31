@@ -374,3 +374,66 @@ test("a refused profile says what is wrong with it in plain words, under its sta
     assert.equal(words[0], "A key in this profile reaches a layer the keyboard does not have.");
     for (const sentence of words) assert.doesNotMatch(sentence, /layer bank|layer-mod|portable profile|action vocabulary|domain|RGB|Invalid|Unbalanced|Unsupported/, sentence);
 });
+
+test("changing a document's domains encodes only those it opens, decoded once and kept", () => {
+    const {editProfileDomains, readProfileDomains} = require("../../core/model/portable-profile");
+    const {PROFILE_DOMAINS} = require("../../core/schema/profile-domains");
+    const source = editMacros(document(), macros => {macros[0] = Buffer.from("hello").toString("base64");});
+    const domains = value => decodeProfileBlob(Buffer.from(value.profile, "base64")).domains;
+    // Opening every domain and changing nothing writes the same bytes.
+    assert.deepEqual(editProfileDomains(source, {}, open => PROFILE_DOMAINS.forEach(domain => open(domain.key))), source);
+    let opened;
+    const renamed = editProfileDomains(source, {}, open => {
+        opened = open("settings"); opened.names[1] = "New name";
+        assert.equal(open("settings"), opened, "a domain opened twice is the one model");
+    });
+    assert.equal(validateSnapshot(renamed).settings.names[1], "New name");
+    assert.deepEqual(domains(renamed).filter(row => row.id !== 0x40), domains(source).filter(row => row.id !== 0x40));
+    assert.notEqual(renamed, source);
+    assert.deepEqual(editProfileDomains(source, {}, () => {}), source, "nothing opened is nothing changed");
+    // Reading never writes: the source's own settings are unchanged.
+    assert.equal(readProfileDomains(source)("settings").names[1], "Numbers");
+    assert.equal(readProfileDomains(renamed)("settings").names[1], "New name");
+});
+
+test("a document's domains are read and written with its keyboard's depth and brightness, and a behaviour edit with its action slots", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
+    const source = document();
+    const brighten = value => open => {open("rgb").layerColors[0].color.v = value;};
+    assert.equal(validateSnapshot(editProfileDomains(source, {limits: {brightnessMax: 200}}, brighten(200))).rgb.layerColors[0].color.v, 200);
+    assert.throws(() => editProfileDomains(source, {limits: {brightnessMax: 200}}, brighten(201)), {code: "BRIGHTNESS_EXCEEDED"});
+    // A behaviour edit checks that every row sends only a macro slot the keyboard has.
+    const macroTap = open => {open("behaviors").rows[0].steps = [{tapIndex: 0, tap: {kind: 6, flags: 0, operand: 40}}];};
+    const capabilities = {...CURRENT_CAPABILITIES, actionAbiDigest: source.actionAbiDigest};
+    assert.doesNotThrow(() => editProfileDomains(source, {capabilities: {...capabilities, macroSlots: 41}, checkActions: true}, macroTap));
+    assert.throws(() => editProfileDomains(source, {capabilities: {...capabilities, macroSlots: 40}, checkActions: true}, macroTap), /macro slot 40/);
+    // Any other edit keeps a row it does not touch, though the keyboard now has fewer slots.
+    const sendsMacro40 = editProfileDomains(source, {capabilities: {...capabilities, macroSlots: 41}, checkActions: true}, macroTap);
+    const fewer = {capabilities: {...capabilities, macroSlots: 16}};
+    const timed = editProfileDomains(sendsMacro40, fewer, open => {open("behaviors").rows[0].tapHoldTerm = 180;});
+    assert.equal(validateSnapshot(timed).behaviors.rows[0].tapHoldTerm, 180);
+    assert.throws(() => editProfileDomains(sendsMacro40, {...fewer, checkActions: true}, open => {open("behaviors");}), /macro slot 40/, "a behaviour edit still checks every row");
+    // So is the profile it makes: checked as any document is.
+    assert.throws(() => editProfileDomains(source, {}, open => {open("rgb").layerColors.pop();}), /does not cover all 16 layers/);
+});
+
+test("a change past what the keyboard holds says the profile is full, by the count it went past, and any other refusal is left as it is", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
+    const {PROFILE_BLOB_V1} = require("../../core/schema/profile-blob-v1");
+    const source = document();
+    const overflow = open => {open("macros")[0] = Buffer.alloc(PROFILE_BLOB_V1.MAX_SIZE, 0x41);};
+    assert.throws(() => editProfileDomains(source, {}, overflow), error => error.code === "PROFILE_FULL" && failureSentence(error) === PROFILE_FULL_WORDS.profile && error.cause.code === "CAPACITY_EXCEEDED");
+    // A name's edit says so in a name's words.
+    assert.throws(() => editProfileDomains(source, {full: PROFILE_FULL_WORDS.name}, overflow), error => error.code === "PROFILE_FULL" && error.message === PROFILE_FULL_WORDS.name);
+    // A count the format names is said by that count, whatever the edit.
+    const rows = validateSnapshot(source).behaviors.rows.length;
+    const more = open => {const {rows: all} = open("behaviors"); all.push({...all[0], target: {kind: 1, flags: 0, operand: 0x68}});};
+    assert.throws(() => editProfileDomains(source, {full: PROFILE_FULL_WORDS.name, capabilities: {maxBehaviorRows: rows}}, more), error => failureSentence(error) === PROFILE_FULL_WORDS.counts.behaviours(rows));
+    // A count the words do not know is the profile as a whole.
+    const unknown = Object.assign(new Error("Some table is full."), {code: "CAPACITY_EXCEEDED", limit: "constructor", most: 1});
+    assert.throws(() => editProfileDomains(source, {}, () => {throw unknown;}), error => failureSentence(error) === PROFILE_FULL_WORDS.profile && error.cause === unknown);
+    const conflict = Object.assign(new Error("Read the keyboard before editing."), {code: "PROFILE_DRAFT_CONFLICT"});
+    assert.throws(() => editProfileDomains(source, {}, () => {throw conflict;}), error => error === conflict);
+});

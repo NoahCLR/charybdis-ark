@@ -28,9 +28,10 @@ reads as a grid (D-L32).
 The Keys workbench keeps what the selected layer stores apart from what the
 layers in view reach:
 
-- Tab counts count what the selected layer stores (`storedCount`); the Key
-  tab counts mapped keys, not transparent or disabled ones
-  (`tests/view/reach-groups.test.mjs`, `tests/view/lighting.test.mjs`).
+- Tab counts count what the selected layer stores (`tabReach`'s `count`,
+  `webview/view/tab-reach.mjs`); the Key tab counts mapped keys, not
+  transparent or disabled ones (`tests/view/tab-reach.test.mjs`,
+  `tests/view/lighting.test.mjs`).
   Reach rows name keys as the board does, never by layout index (no test).
   A route through a behaviour names its key, then each cell that sends the
   row's thing as Review marks a tier (branch badge, tier dot, tier name),
@@ -60,9 +61,10 @@ layers in view reach:
   only once layers are previewed together, as the layer bar shows base on; a
   layer shown alone is the view by itself, and its transparent keys answer
   nothing there (what they fall through to is under **Through a transparent
-  key**). The view is `viewPositions`; what the keyboard does, with base and
-  its default layers always on (each published layer's `alwaysOn`), stays
-  `resolvedPositions`, and a key they answer needs nothing held: the hover
+  key**). The view is `viewPositions` (a layer view's `shown`); what the
+  keyboard does, with base and its default layers always on (each published
+  layer's `alwaysOn`), stays `resolvedPositions` (its `answers`), and a key
+  they answer needs nothing held: the hover
   card's fall-through, a selected transparent key opening the behaviour from
   below, and picking a combo input on the board. A combo is in the view only
   when that activation holds all its inputs, matched on the Combo layer
@@ -74,8 +76,8 @@ layers in view reach:
   `tests/view/reach.test.mjs`, `tests/view/combo-reach.test.mjs`).
 - On the board, a transparent key answered from below wears that key's
   behaviour dots and the badges of the combos it fires in the view
-  (`combosInPreview`); under Combo layer matching nothing from below adds a
-  badge (`tests/view/combo-reach.test.mjs`).
+  (`view.combos.badgesAt`); under Combo layer matching nothing from below adds a
+  badge (`tests/view/board-keys.test.mjs`, `tests/view/combo-reach.test.mjs`).
 - Which combos fire from each layer, under which smallest hold and on which
   keys, is core's (`core/model/combo-reach.js`), published per layer as
   `comboReach` and kept until the keys, combos, their matching or the
@@ -219,8 +221,8 @@ here: its home and tests are in
 | Edit modes: their words and the order the switch offers them ([more](#edit-modes)) | `core/model/vocabulary.js`, `core/session/panel-session.js` | `tests/model/vocabulary.test.js`, `tests/protocol/profile-edit-v1.test.js`, `tests/session/live-watch.test.js`, `tests/view/edit-mode.test.mjs`, `tests/view/enum-drift.test.mjs`, `browser-tests/live-edits.spec.js` |
 | Actions, native keycodes, decode limits, layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
 | Custom-key shortcut keys (firmware D-F26): which keys a shortcut holds, and the caps on them ([more](#custom-key-shortcut-keys)) | `core/schema/settings-domain-v1.js` (`SHORTCUT_KEY_CAPS`, `shortcutKeysRefusal`), `core/model/custom-key-editor.js` | `tests/schema/settings-domain-v1.test.js`, `tests/model/custom-key-editor.test.js`, `tests/view/custom-key.test.mjs`, `browser-tests/custom-key-shortcut.spec.js` |
-| Decoding once: a snapshot's decoded form, and draft history entries ([more](#decoding-once)) | `core/model/portable-profile.js`, `core/session/profile-draft-session.js` | `tests/session/profile-draft-session.test.js` |
-| Pure edits and presentation; the model imports no session or protocol module | `core/model/device-profile-edits.js`, `core/model/key-behavior-edits.js`, `core/model/device-profile-view.js` | `tests/model/device-profile-edits.test.js`, `tests/layering.test.js` |
+| Decoding once: a snapshot's decoded form, draft history entries, and a document's domains as an edit changes them ([more](#decoding-once)) | `core/model/portable-profile.js`, `core/session/profile-draft-session.js` | `tests/session/profile-draft-session.test.js`, `tests/model/portable-profile.test.js` |
+| Pure edits and presentation; the model imports no session or protocol module | `core/model/draft-editor.js` (`applyDraftEdit`), `core/model/device-profile-edits.js`, `core/model/key-behavior-edits.js`, `core/model/device-profile-view.js` | `tests/model/draft-editor.test.js`, `tests/model/device-profile-edits.test.js`, `tests/layering.test.js` |
 | Layer answers: which stack slots answer each position under which active layers ([more](#layer-answers)) | `core/model/layer-resolution.js` compiles and publishes each position's answers; `rules/layer-answers.mjs` says which one answers under the layers that are on | `tests/model/layer-resolution.test.js`, `tests/rules/layer-answers.test.mjs`, `tests/view/layer-resolution.test.mjs` |
 | Combo inputs: which keys press a combo's inputs (by the input positions the keyboard reports, otherwise by keycode or what the key means) and whether they cover every input, so its chord forms (D-L73) | `rules/combo-inputs.mjs`, read by `core/model/combo-reach.js` (`comboReach`) and `webview/view/combo-reach.mjs` (the view of the layers turned on, and which key is a combo's input number n) | `tests/rules/combo-inputs.test.mjs`, `tests/model/combo-reach.test.js`, `tests/view/combo-reach.test.mjs` |
 | A definition's own switches: why a behaviour or combo's Use switch or its layers keep it off a layer (D-L73) | `rules/definition-switches.mjs`, read by `core/model/participation.js` and `webview/view/participation.mjs` | `tests/rules/definition-switches.test.mjs`, `tests/model/participation.test.js`, `tests/view/participation-oracle.test.mjs` |
@@ -241,9 +243,14 @@ here: its home and tests are in
 | Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on ([more](#shortcut-layers)) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
 | The rail's keyboard button and its menu ([more](#the-rails-keyboard-menu)) | `webview/view/keyboard-menu.mjs`, `webview/ui/keyboard-menu.mjs` | `tests/view/keyboard-menu.test.mjs`, `browser-tests/preview.spec.js`, `browser-tests/live-edits.spec.js` |
 | The commit bar: which bar the frame shows over the draft (an Apply running, its read back, a failed one until dismissed, a held live edit, other work, a draft from another keyboard or one the keyboard changed under, a restart, the live modes', the review), drawn by `webview/ui/frame.mjs` | `webview/view/commit-bar.mjs` (`commitBarState`) | `tests/view/commit-bar.test.mjs`, `browser-tests/live-edits.spec.js`, `browser-tests/apply-progress.spec.js` |
+| Whether an area takes an edit now: the draft core binds (`draft.editable`) and the area's own capability, Export only the keyboard; and what a screen says when it does not, or nothing while the draft is busy, which the commit bar says | `webview/view/edit-gate.mjs` (`editGate`) | `tests/view/edit-gate.test.mjs`, `tests/scripts/conventions.test.js` |
+| Which key a spelling is, and whether two spellings are one key: the name the profile knows it by, one canonical spelling per key, the macro, custom key or pointing slot (held or locked) it is, and two ways of finding a behaviour row kept apart, the row keyed exactly by the spelling (what a key means, what a combo sends) and the row listening to the key however either is spelled (a picked or typed key); worked out once per model and spelling | `webview/view/key-identity.mjs` (`keyIdentity`, `sameKey`, `keycodeName`, `macroIndex`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
 | The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, and what a search finds (at most `SEARCH_ROWS` keycodes), drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs` |
-| The hover card's behaviour row: whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold, drawn by `webview/ui/hover-card.mjs` and placed by `webview/ui/hover.mjs` | `webview/view/hover-card.mjs` (`keyBehaviour`) | `tests/view/hover-card.test.mjs`, `browser-tests/participation.spec.js` |
-| A reach row picked in a Keymap tab: its id (`group:name`, `reachRowId`), and the keys the board rings for it by the route it was picked under | `webview/view/reach-groups.mjs` (`pickedReachKeys`), `webview/view/behaviour-reach.mjs` (`behaviourRouteKeys`) | `tests/view/reach-groups.test.mjs`, `tests/view/behaviour-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
+| What reaches one key and what it uses, which the hover card and the Key tab both draw: the layer's own key shown alone, the key answering it from below, and of its behaviour row whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold; drawn by `webview/ui/hover-card.mjs` (placed by `webview/ui/hover.mjs`) and `webview/ui/keys/key-tab.mjs` | `webview/view/key-reach.mjs` (`keyReachAt`, `keyReach`, `keyBehaviour`) | `tests/view/key-reach.test.mjs`, `browser-tests/participation.spec.js` |
+| What the board shows at each key and on the trackball: the key that answers in the view and the layer supplying it, glass or solid, its light, the dots and badges of what runs there, and in the LED selector each LED's index; drawn by `webview/ui/board.mjs` | `webview/view/board-keys.mjs` (`boardKeys`, `boardTrackball`) | `tests/view/board-keys.test.mjs`, `browser-tests/marks.spec.js`, `browser-tests/participation.spec.js`, `browser-tests/lighting-controls.spec.js` |
+| One view of the layer stack: the layer the board shows and the layers previewed with it, by their place in the stack, which is each published layer's `index`; what answers and what shows at each key in it, and the combos and behaviours it reaches, each worked out once per model and view. Screens ask the current one (`currentView()`, `webview/store.mjs`) rather than passing the layer and the preview | `webview/view/layer-view.mjs` (`layerView`, read through `view.answerAt`, `view.shownAt`, `view.combos`, `view.behaviours`) | `tests/view/layer-view.test.mjs`, `tests/view/combo-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs` |
+| What a layer view reaches as each Keymap tab lists it: the tab's groups, what each lists and says when empty, the tab's count, and the group a row asked for by name is picked under | `webview/view/tab-reach.mjs` (`tabReach`) | `tests/view/tab-reach.test.mjs`, `tests/view/reach.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
+| A reach row picked in a Keymap tab: its id (`group:name`, `reachRowId`), and the keys the board rings for it by the route it was picked under | `webview/view/tab-reach.mjs` (`tabReach`'s `keysFor`), `webview/view/behaviour-reach.mjs` (`behaviourRouteKeys`, read as `view.behaviours.routeKeys`) | `tests/view/tab-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
 | Device facts, the review sheet, the unsaved-demo dialog; the app keeps routing, rendering, focus and scroll, and window keys | `webview/ui/device.mjs`, `webview/ui/review-overlay.mjs`, `webview/ui/leave-demo.mjs` | (no test) |
 
 ### Number entry
@@ -291,6 +298,18 @@ message) is the codec's words too (`shortcutStoreRefusal`,
 A snapshot's `decoded` form is taken with `decodedOf`
 (`core/model/portable-profile.js`), which decodes afresh only when the
 document changed; draft history entries are frozen and decoded once each.
+
+A document's domains change one way: `editProfileDomains`
+(`core/model/portable-profile.js`). Its change opens each domain it edits,
+decoded once with the document's codec options (the keyboard's tap depth,
+or the one the document's RGB palette counts; its brightness limit; its
+action slots); only opened domains are encoded again, every other keeps its
+bytes. A result too large for the keyboard is one refusal, `PROFILE_FULL`, in
+`PROFILE_FULL_WORDS` (by the count it went past, otherwise the profile as a
+whole, or a name's words for a name's edit), and the document it makes is
+validated like any other. `readProfileDomains` opens a document's domains
+the same way, to read only: Discard copies from it
+(`tests/model/portable-profile.test.js`).
 
 ### Layer answers
 
@@ -388,7 +407,8 @@ as `qmkKeyTurnsOn`.
 The Keys workbench's Pointing modes tab reads only these: a starting layer
 reaches its mode by itself, and a key, behaviour cell or combo reaches it by
 turning such a layer on with no layer ending that start on, the layer it is
-pressed on included (`webview/view/pointing-reach.mjs` `pointingReach`). Its
+pressed on included (`webview/view/pointing-reach.mjs` `pointingReach`, read
+through `tabReach`). Its
 columns say the link (the layers that start it, an ignored one marked with the
 card's reason, what ends it, the layers its key turns on), a route that starts
 it says what it sends, and the slot is tagged started beside hold or lock.
@@ -561,8 +581,30 @@ only an operation stands in the way. The demo's draft is bound to the demo
   opens import and layer reviews, answers macro inspection and routes Apply
   only for a bound draft, and Apply checks again as it writes
   (`tests/session/panel-loop.test.js`, `tests/session/panel-session.test.js`).
-  `writable()` under `canEdit` reads the published `draft.editable`
-  (`tests/view/messages.test.mjs`).
+  `editGate(model, area)` (`webview/view/edit-gate.mjs`) reads the published
+  `draft.editable`, and each area's own capability with it
+  (`tests/view/edit-gate.test.mjs`). Its `why` says, in this order: no
+  keyboard, firmware Ark does not support (`draft.reason` `unsupported` or
+  `firmware.readable` false, in `vocabulary.firmwareUpdate`), nothing read, no
+  draft, another keyboard's draft, and a stale draft or one read over an
+  earlier connection (`connection-changed`), both in the same words. It says
+  nothing while the draft is `busy` (`quiet`; the commit bar says it) or for
+  an area's own capability; a screen then says its own sentence or nothing,
+  never an empty box. A screen a read left without an editor (`load.held`,
+  `webview/view/readiness.mjs`) says the same reasons as a title and detail;
+  core words both, by reason, in `vocabulary.draftBlocks` (a live draft's
+  detail as `liveDetail`), which `webview/view/draft-block.mjs` reads
+  (`tests/model/vocabulary.test.js`, `tests/view/readiness.test.mjs`). The
+  Keyboard screen says firmware this Ark does not work with in
+  `vocabulary.firmwareUpdate` too.
+- An edit names the draft it was built from (`expectedBase`, or a domain's
+  `expectedFingerprint`), and core refuses it once the draft is another. A
+  form is drawn again from every model, so it names the newest. The keycode
+  picker stays open across models: what it chose whole (a custom key's
+  shortcut, a custom key made for a cell) names the draft as it posts, and a
+  row drawn before it opened (a behaviour cell's, `then` included) names the
+  draft it was drawn from, so it is refused rather than overwrite a newer edit
+  (`browser-tests/picker-identity.spec.js`).
 - Panel controls are registered once in `CONTROLS`
   (`core/session/panel-control-registry.js`): route, draft identity, binding
   rule, demo policy, phase and action. History and local macro inspection run
@@ -578,8 +620,10 @@ only an operation stands in the way. The demo's draft is bound to the demo
 - Closing the web page asks first only when it would lose edits (an unsaved
   draft in Review and save, unsaved edits in Live preview + save, an edit on
   its way in Live edit, the demo's unexported edits) or while an Apply, a Save
-  or a restore writes the profile (`leaving` in `web/web-shell.mjs`;
-  `tests/web-shell.test.mjs`, live cases: no test).
+  or a restore writes the profile (the panel loop's `leaving()`,
+  `core/session/panel-loop.js`, which `web/web-shell.mjs` asks;
+  `tests/session/panel-loop.test.js`, live cases: `closingLoses` in
+  `tests/session/live-edits.test.js`).
 
 ## Snapshot model and device model
 
@@ -814,7 +858,13 @@ escaped payload (D-L26), in `webview/ui/macros/`.
 - `webview/lib/focus.mjs` saves the identity and text selection before a
   render and restores them only when exactly one match remains
   (`browser-tests/focus-identities.spec.js`). A disclosure around the
-  restored field stays open (no test).
+  restored field stays open (no test). Text typed into the field and not yet
+  committed is kept when the render draws the field with the same value as
+  before, and is committed once, on Enter or when the field is left: the
+  change Chrome sends as the render throws the typed field away is held back
+  while the text is kept, and sent on when it is not. A different value
+  means an edit landed, and it replaces the typing; a field drawn disabled
+  keeps none (`browser-tests/focus-identities.spec.js`).
 - Macro steps get local IDs that `webview/view/macro-focus.mjs` carries
   through edits and reorders; they never reach the payload
   (`tests/view/macro-focus.test.mjs`).
@@ -950,7 +1000,7 @@ and the firmware serves the effective name as its USB product string
   one by its stored name, adding a serial or number only where two labels
   match (`tests/session/device-model.test.js`).
 - The Keyboard screen's title is the name (`titleName`), following
-  `canEdit("settings")`, with the built-in name as placeholder
+  `editGate(model, "settings")`, with the built-in name as placeholder
   (`browser-tests/settings-screens.spec.js`). It posts trimmed; core refuses
   more than 32 bytes or control characters (`tests/view/edits.test.mjs`,
   `tests/model/keyboard-name.test.js`).

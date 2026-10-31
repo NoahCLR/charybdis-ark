@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openControls, publishAccepted} = require("./control-preview");
+const {openControls, publishAccepted, clearPosts, posted} = require("./control-preview");
 
 async function identityProblems(page) {
     return page.locator("input, select, textarea").evaluateAll(nodes => {
@@ -93,6 +93,111 @@ test("Pointing name preserves focus and caret across an accepted edit", async ({
     expect(await previous.evaluate(node => node.isConnected)).toBe(false);
     await expect(input).toBeFocused();
     expect(await input.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([2, 5]);
+});
+
+// A name commits on Enter or blur, so a model arriving while it is typed (the
+// live watch reading the keyboard, say) must not throw the typing away.
+test("a name typed but not yet confirmed survives a redraw that renders the same name", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await title.click();
+    await title.fill("Desk 777");
+    await title.evaluate(node => node.setSelectionRange(2, 4));
+    const previous = await title.elementHandle();
+    await publishAccepted(page, [], undefined);
+    expect(await previous.evaluate(node => node.isConnected)).toBe(false);
+    await expect(title).toBeFocused();
+    await expect(title).toHaveValue("Desk 777");
+    expect(await title.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([2, 4]);
+    await clearPosts(page);
+    await title.press("Enter");
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "renameKeyboard", name: "Desk 777"})]);
+});
+
+test("a name typed on after such a redraw is renamed once", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await title.click();
+    await title.fill("Desk 777");
+    await publishAccepted(page, [], undefined);
+    await title.press("End");
+    await title.pressSequentially("8");
+    await clearPosts(page);
+    await title.press("Enter");
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "renameKeyboard", name: "Desk 7778"})]);
+});
+
+test("a redraw that renders a different name drops the typed text for the new name", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await title.click();
+    await title.fill("Desk 777");
+    await publishAccepted(page, ["keyboardName", "name"], "Travel");
+    await expect(title).toBeFocused();
+    await expect(title).toHaveValue("Travel");
+    await clearPosts(page);
+    await title.press("Enter");
+    expect(await posted(page)).toEqual([]);
+});
+
+// The text such a redraw drops still goes on as the browser sent it when the
+// field was thrown away, as before: held back while the redraw decided, not lost.
+test("a redraw that renders a different name still sends what was typed, once", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await title.click();
+    await title.fill("Desk 777");
+    await clearPosts(page);
+    await publishAccepted(page, ["keyboardName", "name"], "Travel");
+    await expect(title).toHaveValue("Travel");
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "renameKeyboard", name: "Desk 777"})]);
+    await title.press("Enter");
+    await title.press("Tab");
+    expect(await posted(page)).toHaveLength(1);
+});
+
+test("a name too long for the keyboard still says so after such a redraw", async ({page}) => {
+    await openControls(page, "device");
+    const title = page.locator('[data-f="keyboard:name"]');
+    await title.click();
+    await title.fill("x".repeat(40));
+    await publishAccepted(page, [], undefined);
+    await expect(title).toHaveValue("x".repeat(40));
+    await expect(page.locator("[data-name-count]")).toHaveClass(/warn/);
+});
+
+// Any field commits on Enter, so a number kept across redraws goes into the
+// draft on Enter, once, and nothing posts while the redraws come.
+test("a number typed but not yet confirmed survives two redraws and is posted once on Enter", async ({page}) => {
+    await openControls(page, "combos");
+    const field = page.locator('[data-f="settings:combo:default"]');
+    await field.click();
+    await field.fill("77");
+    await clearPosts(page);
+    await publishAccepted(page, [], undefined);
+    await publishAccepted(page, [], undefined);
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue("77");
+    expect(await posted(page)).toEqual([]);
+    await field.press("Enter");
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateComboDefaultWindow", defaultTermMs: "77"})]);
+    await field.press("Tab");
+    expect(await posted(page)).toHaveLength(1);
+});
+
+// What a closed field was typed with goes on as the browser sends it when
+// the field is thrown away, as before; the field shows only what is stored.
+test("a field drawn closed keeps no typed text", async ({page}) => {
+    await openControls(page, "combos");
+    const field = page.locator('[data-f="settings:combo:default"]');
+    const stored = await field.inputValue();
+    await field.click();
+    await field.fill("77");
+    await publishAccepted(page, ["draft", "editable"], false);
+    await expect(field).toBeDisabled();
+    await expect(field).toHaveValue(stored);
+    await publishAccepted(page, ["draft", "editable"], true);
+    await expect(field).toHaveValue(stored);
 });
 
 test("picker search has a unique identity beside its underlying editor", async ({page}) => {

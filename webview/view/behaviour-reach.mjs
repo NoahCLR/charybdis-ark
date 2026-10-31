@@ -1,40 +1,47 @@
 // @ts-check
 // The behaviours a layer reaches: on its keys, under a transparent key, or
-// through a combo whose output runs one; and the keys the board rings for one.
-import {behaviourFor, keyMeaning} from "./keyface.mjs";
-import {reachablePositions, viewPositions, downTheStack} from "./layer-resolution.mjs";
-import {comboGroups, comboOutput, combosInView} from "./combo-reach.mjs";
+// through a combo whose output runs one; the keys the board rings for one;
+// and the key whose behaviour a pick on the board opens. A screen reads them
+// through the view (view.behaviours, layer-view.mjs), which works each out
+// once.
+import {keyMeaning} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
+import {downTheStack} from "./layer-resolution.mjs";
+import {comboOutput} from "./combo-reach.mjs";
 import {inputOn} from "../../rules/combo-inputs.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("./keyface-types.js").ComboGroupEntry} ComboGroupEntry */
 /** @typedef {import("./keyface-types.js").BehaviorCombo} BehaviorCombo */
-/** @typedef {import("./keyface-types.js").ComboRoute} ComboRoute */
+/** @typedef {import("./keyface-types.js").BehaviourInView} BehaviourInView */
+/** @typedef {import("./keyface-types.js").BehaviourKey} BehaviourKey */
+/** @typedef {import("./keyface-types.js").LayerView} LayerView */
 /** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
-/** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
 
 // The behaviour a combo's output runs, judged from the layer its last
 // declared input's key comes from, even when matching uses another reference
 // layer, against the layers core publishes for it (outputBehaviorLayers).
-// Several owner placements remain alternatives.
-/** @param {ViewModel} model @param {import("../../contracts/panel.js").ComboView} combo @param {ResolvedKey[]} keys @param {Layer[]} stack @param {number} at @param {number[]} [held] */
-export function comboBehaviourFor(model, combo, keys, stack, at, held = []) {
+// Several owner placements remain alternatives. A key the reference layer
+// supplies comes from whichever layer the view shows there.
+/** @param {LayerView} view @param {import("../../contracts/panel.js").ComboView} combo @param {ResolvedKey[]} keys */
+export function comboBehaviourFor(view, combo, keys) {
+    const {model} = view;
     const layers = combo.outputBehaviorLayers ?? 0;
-    const row = layers ? behaviourFor(model, comboOutput(model, combo)) : undefined;
+    const row = layers ? keyIdentity(model, comboOutput(model, combo)).behaviour : undefined;
     if (!row) return undefined;
     const owner = combo.inputs?.at(-1);
     const placements = keys.filter(({position}) => owner !== undefined && inputOn(owner, position));
-    const physical = placements.some(key => key.reference) ? viewPositions(stack, at, held) : [];
     const permitted = placements.some(key => {
-        const source = key.reference ? physical.find(entry => entry.position.layoutIndex === key.position.layoutIndex)?.layer : key.layer;
+        const source = key.reference ? view.shownAt(key.position.layoutIndex)?.layer : key.layer;
         return source && (layers & (2 ** source.index));
     });
     return permitted ? row : undefined;
 }
 
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} [held] */
-export function behavioursInView(model, stack, at, held = []) {
-    /** @type {Map<string, {row: BehaviorView; keys: ResolvedKey[]; combos: ComboRoute[]}>} */
+/** @param {LayerView} view @returns {BehaviourInView[]} */
+export function behavioursInView(view) {
+    const {model} = view;
+    /** @type {Map<string, BehaviourInView>} */
     const found = new Map();
     /** @param {BehaviorView} row */
     const add = (row) => {
@@ -42,12 +49,12 @@ export function behavioursInView(model, stack, at, held = []) {
         // The entry was inserted above whenever it was absent.
         return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(row.keycode));
     };
-    for (const key of viewPositions(stack, at, held)) {
-        const row = behaviourFor(model, keyMeaning(key.position));
+    for (const key of view.shown) {
+        const row = keyIdentity(model, keyMeaning(key.position)).behaviour;
         if (row) add(row).keys.push(key);
     }
-    for (const route of combosInView(model, stack, at, held)) {
-        const row = comboBehaviourFor(model, route.combo, route.keys, stack, at, held);
+    for (const route of view.combos.inView) {
+        const row = comboBehaviourFor(view, route.combo, route.keys);
         if (row) add(row).combos.push(route);
     }
     return [...found.values()];
@@ -63,14 +70,15 @@ export function behavioursInView(model, stack, at, held = []) {
  * keycode fires it too, with no key carrying it at all. Everything else the
  * profile carries is somewhere this layer never reaches.
  */
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
-export function behaviourGroups(model, stack, at) {
+/** @param {LayerView} view @returns {import("./keyface-types.js").BehaviourGroups} */
+export function behaviourGroups(view) {
+    const {model, stack} = view;
     /** @type {BehaviorView[]} */
     const here = [];
     /** @type {{row: BehaviorView; layer: Layer; whileHeld: boolean}[]} */
     const through = [];
-    for (const {position, layer, fellThrough, whileHeld} of reachablePositions(stack, at)) {
-        const row = behaviourFor(model, keyMeaning(position));
+    for (const {position, layer, fellThrough, whileHeld} of view.reachable) {
+        const row = keyIdentity(model, keyMeaning(position)).behaviour;
         if (!row) continue;
         if (!fellThrough) { if (!here.includes(row)) here.push(row); }
         else if (!through.some((entry) => entry.row === row)) through.push({row, layer, whileHeld});
@@ -84,12 +92,12 @@ export function behaviourGroups(model, stack, at) {
     const combos = [];
     /** @type {BehaviorCombo[]} */
     const combosBelow = [];
-    const groupsOfCombos = comboGroups(model, stack, at);
+    const groupsOfCombos = view.combos.groups;
     /** @type {[ComboGroupEntry[], BehaviorCombo[]][]} */
     const routes = [[groupsOfCombos.onKeys, combos], [groupsOfCombos.throughKeys, combosBelow]];
     for (const [entries, list] of routes) {
         for (const {combo, keys, held} of entries) {
-            const row = comboBehaviourFor(model, combo, keys, stack, at, held.map(layer => layer.index));
+            const row = comboBehaviourFor(view.under(held.map((layer) => stack.indexOf(layer))), combo, keys);
             if (!row) continue;
             const entry = list.find((candidate) => candidate.row === row);
             if (entry) entry.combos.push({combo, keys});
@@ -113,16 +121,16 @@ export function behaviourGroups(model, stack, at) {
  * key that happens to fall through to it. With no route, every way this layer
  * reaches it.
  */
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {string} keycode @param {import("./keyface-types.js").BehaviorRoute | null} [route] @param {number[]} [held] */
-export function behaviourRouteKeys(model, stack, at, keycode, route = null, held = []) {
+/** @param {LayerView} view @param {string} keycode @param {import("./keyface-types.js").BehaviorRoute | null} [route] */
+export function behaviourRouteKeys(view, keycode, route = null) {
     if (!keycode) return [];
-    const carrying = reachablePositions(stack, at).filter(({position}) => keyMeaning(position) === keycode);
-    const groups = behaviourGroups(model, stack, at);
+    const carrying = view.reachable.filter(({position}) => keyMeaning(position) === keycode);
+    const groups = view.behaviours.groups;
     /** @param {BehaviorCombo[]} entries */
     const chorded = (entries) => entries.filter((entry) => entry.row.keycode === keycode)
         .flatMap((entry) => entry.combos).flatMap((combo) => combo.keys);
     const keys = {
-        view: behavioursInView(model, stack, at, held).filter((entry) => entry.row.keycode === keycode)
+        view: view.behaviours.inView.filter((entry) => entry.row.keycode === keycode)
             .flatMap((entry) => [...entry.keys, ...entry.combos.flatMap((combo) => combo.keys)]),
         here: carrying.filter((entry) => !entry.fellThrough),
         through: carrying.filter((entry) => entry.fellThrough),
@@ -131,4 +139,17 @@ export function behaviourRouteKeys(model, stack, at, keycode, route = null, held
     };
     const chosen = route ? keys[route] || [] : Object.values(keys).flat();
     return [...new Set(chosen.map((entry) => entry.position.layoutIndex))];
+}
+
+// The key a board position opens in Behaviours. Rows are keyed by keycode, so
+// a transparent position follows the key that answers it from below, through
+// the layers held in a preview and the base layer, which is always on, and
+// names the layer that supplies it. With nothing mapped below it stays the
+// stored key. Which key answers is core's (each layer's answers): a key that
+// is not transparent answers itself.
+/** @param {LayerView} view @param {number | undefined} layoutIndex @returns {BehaviourKey} */
+export function behaviourKeyAt(view, layoutIndex) {
+    const own = (view.stack[view.at]?.positions || []).find((position) => position.layoutIndex === layoutIndex);
+    const answer = own && view.answerAt(layoutIndex);
+    return answer?.fellThrough ? {keycode: keyMeaning(answer.position), from: answer.layer} : {keycode: keyMeaning(own), from: null};
 }

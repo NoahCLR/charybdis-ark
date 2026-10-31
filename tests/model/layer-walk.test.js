@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {TRANSPARENT, profileFacts, comboCodes, compactWalk, boundedWalk, stateOf, locksOf, heldOf, highest} = require("../../core/model/layer-walk");
+const {TRANSPARENT, profileFacts, walkLayers} = require("../../core/model/layer-walk");
 const {LAYERS, matrixPosition} = require("../../core/data/charybdis-layout");
 const {SETTING} = require("../../core/schema/settings-domain-v1");
 const {settings} = require("../fixtures/portable-profile");
@@ -22,6 +22,12 @@ function decoded(keys = {}, combos = []) {
     policy.values[SETTING.AUTO_MOUSE_ENABLED] = 0; policy.values[SETTING.AUTO_SNIPING_ENABLED] = 0;
     return {layers, settings: policy, behaviors: {rows: []}, combos: {rows: combos}, pdModes: []};
 }
+// The compact walk's budget spent at once, so the bounded walk answers.
+const BOUNDED = {limits: {work: 0}};
+// What either walk answers, less the paths it tells.
+/** @param {import("../../core/model/types.js").LayerWalk} walked */
+const outcome = ({reachabilityComplete, escapeComplete, affectedLayers, reachedLayers, reachableCombos, traps, trapCount}) => ({reachabilityComplete, escapeComplete, affectedLayers, reachedLayers,
+    reachableCombos: [...reachableCombos].sort(), traps: traps.map(({locks, effect}) => ({locks, from: effect.from})), trapCount});
 
 test("the walk reads a profile's layers in layout order, and its combos only while combos are on", () => {
     const combos = [{inputs: [code(KC_A), code(KC_B)], output: code(MO(2))}, {inputs: [code(KC_A)], output: code(KC_B), enabled: false}];
@@ -37,40 +43,52 @@ test("the walk reads a profile's layers in layout order, and its combos only whi
     assert.deepEqual(profileFacts(profile).combos, []);
 });
 
-test("the compact walk and the bounded walk reach the same layers", () => {
+test("the compact walk and the bounded walk reach the same layers, and find no trap where TO(0) waits", () => {
     const facts = profileFacts(decoded({"0:0": TG(1), "0:1": MO(2), "1:2": TO(3), "3:3": TO(0), "2:4": KC_B, "3:4": KC_B}));
-    const compact = compactWalk(facts);
-    assert.equal(compact.complete, true);
-    assert.ok("symbolic" in compact && compact.symbolic);
-    const bounded = boundedWalk(facts);
-    assert.equal(bounded.complete, true);
-    const reached = [...bounded.parent.keys()].reduce((mask, state) => mask | locksOf(state) | heldOf(state), facts.always);
-    assert.equal(reached, 0b1111);
-    assert.equal(compact.reachedLayers, reached);
-    assert.ok(bounded.home.has(stateOf(0b1000, 0)), "TO(0) on Navigation goes home");
+    const compact = walkLayers(facts), bounded = walkLayers(facts, BOUNDED);
+    assert.deepEqual(outcome(compact), {reachabilityComplete: true, escapeComplete: true, affectedLayers: 0, reachedLayers: 0b1111, reachableCombos: [], traps: [], trapCount: 0});
+    assert.deepEqual(outcome(bounded), outcome(compact));
+    assert.ok(bounded.effects.some(effect => effect.kind === "move" && effect.layer === 0 && effect.from.layer === 3), "TO(0) on Navigation is offered");
 });
 
-test("a state is its locks with the held layers on top", () => {
-    const state = stateOf(0b0110, 0b1000);
-    assert.equal(locksOf(state), 0b0110);
-    assert.equal(heldOf(state), 0b1000);
-    assert.equal(highest(0b1010), 3);
+test("both walks find the same smallest traps, the lock that gets into each and the steps from rest", () => {
+    // TG(1) and TG(2) on Base each lock a layer that covers both; TG(3)
+    // falls through its own layer, so locking 3 is no trap.
+    const facts = profileFacts(decoded({"0:0": TG(1), "0:1": TG(2), "0:2": TG(3), "1:0": KC_B, "1:1": KC_B, "2:0": KC_B, "2:1": KC_B}));
+    const compact = walkLayers(facts), bounded = walkLayers(facts, BOUNDED);
+    assert.deepEqual(outcome(compact).traps, [{locks: 0b10, from: {layer: 0, layoutIndex: 0, code: TG(1)}}, {locks: 0b100, from: {layer: 0, layoutIndex: 1, code: TG(2)}}]);
+    assert.equal(compact.trapCount, 2);
+    assert.deepEqual(outcome(bounded), outcome(compact));
+    for (const walked of [compact, bounded]) assert.deepEqual(walked.traps.map(({path}) => path.map(effect => effect.how)), walked.traps.map(({effect}) => [effect.how]), "each is one lock from rest");
 });
 
-test("the codes a press offers combos are the keys that answer under the layers on, or the reference layer's own", () => {
-    const profile = decoded({"1:5": KC_B});
-    const keys = profileFacts(profile).layers[0].length;
-    const resolved = comboCodes(profileFacts(profile), 0b11);
-    assert.deepEqual(resolved.get(KC_B), [1], "layer 1's own key");
-    assert.deepEqual(resolved.get(KC_A), Array(keys - 1).fill(0), "every other key falls through to Base");
-    assert.deepEqual(comboCodes(profileFacts(profile), 0b1).get(KC_B), undefined, "Base alone offers no B");
+test("combos fire on the keys that answer under the layers on, or the reference layer's own, from the layer each key came from", () => {
+    // Layer 1, held from Base, stores B over one key; every other key falls
+    // through to Base's A.
+    const combos = [{inputs: [code(KC_A), code(KC_B)], output: code(KC_A)}, {inputs: [code(KC_A)], output: code(KC_B), allowedLayers: 0b10}, {inputs: [code(KC_B)], output: code(KC_A)}];
+    const profile = decoded({"0:0": MO(1), "1:5": KC_B}, combos);
+    /** @param {number} reference */
+    const fired = (reference) => {
+        profile.settings.layers[1].reference = reference;
+        const facts = profileFacts(profile), compact = walkLayers(facts);
+        assert.deepEqual(outcome(walkLayers(facts, BOUNDED)), outcome(compact));
+        return [...compact.reachableCombos].sort();
+    };
+    assert.deepEqual(fired(1), [0, 2], "layer 1's B joins Base's A; no A comes from layer 1");
     // Under Combo Layer Matching layer 1 matches Base's raw keys, still from
-    // the layer each key came from.
-    profile.settings.layers[1].reference = 0;
-    const matched = comboCodes(profileFacts(profile), 0b11);
-    assert.equal(matched.get(KC_B), undefined);
-    assert.equal(matched.get(KC_A)?.length, keys);
-    assert.deepEqual(matched.get(KC_A)?.filter(layer => layer === 1), [1], "the key layer 1 stores is still its own");
-    profile.settings.layers[1].reference = LAYERS;
-    assert.equal(comboCodes(profileFacts(profile), 0b11).size, 0, "a reference past the bank matches nothing");
+    // the layer each key came from: the key layer 1 stores is its own.
+    assert.deepEqual(fired(0), [1]);
+    assert.deepEqual(fired(LAYERS), [], "a reference past the bank matches nothing while its layer is on top");
+});
+
+test("a walk neither finishes names the layers involved, and claims no reach or trap", () => {
+    // Thirteen independent locks are more states than the bounded walk takes.
+    const keys = {};
+    for (let layer = 1; layer <= 13; layer++) keys[`0:${layer}`] = TG(layer);
+    const walked = walkLayers(profileFacts(decoded(keys)), BOUNDED);
+    assert.equal(walked.reachabilityComplete, false);
+    assert.equal(walked.escapeComplete, false);
+    assert.equal(walked.affectedLayers, 0b11111111111110);
+    assert.deepEqual([walked.traps, walked.trapCount, walked.reachableCombos.size], [[], 0, 0]);
+    assert.equal(walkLayers(profileFacts(decoded(keys))).escapeComplete, true, "the compact walk, given its budget, finishes");
 });

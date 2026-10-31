@@ -2,11 +2,9 @@
 "use strict";
 
 const {layerOfRef} = require("../schema/actions");
-const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 const {effectiveTimings} = require("./gesture-timing");
-const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
-const {validateSnapshot, decodedOf} = require("./portable-profile");
-const {LED_FLAGS, SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
+const {validateSnapshot, decodedOf, editProfileDomains} = require("./portable-profile");
+const {LED_FLAGS, SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, validSetting} = require("../schema/settings-domain-v1");
 const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_ISO, OS_OF} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
 const {dpiChoices} = require("./pointer-dpi");
@@ -313,83 +311,77 @@ function settingsEditorView(snapshot) {
 
 /** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditOf<"updateConfigDefaults">} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editSettings(snapshot, message, capabilities) {
-    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since these settings were opened. Read the keyboard and review your changes before saving again.");
     const value = validateSnapshot(snapshot.document, capabilities);
-    const section = settingsSections(snapshot, value.settings).find(section => section.id === message.sectionId);
-    if (!section || !Array.isArray(message.fields) || message.fields.length !== section.fields.length) throw fail("Choose a complete settings section reported by the keyboard.");
-    const seen = new Set(), before = value.settings.values.slice();
-    for (const input of message.fields) {
-        const field = section.fields.find(field => field.macro === input?.macro);
-        if (!field || seen.has(input.macro)) throw fail("Unknown or repeated settings field.");
-        seen.add(input.macro);
-        /** @type {number} */
-        let number;
-        if (field.kind === "toggle") {
-            if (typeof input.enabled !== "boolean") throw fail(`${field.label} must be enabled or disabled.`);
-            number = Number(input.enabled);
-        } else {
-            const text = field.kind === "layer" ? (layer => layer !== undefined && layer < SETTINGS.LAYERS ? String(layer) : undefined)(layerOfRef(input.value)) : input.value;
-            if (typeof text !== "string" || !/^\d+$/.test(text)) throw fail(`${field.label} needs a whole number${field.kind === "layer" ? " identifying a layer" : ""}.`);
-            number = Number(text);
-            if (field.macro === "brightness" && number !== baseLighting(value.settings.values).brightness) {
-                if (snapshot.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness.");
-                if (number > snapshot.limits.brightnessMax) throw fail(`Brightness must be between 0 and ${snapshot.limits.brightnessMax}, the keyboard's reported limit.`);
+    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits}, open => {
+        const settings = open("settings");
+        const section = settingsSections(snapshot, settings).find(section => section.id === message.sectionId);
+        if (!section || !Array.isArray(message.fields) || message.fields.length !== section.fields.length) throw fail("Choose a complete settings section reported by the keyboard.");
+        const seen = new Set(), before = settings.values.slice();
+        for (const input of message.fields) {
+            const field = section.fields.find(field => field.macro === input?.macro);
+            if (!field || seen.has(input.macro)) throw fail("Unknown or repeated settings field.");
+            seen.add(input.macro);
+            /** @type {number} */
+            let number;
+            if (field.kind === "toggle") {
+                if (typeof input.enabled !== "boolean") throw fail(`${field.label} must be enabled or disabled.`);
+                number = Number(input.enabled);
+            } else {
+                const text = field.kind === "layer" ? (layer => layer !== undefined && layer < SETTINGS.LAYERS ? String(layer) : undefined)(layerOfRef(input.value)) : input.value;
+                if (typeof text !== "string" || !/^\d+$/.test(text)) throw fail(`${field.label} needs a whole number${field.kind === "layer" ? " identifying a layer" : ""}.`);
+                number = Number(text);
+                if (field.macro === "brightness" && number !== baseLighting(settings.values).brightness) {
+                    if (snapshot.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness.");
+                    if (number > snapshot.limits.brightnessMax) throw fail(`Brightness must be between 0 and ${snapshot.limits.brightnessMax}, the keyboard's reported limit.`);
+                }
+                if ((field.min !== undefined && number < field.min) || (field.max !== undefined && number > field.max) || (field.choices && !field.choices.some(choice => (typeof choice === "object" ? choice.value : choice) === number))) throw fail(`${field.label} is outside the keyboard's supported range${field.hint ? ": " + field.hint : "."}`);
             }
-            if ((field.min !== undefined && number < field.min) || (field.max !== undefined && number > field.max) || (field.choices && !field.choices.some(choice => (typeof choice === "object" ? choice.value : choice) === number))) throw fail(`${field.label} is outside the keyboard's supported range${field.hint ? ": " + field.hint : "."}`);
-        }
-        // A share that still reads as what was shown keeps its exact stored
-        // milliseconds, so saving an unchanged section changes nothing.
-        if (field.kind === "share") {
-            const whole = value.settings.values[field.of], stored = value.settings.values[field.id];
-            if (number !== shareOf(stored, whole)) value.settings.values[field.id] = shareAt(number, whole);
-            continue;
-        }
-        if (field.header) {
-            const previous = Number(value.settings[field.header] !== false);
+            // A share that still reads as what was shown keeps its exact stored
+            // milliseconds, so saving an unchanged section changes nothing.
+            if (field.kind === "share") {
+                const whole = settings.values[field.of], stored = settings.values[field.id];
+                if (number !== shareOf(stored, whole)) settings.values[field.id] = shareAt(number, whole);
+                continue;
+            }
+            if (field.header) {
+                const previous = Number(settings[field.header] !== false);
+                if (field.readOnly && number !== previous) throw fail(`${field.label} cannot be changed with this firmware. ${field.hint || ""}`);
+                settings[field.header] = Boolean(number);
+                continue;
+            }
+            if (field.record) {
+                settings.layers[field.layer] = {...settings.layers[field.layer], [field.record]: number};
+                continue;
+            }
+            const previous = settingValue(field, settings.values);
             if (field.readOnly && number !== previous) throw fail(`${field.label} cannot be changed with this firmware. ${field.hint || ""}`);
-            value.settings[field.header] = Boolean(number);
-            continue;
+            if (field.macro === "effectMode" && number !== previous && !snapshot.options?.effects.some(effect => effect.id === number)) throw fail("Choose an effect reported by this keyboard.");
+            settings.values[field.id] = withSetting(field, settings.values[field.id], number);
         }
-        if (field.record) {
-            value.settings.layers[field.layer] = {...value.settings.layers[field.layer], [field.record]: number};
-            continue;
-        }
-        const previous = settingValue(field, value.settings.values);
-        if (field.readOnly && number !== previous) throw fail(`${field.label} cannot be changed with this firmware. ${field.hint || ""}`);
-        if (field.macro === "effectMode" && number !== previous && !snapshot.options?.effects.some(effect => effect.id === number)) throw fail("Choose an effect reported by this keyboard.");
-        value.settings.values[field.id] = withSetting(field, value.settings.values[field.id], number);
-    }
-    rescaleShares(value.settings.values, before);
-    if (section.id === "host") followHostOs(value.settings.values, before, snapshot.hostOs?.detected);
-    if (!value.settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one default layer on.");
-    if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
-    // The pointer layer and the default layers never move onto a layer a
-    // pointing mode's link names (firmware D-F62; pointing-links.js).
-    const linkRefusal = settingsLinkRefusal({values: before, names: value.settings.names}, value.settings, value.pdModes || []);
-    if (linkRefusal) throw fail(linkRefusal);
-    // Nor onto a layer a custom key's shortcut turns on (firmware D-F26;
-    // shortcut-layers.js): the keyboard refuses that profile.
-    const shortcutRefusal = settingsShortcutRefusal(value.settings);
-    if (shortcutRefusal) throw fail(shortcutRefusal);
-    // A timing displayed as default follows that default, including an older
-    // profile's explicit value equal to it. Adopt inheritance only for changed
-    // defaults; unrelated settings edits never rewrite behaviour rows.
-    let behaviorsChanged = false;
-    for (const row of value.behaviors.rows) {
-        const old = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, before, value.settings.customKeyShortcuts);
-        const next = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, value.settings.values, value.settings.customKeyShortcuts);
-        for (const [field, term] of /** @type {const} */ ([["tapHoldTerm", "hold"], ["longHoldTerm", "long"], ["multiTapTerm", "repeat"]])) {
-            if (old[term] !== next[term] && row[field] !== 0 && row[field] === old[term]) {
-                row[field] = 0;
-                behaviorsChanged = true;
+        rescaleShares(settings.values, before);
+        if (section.id === "host") followHostOs(settings.values, before, snapshot.hostOs?.detected);
+        if (!settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one default layer on.");
+        if (!settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
+        // The pointer layer and the default layers never move onto a layer a
+        // pointing mode's link names (firmware D-F62; pointing-links.js).
+        const linkRefusal = settingsLinkRefusal({values: before, names: settings.names}, settings, value.pdModes || []);
+        if (linkRefusal) throw fail(linkRefusal);
+        // Nor onto a layer a custom key's shortcut turns on (firmware D-F26;
+        // shortcut-layers.js): the keyboard refuses that profile.
+        const shortcutRefusal = settingsShortcutRefusal(settings);
+        if (shortcutRefusal) throw fail(shortcutRefusal);
+        // A timing displayed as default follows that default, including an older
+        // profile's explicit value equal to it. Adopt inheritance only for changed
+        // defaults; unrelated settings edits never rewrite behaviour rows, so
+        // the behaviours are opened only when one changes.
+        value.behaviors.rows.forEach((row, index) => {
+            const old = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, before, settings.customKeyShortcuts);
+            const next = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, settings.values, settings.customKeyShortcuts);
+            for (const [field, term] of /** @type {const} */ ([["tapHoldTerm", "hold"], ["longHoldTerm", "long"], ["multiTapTerm", "repeat"]])) {
+                if (old[term] !== next[term] && row[field] !== 0 && row[field] === old[term]) open("behaviors").rows[index][field] = 0;
             }
-        }
-    }
-    let profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(value.settings));
-    if (behaviorsChanged) profile = replaceDomain(profile, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, () => encodeKeyBehaviorDomain(value.behaviors, value.codecOptions.behaviors));
-    const document = {...value.document, profile: profile.toString("base64")};
-    validateSnapshot(document, capabilities);
-    return document;
+        });
+    });
 }
 
 module.exports = {settingsEditorView, editSettings, fieldMask, baseLighting};

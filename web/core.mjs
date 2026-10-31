@@ -9,9 +9,6 @@
 // namespaces, so a name two modules share stays reachable under each.
 
 export {openPanelLoop} from "../core/session/panel-loop.js";
-export {writingProfile} from "../core/session/panel-control-registry.js";
-export {demoUnsaved} from "../core/session/demo-session.js";
-export {closingLoses} from "../core/session/live-edits.js";
 export {recoveryFileName} from "../core/session/recovery-copy.js";
 export {WebHidDeviceAdapter} from "../core/transport/webhid-adapter.js";
 export {FILE_MAX_BYTES, FILE_TOO_LARGE} from "../core/model/portable-profile.js";

@@ -8,12 +8,18 @@
 // between the common prefix and the common suffix, so a key change sends a
 // few bytes rather than its whole domain. `applySplices` is the firmware's
 // side of the same rule, so Ark knows the bytes it just published without
-// reading them back.
+// reading them back. `liveEditPlan` is what one edit sends: nothing, those
+// splices, or the whole profile when the splices do not fit.
 const {decodeProfileBlob, encodeProfileBlob} = require("./profile-blob-v1");
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 
 // The most splices one profile edit carries; the wire's limit
 // (protocol/profile-edit-v1.js) is this one.
 const MAX_SPLICES = 8;
+
+// The firmware never lets a profile lose these (D-F32: a required domain
+// cannot be dropped).
+const REQUIRED_DOMAINS = Object.freeze([PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]);
 
 // Splices are Ark's own, made from its draft: a refusal names their bytes, so
 // it is Ark's fault (schema/bytes.js protocolError).
@@ -22,6 +28,7 @@ const fail = (code, message) => Object.assign(new Error(message), {code, fault: 
 
 /** @typedef {{domainId: number, offset: number, remove: number, insert: number, create?: boolean, drop?: boolean}} Splice */
 /** @typedef {{splices: Splice[], stream: Buffer}} SpliceEdit */
+/** @typedef {{kind: "unchanged"} | {kind: "splices", splices: Splice[], stream: Buffer, bytes: Buffer} | {kind: "replace", stream: Buffer, bytes: Buffer}} LiveEditPlan */
 
 // The splices that turn `from` into `to`, and their inserted bytes as one
 // stream in splice order. `defaults` is the compiled profile the keyboard
@@ -109,4 +116,19 @@ function applySplices(from, {splices, stream}, {versions = {}} = {}) {
 /** @param {number} fromLength @param {number} toLength @param {number} insertTotal @param {number} capacity */
 const spliceEditFits = (fromLength, toLength, insertTotal, capacity) => insertTotal + Math.max(fromLength, toLength) <= capacity;
 
-module.exports = {diffProfiles, applySplices, spliceEditFits, MAX_SPLICES};
+// What one live edit from `from` (the keyboard's working copy, exactly) to
+// `to` sends, and the bytes the keyboard then runs: nothing when no domain
+// differs; the splices and their stream; or, when those are too large to
+// stage beside the profile in a slot of `capacity` bytes, `to` whole as a
+// replacement. Whether the keyboard takes a replacement now is its caller's
+// to know: only with nothing unsaved.
+/** @param {Uint8Array} from @param {Uint8Array} to @param {{defaults?: Uint8Array, capacity: number}} options @returns {LiveEditPlan} */
+function liveEditPlan(from, to, {defaults, capacity}) {
+    const {splices, stream} = diffProfiles(from, to, {defaults, required: REQUIRED_DOMAINS});
+    if (!splices.length) return {kind: "unchanged"};
+    const bytes = applySplices(from, {splices, stream}, {versions: PROFILE_DOMAIN_VERSIONS});
+    if (spliceEditFits(from.length, bytes.length, stream.length, capacity)) return {kind: "splices", splices, stream, bytes};
+    return {kind: "replace", stream: Buffer.from(to), bytes: Buffer.from(to)};
+}
+
+module.exports = {diffProfiles, applySplices, liveEditPlan, MAX_SPLICES};

@@ -13,7 +13,8 @@
 import * as controls from "../view/controls.mjs";
 import * as edits from "../view/edits.mjs";
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
-import {canEdit, getModel, post, postLeavingDemo, render, state} from "../store.mjs";
+import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import {demoOf} from "../view/demo.mjs";
 import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {shellOf} from "../view/shell-panel.mjs";
@@ -36,7 +37,7 @@ export function screenDevice() {
     const health = device?.health;
     const keyboard = model?.keyboardName;
     const title = keyboard ? titleName({f: "keyboard:name", value: keyboard.name, placeholder: keyboard.builtIn || device?.label || "Charybdis",
-        label: "Keyboard name", perName: keyboard.perName || NAME_MAX_BYTES, canEdit: canEdit("settings")})
+        label: "Keyboard name", perName: keyboard.perName || NAME_MAX_BYTES, canEdit: editGate(model, "settings").editable})
         : `<h1>${esc(device?.label || "Keyboard")}</h1>`;
     const dirty = draftMarks(model?.draft?.changes).settings.has("keyboard");
     const sub = demo ? "The demo stands in for a keyboard running current firmware. Nothing here reaches a keyboard."

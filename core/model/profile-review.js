@@ -18,6 +18,7 @@ const {effectiveTimings} = require("./gesture-timing");
 const {VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {customKeyName} = require("../data/user-keycodes");
+const {UNIT, parseUnit} = require("./review-units");
 
 /**
  * @typedef {import("../schema/types.js").SemanticAction} Action
@@ -152,7 +153,8 @@ const positionName = slot => THUMBS.get(slot) || `${slot < 30 ? "Left" : "Right"
 // The review lists items, one per thing a person edits: a key on a layer, a
 // layer's name, a behaviour, a combo, a macro, a settings section, a pointing
 // slot, one lighting record. An item is also the unit a discard puts back
-// (profile-revert.js), so it is the smallest part that is valid on its own.
+// (named in review-units.js, put back by profile-revert.js), so it is the
+// smallest part that is valid on its own.
 // Each carries whether it was added, changed or removed, only the fields that
 // differ (everything it holds, for an added or removed item), and where it
 // is edited, so the review can go there.
@@ -282,18 +284,18 @@ function lightingRecords(value) {
     const record = (unit, title, stage, fields, where = {}, titleMark) => records.set(unit, {title, stage, where, titleMark, fields: new Map(fields)});
     // Each stage's switch sits on its own tab, so the stages record belongs
     // to no single one.
-    record("rgb:stages", "Feedback stages", null, V.stages.filter(stage => stage.bit).map(stage => {
+    record(UNIT.rgb("stages"), "Feedback stages", null, V.stages.filter(stage => stage.bit).map(stage => {
         const on = Boolean(r.stageEnableMask & (stage.bit || 0));
         return [stage.label, {text: on ? "on" : "off", key: on, mark: {kind: "stage", on}}];
     }));
-    for (const row of r.layerColors) record(`rgb:layer:${row.layerId}`, `${layerName(row.layerId)} colour`, "layers",
+    for (const row of r.layerColors) record(UNIT.rgbLayer(row.layerId), `${layerName(row.layerId)} colour`, "layers",
         [["Colour", colour(row.color, row.layerId === 0 ? "off · the background effect shows" : "off")], ["Paints", nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
-    for (const row of r.pdModeColors) record(`rgb:pd:${row.pdModeId}`, `Pointing mode colour · ${slotCalled(row.pdModeId)}`, "pd",
+    for (const row of r.pdModeColors) record(UNIT.rgbPd(row.pdModeId), `Pointing mode colour · ${slotCalled(row.pdModeId)}`, "pd",
         [["Colour", colour(row.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
-    record("rgb:automouse", "Auto-mouse fade", "auto", [["Fade", nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
-    record("rgb:combo", "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
+    record(UNIT.rgb("automouse"), "Auto-mouse fade", "auto", [["Fade", nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
+    record(UNIT.rgb("combo"), "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
     const k = r.keyFeedback;
-    record("rgb:key", "Key feedback", "key", [...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [`${i + 2}× branch`, colour(value)]),
+    record(UNIT.rgb("key"), "Key feedback", "key", [...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [`${i + 2}× branch`, colour(value)]),
         ["Tap committed", colour(k.tapCommittedColor)], ["Hold active", colour(k.holdActiveColor)], ["Long hold active", colour(k.longHoldActiveColor)],
         ["Tap commit", nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
     // LED groups are one record with every row that paints them: rows name
@@ -318,7 +320,7 @@ function lightingRecords(value) {
         const tier = name === undefined ? undefined : V.feedbackTiers[name];
         return tier ? {kind: "tier", tier} : undefined;
     });
-    record("rgb:groups", "LED overrides", "groups", fields);
+    record(UNIT.rgb("groups"), "LED overrides", "groups", fields);
     return records;
 }
 
@@ -376,7 +378,7 @@ function profileReview(before, after, capabilities) {
         // its old name on the keyboard and its new one in the draft.
         /** @param {number} code @param {Names} names */
         const values = (code, names) => ({text: keyLabel(names.keys, code), detail: keyLabelWithName(names.keys, code), key: code, mark: keyMark(code)});
-        item("Keys", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.layers[l][p], namesB)]]),
+        item("Keys", UNIT.layout(l, p), `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.layers[l][p], namesB)]]),
             {kind: "key", layer: l, layoutIndex: LAYOUT_INDEX.get(p)}, undefined, {kind: "layer", layer: l});
     }));
     a.settings.names.forEach((name, i) => {
@@ -385,7 +387,7 @@ function profileReview(before, after, capabilities) {
         /** @param {string[]} names @returns {Fields} */
         const fields = names => new Map([["Name", {text: layerCalled(names, i), key: names[i],
             detail: `${layerCalled(names, i)} · ${names[i] ? `stored name ${JSON.stringify(names[i])}` : "no stored name"}`}]]);
-        item("Layers", `layerName:${i}`, `Layer ${i}`, fields(a.settings.names), fields(b.settings.names), {kind: "layers"}, undefined, {kind: "layer", layer: i});
+        item("Layers", UNIT.layerName(i), `Layer ${i}`, fields(a.settings.names), fields(b.settings.names), {kind: "layers"}, undefined, {kind: "layer", layer: i});
     });
     a.settings.layers.forEach((record, layer) => {
         for (const layoutIndex of CHARYBDIS_4X6_LAYOUT_MATRIX.keys()) {
@@ -393,36 +395,36 @@ function profileReview(before, after, capabilities) {
             /** @param {import("../schema/types.js").LayerRecord} entry @returns {Fields} */
             const fields = entry => new Map([["Use behaviour", entry.bypass.includes(position) ? "off" : "on"], ["Join combos", entry.exclude.includes(position) ? "off" : "on"]]);
             // Named where the key sits, as its layout change is.
-            item("Keys", `placement:${layer}:${position}`, `Participation · ${layerName(b, layer)} · ${positionName(position)}`, fields(record), fields(b.settings.layers[layer]),
+            item("Keys", UNIT.placement(layer, position), `Participation · ${layerName(b, layer)} · ${positionName(position)}`, fields(record), fields(b.settings.layers[layer]),
                 {kind: "key", layer, layoutIndex: LAYOUT_INDEX.get(position)}, [true, true]);
         }
     });
     const targets = new Map([...a.behaviors.rows, ...b.behaviors.rows].map(row => [JSON.stringify(row.target), row.target]));
     for (const [id, target] of targets) {
         const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === id), next = b.behaviors.rows.find(row => JSON.stringify(row.target) === id);
-        item("Behaviours", `behavior:${id}`, action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA, a.settings.customKeyShortcuts), behaviourFields(next, b.settings.values, namesB, b.settings.customKeyShortcuts),
+        item("Behaviours", UNIT.behavior(target), action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA, a.settings.customKeyShortcuts), behaviourFields(next, b.settings.values, namesB, b.settings.customKeyShortcuts),
             {kind: "behaviour", target}, [Boolean(old), Boolean(next)]);
     }
     const combosA = a.combos.rows, combosB = b.combos.rows;
     const removedCombo = singleComboRemovalIndex(combosA, combosB);
     if (removedCombo !== null) {
         const i = removedCombo;
-        item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
+        item("Combos", UNIT.combo(i), `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
             {kind: "combo", badge: `C${i}`});
         if (i < combosB.length) /** @type {Change} */ (items.at(-1)).note = "Later combos move up one number.";
     } else {
         for (let i = 0; i < Math.max(combosA.length, combosB.length); i++) {
-            item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
+            item("Combos", UNIT.combo(i), `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
                 {kind: "combo", badge: `C${i}`});
         }
     }
-    item("Settings", "comboTiming", "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: "Settings"}, [true, true]);
+    item("Settings", UNIT.comboTiming, "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: "Settings"}, [true, true]);
     macrosA.macros.forEach((_, i) => {
         /** @param {Macros["macros"][number]} macro @returns {Fields} */
         const fields = (macro) => new Map(/** @type {[string, Field][]} */ ([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"],
             [VOCABULARY.macroUninterruptible.label, {key: macro.protection, text: protectionWords(macro.protection, macro.uninterruptible)}]]));
         const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
-        item("Macros", `macro:${i}`, `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
+        item("Macros", UNIT.macro(i), `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
     });
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
@@ -456,7 +458,7 @@ function profileReview(before, after, capabilities) {
             };
             // The effect belongs to Host, so discarding it restores Host and
             // preserves independently edited macro text and names.
-            item("Macros", "settings:host", `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · ${VOCABULARY.settingsSections.host} settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index, keycode: macroName(index)}, [true, true]);
+            item("Macros", UNIT.settings("host"), `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · ${VOCABULARY.settingsSections.host} settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index, keycode: macroName(index)}, [true, true]);
             /** @type {Change} */ (items.at(-1)).note = `Playback changes because of ${settingsPath("host", "host")}. Discard it together with that change.`;
         });
     }
@@ -473,14 +475,14 @@ function profileReview(before, after, capabilities) {
         const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
         /** @param {string} name @param {import("../schema/types.js").CustomKeyShortcut} shortcut */
         const exists = (name, shortcut) => Boolean(name || shortcutPresent(shortcut));
-        item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
+        item("Custom keys", UNIT.customKey(i), `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
             [exists(old, shortcutA), exists(next, shortcutB)]);
     });
     // The keyboard's own name, edited on Settings' Keyboard card. Empty is the
     // firmware's built-in name, which the keyboard then reports over USB.
     /** @param {string} name @returns {Fields} */
     const keyboardFields = name => new Map([["Name", name || "built-in name"]]);
-    item("Settings", "keyboardName", "Keyboard name", keyboardFields(a.settings.keyboardName), keyboardFields(b.settings.keyboardName),
+    item("Settings", UNIT.keyboardName, "Keyboard name", keyboardFields(a.settings.keyboardName), keyboardFields(b.settings.keyboardName),
         {kind: "settings", section: "keyboard", area: "Settings"}, [true, true]);
     // Settings are saved a section at a time, so a section is one item.
     /** @param {Snapshot} snapshot @param {import("../schema/types.js").SettingsDomain} settings */
@@ -514,9 +516,9 @@ function profileReview(before, after, capabilities) {
     const sectionsA = sections(before, a.settings);
     for (const section of sections(after, b.settings)) {
         const old = sectionsA.find(entry => entry.id === section.id);
-        item(/** @type {string} */ (section.area), `settings:${section.id}`, section.label, old?.fields || new Map(), section.fields, {kind: "settings", section: section.id, area: section.area, ...(section.stage ? {stage: section.stage} : {})}, [true, true]);
+        item(/** @type {string} */ (section.area), UNIT.settings(section.id), section.label, old?.fields || new Map(), section.fields, {kind: "settings", section: section.id, area: section.area, ...(section.stage ? {stage: section.stage} : {})}, [true, true]);
     }
-    const timingChange = items.find(entry => entry.unit === "settings:keyTiming");
+    const timingChange = items.find(entry => entry.unit === UNIT.settings("keyTiming"));
     if (timingChange) {
         const affected = new Set();
         for (const next of b.behaviors.rows) {
@@ -539,8 +541,10 @@ function profileReview(before, after, capabilities) {
     // A shortcut whose layers become Tap-toggle or One-shot, or stop being
     // either, makes its key dual-role or not (firmware D-F26): a behaviour on
     // it that sets no Tap / hold threshold now follows the other default.
-    for (const change of items.filter(entry => entry.unit.startsWith("customKey:"))) {
-        const slot = Number(change.unit.slice("customKey:".length));
+    for (const change of items) {
+        const unit = parseUnit(change.unit);
+        if (unit?.kind !== "customKey") continue;
+        const slot = unit.index;
         const shortcuts = a.settings.customKeyShortcuts.map((shortcut, i) => i === slot ? b.settings.customKeyShortcuts[i] : shortcut);
         for (const next of b.behaviors.rows) {
             if (next.tapHoldTerm !== 0) continue;
@@ -551,11 +555,11 @@ function profileReview(before, after, capabilities) {
         }
     }
     const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
-    item("Settings", "settings:otherKeyOptions", "Other key options", new Map([["Stored bits", `0x${(a.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]),
+    item("Settings", UNIT.settings("otherKeyOptions"), "Other key options", new Map([["Stored bits", `0x${(a.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]),
         new Map([["Stored bits", `0x${(b.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
     for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
-        item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
+        item("Pointing modes", UNIT.pd(id), `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
             pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind || old?.name), Boolean(next?.kind || next?.name)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);
@@ -568,7 +572,7 @@ function profileReview(before, after, capabilities) {
     // differ and none of them caught it, the review still must not read as
     // empty: an apply always shows that something will change.
     if (!items.length && before.fingerprint !== after.fingerprint) {
-        items.push({area: "Profile", unit: "profile", title: "Stored profile", status: "changed", fields: [{label: "", before: `fingerprint ${before.fingerprint}`,
+        items.push({area: "Profile", unit: UNIT.profile, title: "Stored profile", status: "changed", fields: [{label: "", before: `fingerprint ${before.fingerprint}`,
             after: `fingerprint ${after.fingerprint} · a change this review cannot describe`}], place: null});
     }
     return items;
@@ -590,7 +594,7 @@ function layerOrderReview(after, order) {
         ...(order[0] !== 0 ? [{label: "Base layer", status: /** @type {const} */ ("changed"), before: layerCalled(names, order.indexOf(0)), after: layerCalled(names, 0)}] : []),
         ...moved.map(/** @returns {import("../../contracts/model.js").ReviewField} */ slot => ({label: layerCalled(names, slot), labelMark: {kind: "layer", layer: slot}, status: "changed", before: String(order[slot]), after: where(slot)})),
     ];
-    return {area: "Layers", unit: "layerOrder", title: "Layer priority", note: "Higher layers win", status: "changed", fields,
+    return {area: "Layers", unit: UNIT.layerOrder, title: "Layer priority", note: "Higher layers win", status: "changed", fields,
         place: {kind: "layers", layers: moved}};
 }
 module.exports = {layerOrderReview, profileReview, singleComboRemovalIndex};

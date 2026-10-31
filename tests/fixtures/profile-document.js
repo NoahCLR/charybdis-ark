@@ -1,39 +1,50 @@
 // @ts-check
 "use strict";
 // Test builders edit the actual profile domains, keeping the JSON envelope
-// honest. Reading a view never adds fields to the portable document.
-const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const {replaceDomain, domainCodec} = require("../../core/schema/profile-domains");
-/** @param {import('../../core/model/types.js').PortableDocument} document */
-function profileLayers(document) {
-    return domainCodec("keymap").decode(payload(document, 0x60));
+// honest. Reading a view never adds fields to the portable document. They
+// write what a test needs, a keyboard's own bytes or a payload no editor
+// writes included, so unlike editProfileDomains they check nothing.
+const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {domainCodec} = require("../../core/schema/profile-domains");
+/**
+ * @typedef {import('../../core/model/types.js').PortableDocument} PortableDocument
+ * @typedef {import('../../core/schema/profile-domains-types.js').DomainKey} DomainKey
+ * @typedef {import('../../core/schema/profile-domains-types.js').DomainModels} DomainModels
+ */
+// A profile blob with one domain's payload rewritten, every other domain
+// keeping its bytes.
+/** @param {Uint8Array} bytes @param {DomainKey} key @param {(payload: Buffer) => Buffer} change */
+function withPayload(bytes, key, change) {
+    const blob = decodeProfileBlob(bytes), id = domainCodec(key).id;
+    if (!blob.domains.some(row => row.id === id)) throw Error(`Missing test domain ${key}`);
+    return encodeProfileBlob({...blob, domains: blob.domains.map(domain => domain.id === id ? {...domain, payload: change(domain.payload)} : domain)});
 }
-/** @param {import('../../core/model/types.js').PortableDocument} document */
-function profileMacros(document) {
-    return domainCodec("macros").decode(payload(document, 0x70)).map(bytes => bytes.toString("base64"));
+/** @template {DomainKey} K @param {PortableDocument} document @param {K} key @returns {DomainModels[K]} */
+function profileDomain(document, key) {
+    const found = decodeProfileBlob(Buffer.from(document.profile, "base64")).domains.find(row => row.id === domainCodec(key).id);
+    if (!found) throw Error(`Missing test domain ${key}`);
+    return domainCodec(key).decode(found.payload);
 }
-/** @param {import('../../core/model/types.js').PortableDocument} document @param {number} id */
-function payload(document, id) {
-    const found = decodeProfileBlob(Buffer.from(document.profile, "base64")).domains.find(row => row.id === id);
-    if (!found) throw Error(`Missing test domain ${id}`);
-    return found.payload;
-}
-/** @param {import('../../core/model/types.js').PortableDocument} document @param {(layers: number[][]) => unknown} change */
-function editLayers(document, change) {
-    const layers = profileLayers(document); change(layers);
-    document.profile = replaceDomain(Buffer.from(document.profile, "base64"), 0x60, () => domainCodec("keymap").encode(layers)).toString("base64");
+// The document with one domain's model changed in place.
+/** @template {DomainKey} K @param {PortableDocument} document @param {K} key @param {(value: DomainModels[K]) => unknown} change */
+function editDomain(document, key, change) {
+    const codec = domainCodec(key);
+    document.profile = withPayload(Buffer.from(document.profile, "base64"), key, payload => {
+        const value = codec.decode(payload); change(value); return codec.encode(value);
+    }).toString("base64");
     return document;
 }
-/** @param {import('../../core/model/types.js').PortableDocument} document @param {(macros: string[]) => unknown} change */
-function editMacros(document, change) {
-    const macros = profileMacros(document); change(macros);
-    document.profile = replaceDomain(Buffer.from(document.profile, "base64"), 0x70, () => domainCodec("macros").encode(macros.map(value => Buffer.from(value, "base64")))).toString("base64");
-    return document;
-}
-/** @param {import('../../core/model/types.js').PortableDocument} document @param {(settings: import('../../core/schema/types.js').SettingsDomain) => unknown} change */
-function editSettings(document, change) {
-    const settings = domainCodec("settings").decode(payload(document, 0x40)); change(settings);
-    document.profile = replaceDomain(Buffer.from(document.profile, "base64"), 0x40, () => domainCodec("settings").encode(settings)).toString("base64");
-    return document;
-}
-module.exports = {profileLayers, profileMacros, editLayers, editMacros, editSettings};
+/** @param {PortableDocument} document */
+const profileLayers = document => profileDomain(document, "keymap");
+/** @param {PortableDocument} document */
+const profileMacros = document => profileDomain(document, "macros").map(bytes => bytes.toString("base64"));
+/** @param {PortableDocument} document @param {(layers: number[][]) => unknown} change */
+const editLayers = (document, change) => editDomain(document, "keymap", change);
+/** @param {PortableDocument} document @param {(macros: string[]) => unknown} change */
+const editMacros = (document, change) => editDomain(document, "macros", slots => {
+    const macros = slots.map(bytes => bytes.toString("base64")); change(macros);
+    slots.splice(0, slots.length, ...macros.map(value => Buffer.from(value, "base64")));
+});
+/** @param {PortableDocument} document @param {(settings: import('../../core/schema/types.js').SettingsDomain) => unknown} change */
+const editSettings = (document, change) => editDomain(document, "settings", change);
+module.exports = {withPayload, profileDomain, editDomain, profileLayers, profileMacros, editLayers, editMacros, editSettings};

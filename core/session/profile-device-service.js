@@ -5,13 +5,13 @@ const {PHASE} = require("../model/vocabulary");
 /**
  * @typedef {import("./types.js").DeviceConnection} Connection
  * @typedef {import("./types.js").DeviceCapabilities} Caps
- * @typedef {import("./types.js").ProfileStatus} Status
  * @typedef {import("./types.js").ReadSnapshot} ReadSnapshot
  * @typedef {import("./types.js").RestoredProfile} Restored
  * @typedef {import("./operation-failure.js").PublishedError} PublishedError
+ * @typedef {import("../../contracts/model.js").PhaseId} PhaseId
+ * @typedef {InstanceType<typeof import("./connection-state.js").ConnectionState>} State
  */
-const {requireReady, evaluateProfileCompatibility} = require("./firmware-support");
-const {editorViews} = require("../model/profile-model");
+const {canEdit, requireReady, evaluateProfileCompatibility} = require("./firmware-support");
 const {restoreProfile} = require("./portable-profile-session");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {ProfilePayloadReader, CompiledDefaults} = require("./profile-payload-reader");
@@ -20,14 +20,14 @@ const {DeviceListing} = require("./device-listing");
 const {BackgroundReads, WATCH_TIMEOUT_MS, readLiveStatus, readFlashPauses} = require("./background-reads");
 const {checkRestorable} = require("./restore-checks");
 const {ProfileRequestIdSequence, normalizeRequestId} = require("./request-ids");
-const {serviceSnapshot, clone} = require("./service-snapshot");
+const {ConnectionState, clone} = require("./connection-state");
 const {readServiceEditMode, readLiveFacts} = require("./edit-mode-reads");
-const {adoptPortable, readBaseRgb, readCombos, readCommittedProfile, readCompleteProfile, readDeviceFacts, readLayout} = require("./read-operations");
+const {readBaseRgb, readCombos, readCommittedProfile, readCompleteProfile, readDeviceFacts, readLayout} = require("./read-operations");
 const {flushWorkingCopy, postLiveEdit, readWorkingCopy, restartKeyboard, revertWorkingCopy, saveWorkingCopy, setEditMode} = require("./live-edit-operations");
 const {readCandidateStatus} = require("../protocol/profile-candidate-v1");
 const {PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus} = require("../protocol/profile-wire-v1");
 const {firmwareUpdateRequired} = require("../schema/profile-blob-v1");
-const {STARTING, STARTING_CODE, STARTING_WORDS, hasStarted, stillStarting} = require("./keyboard-starting");
+const {STARTING, STARTING_CODE, STARTING_WORDS, hasStarted, isStartingTimeout, readOnceStarted, stillStarting} = require("./keyboard-starting");
 const {LiveEditCoordinator, TransactionIds} = require("./live-edit-coordinator");
 
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
@@ -35,17 +35,44 @@ const checkReady = requireReady;
 /** @param {number} ms */
 const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * What one operation works with (`#operate`): the keyboard it runs on, and
+ * what the service holds of it, never the service itself. `connection` and
+ * `ids` are the keyboard's as each is asked for, and fail once it is gone;
+ * `waiting` is what the keyboard holds of Ark's until no key is held.
+ * @typedef {{
+ *   readonly connection: Connection,
+ *   readonly ids: import("../protocol/types.js").RequestIds,
+ *   nextRequestId(): number,
+ *   state: State,
+ *   capabilities(): Caps,
+ *   current(): boolean,
+ *   reader(): InstanceType<typeof ProfilePayloadReader>,
+ *   live(): InstanceType<typeof LiveEditCoordinator>,
+ *   progress: ProfileDeviceService["reportReadProgress"],
+ *   say(message: string): void,
+ *   publish(): void,
+ *   waiting: import("./types.js").LiveWaiting | null,
+ *   expectReconnect: ProfileDeviceService["expectReconnect"],
+ *   sleep: ((ms: number) => Promise<void>) | undefined,
+ *   now: (() => number) | undefined,
+ * }} Operation
+ */
+
 // The connected keyboard: scanning, connecting, and every read and save.
 //
-// The class holds the connection's state and runs one operation at a time
-// (`runOperation`). The operations past connecting are grouped by what they
-// do, each taking the service: the profile reads (read-operations.js), the
-// working copy's (live-edit-operations.js) and the reads between operations
-// (background-reads.js).
+// The class runs one operation at a time (`runOperation`), and holds what it
+// knows of the connection as one record (connection-state.js), cleared when
+// the connection ends. Each operation past connecting states here what it
+// needs before it starts and what it resolves with (`#operate`); its work is
+// grouped with others by what it does, each given only the operation: the
+// profile reads (read-operations.js), the working copy's
+// (live-edit-operations.js) and the reads between operations
+// (background-reads.js). Two sequences chain operations of its own: the
+// editor's read (`readForEditor`) and the read after a save (`readBack`).
 //
-// What it holds is published as `snapshot()` (service-snapshot.js), through
-// `onChange`, so the panel draws the keyboard as the service last saw it,
-// failures included.
+// What it holds is published as `snapshot()`, through `onChange`, so the
+// panel draws the keyboard as the service last saw it, failures included.
 //
 // One convention for failure. An operation that fails rejects, with the error
 // it records: `snapshot().error` (code, message and, for a save, where it
@@ -81,7 +108,6 @@ class ProfileDeviceService {
         });
         this.onChange = typeof options.onChange === "function" ? options.onChange : undefined;
         this.watchTimeoutMs = options.watchTimeoutMs || WATCH_TIMEOUT_MS;
-        this.missedLooks = 0;
         this.onApplyProgress = typeof options.onApplyProgress === "function" ? options.onApplyProgress : undefined;
         this.onReadProgress = typeof options.onReadProgress === "function" ? options.onReadProgress : undefined;
         // The wait between polls while reading and saving a profile. A shell
@@ -98,14 +124,9 @@ class ProfileDeviceService {
         this.devices = [];
         // Each keyboard's public id and number (device-listing.js).
         this.listing = new DeviceListing();
-        /** @type {Connection | undefined} */
-        this.connection = undefined;
-        this.connectionPublicId = "";
+        // What the service holds of the connection (connection-state.js).
+        this.state = new ConnectionState();
         this.connectionSequence = 0;
-        /** @type {number | null} */
-        this.connectionToken = null;
-        /** @type {(() => void) | undefined} */
-        this.disposeConnectionListener = undefined;
         this.disconnecting = false;
         // A save renamed the keyboard, which then restarts USB by itself
         // (keyboard-reconnect.js): losing the connection is no failure.
@@ -116,74 +137,34 @@ class ProfileDeviceService {
         /** @type {import("./types.js").LostKeyboard | undefined} */
         this.lost = undefined;
         this.scanned = false;
-        /** @type {import("../../contracts/model.js").PhaseId} */
+        /** @type {PhaseId} */
         this.phase = PHASE.IDLE;
         this.operationId = 0;
-        /** @type {Caps | undefined} */
-        this.capabilities = undefined;
-        /** @type {Status | undefined} */
-        this.status = undefined;
-        /** @type {import("./types.js").CandidateStatus | undefined} */
-        this.candidateStatus = undefined;
-        /** @type {import("../protocol/types.js").RequestIds | undefined} */
-        this.requestIds = undefined;
         /** @type {PublishedError | undefined} */
         this.error = undefined;
         /** @type {string[]} */
         this.diagnostics = [];
-        this.lastRefreshedAt = "";
-        /** @type {NonNullable<import("./types.js").DeviceModelInput["liveApply"]>} */
-        this.liveApply = {state: "idle"};
-        /** @type {import("./types.js").LayoutRead | undefined} */
-        this.layout = undefined;
-        /** @type {import("./types.js").CommittedRead | undefined} */
-        this.committed = undefined;
-        /** @type {import("./types.js").BaseRgbRead | undefined} */
-        this.baseRgb = undefined;
-        /** @type {import("./types.js").ComboRead | undefined} */
-        this.combos = undefined;
-        // Each half's flash pauses, read for the Keyboard screen's Diagnostics.
-        /** @type {import("../../contracts/model.js").FlashPausesView | undefined} */
-        this.flashPauses = undefined;
-        /** @type {ReadSnapshot | Restored | undefined} */
-        this.portable = undefined;
-        this.portableProgress = "";
         // Ark's own live edit or Revert the keyboard holds until no key is
         // held (live-edit-coordinator.js), while it waits.
         /** @type {import("./types.js").LiveWaiting | null} */
         this.liveWaiting = null;
-        /** @type {ReturnType<typeof editorViews>["macroView"] | undefined} */
-        this.macroView = undefined;
-        /** @type {ReturnType<typeof editorViews>["customKeyView"] | undefined} */
-        this.customKeyView = undefined;
-        /** @type {ReturnType<typeof editorViews>["settingsView"] | undefined} */
-        this.settingsView = undefined;
-        /** @type {InstanceType<typeof ProfilePayloadReader> | undefined} */
-        this.payloadReader = undefined;
         // The compiled defaults last verified on any connection, and the
         // shell's copy between runs (profile-payload-reader.js).
         this.compiledDefaults = new CompiledDefaults(options.compiledDefaults);
-        // How edits reach this keyboard (firmware D-F32), read with its
-        // capabilities; undefined when the keyboard does not say.
-        /** @type {(import("../protocol/types.js").EditModeRead & {notStored?: boolean}) | undefined} */
-        this.editMode = undefined;
-        // The edit mode could not be read (not refused as unknown): Review and
-        // save's reads meanwhile, and the next status refresh or read tries
-        // again.
-        this.editModeUnknown = false;
-        // The toggles' stored masters and runtime overrides (GET 0x22).
-        /** @type {import("../protocol/types.js").RuntimeRead | null} */
-        this.runtime = null;
-        /** @type {InstanceType<typeof LiveEditCoordinator> | undefined} */
-        this.liveEdits = undefined;
     }
+
+    // The profile the editors follow, and the capabilities the keyboard
+    // reported, as the panel reads them (connection-state.js).
+    get portable() {return this.state.portable;}
+    set portable(profile) {this.state.portable = profile;}
+    get capabilities() {return this.state.capabilities;}
 
     async enumerate() {
         return this.runOperation(PHASE.ENUMERATE, async () => {
             const descriptors = await this.coordinator.listDevices();
             this.devices = this.listing.list(descriptors);
             this.scanned = true;
-            this.phase = this.connection ? PHASE.CONNECTED : this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY;
+            this.phase = this.state.connection ? PHASE.CONNECTED : this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY;
             this.addDiagnostic(
                 this.devices.length
                     ? `Found ${this.devices.length} compatible Charybdis Raw HID interface${this.devices.length === 1 ? "" : "s"}.`
@@ -197,58 +178,58 @@ class ProfileDeviceService {
         if (this.busy) this.refuseBusy();
         const adapterDeviceId = this.listing.adapterId(String(publicDeviceId || ""));
         if (!adapterDeviceId) this.refuse("Select a keyboard from the latest scan before connecting.");
-        if (this.connection) {
+        if (this.state.connection) {
             await this.disconnect();
         }
         await this.runOperation(PHASE.CONNECT, async () => {
             const connection = await this.coordinator.connect(adapterDeviceId);
-            this.connection = connection;
+            const state = this.state;
+            state.connection = connection;
             this.reconnectExpected = false;
             this.lost = undefined;
-            this.missedLooks = 0;
-            this.requestIds = new ProfileRequestIdSequence(this.requestIdStart);
-            this.connectionPublicId = String(publicDeviceId);
-            this.connectionToken = ++this.connectionSequence;
+            state.missedLooks = 0;
+            state.requestIds = new ProfileRequestIdSequence(this.requestIdStart);
+            state.connectionPublicId = String(publicDeviceId);
+            state.connectionToken = ++this.connectionSequence;
             this.phase = PHASE.CONNECTED;
-            this.disposeConnectionListener = connection.onDisconnect((reason) => this.handleDisconnect(reason));
-            this.addDiagnostic(`Connected to ${this.deviceLabel(this.connectionPublicId)}.`);
+            state.disposeConnectionListener = connection.onDisconnect((reason) => this.handleDisconnect(reason));
+            this.addDiagnostic(`Connected to ${this.deviceLabel(state.connectionPublicId)}.`);
         });
         return this.refresh();
     }
 
     async refresh() {
-        if (!this.connection?.connected) this.refuse("Connect to a keyboard before refreshing live capabilities.");
-        return this.runOperation(PHASE.REFRESH, async () => {
-            const connection = this.connectedConnection();
+        await this.#operate(PHASE.REFRESH, {requires: "Connect to a keyboard before refreshing live capabilities."}, async op => {
+            const connection = op.connection, state = op.state;
             let capabilities;
-            try {capabilities = await readProfileCapabilities(connection, {nextRequestId: () => this.nextRequestId()});}
+            try {capabilities = await readProfileCapabilities(connection, {nextRequestId: op.nextRequestId});}
             catch (error) {
                 const code = /** @type {{code?: string}} */ (error).code;
                 if (code === "INCOMPATIBLE_RESPONSE" || code === "UNHANDLED") throw firmwareUpdateRequired({cause: error});
                 throw error; // Timeouts and broken correlation remain transport failures.
             }
             const compatibility = evaluateProfileCompatibility(capabilities);
-            const status = compatibility.compatible ? await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()}) : undefined;
+            const status = compatibility.compatible ? await readProfileStatus(connection, {nextRequestId: op.nextRequestId}) : undefined;
             const candidateStatus = compatibility.compatible && (capabilities.featureFlags & PROFILE_WIRE_FEATURES.SAVES) !== 0
-                ? await this.readCandidateStatus(connection, {nextRequestId: () => this.nextRequestId()})
+                ? await this.readCandidateStatus(connection, {nextRequestId: op.nextRequestId})
                 : undefined;
             // Every build that saves has a working copy and an edit mode; a
             // keyboard that does not answer is read and applied as before.
-            this.editMode = undefined;
-            this.editModeUnknown = false;
-            if (candidateStatus) await readServiceEditMode(this, connection);
-            if (this.connection !== connection || !connection.connected) {
+            state.editMode = undefined;
+            state.editModeUnknown = false;
+            if (candidateStatus) await readServiceEditMode(op);
+            if (!op.current()) {
                 throw new Error("The keyboard disconnected while live state was being refreshed.");
             }
-            this.capabilities = capabilities;
-            this.status = status;
-            this.candidateStatus = candidateStatus;
+            state.capabilities = capabilities;
+            state.status = status;
+            state.candidateStatus = candidateStatus;
             // A connection that replaces a lost one: an edit Ark began on the
             // old one and never finished is aborted now rather than holding
             // the keyboard until its lease ends.
-            if (this.editMode) await this.liveCoordinator().abandonUnfinished().catch(() => false);
-            await readLiveFacts(this, connection);
-            this.lastRefreshedAt = new Date().toISOString();
+            if (state.editMode) await op.live().abandonUnfinished().catch(() => false);
+            await readLiveFacts(op);
+            state.lastRefreshedAt = new Date().toISOString();
             this.phase = PHASE.CONNECTED;
             this.addDiagnostic(
                 compatibility.compatible
@@ -256,6 +237,7 @@ class ProfileDeviceService {
                     : `Live compatibility check found ${compatibility.reasons.length} blocking issue${compatibility.reasons.length === 1 ? "" : "s"}.`
             );
         });
+        return this.snapshot();
     }
 
     // Waits until the keyboard has finished starting (keyboard-starting.js):
@@ -266,17 +248,16 @@ class ProfileDeviceService {
     // slave half known, it fails KEYBOARD_STARTING.
     /** @param {{deadline?: number}} [options] @returns {Promise<{started: boolean, deadline: number, late: boolean}>} */
     async awaitStarted({deadline} = {}) {
-        if (!this.connection?.connected) this.refuse("Connect to a keyboard before reading it.");
         const now = this.now || Date.now, sleep = this.sleep || defaultSleep;
         const until = deadline ?? now() + STARTING.WAIT_MS;
-        let started = false;
-        await this.runOperation(PHASE.STARTING, async () => {
-            const connection = this.connectedConnection();
+        const started = await this.#operate(PHASE.STARTING, {requires: "Connect to a keyboard before reading it."}, async op => {
+            const connection = op.connection;
+            let started = false;
             if (deadline !== undefined) await sleep(STARTING.POLL_MS);
             for (;;) {
-                if (this.connection !== connection || !connection.connected) throw new Error("The keyboard disconnected while it was starting.");
-                const status = await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()});
-                this.status = status;
+                if (!op.current()) throw new Error("The keyboard disconnected while it was starting.");
+                const status = await readProfileStatus(connection, {nextRequestId: op.nextRequestId});
+                op.state.status = status;
                 if (hasStarted(status)) {started = true; break;}
                 if (now() >= until) {
                     if (stillStarting(status) && status.slaveKnown) throw Object.assign(new Error(STARTING_WORDS.timeout), {code: STARTING_CODE});
@@ -286,6 +267,7 @@ class ProfileDeviceService {
                 await sleep(STARTING.POLL_MS);
             }
             this.phase = PHASE.CONNECTED;
+            return started;
         });
         return {started, deadline: until, late: now() >= until};
     }
@@ -294,18 +276,39 @@ class ProfileDeviceService {
     // the keyboard runs, its committed profile (`reuse` takes bytes a read
     // just checked again, while they are still what it runs), and the
     // optional combos and base RGB, which never reject.
-    readLayout() {return readLayout(this);}
+    async readLayout() {
+        // The layer count comes from the firmware's own advertised capacity:
+        // a keyboard connected without one is refused for that, one not
+        // connected for its connection (#operate).
+        const layerCount = this.state.capabilities?.compiledLayerCount;
+        if (this.state.connected && (typeof layerCount !== "number" || !Number.isInteger(layerCount) || layerCount < 1)) {
+            this.refuse("Refresh capabilities before reading the layout.");
+        }
+        await this.#operate(PHASE.READ_LAYOUT, {requires: "Connect to a keyboard before reading its layout.",
+            initialize: state => {state.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};}},
+        op => readLayout(op, /** @type {number} */ (layerCount)));
+        return this.snapshot();
+    }
     /** @param {{reuse?: boolean}} [options] */
-    readCommittedProfile(options) {return readCommittedProfile(this, options);}
-    readCombos() {return readCombos(this);}
-    readBaseRgb() {return readBaseRgb(this);}
+    async readCommittedProfile(options) {
+        await this.#operate(PHASE.READ_PROFILE, {requires: "Connect to a keyboard before reading its profile.",
+            initialize: state => {state.committed = {state: "reading", progress: {done: 0, total: 0}};}},
+        op => readCommittedProfile(op, options));
+        return this.snapshot();
+    }
+    readCombos() {
+        return this.#readOptional(PHASE.READ_COMBOS, state => {state.combos = {state: "reading"};}, readCombos);
+    }
+    readBaseRgb() {
+        return this.#readOptional(PHASE.READ_BASE_RGB, state => {state.baseRgb = {state: "reading"};}, readBaseRgb);
+    }
 
     // One coherent snapshot supplies the editor and the draft. Standalone
     // exports use the same reader without replacing the editor's state
     // (read-operations.js).
     /** @returns {Promise<import("./types.js").CompleteReadSnapshot>} */
     async readKeyboardProfile() {
-        const read = await readCompleteProfile(this, {forEditor: true});
+        const read = await this.#readComplete({forEditor: true});
         if (read.incomplete) throw new Error("The keyboard did not return a complete editor profile.");
         return read;
     }
@@ -314,13 +317,95 @@ class ProfileDeviceService {
     /** @overload @param {{forRestore?: false; reuseReadback?: boolean}} [options] @returns {Promise<import("./types.js").CompleteReadSnapshot>} */
     /** @param {{forRestore?: boolean; reuseReadback?: boolean}} [options] @returns {Promise<import("./types.js").ReadSnapshot>} */
     async readPortableProfile(options = {}) {
-        return readCompleteProfile(this, options);
+        return this.#readComplete(options);
+    }
+
+    /** @param {Parameters<typeof readCompleteProfile>[1]} options */
+    #readComplete(options) {
+        return this.#operate(PHASE.READ_COMPLETE, {requires: "Connect the keyboard and wait for the current operation to finish.", idle: true, returns: "verified profile"},
+            op => readCompleteProfile(op, options));
+    }
+
+    // The editor's read, as Read keyboard and every read Ark follows back
+    // make it, each step its own operation: list the keyboards, connect
+    // `deviceId` (the first listed when none is given) unless it is the one
+    // connected, read its capabilities, wait until it has finished starting
+    // and read its complete profile, read again while it changes under the
+    // read (keyboard-starting.js). A keyboard not on current firmware is read
+    // no further. A failed complete read is told to `failed`, then falls back
+    // to the independent reads, so a partly readable keyboard still gets its
+    // diagnostics; their failures stay in the snapshot. `progress` runs the
+    // slow steps behind the shell's indicator. Resolves with what it found:
+    //
+    //   {kind: "none"}                no keyboard is listed
+    //   {kind: "firmware", failure?}  not current firmware: its capabilities
+    //                                 say so, or its stored profile does
+    //   {kind: "starting"}            it never finished starting
+    //   {kind: "read", portable}      its complete profile
+    //   {kind: "read", failure}       the complete read failed; the
+    //                                 independent reads ran
+    //
+    // Any other failure (listing, connecting, refreshing, the wait, the
+    // layout) rejects.
+    /** @param {string} [deviceId] @param {import("./types.js").EditorReadHooks} [hooks] @returns {Promise<import("./types.js").EditorRead>} */
+    async readForEditor(deviceId, {progress = (_step, work) => work(), failed} = {}) {
+        await this.enumerate();
+        const devices = this.devices;
+        /** @param {string | undefined} id */
+        const listed = id => devices.some(device => device.id === id);
+        if (!devices.length) return {kind: "none"};
+        if (deviceId && !listed(deviceId)) throw new Error("The selected keyboard is no longer available. Choose a keyboard from the keyboard menu.");
+        // A keyboard that left the list is let go: on the web page, choosing
+        // another keyboard lists only that one, and reading connects it.
+        const connected = this.state.connectionPublicId;
+        if (!this.state.connected || !listed(connected) || (deviceId && connected !== deviceId)) await this.connect(deviceId || devices[0].id);
+        await this.refresh();
+        if (!canEdit(this.capabilities)) return {kind: "firmware"};
+        let started;
+        try {started = await this.awaitStarted();}
+        catch (error) {
+            if (isStartingTimeout(error)) return {kind: "starting"};
+            throw error;
+        }
+        try {return {kind: "read", portable: await progress("complete", () => readOnceStarted(this, started, () => this.readKeyboardProfile()))};}
+        catch (error) {
+            if (isStartingTimeout(error)) return {kind: "starting"};
+            if (/** @type {{code?: string}} */ (error).code === "FIRMWARE_UPDATE_REQUIRED") return {kind: "firmware", failure: /** @type {Error} */ (error)};
+            failed?.(error);
+            // A failed complete read never opens an editable draft. (The
+            // base lighting is read before the combos here, after them in
+            // readBack: neither depends on the other.)
+            await progress("layout", () => this.readLayout());
+            await progress("profile", () => this.readCommittedProfile()).catch(() => {});
+            await this.readBaseRgb();
+            await this.readCombos();
+            return {kind: "read", failure: error};
+        }
+    }
+
+    // After the keyboard stored a new profile, everything the panel shows of
+    // it is read again, each step its own operation, in the order the reads
+    // depend on; `onStep` hears each step as it starts. The layout comes from
+    // the saved profile, downloaded and checked: the fresh read of what the
+    // keyboard stored. The profile step takes those bytes again while the
+    // keyboard still names exactly them (`reuse`). Rejects with what failed,
+    // as the layout and profile reads do.
+    /** @param {(step: import("../../contracts/messages.js").ReadStep) => void} [onStep] */
+    async readBack(onStep = () => {}) {
+        onStep("layout");
+        await this.readLayout();
+        onStep("profile");
+        await this.readCommittedProfile({reuse: true});
+        onStep("combos");
+        await this.readCombos();
+        onStep("baseRgb");
+        await this.readBaseRgb();
     }
 
     // Always ends disconnected and resolves; a failure to close the handle
     // cleanly is recorded in `error`.
     async disconnect() {
-        const connection = this.connection;
+        const connection = this.state.connection;
         if (!connection) {
             this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
             this.emitChange();
@@ -330,15 +415,15 @@ class ProfileDeviceService {
         this.phase = PHASE.DISCONNECT;
         this.error = undefined;
         this.emitChange();
-        this.disposeConnectionListener?.();
-        this.disposeConnectionListener = undefined;
+        this.state.disposeConnectionListener?.();
+        this.state.disposeConnectionListener = undefined;
         try {
             await connection.disconnect();
         } catch (error) {
             this.setError(error);
         } finally {
             this.disconnecting = false;
-            this.clearConnection();
+            this.state.clear();
             this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
             this.addDiagnostic("Disconnected from the live keyboard.");
             this.emitChange();
@@ -350,76 +435,100 @@ class ProfileDeviceService {
     // within it.
     liveCoordinator() {
         const connection = this.connectedConnection();
-        if (!this.liveEdits || this.liveEdits.connection !== connection) {
-            this.liveEdits = new LiveEditCoordinator(connection, {requestIds: this.requestSequence(), transactionIds: new TransactionIds(), sleep: this.sleep, now: this.now});
+        if (!this.state.liveEdits || this.state.liveEdits.connection !== connection) {
+            this.state.liveEdits = new LiveEditCoordinator(connection, {requestIds: this.requestSequence(), transactionIds: new TransactionIds(), sleep: this.sleep, now: this.now});
         }
-        return this.liveEdits;
+        return this.state.liveEdits;
     }
 
     // The working copy's operations (live-edit-operations.js): a live edit,
     // Save, Revert, leaving Live edit, reading what the keyboard runs, a
-    // restart and the edit mode.
+    // restart and the edit mode. After an edit, Save or Revert the service
+    // reads the keyboard's status again, whether it worked or not.
     /** @param {Parameters<typeof postLiveEdit>[1]} edit @param {Parameters<typeof postLiveEdit>[2]} [options] */
-    postLiveEdit(edit, options) {return postLiveEdit(this, edit, options);}
+    postLiveEdit(edit, options) {
+        return this.#operate(PHASE.LIVE_EDIT, {requires: "Connect the keyboard before editing it.", returns: "edit result", refreshAfter: true},
+            op => postLiveEdit(op, edit, options));
+    }
     /** @param {{session: number, revision: number}} identity */
-    saveWorkingCopy(identity) {return saveWorkingCopy(this, identity);}
+    saveWorkingCopy(identity) {
+        return this.#operate(PHASE.LIVE_SAVE, {requires: "Connect the keyboard before saving.", returns: "save result", refreshAfter: true},
+            op => saveWorkingCopy(op, identity));
+    }
     /** @param {{session: number, revision: number}} identity */
-    revertWorkingCopy(identity) {return revertWorkingCopy(this, identity);}
+    revertWorkingCopy(identity) {
+        return this.#operate(PHASE.LIVE_REVERT, {requires: "Connect the keyboard before reverting it.", returns: "revert result", refreshAfter: true},
+            op => revertWorkingCopy(op, identity));
+    }
     /** @param {(document: import("../model/types.js").PortableDocument) => Promise<string | undefined>} saveRecovery */
-    flushWorkingCopy(saveRecovery) {return flushWorkingCopy(this, saveRecovery);}
-    readWorkingCopy() {return readWorkingCopy(this);}
-    restartKeyboard() {return restartKeyboard(this);}
+    flushWorkingCopy(saveRecovery) {
+        return this.#operate(PHASE.LIVE_SAVE, {requires: "Connect the keyboard before changing how edits reach it.", returns: "save result", refreshAfter: true},
+            op => flushWorkingCopy(op, saveRecovery));
+    }
+    readWorkingCopy() {
+        return this.#operate(PHASE.READ_COMPLETE, {requires: "Connect the keyboard before reading it.", returns: "profile"}, readWorkingCopy);
+    }
+    restartKeyboard() {
+        return this.#operate(PHASE.RESTART, {requires: "Connect the keyboard before restarting it.", returns: "restart result"}, restartKeyboard);
+    }
     /** @param {number} mode */
-    setEditMode(mode) {return setEditMode(this, mode);}
+    async setEditMode(mode) {
+        await this.#operate(PHASE.EDIT_MODE, {requires: "Connect the keyboard before changing how edits reach it."}, op => setEditMode(op, mode));
+        return this.state.editMode;
+    }
 
     // Cancel edit, taken while a live edit runs: the keyboard holds it until
     // no key is held, and aborts it at Ark's next look. False when nothing
     // of Ark's is held that can be cancelled.
     cancelLiveEdit() {
-        return Boolean(this.liveWaiting && this.liveEdits?.cancelWaiting());
+        return Boolean(this.liveWaiting && this.state.liveEdits?.cancelWaiting());
     }
 
     // The background reads (background-reads.js): the live watch's look, and
     // each half's flash pauses for the Keyboard screen's Diagnostics. Neither
     // starts while an operation or another background read holds the
     // keyboard, and neither rejects.
-    readLiveStatus() {return readLiveStatus(this, this.#background);}
-    readFlashPauses() {return readFlashPauses(this, this.#background);}
+    readLiveStatus() {
+        const watch = {timeoutMs: this.watchTimeoutMs, label: this.deviceLabel(this.state.connectionPublicId)};
+        return this.#readBetween(undefined, op => readLiveStatus(op, watch), Boolean(this.state.editMode));
+    }
+    readFlashPauses() {
+        return this.#readBetween(false, op => readFlashPauses(op, this.watchTimeoutMs));
+    }
 
     /** @param {import("../model/types.js").PortableDocument} document @param {import("./types.js").RestoreOptions} options @returns {Promise<import("./types.js").RestoredProfile>} */
     async restorePortableProfile(document, options) {
-        if (!this.connection?.connected || this.busy) this.refuse("Connect the keyboard and wait for the current operation to finish.");
-        /** @type {Restored | undefined} */
-        let result;
         let started = false;
-        await this.runOperation(PHASE.RESTORE_COMPLETE, async () => {
-            this.liveApply = {state: "idle"};
+        return this.#operate(PHASE.RESTORE_COMPLETE, {requires: "Connect the keyboard and wait for the current operation to finish.", idle: true, returns: "verified profile"}, async op => {
+            const state = op.state;
+            state.liveApply = {state: "idle"};
             try {
-                const connection = this.connectedConnection();
-                const capabilities = this.profileCapabilities();
-                const cachedBase = options?.expectedFingerprint && this.portable?.fingerprint === options.expectedFingerprint
-                    ? this.portable
+                const connection = op.connection;
+                const capabilities = op.capabilities();
+                const cachedBase = options?.expectedFingerprint && state.portable?.fingerprint === options.expectedFingerprint
+                    ? state.portable
                     : undefined;
-                const facts = await readDeviceFacts(this, connection, cachedBase);
-                checkRestorable(document, facts, this.capabilities);
+                const facts = await readDeviceFacts(op, connection, cachedBase);
+                checkRestorable(document, facts, state.capabilities);
                 started = true;
-                result = await restoreProfile(connection, this.requestSequence(), capabilities, document, {...options,
+                const result = await restoreProfile(connection, op.ids, capabilities, document, {...options,
                     baseSnapshot: cachedBase,
                     sleep: this.sleep,
                     now: this.now,
-                    onProgress: message => {this.portableProgress = message;},
+                    onProgress: message => {state.portableProgress = message;},
                     // The step view the commit bar draws; it outlives the apply
                     // when it failed, so the person can see where and why.
                     onApplyProgress: view => this.reportApplyProgress(view),
                 });
                 Object.assign(result, facts);
-                adoptPortable(this, result);
+                state.adoptPortable(result);
                 if (result.performance) {
                     const seconds = (result.performance.elapsedMs / 1000).toFixed(1);
                     this.addDiagnostic(`Saved the complete profile in ${seconds} s; published one ${result.performance.profileBytes}-byte profile.`);
                 }
+                return result;
             } finally {
-                this.portableProgress = "";
+                state.portableProgress = "";
                 // Once the restore has started — landed, failed, or stopped past
                 // the point of no return — the health the panel shows must be the
                 // keyboard's now, not the status read before the apply began. A
@@ -430,29 +539,119 @@ class ProfileDeviceService {
                 }
             }
         });
-        if (!result) throw new Error("The keyboard operation returned no verified profile.");
-        return result;
     }
 
     async close() {
-        this.disposeConnectionListener?.();
-        this.disposeConnectionListener = undefined;
+        this.state.disposeConnectionListener?.();
+        this.state.disposeConnectionListener = undefined;
         this.disconnecting = true;
         try {
             await this.coordinator.close();
         } finally {
             this.disconnecting = false;
-            this.clearConnection();
+            this.state.clear();
         }
     }
 
-    // What the service holds, as the panel draws it (service-snapshot.js).
+    // What the service holds, as the panel draws it: every part a copy, so
+    // the panel can keep it while the service goes on.
     /** @returns {import("./types.js").ServiceSnapshot} */
-    snapshot() {return serviceSnapshot(this);}
+    snapshot() {
+        return {
+            phase: this.phase,
+            operationId: this.operationId,
+            scanned: this.scanned,
+            busy: this.busy,
+            devices: this.devices.map((device) => ({...device})),
+            ...this.state.published(),
+            liveWaiting: this.liveWaiting ? {...this.liveWaiting} : null,
+            error: this.error ? {...this.error} : null,
+            diagnostics: this.diagnostics.slice(),
+        };
+    }
+
+    // Runs one operation on the connected keyboard: refused with `requires`
+    // before it starts when there is none (and, `idle`, while another runs),
+    // then run as one operation (`runOperation`) given only what it works
+    // with. Resolves with what `work` returns; one that returns nothing
+    // fails, saying it returned no `returns`. `initialize` sets the state
+    // the operation publishes as it starts; `refreshAfter` reads the
+    // keyboard's status after it, whether it worked or not.
+    /**
+     * @template T
+     * @param {PhaseId} phase
+     * @param {{requires: string, idle?: boolean, returns?: string, initialize?: (state: State) => void, refreshAfter?: boolean}} contract
+     * @param {(op: Operation) => Promise<T>} work
+     * @returns {Promise<T>}
+     */
+    async #operate(phase, {requires, idle = false, returns, initialize, refreshAfter = false}, work) {
+        if (!this.state.connected || (idle && this.busy)) this.refuse(requires);
+        /** @type {{value: T} | undefined} */
+        let done;
+        await this.runOperation(phase, async () => {done = {value: await work(this.#operation())};}, {
+            initialize: initialize && (() => initialize(this.state)),
+            after: refreshAfter ? () => this.refreshStatus() : undefined,
+        });
+        if (returns && !done?.value) throw new Error(`The keyboard operation returned no ${returns}.`);
+        return /** @type {{value: T}} */ (done).value;
+    }
+
+    // What an operation is given: the keyboard as it stands when the
+    // operation starts. It is current while the service still holds that
+    // connection and it is still connected.
+    /** @returns {Operation} */
+    #operation() {
+        const service = this, state = this.state, started = state.connection;
+        return {
+            get connection() {return service.connectedConnection();},
+            get ids() {return service.requestSequence();},
+            nextRequestId: () => this.nextRequestId(),
+            state,
+            capabilities: () => this.profileCapabilities(),
+            current: () => Boolean(started && state.connection === started && started.connected),
+            reader: () => this.profilePayloadReader(),
+            live: () => this.liveCoordinator(),
+            progress: (...args) => this.reportReadProgress(...args),
+            say: message => this.addDiagnostic(message),
+            publish: () => this.emitChange(),
+            get waiting() {return service.liveWaiting;},
+            set waiting(waiting) {service.liveWaiting = waiting;},
+            expectReconnect: (expected, reason) => this.expectReconnect(expected, reason),
+            sleep: this.sleep,
+            now: this.now,
+        };
+    }
+
+    // An optional read (readCombos, readBaseRgb): never rejects, and leaves
+    // an earlier error alone. Refused while another operation runs, it
+    // resolves with the snapshot as it is; the phase it ends in is the one
+    // before it while the keyboard is connected.
+    /** @param {PhaseId} phase @param {(state: State) => void} initialize @param {(op: Operation) => Promise<void>} read */
+    async #readOptional(phase, initialize, read) {
+        const previousPhase = this.phase;
+        try {
+            return await this.runOperation(phase, async () => {
+                try {await read(this.#operation());}
+                finally {if (this.state.connected) this.phase = previousPhase;}
+            }, {preserveError: true, initialize: () => initialize(this.state)});
+        } catch (error) {
+            if (/** @type {{code?: string}} */ (error).code !== "SERVICE_BUSY") throw error;
+            return this.snapshot();
+        }
+    }
+
+    // A read between operations (background-reads.js), one at a time:
+    // skipped, resolving with `skipped`, while an operation or another
+    // background read holds the keyboard, or when it is not `wanted`.
+    /** @template T, S @param {S} skipped @param {(op: Operation) => Promise<T>} read @param {boolean} [wanted] @returns {Promise<T | S>} */
+    async #readBetween(skipped, read, wanted = true) {
+        if (!wanted || this.busy || this.#background.out || !this.state.connected || !this.state.requestIds) return skipped;
+        return this.#background.run(() => read(this.#operation()));
+    }
 
     // Runs one operation: busy while it runs, then its failure recorded,
     // published and rejected with (see the class comment).
-    /** @param {import("../../contracts/model.js").PhaseId} phase @param {() => Promise<unknown>} operation @param {{preserveError?: boolean, initialize?: () => void, after?: () => Promise<unknown>}} [options] */
+    /** @param {PhaseId} phase @param {() => Promise<unknown>} operation @param {{preserveError?: boolean, initialize?: () => void, after?: () => Promise<unknown>}} [options] */
     async runOperation(phase, operation, {preserveError = false, initialize, after} = {}) {
         if (this.busy) this.refuseBusy(preserveError);
         this.#operationActive = true;
@@ -469,7 +668,7 @@ class ProfileDeviceService {
             if (background) await background;
             await operation();
         } catch (error) {
-            if (this.reconnectExpected && !this.connection?.connected) {
+            if (this.reconnectExpected && !this.state.connected) {
                 // The keyboard went away to take its new name; the operation
                 // still rejects, but the keyboard is not reported as failing.
                 failure = publicError(error);
@@ -478,35 +677,21 @@ class ProfileDeviceService {
                 this.setError(error);
                 failure = this.error;
             }
-            if (!this.connection?.connected) {
-                this.clearConnection();
+            if (!this.state.connected) {
+                this.state.clear();
             }
-            this.phase = this.connection?.connected
+            this.phase = this.state.connected
                 ? PHASE.CONNECTED
                 : this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
         } finally {
             // Health shown after a live edit, Save or Revert is the keyboard's
             // now, whether it worked or not.
-            if (after && this.connection?.connected) await after().catch(() => {});
+            if (after && this.state.connected) await after().catch(() => {});
             this.#operationActive = false;
             this.emitChange();
         }
         if (failure) throw rejection(failure);
         return this.snapshot();
-    }
-
-    /** @param {import("../../contracts/model.js").PhaseId} phase @param {() => Promise<unknown>} read @param {() => void} initialize */
-    async readOptional(phase, read, initialize) {
-        const previousPhase = this.phase;
-        try {
-            return await this.runOperation(phase, async () => {
-                try {await read();}
-                finally {if (this.connection?.connected) this.phase = previousPhase;}
-            }, {preserveError: true, initialize});
-        } catch (error) {
-            if (/** @type {{code?: string}} */ (error).code !== "SERVICE_BUSY") throw error;
-            return this.snapshot();
-        }
     }
 
     /** @param {boolean} [preserveError] @returns {never} */
@@ -532,10 +717,11 @@ class ProfileDeviceService {
         if (this.disconnecting) {
             return;
         }
-        const label = this.deviceLabel(this.connectionPublicId);
-        const device = this.devices.find((entry) => entry.id === this.connectionPublicId);
+        const publicId = this.state.connectionPublicId;
+        const label = this.deviceLabel(publicId);
+        const device = this.devices.find((entry) => entry.id === publicId);
         const others = this.devices.filter((entry) => entry !== device).map(({id, product}) => ({id, product}));
-        this.clearConnection();
+        this.state.clear();
         this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
         if (this.reconnectExpected) {
             this.addDiagnostic(`${label} disconnected ${this.reconnectReason}.`);
@@ -569,34 +755,6 @@ class ProfileDeviceService {
         return lost;
     }
 
-    clearConnection() {
-        this.portable = undefined; this.portableProgress = "";
-        this.macroView = undefined;
-        this.customKeyView = undefined;
-        this.settingsView = undefined;
-        this.payloadReader = undefined;
-        this.layout = undefined;
-        this.committed = undefined;
-        this.baseRgb = undefined;
-        this.combos = undefined;
-        this.flashPauses = undefined;
-        this.disposeConnectionListener?.();
-        this.disposeConnectionListener = undefined;
-        this.connection = undefined;
-        this.connectionPublicId = "";
-        this.connectionToken = null;
-        this.capabilities = undefined;
-        this.status = undefined;
-        this.candidateStatus = undefined;
-        this.requestIds = undefined;
-        this.lastRefreshedAt = "";
-        this.liveApply = {state: "idle"};
-        this.editMode = undefined;
-        this.editModeUnknown = false;
-        this.runtime = null;
-        this.liveEdits = undefined;
-    }
-
     /** @param {unknown} error */
     setError(error) {
         this.error = publicError(error);
@@ -624,7 +782,7 @@ class ProfileDeviceService {
     // separately avoid rebuilding and sending the complete panel per chunk.
     /** @param {import("../../contracts/model.js").ApplyView} view */
     reportApplyProgress(view) {
-        this.liveApply = view;
+        this.state.liveApply = view;
         if (!this.onApplyProgress) { this.emitChange(); return; }
         try { this.onApplyProgress(clone(view)); } catch {
             // A closed or reloading panel must not interrupt the save.
@@ -635,40 +793,41 @@ class ProfileDeviceService {
     // profile data or asking the panel to rebuild its editor for every reply.
     /** @param {[source: 'layout' | 'profile', progress: import("../../contracts/model.js").CountedProgress] | [source: 'portable', progress: string]} args */
     reportReadProgress(...args) {
-        const [source, progress] = args;
-        if (source === "layout") this.layout = {...this.layout, progress};
-        else if (source === "profile") this.committed = {...this.committed, progress};
-        else if (source === "portable") this.portableProgress = progress;
+        const [source, progress] = args, state = this.state;
+        if (source === "layout") state.layout = {...state.layout, progress};
+        else if (source === "profile") state.committed = {...state.committed, progress};
+        else if (source === "portable") state.portableProgress = progress;
         if (!this.onReadProgress) { this.emitChange(); return; }
         try {
             this.onReadProgress({...(source === "portable" ? {source, progress} : {source, progress: {...progress}}),
                 operationId: this.operationId, phase: this.phase,
-                selectedDeviceId: this.connectionPublicId, connectionToken: this.connectionToken});
+                selectedDeviceId: state.connectionPublicId, connectionToken: state.connectionToken});
         } catch {
             // A closed or reloading panel must not interrupt the read.
         }
     }
 
     connectedConnection() {
-        if (!this.connection?.connected) throw new Error("The keyboard disconnected before its operation could start.");
-        return this.connection;
+        if (!this.state.connection?.connected) throw new Error("The keyboard disconnected before its operation could start.");
+        return this.state.connection;
     }
     requestSequence() {
-        if (!this.requestIds) throw new Error("The keyboard disconnected before its operation could start.");
-        return this.requestIds;
+        if (!this.state.requestIds) throw new Error("The keyboard disconnected before its operation could start.");
+        return this.state.requestIds;
     }
     nextRequestId() {return this.requestSequence().next();}
     profileCapabilities() {
-        const capabilities = this.capabilities;
+        const capabilities = this.state.capabilities;
         checkReady(capabilities);
         return capabilities;
     }
 
     profilePayloadReader() {
-        if (!this.payloadReader || this.payloadReader.connection !== this.connection) {
-            this.payloadReader = new ProfilePayloadReader(this.connectedConnection(), {compiled: this.compiledDefaults.current(), onCompiled: read => this.compiledDefaults.keep(read)});
+        const state = this.state;
+        if (!state.payloadReader || state.payloadReader.connection !== state.connection) {
+            state.payloadReader = new ProfilePayloadReader(this.connectedConnection(), {compiled: this.compiledDefaults.current(), onCompiled: read => this.compiledDefaults.keep(read)});
         }
-        return this.payloadReader;
+        return state.payloadReader;
     }
 
     emitChange() {
@@ -682,15 +841,19 @@ class ProfileDeviceService {
         }
     }
 
+    // The keyboard's health and its toggles as they are now; a failure keeps
+    // what was read before.
     async refreshStatus() {
-        if (!this.connection?.connected || !this.requestIds || !evaluateProfileCompatibility(this.capabilities).compatible) return;
+        const state = this.state;
+        if (!state.connection?.connected || !state.requestIds || !evaluateProfileCompatibility(state.capabilities).compatible) return;
+        const op = this.#operation(), connection = state.connection;
         try {
-            this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.nextRequestId()});
-            this.candidateStatus = await this.readCandidateStatus(this.connection, {
-                nextRequestId: () => this.nextRequestId(),
+            state.status = await readProfileStatus(connection, {nextRequestId: op.nextRequestId});
+            state.candidateStatus = await this.readCandidateStatus(connection, {
+                nextRequestId: op.nextRequestId,
             });
-            await readLiveFacts(this, this.connection);
-            this.lastRefreshedAt = new Date().toISOString();
+            await readLiveFacts(op);
+            state.lastRefreshedAt = new Date().toISOString();
         } catch {
             // Preserve the original outcome; Refresh remains available for a later explicit retry.
         }

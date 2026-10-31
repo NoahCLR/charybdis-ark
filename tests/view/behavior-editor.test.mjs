@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behaviourThresholds, styleDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
+import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behaviourThresholds, styleDetail, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 import {impliedBranch} from "../../webview/view/keyface.mjs";
 import * as edits from "../../webview/view/edits.mjs";
 
@@ -57,38 +57,6 @@ test("transparent and disabled key aliases never open a behaviour editor", () =>
         assert.equal(behaviourEditorRow(profile, key), undefined, key);
     }
     for (const key of ["KC_A", "LT(3,KC_F)", "CUSTOM_KEY_0", "PD_MODE_0"]) assert.equal(canHaveBehaviour(profile, key), true, key);
-});
-
-test("a transparent key in a layer preview opens the key answered from below", () => {
-    const stack = publishedModel(profileDocument({keys: {
-        0: {0: "KC_A", 1: "KC_B", 2: "KC_C", 3: "CUSTOM_KEY_0"},
-        3: {0: "KC_DELETE", 1: "KC_NO", 2: "KC_TRANSPARENT", 3: "KC_TRANSPARENT"},
-        4: {0: "KC_TRANSPARENT", 1: "KC_TRANSPARENT", 2: "KC_TRANSPARENT", 3: "KC_TRANSPARENT"},
-    }})).layers;
-    const key = (held, index) => {
-        const found = behaviourKeyAt(stack, 4, held, index);
-        return [found.keycode, found.from?.displayName ?? null];
-    };
-
-    assert.deepEqual(key([3], 0), ["KC_DELETE", "Navigation"], "the layer held under it answers");
-    assert.deepEqual(key([3], 2), ["KC_C", "Base"], "through two transparent keys to the default layer");
-    assert.deepEqual(key([3], 3), ["CUSTOM_KEY_0", "Base"], "rows are found by what a key means, not its stored name");
-    assert.equal(behaviourEditorRow(profile, key([3], 1)[0]), undefined, "a key answered by KC_NO still has no editor");
-    // With no preview the base layer still answers, as the Key tab's status line says.
-    assert.deepEqual(key([], 0), ["KC_A", "Base"], "outside a preview the base layer answers");
-    assert.deepEqual(key([], 3), ["CUSTOM_KEY_0", "Base"]);
-    assert.deepEqual(behaviourKeyAt(stack, 3, [], 2), {keycode: "KC_C", from: stack[0]}, "a transparent key on a layer above the base");
-    assert.equal(behaviourEditorRow(profile, behaviourKeyAt(stack, 3, [], 1).keycode), undefined, "KC_NO itself has no editor");
-    assert.deepEqual(behaviourKeyAt(stack, 3, [], 0), {keycode: "KC_DELETE", from: null}, "a mapped key opens its own row");
-    assert.deepEqual(behaviourKeyAt(stack, 3, [], 99), {keycode: "", from: null}, "no position, no key");
-
-    const hollow = publishedModel(profileDocument({keys: {0: {0: "KC_TRANSPARENT"}, 1: {0: "KC_TRANSPARENT"}}})).layers;
-    assert.deepEqual(behaviourKeyAt(hollow, 1, [0], 0), {keycode: "KC_TRANSPARENT", from: null}, "nothing mapped below");
-    assert.deepEqual(behaviourKeyAt(hollow, 1, [], 0), {keycode: "KC_TRANSPARENT", from: null}, "nothing mapped below, no preview");
-    const overNothing = publishedModel(profileDocument({keys: {1: {0: "KC_TRANSPARENT"}}})).layers;
-    const below = behaviourKeyAt(overNothing, 1, [], 0);
-    assert.equal(below.keycode, "KC_NO", "a transparent key over KC_NO follows it");
-    assert.equal(canHaveBehaviour(profile, below.keycode), false, "and still has no behaviour");
 });
 
 test("timing fields show effective defaults but keep their stored inheritance zeros", () => {

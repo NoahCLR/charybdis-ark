@@ -4,8 +4,9 @@
 // the core, which answers with a new model. The draft lives on that side too,
 // so what is drawn is always what would be applied.
 
-import {behaviourKeyAt, behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
+import {behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
 import {layersOn, toggleLayer} from "./view/layer-set.mjs";
+import {layerView} from "./view/layer-view.mjs";
 import {initialReachGroups} from "./view/reach-groups.mjs";
 import {leaving} from "./view/demo.mjs";
 import {afterDraftChange, initialState, kept, resets, resetsTo} from "./view/state-fields.mjs";
@@ -184,11 +185,14 @@ export function post(message) {
 }
 
 export const layers = () => getModel()?.layers || [];
+// The view the board shows: the picked layer with the layers previewed on
+// under it that are still worth previewing (view/layer-set.mjs), and whether
+// any are, when the board shows what the keyboard answers with rather than
+// what the layer stores. Every screen asks it what answers, what shows and
+// what is reached, rather than passing the layer and the preview
+// (view/layer-view.mjs).
+export const currentView = () => layerView(getModel(), state.layer, layersOn(state.layer, state.layersOn, layers().length));
 export const currentLayer = () => layers()[state.layer] || layers()[0];
-// The layers previewed on under the current one, and whether any are: the board
-// then shows what the keyboard answers with, not what the layer stores.
-export const heldLayers = () => layersOn(state.layer, state.layersOn, layers().length);
-export const previewing = () => heldLayers().length > 0;
 // A plain pick shows one layer; ⌘-click adds or removes one from the preview.
 /** @param {number} index */
 export function showLayer(index) {
@@ -197,9 +201,9 @@ export function showLayer(index) {
 }
 /** @param {number} index */
 export function toggleLayerOn(index) {
-    const selectedKey = () => behaviourKeyAt(layers(), state.layer, heldLayers(), selectedPosition()?.layoutIndex).keycode;
+    const selectedKey = () => currentView().behaviours.keyAt(selectedPosition()?.layoutIndex).keycode;
     const before = selectedKey();
-    const next = toggleLayer(state.layer, heldLayers(), index);
+    const next = toggleLayer(state.layer, currentView().held, index);
     state.layer = next.top;
     state.layersOn = next.on;
     const row = behaviourRowAfterPreview(state.behaviourRow, before, selectedKey());
@@ -211,12 +215,6 @@ export const positionAt = (layer, index) =>
     (layer?.positions || []).find((position) => position.layoutIndex === index);
 export const selectedPosition = () => positionAt(currentLayer(), state.selected)
     || (currentLayer()?.positions || [])[0];
-
-// Editing is only offered where the keyboard says it is possible; everywhere
-// else the control stays visible and disabled, with the reason. Whether the
-// draft takes an edit is core's to say (`draft.editable`), so what is offered
-// is what the core accepts; the demo's draft, with no keyboard, takes them too.
-export const writable = () => Boolean(getModel()?.draft?.editable);
 
 // Posts a message that leaves the demo (or replaces its file), asking first
 // when that would lose edits not exported (view/demo.mjs leaving()).
@@ -230,25 +228,4 @@ export function postLeavingDemo(message) {
     state.leaveDemo = leave;
     state.overlay = "leaveDemo";
     render();
-}
-
-// Whether an area can be edited now, decided in one place: every edit goes
-// into the draft, so the draft must be this keyboard's, current and idle, and
-// the area's own capability must hold. Exporting only reads the keyboard.
-/** @type {Record<string, (model: import("../contracts/panel.js").PublishedModel | null) => boolean>} */
-const AREA_CAPABILITY = {
-    behaviours: (model) => Boolean(model?.behaviorEditing?.writable),
-    settings: (model) => Boolean(model?.settingsEditing?.writable),
-    macros: (model) => Boolean(model?.macroEditing?.writable),
-    customKeys: (model) => Boolean(model?.customKeyEditing?.writable),
-    pointing: (model) => Boolean(model?.pdModeEditing?.writable),
-    combos: (model) => model?.comboReadback?.writable !== false,
-    layers: (model) => Boolean(model?.portable?.available && !model.portable.busy),
-    import: (model) => Boolean(model?.portable?.available && !model.portable.busy),
-};
-/** @param {string} area */
-export function canEdit(area) {
-    const model = getModel();
-    if (area === "export") return Boolean(model?.portable?.available && !model.portable.busy);
-    return writable() && (AREA_CAPABILITY[area] ? AREA_CAPABILITY[area](model) : true);
 }

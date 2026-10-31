@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {actionNaming, dualRole, keyFace, keyKindOf, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
+import {actionNaming, dualRole, keyFace, keyKindOf, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import {createRequire} from "node:module";
 import keyNames from "../../core/model/key-names.js";
 import {behaviourEditorRow} from "../../webview/view/behavior-editor.mjs";
@@ -77,11 +77,8 @@ test("tiers count the branches that use them, so a key shows what it can do", ()
         {tapCount: 1, tap: {action: "KC_MPLY"}, hold: {action: "KC_ESC"}, longHold: {action: "LOCK_LAYER(1)"}},
         {tapCount: 2, tap: {action: "KC_MNXT"}, longHold: {action: "KC_MNXT"}},
     ]);
-    const model = {keyBehaviors: [thumb]};
-    const behaviour = behaviourFor(model, "LT(2,KC_SPACE)");
-    assert.deepEqual(behaviourTiers(behaviour), [{kind: "tap", count: 3}, {kind: "hold", count: 2}, {kind: "long", count: 2}]);
+    assert.deepEqual(behaviourTiers(thumb), [{kind: "tap", count: 3}, {kind: "hold", count: 2}, {kind: "long", count: 2}]);
     assert.deepEqual(behaviourTiers(undefined), []);
-    assert.equal(behaviourFor(model, "KC_A"), undefined);
 });
 
 test("the behaviour editor keeps every supported tap column visible", () => {
@@ -99,19 +96,6 @@ test("a key for an empty pointing slot says so on one line, as core names it", (
     // slot that holds nothing, which its name already says.
     assert.deepEqual(keyFace(cap("PD_MODE_6"), words), {main: "Slot 6 · hold (empty)", sub: "", kind: "key"});
     assert.equal(keyFace(cap("PD_MODE_0"), words).sub, "");
-});
-
-test("a picked key finds the behaviour it would collide with, whatever its spelling", () => {
-    const model = {
-        qmkKeycodeAliases: {KC_ENT: "KC_ENTER", KC_ENTER: "KC_ENTER", KC_SLSH: "KC_SLASH", KC_SLASH: "KC_SLASH"},
-        keyBehaviors: [{keycode: "KC_ENTER"}, {keycode: "LT(3,KC_SLASH)"}, {keycode: "PD_MODE_0"}],
-    };
-    assert.equal(canonicalKeycode(model, "KC_ENT"), "KC_ENTER");
-    assert.equal(canonicalKeycode(model, "LT(3, KC_SLSH)"), "LT(3,KC_SLASH)");
-    assert.equal(behaviourListeningTo(model, "KC_ENT").keycode, "KC_ENTER");
-    assert.equal(behaviourListeningTo(model, "LT(3, KC_SLSH)").keycode, "LT(3,KC_SLASH)");
-    assert.equal(behaviourListeningTo(model, "PD_MODE_0").keycode, "PD_MODE_0");
-    assert.equal(behaviourListeningTo(model, "KC_A"), undefined);
 });
 
 test("a key's name outside a cap is the core's whole name, not the cap's short legend", () => {
@@ -149,28 +133,6 @@ test("a key is transparent, disabled, a macro's or a custom key's only as core p
     assert.deepEqual([transparent, disabled, plain].map((position) => keyFace(position, model).kind), ["transparent", "disabled", "key"]);
     assert.equal(keyKindOf(model, "0x1"), "transparent", "a number however it is written");
     assert.equal(keyKindOf(model, "LSFT(KC_NO)"), undefined, "a modified key is a key");
-});
-
-test("a value the keyboard names by its hex reads as the name core knows it by, however the hex is written", () => {
-    const model = publishedModel();
-    assert.equal(model.qmkKeycodeAliases["0x7F00"], "CUSTOM_KEY_0", "core names the custom key's bare value");
-    assert.equal(canonicalKeycode(model, "0x7F00"), "CUSTOM_KEY_0");
-    assert.equal(canonicalKeycode(model, "0x7f00"), "CUSTOM_KEY_0");
-    assert.equal(canonicalKeycode(model, "LSFT(0x7F00)"), "LSFT(CUSTOM_KEY_0)", "inside an expression too");
-    assert.equal(canonicalKeycode(model, "0x7E86"), "PD_MODE_6");
-    assert.equal(canonicalKeycode(model, "0x7F7F"), "CUSTOM_KEY_127");
-    assert.equal(canonicalKeycode(model, "0x0041"), "0x0041", "a value nothing names stays as written");
-    assert.equal(behaviourListeningTo({...model, keyBehaviors: [{keycode: "CUSTOM_KEY_0"}]}, "0x7f00")?.keycode, "CUSTOM_KEY_0");
-});
-
-test("a picked key matches its behaviour row however its modifiers are spelled", () => {
-    const model = {qmkKeycodeAliases: {KC_C: "KC_C", KC_ENT: "KC_ENTER", KC_ENTER: "KC_ENTER"}, keyBehaviors: [{keycode: "LGUI(KC_C)"}, {keycode: "LCTL(LSFT(KC_ENTER))"}]};
-    assert.equal(canonicalKeycode(model, "G(KC_C)"), "LGUI(KC_C)");
-    assert.equal(behaviourListeningTo(model, "G(KC_C)")?.keycode, "LGUI(KC_C)", "the picker's Cmd wrapper");
-    assert.equal(behaviourListeningTo(model, "LCMD(KC_C)")?.keycode, "LGUI(KC_C)");
-    assert.equal(behaviourListeningTo(model, "S(C(KC_ENT))")?.keycode, "LCTL(LSFT(KC_ENTER))", "nesting order and aliases");
-    assert.equal(behaviourListeningTo(model, "LCS(KC_ENT)")?.keycode, "LCTL(LSFT(KC_ENTER))", "a combined wrapper");
-    assert.equal(behaviourListeningTo(model, "C(KC_C)"), undefined, "a different modifier is a different key");
 });
 
 test("the line across a cap marks a dual-role key: tap above, hold below", () => {

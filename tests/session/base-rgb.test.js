@@ -8,11 +8,8 @@ const {baseRgbForView} = require("../../core/model/device-profile-view");
 test("base RGB reads Profile Wire settings and preserves earlier errors across optional failure", async t => {
     const {document} = require("../fixtures/portable-profile");
     const {validateSnapshot} = require("../../core/model/portable-profile");
-    const {replaceDomain} = require("../../core/schema/profile-domains");
-    const {encodeSettings} = require("../../core/schema/settings-domain-v1");
-    const doc = document(), settings = validateSnapshot(doc).settings;
-    settings.values[21] = 1 | (1 << 8) | (32 << 16); settings.values[22] = (255 << 8) | (200 << 16);
-    doc.profile = replaceDomain(Buffer.from(doc.profile, "base64"), 64, () => encodeSettings(settings)).toString("base64");
+    const {editSettings} = require("../fixtures/profile-document");
+    const doc = editSettings(document(), settings => {settings.values[21] = 1 | (1 << 8) | (32 << 16); settings.values[22] = (255 << 8) | (200 << 16);});
     const {service, adapter} = await connectedService(t, {document: doc});
     const keyboard = adapter.keyboard;
     let fail = false;

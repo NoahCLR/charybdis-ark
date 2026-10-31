@@ -6,8 +6,18 @@
 // data-f identity authored on every form control. Other focusable elements
 // keep their existing authored hooks. Afterwards the matching control gets
 // focus back, with its caret where it was.
+//
+// A text field commits on change, so what is typed into it is only on screen
+// until then. The redraw keeps that text when it draws the field with the
+// same value as before, and commits it once, on Enter or when the field is
+// left. Chrome commits a typed field as it is thrown away, so that change is
+// held back while the redraw decides: kept, the text commits later; not
+// kept (the redraw draws another value, an edit having landed, or the field
+// closed or gone), the held change goes on, as it would have. A field drawn
+// closed (disabled, read-only) takes no edit, so it keeps no text.
 
-/** @typedef {{selector: string, index: number, unique: boolean, caret: [number, number | null] | null}} CapturedFocus */
+/** @typedef {{value: string, rendered: string, field: HTMLInputElement | HTMLTextAreaElement, held: boolean, hold: (event: Event) => void}} Typed */
+/** @typedef {{selector: string, index: number, unique: boolean, caret: [number, number | null] | null, typed: Typed | null}} CapturedFocus */
 /** @typedef {HTMLElement & {selectionStart?: number | null, selectionEnd?: number | null, setSelectionRange?: (start: number, end: number | null) => void}} FocusControl */
 
 const ACTION_NAMES = [
@@ -17,8 +27,13 @@ const ACTION_NAMES = [
     "data-source", "data-mode", "data-anchor", "data-act", "data-step-text", "data-step-delay", "data-raw-payload",
 ];
 
+// Between capture and restore the app is being drawn again: a field it
+// throws away is not being left.
+let redrawing = false;
+
 /** @param {Element} root @returns {CapturedFocus | null} */
 export function captureFocus(root) {
+    redrawing = true;
     const active = /** @type {FocusControl | null} */ (root.ownerDocument?.activeElement);
     if (!active || active === root.ownerDocument.body || !root.contains(active)) return null;
     const name = active.matches("input, select, textarea") ? "data-f"
@@ -32,16 +47,57 @@ export function captureFocus(root) {
     const index = matches.indexOf(active);
     /** @type {CapturedFocus["caret"]} */
     const caret = typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd ?? null] : null;
-    return {selector, index, unique, caret};
+    const text = caret && unique && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) ? active : null;
+    /** @type {Typed | null} */
+    const typed = text && text.value !== text.defaultValue ? {value: text.value, rendered: text.defaultValue, field: text, held: false,
+        hold: (event) => {event.stopImmediatePropagation(); if (typed) typed.held = true;}} : null;
+    typed?.field.addEventListener("change", typed.hold, {capture: true});
+    return {selector, index, unique, caret, typed};
+}
+
+// The typed field's own change goes on: it is not held back any more, and
+// one already held is sent as the browser sent it.
+/** @param {Typed | null} typed */
+function letGo(typed) {
+    if (!typed) return;
+    typed.field.removeEventListener("change", typed.hold, {capture: true});
+    if (typed.held) typed.field.dispatchEvent(new Event("change", {bubbles: true}));
+}
+
+// `field` keeps what was typed: the field it was typed in, kept by the
+// redraw, or one drawn anew in its place, which takes the text, its own
+// listeners following it as they followed the typing (a name's byte count);
+// the field thrown away stays held back. Text set from code, or whose change
+// was held, is no longer typed, so the browser would commit it neither on
+// Enter nor on blur. The change is sent here instead, once: unless more was
+// typed and the browser sends its own, or the next redraw takes the text over.
+/** @param {Typed} typed @param {HTMLInputElement | HTMLTextAreaElement} field */
+function keepTyped(typed, field) {
+    if (field === typed.field) {
+        field.removeEventListener("change", typed.hold, {capture: true});
+        if (!typed.held) return;
+    } else {
+        field.value = typed.value;
+        field.dispatchEvent(new Event("input", {bubbles: true}));
+    }
+    const commit = () => {
+        field.removeEventListener("blur", commit);
+        field.removeEventListener("keydown", enter);
+        if (!redrawing && field.isConnected && field.value === typed.value) field.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+    /** @param {Event} event */
+    const enter = (event) => {if (/** @type {KeyboardEvent} */ (event).key === "Enter" && field instanceof HTMLInputElement) commit();};
+    field.addEventListener("blur", commit);
+    field.addEventListener("keydown", enter);
 }
 
 /** @param {Element} root @param {CapturedFocus | null} captured */
 export function restoreFocus(root, captured) {
+    redrawing = false;
     if (!captured) return;
     const matches = root.querySelectorAll(captured.selector);
-    if (captured.unique && matches.length !== 1) return;
     const target = /** @type {FocusControl | undefined} */ (matches[captured.index] || matches[0]);
-    if (!target || typeof target.focus !== "function") return;
+    if ((captured.unique && matches.length !== 1) || !target || typeof target.focus !== "function") {letGo(captured.typed); return;}
     // A redraw may rebuild a disclosure closed. The field that had focus
     // stays reachable inside it, just as before that redraw.
     if (captured.unique) {
@@ -50,6 +106,9 @@ export function restoreFocus(root, captured) {
         }
     }
     target.focus({preventScroll: true});
+    const typed = captured.typed, field = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement ? target : null;
+    if (typed && field && !field.disabled && !field.readOnly && field.defaultValue === typed.rendered) keepTyped(typed, field);
+    else letGo(typed);
     if (captured.caret && typeof target.setSelectionRange === "function") {
         try { target.setSelectionRange(...captured.caret); } catch { /* a number input has no caret */ }
     }

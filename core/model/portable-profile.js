@@ -3,6 +3,11 @@
 
 /**
  * @typedef {import("./types.js").PortableDocument} PortableDocument
+ * @typedef {import("./types.js").DomainsContext} DomainsContext
+ * @typedef {import("./types.js").OpenDomain} OpenDomain
+ * @typedef {import("../schema/profile-domains-types.js").DomainKey} DomainKey
+ * @typedef {import("../schema/profile-domains-types.js").DomainModels} DomainModels
+ * @typedef {import("../schema/profile-domains-types.js").DomainOptions} DomainOptions
  * @typedef {import("./types.js").DecodedProfile} DecodedProfile
  * @typedef {import("./types.js").ProfileDestination} ProfileDestination
  * @typedef {{kind: number, operand: number}} WalkAction
@@ -14,7 +19,7 @@ const {SETTING, SETTING_FIELDS, decodeSettings} = require("../schema/settings-do
 const {ALL_LAYERS, CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {QK, inBlock, LAYER_FORMS, LAYER_FORM_LAYERS, layerModLayer, layerTapLayer, withLayerModLayer, withLayerTapLayer} = require("../../rules/qmk-keycodes.mjs");
-const {layerName} = require("./vocabulary");
+const {layerName, PROFILE_FULL_WORDS} = require("./vocabulary");
 const {reorderLinkRefusal} = require("./pointing-links");
 const {reorderShortcutRefusal} = require("./shortcut-layers");
 const {readStoredMacro} = require("./macro-input");
@@ -23,6 +28,7 @@ const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {hostSettings} = require("../schema/host-settings");
 const {answered} = require("../schema/bytes");
 const {profileDepthOptions} = require("../schema/profile-depth");
+const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
 
 // A current-format file contains one complete canonical schema-4 blob.
 // Keymap and macro streams are decoded editor views, never extra authorities.
@@ -32,7 +38,7 @@ const FILE_MAX_BYTES = 196608;
 // What a file over FILE_MAX_BYTES is told, wherever it is refused.
 const FILE_TOO_LARGE = "This file is too large for a backup.";
 const DOCUMENT_VERSION = 5;
-const {DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, encodeProfileDomains, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-domains");
+const {DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-domains");
 /** @type {readonly number[]} */
 const DOMAIN_IDS = DOCUMENT_PROFILE_DOMAINS.map(domain => domain.id);
 /** @param {number} id @param {Buffer} payload */
@@ -216,17 +222,86 @@ function validateSnapshot(value, capabilities) {
     return {document: /** @type {PortableDocument} */ (candidate), profile, candidate: candidateBytes, layers, macroSlots: macros, settings, rgb, behaviors, combos, pdModes, codecOptions, danglingPointingKeys: Object.fromEntries(danglingPointingKeys)};
 }
 
-// A profile with a renamed macro or custom key. Every name fits the settings
-// domain, but the whole profile shares one ceiling, so a long name can meet it
-// once behaviours, combos and other names have used the room.
-/** @param {import("../schema/types.js").BlobInput} profile */
-function encodeNamedProfile(profile) {
+// An edit a byte format refused as too large for the keyboard: the person's
+// edit, said in words (PROFILE_FULL_WORDS), by the count it went past where
+// the format names one (its `limit` and `most`), otherwise as `full`, its own
+// text kept beneath for the diagnostics. Any other refusal is left as it is.
+/** @param {unknown} error @param {string} full */
+function tooFull(error, full) {
+    const details = /** @type {{code?: unknown, limit?: unknown, most?: unknown} | null | undefined} */ (error);
+    if (details?.code !== "CAPACITY_EXCEEDED") return error;
+    const counted = typeof details.limit === "string" && typeof details.most === "number" && Object.hasOwn(PROFILE_FULL_WORDS.counts, details.limit)
+        ? PROFILE_FULL_WORDS.counts[details.limit](details.most) : undefined;
+    return Object.assign(new Error(counted ?? full), {code: "PROFILE_FULL", cause: error});
+}
+// The brightest a colour may be: the keyboard's reported limit, or the
+// codec's whole range when none was read.
+/** @param {DomainsContext["limits"]} limits */
+const brightnessCeiling = (limits) => limits?.brightnessMax ?? 255;
+// The codec options a document's domains are read and written with: the tap
+// depth the keyboard reports, or the one the document's RGB palette counts;
+// and the brightness the keyboard allows. A behaviour edit also checks every
+// row's actions against the keyboard's action slots (`checkActions`), since
+// the keyboard refuses a profile whose actions sit where it cannot run them;
+// any other edit keeps the rows it does not touch as they are.
+/** @param {Uint8Array} rgbPayload @param {DomainsContext & {checkActions?: boolean}} context @returns {DomainOptions} */
+function domainOptions(rgbPayload, {capabilities, limits, checkActions}) {
+    const depth = profileDepthOptions(capabilities, rgbPayload);
+    const actionLimits = {maxPdModes: POINTING_SLOT_COUNT, maxLogicalLayers: capabilities?.compiledLayerCount,
+        maxMacroSlots: capabilities?.macroSlots, maxCustomKeys: capabilities?.customKeySlots};
+    return {rgb: {maximumBrightness: brightnessCeiling(limits), ...depth.rgb},
+        behaviors: {...depth.behaviors, ...(checkActions ? {actionLimits} : {})}};
+}
+// Opens a profile blob's domains as models: each decoded the first time it
+// is opened, with the document's codec options, and the same model handed
+// back after that.
+/** @param {ReturnType<typeof decodeProfileBlob>} blob @param {DomainsContext & {checkActions?: boolean}} context */
+function domainsOf(blob, context) {
+    /** @param {DomainKey} key */
+    const payload = key => {
+        const found = blob.domains.find(domain => domain.id === domainCodec(key).id);
+        if (!found) throw fail("This backup is missing part of the profile. Ark imports only a complete backup.");
+        return found.payload;
+    };
+    const options = domainOptions(payload("rgb"), context);
+    /** @type {Map<DomainKey, DomainModels[DomainKey]>} */
+    const opened = new Map();
+    /** @type {OpenDomain} */
+    const open = key => {
+        if (!opened.has(key)) opened.set(key, domainCodec(key).decode(payload(key), options));
+        return /** @type {DomainModels[typeof key]} */ (opened.get(key));
+    };
+    return {open, opened, options};
+}
+// A document's domains to read, each decoded once when first opened, with
+// the options its edits use. Nothing opened here is written back.
+/** @param {PortableDocument} document @param {DomainsContext} [context] @returns {OpenDomain} */
+function readProfileDomains(document, context = {}) {
+    return domainsOf(decodeProfileBlob(Buffer.from(document.profile, "base64")), context).open;
+}
+// The one way to change a document's domains. `change` opens each domain it
+// edits and changes that model in place; each opened domain is decoded once
+// and encoded again, and every other domain keeps its bytes. A result too
+// large for the keyboard is refused in words (tooFull: `full`, or the profile
+// words), and the document it makes is checked as any other is; a behaviour
+// edit checks every row's actions (`checkActions`, domainOptions).
+/** @param {PortableDocument} document @param {DomainsContext & {full?: string, checkActions?: boolean}} context @param {(open: OpenDomain) => void} change @returns {PortableDocument} */
+function editProfileDomains(document, context, change) {
+    let result;
     try {
-        return encodeProfileBlob(profile);
-    } catch (error) {
-        if (!(error instanceof ProfileBlobProtocolError) || error.code !== "CAPACITY_EXCEEDED") throw error;
-        throw Object.assign(new Error("The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo."), {code: "PROFILE_FULL"});
-    }
+        const blob = decodeProfileBlob(Buffer.from(document.profile, "base64"));
+        const {open, opened, options} = domainsOf(blob, context);
+        change(open);
+        /** @template {DomainKey} K @param {K} key @param {DomainModels[K]} value */
+        const encode = (key, value) => domainCodec(key).encode(value, options);
+        const domains = blob.domains.map(domain => {
+            const key = DOCUMENT_PROFILE_DOMAINS.find(row => row.id === domain.id)?.key;
+            return key && opened.has(key) ? {...domain, payload: encode(key, /** @type {DomainModels[typeof key]} */ (opened.get(key)))} : domain;
+        });
+        result = {...document, profile: opened.size ? encodeProfileBlob({...blob, domains}).toString("base64") : document.profile};
+    } catch (error) {throw tooFull(error, context.full ?? PROFILE_FULL_WORDS.profile);}
+    validateSnapshot(result, context.capabilities);
+    return result;
 }
 
 /** @param {unknown} value @param {(action: WalkAction) => void} action */
@@ -284,9 +359,7 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // the saved base HSV as its own all-key colour after it becomes an overlay.
 /** @param {PortableDocument} document @param {readonly number[]} order @param {readonly string[]} [names] @param {{keysFollow?: boolean}} [options] */
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
-    const validated = validateSnapshot(document);
-    /** @type {PortableDocument} */
-    const result = JSON.parse(JSON.stringify(document));
+    validateSnapshot(document);
     if (!Array.isArray(order) || order.length !== LAYERS || new Set(order).size !== LAYERS || order.some(id => !Number.isInteger(id) || id < 0 || id >= LAYERS)) throw fail("Include every layer once.");
     /** @type {number[]} */
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
@@ -305,65 +378,67 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
         if (inBlock(code, QK.LAYER_MOD)) {const layer = layerModLayer(code); if (layer >= LAYERS) throw fail(OUTSIDE_LAYERS); return withLayerModLayer(code, reach(layer));}
         return code;
     }
-    const layers = order.map(old => validated.layers[old].map(native));
-    if (order[0] !== 0) {
-        layers[0] = layers[0].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0001 ? 0x0000 : code);
-        layers[remap[0]] = layers[remap[0]].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0000 ? 0x0001 : code);
-    }
-    const {rgb, behaviors, combos, settings, pdModes} = validated;
-    const settingsBefore = {values: settings.values.slice(), names: settings.names.slice()}, slotsBefore = structuredClone(pdModes);
-    /** @param {WalkAction} a */
-    const action = a => {if (!renumbers) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
-    walkActions(behaviors, action); walkActions(combos, action);
-    rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
-    if (order[0] !== 0) {
-        // Validation requires a row for every layer, and order is a permutation.
-        const oldBase = /** @type {typeof rgb.layerColors[number]} */ (rgb.layerColors.find(row => row.layerId === remap[0]));
-        if (oldBase.color.s === 0 && oldBase.color.v === 0) {
-            const hsv = settings.values[SETTING.RGB_COLOR];
-            oldBase.color = {h: hsv & 0xff, s: (hsv >>> 8) & 0xff, v: (hsv >>> 16) & 0xff};
-            oldBase.mode = 0; // ALL_KEYS: the base effect covered the whole layer.
+    // Reordering layers never rewrites macro streams or their allowed unused
+    // tail: the macros are never opened.
+    return editProfileDomains(document, {full: PROFILE_FULL_WORDS.name}, open => {
+        const keymap = open("keymap");
+        const layers = order.map(old => keymap[old].map(native));
+        if (order[0] !== 0) {
+            layers[0] = layers[0].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0001 ? 0x0000 : code);
+            layers[remap[0]] = layers[remap[0]].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0000 ? 0x0001 : code);
         }
-    }
-    rgb.layerGroupRows.forEach(row => {if (row.selector !== 255) row.selector = remap[row.selector];});
-    // A name the editor only showed as a default ("Layer 9" for an unnamed
-    // layer) stays unnamed, wherever the layer goes.
-    /** @param {string} name @param {number} old */
-    const unnamed = (name, old) => name === layerName([], old) && settings.names[old] === "";
-    settings.names = names ? names.map((name, next) => (unnamed(name, order[next]) ? "" : name)) : order.map(old => settings.names[old]);
+        keymap.splice(0, keymap.length, ...layers);
+        const rgb = open("rgb"), behaviors = open("behaviors"), combos = open("combos"), settings = open("settings"), pdModes = open("pdModes");
+        const settingsBefore = {values: settings.values.slice(), names: settings.names.slice()}, slotsBefore = structuredClone(pdModes);
+        /** @param {WalkAction} a */
+        const action = a => {if (!renumbers) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
+        walkActions(behaviors, action); walkActions(combos, action);
+        rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
+        if (order[0] !== 0) {
+            // Validation requires a row for every layer, and order is a permutation.
+            const oldBase = /** @type {typeof rgb.layerColors[number]} */ (rgb.layerColors.find(row => row.layerId === remap[0]));
+            if (oldBase.color.s === 0 && oldBase.color.v === 0) {
+                const hsv = settings.values[SETTING.RGB_COLOR];
+                oldBase.color = {h: hsv & 0xff, s: (hsv >>> 8) & 0xff, v: (hsv >>> 16) & 0xff};
+                oldBase.mode = 0; // ALL_KEYS: the base effect covered the whole layer.
+            }
+        }
+        rgb.layerGroupRows.forEach(row => {if (row.selector !== 255) row.selector = remap[row.selector];});
+        // A name the editor only showed as a default ("Layer 9" for an unnamed
+        // layer) stays unnamed, wherever the layer goes.
+        /** @param {string} name @param {number} old */
+        const unnamed = (name, old) => name === layerName([], old) && settings.names[old] === "";
+        settings.names = names ? names.map((name, next) => (unnamed(name, order[next]) ? "" : name)) : order.map(old => settings.names[old]);
 
-    // Each layer's switches, placements and combo reference go with it; a
-    // reference names a layer by what it holds, so it follows that layer.
-    /** @param {number} mask */
-    const follow = mask => remap.reduce((moved, next, old) => (moved | ((mask >>> old) & 1) << next) >>> 0, 0);
-    for (const field of SETTING_FIELDS) {
-        if (field.layerReference === "layer") settings.values[field.id] = remap[settings.values[field.id]];
-        else if (field.layerReference === "mask") {
-            /** @type {(old: number) => number} */
-            const move = field.layerReorder === "reach" ? reach : old => remap[old];
-            const mask = settings.values[field.id];
-            settings.values[field.id] = remap.reduce((result, next, old) => (result | ((mask >>> old) & 1) << move(old)) >>> 0, 0);
+        // Each layer's switches, placements and combo reference go with it; a
+        // reference names a layer by what it holds, so it follows that layer.
+        /** @param {number} mask */
+        const follow = mask => remap.reduce((moved, next, old) => (moved | ((mask >>> old) & 1) << next) >>> 0, 0);
+        for (const field of SETTING_FIELDS) {
+            if (field.layerReference === "layer") settings.values[field.id] = remap[settings.values[field.id]];
+            else if (field.layerReference === "mask") {
+                /** @type {(old: number) => number} */
+                const move = field.layerReorder === "reach" ? reach : old => remap[old];
+                const mask = settings.values[field.id];
+                settings.values[field.id] = remap.reduce((result, next, old) => (result | ((mask >>> old) & 1) << move(old)) >>> 0, 0);
+            }
         }
-    }
-    settings.layers = order.map(old => ({...settings.layers[old], reference: remap[settings.layers[old].reference]}));
-    // The layers a behaviour or combo may act on are layers by what they hold.
-    behaviors.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
-    combos.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
-    // A pointing slot's link moves as the layer keys do.
-    /** @param {number} mask */
-    const reached = mask => remap.reduce((moved, _next, old) => (moved | ((mask >>> old) & 1) << reach(old)) >>> 0, 0);
-    pdModes.forEach(slot => {slot.linkedLayers = reached(slot.linkedLayers); slot.linkTurnsOn = reached(slot.linkTurnsOn);});
-    const linkRefusal = reorderLinkRefusal(settingsBefore, settings, slotsBefore, pdModes, reached, keysFollow);
-    if (linkRefusal) throw fail(linkRefusal);
-    // So do a custom key's shortcut layers (firmware D-F26).
-    const shortcutsBefore = {...settings, names: settingsBefore.names, customKeyShortcuts: settings.customKeyShortcuts};
-    settings.customKeyShortcuts = settings.customKeyShortcuts.map(shortcut => ({...shortcut, layers: reached(shortcut.layers)}));
-    const shortcutRefusal = reorderShortcutRefusal(shortcutsBefore, settings, reached, keysFollow);
-    if (shortcutRefusal) throw fail(shortcutRefusal);
-    const changed = encodeProfileDomains({rgb, behaviors, combos, settings, pdModes, keymap: layers}, validated.codecOptions);
-    // Reordering layers never rewrites macro streams or their allowed unused tail.
-    result.profile = encodeProfileBlob({domains: decodeProfileBlob(validated.profile).domains.map(domain => changed.find(row => row.id === domain.id) || domain)}).toString("base64");
-    validateSnapshot(result); return result;
+        settings.layers = order.map(old => ({...settings.layers[old], reference: remap[settings.layers[old].reference]}));
+        // The layers a behaviour or combo may act on are layers by what they hold.
+        behaviors.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
+        combos.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
+        // A pointing slot's link moves as the layer keys do.
+        /** @param {number} mask */
+        const reached = mask => remap.reduce((moved, _next, old) => (moved | ((mask >>> old) & 1) << reach(old)) >>> 0, 0);
+        pdModes.forEach(slot => {slot.linkedLayers = reached(slot.linkedLayers); slot.linkTurnsOn = reached(slot.linkTurnsOn);});
+        const linkRefusal = reorderLinkRefusal(settingsBefore, settings, slotsBefore, pdModes, reached, keysFollow);
+        if (linkRefusal) throw fail(linkRefusal);
+        // So do a custom key's shortcut layers (firmware D-F26).
+        const shortcutsBefore = {...settings, names: settingsBefore.names, customKeyShortcuts: settings.customKeyShortcuts};
+        settings.customKeyShortcuts = settings.customKeyShortcuts.map(shortcut => ({...shortcut, layers: reached(shortcut.layers)}));
+        const shortcutRefusal = reorderShortcutRefusal(shortcutsBefore, settings, reached, keysFollow);
+        if (shortcutRefusal) throw fail(shortcutRefusal);
+    });
 }
 /** @param {unknown} document */
 const summary = document => summaryOf(validateSnapshot(document));
@@ -373,4 +448,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, brightnessCeiling, editProfileDomains, readProfileDomains, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

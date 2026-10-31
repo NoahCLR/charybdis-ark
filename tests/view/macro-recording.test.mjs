@@ -86,7 +86,7 @@ test("a finished take stands only while its macro holds exactly what the take pr
     assert.equal(takeStands(take, "MACRO_3", "hi"), false, "a step deleted after the take");
     assert.equal(takeStands(take, "MACRO_3", "ho{KC_A}"), false, "text typed after the take");
     // Another spelling of the same steps is no change.
-    assert.equal(takeStands({...take, after: "{KC_LCTL}"}, "MACRO_3", "{KC_LEFT_CTRL}", {KC_LCTL: "KC_LEFT_CTRL"}), true);
+    assert.equal(takeStands({...take, after: "{KC_LCTL}"}, "MACRO_3", "{KC_LEFT_CTRL}", {qmkKeycodeAliases: {KC_LCTL: "KC_LEFT_CTRL"}}), true);
     assert.equal(takeStands(take, "MACRO_4", "hi{KC_A}"), false, "another macro's take");
     assert.equal(takeStands(null, "MACRO_3", "hi{KC_A}"), false);
 });

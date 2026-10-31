@@ -48,7 +48,7 @@ export interface LoadView {
     progress?: CountedProgress | string | null;
 }
 export interface StatusModel {
-    vocabulary?: Pick<Vocabulary, 'phases'> & Partial<Pick<Vocabulary, 'halves'>>;
+    vocabulary?: Pick<Vocabulary, 'phases'> & Partial<Pick<Vocabulary, 'halves' | 'firmwareUpdate' | 'draftBlocks'>>;
     load?: LoadView;
     device?: {connected?: boolean; health?: {error?: string; phase?: PhaseId; halves?: HalvesId}};
     shell?: ShellPanel;
@@ -96,6 +96,10 @@ export interface Vocabulary {
     readSteps: Readonly<Record<import('./messages.js').ReadStep, string>>;
     editModes: Readonly<Record<EditMode, Readonly<{id: EditModeId; label: string; hint: string; detail: string}>>>;
     halves: Readonly<Record<HalvesId, Readonly<{label: string; detail: string}>>>;
+    /** Why nothing can be edited on a keyboard whose firmware Ark does not support (D-L64). */
+    firmwareUpdate: string;
+    /** Why the open draft takes no edit, by the reason core publishes (D-L60): what a control says, and the title and detail a screen shows; a live draft's detail where it differs. */
+    draftBlocks: Readonly<Partial<Record<import('./panel.js').DraftBlock, Readonly<{sentence: string; title: string; detail: string; liveDetail?: string}>>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];
     /** The key a host layout's third level is typed with: "Option" or "AltGr". */
     thirdLevel?: string;

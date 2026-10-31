@@ -107,9 +107,10 @@ test("a key whose behaviour is switched off for it on this layer shows no dots t
     await publish(page, [], 0);
     const found = await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
-        const {behaviourFor, keyMeaning} = await import("/webview/view/keyface.mjs");
+        const {keyMeaning} = await import("/webview/view/keyface.mjs");
+        const {keyIdentity} = await import("/webview/view/key-identity.mjs");
         const model = store.getModel();
-        const key = model.layers[0].positions.find(position => position.row !== undefined && behaviourFor(model, keyMeaning(position))?.steps?.length);
+        const key = model.layers[0].positions.find(position => position.row !== undefined && keyIdentity(model, keyMeaning(position)).behaviour?.steps?.length);
         store.showLayer(0); store.state.tab = "key"; store.state.selected = key.layoutIndex; store.render();
         return {index: key.layoutIndex, keycode: key.semantic || key.keycode, name: model.layers[0].displayName || model.layers[0].name};
     });

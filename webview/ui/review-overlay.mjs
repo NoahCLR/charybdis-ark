@@ -1,7 +1,8 @@
 // @ts-check
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post, render as rerender, state, writable} from "../store.mjs";
+import {getModel, post, render as rerender, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusBesideCount, stillShown} from "../view/review.mjs";
 import {reviewColumns, reviewItem} from "./review-items.mjs";
@@ -16,7 +17,7 @@ export function reviewOverlay() {
     if (!model || state.overlay !== "review" || !draft?.dirty) return null;
     // Discarding goes back to the keyboard's value; it waits while the draft
     // is out of step with the keyboard or busy, as editing does.
-    const canDiscard = writable();
+    const canDiscard = editGate(model, "discard").editable;
     const {groupOf: sourceByCheck, counts: sourceCounts} = checkSources(draft.checks, draft.changes);
     /** @param {number | null | undefined} group */
     const sourceLabel = (group) => {

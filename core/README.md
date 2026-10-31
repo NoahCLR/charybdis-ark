@@ -22,10 +22,12 @@ running unsaved live edits; that read also keeps the working copy's exact
 bytes, which live edits splice against.
 
 **Editing.** The snapshot seeds `ProfileDraftSession`
-(`session/profile-draft-session.js`): one complete document with its history.
+(`session/profile-draft-session.js`): one complete document with its history,
+which follows each later read (`session/draft-follow.js`).
 `session/panel-session.js` routes each message the panel posts; an edit
-reaches `stage()`, which finds its editor through `model/draft-edits.js` and
-rewrites one domain. Review (`model/profile-review.js`) and the checks
+reaches `stage()`, which makes it with `applyDraftEdit` (`model/draft-editor.js`):
+the form checked once against the draft, then the editor `model/draft-edits.js`
+names for its type. Review (`model/profile-review.js`) and the checks
 (`model/profile-checks.js`, `model/compare-findings.js`) compare the draft with
 the keyboard. `buildPanelModel` projects the draft through
 `session/device-model.js` into the model the panel draws: the profile's part
@@ -39,7 +41,8 @@ each status says of the operation sent: `session/candidate-status.js`) and
 `protocol/profile-candidate-v1.js`. In the live modes,
 `session/live-edits.js` computes each target with the same editors and sends
 it through the service's `postLiveEdit`; `session/live-edit-coordinator.js`
-splices it per domain (`schema/profile-splices.js`), and
+sends the edit `liveEditPlan` (`schema/profile-splices.js`) makes of it, its
+splices per domain or the whole profile, and
 `session/live-watch.js` looks at the keyboard between edits.
 
 ## The panel loop
@@ -87,12 +90,14 @@ it; the optional reads (base RGB, combos) never reject and record
 `{state: "unavailable"}` instead. The full convention is the class comment.
 (`tests/session/service-operation-lock.test.js`)
 
-The class holds the connection's state and runs each operation. The
-operations past connecting are grouped by what they do, each taking the
-service: the profile reads in `session/read-operations.js`, the working
-copy's in `session/live-edit-operations.js` and the reads between operations
-in `session/background-reads.js`; what it publishes is
-`session/service-snapshot.js`.
+The class runs each operation, and holds what it knows of the connection as
+one record, `session/connection-state.js`, cleared when the connection ends
+and published in `snapshot()`. Each operation past connecting states in the
+class what it needs before it starts and what it resolves with; its work is
+grouped by what it does, each given only the operation, never the service:
+the profile reads in `session/read-operations.js`, the working copy's in
+`session/live-edit-operations.js` and the reads between operations in
+`session/background-reads.js`.
 
 ## Domain codecs
 

@@ -43,29 +43,17 @@ const {actionName} = require("../schema/actions");
 const {VOCABULARY, layerName, listed, settingsPath} = require("./vocabulary");
 const {maskOf: layersOf} = require("./layer-state-graph");
 const {actionEffects, bit, codeName, layerEffects} = require("./layer-effects");
-const {MAX_TRAPS, NOTHING, TRANSPARENT, boundedWalk, comboCodes, compactWalk, heldOf, highest, locksOf, profileFacts, stateOf} = require("./layer-walk");
+const {MAX_TRAPS, NOTHING, TRANSPARENT, highest, profileFacts, walkLayers} = require("./layer-walk");
 
 /**
  * @typedef {import("./types.js").LayerEffect} LayerEffect
  * @typedef {import("./types.js").OfferedLayerEffect} OfferedEffect
- * @typedef {import("./types.js").WalkLayerEffect} WalkEffect
  * @typedef {import("../schema/types.js").SemanticAction} Action
  * @typedef {import("../../contracts/model.js").Finding} Finding
  * @typedef {import("./layer-walk.js").Facts} Facts
- * @typedef {import("./layer-walk.js").SymbolicWalk} SymbolicWalk
- * @typedef {import("./layer-walk.js").Walk} Walk
+ * @typedef {import("./types.js").LayerWalk} LayerWalk
  */
 const LEVELS = Object.freeze(/** @type {const} */ ({TRAP: "trap", WARNING: "warning", NOTICE: "notice"}));
-
-// How to get from rest to a state, in steps a person takes; releases are not
-// steps.
-/** @param {import("./types.js").BoundedLayerWalk["parent"]} parent @param {number} state */
-function pathTo(parent, state) {
-    /** @type {WalkEffect[]} */
-    const steps = [];
-    for (let at = parent.get(state); at; at = parent.get(at.from)) if (at.effect.kind !== "release") steps.unshift(at.effect);
-    return steps;
-}
 
 /** @param {Facts} facts @param {number} mask */
 const namesOf = (facts, mask) => layersOfMask(mask).map((layer) => layerName(facts.names, layer));
@@ -77,38 +65,10 @@ const keyPlace = (layer, layoutIndex) => ({kind: "key", layer, layoutIndex});
 const placeOf = (from) => (from && typeof from.layer === "number" && Number.isInteger(from.layoutIndex) ? keyPlace(from.layer, from.layoutIndex)
     : from && typeof from.combo === "number" && Number.isInteger(from.combo) ? {kind: "combo", index: from.combo} : undefined);
 
-/** @param {Facts} facts @param {import("./types.js").BoundedLayerWalk | Extract<SymbolicWalk, {complete: true}>} walked @returns {Finding[]} */
+// Names each trap the walk found, and how many more there are.
+/** @param {Facts} facts @param {LayerWalk} walked @returns {Finding[]} */
 function traps(facts, walked) {
-    const {edges} = walked;
-    // Symbolic walks supply traps directly; the bounded helpers run only over explicit edges.
-    const parent = /** @type {import("./types.js").BoundedLayerWalk['parent']} */ (walked.parent);
-    const home = /** @type {Set<number>} */ (walked.home);
-    // A set of locks is a trap once every key is let go and Base cannot be
-    // reached from it; the way in is the lock that first leaves a state that
-    // could still get home.
-    /** @param {number} locks */
-    const trapped = (locks) => parent.has(stateOf(locks, 0)) && !home.has(stateOf(locks, 0));
-    /** @type {Map<number, {from: number, effect: WalkEffect}>} */
-    const found = new Map();
-    /** @param {number} state */
-    const depth = (state) => pathTo(parent, state).length;
-    for (const [from, out] of edges || []) {
-        if (trapped(locksOf(from))) continue;
-        for (const {to, effect} of out) {
-            const locks = locksOf(to);
-            if (effect.kind === "release" || !trapped(locks)) continue;
-            const known = found.get(locks);
-            if (!known || depth(from) < depth(known.from)) found.set(locks, {from, effect});
-        }
-    }
-    /** @type {[number, {from: number, effect: WalkEffect}][]} */
-    const sorted = [];
-    for (const entry of [...found].sort(([a], [b]) => layersOfMask(a).length - layersOfMask(b).length || a - b)) {
-        if (!sorted.some(([mask]) => (entry[0] & mask) === mask)) sorted.push(entry);
-    }
-    const entries = walked.symbolic ? walked.traps : sorted.slice(0, MAX_TRAPS).map(([locks, entry]) => ({locks,
-        effect: entry.effect, path: [...pathTo(parent, entry.from), entry.effect]}));
-    const named = entries.map(/** @returns {Finding} */ ({locks, effect, path}) => {
+    const named = walked.traps.map(/** @returns {Finding} */ ({locks, effect, path}) => {
         const top = highest(locks);
         const names = namesOf(facts, locks);
         return {kind: "trap", level: LEVELS.TRAP, layers: layersOfMask(locks),
@@ -118,7 +78,7 @@ function traps(facts, walked) {
             fix: `Put TO(0) or TG(${top}) on ${layerName(facts.names, top)}, where it answers, or take away the lock.`,
             place: placeOf(effect.from)};
     });
-    const omitted = (walked.symbolic ? walked.trapCount : sorted.length) - named.length;
+    const omitted = walked.trapCount - named.length;
     if (omitted) named.push({kind: "trapOverflow", level: LEVELS.TRAP, layers: [], count: omitted, identity: String(omitted),
         title: `${omitted} more trapping layer combination${omitted === 1 ? " is" : "s are"} possible`,
         detail: `The review shows the first ${MAX_TRAPS} smallest trapping combinations. ${omitted} more minimal combinations of locked layers also have no way back to ${layerName(facts.names, 0)}.`,
@@ -126,15 +86,14 @@ function traps(facts, walked) {
     return named;
 }
 
-/** @param {Facts} facts @param {Walk} walked @returns {Finding[]} */
+/** @param {Facts} facts @param {LayerWalk} walked @returns {Finding[]} */
 function findings(facts, walked) {
-    const reachabilityComplete = walked.reachabilityComplete ?? walked.complete;
-    const uncertain = walked.uncertainty ?? walked;
-    const involved = layersOfMask(uncertain.affectedLayers ?? 0).filter(layer => layer !== 0);
+    const {reachabilityComplete} = walked;
+    const involved = layersOfMask(walked.affectedLayers).filter(layer => layer !== 0);
     const names = involved.map(layer => layerName(facts.names, layer));
     const shortNames = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} other layers` : listed(names);
     /** @type {Finding[]} */
-    const results = walked.complete ? [...traps(facts, walked)] : [{kind: "reachabilityIncomplete", level: LEVELS.WARNING, layers: involved,
+    const results = walked.escapeComplete ? traps(facts, walked) : [{kind: "reachabilityIncomplete", level: LEVELS.WARNING, layers: involved,
         scope: reachabilityComplete ? "escapes" : "reachability",
         title: names.length ? `Check ${reachabilityComplete ? "a way home when" : "how"} ${shortNames} combine` : "Check the layer controls together",
         detail: `${names.length ? `The controls involving ${listed(names)} have complex interactions. ` : ""}${reachabilityComplete
@@ -142,7 +101,7 @@ function findings(facts, walked) {
             : "Ark could not establish which layer and combo combinations can be reached or whether every combination of locks has a way back to Base."}`,
         fix: "Check these layers together, including keys that cover another layer's exit. Keep a TO(0) escape accessible through every overlay.",
         place: involved.length ? keyPlace(involved[0]) : undefined}];
-    const reached = walked.reachedLayers ?? [...walked.parent.keys()].reduce((mask, state) => mask | locksOf(state) | heldOf(state), facts.always);
+    const reached = walked.reachedLayers;
     // A layer of transparent keys and KC_NO has nothing of its own to use.
     /** @param {number} layer */
     const hasKeys = (layer) => facts.layers[layer].some((code) => code !== TRANSPARENT && code !== NOTHING);
@@ -159,7 +118,7 @@ function findings(facts, walked) {
     // Layer keys that reach a layer with no keys of its own, once per layer.
     /** @type {Map<number, OfferedEffect>} */
     const empty = new Map();
-    for (const effect of walked.effects ?? [...walked.cache.values()].flat()) {
+    for (const effect of walked.effects) {
         if (effect.kind === "unowned" || effect.from.trackball) continue;
         for (const layer of layersOfMask(layersOf(effect))) if (layer !== 0 && !hasKeys(layer) && !empty.has(layer)) empty.set(layer, effect);
     }
@@ -172,12 +131,7 @@ function findings(facts, walked) {
     }
 
     if (reachabilityComplete && facts.combos.length) {
-        const reachable = walked.reachableCombos ?? new Set();
-        for (const active of walked.reachableCombos ? [] : walked.cache.keys()) {
-            const present = comboCodes(facts, active);
-            for (const combo of facts.combos) if (combo.inputs.every(code => (present.get(code) || []).some(layer => combo.allowedLayers & bit(layer)))) reachable.add(combo.index);
-        }
-        for (const combo of facts.combos) if (!reachable.has(combo.index)) {
+        for (const combo of facts.combos) if (!walked.reachableCombos.has(combo.index)) {
             results.push({kind: "unreachableCombo", level: LEVELS.WARNING, layers: [], identity: `${combo.index}:${combo.inputs.join(",")}`,
                 title: `Combo ${combo.index} cannot fire`,
                 detail: "No reachable layer combination produces all of this combo's input keys together. Transparent keys can supply inputs from below; they are included in this check.",
@@ -262,9 +216,7 @@ function findings(facts, walked) {
 function layerReach(decoded) {
     if (decoded?.layers?.length !== LAYERS) return [];
     const facts = profileFacts(decoded);
-    const compact = compactWalk(facts);
-    const walked = compact.complete || compact.reachabilityComplete ? compact : {...boundedWalk(facts), uncertainty: compact};
-    return findings(facts, walked);
+    return findings(facts, walkLayers(facts));
 }
 
 module.exports = {layerReach, LEVELS};

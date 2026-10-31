@@ -15,14 +15,15 @@
 // shortcut from another key's behaviour.
 
 import {el, esc} from "../lib/dom.mjs";
-import {customKeyPlacements} from "../view/reach.mjs";
+import {placementsOf} from "../view/reach.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {titleName, attachTitleName} from "./title-name.mjs";
-import {canEdit as canEditArea, getModel, layers, post, render, state, writable} from "../store.mjs";
+import {getModel, layers, post, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {topbar, unavailable} from "./frame.mjs";
-import {keyName} from "../view/keyvalues.mjs";
+import {topbar} from "./frame.mjs";
+import {keycodeName} from "../view/key-identity.mjs";
 import {customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine, sameShortcut, shortcutAct, shortcutLimitWords} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
@@ -34,7 +35,7 @@ export function screenCustomKeys() {
     const model = getModel();
     const keys = model?.customKeys || [];
     const key = keys.find((row) => row.keycode === state.customKey) || keys[0];
-    const canEdit = canEditArea("customKeys");
+    const gate = editGate(model, "customKeys"), canEdit = gate.editable;
 
     const main = el(`<div class="main">${topbar(
         "Custom keys",
@@ -46,7 +47,7 @@ export function screenCustomKeys() {
     if (!keys.length) {
         pad.classList.remove("library");
         pad.appendChild(el(`<div class="screen-stub"><h3>No custom keys read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's custom keys.")}</p></div>`));
+            <p class="note">${esc(gate.why || "Choose Read keyboard to read this keyboard's custom keys.")}</p></div>`));
         main.appendChild(content);
         return main;
     }
@@ -98,7 +99,7 @@ function editor(model, key, canEdit) {
             label: "Custom key name", perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName, canEdit})}
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
             <span class="right row actions">
-                <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
+                <button class="btn tiny ghost" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">${keyFields(model, key).join("")}</div></div>`);
     attachTitleName(card, {stored: key.name, perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName,
         rename: (name) => post(edits.customKeyNameMessage(key.keycode, name, model?.customKeyEditing?.identity))});
@@ -132,7 +133,7 @@ const keyFields = (model, key) => {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
 function behaviourCard(model, key) {
     const behaviour = behaviourEditorRow(model, key.keycode);
-    const placements = customKeyPlacements(model, layers(), key.keycode);
+    const placements = placementsOf(model, "customKeys", key.keycode);
     const placed = placements.length > 0;
     const card = el(`<div class="card custom-key-behaviour">
         <div class="card-h"><h3>What it does</h3>
@@ -155,11 +156,12 @@ function behaviourCard(model, key) {
 // The key's shortcut, set in the keycode picker as any key is on the Keys
 // screen: a key from those the keyboard accepts, and the modifiers in the
 // picker's row, here left and right mixed. Each change posts the whole
-// shortcut; Clear posts none.
+// shortcut; Clear posts none. The picker stays open while new models arrive,
+// and what it posts is its own whole choice, so it names the draft, and is
+// weighed against the key, as they are when it is posted.
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function shortcutField(model, key, canEdit) {
-    const identity = model?.customKeyEditing?.identity;
-    const names = key.shortcut.keys.map((code) => keyName(model, code)).filter(Boolean);
+    const names = key.shortcut.keys.map((code) => keycodeName(model, code)).filter(Boolean);
     const node = el(`<div class="field"><span>Shortcut</span>
             <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
                 data-tip="${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}, any` : "Any"} modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would. Pick… opens the keycode picker with its modifier row and its Layers section.">
@@ -168,13 +170,14 @@ function shortcutField(model, key, canEdit) {
                 data-tip="No shortcut: the key does only what its behaviour says.">Clear</button></div>
             <span class="note">${esc(customKeyShortcutLine(key))}</span></div>`);
     /** @param {import("../../contracts/panel.js").CustomKeyShortcut} shortcut */
-    const save = (shortcut) => post(edits.customKeyShortcutMessage(key.keycode, shortcut, identity));
+    const save = (shortcut) => post(edits.customKeyShortcutMessage(key.keycode, shortcut, getModel()?.customKeyEditing?.identity));
     /** @type {HTMLElement} */ (node.querySelector('[data-act="clear-shortcut"]')).addEventListener("click", () => save({mods: 0, keys: [], layers: 0, layerKind: 0}));
     /** @type {HTMLElement} */ (node.querySelector('[data-act="pick-shortcut"]')).addEventListener("click", () => openPicker({
         title: "Shortcut", context: key.name || `Custom key ${key.slot}`,
         seed: names, allowedKeys: model?.customKeyShortcutKeys || [], shortcut: {mods: key.shortcut.mods, layers: key.shortcut.layers, layerKind: key.shortcut.layerKind},
         onShortcut: (shortcut) => {
-            if (!sameShortcut(shortcut, key.shortcut)) save(shortcut);
+            const now = getModel()?.customKeys?.find((row) => row.keycode === key.keycode) || key;
+            if (!sameShortcut(shortcut, now.shortcut)) save(shortcut);
         },
     }));
     return node;

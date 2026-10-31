@@ -3,7 +3,8 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {canEdit, getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
+import {getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {recordedKeycode, recordedTakePayload, takeStands} from "../../view/macro-recording.mjs";
 import {rememberMacroEdit} from "./history.mjs";
 import {stageMacro} from "./validation.mjs";
@@ -131,11 +132,11 @@ export function reconcileRecording() {
     const model = getModel(), bank = model?.macros || [];
     const selected = bank.find(slot => slot.keycode === state.macroSlot) || bank[0];
     if (state.recording && (state.screen !== "macros" || state.overlay || state.picker
-        || selected?.keycode !== state.recording.slot || !canEdit("macros") || selected?.available === false)) {
+        || selected?.keycode !== state.recording.slot || !editGate(model, "macros").editable || selected?.available === false)) {
         stopRecording(model, null, false);
     }
     const take = state.lastTake, taken = take && bank.find(slot => slot.keycode === take.slot);
-    if (take && !(taken && takeStands(take, taken.keycode, macroForm(taken.keycode).draft ?? taken.payload ?? "", model?.qmkKeycodeAliases))) {
+    if (take && !(taken && takeStands(take, taken.keycode, macroForm(taken.keycode).draft ?? taken.payload ?? "", model))) {
         state.lastTake = null;
     }
 }

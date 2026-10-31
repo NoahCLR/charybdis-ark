@@ -10,6 +10,7 @@
 // never name one thing two ways. Lists are ordered as the editors offer them.
 
 const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
+const {FIRMWARE_UPDATE} = require("../schema/profile-blob-v1");
 const {hostLayouts} = require("../data/host-layouts");
 const {MACRO_LIMITS, macroProblemWords: wordedProblem} = require("../../rules/macro-payload.mjs");
 
@@ -170,7 +171,9 @@ const SAVE_FAILURE_WORDS = Object.freeze({
 
 // What an edit says that would not fit (profile-draft-session.js propose):
 // a count the keyboard caps, by the usage table's name for it (usageCounts),
-// or the profile as a whole. Ark refuses it before the keyboard sees it, so
+// the profile as a whole, or a name: every name fits the settings domain, but
+// the whole profile shares one ceiling, so a long name can meet it once
+// behaviours, combos and other names have used the room. Ark refuses it before the keyboard sees it, so
 // nothing is lost and the person chooses what goes.
 const PROFILE_FULL_WORDS = Object.freeze({
     /** @type {Readonly<Record<string, (most: number) => string>>} */
@@ -181,6 +184,7 @@ const PROFILE_FULL_WORDS = Object.freeze({
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
     }),
     profile: "This change does not fit: the keyboard's profile is full. Remove an LED group, a behaviour, a combo or a macro first.",
+    name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
 });
 
 // What an Apply or a Save cut short says (core/session/interruption.js):
@@ -271,6 +275,28 @@ const HALVES_WORDS = Object.freeze({
         detail: "Ark hasn't read this keyboard yet."}),
 });
 
+// Why the open draft takes no edit (D-L60), for each reason core publishes
+// (`draft.reason`, `load.held`): the sentence a control says where it is,
+// and the title and detail a screen shows in place of the editor. A live
+// draft is what the keyboard runs, so its detail (`liveDetail`, where it
+// differs) reads it again rather than reviews it. A disconnected keyboard
+// says the shell's words, and a busy draft nothing (the commit bar says it).
+const REVIEW_AGAIN = "Review the draft against the current keyboard before editing further.";
+const DRAFT_BLOCK_NEXT = Object.freeze({
+    detail: "Your changes are kept. Choose Review against the keyboard in the bar to compare them with what it runs now, or discard the draft.",
+    liveDetail: "Choose Read keyboard in the bar: the draft is what the keyboard runs, so Ark reads it again before the next edit.",
+});
+/** @type {import('../../contracts/model.js').Vocabulary["draftBlocks"]} */
+const DRAFT_BLOCK_WORDS = Object.freeze({
+    unsupported: Object.freeze({sentence: FIRMWARE_UPDATE, title: "Update the keyboard's firmware", detail: FIRMWARE_UPDATE}),
+    "no-draft": Object.freeze({sentence: "The keyboard's complete profile could not be read, so edits cannot be drafted here. Read the keyboard again.",
+        title: "Keyboard not ready for edits", detail: "A complete profile could not be read. Read the keyboard again to retry."}),
+    "other-keyboard": Object.freeze({sentence: "The local draft belongs to another keyboard. Select it again or discard the draft here.",
+        title: "Draft belongs to another keyboard", detail: "Its changes are kept for that keyboard. Select it to continue editing, or discard the draft in the bar to edit this one."}),
+    stale: Object.freeze({sentence: REVIEW_AGAIN, title: "The keyboard changed since this draft began", ...DRAFT_BLOCK_NEXT}),
+    "connection-changed": Object.freeze({sentence: REVIEW_AGAIN, title: "Keyboard connection changed", ...DRAFT_BLOCK_NEXT}),
+});
+
 // What the bar says while the keyboard is read back after a Save, by the read
 // step (`model.postApplyRead.step`).
 /** @type {Readonly<Record<import('../../contracts/messages.js').ReadStep, string>>} */
@@ -325,6 +351,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     phases: PHASE_WORDS,
     readSteps: READ_STEP_WORDS,
     halves: HALVES_WORDS,
+    // Why nothing can be edited on a keyboard whose firmware Ark does not
+    // support (D-L64), where the control is: the words a refused read says.
+    firmwareUpdate: FIRMWARE_UPDATE,
+    draftBlocks: DRAFT_BLOCK_WORDS,
     editModes: EDIT_MODE_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
     // The side a half reports itself as (GET 0x0D's physical half).

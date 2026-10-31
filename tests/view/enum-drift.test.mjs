@@ -1,8 +1,9 @@
 // The webview keeps a few wire numbers of its own — pointing kinds, axes,
-// what ends a link's mode, modifier bits, limits, edit modes — because its pure modules need them at import
-// time and it may not import core/. They are the keyboard's numbers, so they
-// are pinned here to the schema that defines them: a change there fails here,
-// not on a keyboard.
+// what ends a link's mode, modifier bits, limits, edit modes — and the review
+// units it reads, because its pure modules need them at import time and it
+// may not import core/. They are the keyboard's numbers and core's names, so
+// they are pinned here to the module that defines them: a change there fails
+// here, not on a keyboard.
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -17,6 +18,8 @@ import {LED_FLAGS} from "../../webview/view/lighting.mjs";
 import {ALL_LAYERS, LAYERS} from "../../webview/view/layout.mjs";
 import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE} from "../../webview/view/backups.mjs";
 import {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS as LOCK_SLOTS} from "../../webview/view/keycode-expression.mjs";
+import {macroUnit} from "../../webview/view/macro.mjs";
+import {LAYER_ORDER_UNIT, OTHER_KEY_OPTIONS_UNIT} from "../../webview/view/review.mjs";
 
 const require = createRequire(import.meta.url);
 const pd = require("../../core/schema/pd-mode-domain-v1");
@@ -68,7 +71,7 @@ test("the webview names every pointing slot's lighting row as the RGB schema doe
 });
 
 test("pointing macro identities follow the schema's complete native range", async () => {
-    const {macroIndex} = await import("../../webview/view/keyvalues.mjs");
+    const {macroIndex} = await import("../../webview/view/key-identity.mjs");
     const {isPdMacro} = require("../../core/schema/pd-mode-domain-v1");
     for (let code = 0; code <= 0xffff; code++) assert.equal(macroIndex(code) !== null, isPdMacro(code), code.toString(16));
 });
@@ -91,4 +94,10 @@ test("the webview refuses a profile file over core's limit in core's words", () 
 test("the webview's layer-lock block is the keyboard's", () => {
     const {LAYER_LOCK_BASE: base, LAYER_LOCK_SLOTS} = require("../../core/data/user-keycodes");
     assert.deepEqual([LAYER_LOCK_BASE, LOCK_SLOTS], [base, LAYER_LOCK_SLOTS]);
+});
+
+test("the review units the webview reads are core's", () => {
+    const {UNIT} = require("../../core/model/review-units");
+    for (const index of [0, 7, 31]) assert.equal(macroUnit(index), UNIT.macro(index));
+    assert.deepEqual([LAYER_ORDER_UNIT, OTHER_KEY_OPTIONS_UNIT], [UNIT.layerOrder, UNIT.settings("otherKeyOptions")]);
 });

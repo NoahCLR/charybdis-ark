@@ -1,6 +1,7 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {post, writable} from "../../store.mjs";
+import {post} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {offWording} from "../../view/lighting.mjs";
@@ -10,7 +11,7 @@ import {colourControl, section, stack} from "./common.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageCombo(model) {
     const node = el(`<div></div>`);
-    const canEdit = writable();
+    const canEdit = editGate(model, "lighting").editable;
 
     /** @type {Partial<import("../../../contracts/panel.js").RgbView["comboFeedback"]>} */
     const combo = model.rgb.comboFeedback || {};

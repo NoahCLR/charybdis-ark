@@ -2,8 +2,7 @@
 // A branch or combo action read as the thing the person set up that it acts
 // on — a pointing mode, a layer or a macro — for the names keyface gives keys.
 import {actionLabel, layerFormOf, layerModsOf, layerOfKeycode, layerTapOf} from "./keyface.mjs";
-import {macroNamesOf} from "./reach.mjs";
-import {pointingSlotFor, pointingVariant} from "./pointing-reach.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 import {layerCalledAt, macroNamed, slotNamed, vocabulary} from "./vocabulary.mjs";
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
 
@@ -13,12 +12,12 @@ import {layerCalledAt, macroNamed, slotNamed, vocabulary} from "./vocabulary.mjs
 // resolves, marked empty.
 /** @param {ViewModel} model @param {string} action */
 export function pointingAction(model, action) {
-    const slot = pointingSlotFor(model, action);
+    const {pointing: slot, variant} = keyIdentity(model, action);
     if (!slot) return null;
     return {
         slot,
         name: slotNamed(slot),
-        how: pointingVariant(model, action),
+        how: variant,
         empty: !slot.kind,
     };
 }
@@ -28,7 +27,7 @@ export function pointingAction(model, action) {
 // macro's keycode.
 /** @param {ViewModel} model @param {string} action */
 export function macroAction(model, action) {
-    const [keycode] = macroNamesOf(model)(action);
+    const keycode = keyIdentity(model, action).macro;
     if (!keycode) return null;
     const slot = (model?.macros || []).find((row) => row.keycode === keycode);
     return {slot, keycode, name: macroNamed(slot, keycode), empty: Boolean(slot?.empty)};

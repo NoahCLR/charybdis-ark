@@ -1,17 +1,19 @@
 // @ts-check
 // The reach machinery every Keymap tab shares: what a layer reaches by name,
 // grouped by route or in the view the board shows, the keys the board rings
-// for it, and the layers a macro or custom key is placed on.
-import {behaviourFor, keyKindOf, keyMeaning} from "./keyface.mjs";
-import {reachablePositions, viewPositions, downTheStack} from "./layer-resolution.mjs";
-import {comboGroups, comboOutput, combosInView} from "./combo-reach.mjs";
-import {behaviourGroups, comboBehaviourFor} from "./behaviour-reach.mjs";
-import {keycodeValue} from "./keycode-expression.mjs";
-import {keyName} from "./keyvalues.mjs";
+// for it, and the layers a macro or custom key is placed on. A tab reads it
+// through tabReach (tab-reach.mjs).
+import {keyMeaning} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
+import {downTheStack} from "./layer-resolution.mjs";
+import {layerView} from "./layer-view.mjs";
+import {comboOutput} from "./combo-reach.mjs";
+import {comboBehaviourFor} from "./behaviour-reach.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
-/** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("./keyface-types.js").ComboGroupEntry} ComboGroupEntry */
+/** @typedef {import("./keyface-types.js").LayerView} LayerView */
 /** @typedef {import("./keyface-types.js").ReachEntry} ReachEntry */
+/** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 /** @typedef {import("./keyface-types.js").BranchCell} BranchCell */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
 
@@ -30,16 +32,16 @@ export const reachText = ({named = [], sources = [], matched = []}, {names = tru
  * The keys that name it, and — for anything a behaviour branch sends — the keys
  * carrying that behaviour, because those are the ones you actually reach it
  * through. For anything a combo sends, the keys you chord to fire it. A key answered from a layer below keeps its physical position, which
- * is what the board draws. With `held`, a row On this view rings only the
- * keys of the layers on in that view.
+ * is what the board draws. A row On this view (`inView`) rings only the keys
+ * of the layers on in that view.
  */
-/** @param {Layer[]} stack @param {number} at @param {Partial<Pick<ReachEntry, "keys" | "behaviours" | "combos">> | null | undefined} entry @param {number[] | null} [held] */
-export function reachKeys(stack, at, entry, held = null) {
+/** @param {LayerView} view @param {{keys?: ResolvedKey[], behaviours?: {keycode: string}[], combos?: {keys: ResolvedKey[]}[]} | null | undefined} entry @param {boolean} [inView] */
+export function reachKeys(view, entry, inView = false) {
     const indexes = new Set([...(entry?.keys || []), ...(entry?.combos || []).flatMap((route) => route.keys)]
         .map((key) => key.position.layoutIndex));
     const behaviours = new Set((entry?.behaviours || []).map((row) => row.keycode));
     if (behaviours.size) {
-        for (const {position} of held === null ? reachablePositions(stack, at) : viewPositions(stack, at, held)) {
+        for (const {position} of inView ? view.shown : view.reachable) {
             if (behaviours.has(keyMeaning(position))) indexes.add(position.layoutIndex);
         }
     }
@@ -64,8 +66,9 @@ const addCell = (cells, cell) => {
     if (!cells.some((item) => item.branch === cell.branch && item.tier === cell.tier)) cells.push(cell);
 };
 
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {import("./keyface-types.js").NamesOf} namesOf */
-export function reachInView(model, stack, at, held, namesOf) {
+/** @param {LayerView} view @param {import("./keyface-types.js").NamesOf} namesOf */
+export function reachInView(view, namesOf) {
+    const {model} = view;
     /** @type {Map<string, ReachEntry>} */
     const found = new Map();
     /** @param {string} name */
@@ -74,9 +77,9 @@ export function reachInView(model, stack, at, held, namesOf) {
         // The entry was inserted above whenever it was absent.
         return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name));
     };
-    for (const key of viewPositions(stack, at, held)) {
+    for (const key of view.shown) {
         for (const name of namesOf(keyMeaning(key.position))) add(name).keys.push(key);
-        const row = behaviourFor(model, keyMeaning(key.position));
+        const row = keyIdentity(model, keyMeaning(key.position)).behaviour;
         if (row) branchActions(row, (action, cell) => {
             for (const name of namesOf(action)) {
                 const entry = add(name);
@@ -86,7 +89,7 @@ export function reachInView(model, stack, at, held, namesOf) {
             }
         });
     }
-    for (const {combo, keys} of combosInView(model, stack, at, held)) {
+    for (const {combo, keys} of view.combos.inView) {
         const output = comboOutput(model, combo);
         /** @param {string} action @param {string | null} [via] @param {BranchCell} [cell] */
         const sent = (action, via = null, cell) => {
@@ -99,62 +102,47 @@ export function reachInView(model, stack, at, held, namesOf) {
             }
         };
         sent(output);
-        const row = comboBehaviourFor(model, combo, keys, stack, at, held);
+        const row = comboBehaviourFor(view, combo, keys);
         if (row) branchActions(row, (action, cell) => sent(action, output, cell));
     }
     return [...found.values()];
 }
 
 // What a keycode reaches of one kind, by the name the reach lists key it by:
-// the profile's name for it (MACRO_0, CUSTOM_KEY_0) when core says it is a
-// keycode of that kind (qmkKeyKinds), under any name it is read by
-// (keyKindOf), a bare number included, and nothing for any other keycode.
-// The name is the one the keycode it stores goes by (keyName), so QK_MACRO_3,
-// MC_3 and 0x7703 are all MACRO_3.
-/** @param {ViewModel} model @param {import("../../contracts/model.js").KeyKind} kind @returns {import("./keyface-types.js").NamesOf} */
+// the profile's name for it (MACRO_0, CUSTOM_KEY_0) under any name it is read
+// by (key-identity.mjs), and nothing for any other keycode.
+/** @param {ViewModel} model @param {"macro" | "customKey"} kind @returns {import("./keyface-types.js").NamesOf} */
 const namesOfKind = (model, kind) => (keycode) => {
-    if (!keycode || keyKindOf(model, keycode) !== kind) return [];
-    const value = keycodeValue(model, keycode);
-    const named = value === undefined ? keycode : keyName(model, value);
-    return [model?.qmkKeycodeAliases?.[named] || named];
+    const name = keyIdentity(model, keycode)[kind];
+    return name ? [name] : [];
 };
 
 // The macro a keycode plays, if it plays one.
 /** @param {ViewModel} model */
 export const macroNamesOf = (model) => namesOfKind(model, "macro");
 
-/**
- * The layers a macro is set off from, in stack order: every layer that holds a
- * way to it itself — a key naming it, a behaviour mapped there whose branch
- * sends it, or a combo firing from its keys that sends it, directly or through
- * a behaviour. Each route carries the group the Keymap tab lists it under, so a
- * screen can open that layer on the same row, and the keys the board rings.
- * What a layer only reaches under a transparent key is the lower layer's route,
- * listed for that layer, not repeated for every layer above it. `at` is the
- * layer's position in the stack, which is how a screen selects it.
- */
-/** @param {ViewModel} model @param {Layer[]} stack @param {string} keycode */
-export const macroPlacements = (model, stack, keycode) => placementsVia(macroReach, model, stack, keycode);
-
-// Where a macro or a custom key is placed, by the Keymap tab that lists it.
-/** @param {ViewModel} model @param {Layer[]} stack @param {"macros" | "customKeys"} tab @param {string} keycode */
-export const placementsOf = (model, stack, tab, keycode) => (tab === "macros" ? macroPlacements : customKeyPlacements)(model, stack, keycode);
-
 // The custom key a keycode is, if it is one.
 /** @param {ViewModel} model */
 export const customKeyNamesOf = (model) => namesOfKind(model, "customKey");
 
-// Where a custom key is placed, whatever it does: a key carrying it, a
-// behaviour branch sending it (which sends its shortcut, D-L63) or a combo
-// sending it.
-/** @param {ViewModel} model @param {Layer[]} stack @param {string} keycode */
-export const customKeyPlacements = (model, stack, keycode) => placementsVia(
-    (m, s, at) => reachGroups(m, s, at, customKeyNamesOf(m), [keycode]), model, stack, keycode);
-
-/** @param {import("./keyface-types.js").ReachOf} reachOf @param {ViewModel} model @param {Layer[]} stack @param {string} keycode */
-function placementsVia(reachOf, model, stack, keycode) {
-    return (stack || []).map((layer, at) => {
-        const reach = reachOf(model, stack, at);
+/**
+ * The layers a macro or a custom key is set off from, by the Keymap tab that
+ * lists it, in stack order: every layer that holds a way to it itself — a key
+ * naming it, a behaviour mapped there whose branch sends it (a custom key's
+ * sends its shortcut, D-L63), or a combo firing from its keys that sends it,
+ * directly or through a behaviour. Each route carries the group the Keymap tab
+ * lists it under, so a screen can open that layer on the same row, and the
+ * keys the board rings. What a layer only reaches under a transparent key is
+ * the lower layer's route, listed for that layer, not repeated for every layer
+ * above it. `at` is the layer's position in the stack, which is how a screen
+ * selects it.
+ */
+/** @param {ViewModel} model @param {"macros" | "customKeys"} tab @param {string} keycode */
+export function placementsOf(model, tab, keycode) {
+    const namesOf = namesOfKind(model, tab === "macros" ? "macro" : "customKey");
+    return (model?.layers || []).map((layer, at) => {
+        const view = layerView(model, at);
+        const reach = reachGroups(view, namesOf, [keycode]);
         /** @type {['here' | 'branches' | 'combos', ReachEntry[]][]} */
         const groups = [["here", reach.onKeys], ["branches", reach.fromBranches], ["combos", reach.fromCombos]];
         const routes = groups
@@ -163,7 +151,7 @@ function placementsVia(reachOf, model, stack, keycode) {
             .map((route) => {
                 // The preceding filter kept only routes with an entry.
                 const entry = /** @type {ReachEntry} */ (route.entry);
-                return {...route, entry, keys: reachKeys(stack, at, entry)};
+                return {...route, entry, keys: reachKeys(view, entry)};
             });
         return {layer, at, routes};
     }).filter((placement) => placement.routes.length);
@@ -192,8 +180,9 @@ function placementsVia(reachOf, model, stack, keycode) {
  * of the things a keycode names, as stable string keys, and `all` is every name
  * worth reporting as unreached.
  */
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {import("./keyface-types.js").NamesOf} namesOf @param {string[]} all @returns {import("./keyface-types.js").ReachGroup} */
-export function reachGroups(model, stack, at, namesOf, all) {
+/** @param {LayerView} view @param {import("./keyface-types.js").NamesOf} namesOf @param {string[]} all @returns {import("./keyface-types.js").ReachGroup} */
+export function reachGroups(view, namesOf, all) {
+    const {model, stack} = view;
     /** @type {Map<string, import("./keyface-types.js").ReachRecord>} */
     const found = new Map();
     /** @param {string} name */
@@ -203,7 +192,7 @@ export function reachGroups(model, stack, at, namesOf, all) {
         return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name));
     };
 
-    for (const {position, layer, fellThrough, whileHeld} of reachablePositions(stack, at)) {
+    for (const {position, layer, fellThrough, whileHeld} of view.reachable) {
         for (const name of namesOf(keyMeaning(position))) {
             reachOf(name)[fellThrough ? "fellKeys" : "directKeys"].push({position, layer, fellThrough, whileHeld});
         }
@@ -212,7 +201,7 @@ export function reachGroups(model, stack, at, namesOf, all) {
     // Every behaviour this layer can fire, including the ones it only reaches
     // because a transparent key lets the default layer answer. Those carry the
     // layer that holds them, so a row can say so.
-    const {here, through} = behaviourGroups(model, stack, at);
+    const {here, through} = view.behaviours.groups;
     for (const {row, from, whileHeld} of [...here.map((row) => ({row, from: null, whileHeld: false})),
         ...through.map((item) => ({row: item.row, from: item.layer, whileHeld: item.whileHeld}))]) {
         branchActions(row, (action, cell) => {
@@ -232,7 +221,7 @@ export function reachGroups(model, stack, at, namesOf, all) {
     // sends and, when that is a behaviour's keycode, what the behaviour's
     // branches send. A combo firing from this layer's own keys is this layer's;
     // one that needs a transparent key is reached down the stack.
-    const combos = comboGroups(model, stack, at);
+    const combos = view.combos.groups;
     /** @type {[ComboGroupEntry[], boolean][]} */
     const comboRoutes = [[combos.onKeys, false], [combos.throughKeys, true]];
     for (const [entries, below] of comboRoutes) {
@@ -240,7 +229,7 @@ export function reachGroups(model, stack, at, namesOf, all) {
             const output = comboOutput(model, combo);
             /** @type {{action: string; via: string | null; cell?: BranchCell}[]} */
             const sends = [{action: output, via: null}];
-            const row = comboBehaviourFor(model, combo, keys, stack, at, held.map(layer => layer.index));
+            const row = comboBehaviourFor(view.under(held.map((layer) => stack.indexOf(layer))), combo, keys);
             if (row) branchActions(row, (action, cell) => sends.push({action, via: output, cell}));
             for (const {action, via, cell} of sends) {
                 for (const name of namesOf(action)) {
@@ -272,19 +261,3 @@ export function reachGroups(model, stack, at, namesOf, all) {
         fromCombosBelow: downTheStack(fromCombosBelow),
         elsewhere: all.filter((name) => !found.has(name))};
 }
-
-/**
- * Macro slots, grouped by how this layer sets them off.
- *
- * A key on this layer can carry a macro keycode, which the board shows. A
- * transparent key lets a lower layer's macro key answer instead, which the
- * board shows only as falling through. A behaviour this layer reaches can fire
- * one from any of its branches, and that the board cannot show at all, because
- * the key cap carries the behaviour, not what its branches send. The rest are
- * slots holding a payload nothing here reaches.
- */
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
-export const macroReach = (model, stack, at) => reachGroups(model, stack, at, macroNamesOf(model),
-    (model?.macros || [])
-        // An empty slot is not a macro this layer is missing, it is a slot.
-        .filter((slot) => !slot.empty).map((slot) => slot.keycode));

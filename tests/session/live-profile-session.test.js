@@ -14,7 +14,7 @@ async function live(t, options = {}) {
     const keyboard = liveKeyboard({document: document(), ...options});
     const {now, sleep} = testClock();
     const {service} = await connectedService(t, {keyboard}, {now, sleep});
-    return {service, keyboard, snapshot: () => snapshotLive(service.connection, service.requestIds, service.capabilities)};
+    return {service, keyboard, snapshot: () => snapshotLive(service.state.connection, service.state.requestIds, service.state.capabilities)};
 }
 
 test("over compiled defaults, the saved profile is the compiled one", async t => {
@@ -102,7 +102,7 @@ test("a read waits while the keyboard reports a save running, then reads what it
     keyboard.startAutoSave();
     let waits = 0;
     const said = [];
-    const read = await snapshotLive(service.connection, service.requestIds, service.capabilities, {
+    const read = await snapshotLive(service.state.connection, service.state.requestIds, service.state.capabilities, {
         onProgress: text => said.push(text),
         sleep: async () => {if (++waits === 3) keyboard.autoSave();},
     });
@@ -119,7 +119,7 @@ test("a read waits while the keyboard is still taking an edit, then reads what i
     const {buildEditBeginRequest, buildEditAbortRequest} = require("../../core/protocol/profile-edit-v1");
     keyboard.answer(buildEditBeginRequest(9, {session: keyboard.session, revision: keyboard.revision, splices: 1, insertTotal: 1}));
     let waits = 0;
-    const read = await snapshotLive(service.connection, service.requestIds, service.capabilities, {
+    const read = await snapshotLive(service.state.connection, service.state.requestIds, service.state.capabilities, {
         // Someone releases the held key: the edit ends after a few polls.
         sleep: async () => {if (++waits === 3) keyboard.answer(buildEditAbortRequest(9));},
     });
@@ -136,7 +136,7 @@ test("a save that does not end is waited for a bounded time, then left to the pe
     // A held key keeps the keyboard's own save from finishing.
     keyboard.startAutoSave();
     let waits = 0;
-    await assert.rejects(snapshotLive(service.connection, service.requestIds, service.capabilities, {sleep: async () => {waits++;}}),
+    await assert.rejects(snapshotLive(service.state.connection, service.state.requestIds, service.state.capabilities, {sleep: async () => {waits++;}}),
         error => error.code === "LIVE_SAVE_PENDING" && /still saving/.test(error.message));
     assert.equal(waits, 600, "at least 30 s of polls 50 ms apart");
 });

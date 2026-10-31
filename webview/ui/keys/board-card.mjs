@@ -9,7 +9,8 @@
 import {css, isOff} from "../../lib/colour.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
-import {getModel, heldLayers, layers, render, state, writable} from "../../store.mjs";
+import {getModel, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot} from "../../view/review.mjs";
 import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
@@ -18,13 +19,13 @@ import {shortcut} from "../../view/shortcuts.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
 // order they win. Clicking any tab goes back to one layer.
-/** @param {import("../../../contracts/panel.js").Layer} layer */
-export function previewFoot(layer, lead = "") {
-    const under = heldLayers().filter((at) => at > 0).reverse().map((at) => layerCalled(layers()[at]));
-    const text = `${layerCalled(layer)} on top of ${[...under, layerCalled(layers()[0])].join(", ")}`
+/** @param {import("../../view/keyface-types.js").LayerView} view */
+export function previewFoot({layer, held, stack}, lead = "") {
+    const under = held.filter((at) => at > 0).reverse().map((at) => layerCalled(stack[at]));
+    const text = `${layerCalled(layer)} on top of ${[...under, layerCalled(stack[0])].join(", ")}`
         + ` · keys seen through from below are frosted · edits go to ${layerCalled(layer)}`;
     return el(`<div class="board-foot">${lead}
-        <span class="board-foot-text" data-tip="${esc(text)}"><b>${esc(layerCalled(layer))}</b> on top of ${esc([...under, layerCalled(layers()[0])].join(", "))}
+        <span class="board-foot-text" data-tip="${esc(text)}"><b>${esc(layerCalled(layer))}</b> on top of ${esc([...under, layerCalled(stack[0])].join(", "))}
             · keys seen through from below are frosted · edits go to ${esc(layerCalled(layer))}</span></div>`);
 }
 
@@ -54,7 +55,7 @@ export function legend(model) {
         <span class="legend-item">${comboBadge(model, "C0")} combo input</span>
         <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
         ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}
-        <span class="legend-item dim">${writable() ? "double-click to pick a keycode" : "select a key to read it"}${writable() ? ` · drag one key onto another to swap · ${shortcut("C")} and ${shortcut("V")} copy between keys · delete makes a key transparent` : ` · ${shortcut("C")} copies a key`}</span>
+        <span class="legend-item dim">${editGate(model, "keys").editable ? "double-click to pick a keycode" : "select a key to read it"}${editGate(model, "keys").editable ? ` · drag one key onto another to swap · ${shortcut("C")} and ${shortcut("V")} copy between keys · delete makes a key transparent` : ` · ${shortcut("C")} copies a key`}</span>
         ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
     </div>`);
 }

@@ -34,9 +34,11 @@ start. Ark says **Waiting for the keyboard to finish starting…** and reads it
 once it has. If it hasn't after 15 seconds, Ark says so; read it again in a
 moment, or unplug it and plug it back in.
 
-If the keyboard runs older firmware, Ark stops there and tells you to update
-both halves. Nothing on the keyboard changes. The Keyboard screen links to the
-firmware release.
+If the keyboard runs firmware other than the current one, Ark stops there
+and says **This keyboard's firmware is not current, and Ark supports only
+current firmware. Update both halves, then read the keyboard again.** Every
+control that edits, and the Keyboard screen, says so too. Nothing on the
+keyboard changes. The Keyboard screen links to the firmware release.
 
 If Ark can show the keyboard but can't read its complete profile, the editing
 screens say **Keyboard not ready for edits** and offer **Read keyboard** to

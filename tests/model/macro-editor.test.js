@@ -124,10 +124,9 @@ test("every one of the 128 names can be 32 bytes of text at once", () => {
     assert.equal(settingsDomain(current.document).payload.length, SETTINGS.FIXED_SIZE + layerNames + 128 * 33 + 128 + 1, "the settings hold them all, beside 128 empty shortcuts, 128 empty custom-key names and an empty keyboard name");
 });
 
-test("stale drafts and wrong slots are rejected before a write", () => {
+test("wrong slots, empty messages and oversized macros are rejected before a write", () => {
     const current = snapshot(document());
     const message = {keycode: "MACRO_0", payload: "hello", expectedFingerprint: current.fingerprint};
-    assert.throws(() => editMacro(current, {...message, expectedFingerprint: "stale"}), /changed/);
     for (const keycode of ["MACRO_128", "MACRO_01", "KC_A", "QK_MACRO_2", "CUSTOM_KEY_2"]) assert.throws(() => editMacro(current, {...message, keycode}), /slot/);
     assert.equal(Buffer.from(profileMacros(editMacro(current, {...message, keycode: "MACRO_127"}))[127], "base64").toString(), "hello", "the last slot is a slot");
     assert.throws(() => editMacro(current, {keycode: "MACRO_0", expectedFingerprint: current.fingerprint}), /steps, its name/);
@@ -310,10 +309,10 @@ test("the macro domain can use its full advertised capacity without an extra VIA
 });
 
 test("unused macro tails survive names and layer edits, while stream edits reclaim their shared space", () => {
-    const {replaceDomain} = require("../../core/schema/profile-domains");
+    const {withPayload} = require("../fixtures/profile-document");
     const {reorderLayers} = require("../../core/model/portable-profile");
     const source = pdDocument();
-    source.profile = replaceDomain(Buffer.from(source.profile, "base64"), 112, payload => Buffer.concat([payload, Buffer.alloc(99, 65), Buffer.from([0])])).toString("base64");
+    source.profile = withPayload(Buffer.from(source.profile, "base64"), "macros", payload => Buffer.concat([payload, Buffer.alloc(99, 65), Buffer.from([0])])).toString("base64");
     const current = snapshot(source), bytes = Buffer.from(source.profile, "base64");
     const caps = {...CURRENT_CAPABILITIES, macroBytes: 34903, maxProfilePayload: bytes.length};
     assert.equal(profileMacroBudget(validateSnapshot(source), caps).free, 100);

@@ -3,39 +3,11 @@ const {profileLayers, profileMacros} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {profileReview} = require("../../core/model/profile-review");
-const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
+const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {document: pdDocument} = require("../fixtures/pd-profile");
-
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
-const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
-
-// A draft with one edit of every kind the review describes.
-function edited() {
-    const draft = new ProfileDraftSession(snapshotOf(pdDocument()), "board", capabilities);
-    const stage = (message) => draft.stage({draftId: draft.id, draftRevision: draft.revision, ...message});
-    const settings = (id, updates) => {
-        const section = settingsEditorView(draft.current).sections.find((row) => row.id === id);
-        return {type: "updateConfigDefaults", sectionId: id, expectedFingerprint: draft.current.fingerprint,
-            fields: section.fields.map((field) => field.kind === "toggle" ? {macro: field.macro, enabled: updates[field.macro] ?? field.enabled} : {macro: field.macro, value: updates[field.macro] ?? field.value})};
-    };
-    stage({type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 3, keycode: "KC_B"}, {layoutIndex: 4, keycode: "KC_C"}]});
-    stage({type: "updateMacro", keycode: "MACRO_2", payload: "hello"});
-    stage({type: "updateMacro", keycode: "MACRO_5", name: "Greeting", expectedFingerprint: draft.current.fingerprint});
-    stage(settings("keyTiming", {tapHoldTerm: "175", multiTapTerm: "190"}));
-    stage({type: "retargetBehavior", keycode: "KC_ESCAPE", target: "KC_Q", expectedBase: draft.identity()});
-    stage({type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "50", holdTermMs: "200"});
-    stage({type: "updateComboDefaultWindow", defaultTermMs: "70"});
-    stage({type: "updateLayerColor", layer: "Layer 2", mode: "ALL_KEYS", h: "20", s: "200", v: "100"});
-    stage({type: "updateRgbStages", stageEnableMask: validateSnapshot(draft.document).rgb.stageEnableMask ^ 1});
-    stage({type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 3", ledIndices: [1, 2, 3], h: "0", s: "0", v: "0"}});
-    const slot = validateSnapshot(draft.document).pdModes[1];
-    stage({type: "savePdMode", slot: 1, expectedBase: draft.identity(), config: {...slot, name: "Loudness", thresholdY: 90,
-        directions: Object.fromEntries(Object.entries(slot.directions).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}])),
-        diagonals: Object.fromEntries(Object.entries(slot.diagonals || {}).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}]))}});
-    return draft;
-}
+const {capabilities, editedDraft: edited, snapshotOf} = require("../fixtures/edited-draft");
 
 test("discarding one middle combo deletion restores the full packed table", () => {
     const seeded = new ProfileDraftSession(snapshotOf(pdDocument()), "board", capabilities);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {RESTART_NEEDED, SAVE_IN_PROGRESS, halvesRows, productName} from "../../webview/view/keyboard-view.mjs";
+import {RESTART_NEEDED, SAVE_IN_PROGRESS, firmwareLine, halvesRows, productName} from "../../webview/view/keyboard-view.mjs";
 import {keyboardControl} from "../../webview/view/keyboard-menu.mjs";
 import {createRequire} from "node:module";
 
@@ -67,4 +67,11 @@ test("the Keyboard screen names the halves by role, with the side as detail", ()
     assert.equal(rows("alone")[1].words, "not answering: check the cable between the halves");
     assert.equal(rows("apart")[1].words, "connected, but holding different saved settings");
     assert.deepEqual(rows("agree", false).map(row => row.words), ["not connected", "not connected"]);
+});
+
+test("firmware this Ark does not work with says so in the words every edit control says", () => {
+    const model = connected("");
+    assert.equal(firmwareLine(model).works, true);
+    const old = {...model, firmware: {...model.firmware, worksWithArk: false}};
+    assert.deepEqual(firmwareLine(old), {version: firmwareLine(model).version, works: false, words: model.vocabulary.firmwareUpdate});
 });

@@ -42,7 +42,8 @@ Around the core:
   is drawn and builds every posted edit, purely, and is the one part of the
   interface that imports `rules/`; `webview/ui/` holds the frame
   (`frame.mjs`), the screens and their components; `webview/lib/` the DOM,
-  focus and colour helpers. The store and screens reach a rule through
+  focus and colour helpers, and `once.mjs`, an answer kept per model or per
+  key. The store and screens reach a rule through
   `view/`. The interface never imports `web/`, and of the interface the
   shell imports only `webview/view/`.
 - **The shared rules**, `rules/` (D-L73): synchronous ES modules that import
@@ -64,11 +65,18 @@ Around the core:
   `core/model/settings-editor.js`, which names it through `SETTING`.
 - Anything holding state across a connection: `core/session/`. What a panel
   control does, in order, is `core/session/panel-controls.js`.
-- Documents, completeness and layer-reference rewrites: `core/model/`.
+- Documents, completeness and layer-reference rewrites: `core/model/`. A
+  change to a document's domains goes through `editProfileDomains`
+  (`core/model/portable-profile.js`), never a decode and encode of its own.
 - The words for a value the keyboard stores: `core/model/vocabulary.js`,
   posted as `model.vocabulary` and read through `webview/view/vocabulary.mjs`.
 - A draft edit type: one entry in `core/model/draft-edits.js`, its payload in
-  `contracts/edits.d.ts`, its builder in `webview/view/edits.mjs`.
+  `contracts/edits.d.ts`, its builder in `webview/view/edits.mjs`. A new
+  editor or profile domain also gets its handler in
+  `core/model/draft-editor.js`, where `applyDraftEdit` makes every draft edit.
+- What a review item names and Discard puts back (a review unit): a builder
+  in `UNIT` and a reading in `parseUnit`, both in
+  `core/model/review-units.js`, never a string of its own.
 - Naming an action, its native keycode or a layer reference:
   `core/schema/actions.js`. Where a kind of QMK keycode sits in the number
   space, how it packs its arguments, and how a modifier wrapper is spelled:
@@ -81,6 +89,31 @@ Around the core:
 - A rule about what something means on screen (a colour, a key face, a
   locality): `webview/view/`, with a test. A screen or component:
   `webview/ui/`.
+- A question about the layers the board shows (which key answers, what the
+  view shows, the combos and behaviours it reaches): asked of the view
+  value, `webview/view/layer-view.mjs`, which a screen takes from
+  `currentView()` in `webview/store.mjs` rather than passing the model, the
+  layer and the preview to each function.
+- What that view reaches as a Keymap tab lists it (its groups, their
+  entries and empty words, the tab's count, the keys a picked row rings):
+  `tabReach(view, tab)`, `webview/view/tab-reach.mjs`. A tab draws its rows
+  from it; a new tab or group gets its lists and words there.
+- What that view shows at each key of the board (the key that answers, the
+  layer supplying it, its light, dots and badges): `boardKeys(view)`,
+  `webview/view/board-keys.mjs`; `webview/ui/board.mjs` only draws it. What
+  reaches one key, for the hover card and the Key tab: `keyReachAt(view,
+  index)`, `webview/view/key-reach.mjs`.
+- Which key a spelling is (the name the profile knows it by, one spelling
+  per key, the macro, custom key or pointing slot it is, and the behaviour
+  row keyed exactly by it or listening to it however it is spelled), and
+  whether two spellings are one key: `keyIdentity(model, spelling)` and
+  `sameKey`, `webview/view/key-identity.mjs`. Nothing else in the interface
+  reads the alias table.
+- Whether an area takes an edit now, and what to say when it does not (or
+  nothing, while the draft is busy): `editGate(model, area)`,
+  `webview/view/edit-gate.mjs`. A screen disables its controls by it and
+  draws its words, or its own sentence where it has none; a new area gets
+  its rule there.
 
 ## Facts and their homes
 
@@ -100,6 +133,7 @@ row here for a kind of rule points there rather than repeating it.
 | Keycode names, labels and aliases | the keycode catalog, `core/data/keycode-catalog.js`, vendored from `upstream/qmk/`; a keycode read and written by them in `core/schema/keycodes.js` | `tests/data/keycode-catalog.test.js`, `tests/schema/keycodes.test.js`, `npm run keycodes -- --check` |
 | Which keycodes the keycode picker offers: not those of features this firmware does not build, the retired user block, QMK's own macro names or Charybdis's own drag scroll | `core/data/offered-keycodes.js`, published on each `qmkKeycodes` entry as `offered` and read by `pickable` in `webview/view/picker-sections.mjs` | `tests/data/offered-keycodes.test.js`, `tests/view/picker-sections.test.mjs` |
 | What each layer key does to its layer, by QMK's function (`MO` … `PDF`, `LT`, `LM`, `LOCK_LAYER`), the modifiers a layer-mod holds with it and what a layer-tap taps | `keyLayerForm`, `layerModWords` and `layerTapWords` in `core/model/key-names.js` (a layer-mod's and a mod-tap's modifiers from the keycode's own bits, `heldModifierWords`), published as `qmkKeyLayerForms`, `qmkKeyLayerMods` and `qmkKeyLayerTaps` beside `qmkKeyLayers` and read through `layerFormOf`, `layerModsOf` and `layerTapOf` in `webview/view/keyface.mjs` | `tests/model/profile-model.test.js`, `tests/view/keyface.test.mjs` |
+| Which key a keycode spelling is, by the names core publishes for it (`qmkKeycodeAliases`): the name the profile knows it by, one canonical spelling per key, the names a fact may be published under, and whether two spellings are one key | `keyIdentity` and `sameKey` in `webview/view/key-identity.mjs`, the only interface module reading the alias table beside the keycode grammar's reader (`webview/view/keycode-expression.mjs`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
 | Which keys the interface treats apart: transparent (`KC_TRANSPARENT`), disabled (`KC_NO`), a macro's and a custom key's | `keyKind` in `core/model/key-names.js`, published by every name a keycode is read under as `qmkKeyKinds` and read through `keyKindOf` in `webview/view/keyface.mjs` | `tests/model/key-names.test.js`, `tests/model/profile-model.test.js`, `tests/view/keyface.test.mjs` |
 | Actions, native keycodes and layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
 | Macro limits | `MACRO_DOMAIN_V1` in `core/schema/macro-domain-v1.js`; the keys held at once and the longest delay, `MACRO_LIMITS` in `rules/macro-payload.mjs`, which core and the interface both read | `tests/schema/macro-domain-v1.test.js`, `tests/rules/macro-payload.test.mjs` |
@@ -113,7 +147,8 @@ row here for a kind of rule points there rather than repeating it.
 | The words for stored values and operations | `core/model/vocabulary.js`, posted as `model.vocabulary` in every model and read through `webview/view/vocabulary.mjs`; a stage is found by its id, never its label; an unnamed layer's, pointing slot's and macro's name are core's too, published as each layer's and slot's `displayName` (read through `layerCalled` and `slotCalled` in `webview/view/vocabulary.mjs`), `portable.layers.titles` and each macro slot's `defaultName`; a key feedback state's tier mark is `feedbackTiers` | `tests/model/vocabulary.test.js`, `tests/session/panel-session.test.js`, `tests/view/enum-drift.test.mjs`, `tests/view/vocabulary.test.mjs`, `tests/scripts/conventions.test.js` |
 | Wire enums | the `core/schema/` or `core/protocol/` module that encodes them; the interface's copies in `webview/view/` | `tests/view/enum-drift.test.mjs` |
 | Contract unions | `contracts/`; a runtime list is tied to its union by a test (`PhaseId`, `ApplyStep`, `EditMode`), a table keyed by one by its `Record<Union, …>` type (`TimingTerm`, `TimingSource`, `UsageCountId`, `MacroStepKind`) | `tests/fixtures/contract-unions.js`, read by `tests/model/vocabulary.test.js`, `tests/session/apply-progress.test.js`, `tests/protocol/profile-edit-v1.test.js`; `npm run typecheck` |
-| Draft edit types | `core/model/draft-edits.js`, payload in `contracts/edits.d.ts`, builder in `webview/view/edits.mjs` | `tests/model/draft-edits.test.js`, `tests/view/edits.test.mjs` |
+| Draft edit types | `core/model/draft-edits.js`, payload in `contracts/edits.d.ts`, builder in `webview/view/edits.mjs`; each editor's or domain's handler, and the check that a form was drawn from the draft, in `core/model/draft-editor.js` | `tests/model/draft-edits.test.js`, `tests/model/draft-editor.test.js`, `tests/view/edits.test.mjs` |
+| Review units: the string each review item names and Discard puts back | `UNIT`, `parseUnit` and `unitByLayer` in `core/model/review-units.js`; the interface's copies of the units it reads in `webview/view/macro.mjs` (`macroUnit`) and `webview/view/review.mjs` | `tests/model/review-units.test.js`, `tests/view/enum-drift.test.mjs` |
 | Firmware rules the page runs as a person clicks | `rules/` (D-L73); each rule's owner is its row in the ownership table, such as [Layer answers](../spec/interface-contracts.md#layer-answers) | `tests/rules/`, `tests/layering.test.js`, and the tests its row names |
 | Firmware decisions that depend only on the profile | computed in core and published (D-L73); each decision's owner and tests are in its section of the interface contracts: [Layer answers](../spec/interface-contracts.md#layer-answers) (each layer's `answers`), [Participation controls](../spec/interface-contracts.md#participation-controls) (`participation`, from `core/model/participation.js`), `comboReferenceLayers` and `comboReach` (both `core/model/combo-reach.js`, the first also what Review's walk matches combos on; [Fixed positions and composed reach](../spec/interface-contracts.md#fixed-positions-and-composed-reach)), each layer's `alwaysOn` (`core/model/profile-model.js`, the same section), each combo's `outputBehaviorLayers` ([Combo output behaviour permissions](../spec/interface-contracts.md#combo-output-behaviour-permissions)), each behaviour row's built-in tap and hold, `fromPress` included (`builtIn`, `core/model/built-in-behavior.js`; [Timing, built-in branches and reachability](timing-and-reachability.md)), [Pointing links](../spec/interface-contracts.md#pointing-links) (`pdModes[].linkStarts`, `qmkKeyTurnsOn`) | the tests those rows name, `tests/model/profile-model.test.js`, `tests/model/built-in-behavior.test.js` |
 | The LED each key carries, and the trackball's | `KEY_LEDS` and `TRACKBALL_LED` in `core/data/charybdis-layout.js`, published as `model.leds` and read through `keyLed` and `trackballLed` in `webview/view/lighting.mjs` | `tests/data/charybdis-layout.test.js`, `tests/session/panel-session.test.js`, `tests/view/lighting.test.mjs` |

@@ -8,12 +8,13 @@ import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect, trackballLed} from "../view/lighting.mjs";
 import {listed, slotCalled, stageOrder, layerCalled} from "../view/vocabulary.mjs";
-import {canEdit as canEditArea, currentLayer, getModel, layers, post, render, state, writable, heldLayers} from "../store.mjs";
+import {currentLayer, currentView, getModel, post, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
-import {topbar, unavailable} from "./frame.mjs";
+import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {localityLabel} from "./lighting/common.mjs";
 import {stageBody} from "./lighting/stage-body.mjs";
@@ -28,9 +29,10 @@ export function screenLighting() {
     if (!model?.rgb?.stages) {
         return el(`<div class="main">${topbar("Lighting", "Nothing read yet.")}
             <div class="content"><div class="pad"><div class="screen-stub"><h3>No lighting read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to read this keyboard's lighting.")}</p></div></div></div></div>`);
+            <p class="note">${esc(editGate(model, "lighting").why || "Choose Read keyboard to read this keyboard's lighting.")}</p></div></div></div></div>`);
     }
     const onGroups = state.stage === "groups";
+    const view = currentView();
     const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
         "Lighting",
@@ -46,10 +48,9 @@ export function screenLighting() {
     const card = el(`<div class="board-card"></div>`);
     const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
         ? pdColourRow(model, state.pointingSlot) : null;
-    card.appendChild(board(model, layer, {
+    card.appendChild(board(onGroups ? view.alone : view, {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
-        held: onGroups ? [] : heldLayers(),
         picks: state.ledPicks,
         trackball: state.trackball,
         pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: pdTrigger(model, layer, state.pointingSlot)?.layoutIndex} : null,
@@ -64,8 +65,8 @@ export function screenLighting() {
         <b>${onGroups ? "LED selector" : "Preview"}</b>
         <span class="board-foot-text">${onGroups
             ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerCalled(layer))}${heldLayers().some((at) => at > 0) && !onGroups
-                ? ` with ${esc(listed(heldLayers().filter((at) => at > 0).reverse().map((at) => layerCalled(layers()[at]))))} on`
+            : `${esc(layerCalled(layer))}${view.held.some((at) => at > 0) && !onGroups
+                ? ` with ${esc(listed(view.held.filter((at) => at > 0).reverse().map((at) => layerCalled(view.stack[at]))))} on`
                 : ""} over the background effect${preview
                 ? ` · ${esc(slotName(model, state.pointingSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
                 : ""}`}</span>
@@ -134,7 +135,7 @@ function powerControls(model) {
     const toggle = section.fields.find((field) => field.macro === "lightingEnabled");
     const timeout = section.fields.find((field) => field.macro === "lightingTimeout");
     if (!toggle || !timeout) return null;
-    const editable = canEditArea("settings");
+    const editable = editGate(model, "settings").editable;
     const node = el(`<div class="settings-group lighting-power" data-section="${esc(section.id)}">
         <label class="sw" data-tip="${esc([toggle.hint, toggle.tooltip].filter(Boolean).join(" "))}"><input type="checkbox" data-macro="${esc(toggle.macro)}" data-f="setting:${esc(toggle.macro)}" ${toggle.enabled ? "checked" : ""} ${editable && !toggle.readOnly ? "" : "disabled"}>
             <span class="track"></span><span class="txt">${esc(toggle.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</span></label>
@@ -155,7 +156,7 @@ function powerControls(model) {
 function stageSwitch(model, id, bit) {
     const on = stageEnabled(model, id);
     const node = el(`<label class="sw" data-tip="Turn this whole stage off without losing the colours it stores.">
-        <input data-f="lighting:${esc(id)}:enabled" type="checkbox" ${on ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span>
+        <input data-f="lighting:${esc(id)}:enabled" type="checkbox" ${on ? "checked" : ""} ${editGate(model, "lighting").editable ? "" : "disabled"}><span class="track"></span>
         <span class="txt">${on ? "Stage on" : "Stage off"}</span></label>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
         const mask = model.rgb.stageEnableMask ?? 0;

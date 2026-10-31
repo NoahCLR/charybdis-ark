@@ -1,6 +1,7 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {post, render, state, writable} from "../../store.mjs";
+import {post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {keyLed, offWording, trackballLed} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
@@ -10,7 +11,7 @@ import {vocabulary} from "../../view/vocabulary.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageGroups(model) {
     const node = el(`<div class="tab-split builder"></div>`);
-    const canEdit = writable();
+    const canEdit = editGate(model, "lighting").editable;
     node.append(groupBuilder(model, canEdit), groupTables(model, canEdit));
     return node;
 }

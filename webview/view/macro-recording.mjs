@@ -142,5 +142,5 @@ export function recordedTakePayload(before, events, {explicit = false, delays = 
 // A finished take stands while its macro holds exactly what the take produced.
 // Any later change to that macro's steps ends it, so Clear take, which puts
 // back what the macro held before Record, never loses an edit made after it.
-/** @param {{slot: string, after: string} | null | undefined} take @param {string} slot @param {string} payload @param {Readonly<Record<string, string>>} [aliases] */
-export const takeStands = (take, slot, payload, aliases) => take?.slot === slot && samePayload(payload, take.after, aliases);
+/** @param {{slot: string, after: string} | null | undefined} take @param {string} slot @param {string} payload @param {import("./keyface-types.js").ViewModel} [model] */
+export const takeStands = (take, slot, payload, model) => take?.slot === slot && samePayload(payload, take.after, model);

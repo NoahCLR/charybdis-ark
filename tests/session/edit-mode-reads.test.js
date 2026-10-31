@@ -7,105 +7,102 @@ const {connectedService} = require("../fixtures/connected-service");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {testClock} = require("../fixtures/panel-loop");
-const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
+const {EDIT_MODE, PROFILE_EDIT_V1} = require("../../core/protocol/profile-edit-v1");
 const {PROFILE_ACTIVE_KIND} = require("../../core/protocol/profile-wire-v1");
 const {editLayers} = require("../fixtures/profile-document");
-const {readServiceEditMode, readLiveFacts, readsLive} = require("../../core/session/edit-mode-reads");
 
-// Only what these reads touch of the service, over a keyboard that fails
-// every request with `code`.
-/** @param {string} code */
-function failing(code) {
-    /** @type {string[]} */
-    const diagnostics = [];
-    let requests = 0;
-    const service = {editMode: undefined, editModeUnknown: false, nextRequestId: () => 1, addDiagnostic: (/** @type {string} */ text) => diagnostics.push(text)};
-    const connection = {request: async () => {requests++; throw Object.assign(new Error(code), {code});}};
-    return {service, connection, diagnostics, requests: () => requests};
+const UNREAD = "The keyboard's edit mode could not be read; Ark tries again.";
+
+// A live keyboard whose edit mode cannot be read `modeReadFails` times
+// from the first, connected; `asked(value)` counts the GETs of that value.
+/** @param {import("node:test").TestContext} t @param {{modeReadFails?: number}} [options] */
+async function connected(t, {modeReadFails = 0} = {}) {
+    const keyboard = liveKeyboard({document: document()});
+    if (modeReadFails) keyboard.faults.modeReadFails = modeReadFails;
+    const {now, sleep} = testClock();
+    const {service, adapter} = await connectedService(t, {keyboard}, {now, sleep});
+    /** @param {number} value */
+    const asked = value => adapter.lastConnection().writes.filter(report => report[0] === PROFILE_EDIT_V1.COMMAND_GET && report[2] === value).length;
+    return {service, keyboard, adapter, asked};
 }
+/** @param {(layers: number[][]) => void} change */
+const target = change => {const next = document(); editLayers(next, change); return Buffer.from(next.profile, "base64");};
 
-test("an edit mode that could not be read is tried again; a firmware without one is not", async () => {
-    const lost = failing("TIMEOUT");
-    await readServiceEditMode(lost.service, lost.connection);
-    assert.equal(lost.service.editModeUnknown, true);
-    assert.equal(lost.service.editMode, undefined);
-    assert.deepEqual(lost.diagnostics, ["The keyboard's edit mode could not be read; Ark tries again."]);
-    assert.equal(await readsLive(lost.service, lost.connection), false, "a complete read tries it again first");
-    assert.equal(lost.requests(), 2);
-    const without = failing("UNHANDLED");
-    await readServiceEditMode(without.service, without.connection);
-    assert.equal(without.service.editModeUnknown, false);
-    assert.deepEqual(without.diagnostics, []);
-    await readLiveFacts(without.service, without.connection);
-    assert.equal(without.requests(), 1, "without an edit mode nothing more is asked");
+test("an edit mode that could not be read is tried again at the next read, and said once", async t => {
+    const {service, keyboard, asked} = await connected(t, {modeReadFails: 2});
+    assert.equal(service.snapshot().editMode, null, "unknown: Review and save's reads meanwhile");
+    assert.equal(service.snapshot().diagnostics.filter(line => line === UNREAD).length, 1);
+    assert.equal(asked(PROFILE_EDIT_V1.VALUE_MODE), 2, "the refresh asked, and its live facts asked again");
+    const read = await service.readKeyboardProfile();
+    assert.equal(service.snapshot().editMode?.mode, keyboard.mode, "a complete read tries it again first");
+    assert.ok("live" in read, "and reads live once it is known");
 });
 
-test("a keyboard reads live outside Review and save, and in it while it runs unsaved edits", async t => {
-    const keyboard = liveKeyboard({document: document()});
-    const {now, sleep} = testClock();
-    const {service} = await connectedService(t, {keyboard}, {now, sleep});
-    const connection = service.connectedConnection();
-    assert.equal(service.editMode?.mode, EDIT_MODE.LIVE_REVIEW);
-    assert.equal(await readsLive(service, connection), true);
+test("a firmware without an edit mode is asked once, and nothing more", async t => {
+    const {service, adapter} = await connectedService(t, {document: document()});
+    const asked = (/** @type {number} */ value) => adapter.lastConnection().writes.filter(report => report[0] === PROFILE_EDIT_V1.COMMAND_GET && report[2] === value).length;
+    assert.equal(service.snapshot().editMode, null);
+    assert.ok(!service.snapshot().diagnostics.includes(UNREAD), "nothing to try again");
+    const read = await service.readKeyboardProfile();
+    assert.ok(!("live" in read), "the saved profile is read");
+    assert.equal(asked(PROFILE_EDIT_V1.VALUE_MODE), 1);
+    assert.equal(asked(PROFILE_EDIT_V1.VALUE_RUNTIME), 0, "without an edit mode no toggles are asked for");
+    assert.equal(service.snapshot().runtime, null);
+});
+
+test("a keyboard reads live outside Review and save, and its toggles beside the saved profile in it", async t => {
+    const {service} = await connected(t);
+    assert.equal(service.snapshot().editMode?.mode, EDIT_MODE.LIVE_REVIEW);
+    assert.ok("live" in await service.readKeyboardProfile());
     await service.setEditMode(EDIT_MODE.APPLY);
-    assert.equal(await readsLive(service, connection), false, "nothing unsaved: Review and save reads the saved profile");
-    service.runtime = null;
-    await readLiveFacts(service, connection);
-    assert.ok(service.runtime, "the toggles a key turned off are read beside the profile");
-    assert.equal(service.editMode?.notStored, false);
+    const read = await service.readKeyboardProfile();
+    assert.ok(!("live" in read), "nothing unsaved: Review and save reads the saved profile");
+    assert.ok(service.snapshot().runtime, "the toggles a key turned off are read beside the profile");
+    assert.equal(service.snapshot().editMode?.notStored, false);
 });
 
-/** @param {import("node:test").TestContext} t */
-async function connected(t) {
-    const keyboard = liveKeyboard({document: document()});
-    const {now, sleep} = testClock();
-    const {service} = await connectedService(t, {keyboard}, {now, sleep});
-    return {service, keyboard, connection: service.connectedConnection()};
-}
-
-test("a mode read again is known again, and keeps whether its last write was stored", async t => {
-    const {service, keyboard, connection} = await connected(t);
-    service.editMode = {mode: EDIT_MODE.APPLY, counter: 0, conflict: false, notStored: true};
-    service.editModeUnknown = true;
-    await readServiceEditMode(service, connection);
-    assert.equal(service.editModeUnknown, false);
-    assert.equal(service.editMode?.mode, keyboard.mode, "the mode the keyboard says");
-    assert.equal(service.editMode?.notStored, true, "a read of the mode alone does not say whether it was stored");
-});
-
-test("the live facts read an unknown mode first, then the toggles and whether the mode is stored", async t => {
-    const {service, keyboard, connection} = await connected(t);
-    service.editMode = undefined;
-    service.editModeUnknown = true;
-    service.runtime = null;
+test("a mode read again is known again, then the toggles and whether its write is still owed", async t => {
+    const {service, keyboard} = await connected(t, {modeReadFails: 2});
     keyboard.raised.modeNotStored = true;
-    await readLiveFacts(service, connection);
-    assert.equal(service.editModeUnknown, false);
-    assert.equal(service.editMode?.mode, EDIT_MODE.LIVE_REVIEW);
-    assert.equal(service.editMode?.notStored, true, "the keyboard still owes the mode's write");
-    assert.ok(service.runtime);
+    await service.refreshStatus();
+    const {editMode, runtime} = service.snapshot();
+    assert.equal(editMode?.mode, EDIT_MODE.LIVE_REVIEW);
+    assert.equal(editMode?.notStored, true, "the keyboard still owes the mode's write");
+    assert.ok(runtime);
 });
 
-test("toggles or progress that cannot be read stop nothing, and leave the mode as it was", async () => {
-    const lost = failing("TIMEOUT");
-    const mode = {mode: EDIT_MODE.LIVE, notStored: false};
-    Object.assign(lost.service, {editMode: mode, runtime: null});
-    await readLiveFacts(/** @type {any} */ (lost.service), lost.connection);
-    assert.equal(lost.requests(), 2, "the toggles and the progress were each asked for once");
-    assert.equal(lost.service.editMode, mode);
-    assert.equal(/** @type {any} */ (lost.service).runtime, null);
-    assert.deepEqual(lost.diagnostics, []);
+test("toggles or progress that cannot be read stop nothing, and leave the mode as it was", async t => {
+    const {service, keyboard, adapter, asked} = await connected(t);
+    const before = service.snapshot(), runtimes = asked(PROFILE_EDIT_V1.VALUE_RUNTIME), statuses = asked(PROFILE_EDIT_V1.VALUE_STATUS);
+    // The keyboard stops handling its toggles and its edit status.
+    const answer = keyboard.answer.bind(keyboard);
+    adapter.keyboard = {...keyboard, answer: report => report[0] === PROFILE_EDIT_V1.COMMAND_GET && (report[2] === PROFILE_EDIT_V1.VALUE_RUNTIME || report[2] === PROFILE_EDIT_V1.VALUE_STATUS)
+        ? [Object.assign(Buffer.from(report), {0: 0xff})] : answer(report)};
+    keyboard.raised.modeNotStored = true;
+    await service.refreshStatus();
+    assert.deepEqual([asked(PROFILE_EDIT_V1.VALUE_RUNTIME) - runtimes, asked(PROFILE_EDIT_V1.VALUE_STATUS) - statuses], [1, 1], "each was asked for once");
+    const after = service.snapshot();
+    assert.deepEqual([after.editMode, after.runtime], [before.editMode, before.runtime]);
+    assert.ok(!after.diagnostics.includes(UNREAD));
+    assert.deepEqual([after.error, after.connected], [null, true]);
 });
 
 test("in Review and save a keyboard running unsaved edits reads live, and the status it read is kept", async t => {
-    const {service, keyboard, connection} = await connected(t);
+    const {service, keyboard} = await connected(t);
     await service.setEditMode(EDIT_MODE.APPLY);
-    keyboard.externalEdit((() => {const next = document(); editLayers(next, layers => {layers[0][9] = 0x06;}); return Buffer.from(next.profile, "base64");})());
-    service.status = undefined;
-    assert.equal(await readsLive(service, connection), true);
-    assert.equal(service.status?.activeKind, PROFILE_ACTIVE_KIND.WORKING);
-    service.editModeUnknown = true;
-    service.editMode = undefined;
-    assert.equal(await readsLive(service, connection), true, "a mode unknown is read first");
-    assert.equal(service.editMode?.mode, EDIT_MODE.APPLY);
+    keyboard.externalEdit(target(layers => {layers[0][9] = 0x06;}));
+    const read = await service.readKeyboardProfile();
+    assert.ok("live" in read && read.live.unsaved);
+    assert.equal(service.snapshot().status?.activeKind, PROFILE_ACTIVE_KIND.WORKING);
+});
+
+test("a refresh that cannot read the mode leaves it unknown, and a complete read reads it first", async t => {
+    const {service, keyboard} = await connected(t);
+    await service.setEditMode(EDIT_MODE.APPLY);
+    keyboard.faults.modeReadFails = 2;
+    await service.refresh();
+    assert.equal(service.snapshot().editMode, null);
+    keyboard.externalEdit(target(layers => {layers[0][9] = 0x06;}));
+    assert.ok("live" in await service.readKeyboardProfile(), "a mode unknown is read first");
+    assert.equal(service.snapshot().editMode?.mode, EDIT_MODE.APPLY);
 });

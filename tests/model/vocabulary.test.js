@@ -162,6 +162,15 @@ test("device phase identities are independent of their existing display labels",
     assert.equal(PHASE_WORDS[PHASE.READ_BASE_RGB].read, "Checking the background effect");
 });
 
+// Each reason core publishes for a draft that takes no edit has words, but
+// a disconnected keyboard (the shell's) and a busy draft (the commit bar's).
+test("every reason a draft takes no edit is worded where a control and a screen say it", () => {
+    assert.deepEqual(Object.keys(VOCABULARY.draftBlocks).sort(), ["connection-changed", "no-draft", "other-keyboard", "stale", "unsupported"]);
+    for (const [reason, words] of Object.entries(VOCABULARY.draftBlocks)) for (const part of ["sentence", "title", "detail"]) assert.match(words[part], /^[A-Z].*\S$/, `${reason} ${part}`);
+    assert.equal(VOCABULARY.draftBlocks.unsupported.sentence, VOCABULARY.firmwareUpdate);
+    assert.match(VOCABULARY.draftBlocks.stale.liveDetail, /Read keyboard/, "a live draft is read again, not reviewed");
+});
+
 test("every state of the two halves has a label and words saying what to do", () => {
     assert.deepEqual(Object.keys(VOCABULARY.halves).sort(), ["agree", "alone", "apart", "unread"]);
     for (const [id, {label, detail}] of Object.entries(VOCABULARY.halves)) {
