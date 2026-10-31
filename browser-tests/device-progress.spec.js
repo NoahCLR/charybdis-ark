@@ -30,18 +30,16 @@ for (const {screen, source, initial} of [
                 if (message.type === "readProgress") lastProgress = message;
                 window.dispatchEvent(new MessageEvent("message", {data: message}));
             }}, {adapter: {listDevices: async () => [], connect: async () => {throw Error("fixture must not connect");}}});
-            // What the service holds of a connection, as if the fixture had connected.
+            // What the service holds of a connection, as if the fixture had
+            // connected: opened below, once the connection is made.
             const service = loop.session.service, state = service.state;
-            state.connectionPublicId = "fixture"; state.connectionToken = 1;
-            state.capabilities = capabilities;
-            if (!initial) state.portable = {document: doc};
             const bytes = core.portable.validateSnapshot(doc).candidate, metadata = core.Buffer.alloc(25);
             // Payload metadata layout 2 (Profile Wire 2): a 32-bit length.
             metadata[0] = 2; metadata[1] = 25; metadata.writeUInt32LE(bytes.length, 2);
             metadata.writeUInt32LE(core.profileBlob.fnv1a32(bytes), 10);
             metadata.writeUInt32LE(core.profileBlob.crc32(bytes), 14); metadata[18] = 4; metadata[20] = 127;
-            let requestId = 0; state.requestIds = {next: () => (++requestId % 255) + 1};
-            state.connection = {connected: true, request: async report => {
+            let requestId = 0;
+            const connection = {connected: true, onDisconnect: () => () => {}, request: async report => {
                 if (!readContent) readContent = document.querySelector(".content");
                 else preserved &&= readContent === document.querySelector(".content");
                 if (replies) lastBar = document.querySelector(initial ? ".read-placeholder" : ".commit")?.textContent;
@@ -74,11 +72,14 @@ for (const {screen, source, initial} of [
                 const response = core.Buffer.from(report); response.fill(0, 5);
                 response[6] = payload.length; payload.copy(response, 7); return response;
             }};
+            state.open(connection, {publicId: "fixture", token: 1, requestIds: {next: () => (++requestId % 255) + 1}, onLoss: () => {}});
+            state.of().keep({capabilities});
+            if (!initial) state.of().adopt({document: doc});
             if (initial) loop.session.readBusy = true;
             else {
                 loop.session.portableBusy = true; loop.session.applyRunning = true; loop.session.postApplyReadStep = source;
             }
-            const apply = new core.ApplyProgress(); apply.finish(); state.liveApply = apply.view();
+            const apply = new core.ApplyProgress(); apply.finish(); state.of().liveApply = apply.view();
             store.state.screen = screen;
             const localText = ' {{"key": "{{KC_A}}"}}\ncafé “hello” 🙂. ';
             store.state.macroSlot = "MACRO_17";

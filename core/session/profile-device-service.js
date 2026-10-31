@@ -9,7 +9,8 @@ const {PHASE} = require("../model/vocabulary");
  * @typedef {import("./types.js").RestoredProfile} Restored
  * @typedef {import("./operation-failure.js").PublishedError} PublishedError
  * @typedef {import("../../contracts/model.js").PhaseId} PhaseId
- * @typedef {InstanceType<typeof import("./connection-state.js").ConnectionState>} State
+ * @typedef {InstanceType<typeof import("./connection-state.js").Held>} Held
+ * @typedef {[source: 'layout' | 'profile', progress: import("../../contracts/model.js").CountedProgress] | [source: 'portable', progress: string]} ReadProgress
  */
 const {canEdit, requireReady, evaluateProfileCompatibility} = require("./firmware-support");
 const {restoreProfile} = require("./portable-profile-session");
@@ -37,19 +38,20 @@ const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * What one operation works with (`#operate`): the keyboard it runs on, and
- * what the service holds of it, never the service itself. `connection` and
- * `ids` are the keyboard's as each is asked for, and fail once it is gone;
- * `waiting` is what the keyboard holds of Ark's until no key is held.
+ * the writer of what the service holds of it (`state`, connection-state.js,
+ * which also says whether the connection is still current), never the
+ * service itself. `connection` and `ids` are the keyboard's as each is asked
+ * for, and fail once it is gone; `waiting` is what the keyboard holds of
+ * Ark's until no key is held.
  * @typedef {{
  *   readonly connection: Connection,
  *   readonly ids: import("../protocol/types.js").RequestIds,
  *   nextRequestId(): number,
- *   state: State,
+ *   state: Held,
  *   capabilities(): Caps,
- *   current(): boolean,
  *   reader(): InstanceType<typeof ProfilePayloadReader>,
  *   live(): InstanceType<typeof LiveEditCoordinator>,
- *   progress: ProfileDeviceService["reportReadProgress"],
+ *   progress(...args: ReadProgress): void,
  *   say(message: string): void,
  *   publish(): void,
  *   waiting: import("./types.js").LiveWaiting | null,
@@ -63,11 +65,12 @@ const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 //
 // The class runs one operation at a time (`runOperation`), and holds what it
 // knows of the connection as one record (connection-state.js), cleared when
-// the connection ends. Each operation past connecting states here what it
-// needs before it starts and what it resolves with (`#operate`); its work is
-// grouped with others by what it does, each given only the operation: the
-// profile reads (read-operations.js), the working copy's
-// (live-edit-operations.js) and the reads between operations
+// the connection ends; an operation writes it only through the writer for
+// the connection it started on (`op.state`). Each operation past connecting
+// states here what it needs before it starts and what it resolves with
+// (`#operate`); its work is grouped with others by what it does, each given
+// only the operation: the profile reads (read-operations.js), the working
+// copy's (live-edit-operations.js) and the reads between operations
 // (background-reads.js). Two sequences chain operations of its own: the
 // editor's read (`readForEditor`) and the read after a save (`readBack`).
 //
@@ -92,6 +95,12 @@ class ProfileDeviceService {
     #operationActive = false;
     // The live watch's look and the flash pauses (background-reads.js).
     #background = new BackgroundReads();
+    // Each connection's payload reader and live edit coordinator, made for
+    // it on first use and gone with it.
+    /** @type {WeakMap<Connection, InstanceType<typeof ProfilePayloadReader>>} */
+    #readers = new WeakMap();
+    /** @type {WeakMap<Connection, InstanceType<typeof LiveEditCoordinator>>} */
+    #liveEdits = new WeakMap();
 
     get busy() { return this.#operationActive || this.disconnecting; }
 
@@ -182,17 +191,12 @@ class ProfileDeviceService {
         }
         await this.runOperation(PHASE.CONNECT, async () => {
             const connection = await this.coordinator.connect(adapterDeviceId);
-            const state = this.state;
-            state.connection = connection;
             this.reconnectExpected = false;
             this.lost = undefined;
-            state.missedLooks = 0;
-            state.requestIds = new ProfileRequestIdSequence(this.requestIdStart);
-            state.connectionPublicId = String(publicDeviceId);
-            state.connectionToken = ++this.connectionSequence;
+            this.state.open(connection, {publicId: String(publicDeviceId), token: ++this.connectionSequence,
+                requestIds: new ProfileRequestIdSequence(this.requestIdStart), onLoss: reason => this.handleDisconnect(reason)});
             this.phase = PHASE.CONNECTED;
-            state.disposeConnectionListener = connection.onDisconnect((reason) => this.handleDisconnect(reason));
-            this.addDiagnostic(`Connected to ${this.deviceLabel(state.connectionPublicId)}.`);
+            this.addDiagnostic(`Connected to ${this.deviceLabel(this.state.connectionPublicId)}.`);
         });
         return this.refresh();
     }
@@ -214,20 +218,17 @@ class ProfileDeviceService {
                 : undefined;
             // Every build that saves has a working copy and an edit mode; a
             // keyboard that does not answer is read and applied as before.
-            state.forgetEditMode();
+            state.mode({absent: true});
             if (candidateStatus) await readServiceEditMode(op);
-            if (!op.current()) {
+            if (!state.keep({capabilities, status, candidateStatus})) {
                 throw new Error("The keyboard disconnected while live state was being refreshed.");
             }
-            state.capabilities = capabilities;
-            state.status = status;
-            state.candidateStatus = candidateStatus;
             // A connection that replaces a lost one: an edit Ark began on the
             // old one and never finished is aborted now rather than holding
             // the keyboard until its lease ends.
             if (state.editMode) await op.live().abandonUnfinished().catch(() => false);
             await readLiveFacts(op);
-            state.lastRefreshedAt = new Date().toISOString();
+            state.keep({lastRefreshedAt: new Date().toISOString()});
             this.phase = PHASE.CONNECTED;
             this.addDiagnostic(
                 compatibility.compatible
@@ -253,9 +254,9 @@ class ProfileDeviceService {
             let started = false;
             if (deadline !== undefined) await sleep(STARTING.POLL_MS);
             for (;;) {
-                if (!op.current()) throw new Error("The keyboard disconnected while it was starting.");
+                if (!op.state.current) throw new Error("The keyboard disconnected while it was starting.");
                 const status = await readProfileStatus(connection, {nextRequestId: op.nextRequestId});
-                op.state.status = status;
+                op.state.keep({status});
                 if (hasStarted(status)) {started = true; break;}
                 if (now() >= until) {
                     if (stillStarting(status) && status.slaveKnown) throw Object.assign(new Error(STARTING_WORDS.timeout), {code: STARTING_CODE});
@@ -282,23 +283,21 @@ class ProfileDeviceService {
         if (this.state.connected && (typeof layerCount !== "number" || !Number.isInteger(layerCount) || layerCount < 1)) {
             this.refuse("Refresh capabilities before reading the layout.");
         }
-        await this.#operate(PHASE.READ_LAYOUT, {requires: "Connect to a keyboard before reading its layout.",
-            initialize: state => {state.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};}},
-        op => readLayout(op, /** @type {number} */ (layerCount)));
+        await this.#operate(PHASE.READ_LAYOUT, {requires: "Connect to a keyboard before reading its layout.", reading: "layout"},
+            op => readLayout(op, /** @type {number} */ (layerCount)));
         return this.snapshot();
     }
     /** @param {{reuse?: boolean}} [options] */
     async readCommittedProfile(options) {
-        await this.#operate(PHASE.READ_PROFILE, {requires: "Connect to a keyboard before reading its profile.",
-            initialize: state => {state.committed = {state: "reading", progress: {done: 0, total: 0}};}},
-        op => readCommittedProfile(op, options));
+        await this.#operate(PHASE.READ_PROFILE, {requires: "Connect to a keyboard before reading its profile.", reading: "committed"},
+            op => readCommittedProfile(op, options));
         return this.snapshot();
     }
     readCombos() {
-        return this.#readOptional(PHASE.READ_COMBOS, state => {state.combos = {state: "reading"};}, readCombos);
+        return this.#readOptional(PHASE.READ_COMBOS, "combos", readCombos);
     }
     readBaseRgb() {
-        return this.#readOptional(PHASE.READ_BASE_RGB, state => {state.baseRgb = {state: "reading"};}, readBaseRgb);
+        return this.#readOptional(PHASE.READ_BASE_RGB, "baseRgb", readBaseRgb);
     }
 
     // One coherent snapshot supplies the editor and the draft. Standalone
@@ -413,8 +412,7 @@ class ProfileDeviceService {
         this.phase = PHASE.DISCONNECT;
         this.error = undefined;
         this.emitChange();
-        this.state.disposeConnectionListener?.();
-        this.state.disposeConnectionListener = undefined;
+        this.state.detach();
         try {
             await connection.disconnect();
         } catch (error) {
@@ -433,10 +431,9 @@ class ProfileDeviceService {
     // within it.
     liveCoordinator() {
         const connection = this.connectedConnection();
-        if (!this.state.liveEdits || this.state.liveEdits.connection !== connection) {
-            this.state.liveEdits = new LiveEditCoordinator(connection, {requestIds: this.requestSequence(), transactionIds: new TransactionIds(), sleep: this.sleep, now: this.now});
-        }
-        return this.state.liveEdits;
+        let live = this.#liveEdits.get(connection);
+        if (!live) this.#liveEdits.set(connection, live = new LiveEditCoordinator(connection, {requestIds: this.requestSequence(), transactionIds: new TransactionIds(), sleep: this.sleep, now: this.now}));
+        return live;
     }
 
     // The working copy's operations (live-edit-operations.js): a live edit,
@@ -479,7 +476,8 @@ class ProfileDeviceService {
     // no key is held, and aborts it at Ark's next look. False when nothing
     // of Ark's is held that can be cancelled.
     cancelLiveEdit() {
-        return Boolean(this.liveWaiting && this.state.liveEdits?.cancelWaiting());
+        const connection = this.state.connection;
+        return Boolean(this.liveWaiting && connection && this.#liveEdits.get(connection)?.cancelWaiting());
     }
 
     // The background reads (background-reads.js): the live watch's look, and
@@ -497,51 +495,43 @@ class ProfileDeviceService {
     /** @param {import("../model/types.js").PortableDocument} document @param {import("./types.js").RestoreOptions} options @returns {Promise<import("./types.js").RestoredProfile>} */
     async restorePortableProfile(document, options) {
         let started = false;
-        return this.#operate(PHASE.RESTORE_COMPLETE, {requires: "Connect the keyboard and wait for the current operation to finish.", idle: true, returns: "verified profile"}, async op => {
+        // Once the restore has started — landed, failed, or stopped past the
+        // point of no return — the health the panel shows must be the
+        // keyboard's now, not the status read before the apply began. A
+        // refusal before the first write changed nothing, so it reads nothing.
+        return this.#operate(PHASE.RESTORE_COMPLETE, {requires: "Connect the keyboard and wait for the current operation to finish.", idle: true, returns: "verified profile",
+            refreshAfter: () => started}, async op => {
             const state = op.state;
             state.liveApply = {state: "idle"};
-            try {
-                const connection = op.connection;
-                const capabilities = op.capabilities();
-                const cachedBase = options?.expectedFingerprint && state.portable?.fingerprint === options.expectedFingerprint
-                    ? state.portable
-                    : undefined;
-                const facts = await readDeviceFacts(op, connection, cachedBase);
-                checkRestorable(document, facts, state.capabilities);
-                started = true;
-                const result = await restoreProfile(connection, op.ids, capabilities, document, {...options,
-                    baseSnapshot: cachedBase,
-                    sleep: this.sleep,
-                    now: this.now,
-                    onProgress: message => {state.portableProgress = message;},
-                    // The step view the commit bar draws; it outlives the apply
-                    // when it failed, so the person can see where and why.
-                    onApplyProgress: view => this.reportApplyProgress(view),
-                });
-                Object.assign(result, facts);
-                state.adoptPortable(result);
-                if (result.performance) {
-                    const seconds = (result.performance.elapsedMs / 1000).toFixed(1);
-                    this.addDiagnostic(`Saved the complete profile in ${seconds} s; published one ${result.performance.profileBytes}-byte profile.`);
-                }
-                return result;
-            } finally {
-                state.portableProgress = "";
-                // Once the restore has started — landed, failed, or stopped past
-                // the point of no return — the health the panel shows must be the
-                // keyboard's now, not the status read before the apply began. A
-                // refusal before the first write changed nothing, so it reads nothing.
-                if (started) {
-                    await this.refreshStatus();
-                    this.emitChange();
-                }
+            const connection = op.connection;
+            const capabilities = op.capabilities();
+            const cachedBase = options?.expectedFingerprint && state.portable?.fingerprint === options.expectedFingerprint
+                ? state.portable
+                : undefined;
+            const facts = await readDeviceFacts(op, connection, cachedBase);
+            checkRestorable(document, facts, state.capabilities);
+            started = true;
+            const result = await restoreProfile(connection, op.ids, capabilities, document, {...options,
+                baseSnapshot: cachedBase,
+                sleep: this.sleep,
+                now: this.now,
+                onProgress: message => state.showing(message),
+                // The step view the commit bar draws; it outlives the apply
+                // when it failed, so the person can see where and why.
+                onApplyProgress: view => this.#applyProgress(state, view),
+            });
+            Object.assign(result, facts);
+            state.adopt(result);
+            if (result.performance) {
+                const seconds = (result.performance.elapsedMs / 1000).toFixed(1);
+                this.addDiagnostic(`Saved the complete profile in ${seconds} s; published one ${result.performance.profileBytes}-byte profile.`);
             }
+            return result;
         });
     }
 
     async close() {
-        this.state.disposeConnectionListener?.();
-        this.state.disposeConnectionListener = undefined;
+        this.state.detach();
         this.disconnecting = true;
         try {
             await this.coordinator.close();
@@ -571,45 +561,50 @@ class ProfileDeviceService {
     // Runs one operation on the connected keyboard: refused with `requires`
     // before it starts when there is none (and, `idle`, while another runs),
     // then run as one operation (`runOperation`) given only what it works
-    // with. Resolves with what `work` returns; one that returns nothing
-    // fails, saying it returned no `returns`. `initialize` sets the state
-    // the operation publishes as it starts; `refreshAfter` reads the
-    // keyboard's status after it, whether it worked or not.
+    // with, and ended when its work does (`Held.end`). Resolves with what
+    // `work` returns; one that returns nothing fails, saying it returned no
+    // `returns`. `reading` is the read the operation publishes as starting;
+    // `refreshAfter` reads the keyboard's status after it, whether it worked
+    // or not (given a function, when that says so then).
     /**
      * @template T
      * @param {PhaseId} phase
-     * @param {{requires: string, idle?: boolean, returns?: string, initialize?: (state: State) => void, refreshAfter?: boolean}} contract
+     * @param {{requires: string, idle?: boolean, returns?: string, reading?: Parameters<Held["reading"]>[0], refreshAfter?: boolean | (() => boolean)}} contract
      * @param {(op: Operation) => Promise<T>} work
      * @returns {Promise<T>}
      */
-    async #operate(phase, {requires, idle = false, returns, initialize, refreshAfter = false}, work) {
+    async #operate(phase, {requires, idle = false, returns, reading, refreshAfter = false}, work) {
         if (!this.state.connected || (idle && this.busy)) this.refuse(requires);
+        const op = this.#operation();
         /** @type {{value: T} | undefined} */
         let done;
-        await this.runOperation(phase, async () => {done = {value: await work(this.#operation())};}, {
-            initialize: initialize && (() => initialize(this.state)),
-            after: refreshAfter ? () => this.refreshStatus() : undefined,
+        await this.runOperation(phase, async () => {
+            try {done = {value: await work(op)};}
+            finally {op.state.end();}
+        }, {
+            initialize: reading && (() => op.state.reading(reading)),
+            after: refreshAfter ? async () => {if (refreshAfter === true || refreshAfter()) await this.refreshStatus();} : undefined,
         });
         if (returns && !done?.value) throw new Error(`The keyboard operation returned no ${returns}.`);
         return /** @type {{value: T}} */ (done).value;
     }
 
     // What an operation is given: the keyboard as it stands when the
-    // operation starts. It is current while the service still holds that
-    // connection and it is still connected.
+    // operation starts, and the writer of what the service holds of it,
+    // current while the service still holds that connection and it is still
+    // connected.
     /** @returns {Operation} */
     #operation() {
-        const service = this, state = this.state, started = state.connection;
+        const service = this, state = this.state.of();
         return {
             get connection() {return service.connectedConnection();},
             get ids() {return service.requestSequence();},
             nextRequestId: () => this.nextRequestId(),
             state,
             capabilities: () => this.profileCapabilities(),
-            current: () => Boolean(started && state.connection === started && started.connected),
             reader: () => this.profilePayloadReader(),
             live: () => this.liveCoordinator(),
-            progress: (...args) => this.reportReadProgress(...args),
+            progress: (...args) => this.#readProgress(state, ...args),
             say: message => this.addDiagnostic(message),
             publish: () => this.emitChange(),
             get waiting() {return service.liveWaiting;},
@@ -624,14 +619,17 @@ class ProfileDeviceService {
     // an earlier error alone. Refused while another operation runs, it
     // resolves with the snapshot as it is; the phase it ends in is the one
     // before it while the keyboard is connected.
-    /** @param {PhaseId} phase @param {(state: State) => void} initialize @param {(op: Operation) => Promise<void>} read */
-    async #readOptional(phase, initialize, read) {
-        const previousPhase = this.phase;
+    /** @param {PhaseId} phase @param {"combos" | "baseRgb"} part @param {(op: Operation) => Promise<void>} read */
+    async #readOptional(phase, part, read) {
+        const previousPhase = this.phase, op = this.#operation();
         try {
             return await this.runOperation(phase, async () => {
-                try {await read(this.#operation());}
-                finally {if (this.state.connected) this.phase = previousPhase;}
-            }, {preserveError: true, initialize: () => initialize(this.state)});
+                try {await read(op);}
+                finally {
+                    op.state.end();
+                    if (this.state.connected) this.phase = previousPhase;
+                }
+            }, {preserveError: true, initialize: () => op.state.reading(part)});
         } catch (error) {
             if (/** @type {{code?: string}} */ (error).code !== "SERVICE_BUSY") throw error;
             return this.snapshot();
@@ -778,9 +776,12 @@ class ProfileDeviceService {
 
     // Transfer progress changes no profile data. Shells that can display it
     // separately avoid rebuilding and sending the complete panel per chunk.
+    // An operation reports its own connection's (`#applyProgress`).
     /** @param {import("../../contracts/model.js").ApplyView} view */
-    reportApplyProgress(view) {
-        this.state.liveApply = view;
+    reportApplyProgress(view) {this.#applyProgress(this.state.of(), view);}
+    /** @param {Held} state @param {import("../../contracts/model.js").ApplyView} view */
+    #applyProgress(state, view) {
+        state.liveApply = view;
         if (!this.onApplyProgress) { this.emitChange(); return; }
         try { this.onApplyProgress(clone(view)); } catch {
             // A closed or reloading panel must not interrupt the save.
@@ -789,12 +790,14 @@ class ProfileDeviceService {
 
     // Keep the read's latest counter for snapshots without copying all the
     // profile data or asking the panel to rebuild its editor for every reply.
-    /** @param {[source: 'layout' | 'profile', progress: import("../../contracts/model.js").CountedProgress] | [source: 'portable', progress: string]} args */
-    reportReadProgress(...args) {
-        const [source, progress] = args, state = this.state;
-        if (source === "layout") state.layout = {...state.layout, progress};
-        else if (source === "profile") state.committed = {...state.committed, progress};
-        else if (source === "portable") state.portableProgress = progress;
+    // An operation reports its own connection's (`#readProgress`).
+    /** @param {ReadProgress} args */
+    reportReadProgress(...args) {this.#readProgress(this.state.of(), ...args);}
+    /** @param {Held} state @param {ReadProgress} args */
+    #readProgress(state, ...args) {
+        const [source, progress] = args;
+        if (source === "portable") state.showing(progress);
+        else state.progress(source === "profile" ? "committed" : source, progress);
         if (!this.onReadProgress) { this.emitChange(); return; }
         try {
             this.onReadProgress({...(source === "portable" ? {source, progress} : {source, progress: {...progress}}),
@@ -821,11 +824,10 @@ class ProfileDeviceService {
     }
 
     profilePayloadReader() {
-        const state = this.state;
-        if (!state.payloadReader || state.payloadReader.connection !== state.connection) {
-            state.payloadReader = new ProfilePayloadReader(this.connectedConnection(), {compiled: this.compiledDefaults.current(), onCompiled: read => this.compiledDefaults.keep(read)});
-        }
-        return state.payloadReader;
+        const connection = this.connectedConnection();
+        let reader = this.#readers.get(connection);
+        if (!reader) this.#readers.set(connection, reader = new ProfilePayloadReader(connection, {compiled: this.compiledDefaults.current(), onCompiled: read => this.compiledDefaults.keep(read)}));
+        return reader;
     }
 
     emitChange() {
@@ -846,12 +848,12 @@ class ProfileDeviceService {
         if (!state.connection?.connected || !state.requestIds || !evaluateProfileCompatibility(state.capabilities).compatible) return;
         const op = this.#operation(), connection = state.connection;
         try {
-            state.status = await readProfileStatus(connection, {nextRequestId: op.nextRequestId});
-            state.candidateStatus = await this.readCandidateStatus(connection, {
+            op.state.keep({status: await readProfileStatus(connection, {nextRequestId: op.nextRequestId})});
+            op.state.keep({candidateStatus: await this.readCandidateStatus(connection, {
                 nextRequestId: op.nextRequestId,
-            });
+            })});
             await readLiveFacts(op);
-            state.lastRefreshedAt = new Date().toISOString();
+            op.state.keep({lastRefreshedAt: new Date().toISOString()});
         } catch {
             // Preserve the original outcome; Refresh remains available for a later explicit retry.
         }

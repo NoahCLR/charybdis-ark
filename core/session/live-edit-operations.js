@@ -39,17 +39,15 @@ function showWaiting(op, waiting) {
 }
 
 // Save: the keyboard writes its working copy as a new generation on both
-// halves (firmware D-F32). Resolves with the edit status after it.
+// halves (firmware D-F32). Resolves with the edit status after it; its words
+// go when the operation ends, failed or not.
 /** @param {Operation} op @param {{session: number, revision: number}} identity */
 async function saveWorkingCopy(op, identity) {
-    // Its words go when it ends, failed or not.
-    try {
-        return await op.live().save(identity, status => {
-            op.state.portableProgress = status.storagePaused || status.slaveStoragePaused ? "Waiting for a quiet keyboard to save"
-                : status.waitingSafe ? "Release held keys to finish saving" : "Saving on both halves";
-            op.publish();
-        });
-    } finally {op.state.portableProgress = "";}
+    return op.live().save(identity, status => {
+        op.state.showing(status.storagePaused || status.slaveStoragePaused ? "Waiting for a quiet keyboard to save"
+            : status.waitingSafe ? "Release held keys to finish saving" : "Saving on both halves");
+        op.publish();
+    });
 }
 
 // Revert: the keyboard runs its saved profile again; nothing is written.
@@ -64,9 +62,9 @@ async function revertWorkingCopy(op, identity) {
 // edit status after it.
 /** @param {Operation} op @param {(document: import("../model/types.js").PortableDocument) => Promise<string | undefined>} saveRecovery */
 async function flushWorkingCopy(op, saveRecovery) {
-    try {return await op.live().flush(status => {
-        op.state.portableProgress = status.storagePaused || status.slaveStoragePaused ? "Waiting for a quiet keyboard to save"
-            : status.autoSave.inProgress ? "The keyboard is saving its edits" : "Saving what the keyboard has not saved yet";
+    return op.live().flush(status => {
+        op.state.showing(status.storagePaused || status.slaveStoragePaused ? "Waiting for a quiet keyboard to save"
+            : status.autoSave.inProgress ? "The keyboard is saving its edits" : "Saving what the keyboard has not saved yet");
         op.publish();
     }, async status => {
         // A quiet-period save may have moved the saved base since the
@@ -80,9 +78,7 @@ async function flushWorkingCopy(op, saveRecovery) {
         }
         const recovery = await saveRecovery(snapshot.saved.document);
         if (!recovery) throw Object.assign(new Error("A recovery copy could not be saved. Nothing was saved on the keyboard."), {code: "RECOVERY_REQUIRED"});
-    });}
-    // Its words go when it ends, failed or not.
-    finally {op.state.portableProgress = "";}
+    });
 }
 
 // What the keyboard runs now (its working copy, or its saved profile),
@@ -105,6 +101,6 @@ async function restartKeyboard(op) {
 // How edits reach this keyboard, stored on both halves; refused while it
 // has unsaved edits (Save or Revert first).
 /** @param {Operation} op @param {number} mode */
-async function setEditMode(op, mode) {op.state.editModeRead(await op.live().setMode(mode));}
+async function setEditMode(op, mode) {op.state.mode({set: await op.live().setMode(mode)});}
 
 module.exports = {postLiveEdit, saveWorkingCopy, revertWorkingCopy, flushWorkingCopy, readWorkingCopy, restartKeyboard, setEditMode};
