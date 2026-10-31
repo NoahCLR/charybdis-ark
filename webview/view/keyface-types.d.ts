@@ -20,7 +20,17 @@ export interface SortableReach {layer?: Layer | null; keys?: ResolvedKey[]; beha
 export interface BehaviorCombo {row: BehaviorView; combos: ComboRoute[]}
 export interface ComboGroupEntry extends ComboRoute {inputs: number; covered: number; held: Layer[]}
 export interface ComboGroups {onKeys: ComboGroupEntry[]; throughKeys: ComboGroupEntry[]; fromBranches: never[]; fromBranchesBelow: never[]; elsewhere: ComboGroupEntry[]}
-export interface ReachRecord {directKeys: ResolvedKey[]; fellKeys: ResolvedKey[]; directRows: ReachedBehavior[]; belowRows: ReachedBehavior[]; directCombos: ReachedCombo[]; belowCombos: ReachedCombo[]}
+// What a behaviour's branch sends, and the cell of its grid it sits in.
+export interface BranchSend {action: string; cell: BranchCell}
+// One way a layer view reaches something (view/reach-routes.mjs): a key and what it sends; a behaviour, on a key in the
+// view or once for how the layer reaches it, and what its branches send; or a combo and what it sends, with the behaviour
+// that output runs and what its branches send. `below`: reached only under a transparent key, and a behaviour reached
+// so names the layer answering with it.
+export type ReachRoute =
+    | {how: 'key'; below: boolean; key: ResolvedKey; action: string}
+    | {how: 'behaviour'; below: false; row: BehaviorView; key?: ResolvedKey; layer: Layer | null; whileHeld: boolean; sends: BranchSend[]}
+    | {how: 'behaviour'; below: true; row: BehaviorView; key?: ResolvedKey; layer: Layer; whileHeld: boolean; sends: BranchSend[]}
+    | {how: 'combo'; below: boolean; combo: ComboView; keys: ResolvedKey[]; action: string; row: BehaviorView | undefined; sends: BranchSend[]};
 // Whether a combo fires from a key in one view, and the words for why not.
 export interface ComboUse {fires: boolean; reasons: string[]}
 // The combos the board marks on each key in one view, by layout index, and whether each fires from it there.

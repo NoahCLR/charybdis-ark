@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {createRequire} from "node:module";
 import {tabReach} from "../../webview/view/tab-reach.mjs";
-import {comboBehaviourFor} from "../../webview/view/behaviour-reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 import {macroMessage} from "../../webview/view/edits.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
-
-const {keyAt} = createRequire(import.meta.url)("../fixtures/published-model.js");
 
 // The behaviour views read what core publishes for a profile (published): its
 // layers with their answers, its combos and the reach core works out for them.
@@ -90,28 +86,34 @@ test("generated behaviour lists use the declared owner's physical source rather 
 });
 
 test("a combo runs its output's behaviour only when its last input's key comes from a layer the behaviour runs on", () => {
-    // CUSTOM_KEY_0's behaviour runs on Base alone; CUSTOM_KEY_1 has none.
-    const model = published({keys: {0: {0: "KC_J", 1: "KC_K"}, 1: {0: "KC_J", 1: "KC_K"}, 2: {0: "KC_TRANSPARENT", 1: "KC_TRANSPARENT"}},
-        combos: [{inputs: ["KC_J", "KC_K"], output: "CUSTOM_KEY_0"}, {inputs: ["KC_J", "KC_K"], output: "CUSTOM_KEY_1"},
-            {inputs: ["KC_J", "KC_K"], output: "CUSTOM_KEY_0", useOutputBehavior: false}],
-        behaviours: [{keycode: "CUSTOM_KEY_0", allowedLayers: 1, steps: [{tapCount: 1, tap: {action: "KC_X"}}]}]});
-    const stack = model.layers;
-    // The key at `layoutIndex`, pressed from `layer`.
-    const key = (/** @type {number} */ layer, /** @type {number} */ layoutIndex) => ({layer: stack[layer], fellThrough: false, whileHeld: false,
-        position: keyAt(model, layer, layoutIndex)});
-    const [sends, none, bypassed] = model.combos;
-    assert.equal(comboBehaviourFor(layerView(model, 0), sends, [key(0, 0), key(0, 1)])?.keycode, "CUSTOM_KEY_0", "both keys from Base");
-    assert.equal(comboBehaviourFor(layerView(model, 1), sends, [key(1, 0), key(1, 1)]), undefined, "both from layer 1, where it does not run");
-    assert.equal(comboBehaviourFor(layerView(model, 1), sends, [key(1, 0), key(0, 1)])?.keycode, "CUSTOM_KEY_0", "K, its last input, from Base decides");
-    assert.equal(comboBehaviourFor(layerView(model, 1), sends, [key(0, 0), key(1, 1)]), undefined, "J from Base cannot lend K its layer");
+    // CUSTOM_KEY_0's behaviour runs on Base alone; CUSTOM_KEY_1 has none, and
+    // C2 bypasses its output's behaviour. Numbers holds J and K, Symbols J
+    // over a transparent K, and layer 3 K over a transparent J.
+    const combos = [{inputs: ["KC_J", "KC_K"], output: "CUSTOM_KEY_0"}, {inputs: ["KC_J", "KC_K"], output: "CUSTOM_KEY_1"},
+        {inputs: ["KC_J", "KC_K"], output: "CUSTOM_KEY_0", useOutputBehavior: false}];
+    const behaviours = [{keycode: "CUSTOM_KEY_0", allowedLayers: 1, steps: [{tapCount: 1, tap: {action: "KC_X"}}]}];
+    const model = published({keys: {0: {0: "KC_J", 1: "KC_K"}, 1: {0: "KC_J", 1: "KC_K"}, 2: {0: "KC_J", 1: "KC_TRANSPARENT"}, 3: {0: "KC_TRANSPARENT", 1: "KC_K"}},
+        combos, behaviours});
+    assert.equal(model.combos[2].outputBehaviorLayers, 0);
+    // What a Behaviours group lists: each behaviour, with the combos running it.
+    const run = (/** @type {import("../../webview/view/keyface-types.js").LayerView} */ view, /** @type {string} */ group) =>
+        (tabReach(view, "behaviours").groups.find((entry) => entry.id === group)?.entries || [])
+            .map((entry) => [entry.name, entry.combos.map((route) => route.combo.badge)]);
+    assert.deepEqual(run(layerView(model, 0), "combos"), [["CUSTOM_KEY_0", ["C0"]]],
+        "both keys from Base: an output with no behaviour runs none, and neither does a combo that bypasses it");
+    assert.deepEqual(run(layerView(model, 0), "view"), [["CUSTOM_KEY_0", ["C0"]]]);
+    assert.deepEqual([...run(layerView(model, 1), "combos"), ...run(layerView(model, 1), "belowCombos")], [], "both from Numbers, where it does not run");
+    assert.deepEqual(run(layerView(model, 2), "belowCombos"), [["CUSTOM_KEY_0", ["C0"]]], "K, its last input, from Base decides");
+    assert.deepEqual(layerView(model, 3).combos.groups.throughKeys.map((entry) => entry.combo.badge), ["C0", "C1", "C2"], "every combo fires from layer 3");
+    assert.deepEqual(run(layerView(model, 3), "belowCombos"), [], "but J from Base cannot lend K its layer");
+
     // Matched on a reference layer's raw keys, the key's layer is the one
-    // that answers that place in the view: on layer 2, which is transparent
-    // there, Base once it is on too.
-    const referenced = [key(1, 0), {...key(1, 1), reference: true}];
-    assert.equal(comboBehaviourFor(layerView(model, 2, [0]), sends, referenced)?.keycode, "CUSTOM_KEY_0", "a reference key's place answers from Base");
-    assert.equal(comboBehaviourFor(layerView(model, 2), sends, referenced), undefined, "layer 2 shown alone answers nothing there");
-    assert.equal(comboBehaviourFor(layerView(model, 1), sends, referenced), undefined, "and on layer 1 from layer 1");
-    assert.equal(comboBehaviourFor(layerView(model, 0), none, [key(0, 0), key(0, 1)]), undefined, "an output with no behaviour runs none");
-    assert.equal(bypassed.outputBehaviorLayers, 0);
-    assert.equal(comboBehaviourFor(layerView(model, 0), bypassed, [key(0, 0), key(0, 1)]), undefined, "a combo that bypasses its output's behaviour runs none");
+    // that answers that place in the view: Symbols matches Numbers' keys and
+    // is transparent there, so Base answers once it is on too.
+    const referenced = published({keys: {0: {0: "KC_J", 1: "KC_K"}, 1: {0: "KC_J", 1: "KC_K"}, 2: {0: "KC_TRANSPARENT", 1: "KC_TRANSPARENT"}},
+        combos, behaviours, settings: (settings) => { settings.layers[2].reference = 1; }});
+    assert.ok(layerView(referenced, 2).combos.inView.every((route) => route.keys.every((key) => key.reference)), "the combos fire on Numbers' keys");
+    assert.deepEqual(run(layerView(referenced, 2, [0]), "view"), [["CUSTOM_KEY_0", ["C0"]]], "a reference key's place answers from Base");
+    assert.deepEqual(run(layerView(referenced, 2), "view"), [], "Symbols shown alone answers nothing there");
+    assert.deepEqual(run(layerView(referenced, 1), "view"), [], "and on Numbers from Numbers");
 });

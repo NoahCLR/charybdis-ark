@@ -9,7 +9,7 @@
 
 import {demoOf} from "./demo.mjs";
 import {shellOf} from "./shell-panel.mjs";
-import {draftBlockWords} from "./draft-block.mjs";
+import {draftBlockWords} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel} Model
@@ -49,7 +49,7 @@ const TAKES_EDITS = {
 // read over an earlier connection, both reviewed against the keyboard. ''
 // for the rest (an operation running, which the commit bar says; the area's
 // own capability); a screen then says its own sentence, or nothing. The
-// draft's reasons are worded in draft-block.mjs, as readiness says them.
+// draft's reasons are worded by draftBlockWords, as readiness says them.
 // Unsupported firmware comes before what it leaves unread or unmatched: core
 // reads no further and publishes its draft as unmatched (D-L64).
 /** @param {Model | null | undefined} model */

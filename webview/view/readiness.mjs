@@ -7,8 +7,7 @@ import {configureReady, screenAvailable, screenDefinition} from "./screens.mjs";
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {import("../../contracts/model.js").CountedProgress} CountedProgress */
 
-import {phaseWords, readStepWords} from "./vocabulary.mjs";
-import {draftBlockWords} from "./draft-block.mjs";
+import {draftBlockWords, phaseWords, readStepWords} from "./vocabulary.mjs";
 
 /** @param {Parameters<typeof readStepWords>[0]} model @param {{step: string, progress?: CountedProgress | null} | null | undefined} read */
 export function postApplyReadText(model, read) {
@@ -51,7 +50,7 @@ export function readScreen(model, screen = "keys") {
     const halvesDetail = halves === "alone" || halves === "apart" ? model.vocabulary?.halves?.[halves]?.detail : "";
     if (halvesDetail || device.health?.error) return {state: "unavailable", title: "Keyboard not ready for edits", detail: halvesDetail || /** @type {string} */ (device.health?.error)};
     // A read that worked, held by its draft: why, and what the bar offers;
-    // otherwise the read failed (draft-block.mjs words both).
+    // otherwise the read failed (draftBlockWords words both).
     const live = Boolean(model.draft?.live);
     const words = draftBlockWords(model, model.load?.held, live) || draftBlockWords(model, "no-draft", live);
     return {state: "unavailable", title: words?.title || "", detail: words?.detail || ""};

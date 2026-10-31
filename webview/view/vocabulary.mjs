@@ -76,6 +76,17 @@ export const readStepWords = (model, step) => /** @type {Readonly<Record<string,
 /** @param {{vocabulary?: Pick<import('../../contracts/model.js').Vocabulary, 'phases'>} | null | undefined} model @param {import("../../contracts/model.js").PhaseId | undefined} phase */
 export const phaseWords = (model, phase) => phase ? model?.vocabulary?.phases?.[/** @type {import('../../contracts/model.js').PhaseId} */ (phase)] : undefined;
 
+// Why the open draft takes no edit (D-L60), in core's words for each reason
+// it publishes (`DraftBlock`, vocabulary.draftBlocks): the sentence a control
+// says where it is (edit-gate.mjs), and the title and detail a screen shows in
+// place of the editor (readiness.mjs). A live draft is what the keyboard
+// runs, so it is read again rather than reviewed.
+/** @param {{vocabulary?: Partial<Pick<Vocabulary, 'draftBlocks'>>} | null | undefined} model @param {import("../../contracts/panel.js").DraftBlock | undefined} reason @param {boolean} [live] @returns {{sentence: string, title: string, detail: string} | null} */
+export function draftBlockWords(model, reason, live = false) {
+    const words = reason ? model?.vocabulary?.draftBlocks?.[reason] : undefined;
+    return words ? {sentence: words.sentence, title: words.title, detail: (live && words.liveDetail) || words.detail} : null;
+}
+
 // Whether the two halves agree, in the words core chose. A state the table
 // does not know reads as itself.
 /** @param {{vocabulary?: Partial<Pick<import('../../contracts/model.js').Vocabulary, 'halves'>>} | null | undefined} model @param {import("../../contracts/model.js").HalvesId | undefined} halves @returns {{label: string, detail: string}} */
