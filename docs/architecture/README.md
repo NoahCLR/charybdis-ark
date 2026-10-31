@@ -75,6 +75,8 @@ Around the core:
   editor or profile domain also gets its handler in
   `core/model/draft-editor.js`, where `applyDraftEdit` makes every draft edit;
   no other runtime module runs an editor's edit (`tests/scripts/conventions.test.js`).
+  Every handler edits the document it is given, reading it through
+  `editProfileDomains`, so any edit may follow a custom key made in the same step.
 - What a review item names and Discard puts back (a review unit): a builder
   in `UNIT` and a reading in `parseUnit`, both in
   `core/model/review-units.js`, never a string of its own.

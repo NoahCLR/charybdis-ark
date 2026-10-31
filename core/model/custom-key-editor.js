@@ -10,7 +10,7 @@
 // works on top of it. Without either, the key does nothing. A behaviour step on
 // another key that sends a custom key sends only its shortcut.
 
-const {decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {decodedOf, editProfileDomains} = require("./portable-profile");
 const {PROFILE_FULL_WORDS} = require("./vocabulary");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity} = require("../schema/settings-domain-v1");
@@ -51,8 +51,8 @@ const SHORTCUT_KEY_NAMES = Object.freeze(keycodes.entries()
 
 // A custom key's name, or its shortcut. Both live in the profile's settings
 // domain; a message carries one or the other.
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']} message @param {import("./types.js").ProfileDestination} [capabilities] */
-function editCustomKey(snapshot, message, capabilities) {
+/** @param {import("./types.js").PortableDocument} document @param {import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']} message @param {import("./types.js").Draft} draft */
+function editCustomKey(document, message, draft) {
     const slot = customKeyOfName(message.keycode);
     if (slot === undefined) throw fail("Choose a custom key the keyboard has.");
     // A message renames the key, sets its shortcut, or both at once (a key
@@ -60,33 +60,26 @@ function editCustomKey(snapshot, message, capabilities) {
     const renaming = "name" in message && message.name !== undefined;
     if (renaming && typeof message.name !== "string") throw fail("A custom key name must be text.");
     const shortcut = "shortcut" in message ? message.shortcut : undefined;
-    if (!customKeysSupported(snapshot.document, capabilities)) throw fail("Custom keys need firmware with the userspace keycode blocks.", "CUSTOM_KEYS_UNSUPPORTED");
-    const value = validateSnapshot(snapshot.document, capabilities);
-    // A layer that is always on is refused in words before the bare shape check.
-    const layers = /** @type {{layers?: unknown} | undefined} */ (shortcut)?.layers;
-    const refusal = Number.isInteger(layers) ? shortcutRefusal(value.settings, {layers: /** @type {number} */ (layers)}) : "";
-    if (refusal) throw fail(refusal, "CUSTOM_KEY_SHORTCUT_INVALID");
-    // So is any other shortcut it cannot store: its keys' refusal (too many,
-    // twice, a second media or system key, a byte that is no such key), or
-    // the shape it has.
-    const storeRefusal = !renaming || shortcut !== undefined ? shortcutStoreRefusal(shortcut) : "";
-    if (storeRefusal) throw fail(storeRefusal, "CUSTOM_KEY_SHORTCUT_INVALID");
-    const settings = structuredClone(value.settings);
-    if (renaming) {
-        const name = /** @type {string} */ (message.name).trim();
-        if (!validName(name)) throw fail(`A custom key name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "CUSTOM_KEY_NAME_INVALID");
-        settings.customKeyNames[slot] = name;
-    }
-    if (shortcut !== undefined) {
-        const {mods, keys, layers, layerKind} = /** @type {import("../schema/types.js").CustomKeyShortcut} */ (shortcut);
-        settings.customKeyShortcuts[slot] = {mods, keys: [...keys], layers, layerKind};
-    }
-    const was = value.settings.customKeyShortcuts[slot], now = settings.customKeyShortcuts[slot];
-    if (settings.customKeyNames[slot] === value.settings.customKeyNames[slot] && shortcutIdentity(now) === shortcutIdentity(was)) return value.document;
-    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: PROFILE_FULL_WORDS.name}, open => {
-        const stored = open("settings");
-        stored.customKeyNames[slot] = settings.customKeyNames[slot];
-        stored.customKeyShortcuts[slot] = settings.customKeyShortcuts[slot];
+    if (!customKeysSupported(document, draft.capabilities)) throw fail("Custom keys need firmware with the userspace keycode blocks.", "CUSTOM_KEYS_UNSUPPORTED");
+    return editProfileDomains(document, {...draft, full: PROFILE_FULL_WORDS.name}, (open, read) => {
+        const stored = read().settings;
+        // A layer that is always on is refused in words before the bare shape check.
+        const layers = /** @type {{layers?: unknown} | undefined} */ (shortcut)?.layers;
+        const refusal = Number.isInteger(layers) ? shortcutRefusal(stored, {layers: /** @type {number} */ (layers)}) : "";
+        if (refusal) throw fail(refusal, "CUSTOM_KEY_SHORTCUT_INVALID");
+        // So is any other shortcut it cannot store: its keys' refusal (too many,
+        // twice, a second media or system key, a byte that is no such key), or
+        // the shape it has.
+        const storeRefusal = !renaming || shortcut !== undefined ? shortcutStoreRefusal(shortcut) : "";
+        if (storeRefusal) throw fail(storeRefusal, "CUSTOM_KEY_SHORTCUT_INVALID");
+        const name = renaming ? /** @type {string} */ (message.name).trim() : stored.customKeyNames[slot];
+        if (renaming && !validName(name)) throw fail(`A custom key name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "CUSTOM_KEY_NAME_INVALID");
+        const given = /** @type {import("../schema/types.js").CustomKeyShortcut | undefined} */ (shortcut), was = stored.customKeyShortcuts[slot];
+        const now = given ? {mods: given.mods, keys: [...given.keys], layers: given.layers, layerKind: given.layerKind} : was;
+        if (name === stored.customKeyNames[slot] && shortcutIdentity(now) === shortcutIdentity(was)) return;
+        const settings = open("settings");
+        if (renaming) settings.customKeyNames[slot] = name;
+        if (given) settings.customKeyShortcuts[slot] = now;
     });
 }
 

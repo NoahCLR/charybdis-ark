@@ -5,6 +5,7 @@
  * @typedef {import("./types.js").PortableDocument} PortableDocument
  * @typedef {import("./types.js").DomainsContext} DomainsContext
  * @typedef {import("./types.js").OpenDomain} OpenDomain
+ * @typedef {import("./types.js").ReadDomain} ReadDomain
  * @typedef {import("../schema/profile-domains-types.js").DomainKey} DomainKey
  * @typedef {import("../schema/profile-domains-types.js").DomainModels} DomainModels
  * @typedef {import("../schema/profile-domains-types.js").DomainOptions} DomainOptions
@@ -254,7 +255,7 @@ function domainOptions(rgbPayload, {capabilities, limits, checkActions}) {
 }
 // Opens a profile blob's domains as models: each decoded the first time it
 // is opened, with the document's codec options, and the same model handed
-// back after that.
+// back after that; `isOpen` says whether it has been.
 /** @param {ReturnType<typeof decodeProfileBlob>} blob @param {DomainsContext & {checkActions?: boolean}} context */
 function domainsOf(blob, context) {
     /** @param {DomainKey} key */
@@ -267,40 +268,46 @@ function domainsOf(blob, context) {
     /** @type {Map<DomainKey, DomainModels[DomainKey]>} */
     const opened = new Map();
     /** @type {OpenDomain} */
-    const open = key => {
+    const open = Object.assign(/** @type {ReadDomain} */ (key => {
         if (!opened.has(key)) opened.set(key, domainCodec(key).decode(payload(key), options));
         return /** @type {DomainModels[typeof key]} */ (opened.get(key));
-    };
+    }), {isOpen: (/** @type {DomainKey} */ key) => opened.has(key)});
     return {open, opened, options};
 }
 // A document's domains to read, each decoded once when first opened, with
 // the options its edits use. Nothing opened here is written back.
-/** @param {PortableDocument} document @param {DomainsContext} [context] @returns {OpenDomain} */
+/** @param {PortableDocument} document @param {DomainsContext} [context] @returns {ReadDomain} */
 function readProfileDomains(document, context = {}) {
     return domainsOf(decodeProfileBlob(Buffer.from(document.profile, "base64")), context).open;
 }
 // The one way to change a document's domains. `change` opens each domain it
 // edits and changes that model in place; each opened domain is decoded once
-// and encoded again, and every other domain keeps its bytes. A result too
-// large for the keyboard is refused in words (tooFull: `full`, or the profile
-// words), and the document it makes is checked as any other is; a behaviour
-// edit checks every row's actions (`checkActions`, domainOptions).
-/** @param {PortableDocument} document @param {DomainsContext & {full?: string, checkActions?: boolean}} context @param {(open: OpenDomain) => void} change @returns {PortableDocument} */
+// and encoded again, and every other domain keeps its bytes; with none
+// opened, the document itself is the result. `read` is the document as it
+// stands, checked against the keyboard once (the caller's `decoded` when it
+// is of this very document) and never written back. A result too large for
+// the keyboard is refused in words (tooFull: `full`, or the profile words),
+// and the document it makes is checked as any other is; a behaviour edit
+// checks every row's actions (`checkActions`, domainOptions).
+/** @param {PortableDocument} document @param {DomainsContext & {full?: string, checkActions?: boolean}} context @param {(open: OpenDomain, read: () => DecodedProfile) => void} change @returns {PortableDocument} */
 function editProfileDomains(document, context, change) {
     let result;
+    /** @type {DecodedProfile | undefined} */
+    let decoded = context.decoded?.document === document ? context.decoded : undefined;
+    const read = () => decoded ??= validateSnapshot(document, context.capabilities);
     try {
         const blob = decodeProfileBlob(Buffer.from(document.profile, "base64"));
         const {open, opened, options} = domainsOf(blob, context);
-        change(open);
+        change(open, read);
         /** @template {DomainKey} K @param {K} key @param {DomainModels[K]} value */
         const encode = (key, value) => domainCodec(key).encode(value, options);
         const domains = blob.domains.map(domain => {
             const key = DOCUMENT_PROFILE_DOMAINS.find(row => row.id === domain.id)?.key;
             return key && opened.has(key) ? {...domain, payload: encode(key, /** @type {DomainModels[typeof key]} */ (opened.get(key)))} : domain;
         });
-        result = {...document, profile: opened.size ? encodeProfileBlob({...blob, domains}).toString("base64") : document.profile};
+        result = opened.size ? {...document, profile: encodeProfileBlob({...blob, domains}).toString("base64")} : document;
     } catch (error) {throw tooFull(error, context.full ?? PROFILE_FULL_WORDS.profile);}
-    validateSnapshot(result, context.capabilities);
+    if (result === document) read(); else validateSnapshot(result, context.capabilities);
     return result;
 }
 

@@ -44,10 +44,8 @@ function revertUnits(before, after, units, capabilities) {
     return editProfileDomains(b.document, context, open => {
         // Each domain a unit touches is opened once, edited for every unit, and
         // encoded once.
-        /** @type {Set<DomainKey>} */
-        const opened = new Set();
         /** @template {DomainKey} K @param {K} key @returns {DomainPair<K>} */
-        const domain = key => {opened.add(key); return {mine: open(key), theirs: stored(key)};};
+        const domain = key => ({mine: open(key), theirs: stored(key)});
         // Both inputs are complete snapshots; their settings views are available.
         const settingsView = /** @type {NonNullable<ReturnType<typeof settingsEditorView>>} */ (settingsEditorView(before));
         const sections = new Map(settingsView.sections.map(section => [section.id, section.fields]));
@@ -136,12 +134,12 @@ function revertUnits(before, after, units, capabilities) {
         // A custom key's shortcut and the default layers share the settings
         // domain: discarding one alone must not leave a shortcut on a layer that is
         // always on, which the keyboard refuses (firmware D-F26).
-        if (opened.has("settings")) {
+        if (open.isOpen("settings")) {
             const refusal = settingsShortcutRefusal(domain("settings").mine);
             const what = [...units].some(name => parseUnit(name)?.kind === "settings") ? "These settings" : "This change";
             if (refusal) throw fail(`${what} cannot be discarded on ${what === "This change" ? "its" : "their"} own: ${refusal}`);
         }
-        if (opened.has("combos")) {
+        if (open.isOpen("combos")) {
             const combos = domain("combos");
             combos.mine.rows = combos.mine.rows.filter(Boolean);
         }

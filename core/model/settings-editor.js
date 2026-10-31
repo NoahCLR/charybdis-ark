@@ -3,7 +3,7 @@
 
 const {layerOfRef} = require("../schema/actions");
 const {effectiveTimings} = require("./gesture-timing");
-const {validateSnapshot, decodedOf, editProfileDomains} = require("./portable-profile");
+const {decodedOf, editProfileDomains} = require("./portable-profile");
 const {LED_FLAGS, SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, validSetting} = require("../schema/settings-domain-v1");
 const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_ISO, OS_OF} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
@@ -309,12 +309,12 @@ function settingsEditorView(snapshot) {
         comboReferences: settings.layers.map(record => record.reference)};
 }
 
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditOf<"updateConfigDefaults">} message @param {import("./types.js").ProfileDestination} [capabilities] */
-function editSettings(snapshot, message, capabilities) {
-    const value = validateSnapshot(snapshot.document, capabilities);
-    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits}, open => {
+/** @param {import("./types.js").PortableDocument} document @param {import("../../contracts/edits.js").EditOf<"updateConfigDefaults">} message @param {import("./types.js").Draft} draft */
+function editSettings(document, message, draft) {
+    return editProfileDomains(document, draft, (open, read) => {
+        const value = read();
         const settings = open("settings");
-        const section = settingsSections(snapshot, settings).find(section => section.id === message.sectionId);
+        const section = settingsSections(draft, settings).find(section => section.id === message.sectionId);
         if (!section || !Array.isArray(message.fields) || message.fields.length !== section.fields.length) throw fail("Choose a complete settings section reported by the keyboard.");
         const seen = new Set(), before = settings.values.slice();
         for (const input of message.fields) {
@@ -331,8 +331,8 @@ function editSettings(snapshot, message, capabilities) {
                 if (typeof text !== "string" || !/^\d+$/.test(text)) throw fail(`${field.label} needs a whole number${field.kind === "layer" ? " identifying a layer" : ""}.`);
                 number = Number(text);
                 if (field.macro === "brightness" && number !== baseLighting(settings.values).brightness) {
-                    if (snapshot.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness.");
-                    if (number > snapshot.limits.brightnessMax) throw fail(`Brightness must be between 0 and ${snapshot.limits.brightnessMax}, the keyboard's reported limit.`);
+                    if (draft.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness.");
+                    if (number > draft.limits.brightnessMax) throw fail(`Brightness must be between 0 and ${draft.limits.brightnessMax}, the keyboard's reported limit.`);
                 }
                 if ((field.min !== undefined && number < field.min) || (field.max !== undefined && number > field.max) || (field.choices && !field.choices.some(choice => (typeof choice === "object" ? choice.value : choice) === number))) throw fail(`${field.label} is outside the keyboard's supported range${field.hint ? ": " + field.hint : "."}`);
             }
@@ -355,11 +355,11 @@ function editSettings(snapshot, message, capabilities) {
             }
             const previous = settingValue(field, settings.values);
             if (field.readOnly && number !== previous) throw fail(`${field.label} cannot be changed with this firmware. ${field.hint || ""}`);
-            if (field.macro === "effectMode" && number !== previous && !snapshot.options?.effects.some(effect => effect.id === number)) throw fail("Choose an effect reported by this keyboard.");
+            if (field.macro === "effectMode" && number !== previous && !draft.options?.effects.some(effect => effect.id === number)) throw fail("Choose an effect reported by this keyboard.");
             settings.values[field.id] = withSetting(field, settings.values[field.id], number);
         }
         rescaleShares(settings.values, before);
-        if (section.id === "host") followHostOs(settings.values, before, snapshot.hostOs?.detected);
+        if (section.id === "host") followHostOs(settings.values, before, draft.hostOs?.detected);
         if (!settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one default layer on.");
         if (!settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
         // The pointer layer and the default layers never move onto a layer a
@@ -373,7 +373,7 @@ function editSettings(snapshot, message, capabilities) {
         // A timing displayed as default follows that default, including an older
         // profile's explicit value equal to it. Adopt inheritance only for changed
         // defaults; unrelated settings edits never rewrite behaviour rows, so
-        // the behaviours are opened only when one changes.
+        // the behaviours are read as they stand and opened only when one changes.
         value.behaviors.rows.forEach((row, index) => {
             const old = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, before, settings.customKeyShortcuts);
             const next = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, settings.values, settings.customKeyShortcuts);

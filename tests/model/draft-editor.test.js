@@ -68,3 +68,33 @@ test("the edit a custom key carries is checked as its own: an older profile form
     assert.equal(both.settings.customKeyNames[9], "Left Ctrl + Right Ctrl");
     assert.deepEqual(both.combos.rows.at(-1).output, {kind: 7, flags: 0, operand: 9});
 });
+
+// One edit of each kind that may follow a custom key made for a shortcut,
+// putting that key to use.
+const disabled = () => ({style: "", action: "", repeatHz: ""});
+const FOLLOWERS = {
+    updateLayoutKeys: {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "CUSTOM_KEY_9"}]},
+    addCombo: {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "CUSTOM_KEY_9", termMs: ""},
+    saveCombo: {type: "saveCombo", id: 0, inputs: ["KC_C", "KC_D"], output: "CUSTOM_KEY_9", termMs: ""},
+    saveBehavior: {type: "saveBehavior", behavior: {keycode: "KC_A", tapHoldTerm: "", longHoldTerm: "0", multiTapTerm: "250", keepsAutoMouseAnchored: true,
+        steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "CUSTOM_KEY_9"}, hold: disabled(), longHold: disabled()}]}},
+};
+
+test("every edit that may follow a custom key made for a shortcut edits the document that key is already in", () => {
+    const {snapshot: draftSnapshot, identity} = draft();
+    // A combo to save over, so saveCombo has one.
+    const document = applyDraftEdit(draftSnapshot, {type: "addCombo", inputs: ["KC_E", "KC_F"], output: "KC_G", termMs: ""}, {capabilities, identity});
+    const snapshot = {document, fingerprint: portable.fingerprint(document), summary: portable.summary(document), limits: draftSnapshot.limits};
+    const follows = Object.keys(DRAFT_EDIT_TYPES).filter(type => "follows" in DRAFT_EDIT_TYPES[type]);
+    assert.deepEqual(Object.keys(FOLLOWERS).sort(), follows.sort(), "an edit that may follow a custom key has a case here");
+    const made = {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, keys: [], layers: 0, layerKind: 0}, name: "Left Ctrl + Right Ctrl"};
+    const key = applyDraftEdit(snapshot, made, {capabilities, identity});
+    for (const type of follows) {
+        const both = applyDraftEdit(snapshot, {...made, then: FOLLOWERS[type]}, {capabilities, identity});
+        const {settings} = settled(both);
+        assert.equal(settings.customKeyNames[9], "Left Ctrl + Right Ctrl", type);
+        assert.equal(settings.customKeyShortcuts[9].mods, 0x11, type);
+        assert.notDeepEqual(both, key, `${type} is made too`);
+        assert.deepEqual(both, applyDraftEdit({document: key, limits: snapshot.limits}, FOLLOWERS[type], {capabilities}), `${type} is made on the custom key's document`);
+    }
+});

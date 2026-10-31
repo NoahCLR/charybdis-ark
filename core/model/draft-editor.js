@@ -29,8 +29,12 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/c
  * @typedef {import("./draft-edits.js").Domain} Domain
  * @typedef {Extract<PanelEdit, {type: DraftEditType}> & {expectedBase?: Partial<import("../../contracts/edits.js").BaseIdentity>}} DraftEdit
  * @typedef {{capabilities?: import("./types.js").ProfileDestination, identity?: import("../../contracts/edits.js").BaseIdentity}} Context
- * @typedef {{snapshot: Snapshot, capabilities?: import("./types.js").ProfileDestination, limits: Snapshot["limits"], identity?: import("../../contracts/edits.js").BaseIdentity}} Draft
+ * @typedef {import("./types.js").Draft} Draft
  */
+// Every handler edits the document it is given, and nothing else: the draft
+// carries the keyboard's facts, never a document, and its decoded form is
+// read only through editProfileDomains, for that very document. So any edit
+// may follow a custom key made in the same step.
 /**
  * @template {DraftEditType} K
  * @typedef {(document: Document, message: Extract<PanelEdit, {type: K}>, draft: Draft) => Document} Handler
@@ -41,10 +45,11 @@ const refuse = (text, code = "PROFILE_DRAFT_CONFLICT") => Object.assign(new Erro
 // A layout message is untrusted like any other: its layer and every key
 // are checked before anything is written.
 /** @type {Handler<"updateLayoutKeys">} */
-function editLayout(document, {layer: reference, changes}, {capabilities, limits}) {
+function editLayout(document, {layer: reference, changes}, draft) {
+    const {capabilities} = draft;
     const layer = layerOfRef(reference);
     if (layer === undefined || !(layer < LAYERS) || !Array.isArray(changes)) throw refuse("Choose a layer reported by this keyboard.");
-    return editProfileDomains(document, {capabilities, limits}, open => {
+    return editProfileDomains(document, draft, open => {
         const layers = open("keymap");
         for (const change of changes) {
             const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
@@ -57,16 +62,13 @@ function editLayout(document, {layer: reference, changes}, {capabilities, limits
     });
 }
 
-// Each edit's handler, by its domain on the profile, else by its editor. The
-// whole-document editors edit the draft as it stands, with what it was read
-// with; the layout and the profile's domains edit the document given, which a
-// custom key made in the same step may already have changed.
+// Each edit's handler, by its domain on the profile, else by its editor.
 const HANDLERS = Object.freeze(/** @satisfies {{[E in Exclude<Editor, "profile">]: Handler<import("./draft-edits.js").EditedBy<E>>} & {[D in Domain]: Handler<import("./draft-edits.js").InDomain<D>>}} */ ({
     keymap: editLayout,
-    settings: (document, message, {snapshot, capabilities}) => editSettings(snapshot, message, capabilities),
-    macro: (document, message, {snapshot, capabilities}) => editMacro(snapshot, message, capabilities),
-    customKey: (document, message, {snapshot, capabilities}) => editCustomKey(snapshot, message, capabilities),
-    keyboardName: (document, message, {snapshot, capabilities}) => editKeyboardName(snapshot, message, capabilities),
+    settings: editSettings,
+    macro: editMacro,
+    customKey: editCustomKey,
+    keyboardName: editKeyboardName,
     ...PROFILE_EDITS,
 }));
 
@@ -93,7 +95,7 @@ function checkDrawnFrom(editor, message, draft) {
         return;
     }
     const expected = "expectedFingerprint" in message ? message.expectedFingerprint : undefined;
-    if (expected && expected !== draft.snapshot.fingerprint) throw refuse(...CHANGED_SINCE[editor]);
+    if (expected && expected !== draft.fingerprint) throw refuse(...CHANGED_SINCE[editor]);
 }
 
 /** @param {NonNullable<ReturnType<typeof draftEditEntry>>} entry @param {DraftEdit} message @param {Draft} draft @param {Document} document */
@@ -109,8 +111,9 @@ function edit(entry, message, draft, document) {
 function applyDraftEdit(snapshot, message, {capabilities, identity} = {}) {
     const entry = draftEditEntry(message.type);
     if (!entry) throw refuse("Unsupported draft edit.");
+    const {fingerprint, limits, hostOs, options, decoded} = snapshot;
     /** @type {Draft} */
-    const draft = {snapshot, capabilities, limits: snapshot.limits, identity};
+    const draft = {capabilities, limits, hostOs, options, decoded, fingerprint, identity};
     const document = edit(entry, message, draft, snapshot.document);
     // A custom key made for a shortcut is put to use in the same step (a
     // layout key, a behaviour cell, a combo's output), so one undo takes both
