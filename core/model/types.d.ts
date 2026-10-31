@@ -35,9 +35,21 @@ export interface ProfileDestination extends Partial<ActionLimits> {
 export interface DomainsContext {
     capabilities?: ProfileDestination;
     limits?: SnapshotFacts['limits'];
+    /** A document's decoded form the caller already has; editProfileDomains reads it only for that very document. */
+    decoded?: DecodedProfile;
 }
-/** A document's domain, opened as its model; the same model each time it is opened. */
-export type OpenDomain = <K extends import('../schema/profile-domains-types.js').DomainKey>(key: K) => import('../schema/profile-domains-types.js').DomainModels[K];
+/** A document's domain, read as its model; the same model each time it is read. */
+export type ReadDomain = <K extends import('../schema/profile-domains-types.js').DomainKey>(key: K) => import('../schema/profile-domains-types.js').DomainModels[K];
+/** A document's domain, opened as its model to be encoded again; the same model each time it is opened. */
+export interface OpenDomain extends ReadDomain {
+    /** Whether the domain has been opened, so will be encoded again. */
+    isOpen(key: import('../schema/profile-domains-types.js').DomainKey): boolean;
+}
+/** A draft edit's draft as it stands, besides the document it edits (model/draft-editor.js): the keyboard's facts, the revision a form names, and its decoded form, which only editProfileDomains reads. */
+export interface Draft extends DomainsContext, SnapshotFacts {
+    fingerprint?: string;
+    identity?: import('../../contracts/edits.js').BaseIdentity;
+}
 export interface DecodedProfile {
     document: PortableDocument;
     profile: Buffer;

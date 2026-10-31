@@ -2,7 +2,7 @@
 "use strict";
 const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 
-const {decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {decodedOf, editProfileDomains} = require("./portable-profile");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
 const {SETTINGS} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
@@ -71,15 +71,17 @@ function macroEditorView(snapshot, capabilities) {
         macroPayloadKeycodes: macroKeycodes(), macroPayloadModifierKeycodes: macroModifierKeycodes()};
 }
 
-// A macro's steps, its name, or both. A name lives in the profile's settings
-// domain.
+// What the editor is told of a macro's steps before they are staged: whether
+// they play, and fit the bank.
 /** @param {import("./types.js").CompleteSnapshot} snapshot @param {{keycode: string, payload?: string, protection?: 'auto' | 'on' | 'off'}} message @param {import("./types.js").ProfileDestination} [capabilities] */
-function macroInputStatus(snapshot, message, capabilities) {
+const macroInputStatus = (snapshot, message, capabilities) => inputStatus(decodedOf(snapshot), snapshot.hostOs, message, capabilities);
+
+/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").SnapshotFacts["hostOs"]} hostOs @param {{keycode: string, payload?: string, protection?: 'auto' | 'on' | 'off'}} message @param {import("./types.js").ProfileDestination} [capabilities] */
+function inputStatus(decoded, hostOs, message, capabilities) {
     const index = macroIndex(message.keycode);
-    const {macroSlots, settings} = decodedOf(snapshot);
-    const slots = macroSlots;
-    const budget = profileMacroBudget(decodedOf(snapshot), capabilities);
-    const host = hostSettings(settings.values, snapshot.hostOs?.detected);
+    const {macroSlots: slots, settings} = decoded;
+    const budget = profileMacroBudget(decoded, capabilities);
+    const host = hostSettings(settings.values, hostOs?.detected);
     return inspectMacroInput(message.payload, {mode: host.unicodeMode, protection: message.protection ?? macroProtectionOf(slots[index]),
         enabled: Boolean(host.unicodeMode), layout: host.layout, os: host.effective, macosIso: host.macosIso, currentBytes: slots[index].length, bankFree: budget.free});
 }
@@ -91,19 +93,20 @@ function macroIndex(keycode) {
     return index;
 }
 
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateMacro']} message @param {import("./types.js").ProfileDestination} [capabilities] */
-function editMacro(snapshot, message, capabilities) {
+// A macro's steps, its name, or both. A name lives in the profile's settings
+// domain.
+/** @param {import("./types.js").PortableDocument} document @param {import("../../contracts/edits.js").EditPayloads['updateMacro']} message @param {import("./types.js").Draft} draft */
+function editMacro(document, message, draft) {
     const index = macroIndex(message.keycode);
     if (message.payload === undefined && message.name === undefined && message.protection === undefined) throw fail("Send the macro's steps, its name or its playback protection.");
-    const value = validateSnapshot(snapshot.document, capabilities);
-    const renaming = message.name !== undefined && message.name !== value.settings.macroNames[index];
     // A profile too full for the edit is said in a name's words only when the
     // name is all the edit changes; new steps say the profile's.
-    const onlyName = renaming && message.payload === undefined && message.protection === undefined;
-    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: onlyName ? PROFILE_FULL_WORDS.name : undefined}, open => {
+    const onlyName = message.name !== undefined && message.payload === undefined && message.protection === undefined;
+    return editProfileDomains(document, {...draft, full: onlyName ? PROFILE_FULL_WORDS.name : undefined}, (open, read) => {
+        const value = read();
         if (message.payload !== undefined) {
-            const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
-            const status = macroInputStatus(snapshot, message, capabilities);
+            const host = hostSettings(value.settings.values, draft.hostOs?.detected);
+            const status = inputStatus(value, draft.hostOs, message, draft.capabilities);
             if (status.error) throw fail(status.error, status.code);
             const slots = open("macros");
             const protection = message.protection ?? macroProtectionOf(slots[index]);
@@ -116,7 +119,7 @@ function editMacro(snapshot, message, capabilities) {
             const prefix = encodeMacroPayload("", {protection: message.protection});
             slots[index] = Buffer.concat([prefix, bytes.subarray(previous === "auto" ? 0 : 3)]);
         }
-        if (renaming) {
+        if (message.name !== undefined && message.name !== value.settings.macroNames[index]) {
             if (typeof message.name !== "string") throw fail("A macro name must be text.");
             if (!validName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "MACRO_NAME_INVALID");
             open("settings").macroNames[index] = message.name.trim();

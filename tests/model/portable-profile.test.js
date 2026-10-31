@@ -396,6 +396,29 @@ test("changing a document's domains encodes only those it opens, decoded once an
     assert.equal(readProfileDomains(renamed)("settings").names[1], "New name");
 });
 
+test("a change reads the document as it stands, checked once and never written back, and knows which domains it opened", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const source = document(), decoded = validateSnapshot(source);
+    const renamed = editProfileDomains(source, {decoded}, (open, read) => {
+        assert.equal(read(), decoded, "the caller's decoded form of this very document is read");
+        assert.equal(read(), read(), "and read once");
+        assert.equal(open.isOpen("settings"), false);
+        open("settings").names[1] = "New name";
+        assert.equal(open.isOpen("settings"), true);
+        assert.equal(open.isOpen("behaviors"), false);
+        assert.equal(read().settings.names[1], "Numbers", "reading never sees what is opened");
+        read().settings.names[2] = "Never written";
+    });
+    assert.deepEqual(validateSnapshot(renamed).settings.names.slice(1, 3), ["New name", validateSnapshot(source).settings.names[2]]);
+    // Another document's decoded form is never read for this one.
+    editProfileDomains(renamed, {decoded}, (open, read) => {
+        assert.notEqual(read(), decoded);
+        assert.equal(read().settings.names[1], "New name");
+    });
+    // Nothing opened is the document itself, checked as read.
+    assert.equal(editProfileDomains(source, {decoded}, () => {}), source);
+});
+
 test("a document's domains are read and written with its keyboard's depth and brightness, and a behaviour edit with its action slots", () => {
     const {editProfileDomains} = require("../../core/model/portable-profile");
     const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");

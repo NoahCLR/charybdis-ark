@@ -304,7 +304,11 @@ A document's domains change one way: `editProfileDomains`
 decoded once with the document's codec options (the keyboard's tap depth,
 or the one the document's RGB palette counts; its brightness limit; its
 action slots); only opened domains are encoded again, every other keeps its
-bytes. A result too large for the keyboard is one refusal, `PROFILE_FULL`, in
+bytes, and with none opened the document itself is the result. Beside
+`open`, the change gets `read`: the document as it stands, validated against
+the keyboard once (the caller's decoded form when it is of that very
+document) and never written back; `open.isOpen` says which domains it
+opened. A result too large for the keyboard is one refusal, `PROFILE_FULL`, in
 `PROFILE_FULL_WORDS` (by the count it went past, otherwise the profile as a
 whole, or a name's words for a name's edit), and the document it makes is
 validated like any other. `readProfileDomains` opens a document's domains
