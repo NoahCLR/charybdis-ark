@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {UNIT, formatUnit, parseUnit, unitByLayer} = require("../../core/model/review-units");
+const {UNIT, parseUnit, unitByLayer} = require("../../core/model/review-units");
 const {layerOrderReview, profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {capabilities, editedDraft} = require("../fixtures/edited-draft");
@@ -14,7 +14,6 @@ test("every unit the review names reads back as itself, and Discard takes it", (
     for (const unit of units) {
         const read = parseUnit(unit);
         assert.ok(read, unit);
-        assert.equal(formatUnit(read), unit);
         kinds.add(read.kind === "rgb" ? `rgb:${read.record}` : read.kind);
         assert.doesNotThrow(() => revertUnits(base, current, new Set([unit]), capabilities), unit);
     }
@@ -46,7 +45,6 @@ test("each builder writes a unit that reads back as what it names", () => {
     ];
     for (const [unit, read] of units) {
         assert.deepEqual(parseUnit(unit), read, unit);
-        assert.equal(formatUnit(read), unit);
     }
     // The strings the panel already reads keep their bytes.
     assert.deepEqual(units.map(([unit]) => unit), ["layout:2:5", "placement:2:5", "layerName:3", 'behavior:{"kind":1,"flags":0,"operand":41}', "combo:7", "comboTiming",

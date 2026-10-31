@@ -46,5 +46,5 @@ const editMacros = (document, change) => editDomain(document, "macros", slots =>
     slots.splice(0, slots.length, ...macros.map(value => Buffer.from(value, "base64")));
 });
 /** @param {PortableDocument} document @param {(settings: import('../../core/schema/types.js').SettingsDomain) => unknown} change */
-const editSettings = (document, change) => editDomain(document, "settings", change);
-module.exports = {withPayload, profileDomain, editDomain, profileLayers, profileMacros, editLayers, editMacros, editSettings};
+const editSettingsDomain = (document, change) => editDomain(document, "settings", change);
+module.exports = {withPayload, profileDomain, editDomain, profileLayers, profileMacros, editLayers, editMacros, editSettingsDomain};

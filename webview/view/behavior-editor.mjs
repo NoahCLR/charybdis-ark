@@ -1,6 +1,5 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
-import {keyKindOf} from "./keyface.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {timingInput} from "./timing-input.mjs";
 import {vocabulary} from "./vocabulary.mjs";
@@ -8,7 +7,7 @@ import {vocabulary} from "./vocabulary.mjs";
 // Every key may have a behaviour but a transparent or disabled one, as core
 // says which those are (qmkKeyKinds), however it is spelled.
 export function canHaveBehaviour(/** @type {Model} */ model, /** @type {string} */ keycode) {
-    const kind = keyKindOf(model, String(keycode ?? ""));
+    const kind = keyIdentity(model, keycode).kind;
     return Boolean(keycode) && kind !== "transparent" && kind !== "disabled";
 }
 

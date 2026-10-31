@@ -8,8 +8,9 @@ import {keyIdentity} from "./key-identity.mjs";
 // Layout legends already carry dead-key marks and the macOS ISO swap from the
 // model. Keep the stored value and board geometry while choosing what to draw.
 export function pickerBoardKey(/** @type {{x: number, y: number, w: number, h: number, value: string, labels: string[]}} */ source, /** @type {Model} */ model) {
-  const spoken = model?.qmkKeyLabels?.[source.value];
-  const code = keyIdentity(model, source.value).entry?.keycode;
+  const identity = keyIdentity(model, source.value);
+  const spoken = identity.lookUp(model?.qmkKeyLabels);
+  const code = identity.entry?.keycode;
   const modifier = code !== undefined && inBlock(code, MODIFIER_KEYS);
   const legend = model?.hostLayoutLegends?.[source.value];
   return modifier ? {...source, labels: [(spoken || source.value).replace(/^(Left|Right) /, "")]} : legend ? {...source, labels: legend} : source;

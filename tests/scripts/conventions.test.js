@@ -136,6 +136,7 @@ test("the page's backup chooser holds a file to the backup's byte limit", () => 
 // lines keep their numbers.
 const uncommented = source => source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, comment => comment.replace(/[^\n]/g, " "));
 const lineAt = (source, index) => source.slice(0, index).split("\n").length;
+const posix = file => file.split(path.sep).join("/");
 
 // Whether an area takes edits is editGate(model, area) (webview/view/edit-gate.mjs),
 // which reads the published draft.editable; every other module asks it,
@@ -182,6 +183,73 @@ test("only the key identity reads the keycode alias table", () => {
         return Array.from(code.matchAll(/\bqmkKeycodeAliases\b/g), match => `${file}:${lineAt(code, match.index)}`);
     });
     assert.deepEqual(violations, [], "ask keyIdentity(model, spelling) in webview/view/key-identity.mjs");
+});
+
+// A draft edit is made by applyDraftEdit (core/model/draft-editor.js), which
+// checks the form was drawn from the draft before an editor runs, so it alone
+// runs an editor's edit; the profile's domains are run through PROFILE_EDITS,
+// which alone runs a behaviour edit. Each module's other exports (its view,
+// its budgets) stay anyone's. Tests edit as the panel does, through
+// applyDraftEdit (tests/fixtures/draft-edit.js), except the behaviour editor's
+// own, which edits a behaviours domain byte for byte, with no document around
+// it.
+const EDITOR_RUNNERS = {
+    editSettings: ["core/model/settings-editor.js", "core/model/draft-editor.js"],
+    editMacro: ["core/model/macro-editor.js", "core/model/draft-editor.js"],
+    editCustomKey: ["core/model/custom-key-editor.js", "core/model/draft-editor.js"],
+    editKeyboardName: ["core/model/keyboard-name.js", "core/model/draft-editor.js"],
+    PROFILE_EDITS: ["core/model/device-profile-edits.js", "core/model/draft-editor.js"],
+    editKeyBehaviors: ["core/model/key-behavior-edits.js", "core/model/device-profile-edits.js", "tests/model/key-behavior-edits.test.js"],
+};
+const runsEditors = (file, source) => {
+    const code = uncommented(source);
+    return Object.entries(EDITOR_RUNNERS).filter(([, allowed]) => !allowed.includes(file)).flatMap(([name]) =>
+        Array.from(code.matchAll(new RegExp(`\\b${name}\\b`, "g")), match => `${file}:${lineAt(code, match.index)}: ${name}`));
+};
+
+test("the editor check catches a module naming an editor", () => {
+    for (const sample of ['const {editSettings} = require("./settings-editor");', 'const next = require("./macro-editor").editMacro(snapshot, message);',
+        'import {editKeyBehaviors} from "./key-behavior-edits.js";', "const run = PROFILE_EDITS[domain];"]) {
+        assert.equal(runsEditors("core/session/sample.js", sample).length, 1, sample);
+    }
+    for (const sample of ['const {settingsEditorView, baseLighting} = require("./settings-editor");', "// editSettings checks the fingerprint",
+        'const {macroInputStatus} = require("./macro-editor");']) {
+        assert.deepEqual(runsEditors("core/session/sample.js", sample), [], sample);
+    }
+});
+
+test("only the draft editor runs an editor's edit", () => {
+    const violations = ["core", "rules", "webview", "web", "scripts", "tests", "browser-tests"].flatMap(sources).map(posix)
+        .filter(file => file !== "tests/scripts/conventions.test.js")
+        .flatMap(file => runsEditors(file, read(file)));
+    assert.deepEqual(violations, [], "make a draft edit with applyDraftEdit in core/model/draft-editor.js");
+});
+
+// The edit mode the device service holds is written only by ConnectionState
+// (core/session/connection-state.js), whose methods say what each read or set
+// means for it.
+const EDIT_MODE_WRITE = /\.\s*editMode(?:Unknown)?\s*(?:=|\?\?=|\|\|=|&&=)(?!=)|\[\s*["'`]editMode(?:Unknown)?["'`]\s*\]\s*=(?!=)/g;
+const writesEditMode = source => {
+    const code = uncommented(source);
+    return Array.from(code.matchAll(EDIT_MODE_WRITE), match => lineAt(code, match.index));
+};
+
+test("the edit mode check catches a module writing it", () => {
+    for (const sample of ["state.editMode = undefined;", "if (state.editMode) state.editMode = {...state.editMode, mode};",
+        "op.state.editModeUnknown = true;", "state.editModeUnknown ||= failed;", 'state["editMode"] = read;']) {
+        assert.equal(writesEditMode(sample).length, 1, sample);
+    }
+    for (const sample of ["if (state.editMode === undefined) return;", "const editMode = mode ? {mode: mode.mode} : null;",
+        "state.editModeRead(read);", "// state.editMode = undefined", "editMode: this.editMode ? {...this.editMode} : null,"]) {
+        assert.deepEqual(writesEditMode(sample), [], sample);
+    }
+});
+
+test("only ConnectionState writes the edit mode", () => {
+    const violations = ["core", "rules", "webview", "web", "scripts"].flatMap(sources).map(posix)
+        .filter(file => file !== "core/session/connection-state.js")
+        .flatMap(file => writesEditMode(read(file)).map(line => `${file}:${line}`));
+    assert.deepEqual(violations, [], "write it through a ConnectionState method in core/session/connection-state.js");
 });
 
 // A screen posts what a builder returns (webview/view/edits.mjs,
@@ -235,7 +303,6 @@ test("screens post only builder output", () => {
 // Each fact below has one home (docs/architecture/README.md, "Facts and their
 // homes"); a module imports it from there. A check names its exceptions in an
 // allow-list, each with its reason, and a sample of what it catches.
-const posix = file => file.split(path.sep).join("/");
 // Every match of `pattern` in a module's code, comments blanked, as
 // `file:line: text`, less the allowed lines: `{file, line}` pairs naming the
 // trimmed line exactly, so an allowed line that changes is checked again.
@@ -252,6 +319,37 @@ const staleAllowed = (directories, pattern, allowed) => {
     const found = matches(directories, pattern);
     return allowed.filter(allow => !found.some(match => isAllowed([allow], match)));
 };
+
+// A table core keys by keycode name (qmkKeyLabels, qmkKeyShortLabels,
+// qmkKeyKinds, qmkKeyLayers, qmkKeyTurnsOn, …) holds a key under the names
+// core knows it by, so it is read under each of the key's spellings, by
+// keyIdentity(model, spelling).lookUp (or .kind) in
+// webview/view/key-identity.mjs; keyface.mjs's factOf is that call. Every
+// other module hands lookUp the table, never indexes it. Syntactic: any
+// mention of such a table but as lookUp's or factOf's table.
+const KEY_TABLE = /(?<!(?:\.lookUp|\bfactOf)\(\s*model\?\.\s*)\bqmkKey[A-Z]\w*/g;
+const KEY_TABLE_ALLOWED = [
+    // The keys core names a layer for, to find the one a text names: a walk
+    // of the whole table, which reads no spelling.
+    {file: "webview/ui/marks.mjs", line: "const keycodes = marker?.kind === \"layer\" ? Object.entries(model?.qmkKeyLayers || {}).flatMap(([keycode, layer]) => layer === marker.layer ? [keycode] : [])"},
+];
+
+test("the key table check catches a table read under one spelling", () => {
+    for (const sample of ["const spoken = model?.qmkKeyLabels?.[source.value];", "return model.qmkKeyKinds[known] === \"macro\";",
+        "const table = model?.qmkKeyTurnsOn || {};", "const {qmkKeyShortLabels} = model;"]) {
+        assert.equal(uncommented(sample).match(KEY_TABLE)?.length, 1, sample);
+    }
+    for (const sample of ["const spoken = keyIdentity(model, key).lookUp(model?.qmkKeyLabels);", "const tap = factOf(model?.qmkKeyLayerTaps, model, keycode);",
+        "const kind = keyIdentity(model, keycode).kind;", "// as core publishes it (qmkKeyKinds)", "const entry = model?.qmkKeycodes?.[0];"]) {
+        assert.equal(uncommented(sample).match(KEY_TABLE), null, sample);
+    }
+});
+
+test("only the key identity reads a keycode-keyed table under a spelling", () => {
+    const violations = literals(["webview"], KEY_TABLE, KEY_TABLE_ALLOWED).filter(found => !found.startsWith("webview/view/key-identity.mjs:"));
+    assert.deepEqual(violations, [], "read it with keyIdentity(model, spelling).lookUp(table) in webview/view/key-identity.mjs");
+    assert.deepEqual(staleAllowed(["webview"], KEY_TABLE, KEY_TABLE_ALLOWED), [], "drop an allowed line the check no longer finds");
+});
 
 // QMK's keycode layout lives in rules/qmk-keycodes.mjs and the keyboard's
 // own blocks in core/data/user-keycodes.js. A number in QMK's keycode space

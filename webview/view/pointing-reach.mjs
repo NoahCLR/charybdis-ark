@@ -68,11 +68,7 @@ const pointingNamesOf = (model) => (keycode) => {
 // name the core knows it by, or however the expression is spelled.
 /** @param {ViewModel} model @param {string | undefined} keycode */
 function layersTurnedOn(model, keycode) {
-    const table = model?.qmkKeyTurnsOn || {};
-    for (const key of keyIdentity(model, keycode).spellings) {
-        if (Number.isInteger(table[key])) return table[key] >>> 0;
-    }
-    return 0;
+    return (keyIdentity(model, keycode).lookUp(model?.qmkKeyTurnsOn, (layers) => Number.isInteger(layers)) ?? 0) >>> 0;
 }
 
 // The layers by which `keycode` starts a slot's mode, as a mask: the layers it

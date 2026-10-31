@@ -4,8 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {profileUsage} = require("../../core/model/profile-usage");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {editMacro} = require("../../core/model/macro-editor");
-const {editCustomKey} = require("../../core/model/custom-key-editor");
+const {draftEdit} = require("../fixtures/draft-edit");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
@@ -51,13 +50,13 @@ test("a custom key is in use once it has a name, a shortcut or a behaviour", () 
     assert.equal(validateSnapshot(before.document).settings.customKeyNames[2], "");
     assert.ok(count(behaved, "customKeys").used >= 1, "a behaviour alone puts a key in use");
 
-    const named = snapshot(editCustomKey(before, {keycode: "CUSTOM_KEY_100", name: "Zoom", expectedFingerprint: before.fingerprint}, customKeyCapabilities));
+    const named = snapshot(draftEdit(before, {type: "updateCustomKey", keycode: "CUSTOM_KEY_100", name: "Zoom"}, customKeyCapabilities));
     assert.equal(count(profileUsage(named, schema2), "customKeys").used, count(behaved, "customKeys").used + 1, "a name");
-    const shortcut = snapshot(editCustomKey(named, {keycode: "CUSTOM_KEY_101", shortcut: {mods: 1, keys: [0x1d], layers: 0, layerKind: 0}, expectedFingerprint: named.fingerprint}, customKeyCapabilities));
+    const shortcut = snapshot(draftEdit(named, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_101", shortcut: {mods: 1, keys: [0x1d], layers: 0, layerKind: 0}}, customKeyCapabilities));
     assert.equal(count(profileUsage(shortcut, schema2), "customKeys").used, count(behaved, "customKeys").used + 2, "a shortcut");
-    const both = snapshot(editCustomKey(shortcut, {keycode: "CUSTOM_KEY_100", shortcut: {mods: 2, keys: [0x04], layers: 0, layerKind: 0}, expectedFingerprint: shortcut.fingerprint}, customKeyCapabilities));
+    const both = snapshot(draftEdit(shortcut, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_100", shortcut: {mods: 2, keys: [0x04], layers: 0, layerKind: 0}}, customKeyCapabilities));
     assert.equal(count(profileUsage(both, schema2), "customKeys").used, count(behaved, "customKeys").used + 2, "a key is counted once");
-    const layered = snapshot(editCustomKey(both, {keycode: "CUSTOM_KEY_102", shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind: 0}, expectedFingerprint: both.fingerprint}, customKeyCapabilities));
+    const layered = snapshot(draftEdit(both, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_102", shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind: 0}}, customKeyCapabilities));
     assert.equal(count(profileUsage(layered, schema2), "customKeys").used, count(behaved, "customKeys").used + 3, "layers alone (firmware D-F26)");
 });
 
@@ -82,10 +81,9 @@ test("an empty profile sets up nothing it can grow", () => {
 });
 
 test("naming a macro or the keyboard grows the bar, not the counts", () => {
-    const {editKeyboardName} = require("../../core/model/keyboard-name");
     const before = snapshot(pdDocument());
-    const macro = snapshot(editMacro(before, {keycode: "MACRO_3", name: "Zoom mute", expectedFingerprint: before.fingerprint}));
-    const keyboard = snapshot(editKeyboardName(before, {name: "Noah’s board", expectedFingerprint: before.fingerprint}));
+    const macro = snapshot(draftEdit(before, {type: "updateMacro", keycode: "MACRO_3", name: "Zoom mute"}));
+    const keyboard = snapshot(draftEdit(before, {type: "renameKeyboard", name: "Noah’s board"}));
     const a = profileUsage(before, schema2), b = profileUsage(macro, schema2), c = profileUsage(keyboard, schema2);
     assert.equal(b.used - a.used, 9, "the name's text, beside the length byte every name has");
     assert.equal(c.used - a.used, Buffer.byteLength("Noah’s board"));

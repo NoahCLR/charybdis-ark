@@ -18,10 +18,10 @@ test("a profile exceeding the connected keyboard's brightness limit is refused b
 test("an unavailable lighting effect is refused before recovery or profile staging", async t => {
     const options = wire();
     // The source uses effect 2; the destination only supports effect 1.
-    const {editSettings} = require("../../core/model/settings-editor");
+    const {draftEdit} = require("../fixtures/draft-edit");
     const source = {document: document(), fingerprint: fingerprint(document()), options: require("../fixtures/keyboard-options").options()};
     const section = settingsEditorView(source).sections.find(item => item.id === "rgbAppearance");
-    const target = editSettings(source, {sectionId: section.id, expectedFingerprint: source.fingerprint,
+    const target = draftEdit(source, {type: "updateConfigDefaults", sectionId: section.id,
         fields: section.fields.map(field => ({macro: field.macro, value: field.macro === "effectMode" ? "2" : field.value, enabled: field.enabled}))});
     options.bytes = options.bytes.subarray(0, 26 + 64); options.metadata[4] = 1; options.metadata.writeUInt16LE(options.bytes.length, 2);
     const {service, keyboard} = await connectedService(t, {options});

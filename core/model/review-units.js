@@ -64,6 +64,8 @@ const UNIT = Object.freeze({
     layerOrder: "layerOrder",
 });
 
+// A read unit as its builder writes it, for parseUnit's exact match and
+// unitByLayer; everything else writes a unit with UNIT.
 /** @param {ReviewUnit} unit @returns {string} */
 function formatUnit(unit) {
     switch (unit.kind) {
@@ -122,4 +124,4 @@ function unitByLayer(text, order) {
     return formatUnit({...unit, layer: order[unit.layer]});
 }
 
-module.exports = {UNIT, formatUnit, parseUnit, unitByLayer};
+module.exports = {UNIT, parseUnit, unitByLayer};

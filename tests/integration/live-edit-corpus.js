@@ -33,7 +33,7 @@ const abi = CAPABILITIES_32.actionAbiDigest;
 const positions = MATRIX_ROWS * MATRIX_COLUMNS;
 
 /** @param {Buffer} bytes @param {(settings: ReturnType<typeof decodeSettings>) => void} change */
-function editSettings(bytes, change) {
+function withSettings(bytes, change) {
     const profile = decodeProfileBlob(bytes), settings = profile.domains.find(d => d.id === PROFILE_DOMAIN_IDS.SETTINGS);
     assert(settings, "The corpus profile holds settings.");
     const decoded = decodeSettings(settings.payload); change(decoded);
@@ -120,7 +120,7 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
     try {
         const one = withLayers(ordinary, layers => {layers[0][1] = 0x05;});
         await edit(keyboard, one);
-        const many = editSettings(withLayers(one, layers => {for (let key = 0; key < 30; key++) layers[2][key] = 0x04 + (key % 20);}), settings => {settings.names[0] = "Bridge";});
+        const many = withSettings(withLayers(one, layers => {for (let key = 0; key < 30; key++) layers[2][key] = 0x04 + (key % 20);}), settings => {settings.names[0] = "Bridge";});
         const sent = diffProfiles(one, many);
         assert.ok(sent.splices.length >= 2, "a multi-domain edit");
         assert.ok(sent.stream.length > 2 * PROFILE_EDIT_V1.DATA_MAX && sent.stream.length % PROFILE_EDIT_V1.DATA_MAX !== 0, "its stream crosses several data reports");
@@ -155,7 +155,7 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
     keyboard = await probe("refusals", ordinary);
     try {
         const {coordinator, options, connection} = keyboard;
-        const to = editSettings(withLayers(ordinary, layers => {layers[0][2] = 0x06; layers[3][0] = 0x07;}), settings => {settings.names[0] = "Refusals";});
+        const to = withSettings(withLayers(ordinary, layers => {layers[0][2] = 0x06; layers[3][0] = 0x07;}), settings => {settings.names[0] = "Refusals";});
         const {splices, stream} = diffProfiles(ordinary, to);
         assert.ok(splices.length > 1);
         let progress = await readEditProgress(connection, options);

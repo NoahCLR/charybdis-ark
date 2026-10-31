@@ -209,7 +209,7 @@ async function readLiveProfile(op, forEditor) {
     const result = {...snapshot, ...facts, saved: {...snapshot.saved, ...facts}};
     state.status = snapshot.status;
     state.runtime = snapshot.runtime;
-    if (state.editMode) state.editMode = {...state.editMode, mode: snapshot.live.mode};
+    state.modeSeenLive(snapshot.live.mode);
     if (forEditor) {
         const decoded = validateSnapshot(result.document);
         const lighting = baseLighting(decoded.settings.values);

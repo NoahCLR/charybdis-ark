@@ -178,8 +178,8 @@ Each thing with a colour of its own has exactly one mark, drawn by
   `tests/model/vocabulary.test.js`). Whether a key is transparent or
   disabled, or a macro's or a custom key's, is `keyKind` in
   `core/model/key-names.js`, published by every name a keycode is read under
-  as `qmkKeyKinds` and read through `keyKindOf`; no screen knows one by its
-  spelling (`tests/model/profile-model.test.js`,
+  as `qmkKeyKinds` and read as `keyIdentity(model, spelling).kind`; no
+  screen knows one by its spelling (`tests/model/profile-model.test.js`,
   `tests/view/keyface.test.mjs`).
 - In the behaviour grid and the hover card, a branch or combo action that acts
   on a layer, runs a pointing mode or plays a macro reads as that thing

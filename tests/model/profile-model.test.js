@@ -11,7 +11,7 @@ const {runningComboRows} = require("../../core/schema/combo-domain-v1");
 const {SETTING, alwaysOnLayers} = require("../../core/schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYER_IDENTITY, matrixPosition} = require("../../core/data/charybdis-layout");
 const keycodes = require("../../core/schema/keycodes");
-const {editSettings} = require("../fixtures/profile-document");
+const {editSettingsDomain} = require("../fixtures/profile-document");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
 const {resolve} = keycodes;
@@ -22,7 +22,7 @@ const EDITING = {busy: false, behaviors: true, pointing: true, combos: true, mac
 // and its decoded form.
 /** @param {(settings: import("../../core/schema/types.js").SettingsDomain) => unknown} [change] */
 function opened(change = () => {}) {
-    const doc = editSettings(structuredClone(require("../../core/data/demo-profile.charybdis.json")), change);
+    const doc = editSettingsDomain(structuredClone(require("../../core/data/demo-profile.charybdis.json")), change);
     const snapshot = {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS};
     return {snapshot, decoded: decodedOf(snapshot)};
 }
@@ -375,8 +375,8 @@ test("what each keycode is that the interface treats apart is published under ev
 test("each layer's combo reference layer comes from the draft's settings, else the keyboard's readback, else itself", () => {
     const portable = require("../../core/model/portable-profile");
     const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
-    const {editSettings} = require("../fixtures/profile-document");
-    const doc = editSettings(require("../fixtures/pd-profile").document(), (settings) => {settings.layers[2].reference = 0; settings.layers[5].reference = 3;});
+    const {editSettingsDomain} = require("../fixtures/profile-document");
+    const doc = editSettingsDomain(require("../fixtures/pd-profile").document(), (settings) => {settings.layers[2].reference = 0; settings.layers[5].reference = 3;});
     const model = draftModel({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS},
         DEMO_CAPABILITIES);
     assert.deepEqual(model.comboReferenceLayers, Array.from({length: 16}, (_, layer) => layer === 2 ? 0 : layer === 5 ? 3 : layer));
@@ -388,9 +388,9 @@ test("each layer's combo reference layer comes from the draft's settings, else t
 test("each published layer says whether it is always on: base, and every default layer the keyboard keeps", () => {
     const portable = require("../../core/model/portable-profile");
     const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
-    const {editSettings} = require("../fixtures/profile-document");
+    const {editSettingsDomain} = require("../fixtures/profile-document");
     const {SETTING} = require("../../core/schema/settings-domain-v1");
-    const doc = editSettings(require("../fixtures/pd-profile").document(), (settings) => {settings.values[SETTING.DEFAULT_LAYERS] = 0b100;});
+    const doc = editSettingsDomain(require("../fixtures/pd-profile").document(), (settings) => {settings.values[SETTING.DEFAULT_LAYERS] = 0b100;});
     const model = draftModel({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS},
         DEMO_CAPABILITIES);
     assert.deepEqual(model.layers.filter((layer) => layer.alwaysOn).map((layer) => layer.index), [0, 2]);
@@ -403,7 +403,7 @@ test("the published model carries each layer's combo reach and each combo's outp
     const portable = require("../../core/model/portable-profile");
     const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
     const {comboReach} = require("../../core/model/combo-reach");
-    const {editSettings} = require("../fixtures/profile-document");
+    const {editSettingsDomain} = require("../fixtures/profile-document");
     const {SETTING} = require("../../core/schema/settings-domain-v1");
     /** @param {any} doc */
     const modelOf = (doc) => draftModel({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS},
@@ -414,11 +414,11 @@ test("the published model carries each layer's combo reach and each combo's outp
     assert.deepEqual(model.comboReach, comboReach(model.layers, model.combos, model.comboReferenceLayers));
     assert.ok(model.comboReach[0].some((reach) => reach.fires), "the demo's combos fire from base");
     assert.ok(model.combos.some((combo) => combo.outputBehaviorLayers), "and some run their output's behaviour");
-    const defaults = modelOf(editSettings(structuredClone(demo), (settings) => { settings.values[SETTING.DEFAULT_LAYERS] = 0b11; }));
+    const defaults = modelOf(editSettingsDomain(structuredClone(demo), (settings) => { settings.values[SETTING.DEFAULT_LAYERS] = 0b11; }));
     assert.equal(defaults.layers[1].alwaysOn, true);
     assert.notDeepEqual(defaults.comboReach, model.comboReach, "a default layer changes it");
     assert.deepEqual(defaults.comboReach, comboReach(defaults.layers, defaults.combos, defaults.comboReferenceLayers), "and it is worked out again");
-    const vetoed = modelOf(editSettings(structuredClone(demo), (settings) => { settings.comboOutputBehaviors = false; }));
+    const vetoed = modelOf(editSettingsDomain(structuredClone(demo), (settings) => { settings.comboOutputBehaviors = false; }));
     assert.deepEqual(vetoed.combos.map((combo) => combo.outputBehaviorLayers), vetoed.combos.map(() => 0), "Combo outputs use behaviours off runs none");
 });
 

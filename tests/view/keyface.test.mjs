@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {actionNaming, dualRole, keyFace, keyKindOf, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
+import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import {createRequire} from "node:module";
 import keyNames from "../../core/model/key-names.js";
 import {behaviourEditorRow} from "../../webview/view/behavior-editor.mjs";
+import {keyIdentity} from "../../webview/view/key-identity.mjs";
 import * as edits from "../../webview/view/edits.mjs";
 
 const require = createRequire(import.meta.url);
@@ -127,12 +128,13 @@ test("a key is transparent, disabled, a macro's or a custom key's only as core p
     // Every name core publishes a kind under reads as that kind, and a key on
     // the board is drawn by it: the interface keeps no list of these names.
     const model = publishedModel(profileDocument({keys: {0: {0: "KC_TRANSPARENT", 1: "KC_NO", 2: "MACRO_3", 3: "CUSTOM_KEY_3", 4: "KC_A"}}}));
-    for (const [name, kind] of Object.entries(model.qmkKeyKinds)) assert.equal(keyKindOf(model, name), kind, name);
+    const kindOf = (/** @type {string} */ keycode) => keyIdentity(model, keycode).kind;
+    for (const [name, kind] of Object.entries(model.qmkKeyKinds)) assert.equal(kindOf(name), kind, name);
     const [transparent, disabled, macro, custom, plain] = model.layers[0].positions;
-    assert.deepEqual([transparent, disabled, macro, custom, plain].map((position) => keyKindOf(model, position)), ["transparent", "disabled", "macro", "customKey", undefined]);
+    assert.deepEqual([transparent, disabled, macro, custom, plain].map((position) => kindOf(position.keycode)), ["transparent", "disabled", "macro", "customKey", undefined]);
     assert.deepEqual([transparent, disabled, plain].map((position) => keyFace(position, model).kind), ["transparent", "disabled", "key"]);
-    assert.equal(keyKindOf(model, "0x1"), "transparent", "a number however it is written");
-    assert.equal(keyKindOf(model, "LSFT(KC_NO)"), undefined, "a modified key is a key");
+    assert.equal(kindOf("0x1"), "transparent", "a number however it is written");
+    assert.equal(kindOf("LSFT(KC_NO)"), undefined, "a modified key is a key");
 });
 
 test("the line across a cap marks a dual-role key: tap above, hold below", () => {

@@ -473,10 +473,10 @@ for (const mode of [EDIT_MODE.LIVE_REVIEW, EDIT_MODE.LIVE]) test(`a live rename 
 // with unsaved edits until Read keyboard.
 /** @param {import("node:test").TestContext} t */
 async function renamedInLive(t) {
-    const {editKeyboardName} = require("../../core/model/keyboard-name");
+    const {draftEdit} = require("../fixtures/draft-edit");
     const {fingerprint} = require("../../core/model/portable-profile");
     const plain = document(), print = fingerprint(plain);
-    const named = editKeyboardName({document: plain, fingerprint: print}, {name: "Charybdis on the desk", expectedFingerprint: print});
+    const named = draftEdit({document: plain, fingerprint: print}, {type: "renameKeyboard", name: "Charybdis on the desk"});
     const opened = await openLoop(t, {keyboard: liveKeyboard({document: named, mode: EDIT_MODE.LIVE})});
     const {keyboard, adapter, loop} = opened;
     keyboard.firstDeviceId = loop.session.draft.deviceId;
