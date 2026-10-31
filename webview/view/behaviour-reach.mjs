@@ -5,42 +5,19 @@
 // through the view (view.behaviours, layer-view.mjs), which works each out
 // once.
 import {keyMeaning} from "./keyface.mjs";
-import {keyIdentity} from "./key-identity.mjs";
 import {downTheStack} from "./layer-resolution.mjs";
-import {comboOutput} from "./combo-reach.mjs";
-import {inputOn} from "../../rules/combo-inputs.mjs";
+import {routesOf} from "./reach-routes.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
-/** @typedef {import("./keyface-types.js").ComboGroupEntry} ComboGroupEntry */
 /** @typedef {import("./keyface-types.js").BehaviorCombo} BehaviorCombo */
 /** @typedef {import("./keyface-types.js").BehaviourInView} BehaviourInView */
 /** @typedef {import("./keyface-types.js").BehaviourKey} BehaviourKey */
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
-/** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 
-// The behaviour a combo's output runs, judged from the layer its last
-// declared input's key comes from, even when matching uses another reference
-// layer, against the layers core publishes for it (outputBehaviorLayers).
-// Several owner placements remain alternatives. A key the reference layer
-// supplies comes from whichever layer the view shows there.
-/** @param {LayerView} view @param {import("../../contracts/panel.js").ComboView} combo @param {ResolvedKey[]} keys */
-export function comboBehaviourFor(view, combo, keys) {
-    const {model} = view;
-    const layers = combo.outputBehaviorLayers ?? 0;
-    const row = layers ? keyIdentity(model, comboOutput(model, combo)).behaviour : undefined;
-    if (!row) return undefined;
-    const owner = combo.inputs?.at(-1);
-    const placements = keys.filter(({position}) => owner !== undefined && inputOn(owner, position));
-    const permitted = placements.some(key => {
-        const source = key.reference ? view.shownAt(key.position.layoutIndex)?.layer : key.layer;
-        return source && (layers & (2 ** source.index));
-    });
-    return permitted ? row : undefined;
-}
-
+// The behaviours the view the board shows reaches: on its keys, then through
+// the combos firing in it.
 /** @param {LayerView} view @returns {BehaviourInView[]} */
 export function behavioursInView(view) {
-    const {model} = view;
     /** @type {Map<string, BehaviourInView>} */
     const found = new Map();
     /** @param {BehaviorView} row */
@@ -49,13 +26,9 @@ export function behavioursInView(view) {
         // The entry was inserted above whenever it was absent.
         return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(row.keycode));
     };
-    for (const key of view.shown) {
-        const row = keyIdentity(model, keyMeaning(key.position)).behaviour;
-        if (row) add(row).keys.push(key);
-    }
-    for (const route of view.combos.inView) {
-        const row = comboBehaviourFor(view, route.combo, route.keys);
-        if (row) add(row).combos.push(route);
+    for (const route of routesOf(view, "view")) {
+        if (route.how === "behaviour" && route.key) add(route.row).keys.push(route.key);
+        else if (route.how === "combo" && route.row) add(route.row).combos.push({combo: route.combo, keys: route.keys});
     }
     return [...found.values()];
 }
@@ -67,49 +40,39 @@ export function behavioursInView(view) {
  * lets the layer underneath answer, so a behaviour stored below still fires
  * while this layer is active — that one is reached *through* the layer, and it
  * is worth naming which layer answers. A combo that sends a behaviour's
- * keycode fires it too, with no key carrying it at all. Everything else the
- * profile carries is somewhere this layer never reaches.
+ * keycode fires it too, with no key carrying it at all: one chorded on this
+ * layer's own keys is this layer's, one needing a transparent key is reached
+ * down the stack. Everything else the profile carries is somewhere this layer
+ * never reaches.
  */
 /** @param {LayerView} view @returns {import("./keyface-types.js").BehaviourGroups} */
 export function behaviourGroups(view) {
-    const {model, stack} = view;
     /** @type {BehaviorView[]} */
     const here = [];
     /** @type {{row: BehaviorView; layer: Layer; whileHeld: boolean}[]} */
     const through = [];
-    for (const {position, layer, fellThrough, whileHeld} of view.reachable) {
-        const row = keyIdentity(model, keyMeaning(position)).behaviour;
-        if (!row) continue;
-        if (!fellThrough) { if (!here.includes(row)) here.push(row); }
-        else if (!through.some((entry) => entry.row === row)) through.push({row, layer, whileHeld});
-    }
-
-    // A combo's output is processed like a key press, so a combo sending a
-    // behaviour's keycode fires it though no key carries it. A combo chorded on
-    // this layer's own keys is this layer's; one needing a transparent key is
-    // reached down the stack.
     /** @type {BehaviorCombo[]} */
     const combos = [];
     /** @type {BehaviorCombo[]} */
     const combosBelow = [];
-    const groupsOfCombos = view.combos.groups;
-    /** @type {[ComboGroupEntry[], BehaviorCombo[]][]} */
-    const routes = [[groupsOfCombos.onKeys, combos], [groupsOfCombos.throughKeys, combosBelow]];
-    for (const [entries, list] of routes) {
-        for (const {combo, keys, held} of entries) {
-            const row = comboBehaviourFor(view.under(held.map((layer) => stack.indexOf(layer))), combo, keys);
-            if (!row) continue;
-            const entry = list.find((candidate) => candidate.row === row);
-            if (entry) entry.combos.push({combo, keys});
-            else list.push({row, combos: [{combo, keys}]});
+    for (const route of routesOf(view, "layer")) {
+        if (route.how === "behaviour") {
+            // A behaviour under a transparent key names the layer answering with it.
+            if (route.below) through.push({row: route.row, layer: route.layer, whileHeld: route.whileHeld});
+            else here.push(route.row);
+        } else if (route.how === "combo" && route.row) {
+            const list = route.below ? combosBelow : combos;
+            const entry = list.find((candidate) => candidate.row === route.row);
+            if (entry) entry.combos.push({combo: route.combo, keys: route.keys});
+            else list.push({row: route.row, combos: [{combo: route.combo, keys: route.keys}]});
         }
     }
 
     // A behaviour reached several ways is listed under each, the same as
     // anything else: the groups say how this layer gets at it, not which way won.
     const reached = new Set([...here, ...[...through, ...combos, ...combosBelow].map((entry) => entry.row)]);
-    return {here, through: downTheStack(through), combos, combosBelow: downTheStack(combosBelow),
-        elsewhere: (model?.keyBehaviors || []).filter((row) => !reached.has(row))};
+    return {here, through, combos, combosBelow: downTheStack(combosBelow),
+        elsewhere: (view.model?.keyBehaviors || []).filter((row) => !reached.has(row))};
 }
 
 /**

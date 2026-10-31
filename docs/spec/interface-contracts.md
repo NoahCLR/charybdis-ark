@@ -249,7 +249,7 @@ here: its home and tests are in
 | What reaches one key and what it uses, which the hover card and the Key tab both draw: the layer's own key shown alone, the key answering it from below, and of its behaviour row whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold; drawn by `webview/ui/hover-card.mjs` (placed by `webview/ui/hover.mjs`) and `webview/ui/keys/key-tab.mjs` | `webview/view/key-reach.mjs` (`keyReachAt`, `keyReach`, `keyBehaviour`) | `tests/view/key-reach.test.mjs`, `browser-tests/participation.spec.js` |
 | What the board shows at each key and on the trackball: the key that answers in the view and the layer supplying it, glass or solid, its light, the dots and badges of what runs there, and in the LED selector each LED's index; drawn by `webview/ui/board.mjs` | `webview/view/board-keys.mjs` (`boardKeys`, `boardTrackball`) | `tests/view/board-keys.test.mjs`, `browser-tests/marks.spec.js`, `browser-tests/participation.spec.js`, `browser-tests/lighting-controls.spec.js` |
 | One view of the layer stack: the layer the board shows and the layers previewed with it, by their place in the stack, which is each published layer's `index`; what answers and what shows at each key in it, and the combos and behaviours it reaches, each worked out once per model and view. Screens ask the current one (`currentView()`, `webview/store.mjs`) rather than passing the layer and the preview | `webview/view/layer-view.mjs` (`layerView`, read through `view.answerAt`, `view.shownAt`, `view.combos`, `view.behaviours`) | `tests/view/layer-view.test.mjs`, `tests/view/combo-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs` |
-| What a layer view reaches as each Keymap tab lists it: the tab's groups, what each lists and says when empty, the tab's count, and the group a row asked for by name is picked under | `webview/view/tab-reach.mjs` (`tabReach`) | `tests/view/tab-reach.test.mjs`, `tests/view/reach.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
+| What a layer view reaches as each Keymap tab lists it: the tab's groups, what each lists and says when empty, the tab's count, and the group a row asked for by name is picked under | `webview/view/tab-reach.mjs` (`tabReach`), whose lists, the view's behaviours included, sort the one walk of its routes (`routesOf`, `webview/view/reach-routes.mjs`): each key, behaviour and combo, and the behaviour a combo's output runs, worked out once per view | `tests/view/tab-reach.test.mjs`, `tests/view/reach.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
 | A reach row picked in a Keymap tab: its id (`group:name`, `reachRowId`), and the keys the board rings for it by the route it was picked under | `webview/view/tab-reach.mjs` (`tabReach`'s `keysFor`), `webview/view/behaviour-reach.mjs` (`behaviourRouteKeys`, read as `view.behaviours.routeKeys`) | `tests/view/tab-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
 | Device facts, the review sheet, the unsaved-demo dialog; the app keeps routing, rendering, focus and scroll, and window keys | `webview/ui/device.mjs`, `webview/ui/review-overlay.mjs`, `webview/ui/leave-demo.mjs` | (no test) |
 
@@ -597,8 +597,9 @@ only an operation stands in the way. The demo's draft is bound to the demo
   never an empty box. A screen a read left without an editor (`load.held`,
   `webview/view/readiness.mjs`) says the same reasons as a title and detail;
   core words both, by reason, in `vocabulary.draftBlocks` (a live draft's
-  detail as `liveDetail`), which `webview/view/draft-block.mjs` reads
-  (`tests/model/vocabulary.test.js`, `tests/view/readiness.test.mjs`). The
+  detail as `liveDetail`), which `draftBlockWords`
+  (`webview/view/vocabulary.mjs`) reads (`tests/model/vocabulary.test.js`,
+  `tests/view/readiness.test.mjs`). The
   Keyboard screen says firmware this Ark does not work with in
   `vocabulary.firmwareUpdate` too.
 - An edit names the draft it was built from (`expectedBase`, or a domain's

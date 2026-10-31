@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {comboBehaviours, comboInputIsKey, comboReferenceLayer, combosForKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
+import {comboBehaviours, comboInputIsKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 import {comboMessage, saveBehaviour} from "../../webview/view/edits.mjs";
 
@@ -51,11 +51,13 @@ test("a combo's reported input positions are the one shape these tests add to wh
 });
 
 test("combos follow the device's own input positions before falling back to keycodes", () => {
-    const model = reporting(modelOf({combos: [{inputs: ["KC_D", "KC_F"], output: "KC_ESC"}, {inputs: ["KC_J", "KC_K"], output: "KC_TAB"}]}), [[27, 28]]);
+    const model = reporting(modelOf({keys: {0: {27: "KC_D", 40: "KC_J", 41: "KC_Z"}},
+        combos: [{inputs: ["KC_D", "KC_F"], output: "KC_ESC"}, {inputs: ["KC_J", "KC_K"], output: "KC_TAB"}]}), [[27, 28]]);
     const [placed, named] = model.combos.map((/** @type {any} */ combo) => combo.badge);
-    assert.deepEqual(combosForKey(model, {layoutIndex: 27, keycode: "KC_D"}).map((c) => c.badge), [placed]);
-    assert.deepEqual(combosForKey(model, {layoutIndex: 99, keycode: "KC_J"}).map((c) => c.badge), [named]);
-    assert.deepEqual(combosForKey(model, {layoutIndex: 99, keycode: "KC_Z"}), []);
+    const onKey = (/** @type {number} */ layoutIndex) => layerView(model, 0).combos.onKey(layoutIndex).combos.map((c) => c.badge);
+    assert.deepEqual(onKey(27), [placed]);
+    assert.deepEqual(onKey(40), [named], "a combo with no reported positions finds its key by keycode, wherever it is");
+    assert.deepEqual(onKey(41), []);
 });
 
 test("the combo table and the board's badges count the same keys", () => {
@@ -67,9 +69,9 @@ test("the combo table and the board's badges count the same keys", () => {
 
     const whole = layerView(model, 0).combos.groups;
     assert.deepEqual(whole.onKeys[0].keys.map((key) => key.position.layoutIndex), [27, 28]);
-    assert.deepEqual(combosForKey(model, keyAt(model, 0, 27)).map((row) => row.badge), ["C0"],
+    assert.deepEqual(layerView(model, 0).combos.onKey(27).combos.map((row) => row.badge), ["C0"],
         "the badge and the count come from one predicate");
-    assert.deepEqual(combosForKey(model, keyAt(model, 0, 29)), []);
+    assert.deepEqual(layerView(model, 0).combos.onKey(29).combos, []);
 
     const half = modelOf({keys: {0: {27: "KC_D"}}, combos});
     const partial = layerView(half, 0).combos.groups;
@@ -228,9 +230,14 @@ test("combos follow the keyboard's combo layer matching", () => {
     assert.equal(referenced.onKeys.length, 1);
     assert.deepEqual(referenced.onKeys[0].keys.map((key) => key.position.layoutIndex), [13, 14]);
     assert.ok(referenced.onKeys[0].keys.every((key) => key.reference && key.layer.displayName === "Base"));
-    assert.equal(comboReferenceLayer(settings, 1), 0, "as core publishes it");
-    assert.equal(comboReferenceLayer(model, 1), 1, "and each layer matches itself unless set to another");
-    assert.equal(comboReferenceLayer({}, 1), 1, "and without it");
+    // The view matches the reference layer core publishes for each layer
+    // (comboReferenceLayers), and each layer itself without one.
+    assert.equal(settings.comboReferenceLayers[1], 0, "as core publishes it");
+    assert.ok(layerView(settings, 1).combos.inView[0].keys.every((key) => key.reference && key.layer.displayName === "Base"));
+    assert.deepEqual(layerView(model, 1).combos.inView, [], "and each layer matches itself unless set to another");
+    const unpublished = {...settings, comboReferenceLayers: undefined};
+    assert.deepEqual(layerView(unpublished, 1).combos.inView, [], "and without it");
+    assert.equal(layerView(unpublished, 1).combos.answers.get(13)?.keycode, "KC_1");
 
     assert.deepEqual(layerView(settings, 1).combos.inputKeys(settings.combos[0].inputs), [13, 14], "the builder rings the keys the keyboard matches");
     assert.equal(layerView(settings, 1).combos.answers.get(13).keycode, "KC_Q", "and picks the keycode it matches, not Numbers' own");

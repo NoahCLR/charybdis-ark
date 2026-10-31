@@ -81,7 +81,7 @@ export function comboBehaviours(model, combos, layer) {
 // The matching rule alone, for one key, with no layer in view. Screens ask
 // combosAt(), which applies it the way the keyboard does on the layer shown.
 /** @param {ViewModel} model @param {Position | null | undefined} position */
-export function combosForKey(model, position) {
+function combosForKey(model, position) {
     if (!position) return [];
     return (model?.combos || []).filter((combo) => comboTouches(combo, position));
 }
@@ -130,7 +130,7 @@ const recordUses = (uses, combo, byKey) => {
 // top layer, the keyboard's Combo Layer Matching, as core publishes it
 // (comboReferenceLayers); a layer matches itself without it.
 /** @param {ViewModel} model @param {number} at */
-export const comboReferenceLayer = (model, at) => model?.comboReferenceLayers?.[at] ?? at;
+const comboReferenceLayer = (model, at) => model?.comboReferenceLayers?.[at] ?? at;
 
 // Which combos fire from this layer, and on which keys, as core publishes it
 // (comboReach, core/model/combo-reach.js): turned back into the keys the board

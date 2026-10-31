@@ -8,7 +8,7 @@
 // what each tab's groups list is tab-reach.mjs's.
 
 /** @type {Readonly<Record<string, string>>} */
-export const ROUTE_WORDS = Object.freeze({here: "key", branches: "behaviour", combos: "combo"});
+const ROUTE_WORDS = Object.freeze({here: "key", branches: "behaviour", combos: "combo"});
 
 export const GROUP_TITLES = {
     // The Combos tab's one cut across the others: what the selected key takes

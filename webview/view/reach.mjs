@@ -7,12 +7,11 @@ import {keyMeaning} from "./keyface.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {downTheStack} from "./layer-resolution.mjs";
 import {layerView} from "./layer-view.mjs";
-import {comboOutput} from "./combo-reach.mjs";
-import {comboBehaviourFor} from "./behaviour-reach.mjs";
-/** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
-/** @typedef {import("./keyface-types.js").ComboGroupEntry} ComboGroupEntry */
+import {routesOf} from "./reach-routes.mjs";
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
+/** @typedef {import("./keyface-types.js").NamesOf} NamesOf */
 /** @typedef {import("./keyface-types.js").ReachEntry} ReachEntry */
+/** @typedef {import("./keyface-types.js").ReachRoute} ReachRoute */
 /** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 /** @typedef {import("./keyface-types.js").BranchCell} BranchCell */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
@@ -48,65 +47,67 @@ export function reachKeys(view, entry, inView = false) {
     return [...indexes];
 }
 
-// Macros and pointing modes share the same view routes: a visible key, a
-// behaviour on a visible key, or a combo that fires under this exact stack.
-// Every branch of a behaviour that sends something, with the cell of its grid
-// it sits in: the branch by how many taps start it, and the tier. A route names
-// the cell, so "double tap and hold locks it" reads as that, not as the key.
-/** @param {BehaviorView} row @param {(action: string, cell: BranchCell) => void} record */
-const branchActions = (row, record) => {
-    for (const step of row.steps || []) {
-        for (const [tier, branch] of /** @type {const} */ ([["tap", step.tap], ["hold", step.hold], ["long", step.longHold]])) {
-            if (branch?.action) record(branch.action, {branch: step.tapCount + 1, tier});
-        }
-    }
-};
 /** @param {BranchCell[]} cells @param {BranchCell} cell */
 const addCell = (cells, cell) => {
     if (!cells.some((item) => item.branch === cell.branch && item.tier === cell.tier)) cells.push(cell);
 };
 
-/** @param {LayerView} view @param {import("./keyface-types.js").NamesOf} namesOf */
-export function reachInView(view, namesOf) {
-    const {model} = view;
-    /** @type {Map<string, ReachEntry>} */
+/** @typedef {Omit<ReachEntry, "name">} Reached */
+// What `namesOf` names along each route, by name in the order the routes
+// first name it: the keys naming it, the behaviours a branch of which sends
+// it, with the cells of their grids that do, and the combos sending it,
+// directly or through the behaviour their output runs. What the layer holds
+// is kept apart from what it reaches only below a transparent key.
+/** @param {ReachRoute[]} routes @param {NamesOf} namesOf */
+function byName(routes, namesOf) {
+    /** @type {Map<string, {here: Reached, below: Reached}>} */
     const found = new Map();
-    /** @param {string} name */
-    const add = (name) => {
-        if (!found.has(name)) found.set(name, {name, keys: [], behaviours: [], combos: []});
+    /** @param {string} name @param {boolean} below */
+    const reachOf = (name, below) => {
+        if (!found.has(name)) found.set(name, {here: {keys: [], behaviours: [], combos: []}, below: {keys: [], behaviours: [], combos: []}});
         // The entry was inserted above whenever it was absent.
-        return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name));
+        return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name))[below ? "below" : "here"];
     };
-    for (const key of view.shown) {
-        for (const name of namesOf(keyMeaning(key.position))) add(name).keys.push(key);
-        const row = keyIdentity(model, keyMeaning(key.position)).behaviour;
-        if (row) branchActions(row, (action, cell) => {
-            for (const name of namesOf(action)) {
-                const entry = add(name);
-                const found = entry.behaviours.find((item) => item.keycode === row.keycode && item.action === action);
-                if (found) addCell(found.cells, cell);
-                else entry.behaviours.push({keycode: row.keycode, action, layer: key.fellThrough ? key.layer : null, whileHeld: key.whileHeld, cells: [cell]});
+    for (const route of routes) {
+        if (route.how === "key") {
+            for (const name of namesOf(route.action)) reachOf(name, route.below).keys.push(route.key);
+        } else if (route.how === "behaviour") {
+            const {row, layer, whileHeld} = route;
+            for (const {action, cell} of route.sends) {
+                for (const name of namesOf(action)) {
+                    const rows = reachOf(name, route.below).behaviours;
+                    // The action matters as well as the behaviour: a pointing
+                    // mode answers to two keycodes, and which one a branch
+                    // sends is the difference between holding and locking it.
+                    const reached = rows.find((entry) => entry.keycode === row.keycode && entry.action === action);
+                    if (reached) addCell(reached.cells, cell);
+                    else rows.push({keycode: row.keycode, action, layer, whileHeld, cells: [cell]});
+                }
             }
-        });
-    }
-    for (const {combo, keys} of view.combos.inView) {
-        const output = comboOutput(model, combo);
-        /** @param {string} action @param {string | null} [via] @param {BranchCell} [cell] */
-        const sent = (action, via = null, cell) => {
-            for (const name of namesOf(action)) {
-                const entry = add(name);
-                const found = entry.combos.find((item) => item.combo === combo && item.action === action);
-                const route = found || {combo, keys, via, action, cells: []};
-                if (!found) entry.combos.push(route);
-                if (cell) addCell(route.cells, cell);
+        } else {
+            const {combo, keys, action: output} = route;
+            /** @type {{action: string, via: string | null, cell?: BranchCell}[]} */
+            const sends = [{action: output, via: null}, ...route.sends.map(({action, cell}) => ({action, via: output, cell}))];
+            for (const {action, via, cell} of sends) {
+                for (const name of namesOf(action)) {
+                    const combos = reachOf(name, route.below).combos;
+                    const reached = combos.find((item) => item.combo === combo && item.action === action);
+                    const sent = reached || {combo, keys, via, action, cells: []};
+                    if (!reached) combos.push(sent);
+                    if (cell) addCell(sent.cells, cell);
+                }
             }
-        };
-        sent(output);
-        const row = comboBehaviourFor(view, combo, keys);
-        if (row) branchActions(row, (action, cell) => sent(action, output, cell));
+        }
     }
-    return [...found.values()];
+    return found;
 }
+
+// What the view the board shows reaches, by name. Macros and pointing modes
+// share the same view routes: a visible key, a behaviour on a visible key, or
+// a combo that fires under this exact stack.
+/** @param {LayerView} view @param {NamesOf} namesOf @returns {ReachEntry[]} */
+export const reachInView = (view, namesOf) =>
+    [...byName(routesOf(view, "view"), namesOf)].map(([name, {here}]) => ({name, ...here}));
 
 // What a keycode reaches of one kind, by the name the reach lists key it by:
 // the profile's name for it (MACRO_0, CUSTOM_KEY_0) under any name it is read
@@ -180,81 +181,22 @@ export function placementsOf(model, tab, keycode) {
  * of the things a keycode names, as stable string keys, and `all` is every name
  * worth reporting as unreached.
  */
-/** @param {LayerView} view @param {import("./keyface-types.js").NamesOf} namesOf @param {string[]} all @returns {import("./keyface-types.js").ReachGroup} */
+/** @param {LayerView} view @param {NamesOf} namesOf @param {string[]} all @returns {import("./keyface-types.js").ReachGroup} */
 export function reachGroups(view, namesOf, all) {
-    const {model, stack} = view;
-    /** @type {Map<string, import("./keyface-types.js").ReachRecord>} */
-    const found = new Map();
-    /** @param {string} name */
-    const reachOf = (name) => {
-        if (!found.has(name)) found.set(name, {directKeys: [], fellKeys: [], directRows: [], belowRows: [], directCombos: [], belowCombos: []});
-        // The entry was inserted above whenever it was absent.
-        return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name));
-    };
-
-    for (const {position, layer, fellThrough, whileHeld} of view.reachable) {
-        for (const name of namesOf(keyMeaning(position))) {
-            reachOf(name)[fellThrough ? "fellKeys" : "directKeys"].push({position, layer, fellThrough, whileHeld});
-        }
-    }
-
-    // Every behaviour this layer can fire, including the ones it only reaches
-    // because a transparent key lets the default layer answer. Those carry the
-    // layer that holds them, so a row can say so.
-    const {here, through} = view.behaviours.groups;
-    for (const {row, from, whileHeld} of [...here.map((row) => ({row, from: null, whileHeld: false})),
-        ...through.map((item) => ({row: item.row, from: item.layer, whileHeld: item.whileHeld}))]) {
-        branchActions(row, (action, cell) => {
-            for (const name of namesOf(action)) {
-                const rows = reachOf(name)[from ? "belowRows" : "directRows"];
-                // The action matters as well as the behaviour: a pointing
-                // mode answers to two keycodes, and which one a branch
-                // sends is the difference between holding and locking it.
-                const found = rows.find((entry) => entry.keycode === row.keycode && entry.action === action);
-                if (found) addCell(found.cells, cell);
-                else rows.push({keycode: row.keycode, action, layer: from, whileHeld, cells: [cell]});
-            }
-        });
-    }
-
-    // A combo's output is processed like a key press, so it reaches what it
-    // sends and, when that is a behaviour's keycode, what the behaviour's
-    // branches send. A combo firing from this layer's own keys is this layer's;
-    // one that needs a transparent key is reached down the stack.
-    const combos = view.combos.groups;
-    /** @type {[ComboGroupEntry[], boolean][]} */
-    const comboRoutes = [[combos.onKeys, false], [combos.throughKeys, true]];
-    for (const [entries, below] of comboRoutes) {
-        for (const {combo, keys, held} of entries) {
-            const output = comboOutput(model, combo);
-            /** @type {{action: string; via: string | null; cell?: BranchCell}[]} */
-            const sends = [{action: output, via: null}];
-            const row = comboBehaviourFor(view.under(held.map((layer) => stack.indexOf(layer))), combo, keys);
-            if (row) branchActions(row, (action, cell) => sends.push({action, via: output, cell}));
-            for (const {action, via, cell} of sends) {
-                for (const name of namesOf(action)) {
-                    const routes = reachOf(name)[below ? "belowCombos" : "directCombos"];
-                    const found = routes.find((route) => route.combo === combo && route.action === action);
-                    const route = found || {combo, via, action, keys, cells: []};
-                    if (!found) routes.push(route);
-                    if (cell) addCell(route.cells, cell);
-                }
-            }
-        }
-    }
+    const found = byName(routesOf(view, "layer"), namesOf);
 
     // One thing is often reached several ways, and the groups answer which way
     // rather than which way first — so it is listed under each route it has,
     // each entry carrying only that route. A macro sitting on a key here that a
     // behaviour here also fires is two answers, not one with a footnote.
     const onKeys = [], fromBranches = [], fromCombos = [], throughKeys = [], fromBranchesBelow = [], fromCombosBelow = [];
-    for (const [name, reach] of found) {
-        if (reach.directKeys.length) onKeys.push({name, keys: reach.directKeys, behaviours: [], combos: []});
-        if (reach.directRows.length) fromBranches.push({name, keys: [], behaviours: reach.directRows, combos: []});
-        if (reach.directCombos.length) fromCombos.push({name, keys: [], behaviours: [], combos: reach.directCombos});
-        if (reach.fellKeys.length) throughKeys.push({name, keys: reach.fellKeys, behaviours: [], combos: []});
-        if (reach.belowRows.length) fromBranchesBelow.push({name, keys: [], behaviours: reach.belowRows, combos: []});
-        if (reach.belowCombos.length) fromCombosBelow.push({name, keys: [], behaviours: [], combos: reach.belowCombos});
+    for (const [name, {here, below}] of found) {
+        if (here.keys.length) onKeys.push({name, keys: here.keys, behaviours: [], combos: []});
+        if (here.behaviours.length) fromBranches.push({name, keys: [], behaviours: here.behaviours, combos: []});
+        if (here.combos.length) fromCombos.push({name, keys: [], behaviours: [], combos: here.combos});
+        if (below.keys.length) throughKeys.push({name, keys: below.keys, behaviours: [], combos: []});
+        if (below.behaviours.length) fromBranchesBelow.push({name, keys: [], behaviours: below.behaviours, combos: []});
+        if (below.combos.length) fromCombosBelow.push({name, keys: [], behaviours: [], combos: below.combos});
     }
     return {onKeys, fromBranches, fromCombos,
         throughKeys: downTheStack(throughKeys), fromBranchesBelow: downTheStack(fromBranchesBelow),

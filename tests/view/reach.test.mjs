@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {keyMeaning} from "../../webview/view/keyface.mjs";
-import {combosForKey} from "../../webview/view/combo-reach.mjs";
 import {reachText, placementsOf} from "../../webview/view/reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 import {tabReach} from "../../webview/view/tab-reach.mjs";
@@ -39,7 +38,7 @@ test("what a key reaches is looked up by what its value means", () => {
     assert.equal(keyMeaning(pointingKey), "PD_MODE_0");
     assert.equal(keyMeaning({keycode: "KC_A"}), "KC_A", "an ordinary key means itself");
     assert.equal(keyMeaning(undefined), "");
-    assert.deepEqual(combosForKey(model, macroKey).map((combo) => combo.badge), ["C0"],
+    assert.deepEqual(layerView(model, 0).combos.onKey(macroKey.layoutIndex).combos.map((combo) => combo.badge), ["C0"],
         "a combo on the macro key still finds its key");
 });
 
