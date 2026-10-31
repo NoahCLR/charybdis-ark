@@ -73,7 +73,8 @@ Around the core:
 - A draft edit type: one entry in `core/model/draft-edits.js`, its payload in
   `contracts/edits.d.ts`, its builder in `webview/view/edits.mjs`. A new
   editor or profile domain also gets its handler in
-  `core/model/draft-editor.js`, where `applyDraftEdit` makes every draft edit.
+  `core/model/draft-editor.js`, where `applyDraftEdit` makes every draft edit;
+  no other runtime module runs an editor's edit (`tests/scripts/conventions.test.js`).
 - What a review item names and Discard puts back (a review unit): a builder
   in `UNIT` and a reading in `parseUnit`, both in
   `core/model/review-units.js`, never a string of its own.
@@ -108,7 +109,9 @@ Around the core:
   row keyed exactly by it or listening to it however it is spelled), and
   whether two spellings are one key: `keyIdentity(model, spelling)` and
   `sameKey`, `webview/view/key-identity.mjs`. Nothing else in the interface
-  reads the alias table.
+  reads the alias table, and a table core keys by keycode name
+  (`qmkKeyLabels`, `qmkKeyKinds`, …) is read under a key's spellings only
+  through its `lookUp`.
 - Whether an area takes an edit now, and what to say when it does not (or
   nothing, while the draft is busy): `editGate(model, area)`,
   `webview/view/edit-gate.mjs`. A screen disables its controls by it and
@@ -134,7 +137,7 @@ row here for a kind of rule points there rather than repeating it.
 | Which keycodes the keycode picker offers: not those of features this firmware does not build, the retired user block, QMK's own macro names or Charybdis's own drag scroll | `core/data/offered-keycodes.js`, published on each `qmkKeycodes` entry as `offered` and read by `pickable` in `webview/view/picker-sections.mjs` | `tests/data/offered-keycodes.test.js`, `tests/view/picker-sections.test.mjs` |
 | What each layer key does to its layer, by QMK's function (`MO` … `PDF`, `LT`, `LM`, `LOCK_LAYER`), the modifiers a layer-mod holds with it and what a layer-tap taps | `keyLayerForm`, `layerModWords` and `layerTapWords` in `core/model/key-names.js` (a layer-mod's and a mod-tap's modifiers from the keycode's own bits, `heldModifierWords`), published as `qmkKeyLayerForms`, `qmkKeyLayerMods` and `qmkKeyLayerTaps` beside `qmkKeyLayers` and read through `layerFormOf`, `layerModsOf` and `layerTapOf` in `webview/view/keyface.mjs` | `tests/model/profile-model.test.js`, `tests/view/keyface.test.mjs` |
 | Which key a keycode spelling is, by the names core publishes for it (`qmkKeycodeAliases`): the name the profile knows it by, one canonical spelling per key, the names a fact may be published under, and whether two spellings are one key | `keyIdentity` and `sameKey` in `webview/view/key-identity.mjs`, the only interface module reading the alias table beside the keycode grammar's reader (`webview/view/keycode-expression.mjs`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
-| Which keys the interface treats apart: transparent (`KC_TRANSPARENT`), disabled (`KC_NO`), a macro's and a custom key's | `keyKind` in `core/model/key-names.js`, published by every name a keycode is read under as `qmkKeyKinds` and read through `keyKindOf` in `webview/view/keyface.mjs` | `tests/model/key-names.test.js`, `tests/model/profile-model.test.js`, `tests/view/keyface.test.mjs` |
+| Which keys the interface treats apart: transparent (`KC_TRANSPARENT`), disabled (`KC_NO`), a macro's and a custom key's | `keyKind` in `core/model/key-names.js`, published by every name a keycode is read under as `qmkKeyKinds` and read as `keyIdentity(model, spelling).kind` in `webview/view/key-identity.mjs` | `tests/model/key-names.test.js`, `tests/model/profile-model.test.js`, `tests/view/keyface.test.mjs` |
 | Actions, native keycodes and layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
 | Macro limits | `MACRO_DOMAIN_V1` in `core/schema/macro-domain-v1.js`; the keys held at once and the longest delay, `MACRO_LIMITS` in `rules/macro-payload.mjs`, which core and the interface both read | `tests/schema/macro-domain-v1.test.js`, `tests/rules/macro-payload.test.mjs` |
 | Combo limits | `COMBO_LIMITS` in `core/schema/combo-domain-v1.js` | `tests/schema/combo-domain-v1.test.js` |

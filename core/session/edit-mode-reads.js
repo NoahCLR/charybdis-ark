@@ -9,18 +9,14 @@ const {EDIT_MODE, readEditMode, readEditProgress, readRuntime} = require("../pro
 // it into its connection state (profile-device-service.js): at each status
 // refresh and before a complete read.
 
-// The edit mode; anything but a firmware without it (UNHANDLED) leaves
-// the mode unknown, tried again at the next status refresh or read.
+// The edit mode, or why it is not known (ConnectionState.editModeFailed).
 /** @param {Operation} op */
 async function readServiceEditMode(op) {
     const state = op.state;
     try {
-        const editMode = await readEditMode(op.connection, {nextRequestId: op.nextRequestId});
-        state.editMode = {...editMode, notStored: state.editMode?.notStored ?? false};
-        state.editModeUnknown = false;
+        state.editModeRead(await readEditMode(op.connection, {nextRequestId: op.nextRequestId}));
     } catch (error) {
-        state.editModeUnknown = /** @type {{code?: string}} */ (error).code !== "UNHANDLED";
-        if (state.editModeUnknown) op.say("The keyboard's edit mode could not be read; Ark tries again.");
+        if (state.editModeFailed(error)) op.say("The keyboard's edit mode could not be read; Ark tries again.");
     }
 }
 

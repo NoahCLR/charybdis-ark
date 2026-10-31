@@ -97,7 +97,7 @@ function sectionBody(model) {
     const section = shownSection(model, picker);
     if (section.kind === "board") {
         const keys = PICKER_BOARD.keys.filter(source => pickAllowed(model, picker, source.value)).map((source) => {
-            const spoken = model?.qmkKeyLabels?.[source.value];
+            const spoken = keyIdentity(model, source.value).lookUp(model?.qmkKeyLabels);
             // The host layout's legends replace the ANSI board's, so a German
             // board reads Z where QMK says KC_Y; the key it stores is unchanged.
             const key = pickerBoardKey(source, model);

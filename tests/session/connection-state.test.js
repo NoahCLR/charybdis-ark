@@ -53,6 +53,36 @@ test("adopting a profile builds the editors' views of it", async t => {
     assert.deepEqual({settingsView, macroView, customKeyView}, editorViews(read, service.capabilities));
 });
 
+test("an edit mode read keeps whether its write is owed, and a set says it anew", () => {
+    const state = new ConnectionState();
+    const read = {mode: 1, counter: 3, slaveMode: 1, slaveCounter: 3, slaveKnown: true, conflict: false, agreed: true};
+    state.editModeRead(read);
+    assert.deepEqual(state.editMode, {...read, notStored: false}, "nothing said yet is nothing owed");
+    assert.equal(state.modeNotStored(true), true);
+    state.editModeRead({...read, mode: 2});
+    assert.deepEqual(state.editMode, {...read, mode: 2, notStored: true}, "a read says nothing of it");
+    state.editModeRead({...read, notStored: false});
+    assert.equal(state.editMode?.notStored, false, "a set says it");
+});
+
+test("an edit mode read that failed is none from a firmware without it, else unknown until read; a live read says its mode", () => {
+    const state = new ConnectionState();
+    const read = {mode: 1, counter: 3, slaveMode: 1, slaveCounter: 3, slaveKnown: true, conflict: false, agreed: true};
+    state.modeSeenLive(2);
+    assert.equal(state.editMode, undefined, "nothing without an edit mode");
+    assert.equal(state.editModeFailed(Object.assign(new Error("timed out"), {code: "TIMEOUT"})), true, "unknown, which Ark says");
+    assert.deepEqual([state.editMode, state.editModeUnknown], [undefined, true]);
+    state.editModeRead(read);
+    assert.equal(state.editModeUnknown, false, "known once read");
+    state.modeSeenLive(2);
+    assert.deepEqual(state.editMode, {...read, mode: 2, notStored: false});
+    assert.equal(state.editModeFailed(Object.assign(new Error("no edit mode"), {code: "UNHANDLED"})), false, "none: nothing to say or try again");
+    assert.deepEqual([state.editMode, state.editModeUnknown], [undefined, false]);
+    state.editModeFailed(new Error("timed out"));
+    state.forgetEditMode();
+    assert.deepEqual([state.editMode, state.editModeUnknown], [undefined, false], "a refresh reads it anew");
+});
+
 test("a connection that ends leaves nothing of it, and is no longer listened to", async t => {
     const {service, adapter} = await connectedService(t);
     await service.readKeyboardProfile();

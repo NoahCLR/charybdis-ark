@@ -66,16 +66,15 @@ test("a unit this module does not know is refused rather than skipped", () => {
 });
 
 test("discarding a default-layer change alone that would put a shortcut on an always-on layer is refused in words", () => {
-    const {editSettings} = require("../../core/model/settings-editor");
-    const {editCustomKey} = require("../../core/model/custom-key-editor");
+    const {draftEdit} = require("../fixtures/draft-edit");
     const fields = (snapshot, updates) => settingsEditorView(snapshot).sections.find((row) => row.id === "startupLayers").fields
         .map((field) => ({macro: field.macro, enabled: updates[field.macro] ?? field.enabled}));
     // The keyboard has Navigation (3) as a default layer.
     const plain = snapshotOf(pdDocument());
-    const keyboard = snapshotOf(editSettings(plain, {type: "updateConfigDefaults", sectionId: "startupLayers", expectedFingerprint: plain.fingerprint, fields: fields(plain, {startupLayer3: true})}, capabilities));
+    const keyboard = snapshotOf(draftEdit(plain, {type: "updateConfigDefaults", sectionId: "startupLayers", fields: fields(plain, {startupLayer3: true})}, capabilities));
     // The draft makes it an ordinary layer, then a custom key turns it on.
-    const freed = snapshotOf(editSettings(keyboard, {type: "updateConfigDefaults", sectionId: "startupLayers", expectedFingerprint: keyboard.fingerprint, fields: fields(keyboard, {startupLayer3: false})}, capabilities));
-    const draft = snapshotOf(editCustomKey(freed, {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind: 0}, expectedFingerprint: freed.fingerprint}, capabilities));
+    const freed = snapshotOf(draftEdit(keyboard, {type: "updateConfigDefaults", sectionId: "startupLayers", fields: fields(keyboard, {startupLayer3: false})}, capabilities));
+    const draft = snapshotOf(draftEdit(freed, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind: 0}}, capabilities));
     const units = profileReview(keyboard, draft).map((row) => row.unit);
     const startup = units.find((unit) => unit.startsWith("settings:") && unit.includes("startupLayers"));
     assert.ok(startup, units.join());

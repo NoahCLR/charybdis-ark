@@ -206,9 +206,9 @@ test("an Apply that renames the keyboard expects it to reconnect, and a readback
 
 test("restoring a named backup over an incomplete read expects the safe USB restart", async () => {
     const {RECONNECT_WORDS} = require("../../core/session/keyboard-reconnect");
-    const {editKeyboardName} = require("../../core/model/keyboard-name");
+    const {draftEdit} = require("../fixtures/draft-edit");
     const service = fakeService(), before = {...service.portable, incomplete: true};
-    const named = editKeyboardName(service.portable, {name: "Desk", expectedFingerprint: service.portable.fingerprint});
+    const named = draftEdit(service.portable, {type: "renameKeyboard", name: "Desk"});
     const session = {service, portableReview: {before, document: named}};
     const expecting = [];
     service.expectReconnect = (on) => {expecting.push(on);};

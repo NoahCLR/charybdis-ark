@@ -156,7 +156,6 @@ class ProfileDeviceService {
     // The profile the editors follow, and the capabilities the keyboard
     // reported, as the panel reads them (connection-state.js).
     get portable() {return this.state.portable;}
-    set portable(profile) {this.state.portable = profile;}
     get capabilities() {return this.state.capabilities;}
 
     async enumerate() {
@@ -215,8 +214,7 @@ class ProfileDeviceService {
                 : undefined;
             // Every build that saves has a working copy and an edit mode; a
             // keyboard that does not answer is read and applied as before.
-            state.editMode = undefined;
-            state.editModeUnknown = false;
+            state.forgetEditMode();
             if (candidateStatus) await readServiceEditMode(op);
             if (!op.current()) {
                 throw new Error("The keyboard disconnected while live state was being refreshed.");

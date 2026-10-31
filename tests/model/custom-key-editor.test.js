@@ -4,9 +4,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {customKeyEditorView, editCustomKey} = require("../../core/model/custom-key-editor");
+const {customKeyEditorView} = require("../../core/model/custom-key-editor");
+const {draftEdit} = require("../fixtures/draft-edit");
 const {SHORTCUT_KEY_LIMITS, SHORTCUT_KEY_REFUSALS, shortcutKeysRefusal} = require("../../core/schema/settings-domain-v1");
-const {macroEditorView, editMacro} = require("../../core/model/macro-editor");
+const {macroEditorView} = require("../../core/model/macro-editor");
 const {profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {buildDeviceModel} = require("../../core/session/device-model");
@@ -34,7 +35,7 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
     assert.ok(view.shortcutKeyLimits.caps[2].keycodes.includes(0xae) && view.shortcutKeyLimits.caps[2].keycodes.includes(0xc2) && !view.shortcutKeyLimits.caps[2].keycodes.includes(0xa7), "Play and Launchpad are media keys, Wake is not");
     assert.deepEqual(view.shortcutKeyLimits.caps[3].keycodes, [0xa5, 0xa6, 0xa7], "power, sleep and wake");
     assert.equal(view.shortcutKeyLimits.words, "up to 6 keys held together, at most one media key and one system key");
-    const named = editCustomKey(before, {keycode: "CUSTOM_KEY_2", name: " Click Spam ", expectedFingerprint: before.fingerprint}, capabilities);
+    const named = draftEdit(before, {type: "updateCustomKey", keycode: "CUSTOM_KEY_2", name: " Click Spam "}, capabilities);
     const after = validateSnapshot(named, capabilities);
     assert.equal(after.settings.formatVersion, 11);
     assert.equal(after.settings.customKeyNames[2], "Click Spam", "trimmed");
@@ -53,8 +54,8 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
 
 test("a macro name edit keeps the custom-key names", () => {
     let current = snapshot(pdDocument());
-    current = snapshot(editCustomKey(current, {keycode: "CUSTOM_KEY_0", name: "Right Thumb", expectedFingerprint: current.fingerprint}, capabilities));
-    current = snapshot(editMacro(current, {keycode: "MACRO_3", name: "OCR Copy", expectedFingerprint: current.fingerprint}, capabilities));
+    current = snapshot(draftEdit(current, {type: "updateCustomKey", keycode: "CUSTOM_KEY_0", name: "Right Thumb"}, capabilities));
+    current = snapshot(draftEdit(current, {type: "updateMacro", keycode: "MACRO_3", name: "OCR Copy"}, capabilities));
     const settings = validateSnapshot(current.document).settings;
     assert.equal(settings.formatVersion, 11);
     assert.equal(settings.customKeyNames[0], "Right Thumb");
@@ -63,8 +64,8 @@ test("a macro name edit keeps the custom-key names", () => {
 
 test("an imported profile without custom-key names can take one name back from the keyboard", () => {
     let keyboard = snapshot(pdDocument());
-    keyboard = snapshot(editCustomKey(keyboard, {keycode: "CUSTOM_KEY_0", name: "Right Thumb", expectedFingerprint: keyboard.fingerprint}, capabilities));
-    keyboard = snapshot(editCustomKey(keyboard, {keycode: "CUSTOM_KEY_1", name: "Left Thumb", expectedFingerprint: keyboard.fingerprint}, capabilities));
+    keyboard = snapshot(draftEdit(keyboard, {type: "updateCustomKey", keycode: "CUSTOM_KEY_0", name: "Right Thumb"}, capabilities));
+    keyboard = snapshot(draftEdit(keyboard, {type: "updateCustomKey", keycode: "CUSTOM_KEY_1", name: "Left Thumb"}, capabilities));
     const imported = snapshot(pdDocument());
     assert.deepEqual(validateSnapshot(imported.document).settings.customKeyNames, Array(128).fill(""), "a backup whose custom keys have no names");
     assert.deepEqual(profileReview(keyboard, imported).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:0", "customKey:1"]);
@@ -78,27 +79,27 @@ test("an imported profile without custom-key names can take one name back from t
 
 test("wrong keys, long names and older firmware are refused", () => {
     const current = snapshot(pdDocument());
-    const message = {keycode: "CUSTOM_KEY_0", name: "Thumb", expectedFingerprint: current.fingerprint};
-    for (const keycode of ["CUSTOM_KEY_128", "CUSTOM_KEY_01", "MACRO_0", "KC_A"]) assert.throws(() => editCustomKey(current, {...message, keycode}, capabilities), /custom key/);
-    assert.equal(validateSnapshot(editCustomKey(current, {...message, keycode: "CUSTOM_KEY_127"}, capabilities)).settings.customKeyNames[127], "Thumb", "the last custom key is one");
-    assert.throws(() => editCustomKey(current, {...message, name: "x".repeat(33)}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID" && /32 bytes of text/.test(error.message));
-    assert.throws(() => editCustomKey(current, {...message, name: "tab\there"}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID" && /no control characters/.test(error.message));
+    const message = {type: "updateCustomKey", keycode: "CUSTOM_KEY_0", name: "Thumb"};
+    for (const keycode of ["CUSTOM_KEY_128", "CUSTOM_KEY_01", "MACRO_0", "KC_A"]) assert.throws(() => draftEdit(current, {...message, keycode}, capabilities), /custom key/);
+    assert.equal(validateSnapshot(draftEdit(current, {...message, keycode: "CUSTOM_KEY_127"}, capabilities)).settings.customKeyNames[127], "Thumb", "the last custom key is one");
+    assert.throws(() => draftEdit(current, {...message, name: "x".repeat(33)}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID" && /32 bytes of text/.test(error.message));
+    assert.throws(() => draftEdit(current, {...message, name: "tab\there"}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID" && /no control characters/.test(error.message));
     // Limits count bytes: sixteen two-byte letters fit, one more byte does not.
-    assert.equal(validateSnapshot(editCustomKey(current, {...message, name: "ü".repeat(16)}, capabilities)).settings.customKeyNames[0], "ü".repeat(16));
-    assert.throws(() => editCustomKey(current, {...message, name: `${"ü".repeat(16)}x`}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID");
-    assert.equal(validateSnapshot(editCustomKey(current, {...message, name: "Café"}, capabilities)).settings.customKeyNames[0], "Café", "accented letters are text");
+    assert.equal(validateSnapshot(draftEdit(current, {...message, name: "ü".repeat(16)}, capabilities)).settings.customKeyNames[0], "ü".repeat(16));
+    assert.throws(() => draftEdit(current, {...message, name: `${"ü".repeat(16)}x`}, capabilities), error => error.code === "CUSTOM_KEY_NAME_INVALID");
+    assert.equal(validateSnapshot(draftEdit(current, {...message, name: "Café"}, capabilities)).settings.customKeyNames[0], "Café", "accented letters are text");
     for (const actionAbiDigest of [0x61072732, 0xf79c6151]) {
         const older = {...capabilities, actionAbiDigest};
         assert.equal(customKeyEditorView(current, older), null, "no custom keys on firmware that numbers them differently");
-        assert.throws(() => editCustomKey(current, message, older), /keycode blocks/);
+        assert.throws(() => draftEdit(current, message, older), /keycode blocks/);
     }
-    assert.equal(editCustomKey(current, {...message, name: ""}, capabilities), validateSnapshot(current.document, capabilities).document, "an unchanged name is no edit");
+    assert.equal(draftEdit(current, {...message, name: ""}, capabilities), validateSnapshot(current.document, capabilities).document, "an unchanged name is no edit");
 });
 
 test("a shortcut is staged, reviewed beside the name, discarded alone and named in the host's words", () => {
     const before = snapshot(pdDocument());
-    const message = {keycode: "CUSTOM_KEY_2", shortcut: {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}, expectedFingerprint: before.fingerprint};
-    const changed = editCustomKey(before, message, capabilities);
+    const message = {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", shortcut: {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}};
+    const changed = draftEdit(before, message, capabilities);
     const after = validateSnapshot(changed, capabilities);
     assert.deepEqual(after.settings.customKeyShortcuts[2], {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0}, "Left Ctrl + Right Alt + K, mixed sides");
     assert.equal(after.settings.customKeyNames[2], "", "the name is untouched");
@@ -112,20 +113,20 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
     // Modifiers alone and a key alone are shortcuts; both zero clears one.
     let current = snapshot(changed);
     for (const shortcut of [{mods: 0x0f, keys: [], layers: 0, layerKind: 0}, {mods: 0, keys: [0xd1], layers: 0, layerKind: 0}, {mods: 0, keys: [], layers: 0, layerKind: 0}]) {
-        current = snapshot(editCustomKey(current, {...message, shortcut, expectedFingerprint: current.fingerprint}, capabilities));
+        current = snapshot(draftEdit(current, {...message, shortcut}, capabilities));
         assert.deepEqual(validateSnapshot(current.document, capabilities).settings.customKeyShortcuts[2], shortcut);
     }
-    assert.equal(editCustomKey(current, {...message, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}, expectedFingerprint: current.fingerprint}, capabilities),
+    assert.equal(draftEdit(current, {...message, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}}, capabilities),
         validateSnapshot(current.document, capabilities).document, "an unchanged shortcut is no edit");
     for (const shortcut of [{mods: 0x100, keys: [], layers: 0, layerKind: 0}, {mods: 0, keys: [0xe0], layers: 0, layerKind: 0}, {mods: 1, keys: [0xdd], layers: 0, layerKind: 0}, {mods: 1, keys: [0x7f00], layers: 0, layerKind: 0},
         {mods: 1, keys: 4, layers: 0, layerKind: 0}, undefined, null]) {
-        assert.throws(() => editCustomKey(before, {...message, shortcut}, capabilities), error => error.code === "CUSTOM_KEY_SHORTCUT_INVALID", JSON.stringify(shortcut));
+        assert.throws(() => draftEdit(before, {...message, shortcut}, capabilities), error => error.code === "CUSTOM_KEY_SHORTCUT_INVALID", JSON.stringify(shortcut));
     }
     // Six keys, a media key among them, are one shortcut, named key by
     // key; a seventh, a key twice, a second media or system key are refused in
     // words.
     const six = {mods: 0x02, keys: [0x04, 0x16, 0x07, 0xae, 0xd1, 0xa6], layers: 0, layerKind: 0};
-    const sixKeyed = snapshot(editCustomKey(before, {...message, shortcut: six}, capabilities));
+    const sixKeyed = snapshot(draftEdit(before, {...message, shortcut: six}, capabilities));
     assert.deepEqual(validateSnapshot(sixKeyed.document, capabilities).settings.customKeyShortcuts[2], six);
     const sixModel = buildDeviceModel({customKeyView: customKeyEditorView(sixKeyed, capabilities), capabilities});
     assert.deepEqual(sixModel.customKeys[2].shortcutKeys.slice(0, 4), ["Left Shift", "A", "S", "D"], "each key, in the order it is pressed");
@@ -134,7 +135,7 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
     const [sixItem] = profileReview(before, sixKeyed).filter(row => row.unit === "customKey:2");
     assert.deepEqual(sixItem.fields.map(field => [field.label, field.after]), [["Shortcut", sixModel.customKeys[2].shortcutLabel]], "Review names every key");
     for (const [keys, words] of [[[4, 5, 6, 7, 8, 9, 10], /at most 6 keys/], [[4, 5, 4], /each key once/], [[0xae, 0xa9], /one media key/], [[0xa5, 0xa7], /one system key/]]) {
-        assert.throws(() => editCustomKey(before, {...message, shortcut: {mods: 0, keys, layers: 0, layerKind: 0}}, capabilities),
+        assert.throws(() => draftEdit(before, {...message, shortcut: {mods: 0, keys, layers: 0, layerKind: 0}}, capabilities),
             error => error.code === "CUSTOM_KEY_SHORTCUT_INVALID" && words.test(error.message), keys.join());
     }
     // A byte that is no key a shortcut holds, or a message naming one key the
@@ -143,7 +144,7 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
         [{mods: 1, keys: [0xdd], layers: 0, layerKind: 0}, SHORTCUT_KEY_REFUSALS.acceleration], [{mods: 1, keys: [0xe1], layers: 0, layerKind: 0}, SHORTCUT_KEY_REFUSALS.modifier],
         [{mods: 1, keys: [0x7f00], layers: 0, layerKind: 0}, SHORTCUT_KEY_REFUSALS.kind], [{mods: 1, keys: 4, layers: 0, layerKind: 0}, SHORTCUT_KEY_REFUSALS.list],
         [{mods: 1, key: 4, layers: 0, layerKind: 0}, SHORTCUT_KEY_REFUSALS.single], [{mods: 0x100, keys: [], layers: 0, layerKind: 0}, SHORTCUT_KEY_REFUSALS.shape], [null, SHORTCUT_KEY_REFUSALS.shape]]) {
-        assert.throws(() => editCustomKey(before, {...message, shortcut: /** @type {any} */ (shortcut)}, capabilities),
+        assert.throws(() => draftEdit(before, {...message, shortcut: /** @type {any} */ (shortcut)}, capabilities),
             error => error.code === "CUSTOM_KEY_SHORTCUT_INVALID" && error.message === words, JSON.stringify(shortcut));
     }
     // Named for the host: macOS calls Alt Option and GUI Command.
@@ -177,22 +178,22 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
 
 test("one message can name a custom key and set its shortcut together", () => {
     const before = snapshot(pdDocument());
-    const after = validateSnapshot(editCustomKey(before, {keycode: "CUSTOM_KEY_9", name: "Both GUI", shortcut: {mods: 0x88, keys: [], layers: 0, layerKind: 0}, expectedFingerprint: before.fingerprint}, capabilities));
+    const after = validateSnapshot(draftEdit(before, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", name: "Both GUI", shortcut: {mods: 0x88, keys: [], layers: 0, layerKind: 0}}, capabilities));
     assert.equal(after.settings.customKeyNames[9], "Both GUI");
     assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x88, keys: [], layers: 0, layerKind: 0});
-    assert.throws(() => editCustomKey(before, {keycode: "CUSTOM_KEY_9", name: "x", shortcut: {mods: 0, keys: [0xe0], layers: 0, layerKind: 0}, expectedFingerprint: before.fingerprint}, capabilities),
+    assert.throws(() => draftEdit(before, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", name: "x", shortcut: {mods: 0, keys: [0xe0], layers: 0, layerKind: 0}}, capabilities),
         /not modifier keys/, "the shortcut is still checked");
 });
 
 test("a shortcut's layers are staged, listed by name, moved by a reorder and kept off the default layers", () => {
     const {reorderLayers} = require("../../core/model/portable-profile");
-    const {settingsEditorView, editSettings} = require("../../core/model/settings-editor");
+    const {settingsEditorView} = require("../../core/model/settings-editor");
     const before = snapshot(pdDocument());
     const names = validateSnapshot(before.document).settings.names;
     // Firmware D-F26: layers alone are a shortcut; the base layer never is one.
-    const layered = snapshot(editCustomKey(before, {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x08, keys: [], layers: (1 << 3) | (1 << 6), layerKind: 0}, expectedFingerprint: before.fingerprint}, capabilities));
+    const layered = snapshot(draftEdit(before, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x08, keys: [], layers: (1 << 3) | (1 << 6), layerKind: 0}}, capabilities));
     assert.deepEqual(validateSnapshot(layered.document).settings.customKeyShortcuts[9], {mods: 0x08, keys: [], layers: 0b1001000, layerKind: 0});
-    assert.throws(() => editCustomKey(before, {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0, keys: [], layers: 1, layerKind: 0}, expectedFingerprint: before.fingerprint}, capabilities),
+    assert.throws(() => draftEdit(before, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0, keys: [], layers: 1, layerKind: 0}}, capabilities),
         error => error.code === "CUSTOM_KEY_SHORTCUT_INVALID" && /^Base is the base layer: it is always on/.test(error.message));
     const view = customKeyEditorView(layered, capabilities);
     assert.deepEqual(view.shortcutLayers.filter(target => target.refusal).map(target => target.layer), [0], "only the base layer is always on here");
@@ -207,9 +208,9 @@ test("a shortcut's layers are staged, listed by name, moved by a reorder and kep
     const section = settingsEditorView(layered).sections.find(entry => entry.id === "startupLayers");
     const keep = field => field.kind === "toggle" ? {macro: field.macro, enabled: field.enabled} : {macro: field.macro, value: field.value};
     const fields = section.fields.map(field => field.macro === "startupLayer3" ? {macro: field.macro, enabled: true} : keep(field));
-    assert.throws(() => editSettings(layered, {type: "updateConfigDefaults", sectionId: "startupLayers", expectedFingerprint: layered.fingerprint, fields}, capabilities),
+    assert.throws(() => draftEdit(layered, {type: "updateConfigDefaults", sectionId: "startupLayers", fields}, capabilities),
         new RegExp(`^Error: ${names[3]} is turned on by Custom key 9's shortcut, and a shortcut cannot turn on a default layer`));
     // A layer no shortcut names may still become one.
     const free = section.fields.map(field => field.macro === "startupLayer2" ? {macro: field.macro, enabled: true} : keep(field));
-    assert.doesNotThrow(() => editSettings(layered, {type: "updateConfigDefaults", sectionId: "startupLayers", expectedFingerprint: layered.fingerprint, fields: free}, capabilities));
+    assert.doesNotThrow(() => draftEdit(layered, {type: "updateConfigDefaults", sectionId: "startupLayers", fields: free}, capabilities));
 });

@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {RECONNECT_WORDS, renamedTo, expectReconnect, endReconnect, reconnectTarget, awaitReconnect} = require("../../core/session/keyboard-reconnect");
-const {editKeyboardName} = require("../../core/model/keyboard-name");
+const {draftEdit} = require("../fixtures/draft-edit");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/portable-profile");
 const {fakeKeyboard} = require("../fixtures/fake-keyboard");
@@ -11,7 +11,7 @@ const {openPanelLoop} = require("../../core/session/panel-loop");
 const {fakeShell, testClock} = require("../fixtures/panel-loop");
 
 const snapshot = (value) => ({document: value, fingerprint: fingerprint(value), summary: summary(value)});
-const named = (name, base = snapshot(document())) => snapshot(editKeyboardName(base, {name, expectedFingerprint: base.fingerprint}));
+const named = (name, base = snapshot(document())) => snapshot(draftEdit(base, {type: "renameKeyboard", name}));
 
 test("a save renames the keyboard only when the stored name changes", () => {
     const plain = snapshot(document()), desk = named("Desk");

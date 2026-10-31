@@ -9,7 +9,7 @@ import {createPanelMessages} from "./messages.mjs";
 import * as controls from "./view/controls.mjs";
 import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
-import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
+import {activateOnKey, focusDialog, redrawKeepingFocus, trapTab} from "./lib/focus.mjs";
 import {mountNumberEntry} from "./lib/number-entry.mjs";
 import {getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
@@ -57,7 +57,13 @@ function render({keepScreen = false} = {}) {
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
     const benchHeight = captureKeysBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
     state.resetBenchHeight = false;
-    const focus = captureFocus(root);
+    redrawKeepingFocus(root, () => drawApp(keptScreen, scroll, benchHeight));
+    focusDialog(root);
+    reveal();
+}
+
+/** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureKeysBenchHeight>} benchHeight */
+function drawApp(keptScreen, scroll, benchHeight) {
     hideHover();
     const model = getModel();
     root.replaceChildren();
@@ -97,9 +103,6 @@ function render({keepScreen = false} = {}) {
     if (ask) root.appendChild(ask);
     const proposal = liveProposalOverlay();
     if (proposal) root.appendChild(proposal);
-    restoreFocus(root, focus);
-    focusDialog(root);
-    reveal();
 }
 
 /** @param {NonNullable<ReturnType<typeof readScreen>>} read @param {import("../contracts/panel.js").PublishedModel | null} model */

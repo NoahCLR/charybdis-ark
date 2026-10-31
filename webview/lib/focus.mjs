@@ -27,13 +27,28 @@ const ACTION_NAMES = [
     "data-source", "data-mode", "data-anchor", "data-act", "data-step-text", "data-step-delay", "data-raw-payload",
 ];
 
-// Between capture and restore the app is being drawn again: a field it
-// throws away is not being left.
+// While a redraw draws, a field it throws away is not being left.
 let redrawing = false;
 
-/** @param {Element} root @returns {CapturedFocus | null} */
-export function captureFocus(root) {
+// `draw` replaces what `root` shows; the control focused before it is
+// focused again after it, its caret and typed text kept. Whether `draw`
+// finishes or throws, the redraw is over when this returns, so a kept field
+// commits when it is left.
+/** @param {Element} root @param {() => void} draw */
+export function redrawKeepingFocus(root, draw) {
+    const captured = captureFocus(root);
+    const outer = redrawing;
     redrawing = true;
+    try {
+        draw();
+    } finally {
+        redrawing = outer;
+        restoreFocus(root, captured);
+    }
+}
+
+/** @param {Element} root @returns {CapturedFocus | null} */
+function captureFocus(root) {
     const active = /** @type {FocusControl | null} */ (root.ownerDocument?.activeElement);
     if (!active || active === root.ownerDocument.body || !root.contains(active)) return null;
     const name = active.matches("input, select, textarea") ? "data-f"
@@ -92,8 +107,7 @@ function keepTyped(typed, field) {
 }
 
 /** @param {Element} root @param {CapturedFocus | null} captured */
-export function restoreFocus(root, captured) {
-    redrawing = false;
+function restoreFocus(root, captured) {
     if (!captured) return;
     const matches = root.querySelectorAll(captured.selector);
     const target = /** @type {FocusControl | undefined} */ (matches[captured.index] || matches[0]);

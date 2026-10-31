@@ -100,6 +100,36 @@ class ConnectionState {
     /** @param {Omit<Extract<import("./types.js").BaseRgbRead, {state: "read"}>, "state" | "readAt">} settings */
     baseRgbRead(settings) {this.baseRgb = {state: "read", ...settings, readAt: new Date().toISOString()};}
 
+    // The edit mode is read anew: a status refresh starts.
+    forgetEditMode() {
+        this.editMode = undefined;
+        this.editModeUnknown = false;
+    }
+
+    // The edit mode as just read or set. A read that does not say whether the
+    // keyboard still owes the mode's write (a set does) keeps what was last
+    // said of it.
+    /** @param {import("../protocol/types.js").EditModeRead & {notStored?: boolean}} read */
+    editModeRead(read) {
+        this.editMode = {...read, notStored: read.notStored ?? this.editMode?.notStored ?? false};
+        this.editModeUnknown = false;
+    }
+
+    // The edit mode could not be read. A firmware without it (UNHANDLED) has
+    // none; anything else leaves it unknown, tried again at the next status
+    // refresh or read. Resolves true when it is unknown, which Ark says.
+    /** @param {unknown} error */
+    editModeFailed(error) {
+        this.editMode = undefined;
+        this.editModeUnknown = /** @type {{code?: string} | undefined} */ (error)?.code !== "UNHANDLED";
+        return this.editModeUnknown;
+    }
+
+    // The mode a live read found the keyboard in. Nothing without an edit
+    // mode.
+    /** @param {number} mode */
+    modeSeenLive(mode) {if (this.editMode) this.editMode = {...this.editMode, mode};}
+
     // Whether the keyboard still owes its edit mode's write (firmware D-F32,
     // flag 12), as it says now; resolves true when that changed. Nothing
     // without an edit mode.

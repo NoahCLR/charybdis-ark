@@ -19,7 +19,7 @@ import {keyIdentity} from "./key-identity.mjs";
 export function keyFace(/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position, model) {
     if (!position) return {main: "", sub: "", kind: "none"};
     const keycode = position.keycode || "";
-    const kind = keyKindOf(model, keycode);
+    const kind = keyIdentity(model, keycode).kind;
     if (kind === "transparent") return {main: "▽", sub: "", kind};
     if (kind === "disabled") return {main: "", sub: "", kind};
     const form = layerFormOf(model, position);
@@ -54,20 +54,6 @@ export const layerOfKeycode = (model, keycode) => keyIdentity(model, keycode).lo
 // it is cased included. Undefined when it says nothing.
 /** @template T @param {Readonly<Record<string, T>> | null | undefined} table @param {ViewModel} model @param {string} name @returns {T | undefined} */
 const factOf = (table, model, name) => keyIdentity(model, name).lookUp(table);
-
-// What a key, or a keycode by name, is where the interface treats it apart
-// from other keys, as core publishes it (qmkKeyKinds, from
-// core/model/key-names.js keyKind): transparent, disabled, a macro's or a
-// custom key's, read under the stored name, the profile's name for it, or
-// however the expression is spelled. Undefined for any other key.
-/** @param {ViewModel} model @param {Position | string | null | undefined} key @returns {import("../../contracts/model.js").KeyKind | undefined} */
-export function keyKindOf(model, key) {
-    for (const name of typeof key === "string" ? [key] : [key?.keycode, key?.semantic]) {
-        const kind = name ? keyIdentity(model, name).kind : undefined;
-        if (kind) return kind;
-    }
-    return undefined;
-}
 
 // What a key, or a keycode by name, does to the layer it acts on, as core
 // names it (qmkKeyLayerForms, from core/model/key-names.js keyLayerForm):
@@ -130,8 +116,8 @@ export {keyMeaning};
 // use this when a screen prints that keycode to a person.
 /** @param {ViewModel} model @param {string} name */
 export const visibleKeycode = (model, name) => {
-    const known = keyIdentity(model, name).name;
-    return model?.qmkKeyKinds?.[known] === "macro" || /^0x[0-9a-f]+$/i.test(name) ? known : name || "";
+    const identity = keyIdentity(model, name);
+    return identity.kind === "macro" || /^0x[0-9a-f]+$/i.test(name) ? identity.name : name || "";
 };
 
 // An action as the hover card names it: its words, and the keycode it stores
@@ -159,7 +145,7 @@ export const actionLabel = (model, name) => (name ? factOf(model?.qmkKeyLabels, 
 /** @param {ViewModel} model @param {import("../../contracts/panel.js").Branch | null | undefined} branch */
 export function cellLabel(model, branch) {
     const action = String(branch?.action ?? "");
-    if (keyKindOf(model, action) === "customKey" && branch?.label) return branch.label;
+    if (keyIdentity(model, action).kind === "customKey" && branch?.label) return branch.label;
     const named = actionLabel(model, action);
     return named !== action ? named : branch?.label || action;
 }

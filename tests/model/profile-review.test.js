@@ -7,11 +7,12 @@ const {fingerprint,reorderLayers} = require("../../core/model/portable-profile")
 const snapshot = document => ({document,fingerprint:fingerprint(document)});
 
 test("idle timeout review uses human units while comparing stored milliseconds", () => {
-    const {settingsEditorView, editSettings} = require("../../core/model/settings-editor");
+    const {settingsEditorView} = require("../../core/model/settings-editor");
+    const {draftEdit} = require("../fixtures/draft-edit");
     let before = snapshot(document());
     for (const [value, expected] of [["60000", "1 minute"], ["90000", "90 seconds"], ["777", "0.777 seconds"], ["1000", "1 second"], ["0", "Always on"], ["86400000", "1440 minutes"]]) {
         const section = settingsEditorView(before).sections.find(row => row.id === "lightingPower");
-        const after = snapshot(editSettings(before, {sectionId: section.id, expectedFingerprint: before.fingerprint,
+        const after = snapshot(draftEdit(before, {type: "updateConfigDefaults", sectionId: section.id,
             fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: field.enabled} : {macro: field.macro, value: field.macro === "lightingTimeout" ? value : field.value})}));
         const change = profileReview(before, after).find(row => row.unit === "settings:lightingPower");
         assert.equal(change.fields.find(field => field.label === "Idle timeout").after, expected);

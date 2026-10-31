@@ -31,24 +31,23 @@ node - "$BUILD_DIR/current.bin" "$BUILD_DIR/maximum.bin" "$BUILD_DIR/combo-permi
 const fs = require("node:fs");
 const app = process.env.CHARYBDIS_ARK_ROOT;
 const {fingerprint, validateSnapshot} = require(app + "/core/model/portable-profile");
-const {editMacro} = require(app + "/core/model/macro-editor");
-const {editCustomKey} = require(app + "/core/model/custom-key-editor");
+const {draftEdit} = require(app + "/tests/fixtures/draft-edit");
 const {CAPABILITIES_32, document32} = require(app + "/tests/fixtures/pointing-slots-32");
 // Current schema 3.0 with slot 12 configured, all 128 macro/custom-key names
 // at their 32-byte maximum and four custom-key shortcuts, plus the maximum
 // profile.
 let current = document32();
-current = editMacro({document: current, fingerprint: fingerprint(current)},
-    {keycode: "MACRO_0", payload: "hello{KC_A}", expectedFingerprint: fingerprint(current)});
-for (let slot = 0; slot < 128; slot++) current = editMacro({document: current, fingerprint: fingerprint(current)},
-    {keycode: `MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(32, "!"), expectedFingerprint: fingerprint(current)});
-for (let slot = 0; slot < 128; slot++) current = editCustomKey({document: current, fingerprint: fingerprint(current)},
-    {keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(32, "?"), expectedFingerprint: fingerprint(current)}, CAPABILITIES_32);
+current = draftEdit({document: current, fingerprint: fingerprint(current)},
+    {type: "updateMacro", keycode: "MACRO_0", payload: "hello{KC_A}"});
+for (let slot = 0; slot < 128; slot++) current = draftEdit({document: current, fingerprint: fingerprint(current)},
+    {type: "updateMacro", keycode: `MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(32, "!")});
+for (let slot = 0; slot < 128; slot++) current = draftEdit({document: current, fingerprint: fingerprint(current)},
+    {type: "updateCustomKey", keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(32, "?")}, CAPABILITIES_32);
 // Shortcuts Ark writes (firmware D-F26): mixed sides with a key, modifiers
 // alone, a mouse button alone, and every modifier with six keys, the last
 // keyboard, media and mouse keys among them.
-for (const [slot, mods, keys] of [[0, 0x41, [0x0e]], [63, 0x0f, []], [64, 0, [0xd1]], [127, 0xff, [0x04, 0x52, 0xa7, 0xa4, 0xc2, 0xdc]]]) current = editCustomKey({document: current, fingerprint: fingerprint(current)},
-    {keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods, keys, layers: 0, layerKind: 0}, expectedFingerprint: fingerprint(current)}, CAPABILITIES_32);
+for (const [slot, mods, keys] of [[0, 0x41, [0x0e]], [63, 0x0f, []], [64, 0, [0xd1]], [127, 0xff, [0x04, 0x52, 0xa7, 0xa4, 0xc2, 0xdc]]]) current = draftEdit({document: current, fingerprint: fingerprint(current)},
+    {type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods, keys, layers: 0, layerKind: 0}}, CAPABILITIES_32);
 fs.writeFileSync(process.argv[2], validateSnapshot(current, CAPABILITIES_32).candidate);
 const fixture = fs.readFileSync(app + "/upstream/firmware/tests/fixtures/maximum_profile_v4.fixture", "utf8");
 const maximum = Buffer.from(fixture.match(/^profile\.hex=(.*)$/m)[1], "hex");

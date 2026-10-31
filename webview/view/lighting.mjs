@@ -7,7 +7,7 @@
 
 import {GEO, inLocality, trackballInLocality} from "./geometry.mjs";
 import {keyIdentity} from "./key-identity.mjs";
-import {keyKindOf, keyMeaning} from "./keyface.mjs";
+import {keyMeaning} from "./keyface.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 import {OFF, inheritsStageColour, layerPaints, ledColour} from "../../rules/led-light.mjs";
 
@@ -147,7 +147,7 @@ export const tierColour = (model, kind) => feedbackColours(model)[kind] || OFF;
 // transparent and disabled positions keep the layer underneath (qmkKeyKinds).
 /** @param {Model} model @param {Position | undefined} position */
 const isMapped = (model, position) => {
-    const kind = position?.keycode ? keyKindOf(model, position.keycode) : "disabled";
+    const kind = position?.keycode ? keyIdentity(model, position.keycode).kind : "disabled";
     return kind !== "transparent" && kind !== "disabled";
 };
 

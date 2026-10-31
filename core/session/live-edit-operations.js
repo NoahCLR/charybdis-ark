@@ -105,6 +105,6 @@ async function restartKeyboard(op) {
 // How edits reach this keyboard, stored on both halves; refused while it
 // has unsaved edits (Save or Revert first).
 /** @param {Operation} op @param {number} mode */
-async function setEditMode(op, mode) {op.state.editMode = await op.live().setMode(mode);}
+async function setEditMode(op, mode) {op.state.editModeRead(await op.live().setMode(mode));}
 
 module.exports = {postLiveEdit, saveWorkingCopy, revertWorkingCopy, flushWorkingCopy, readWorkingCopy, restartKeyboard, setEditMode};

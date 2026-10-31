@@ -12,7 +12,7 @@ export function sequenceFace(model, step) {
     const full = describeStep(step, key => actionLabel(model, key));
     const label = step.kind === "text" ? step.text.replaceAll("\n", " ↵ ").replaceAll("\t", " ⇥ ")
         : step.kind === "delay" ? String(step.delay)
-        : step.keys.map(key => model?.qmkKeyShortLabels?.[key] || model?.qmkKeyShortLabels?.[keyIdentity(model, key).name] || actionLabel(model, key)).join(" + ");
+        : step.keys.map(key => keyIdentity(model, key).lookUp(model?.qmkKeyShortLabels) || actionLabel(model, key)).join(" + ");
     const kind = step.kind === "tap" && step.keys.length > 1 ? "chord" : step.kind;
     return {full, label, wide: step.kind === "text" || ("keys" in step && step.keys.length > 1), kind};
 }

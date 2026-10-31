@@ -129,6 +129,10 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | The interface keeps no table of words of its own: three or more phrases by key or `{label, what}` records by key, or two or more `[id, phrase]` pairs, in a list or a `Map`; the exceptions say why | `tests/scripts/conventions.test.js` |
 | Semantic lookups never use a position's stored keycode name | `tests/scripts/conventions.test.js` |
 | Only `webview/view/edit-gate.mjs` reads the draft's `editable`; every other webview module asks `editGate(model, area)` | `tests/scripts/conventions.test.js` |
+| Only `webview/view/key-identity.mjs` and the keycode grammar's reader (`webview/view/keycode-expression.mjs`) read the keycode alias table, `qmkKeycodeAliases`; every other webview module asks `keyIdentity(model, spelling)` | `tests/scripts/conventions.test.js` |
+| A table core keys by keycode name (`qmkKeyLabels`, `qmkKeyKinds`, `qmkKeyLayers`, …) is read under a spelling only through `keyIdentity(model, spelling).lookUp(table)` or `.kind`; the exceptions say why | `tests/scripts/conventions.test.js` |
+| Only `core/model/draft-editor.js` runs an editor's edit (`editSettings`, `editMacro`, `editCustomKey`, `editKeyboardName`, `PROFILE_EDITS`), in tests too; only `core/model/device-profile-edits.js` and the behaviour editor's own test run `editKeyBehaviors` | `tests/scripts/conventions.test.js` |
+| Only `core/session/connection-state.js` writes the device service's edit mode (`editMode`, `editModeUnknown`) | `tests/scripts/conventions.test.js` |
 | No webview module posts an object literal: `post()` and `postLeavingDemo()` take a builder's output or a message the store hands back | `tests/scripts/conventions.test.js` |
 | Every stored enum value has a word | `tests/model/vocabulary.test.js` |
 | A draft edit type agrees across `core/model/draft-edits.js`, `contracts/edits.d.ts` and `webview/view/edits.mjs` | `tests/model/draft-edits.test.js` |

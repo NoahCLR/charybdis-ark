@@ -17,7 +17,7 @@ const require = createRequire(import.meta.url);
 const portable = require("../../core/model/portable-profile");
 const {publishedModel: modelOf} = require("../fixtures/published-model");
 const {document} = require("../fixtures/pd-profile");
-const {editLayers, editSettings} = require("../fixtures/profile-document");
+const {editLayers, editSettingsDomain} = require("../fixtures/profile-document");
 const {participation} = require("../../core/model/participation");
 const {SETTING} = require("../../core/schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../../core/data/charybdis-layout");
@@ -33,7 +33,7 @@ test("a behaviour runs, and a key joins a combo, where core says it does", () =>
     for (let seed = 1; seed <= 12; seed++) {
         const next = random(seed);
         const pick = () => MATRIX.filter(() => next() < 0.2).sort((a, b) => a - b);
-        const doc = editSettings(document(), (settings) => {
+        const doc = editSettingsDomain(document(), (settings) => {
             settings.values[SETTING.BEHAVIORS_ENABLED] = next() < 0.85 ? 1 : 0;
             settings.values[SETTING.COMBOS_ENABLED] = next() < 0.85 ? 1 : 0;
             settings.values[SETTING.LAYER_BEHAVIORS] = Math.floor(next() * 0x10000);

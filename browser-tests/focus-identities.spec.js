@@ -238,24 +238,56 @@ test("macro step identity moves with the step and survives edits and accepted mo
 test("ambiguous form identities are refused while action and SVG hooks still restore", async ({page}) => {
     await openControls(page, "keys");
     const result = await page.evaluate(async () => {
-        const {captureFocus, restoreFocus} = await import("/webview/lib/focus.mjs");
+        const {redrawKeepingFocus} = await import("/webview/lib/focus.mjs");
         // The page takes markup only through the panel's policy (Trusted Types).
         const {html} = await import("/webview/lib/dom.mjs");
         const root = document.createElement("div"); document.body.append(root);
-        root.innerHTML = html('<input data-f="duplicate"><input data-f="duplicate">');
-        root.querySelector("input").focus();
-        const ambiguous = captureFocus(root);
-        root.innerHTML = html('<input data-f="stable">'); root.querySelector("input").focus();
-        const form = captureFocus(root);
-        root.innerHTML = html('<input data-f="stable"><input data-f="stable">'); restoreFocus(root, form);
-        const refusesReplacement = !root.contains(document.activeElement);
-        const restored = [];
-        for (const markup of ['<button data-act="test">Action</button>', '<svg><g data-key="42" role="button" tabindex="0"></g></svg>']) {
-            root.innerHTML = html(markup); root.querySelector("[data-act], [data-key]").focus();
-            const captured = captureFocus(root); root.innerHTML = html(markup); restoreFocus(root, captured);
-            restored.push(root.contains(document.activeElement));
-        }
+        /** @param {string} before @param {string} after */
+        const restores = (before, after) => {
+            root.innerHTML = html(before); /** @type {HTMLElement} */ (root.querySelector("input, [data-act], [data-key]")).focus();
+            redrawKeepingFocus(root, () => {root.innerHTML = html(after);});
+            return root.contains(document.activeElement);
+        };
+        const duplicate = '<input data-f="duplicate"><input data-f="duplicate">';
+        const ambiguous = restores(duplicate, duplicate);
+        const refusesReplacement = !restores('<input data-f="stable">', '<input data-f="stable"><input data-f="stable">');
+        const restored = ['<button data-act="test">Action</button>', '<svg><g data-key="42" role="button" tabindex="0"></g></svg>']
+            .map((markup) => restores(markup, markup));
         root.remove(); return {ambiguous, refusesReplacement, restored};
     });
-    expect(result).toEqual({ambiguous: null, refusesReplacement: true, restored: [true, true]});
+    expect(result).toEqual({ambiguous: false, refusesReplacement: true, restored: [true, true]});
+});
+
+// A redraw that throws part way is still over: the text it kept commits
+// when its field is left, once, as after a redraw that finished.
+test("typed text kept by a redraw commits on leaving after a later redraw throws", async ({page}) => {
+    await openControls(page, "keys");
+    await page.evaluate(async () => {
+        const {html} = await import("/webview/lib/dom.mjs");
+        const root = document.createElement("div"); root.id = "redraw-root"; document.body.append(root);
+        root.innerHTML = html('<input data-f="typed" value="Desk">');
+        /** @type {string[]} */ (/** @type {any} */ (window).changes = []);
+        root.addEventListener("change", (event) => /** @type {any} */ (window).changes.push(/** @type {HTMLInputElement} */ (event.target).value));
+    });
+    const field = page.locator('#redraw-root [data-f="typed"]');
+    await field.click();
+    await field.fill("Desk 777");
+    const thrown = await page.evaluate(async () => {
+        const {redrawKeepingFocus} = await import("/webview/lib/focus.mjs");
+        const {html} = await import("/webview/lib/dom.mjs");
+        const root = /** @type {HTMLElement} */ (document.getElementById("redraw-root"));
+        redrawKeepingFocus(root, () => {root.innerHTML = html('<input data-f="typed" value="Desk">');});
+        try {
+            redrawKeepingFocus(root, () => {throw new Error("a screen failed to draw");});
+        } catch (error) {
+            return /** @type {Error} */ (error).message;
+        }
+        return null;
+    });
+    expect(thrown).toBe("a screen failed to draw");
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue("Desk 777");
+    expect(await page.evaluate(() => /** @type {any} */ (window).changes)).toEqual([]);
+    await field.evaluate((node) => /** @type {HTMLElement} */ (node).blur());
+    expect(await page.evaluate(() => /** @type {any} */ (window).changes)).toEqual(["Desk 777"]);
 });
