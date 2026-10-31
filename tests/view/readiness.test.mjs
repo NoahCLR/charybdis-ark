@@ -17,7 +17,7 @@ test("only a ready model releases Configure screens", () => {
     assert.equal(configureReady({load: {state: "unavailable"}}), false);
     assert.equal(configureReady({load: {state: "ready"}}), true);
     assert.equal(readScreen({load: {state: "ready"}}), null);
-    assert.match(readScreen({load: {state: "unavailable"}, device: {connected: true}}).detail, /complete profile/);
+    assert.match(readScreen({vocabulary: VOCABULARY, load: {state: "unavailable"}, device: {connected: true}}).detail, /complete profile/);
 });
 
 test("rail screens follow the read and the capability each screen needs", () => {
@@ -114,6 +114,7 @@ test("a draft that holds editing says why, not that the read failed", () => {
     const other = held("other-keyboard");
     assert.equal(other.title, "Draft belongs to another keyboard");
     assert.match(other.detail, /Select it to continue editing, or discard the draft/);
+    assert.equal(held("unsupported").detail, VOCABULARY.firmwareUpdate, "firmware Ark does not support says so, as the edit controls do");
 });
 
 test("only a read that failed says the complete profile could not be read; halves and errors keep their words", () => {

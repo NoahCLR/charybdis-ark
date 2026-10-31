@@ -76,7 +76,7 @@ test("an edit waits for the slave half before it says both halves hold it", asyn
     const result = await service.postLiveEdit({from: read.live.working, to: target(layers => {layers[1][0] = 0x08;}), defaults: read.live.defaults, identity: read.live});
     assert.equal(result.converged, true);
     const {now, sleep} = testClock();
-    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now, sleep, timing: {slaveMs: -1}});
+    const coordinator = new LiveEditCoordinator(service.state.connection, {requestIds: service.state.requestIds, now, sleep, timing: {slaveMs: -1}});
     keyboard.faults.slaveLag = 50;
     const late = await coordinator.post({from: result.bytes, to: target(layers => {layers[1][1] = 0x09;}), defaults: read.live.defaults, identity: result, capacity: 130048});
     assert.equal(late.converged, false, "an edit the slave half has not taken yet is not shown as applied on both");
@@ -123,7 +123,7 @@ test("Save writes the working copy as the saved profile; Revert puts the saved o
 /** @param {Awaited<ReturnType<typeof live>>["service"]} service */
 function clocked(service) {
     const clock = testClock();
-    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now: clock.now, sleep: clock.sleep});
+    const coordinator = new LiveEditCoordinator(service.state.connection, {requestIds: service.state.requestIds, now: clock.now, sleep: clock.sleep});
     return {coordinator, clock, at: clock.at};
 }
 const ABORT = 0x24;
@@ -273,7 +273,7 @@ test("transaction ids skip one still being received and any an earlier connectio
 /** @param {Awaited<ReturnType<typeof live>>} connected @param {Partial<import("../../core/session/live-edit-coordinator").DEFAULT_TIMING>} [timing] */
 const coordinatorOf = ({service}, timing = {}) => {
     const {now, sleep} = testClock();
-    return new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now, sleep, timing});
+    return new LiveEditCoordinator(service.state.connection, {requestIds: service.state.requestIds, now, sleep, timing});
 };
 // An edit begun on the keyboard by someone else (or by Ark on a lost
 // connection), never finished.
@@ -340,7 +340,7 @@ test("Ark records the bytes it sent and checks the keyboard holds a profile of t
         {code: "LIVE_EDIT_MISMATCH"});
     // A replacement records the bytes it sent as they are.
     const {now, sleep} = testClock();
-    const coordinator = new LiveEditCoordinator(service.connection, {requestIds: service.requestIds, now, sleep});
+    const coordinator = new LiveEditCoordinator(service.state.connection, {requestIds: service.state.requestIds, now, sleep});
     const fresh = await service.readKeyboardProfile();
     await service.revertWorkingCopy(fresh.live);
     const clean = await service.readKeyboardProfile();
@@ -356,7 +356,7 @@ test("a save waiting for a quiet keyboard on the slave half says so", async t =>
     keyboard.faults.savePauses = 3;
     const seen = [];
     const original = service.emitChange.bind(service);
-    service.emitChange = () => {seen.push(service.portableProgress); original();};
+    service.emitChange = () => {seen.push(service.state.portableProgress); original();};
     assert.equal((await service.saveWorkingCopy(edited)).saved, true);
     assert.ok(seen.includes("Waiting for a quiet keyboard to save"));
 });
@@ -370,7 +370,7 @@ test("a mode the keyboard could not store yet is said; an unreadable mode is rea
     await service.disconnect();
     await service.connect(id);
     assert.equal(service.snapshot().editMode, null, "an unreadable mode is unknown, not fatal");
-    assert.equal(service.editModeUnknown, true);
+    assert.equal(service.state.editModeUnknown, true);
     await service.readKeyboardProfile();
     assert.equal(service.snapshot().editMode.mode, EDIT_MODE.APPLY, "read again before the next read");
     assert.notEqual(service.snapshot().runtime, null, "the toggles are read in Apply too");
@@ -437,17 +437,17 @@ test("a queued keyboard adjustment is decoded and blocks new mutations until it 
     assert.equal(status.adjustmentPending, true);
     const identity = {session: keyboard.session, revision: keyboard.revision};
     for (const request of [buildEditBeginRequest(101, {...identity, splices: 1, insertTotal: 2}), buildSaveRequest(102, identity), buildRevertRequest(103, identity)]) {
-        assert.equal((await sendEditRequest(service.connection, request)).result, EDIT_RESULT.BUSY);
+        assert.equal((await sendEditRequest(service.state.connection, request)).result, EDIT_RESULT.BUSY);
     }
     // A mode change is NOT_CLEAN, as with unsaved edits (firmware #126).
-    assert.equal((await sendEditRequest(service.connection, buildEditModeRequest(104, EDIT_MODE.LIVE))).result, EDIT_RESULT.NOT_CLEAN);
+    assert.equal((await sendEditRequest(service.state.connection, buildEditModeRequest(104, EDIT_MODE.LIVE))).result, EDIT_RESULT.NOT_CLEAN);
     const begin = buildCandidateBeginRequest(105, candidateMetadataForBlob(keyboard.saved, {actionAbiDigest: document().actionAbiDigest}));
     const response = keyboard.answer(begin)[0];
     const ack = decodeCandidateAcknowledgement(response, begin);
     assert.deepEqual([ack.admission, ack.errorId], [CANDIDATE_ADMISSION.BUSY, CANDIDATE_ERROR.MAILBOX_BUSY]);
     keyboard.raised.adjustmentPending = false;
     assert.equal((await service.readLiveStatus()).adjustmentPending, false);
-    await sendEditRequest(service.connection, buildEditModeRequest(106, EDIT_MODE.LIVE));
+    await sendEditRequest(service.state.connection, buildEditModeRequest(106, EDIT_MODE.LIVE));
     assert.equal(keyboard.mode, EDIT_MODE.LIVE);
 });
 

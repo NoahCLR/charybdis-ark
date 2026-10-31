@@ -1,49 +1,23 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {macroNamed, vocabulary} from "./vocabulary.mjs";
-import {actionLabel, canonicalKeycode} from "./keyface.mjs";
-import {keycodeValue} from "./keycode-expression.mjs";
-import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MODS, MOD_BITS, MOD_RIGHT, QK, inBlock, keyOf, macroName, macroOfName, modsOf, wrapperOf} from "../../rules/qmk-keycodes.mjs";
+import {actionLabel} from "./keyface.mjs";
+import {keyIdentity, keycodeName, macroIndex} from "./key-identity.mjs";
+import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MOD_BITS, MOD_RIGHT, QK, inBlock, macroName, modsOf} from "../../rules/qmk-keycodes.mjs";
 
-// Numeric keycodes, named.
-//
-// Pointing slots store their shortcuts as bare numbers, and the profile
-// writer takes them back as names. This turns one into the other using the
-// catalogue the keyboard itself reported, and falls back to the hex value
-// rather than inventing a name it cannot prove.
-
-const LEFT_MODS = [MODS.LCTL, MODS.LSFT, MODS.LALT, MODS.LGUI], RIGHT_MODS = [MODS.RCTL, MODS.RSFT, MODS.RALT, MODS.RGUI];
-
-export function keyName(/** @type {Model} */ model, /** @type {number} */ code) {
-    if (!code) return "";
-    const macro = macroIndex(code);
-    if (macro !== null) return macroName(macro);
-    const direct = (/** @type {number} */ value) => (model?.qmkKeycodes || []).find((entry) => entry.keycode === value)?.value;
-    const exact = direct(code);
-    if (exact) return exact;
-
-    // Modifier-wrapped basic keycodes: 0x0100–0x1fff carries the held
-    // modifiers in bits 8–12, and bit 12 means they are the right-hand ones.
-    // The side flag with no modifier is no name of QMK's, so it stays hex.
-    if (inBlock(code, QK.MODS)) {
-        const base = direct(keyOf(code));
-        const bits = modsOf(code);
-        if (base && bits & MOD_BITS) {
-            const mods = bits & MOD_RIGHT ? RIGHT_MODS : LEFT_MODS;
-            return mods.filter((mod) => bits & mod & MOD_BITS).reduceRight((value, mod) => `${wrapperOf(mod)}(${value})`, base);
-        }
-    }
-    return `0x${code.toString(16).toUpperCase()}`;
-}
+// Keycodes as values: a stored shortcut named for a person, the modifiers a
+// keycode carries, and a picker selection folded into one keycode. Pointing
+// slots store their shortcuts as bare numbers; the name a field stages for one
+// is keycodeName's (key-identity.mjs).
 
 // A stored shortcut as the picker and the rest of Ark name it: a macro by its
 // name, any other keycode by the label the keyboard's profile gives it
-// ("Mouse Button 3", "Cmd+C"). keyName stays the form a field stages.
+// ("Mouse Button 3", "Cmd+C"). keycodeName stays the form a field stages.
 export function keyDisplayName(/** @type {Model} */ model, /** @type {number} */ code) {
     if (!code) return "";
     const macro = pointingMacro(model, code);
     if (macro) return macro.name;
-    return actionLabel(model, canonicalKeycode(model, keyName(model, code)));
+    return actionLabel(model, keyIdentity(model, keycodeName(model, code)).canonical);
 }
 
 // The modifiers a compact keycode carries (0x0100–0x1fff, as KC_EXLM is
@@ -74,9 +48,7 @@ export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ 
 export function modifierPick(model, {keys = [], mods = []}) {
     const controls = vocabulary(model).pickerModifiers || [];
     const wrapped = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
-    /** @param {string} name */
-    const entryOf = (name) => (model?.qmkKeycodes || []).find((entry) => entry.value === (model?.qmkKeycodeAliases?.[name] || name) || entry.aliases?.includes(name));
-    const code = keys[0] ? entryOf(keys[0])?.keycode : undefined;
+    const code = keys[0] ? keyIdentity(model, keys[0]).entry?.keycode : undefined;
     const keyBit = code !== undefined && inBlock(code, MODIFIER_KEYS) ? 1 << (code - MODIFIER_KEYS.first) : 0;
     if (keys.length && !keyBit) return null;
     const mask = wrapped | keyBit;
@@ -110,25 +82,14 @@ export function pickerModifierProblem(model, picker) {
         return "Only keyboard keys take modifiers here. Send this key on its own, or clear the modifiers.";
     }
     let mask = picker.mods.reduce((bits, wrapper) => bits | ((vocabulary(model).pickerModifiers || []).find(entry => entry.value === wrapper)?.bit ?? 0), 0);
-    const selected = model?.qmkKeycodeAliases?.[picker.keys[0]] || picker.keys[0];
-    const code = model?.qmkKeycodes?.find(entry => entry.value === selected)?.keycode;
+    const code = keyIdentity(model, picker.keys[0]).entry?.keycode;
     if (code !== undefined) mask |= compactModifierMask(code);
     return (mask & MODIFIER_KEY_SIDES.LEFT) && (mask & MODIFIER_KEY_SIDES.RIGHT)
         ? "A keycode can hold left modifiers or right modifiers together. Choose modifiers from one side." : "";
 }
 
-// The macro slot a stored keycode names (MACRO_n), including the other
-// names the writer accepts: the former VIA_MACRO_n, its number, and QMK's own
-// names for the first 32 slots, which are the keycode catalog's and so are
-// read through the model (keycodeValue).
-/** @param {string | number | null | undefined} code @param {Model} [model] */
-export function macroIndex(code, model) {
-    const text = String(code ?? "").trim();
-    const named = macroOfName(text);
-    if (named !== undefined) return named;
-    const value = /^(?:0x[0-9a-f]+|\d+)$/i.test(text) ? Number(text) : keycodeValue(model, text);
-    return value !== undefined && inBlock(value, QK.MACRO) ? value - QK.MACRO.first : null;
-}
+// The macro slot a stored keycode plays (macroIndex, key-identity.mjs), and
+// the name it goes by.
 /** @param {Model} model @param {string | number | null | undefined} code */
 export function pointingMacro(model, code) {
     const index = macroIndex(code, model);

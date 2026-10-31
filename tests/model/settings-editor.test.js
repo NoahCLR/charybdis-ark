@@ -166,9 +166,8 @@ test("background effect and All lighting edits preserve the effect and flags whi
     assert.equal(values[22], 23); assert.equal(values[17], 0);
 });
 
-test("invalid settings, incomplete sections and stale drafts fail before any device write", () => {
+test("invalid settings and incomplete sections fail before any device write", () => {
     const current = snapshot(), edit = (section, fields) => editSettings(current, message(current, section, fields));
-    assert.throws(() => editSettings(current, {...message(current, "autoMouse"), expectedFingerprint: "old"}), /changed/);
     assert.throws(() => edit("autoMouse", {mouseTimeout: "0"}), /Timeout.*range/, "the fade needs a timeout to be a share of");
     assert.throws(() => edit("automouseFade", {mouseFadeHold: "100"}), /range/, "a share is shorter than the whole");
     assert.throws(() => edit("autoMouse", {mouseDebounce: "256"}), /debounce.*range/);

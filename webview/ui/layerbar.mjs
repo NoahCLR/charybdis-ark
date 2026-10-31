@@ -4,7 +4,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, heldLayers, layers, previewing, render, showLayer, state, toggleLayerOn} from "../store.mjs";
+import {currentView, getModel, render, showLayer, state, toggleLayerOn} from "../store.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
@@ -37,12 +37,13 @@ const ADD_KEY = modifierKey();
 export function layerBar(trailing = "") {
     const model = getModel();
     const drafted = draftMarks(model?.draft?.changes).layers;
-    const held = new Set(heldLayers());
-    const tabs = layers().map((layer, index) => {
+    const view = currentView();
+    const held = new Set(view.held);
+    const tabs = view.stack.map((layer, index) => {
         const swatch = layerSwatch(model, layer);
-        const on = held.has(index) || (index === 0 && previewing());
+        const on = held.has(index) || (index === 0 && view.previewing);
         const baseOnly = held.size === 1 && held.has(0);
-        const how = index === state.layer && previewing()
+        const how = index === state.layer && view.previewing
             ? " · on top, so it wins · edits go here"
             : index === 0 ? (baseOnly ? ` · on in this preview · ${ADD_KEY}-click to turn off`
                 : on ? " · always on" : state.layer > 0 ? ` · ${ADD_KEY}-click to preview under the picked layer` : "")

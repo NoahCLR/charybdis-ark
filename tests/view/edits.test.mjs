@@ -27,6 +27,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const {ProfileDraftSession} = require(path.join(here, "..", "..", "core", "session", "profile-draft-session"));
 const portable = require(path.join(here, "..", "..", "core", "model", "portable-profile"));
 const {settingsEditorView} = require(path.join(here, "..", "..", "core", "model", "settings-editor"));
+const {profileComboReadback} = require(path.join(here, "..", "..", "core", "model", "profile-model"));
 const {buildDeviceModel, buildSnapshotModel} = require(path.join(here, "..", "..", "core", "session", "device-model"));
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core", "data", "charybdis-layout"));
 const {RGB_LOCALITIES} = require(path.join(here, "..", "..", "core", "schema", "rgb-domain-v1"));
@@ -382,7 +383,7 @@ test("the default window and the hold threshold are each their own message, set 
         stage(draft, edits.comboMessage(null, {inputs, output, termMs: ""}));
     }
     stage(draft, edits.comboDefaultWindow("45"));
-    assert.deepEqual(draft.combos().rows.map((row) => [row.termMs, row.followsDefault]), [[45, true], [45, true]],
+    assert.deepEqual(profileComboReadback(draft.current.decoded).rows.map((row) => [row.termMs, row.followsDefault]), [[45, true], [45, true]],
         "the combos that follow the default run with its new value");
     assert.throws(() => stage(draft, edits.comboDefaultWindow("0")), /at least 1 ms/);
 });

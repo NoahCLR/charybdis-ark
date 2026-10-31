@@ -9,12 +9,11 @@ import {encodeKeyBehaviorDomain} from '../../core/schema/key-behavior-domain-v1.
 import {encodeComboDomain} from '../../core/schema/combo-domain-v1.js';
 import {encodeSettings} from '../../core/schema/settings-domain-v1.js';
 import {validateSnapshot, decodedOf} from '../../core/model/portable-profile.js';
-import {editMacro} from '../../core/model/macro-editor.js';
 import {analyzeLayerStates} from '../../core/model/layer-state-graph.js';
 import {profileReview} from '../../core/model/profile-review.js';
 import {revertUnits} from '../../core/model/profile-revert.js';
 import {ProfileDraftSession} from '../../core/session/profile-draft-session.js';
-import {editDeviceProfile} from '../../core/model/device-profile-edits.js';
+import {applyDraftEdit} from '../../core/model/draft-editor.js';
 import {ApplyProgress} from '../../core/session/apply-progress.js';
 import {ProfilePayloadReader} from '../../core/session/profile-payload-reader.js';
 import {candidateMetadataForBlob} from '../../core/protocol/profile-candidate-v1.js';
@@ -68,14 +67,14 @@ function profileContracts(document: PortableDocument, snapshot: CompleteSnapshot
     draft.stage({type: 'updateMacro', keycode: 'MACRO_0', payload: 'hello'});
     // @ts-expect-error Layout edits use Layer n references rather than bare indices.
     draft.stage({type: 'updateLayoutKeys', layer: 0, changes: [], draftRevision: draft.revision});
-    // @ts-expect-error Profile-domain edits cannot write the separate macro bank.
-    editDeviceProfile(Buffer.alloc(32), {type: 'updateMacro', keycode: 'MACRO_0', payload: 'hello'});
+    // @ts-expect-error A custom key made for a shortcut goes on a key, in a behaviour or in a combo, never in a macro.
+    applyDraftEdit(snapshot, {type: 'updateCustomKeyShortcut', keycode: 'CUSTOM_KEY_0', shortcut: {mods: 1, keys: [], layers: 0, layerKind: 0}, then: {type: 'updateMacro', keycode: 'MACRO_0', payload: 'hello'}});
     const validated = validateSnapshot(document);
     const same: PortableDocument = decodedOf({document, decoded: validated}).document;
     const reader = new ProfilePayloadReader(connection);
     const apply = new ApplyProgress(view => {const progress: number | undefined = view.bytes?.completed; void progress;});
     apply.report('upload', {completed: 1, total: 2});
-    editMacro(snapshot, {keycode: 'MACRO_0', payload: 'hello', expectedFingerprint: snapshot.fingerprint});
+    applyDraftEdit(snapshot, {type: 'updateMacro', keycode: 'MACRO_0', payload: 'hello', expectedFingerprint: snapshot.fingerprint});
     void same;
 
     // @ts-expect-error Decoding needs a complete document, not partial profile fields.
@@ -84,8 +83,8 @@ function profileContracts(document: PortableDocument, snapshot: CompleteSnapshot
     reader.readCompiled({previous: {metadata: {}, bytes: Buffer.alloc(32)}});
     // @ts-expect-error Progress uses the established Apply steps.
     apply.report('writing random bytes');
-    // @ts-expect-error A direct macro edit needs the fingerprint it was built from.
-    editMacro(snapshot, {keycode: 'MACRO_0', payload: 'hello'});
+    // @ts-expect-error A draft edit is a registered type; a macro check stages nothing.
+    applyDraftEdit(snapshot, {type: 'validateMacro', keycode: 'MACRO_0', payload: 'hello'});
     // @ts-expect-error Portable documents store encoded macro streams, not numeric keycodes.
     document.macros = [4];
     // @ts-expect-error Candidate metadata needs its action vocabulary identity.

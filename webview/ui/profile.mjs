@@ -11,7 +11,8 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post, canEdit as canEditArea} from "../store.mjs";
+import {getModel, post} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import {topbar} from "./frame.mjs";
 import {categorySummary, statusBesideCount} from "../view/review.mjs";
 import {copyTitle, deleteRecovery, downloadRecovery, shellOf, useRecovery} from "../view/shell-panel.mjs";
@@ -25,8 +26,8 @@ export function screenProfile() {
     /** @type {Partial<import("../../contracts/panel.js").PublishedModel["portable"]>} */
     const portable = model?.portable || {};
     const busy = Boolean(portable.busy);
-    const canExport = canEditArea("export");
-    const canImport = canEditArea("import");
+    const canExport = editGate(model, "export").editable;
+    const canImport = editGate(model, "import").editable;
     // In the demo there is no keyboard: Export saves the demo's draft,
     // Import reviews a file against the demo profile, and nothing is recovered.
     const demo = demoOf(model).active;
@@ -92,7 +93,7 @@ function wireProfileDrop(card) {
     const status = /** @type {HTMLElement} */ (card.querySelector(".profile-drop-status"));
     const choose = /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="import"]'));
     let reading = false;
-    const available = () => !reading && canEditArea("import");
+    const available = () => !reading && editGate(getModel(), "import").editable;
     /** @param {string} text */
     const tell = (text) => {status.textContent = text; status.hidden = !text;};
     /** @param {DragEvent} event */
@@ -124,7 +125,7 @@ function wireProfileDrop(card) {
         try {
             const text = await file.text();
             if (!card.isConnected) return;
-            if (!canEditArea("import") || getModel()?.draft?.id !== id || getModel()?.draft?.revision !== revision) {
+            if (!editGate(getModel(), "import").editable || getModel()?.draft?.id !== id || getModel()?.draft?.revision !== revision) {
                 tell("The draft changed while reading this file. Drop it again when ready.");
                 return;
             }
@@ -134,7 +135,7 @@ function wireProfileDrop(card) {
             tell("This file could not be read. Try Import profile… instead.");
         } finally {
             reading = false;
-            choose.disabled = !canEditArea("import");
+            choose.disabled = !editGate(getModel(), "import").editable;
         }
     });
 }
@@ -147,7 +148,7 @@ function wireProfileDrop(card) {
 /** @param {import("../../contracts/model.js").RecoveryCopy[]} recoveries */
 function recoveriesCard(recoveries) {
     const model = getModel();
-    const canImport = canEditArea("import");
+    const canImport = editGate(model, "import").editable;
     const node = el(`<div class="card recoveries">
         <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
         ${recoveries.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">

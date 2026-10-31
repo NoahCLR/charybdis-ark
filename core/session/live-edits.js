@@ -18,6 +18,10 @@
 //   closingLoses  whether closing Ark now loses edits
 //   saveCutShortResult  after a Save the connection cut short, what the next
 //                 read shows became of the edits
+//   readNews      what a read Ark made tells that is not said yet: a restart
+//                 over unsaved edits, a Save cut short's result, a working
+//                 copy changed without Ark
+//   withNews      a failure after such a read, carrying what it told
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -29,10 +33,11 @@ const {fingerprint} = require("../model/portable-profile");
 const {EDIT_MODE, isEditMode} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS, INTERRUPTION_REASONS, PHASE, SAVE_WORDS, arkCode, failureSentence, quietWords} = require("../model/vocabulary");
 const {LAYER_IDENTITY} = require("../data/charybdis-layout");
-const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
+const {keepStale, needRead, readAndFollow, replaceFromRead, takeNews, takeRead} = require("./draft-follow");
 const {expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {interruption, saveResult} = require("./interruption");
+const {forget, keptFor, keptForAny, remember} = require("./kept");
 
 /** @param {string} message @param {string} [code] */
 const refusal = (message, code = "LIVE_EDIT_REFUSED") => Object.assign(new Error(message), {code});
@@ -115,7 +120,7 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
     } catch (error) {
         session.resetDraftForms = true;
         if (codeOf(error) === "LIVE_HALVES_APART") markApart(draft);
-        if (!LOCAL_REFUSALS.has(codeOf(error))) await reread(session);
+        const told = LOCAL_REFUSALS.has(codeOf(error)) ? undefined : await reread(session);
         // The read shows exactly the edit Ark sent, published: whatever went
         // wrong on the way, it landed, and the draft has confirmed it.
         if (expected?.confirmed && session.draft === draft && draft.live) {
@@ -126,10 +131,10 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
         // app): nothing failed, the edit was simply made against an older
         // state. The draft now shows the keyboard's; the person makes it again.
         if (codeOf(error) === "LIVE_EDIT_STALE") {
-            session.notice = "Not sent: the keyboard changed by itself just before (a DPI or lighting key, or another app). Ark read it again; make the edit again.";
+            session.notice = ["Not sent: the keyboard changed by itself just before (a DPI or lighting key, or another app). Ark read it again; make the edit again.", told?.restart].filter(Boolean).join(" ");
             return false;
         }
-        throw error;
+        throw withNews(error, told?.words || "");
     }
 }
 
@@ -151,14 +156,14 @@ function landed(session, before, target, result, accepted) {
 /** @param {Session} session @param {Draft} draft @param {Target} target */
 async function revertTo(session, draft, target) {
     const live = /** @type {import("./types.js").LiveState} */ (draft.live);
-    const result = await session.service.revertWorkingCopy({session: live.session, revision: live.revision}).catch(async error => {await reread(session); throw error;});
+    const result = await session.service.revertWorkingCopy({session: live.session, revision: live.revision}).catch(async error => {throw withNews(error, (await reread(session)).words);});
     // Save elsewhere can advance the saved profile without changing the
     // working revision. Revert confirms that saved generation, not ours.
     if (result.savedGeneration !== live.savedGeneration || result.savedOrigin !== live.savedOrigin) {
-        await reread(session);
+        const told = await reread(session);
         session.resetDraftForms = true;
-        if (session.draft?.stale) throw refusal("Reverted on the keyboard, but its saved profile could not be read. Read the keyboard again.");
-        session.notice = "Reverted: the keyboard runs its saved profile again. It was saved elsewhere; Ark read that profile again.";
+        if (session.draft?.stale) throw withNews(refusal("Reverted on the keyboard, but its saved profile could not be read. Read the keyboard again."), told.words);
+        session.notice = ["Reverted: the keyboard runs its saved profile again. It was saved elsewhere; Ark read that profile again.", told.restart].filter(Boolean).join(" ");
         return false;
     }
     const before = draft.current;
@@ -178,61 +183,78 @@ async function saveCutShort(session, draft, error, saveRecovery) {
     /** @type {string | undefined} */
     let recovery;
     try {recovery = await saveRecovery(draft.current.document);} catch {}
-    const state = session.service.snapshot();
-    const serialNumber = (state.devices || []).find(device => device.id === draft.deviceId)?.serialNumber || "";
-    session.saveCutShort = {deviceId: draft.deviceId, serialNumber, edits: draft.current.fingerprint, recovery};
-    await reread(session);
+    remember(session, "saveCutShort", {edits: draft.current.fingerprint, recovery}, session.service.snapshot(), draft.deviceId);
+    const told = await reread(session);
     const reason = INTERRUPTION_REASONS[/** @type {"lost" | "unanswered"} */ (interruption(error))];
-    const read = session.service.snapshot().connected ? saveCutShortResult(session, session.observedPortable) : "";
-    return Object.assign(new Error([SAVE_WORDS.cutShort, reason, read || SAVE_WORDS.later(recovery)].join(" ")),
-        {code: arkCode(error, "LIVE_SAVE_CUT_SHORT"), cause: error, verdict: SAVE_WORDS.cutShort});
+    const read = told.cutShort ? told.restart : "";
+    return withNews(Object.assign(new Error([SAVE_WORDS.cutShort, reason, read || SAVE_WORDS.later(recovery)].join(" ")),
+        {code: arkCode(error, "LIVE_SAVE_CUT_SHORT"), cause: error, verdict: SAVE_WORDS.cutShort}), read ? told.elsewhere : told.words);
 }
 
 // After a Save cut short, what `read` (a live read of the same keyboard)
 // shows became of the edits, said once; "" until there is one. A restarted
 // keyboard may come back under a new device id: it is the same one by its
-// serial number, or because Ark followed it back (keyboard-reconnect.js).
+// serial number, or because Ark followed it back (kept.js).
 // A read of another keyboard forgets the Save, which it cannot tell about.
 /** @param {Session} session @param {import("../model/types.js").ProfileSnapshot | undefined} read */
 function saveCutShortResult(session, read) {
-    const cut = session.saveCutShort;
-    if (!cut || !read) return "";
-    const state = session.service.snapshot();
-    const serialNumber = (state.devices || []).find(device => device.id === state.selectedDeviceId)?.serialNumber || "";
-    const same = state.selectedDeviceId === cut.deviceId || (Boolean(cut.serialNumber) && serialNumber === cut.serialNumber)
-        || session.reconnect?.lost !== undefined;
-    if (!same) {session.saveCutShort = undefined; return "";}
+    if (!read) return "";
+    const cut = keptFor(session, "saveCutShort", session.service.snapshot());
+    if (!cut) {forget(session, "saveCutShort"); return "";}
     const said = saveResult(cut, /** @type {Parameters<typeof saveResult>[1]} */ (read));
-    if (said) session.saveCutShort = undefined;
+    if (said) forget(session, "saveCutShort");
     return said;
 }
 
-// The keyboard as it is now, after a refusal or a lost answer. A failed read
-// leaves the draft stale, which says to read again.
-/** @param {Session} session */
-async function reread(session) {
-    const draft = session.draft;
-    if (draft) draft.needsRead = true;
-    if (!session.service.snapshot().connected) return;
-    try {
-        const read = await session.service.readKeyboardProfile();
-        session.draft?.observe(read, session.service.snapshot().selectedDeviceId, session.service.snapshot().connectionToken, session.service.snapshot().capabilities || undefined);
-        session.observedPortable = read;
-        session.liveReadRetry = undefined;
-        if (session.draft?.changedElsewhere) {session.notice = CHANGED_ELSEWHERE; session.draft.changedElsewhere = false;}
-    } catch (error) {retryRead(session, error);}
+// What `read` (a read Ark made) says of a live keyboard that restarted over
+// unsaved edits, said once; "" when it says nothing. A Save cut short says
+// what became of its edits, which also tells the restart (`cutShort`); a
+// restart Ark asked for says it itself (keyboard-restart.js).
+/** @param {Session} session @param {import("../model/types.js").ProfileSnapshot | undefined} read @returns {{words: string, cutShort: boolean}} */
+function restartNews(session, read) {
+    const restarted = takeNews(session, "restarted", read);
+    const cutShort = saveCutShortResult(session, read);
+    if (cutShort) return {words: cutShort, cutShort: true};
+    if (!restarted || keptForAny(session, "restart")) return {words: "", cutShort: false};
+    const words = restarted.kept ? "The keyboard restarted since Ark last read it and kept your edits: it saved them first."
+        : restarted.mode === EDIT_MODE.LIVE ? "The keyboard restarted before it saved your last edits, so those are gone: it runs what it saved."
+        : "The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";
+    return {words, cutShort: false};
 }
 
-// Only a read that moved underneath us is automatically retried. Three
-// failed reads in this cycle leave Read keyboard to the person; unrelated
-// stale Review and save drafts and persistent device failures are never polled
-// away.
-/** @param {Session} session @param {unknown} error */
-function retryRead(session, error) {
-    const draft = session.draft;
-    if (!draft || codeOf(error) !== "PROFILE_CHANGED") {session.liveReadRetry = undefined; return;}
-    const attempts = session.liveReadRetry?.draftId === draft.id ? session.liveReadRetry.attempts : 0;
-    session.liveReadRetry = {draftId: draft.id, attempts: attempts + 1};
+// What `read` (a read Ark made) tells that is not said yet, in Read
+// keyboard's words, each said once: a restart over unsaved edits, or what
+// became of a Save cut short, which also tells the restart (`cutShort`);
+// then a working copy changed without Ark (`elsewhere`). `restart` is what
+// no other words say: an operation that says in its own words that the
+// keyboard moved adds only that.
+/** @typedef {{restart: string, cutShort: boolean, elsewhere: string, words: string}} ReadNewsWords */
+/** @param {Session} session @param {import("../model/types.js").ProfileSnapshot | undefined} read @returns {ReadNewsWords} */
+function readNews(session, read) {
+    const {words: restart, cutShort} = restartNews(session, read);
+    const elsewhere = takeNews(session, "changedElsewhere", read) ? CHANGED_ELSEWHERE : "";
+    return {restart, cutShort, elsewhere, words: [restart, elsewhere].filter(Boolean).join(" ")};
+}
+
+// A failure after a read carries what the read told that nothing else says
+// (`news`), which the panel says after the failure (panel-loop.js fail).
+/** @template T @param {T} error @param {string} news @returns {T} */
+function withNews(error, news) {
+    if (news && error && typeof error === "object") Object.assign(error, {news});
+    return error;
+}
+
+// The keyboard as it is now, after a refusal or a lost answer, and what the
+// read told said (readNews), which an operation that says something else
+// after it keeps. Until it is read, the draft is stale, which says to read
+// again; a read that fails leaves it so, and tells nothing.
+/** @param {Session} session @returns {Promise<ReadNewsWords>} */
+async function reread(session) {
+    needRead(session);
+    if (!session.service.snapshot().connected) return readNews(session, undefined);
+    const told = readNews(session, await readAndFollow(session));
+    if (told.words) session.notice = told.words;
+    return told;
 }
 
 // A posted edit, in Live preview + save: the same editors stage it, the
@@ -257,8 +279,8 @@ const LIVE_ACTIONS = Object.freeze({
     },
     putBack: ({draft, revision, session}) => {
         draft.assertRevision(revision);
-        const before = session.beforeApply;
-        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before a save on this keyboard to put back.");
+        const before = keptFor(session, "beforeApply", session.service.snapshot(), draft.deviceId);
+        if (!before) throw new Error("There is no copy from before a save on this keyboard to put back.");
         return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before the save", origin: "edit", order: LAYER_IDENTITY}, {replaceWhenLarge: true});
     },
     // Discard all is Revert: the keyboard runs its saved profile again, and
@@ -293,17 +315,17 @@ const LIVE_ACTIONS = Object.freeze({
         } catch (error) {
             if (codeOf(error) === "LIVE_HALVES_APART") markApart(draft);
             else if (interruption(error)) throw await saveCutShort(session, draft, error, saveRecovery);
-            else await reread(session);
+            else throw withNews(error, (await reread(session)).words);
             throw error;
         }
     },
     // A live draft out of step with the keyboard (a reconnect, a refused
     // read) is brought back by reading it: what it runs is the draft.
     rebase: async ({session}) => {
-        await reread(session);
+        const told = await reread(session);
         session.resetDraftForms = true;
-        if (session.draft?.stale) throw new Error("Read the keyboard again; it could not be read just now.");
-        session.notice = "Read the keyboard again: the draft shows what it runs now.";
+        if (session.draft?.stale) throw withNews(new Error("Read the keyboard again; it could not be read just now."), told.words);
+        session.notice = ["Read the keyboard again: the draft shows what it runs now.", told.restart].filter(Boolean).join(" ");
     },
     confirmLive: async ({session, draft, message}) => {
         const proposal = session.liveProposal;
@@ -359,10 +381,8 @@ async function setEditMode(session, message, recoveryFor, shell) {
     }
     await service.setEditMode(mode);
     // The draft starts again from the keyboard in its new mode.
-    const read = await service.readKeyboardProfile();
+    replaceFromRead(session, await service.readKeyboardProfile());
     const state = service.snapshot();
-    replaceDraft(session, new ProfileDraftSession(read, state.selectedDeviceId, /** @type {import("../model/types.js").ProfileDestination} */ (state.capabilities), state.connectionToken));
-    session.observedPortable = read;
     session.liveProposal = undefined;
     const words = {
         [EDIT_MODE.APPLY]: "edits wait in Ark's draft until you review and save them.",
@@ -391,23 +411,20 @@ async function sendApplyDraft(session, kept, mode, notice) {
         // The Review and save draft belongs to the person until publication
         // succeeds, even if the keyboard refuses the return to Review and
         // save.
-        replaceDraft(session, kept);
-        kept.needsRead = true;
-        session.observedPortable = service.portable || undefined;
+        keepStale(session, kept);
         let back = false;
         try {
             await service.setEditMode(EDIT_MODE.APPLY);
             const read = await service.readKeyboardProfile();
-            const state = service.snapshot();
             replaceDraft(session, kept);
-            kept.observe(read, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined);
-            session.observedPortable = read;
+            takeRead(session, kept, read);
             back = true;
         } catch {}
         const review = EDIT_MODE_WORDS[EDIT_MODE.APPLY].label;
-        throw Object.assign(new Error(`Your draft was not sent: ${failureSentence(error)} ${back
+        const news = /** @type {{news?: unknown}} */ (error)?.news;
+        throw withNews(Object.assign(new Error(`Your draft was not sent: ${failureSentence(error)} ${back
             ? `The keyboard is back in ${review}, and your draft is kept.`
-            : `Ark could not switch back to ${review}; your draft is kept. Return the keyboard to ${review} before continuing.`}`, {cause: error}), {code: arkCode(error, "LIVE_EDIT_REFUSED")});
+            : `Ark could not switch back to ${review}; your draft is kept. Return the keyboard to ${review} before continuing.`}`, {cause: error}), {code: arkCode(error, "LIVE_EDIT_REFUSED")}), typeof news === "string" ? news : "");
     }
 }
 
@@ -425,4 +442,4 @@ function closingLoses(session) {
     return draft.live.unsaved || draft.dirty;
 }
 
-module.exports = {LIVE_ACTIONS, CHANGED_ELSEWHERE, closingLoses, liveEdit, proposeLive, reread, retryRead, saveCutShortResult, setEditMode};
+module.exports = {LIVE_ACTIONS, closingLoses, liveEdit, proposeLive, readNews, reread, setEditMode};

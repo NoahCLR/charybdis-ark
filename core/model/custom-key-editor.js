@@ -1,6 +1,5 @@
 // @ts-check
 "use strict";
-const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 
 // The 128 custom keys. A key has an identity (CUSTOM_KEY_n, keycode
 // 0x7f00 + n), a name and a shortcut: modifiers from either side, up to six
@@ -11,9 +10,10 @@ const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains")
 // works on top of it. Without either, the key does nothing. A behaviour step on
 // another key that sends a custom key sends only its shortcut.
 
-const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
+const {decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
+const {PROFILE_FULL_WORDS} = require("./vocabulary");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
 const {shortcutLayerTargets, shortcutRefusal} = require("./shortcut-layers");
 const keycodes = require("../data/keycode-catalog");
@@ -51,9 +51,8 @@ const SHORTCUT_KEY_NAMES = Object.freeze(keycodes.entries()
 
 // A custom key's name, or its shortcut. Both live in the profile's settings
 // domain; a message carries one or the other.
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {(import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']) & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editCustomKey(snapshot, message, capabilities) {
-    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.");
     const slot = customKeyOfName(message.keycode);
     if (slot === undefined) throw fail("Choose a custom key the keyboard has.");
     // A message renames the key, sets its shortcut, or both at once (a key
@@ -84,11 +83,11 @@ function editCustomKey(snapshot, message, capabilities) {
     }
     const was = value.settings.customKeyShortcuts[slot], now = settings.customKeyShortcuts[slot];
     if (settings.customKeyNames[slot] === value.settings.customKeyNames[slot] && shortcutIdentity(now) === shortcutIdentity(was)) return value.document;
-    /** @type {import("./types.js").PortableDocument} */
-    const document = JSON.parse(JSON.stringify(value.document));
-    document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
-    validateSnapshot(document, capabilities);
-    return document;
+    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: PROFILE_FULL_WORDS.name}, open => {
+        const stored = open("settings");
+        stored.customKeyNames[slot] = settings.customKeyNames[slot];
+        stored.customKeyShortcuts[slot] = settings.customKeyShortcuts[slot];
+    });
 }
 
 module.exports = {customKeyEditorView, editCustomKey};

@@ -376,8 +376,11 @@ function hexByte(value) {
 // answers or the format it stores say so. Ark supports only current firmware
 // and migrates nothing, so it reads such a keyboard no further. `words` are
 // another sentence only where reading again would not help.
+// FIRMWARE_UPDATE is what every control that edits says of such a keyboard
+// (core/model/vocabulary.js firmwareUpdate).
+const FIRMWARE_UPDATE = "This keyboard's firmware is not current, and Ark supports only current firmware. Update both halves, then read the keyboard again.";
 /** @param {{words?: string, cause?: unknown}} [options] */
-function firmwareUpdateRequired({words = "This keyboard's firmware is not current, and Ark supports only current firmware. Update both halves, then read the keyboard again. The keyboard has not been changed.", cause} = {}) {
+function firmwareUpdateRequired({words = `${FIRMWARE_UPDATE} The keyboard has not been changed.`, cause} = {}) {
     return Object.assign(new Error(words), {code: "FIRMWARE_UPDATE_REQUIRED"}, cause === undefined ? {} : {cause});
 }
 
@@ -397,6 +400,7 @@ module.exports = {
     PROFILE_ACTION_LIMITS,
     PROFILE_BLOB_V1,
     ProfileBlobProtocolError,
+    FIRMWARE_UPDATE,
     crc32,
     decodeDomainEnvelope,
     decodeProfileBlob,

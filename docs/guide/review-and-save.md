@@ -23,6 +23,13 @@ Closing Ark changes none of this. In Live preview + save the keyboard keeps
 running your unsaved edits until it is unplugged. In Live edit it saves them
 by itself, with or without Ark.
 
+If a live keyboard restarts while Ark has it open, Ark reads it again and
+says at once what became of the unsaved edits: the keyboard saved them first,
+or they are gone and it runs what it saved. Ark says it with the read that
+found it, whichever made it: a look between edits, the read after an edit,
+Save or Revert that did not go through (after what went wrong), or Read
+keyboard. Ark never says it a second time.
+
 ### Live edit
 
 Live edit works like Live preview + save (below), with the same undo, redo and
@@ -183,9 +190,21 @@ keyboard again and shows the new value. That is not an error.
   **Review against the keyboard** compares your draft with the keyboard as it
   is now. **Discard draft** starts over from the keyboard. Until you choose
   one, the editing screens say the keyboard changed since the draft began
-  and point to the bar.
-- In the live modes, an edit you make just as a key changed the keyboard is
-  not sent. Ark reads the keyboard; make the edit again.
+  and point to the bar. A keyboard that reconnects while the draft has edits
+  is held the same way, and its controls ask you to review the draft too.
+- In the live modes, the draft shows what the keyboard runs now, and its
+  history starts again there. An edit you make just as a key changed the
+  keyboard is not sent. Ark reads the keyboard; make the edit again.
+
+A name or number you are still typing stays as you typed it while Ark shows
+the change, and goes into the draft when you press Enter or leave the field.
+If the field's own value changed meanwhile, the new value replaces your
+typing, and a field that closes (while Ark is busy, say) drops it.
+
+The keycode picker stays open through such a change. A key you pick for a
+custom key's shortcut still goes in. A key you pick for a behaviour's tap or
+hold is refused if the behaviour changed after the picker opened, so it never
+overwrites the newer edit; pick it again.
 
 **Keyboard adjustment pending** means such a change is still waiting to reach
 both halves. Release any held keys. The keyboard's dot in the rail says it on

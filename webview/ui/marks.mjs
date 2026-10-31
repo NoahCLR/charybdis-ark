@@ -17,7 +17,7 @@ import {actionLabel, layerOfKeycode, visibleKeycode} from "../view/keyface.mjs";
 import {macroChips} from "../view/macro.mjs";
 import {sequenceFace} from "../view/macro-sequence.mjs";
 import {layerTapAction, namedAction} from "../view/named-action.mjs";
-import {slotKeycodeNames} from "../view/pointing-reach.mjs";
+import {slotKeycodeNames} from "../view/key-identity.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {SCREENS} from "../view/screens.mjs";
 import {layerCalledAt, vocabulary} from "../view/vocabulary.mjs";

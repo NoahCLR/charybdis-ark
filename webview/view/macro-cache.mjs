@@ -30,10 +30,10 @@ export function createMacroReader(parse = parseMacro) {
 function readingOptions(model, purpose) {
     if (purpose === "peek") return {};
     const problems = vocabulary(model).macroProblems;
-    if (purpose === "editor") return {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases, problems};
+    if (purpose === "editor") return {keys: model?.macroPayloadKeycodes, model, problems};
     return {problems, textEntry: Boolean(model?.macroUnicode?.mode),
         layoutChars: model?.macroUnicode?.layoutChars, modifierKeys: model?.macroPayloadModifierKeycodes,
-        ...(purpose === "feedback" ? {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases} : {})};
+        ...(purpose === "feedback" ? {keys: model?.macroPayloadKeycodes, model} : {})};
 }
 
 export const readMacro = createMacroReader();

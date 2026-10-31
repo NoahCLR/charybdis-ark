@@ -4,7 +4,7 @@
  */
 
 import {el, esc} from "../../lib/dom.mjs";
-import {behaviourListeningTo, canonicalKeycode} from "../../view/keyface.mjs";
+import {keyIdentity, sameKey} from "../../view/key-identity.mjs";
 import {getModel, post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
@@ -22,9 +22,9 @@ export function pickBehaviourKey(behaviour) {
         seed: [behaviour.keycode],
         onPick: (expression) => {
             const model = getModel();
-            const to = canonicalKeycode(model, expression);
-            if (!to || to === canonicalKeycode(model, behaviour.keycode)) { render(); return; }
-            const existing = behaviourListeningTo(model, expression);
+            const picked = keyIdentity(model, expression);
+            if (!picked.canonical || sameKey(model, expression, behaviour.keycode)) { render(); return; }
+            const existing = picked.listening;
             if (existing) { state.retarget = {from: behaviour.keycode, to: expression, existing: existing.keycode}; render(); return; }
             retargetBehaviour(behaviour.keycode, expression);
         },
@@ -35,8 +35,8 @@ export function pickBehaviourKey(behaviour) {
 function retargetBehaviour(from, to, conflict) {
     const model = getModel();
     state.retarget = null;
-    const row = conflict === "swap" || conflict === "overwrite"
-        ? behaviourListeningTo(model, to)?.keycode || canonicalKeycode(model, to) : canonicalKeycode(model, to);
+    const key = keyIdentity(model, to);
+    const row = (conflict === "swap" || conflict === "overwrite" ? key.listening?.keycode : "") || key.canonical;
     // The editor that moved it follows it to its new key: the Keymap screen's
     // open row, or on Custom keys the key now holding it if that is one. Moved
     // from Custom keys to any other key, it opens on the Keymap screen, where

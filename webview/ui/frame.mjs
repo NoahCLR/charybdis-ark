@@ -314,14 +314,3 @@ function liveCommitBar(draft, bar) {
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="revert"]')).addEventListener("click", () => post(controls.revertDraft()));
     return node;
 }
-
-// Read-only reasons, said plainly where the control is.
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model */
-export function unavailable(model) {
-    if (!model?.device?.connected && !demoOf(model).active) return shellOf(model).blocked?.title || shellOf(model).words.noKeyboard || "";
-    if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";
-    if (!model?.draft) return "The keyboard's complete profile could not be read, so edits cannot be drafted here. Read the keyboard again.";
-    if (!model.draft.matching) return "The local draft belongs to another keyboard. Select it again or discard the draft here.";
-    if (model.draft.stale) return "Review the draft against the current keyboard before editing further.";
-    return "";
-}

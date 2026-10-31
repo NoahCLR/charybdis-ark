@@ -11,6 +11,11 @@
 import {screenOfSection} from "./settings-layout.mjs";
 import {listed, stageOrder, vocabulary} from "./vocabulary.mjs";
 
+// The review units read here by name: core's (core/model/review-units.js),
+// copied since the interface may not import core and pinned by
+// tests/view/enum-drift.test.mjs.
+export const LAYER_ORDER_UNIT = "layerOrder", OTHER_KEY_OPTIONS_UNIT = "settings:otherKeyOptions";
+
 // The order areas are read in, as the rail lists the screens they live on.
 const AREAS = ["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
 // An area's place in that order; one the rail does not list comes last.
@@ -93,7 +98,7 @@ function categoryOf(item, names, stages, sections) {
     const place = item.place;
     switch (place?.kind) {
         case "key": return ["Keys", `Keys on ${names[place.layer] ?? ""}`, place.layer];
-        case "layers": return item.unit === "layerOrder" ? ["Keys", "Layer priority", 20] : ["Keys", "Layer names", 21];
+        case "layers": return item.unit === LAYER_ORDER_UNIT ? ["Keys", "Layer priority", 20] : ["Keys", "Layer names", 21];
         case "behaviour": return ["Keys", "Behaviours", 30];
         case "combo": return ["Keys", "Combos", 40];
         case "macro": return ["Macros", "Macros", 0];
@@ -105,7 +110,7 @@ function categoryOf(item, names, stages, sections) {
             return stageRow(place.stage, stages);
         }
         case "settings": return place.stage ? stageRow(place.stage, stages) : sectionRow(place.section || "", sections)
-            || (item.unit === "settings:otherKeyOptions" ? sectionRow("keyboardOptions", sections) : undefined) || ["Other", item.title, 0];
+            || (item.unit === OTHER_KEY_OPTIONS_UNIT ? sectionRow("keyboardOptions", sections) : undefined) || ["Other", item.title, 0];
         default: return ["Other", item.title, 0];
     }
 }

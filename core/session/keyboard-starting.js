@@ -6,7 +6,7 @@
 // which profile runs: until then its profile status reports the active
 // profile pending (active kind 3, flag 7 set, firmware D-F61), and for a
 // moment more the halves have not yet agreed. Read then, it fails. So before
-// the editor's read of a keyboard (readKeyboard: every read Ark follows back,
+// the editor's read of a keyboard (readForEditor: every read Ark follows back,
 // and Read keyboard), Ark polls profile status until the keyboard has
 // finished starting, for at most STARTING.WAIT_MS (D-L70):
 //
@@ -27,6 +27,7 @@
 /** @typedef {import("./types.js").ProfileStatus} Status */
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
 const {halvesConverged} = require("./device-model");
+const {keptForAny} = require("./kept");
 
 // A booting keyboard decided within about 2.5 s (a 6 KB profile) to 4 s (the
 // largest) on Noah's keyboard; the bound leaves room for a slow half.
@@ -56,9 +57,9 @@ const isStartingTimeout = error => codeOf(error) === STARTING_CODE;
 // The timeout notice, naming the recovery copy that holds unsaved edits: a
 // Restart's, or a Save's the connection cut short. A Restart's follow-back
 // says its own copy after its words (keyboard-restart.js), so not here.
-/** @param {Pick<import("./types.js").RunningPanelSession, "reconnect" | "restart" | "saveCutShort">} session */
+/** @param {Pick<import("./types.js").RunningPanelSession, "reconnect" | "kept">} session */
 function startingTimeout(session) {
-    const recovery = session.reconnect?.restart ? undefined : session.restart?.recovery || session.saveCutShort?.recovery;
+    const recovery = session.reconnect?.restart ? undefined : keptForAny(session, "restart")?.recovery || keptForAny(session, "saveCutShort")?.recovery;
     return `${STARTING_WORDS.timeout}${recovery ? ` Your unsaved edits are in the recovery copy: ${recovery}` : ""}`;
 }
 

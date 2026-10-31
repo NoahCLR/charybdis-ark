@@ -41,6 +41,8 @@
  */
 const {storedKeyboardName} = require("../model/keyboard-name");
 const {isStartingTimeout, startingTimeout} = require("./keyboard-starting");
+const {selectedDevice} = require("./device-model");
+const {followKeyboard} = require("./kept");
 
 const RECONNECT = Object.freeze({WAIT_MS: 10000, POLL_MS: 500});
 const RECONNECT_WORDS = Object.freeze({
@@ -83,7 +85,7 @@ function renamedTo(before, after) {
 function expectReconnect(session, name, now = Date.now) {
     if (name === null) return undefined;
     const state = session.service.snapshot();
-    const device = (state.devices || []).find((entry) => entry.id === state.selectedDeviceId);
+    const device = selectedDevice(state);
     if (!state.connected || !device) return undefined;
     const otherDevices = (state.devices || []).filter((entry) => entry.id !== device.id).map(({id, product}) => ({id, product}));
     /** @type {Expected} */
@@ -98,7 +100,7 @@ function expectReconnect(session, name, now = Date.now) {
 /** @param {Session} session @param {() => number} [now] */
 function expectRestart(session, now = Date.now) {
     const state = session.service.snapshot();
-    const device = (state.devices || []).find((entry) => entry.id === state.selectedDeviceId);
+    const device = selectedDevice(state);
     if (!device) return undefined;
     const otherDevices = (state.devices || []).filter((entry) => entry.id !== device.id).map(({id, product}) => ({id, product}));
     /** @type {Expected} */
@@ -155,20 +157,6 @@ function reconnectTarget(expected, devices) {
     return named.length === 1 ? {device: named[0]} : {ambiguous: true};
 }
 
-// The keyboard a follow-back found is the one it waited for, though the
-// adapter may list it under a new device id (node-hid gives it a new path at
-// every enumeration): what Ark keeps for that keyboard goes with it, the
-// draft, a restart's kept edits, a Save cut short and the copy from before an
-// Apply, so the read after it is that keyboard's.
-/** @param {Session} session @param {string} from @param {string} to */
-function followKeyboard(session, from, to) {
-    if (from === to) return;
-    if (session.draft?.deviceId === from) session.draft.followDevice(to);
-    for (const kept of [session.restart, session.saveCutShort, session.beforeApply]) {
-        if (kept?.deviceId === from) kept.deviceId = to;
-    }
-}
-
 /**
  * Waits for the renamed keyboard to drop off and come back, then reads it
  * with `read`, which resolves false when the keyboard is not ready to edit
@@ -216,6 +204,7 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
         if (session.reconnect !== expected) return;
         const target = reconnectTarget(expected, service.snapshot().devices || []);
         if (target && "device" in target) {
+            // What Ark keeps for the keyboard goes with it (kept.js).
             followKeyboard(session, expected.deviceId, target.device.id);
             // A read that rejects, or says it is not ready (its complete
             // profile could not be read), failed.
@@ -236,4 +225,4 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
 /** @param {number} ms */
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-module.exports = {RECONNECT_WORDS, LOST_WORDS, RESTART_WORDS, renamedTo, expectReconnect, expectRestart, expectLost, endReconnect, reconnectTarget, followKeyboard, awaitReconnect};
+module.exports = {RECONNECT_WORDS, LOST_WORDS, RESTART_WORDS, renamedTo, expectReconnect, expectRestart, expectLost, endReconnect, reconnectTarget, awaitReconnect};

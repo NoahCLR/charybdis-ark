@@ -172,7 +172,7 @@ test("the entry exports what its readers use, and each is there, under Node as i
     // build's tests' (browser-tests/: core-exercise.js and the specs that
     // drive the bundled core).
     assert.deepEqual(Object.keys(core).sort(), [
-        "closingLoses", "demoUnsaved", "FILE_MAX_BYTES", "FILE_TOO_LARGE", "openPanelLoop", "recoveryFileName", "WebHidDeviceAdapter", "writingProfile",
+        "FILE_MAX_BYTES", "FILE_TOO_LARGE", "openPanelLoop", "recoveryFileName", "WebHidDeviceAdapter",
         "ApplyProgress", "Buffer", "buildPanelModel", "ProfileDraftSession", "startLayerEdit",
         "comboDomain", "keyBehaviorDomain", "pdModeDomain", "portable", "profileBlob", "rgbDomain", "settingsDomain",
     ].sort());

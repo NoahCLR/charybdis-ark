@@ -1,14 +1,14 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff, label as hsvLabel} from "../../lib/colour.mjs";
-import {canEdit as canEditArea, post, render, state, writable} from "../../store.mjs";
+import {post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {offWording, stageIdle} from "../../view/lighting.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {shareHold} from "../../view/share.mjs";
 import {sectionPath, sectionsIn} from "../../view/settings-layout.mjs";
-import {unavailable} from "../frame.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 
 // How long the auto-mouse colour holds before it fades, as a share of the
@@ -18,13 +18,14 @@ import {colourControl, section, stack} from "./common.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {string | null} idle */
 function fadeTiming(model, idle) {
     const section = sectionsIn(model, "Lighting").find((entry) => entry.stage === "auto");
+    const gate = editGate(model, "settings");
     const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h4></div></section>`);
     if (!section) {
-        node.append(el(`<p class="note">${esc(unavailable(model) || "Choose Read keyboard to read the auto-mouse timing.")}</p>`));
+        node.append(el(`<p class="note">${esc(gate.why || "Choose Read keyboard to read the auto-mouse timing.")}</p>`));
         return node;
     }
     const field = section.fields[0];
-    const editable = canEditArea("settings") && !field.readOnly && !idle;
+    const editable = gate.editable && !field.readOnly && !idle;
     const whole = Number(field.whole);
     // The slider's track is the timeout: solid while the colour holds, fading
     // after. Dragging previews here and commits once on release, since every
@@ -49,7 +50,7 @@ function fadeTiming(model, idle) {
     const box = el(`<div class="stack gap-12"></div>`);
     box.append(control, note);
     if (!idle) box.append(open);
-    if (!editable && !idle && !model?.draft?.busy) box.append(el(`<div class="unavailable">${esc(unavailable(model) || "The fade timing cannot be edited right now.")}</div>`));
+    if (!editable && !idle && !gate.quiet) box.append(el(`<div class="unavailable">${esc(gate.why || "The fade timing cannot be edited right now.")}</div>`));
     node.append(box);
     return node;
 }
@@ -57,7 +58,7 @@ function fadeTiming(model, idle) {
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageAuto(model) {
     const node = el(`<div></div>`);
-    const canEdit = writable();
+    const canEdit = editGate(model, "lighting").editable;
 
     /** @type {Partial<import("../../../contracts/panel.js").RgbView["automouseFade"]>} */
     const fade = model.rgb.automouseFade || {};

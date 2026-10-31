@@ -26,7 +26,7 @@ test("Apply progress updates do not rebuild or post the complete panel model", (
     const apply = {id: 777, state: "applying", current: "stage", steps: [], bytes: {completed: 12, total: 120}};
     loop.session.service.reportApplyProgress(apply);
     assert.deepEqual(shell.posted, [{type: "applyProgress", apply, draftId: "draft-777", draftRevision: 3}]);
-    assert.deepEqual(loop.session.service.liveApply, apply, "full snapshots retain the latest progress");
+    assert.deepEqual(loop.session.service.snapshot().liveApply, apply, "full snapshots retain the latest progress");
 });
 
 test("read progress posts only a small operation-correlated view", async t => {
@@ -65,7 +65,7 @@ test("a keyboard storing settings in another version is not read, and is told to
     assert.equal(loop.session.draft, undefined, "no draft opens");
     assert.equal(model.load.state, "unavailable");
     assert.match(notice, /Ark supports only current firmware\. Update both halves/);
-    assert.equal(loop.session.service.layout, undefined, "nothing more is read");
+    assert.equal(loop.session.service.snapshot().layout, null, "nothing more is read");
     await loop.handleMessage({type: "updateCustomKey", keycode: "CUSTOM_KEY_1", name: "Late"});
     assert.match(last(shell).notice, /no editable draft/);
     assert.deepEqual(adapter.keyboard.mutations, []);
@@ -116,9 +116,7 @@ function fakeService(extra = {}) {
     const service = {
         calls, capabilities, portable: snapshot(),
         snapshot: () => state,
-        enumerate: record("enumerate"), connect: record("connect"), refresh: record("refresh"),
-        readLayout: record("readLayout"), readCommittedProfile: record("readCommittedProfile"),
-        readBaseRgb: record("readBaseRgb"), readCombos: record("readCombos"),
+        readForEditor: record("readForEditor", async () => ({kind: "read", portable: await service.readKeyboardProfile()})),
         readKeyboardProfile: record("readKeyboardProfile", () => service.portable),
         readPortableProfile: record("readPortableProfile", () => service.portable),
         close: record("close"),
@@ -219,12 +217,11 @@ test("a keyboard that never answers becomes a failure notice and a shell error",
     await loop.close();
 });
 
-test("a read connects, reads in order and publishes what it read", async () => {
+test("a read publishes what it read", async () => {
     const shell = fakeShell();
     const service = fakeService();
     const loop = openPanelLoop(shell, {service});
     await loop.handleMessage({type: "ready"});
-    assert.deepEqual(service.calls, ["enumerate", "refresh", "readKeyboardProfile"]);
     assert.deepEqual(shell.posted.map((message) => message.type), ["catalog", "model"], "one answer, after the catalog");
     assert.match(last(shell).notice, /saved profile, generation 7/);
     assert.equal(loop.session.readReady, true);
@@ -508,28 +505,6 @@ test("a retained dirty draft adopts the reconnected keyboard's capabilities at r
     assert.equal(last(shell).model.macros[0].payload.length, 600);
 });
 
-test("a read lets go of a keyboard that left the list and connects the one listed", async () => {
-    const shell = fakeShell();
-    const chosen = {...device, id: "chosen"};
-    const service = fakeService();
-    service.snapshot().devices = [chosen];
-    service.connect = async (id) => {service.calls.push(`connect ${id}`);};
-    const loop = openPanelLoop(shell, {service});
-    await loop.handleMessage({type: "refresh"});
-    assert.deepEqual(service.calls.slice(0, 2), ["enumerate", "connect chosen"]);
-    await loop.close();
-});
-
-test("a read keeps the connected keyboard while it is still listed", async () => {
-    const shell = fakeShell();
-    const service = fakeService();
-    service.snapshot().devices = [{...device, id: "other"}, device];
-    const loop = openPanelLoop(shell, {service});
-    await loop.handleMessage({type: "refresh"});
-    assert.ok(!service.calls.includes("connect"), "the connected keyboard stays chosen");
-    await loop.close();
-});
-
 // What every model of a build starts from goes to the panel once, as the
 // catalog, and each model without it, saying what it lays over it
 // (panel-loop.js postedModel); the panel lays it back (webview/catalog.mjs).
@@ -624,4 +599,43 @@ test("what each key is, by every name, is the catalog's for a profile on current
     assert.ok(!("MACRO_0" in empty.qmkKeyKinds), "no profile names its macros");
     assert.equal(posted.qmkKeyKinds, empty.qmkKeyKinds, "so its kinds are posted whole");
     assert.deepEqual(withCatalog(posted, catalog), empty);
+});
+
+// Keyboards that come and go while an operation runs are looked at again
+// once it ends; a loop closed before then looks no more.
+test("a closed panel loop does not look at the keyboards again after a running operation", async t => {
+    t.mock.timers.enable({apis: ["setTimeout"]});
+    let enumerated = 0;
+    const loop = openPanelLoop(fakeShell(), {service: fakeService({enumerate: async () => {enumerated++;}})});
+    loop.session.service.snapshot().busy = true;
+    await loop.keyboardsChanged();
+    await loop.close();
+    loop.session.service.snapshot().busy = false;
+    t.mock.timers.tick(1000);
+    await new Promise(setImmediate);
+    assert.equal(enumerated, 0);
+});
+
+// The loop's session as a test sets it, for what closing would lose.
+const leaving = (session) => {
+    const loop = openPanelLoop(fakeShell(), {service: /** @type {any} */ ({})});
+    Object.assign(loop.session, session);
+    return loop.leaving();
+};
+
+test("closing asks first with unapplied edits or an Apply running", () => {
+    assert.equal(leaving({}), false);
+    assert.equal(leaving({draft: {dirty: false}}), false);
+    assert.equal(leaving({draft: {dirty: true}}), true);
+    assert.equal(leaving({applyRunning: true}), true);
+    assert.equal(leaving({service: {phase: "restore-complete"}}), true);
+    assert.equal(leaving({service: {phase: "read-layout"}}), false);
+});
+
+test("in the demo, closing asks only about edits not exported", () => {
+    const draft = (print) => ({dirty: true, current: {fingerprint: print}});
+    assert.equal(leaving({demo: {exported: null}, draft: draft(1)}), true);
+    assert.equal(leaving({demo: {exported: 1}, draft: draft(1)}), false, "exported as they are");
+    assert.equal(leaving({demo: {exported: 1}, draft: draft(2)}), true, "edited since");
+    assert.equal(leaving({demo: {exported: null}, draft: {dirty: false}}), false);
 });

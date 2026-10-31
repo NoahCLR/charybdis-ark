@@ -1,16 +1,16 @@
 // @ts-check
 "use strict";
-const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
+const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 
-const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
+const {decodedOf, editProfileDomains, validateSnapshot} = require("./portable-profile");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
-const {SETTINGS, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, macroProtectionOf} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
 const {inspectMacroInput, inspectMacroPlayback, readStoredMacro} = require("./macro-input");
-const {VOCABULARY, macroDefaultName, word} = require("./vocabulary");
+const {PROFILE_FULL_WORDS, VOCABULARY, macroDefaultName, word} = require("./vocabulary");
 const {macroName, macroOfName} = require("../../rules/qmk-keycodes.mjs");
 /** @param {string} message @param {string} [code] */
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
@@ -91,39 +91,37 @@ function macroIndex(keycode) {
     return index;
 }
 
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateMacro'] & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateMacro']} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editMacro(snapshot, message, capabilities) {
-    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
     const index = macroIndex(message.keycode);
     if (message.payload === undefined && message.name === undefined && message.protection === undefined) throw fail("Send the macro's steps, its name or its playback protection.");
     const value = validateSnapshot(snapshot.document, capabilities);
-    /** @type {import("./types.js").PortableDocument} */
-    const document = JSON.parse(JSON.stringify(value.document));
-    const slots = value.macroSlots.map(bytes => Buffer.from(bytes));
-    if (message.payload !== undefined) {
-        const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
-        const status = macroInputStatus(snapshot, message, capabilities);
-        if (status.error) throw fail(status.error, status.code);
-        const protection = message.protection ?? macroProtectionOf(slots[index]);
-        const bytes = encodeMacroPayload(message.payload, {textEntry: Boolean(host.unicodeMode), layout: host.layout, protection});
-        slots[index] = bytes;
-    }
-    if (message.protection !== undefined && message.payload === undefined) {
-        const bytes = slots[index];
-        const previous = macroProtectionOf(bytes);
-        const prefix = encodeMacroPayload("", {protection: message.protection});
-        slots[index] = Buffer.concat([prefix, bytes.subarray(previous === "auto" ? 0 : 3)]);
-    }
-    if (message.name !== undefined && message.name !== value.settings.macroNames[index]) {
-        if (typeof message.name !== "string") throw fail("A macro name must be text.");
-        if (!validName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "MACRO_NAME_INVALID");
-        const settings = structuredClone(value.settings);
-        settings.macroNames[index] = message.name.trim();
-        document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
-    }
-    if (message.payload !== undefined || message.protection !== undefined) document.profile = replaceDomain(Buffer.from(document.profile, "base64"), PROFILE_DOMAIN_IDS.MACROS, () => require("../schema/macro-domain-v1").encodeMacroDomain(slots)).toString("base64");
-    validateSnapshot(document, capabilities);
-    return document;
+    const renaming = message.name !== undefined && message.name !== value.settings.macroNames[index];
+    // A profile too full for the edit is said in a name's words only when the
+    // name is all the edit changes; new steps say the profile's.
+    const onlyName = renaming && message.payload === undefined && message.protection === undefined;
+    return editProfileDomains(value.document, {capabilities, limits: snapshot.limits, full: onlyName ? PROFILE_FULL_WORDS.name : undefined}, open => {
+        if (message.payload !== undefined) {
+            const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
+            const status = macroInputStatus(snapshot, message, capabilities);
+            if (status.error) throw fail(status.error, status.code);
+            const slots = open("macros");
+            const protection = message.protection ?? macroProtectionOf(slots[index]);
+            slots[index] = encodeMacroPayload(message.payload, {textEntry: Boolean(host.unicodeMode), layout: host.layout, protection});
+        }
+        if (message.protection !== undefined && message.payload === undefined) {
+            const slots = open("macros");
+            const bytes = slots[index];
+            const previous = macroProtectionOf(bytes);
+            const prefix = encodeMacroPayload("", {protection: message.protection});
+            slots[index] = Buffer.concat([prefix, bytes.subarray(previous === "auto" ? 0 : 3)]);
+        }
+        if (renaming) {
+            if (typeof message.name !== "string") throw fail("A macro name must be text.");
+            if (!validName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "MACRO_NAME_INVALID");
+            open("settings").macroNames[index] = message.name.trim();
+        }
+    });
 }
 
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [capabilities] */

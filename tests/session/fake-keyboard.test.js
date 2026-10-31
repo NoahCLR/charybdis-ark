@@ -50,8 +50,8 @@ for (const [name, document] of [["the compiled pointing profile", document32()],
             assert.ok(keyboard.requests.length > 100, "the whole keyboard was read over the wire");
             assert.equal(keyboard.requests.some(request => request[0] === 8 && request[2] === 0x0c), false, "macros come from the profile domain");
             assert.equal(keyboard.requests.filter(request => request[0] === 8 && request[1] === 0 && request[2] === 6).length,
-                3 + 2 * loop.session.service.combos.rows.length, "one verified combo read feeds both views");
-            assert.deepEqual(loop.session.service.layout.layers.flatMap(({layer, keys}) => keys.map(key => key.keycode)),
+                3 + 2 * loop.session.service.snapshot().combos.rows.length, "one verified combo read feeds both views");
+            assert.deepEqual(loop.session.service.snapshot().layout.layers.flatMap(({layer, keys}) => keys.map(key => key.keycode)),
                 profileLayers(document).flatMap(layer => CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => layer[row * 6 + column])));
             assert.deepEqual(keyboard.mutations, [], "a read and a staged edit write nothing to the keyboard");
         } finally {
@@ -87,30 +87,10 @@ test("profile verification reads fresh committed bytes, reuses immutable default
         assert.equal(service.snapshot().error.code, "PAYLOAD_CORRUPT");
         adapter.keyboard.answer = originalAnswer;
         await service.disconnect();
-        assert.equal(service.payloadReader, undefined);
+        assert.equal(service.state.payloadReader, undefined);
         await loop.handleMessage({type: "refresh"});
         assert.equal(chunks(5), count, "a new connection reuses the defaults verified before: metadata only");
         assert.deepEqual(adapter.keyboard.mutations, []);
-    } finally {await loop.close();}
-});
-
-// After Apply the layout step downloads and checks the saved profile; the
-// profile step right after takes those bytes while the keyboard still names
-// them, so the readback downloads the saved profile once, not twice.
-test("the read after a save downloads the saved profile once", async () => {
-    const {rereadKeyboard} = require("../../core/session/panel-controls");
-    const source = document32(), shell = recordingShell(), adapter = fakeKeyboardAdapter({document: source});
-    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 200});
-    const chunks = value => adapter.keyboard.requests.filter(request => request[0] === 0x08 && request[2] === value && (request[4] || request[5])).length;
-    const count = Math.ceil(validateSnapshot(source).candidate.length / 25);
-    try {
-        await loop.handleMessage({type: "ready"});
-        const service = loop.session.service, before = chunks(4);
-        await rereadKeyboard(service);
-        assert.equal(chunks(4) - before, count);
-        assert.equal(service.committed.state, "read");
-        await service.readCommittedProfile();
-        assert.equal(chunks(4) - before, count * 2, "a read on its own still downloads");
     } finally {await loop.close();}
 });
 
@@ -147,10 +127,10 @@ for (const compiledOnly of [false, true]) {
             await loop.handleMessage({type: "ready"});
             assert.equal(loop.session.readReady, true, last(shell).notice);
             const service = loop.session.service;
-            assert.equal(service.committed.source, compiledOnly ? "compiled" : "committed");
-            assert.equal(service.baseRgb.state, "read");
+            assert.equal(service.snapshot().committed.source, compiledOnly ? "compiled" : "committed");
+            assert.equal(service.snapshot().baseRgb.state, "read");
             assert.equal(settingHeaders, 4, "no independent RGB read can race the coherent snapshot");
-            assert.equal(service.combos.rows.length, 1);
+            assert.equal(service.snapshot().combos.rows.length, 1);
             assert.equal(service.portable.readback, undefined, "raw readback handoff does not live on the portable snapshot");
             assert.equal(fingerprint(service.portable.document), fingerprint(source));
             assert.equal(last(shell).model.load.progress, null, "a completed snapshot clears its transfer text");
@@ -181,7 +161,7 @@ test("a configuration that keeps changing through the shared read's wait leaves 
         assert.equal(loop.session.readReady, false);
         assert.equal(loop.session.draft, undefined);
         assert.equal(loop.session.service.portable, undefined);
-        assert.equal(loop.session.service.layout.state, "read", "independent layout diagnostics remain available");
+        assert.equal(loop.session.service.snapshot().layout.state, "read", "independent layout diagnostics remain available");
         assert.equal(last(shell).model.load.state, "unavailable");
         assert.match(last(shell).notice, /profile changed while Ark read it/);
         assert.deepEqual(adapter.keyboard.mutations, []);

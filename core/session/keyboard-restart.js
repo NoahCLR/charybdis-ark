@@ -31,9 +31,11 @@ const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS, arkCode, failureSentence} = require("../model/vocabulary");
 const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {snapshotOf} = require("./live-profile-session");
-const {expectRestart, followKeyboard} = require("./keyboard-reconnect");
+const {expectRestart} = require("./keyboard-reconnect");
+const {followKeyboard, forget, keptFor, remember} = require("./kept");
 const {fingerprint} = require("../model/portable-profile");
 const {proposeLive} = require("./live-edits");
+const {takeRead} = require("./draft-follow");
 
 const RESTART_LABEL = "Put back the unsaved edits from before the restart";
 
@@ -68,7 +70,6 @@ async function keptEdits(session, draft) {
 async function restartKeyboard({session, draft, saveRecovery}) {
     const service = session.service, state = service.snapshot();
     if (!state.connected) throw refusal("Connect the keyboard before restarting it.", "RESTART_UNCONNECTED");
-    const device = (state.devices || []).find(entry => entry.id === state.selectedDeviceId);
     const kept = await keptEdits(session, draft);
     let recovery;
     if (kept) {
@@ -84,42 +85,31 @@ async function restartKeyboard({session, draft, saveRecovery}) {
         // stays under it, for the diagnostics.
         throw Object.assign(refusal(`The keyboard did not restart. ${failureSentence(error)}${inRecovery(recovery)}`, code), {cause: error});
     }
-    session.restart = {deviceId: device?.id, serialNumber: device?.serialNumber || "", kept, recovery, slaveAcknowledged: result.slaveAcknowledged};
+    remember(session, "restart", {kept, recovery, slaveAcknowledged: result.slaveAcknowledged}, state);
     const expected = expectRestart(session);
     // Said if the keyboard never comes back; replaced once it is read again.
     if (expected) expected.after = `${inRecovery(recovery).trim()}${result.slaveAcknowledged ? "" : UNANSWERED}`.trim();
     session.notice = kept ? "Restarting the keyboard… Ark keeps its unsaved edits and puts them back once it is back." : "Restarting the keyboard…";
 }
 
-// Whether `session.restart` is for the keyboard just read: the one the
-// restart's own wait followed back, or the same device or serial number.
-/** @param {Session} session @param {NonNullable<Session["restart"]>} restart */
-function sameKeyboard(session, restart) {
-    if (session.reconnect?.restart) return true;
-    const state = session.service.snapshot();
-    const device = (state.devices || []).find(entry => entry.id === state.selectedDeviceId);
-    return Boolean(device && (device.id === restart.deviceId || (restart.serialNumber && device.serialNumber === restart.serialNumber)));
-}
-
-// After the restarted keyboard was read again. What happened is said after
-// the follow-back's own words when one is running, else at once.
+// After the restarted keyboard was read again, when the restart Ark asked
+// for is this keyboard's (kept.js: the one its own wait followed back, or the
+// same device or serial number). What happened is said after the
+// follow-back's own words when one is running, else at once.
 /** @param {Session} session */
 async function putBackAfterRestart(session) {
-    const restart = session.restart;
-    if (!restart || !sameKeyboard(session, restart)) return;
-    session.restart = undefined;
+    const state = session.service.snapshot(), portable = session.service.portable;
+    const restart = keptFor(session, "restart", state);
+    if (!restart) return;
+    forget(session, "restart");
     // The same keyboard, perhaps listed under a new device id since: its
     // draft follows it and takes the read just made, which the shell may not
     // have shown it yet, so the edits go to the session it runs now.
-    const state = session.service.snapshot(), portable = session.service.portable;
     if (state.selectedDeviceId) followKeyboard(session, restart.deviceId || "", state.selectedDeviceId);
     const followed = session.draft;
     // A live draft takes a live read; anything else is the panel's, which
-    // asks before a draft changes its kind (observePortable).
-    if (portable && "live" in portable && portable.live && followed?.live && followed.deviceId === state.selectedDeviceId) {
-        followed.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined);
-        session.observedPortable = portable;
-    }
+    // asks before a draft changes its kind (draft-follow.js followRead).
+    if (portable && "live" in portable && portable.live && followed?.live && followed.deviceId === state.selectedDeviceId) takeRead(session, followed, portable);
     // A Review and save draft takes the new connection when the keyboard
     // still holds what it began from. Its read says nothing of the keyboard's
     // saving: look at it now, so a keyboard that stopped again is told from
@@ -136,7 +126,7 @@ async function putBackAfterRestart(session) {
     else if (outcome) session.notice = `${session.notice ? `${session.notice} ` : ""}${outcome}`;
 }
 
-/** @param {Session} session @param {NonNullable<Session["restart"]>} restart @param {import("../model/types.js").ProfileSnapshot | null | undefined} read @returns {Promise<string>} */
+/** @param {Session} session @param {NonNullable<import("./types.js").KeptRecords["restart"]>} restart @param {import("../model/types.js").ProfileSnapshot | null | undefined} read @returns {Promise<string>} */
 async function putBack(session, restart, read) {
     const draft = session.draft, keyboard = draft?.keyboardStatus;
     // Read again, the keyboard answered for both halves (a read refuses one

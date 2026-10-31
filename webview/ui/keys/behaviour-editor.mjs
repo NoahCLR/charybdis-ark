@@ -7,7 +7,8 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {actionLabel, behaviourGridSteps, cellLabel, impliedBranch, inheritedBranch} from "../../view/keyface.mjs";
-import {getModel, layers, post, render, state, canEdit as canEditArea} from "../../store.mjs";
+import {getModel, layers, post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
@@ -66,7 +67,7 @@ function storageNotes(behaviour) {
 export function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
-    const canEdit = canEditArea("behaviours");
+    const canEdit = editGate(model, "behaviours").editable;
     // Timing waits for a branch on a plain key; the switches wait for anything
     // they could turn on or off.
     const timingIdle = !behaviour.steps.length && behaviour.timingAlone === false;
@@ -189,7 +190,7 @@ export function behaviourEditor(behaviour) {
     if (state.retarget?.from === behaviour.keycode) node.append(retargetPrompt(behaviour));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="remove"]'))?.addEventListener("click", () =>
         post(edits.deleteBehaviour(behaviour.keycode, model?.profileIdentity)));
-    const commit = () => saveBehaviour(node, behaviour);
+    const commit = () => saveBehaviour(node, behaviour, model?.profileIdentity);
     /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-term]")).forEach((input) => input.addEventListener("change", () => {
         const term = /** @type {import("../../../contracts/edits.js").TimingTerm} */ (input.dataset.term);
         input.dataset.stored = behaviourTimingEdit(input.value, behaviourTimingField(behaviour, term));

@@ -8,16 +8,17 @@
 
 import {isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {comboAnswers, comboInputKeys, toggleComboInput} from "../view/combo-reach.mjs";
+import {toggleComboInput} from "../view/combo-reach.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
-import {currentLayer, getModel, heldLayers, layers, post, previewing, render, state, writable} from "../store.mjs";
+import {currentView, getModel, post, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftMarks} from "../view/review.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
-import {topbar, unavailable} from "./frame.mjs";
+import {topbar} from "./frame.mjs";
 import {bench} from "./keys/bench.mjs";
 import {legend, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
 import {behaviourKey, selectBehaviourKey} from "./keys/behaviour-selection.mjs";
@@ -27,16 +28,17 @@ import {reachHighlight} from "./keys/reach.mjs";
 
 export function screenKeys() {
     const model = getModel();
-    const layer = currentLayer();
+    const view = currentView();
+    const layer = view.layer;
     const main = el(`<div class="main">${topbar(
         "Keymap",
         "Click a key to change what it does. The tabs under the board edit its behaviour, its combos and what this layer reaches.",
     )}</div>`);
 
-    const blocked = unavailable(model);
+    const gate = editGate(model, "keys");
     if (!layer) {
         const content = el(`<div class="content"><div class="pad"><div class="screen-stub">
-            <h3>Nothing read yet</h3><p class="note">${esc(blocked || "Choose Read keyboard to read this keyboard's layers.")}</p></div></div></div>`);
+            <h3>Nothing read yet</h3><p class="note">${esc(gate.why || "Choose Read keyboard to read this keyboard's layers.")}</p></div></div></div>`);
         main.appendChild(content);
         return main;
     }
@@ -58,23 +60,22 @@ export function screenKeys() {
     // One indication at a time: while a combo is being built its inputs are
     // the keys in question, otherwise the keys that reach the picked row.
     const building = state.combo.picking || (state.combo.open && state.tab === "combos");
-    card.appendChild(board(model, layer, {
+    card.appendChild(board(view, {
         selected: state.selected,
         drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
-        reach: building ? comboInputKeys(model, layers(), state.layer, heldLayers(), state.combo.inputs) : reachHighlight(model),
+        reach: building ? view.combos.inputKeys(state.combo.inputs) : reachHighlight(view),
         picking: state.combo.picking || Boolean(state.placement),
-        held: heldLayers(),
         onKey: (/** @type {number} */ index) => {
             if (state.placement) {
                 const placement = state.placement;
                 state.placement = null;
                 state.selected = index;
-                if (writable()) post(edits.setKey(layer.name, index, placement.keycode));
+                if (editGate(getModel(), "keys").editable) post(edits.setKey(layer.name, index, placement.keycode));
             } else if (state.combo.picking) {
                 // The key the keyboard would answer with here, taken now: a
                 // transparent key picks what shows through it, and switching
                 // layers afterwards leaves this input as it is.
-                const answer = comboAnswers(model, layers(), state.layer, heldLayers()).get(index);
+                const answer = view.combos.answers.get(index);
                 state.combo.inputs = toggleComboInput(model, state.combo.inputs, answer, model?.firmware?.keysPerCombo);
             } else {
                 state.selected = index;
@@ -84,10 +85,10 @@ export function screenKeys() {
             }
             render();
         },
-        onOpen: writable() ? (/** @type {number} */ index) => pickKeycodeFor(index) : undefined,
-        onSwap: writable() ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
+        onOpen: gate.editable ? (/** @type {number} */ index) => pickKeycodeFor(index) : undefined,
+        onSwap: gate.editable ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
     }));
-    card.appendChild(previewing() ? previewFoot(layer) : el(`<div class="board-foot"><span class="board-foot-text">${lit
+    card.appendChild(view.previewing ? previewFoot(view) : el(`<div class="board-foot"><span class="board-foot-text">${lit
         ? `lit ${esc(hsvLabel(row.color))} · ${esc(word(vocabulary(model).paintModes, row.mode).toLowerCase())}`
         : "no layer colour · the background effect shows through"}</span></div>`));
     card.append(bar);

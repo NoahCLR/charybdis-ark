@@ -7,9 +7,9 @@
 // The model already resolved each position to a display label; this adds the
 // layer-tap hint, the behaviour tiers and the combo badges, and nothing else.
 
-import {MODIFIER_WRAPPERS, MODS, MOD_BITS, MOD_RIGHT} from "../../rules/qmk-keycodes.mjs";
 import {keyMeaning} from "../../rules/combo-inputs.mjs";
 import {vocabulary} from "./vocabulary.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 
 // A layer key's second line is in the vocabulary's words (keyCapLayerVerbs),
 // and which keys act on a layer, and how, is core's (qmkKeyLayerForms), as is
@@ -47,31 +47,13 @@ export function keyFace(/** @type {import("../../contracts/panel.js").Position |
 // spelled. Null for any other key: the interface never works a layer out of a
 // keycode itself.
 /** @param {ViewModel} model @param {string} keycode @returns {number | null} */
-export function layerOfKeycode(model, keycode) {
-    const layers = model?.qmkKeyLayers || {};
-    for (const key of spellingsOf(model, String(keycode ?? ""))) {
-        if (Number.isInteger(layers[key])) return layers[key];
-    }
-    return null;
-}
-
-// The names core may publish a fact about a keycode under, in the order a
-// table keyed by them is read: as written, the name the core knows it by
-// (QK_USER_31 → LOCK_LAYER(3), KC_TRNS → KC_TRANSPARENT), however the
-// expression is spelled (canonicalKeycode), and a bare number as core keys
-// one (0x7f00 → 0x7F00).
-/** @param {ViewModel} model @param {string} name @returns {string[]} */
-export const spellingsOf = (model, name) =>
-    [name, model?.qmkKeycodeAliases?.[name] ?? "", canonicalKeycode(model, name), hexSpelling(name)].filter(Boolean);
+export const layerOfKeycode = (model, keycode) => keyIdentity(model, keycode).lookUp(model?.qmkKeyLayers, (layer) => Number.isInteger(layer)) ?? null;
 
 // What a table core keys by keycode name says of a keycode, read under each
-// of its spellings in turn (spellingsOf), a bare number however it is cased
-// included. Undefined when it says nothing.
+// of its spellings in turn (key-identity.mjs lookUp), a bare number however
+// it is cased included. Undefined when it says nothing.
 /** @template T @param {Readonly<Record<string, T>> | null | undefined} table @param {ViewModel} model @param {string} name @returns {T | undefined} */
-const factOf = (table, model, name) => {
-    for (const spelled of spellingsOf(model, name)) if (table?.[spelled]) return table[spelled];
-    return undefined;
-};
+const factOf = (table, model, name) => keyIdentity(model, name).lookUp(table);
 
 // What a key, or a keycode by name, is where the interface treats it apart
 // from other keys, as core publishes it (qmkKeyKinds, from
@@ -81,7 +63,7 @@ const factOf = (table, model, name) => {
 /** @param {ViewModel} model @param {Position | string | null | undefined} key @returns {import("../../contracts/model.js").KeyKind | undefined} */
 export function keyKindOf(model, key) {
     for (const name of typeof key === "string" ? [key] : [key?.keycode, key?.semantic]) {
-        const kind = name ? factOf(model?.qmkKeyKinds, model, name) : undefined;
+        const kind = name ? keyIdentity(model, name).kind : undefined;
         if (kind) return kind;
     }
     return undefined;
@@ -148,9 +130,8 @@ export {keyMeaning};
 // use this when a screen prints that keycode to a person.
 /** @param {ViewModel} model @param {string} name */
 export const visibleKeycode = (model, name) => {
-    const semantic = model?.qmkKeycodeAliases?.[name] || "";
-    if (semantic && model?.qmkKeyKinds?.[semantic] === "macro") return semantic;
-    return semantic && /^0x[0-9a-f]+$/i.test(name) ? semantic : name || "";
+    const known = keyIdentity(model, name).name;
+    return model?.qmkKeyKinds?.[known] === "macro" || /^0x[0-9a-f]+$/i.test(name) ? known : name || "";
 };
 
 // An action as the hover card names it: its words, and the keycode it stores
@@ -182,44 +163,6 @@ export function cellLabel(model, branch) {
     const named = actionLabel(model, action);
     return named !== action ? named : branch?.label || action;
 }
-
-/** @param {ViewModel} model @param {string} keycode */
-export const behaviourFor = (model, keycode) =>
-    (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
-
-// One spelling per key: the picker says KC_ENT and G(KC_C) where a behaviour
-// row says KC_ENTER and LGUI(KC_C), and an expression may or may not space its
-// arguments or nest two modifiers either way round. Every name goes through the
-// keyboard's alias table, and every modifier wrapper becomes one ordered set.
-const MOD_ORDER = /** @type {(keyof typeof MODS)[]} */ (Object.keys(MODS));
-/** @param {string} wrapper The modifiers a wrapper spelling holds, by their long names, or undefined for no wrapper. */
-const wrapperMods = (wrapper) => {
-    const bits = Object.hasOwn(MODIFIER_WRAPPERS, wrapper) ? MODIFIER_WRAPPERS[wrapper] : undefined;
-    return bits === undefined ? undefined : MOD_ORDER.filter((mod) => (MODS[mod] & MOD_RIGHT) === (bits & MOD_RIGHT) && MODS[mod] & bits & MOD_BITS);
-};
-// A number as the keyboard names a value it has no name for, the way core
-// keys it: 0x7f00 and 0x7F00 are both 0x7F00 (core/schema/keycodes.js). Any
-// other name stays as it is.
-/** @param {string} name */
-const hexSpelling = (name) => /^0x[0-9a-f]+$/i.test(name) ? `0x${Number(name).toString(16).toUpperCase().padStart(4, "0")}` : name;
-export function canonicalKeycode(/** @type {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} */ model, /** @type {string} */ expression) {
-    let text = String(expression ?? "").replace(/\s+/g, "");
-    /** @type {Set<string>} */
-    const mods = new Set();
-    for (let match, held; (match = /^([A-Z]+)\((.*)\)$/.exec(text)) && (held = wrapperMods(match[1]));) {
-        held.forEach((mod) => mods.add(mod));
-        text = match[2];
-    }
-    const aliases = model?.qmkKeycodeAliases;
-    const inner = text.replace(/0x[0-9A-Fa-f]+\b|[A-Za-z_][A-Za-z0-9_]*/g, (name) => aliases?.[name] ?? aliases?.[hexSpelling(name)] ?? name);
-    return MOD_ORDER.filter((mod) => mods.has(mod)).reduceRight((wrapped, mod) => `${mod}(${wrapped})`, inner);
-}
-
-// The behaviour row a picked expression would land on, however it is spelled.
-export const behaviourListeningTo = (/** @type {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} */ model, /** @type {string} */ expression) => {
-    const wanted = canonicalKeycode(model, expression);
-    return (model?.keyBehaviors || []).find((row) => canonicalKeycode(model, row.keycode) === wanted);
-};
 
 
 // One dot per tier the behaviour uses anywhere, carrying how many branches use

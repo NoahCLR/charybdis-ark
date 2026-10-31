@@ -11,11 +11,12 @@ const {buildSnapshotModel} = require("../../core/session/device-model");
 const {buildPanelModel} = require("../../core/session/panel-session");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
-const {PROFILE_DOMAIN_IDS, domainCodec, replaceDomain} = require("../../core/schema/profile-domains");
+
 const {PD_MODE_KEYS} = require("../../core/data/pd-mode-keys");
 const {LAYERS, matrixPosition} = require("../../core/data/charybdis-layout");
 const {customKeyCode, customKeyOfName} = require("../../core/data/user-keycodes");
 const {compiled, settings: testSettings} = require("./portable-profile");
+const {editDomain} = require("./profile-document");
 
 const DEMO_PROFILE = require("../../core/data/demo-profile.charybdis.json");
 
@@ -50,13 +51,7 @@ function profileDocument({keys = {}, combos = [], settings, slots} = {}) {
     settings?.(policy);
     const doc = compiled({layers, policy, combos: combos.map(({inputs, output, ...row}, id) => ({id, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false,
         ...row, inputs: inputs.map(keycodeOf), output: keycodeOf(output)}))});
-    if (slots) {
-        const codec = domainCodec("pdModes");
-        doc.profile = replaceDomain(Buffer.from(doc.profile, "base64"), PROFILE_DOMAIN_IDS.PD_MODES, (payload) => {
-            const records = codec.decode(payload); slots(records); return codec.encode(records);
-        }).toString("base64");
-    }
-    return doc;
+    return slots ? editDomain(doc, "pdModes", slots) : doc;
 }
 
 // The bundled demo profile, a fresh copy each time.

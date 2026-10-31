@@ -9,7 +9,7 @@ const {lastMessage, lastModel, openLoop} = require("../fixtures/panel-loop");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const {replaceDomain} = require("../../core/schema/profile-domains");
+const {withPayload} = require("../fixtures/profile-document");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
 
@@ -58,7 +58,7 @@ test("Save is not Live edit's: it is refused until the keyboard's own save fails
 test("an adjustment key's edit is read as news, not as a failure", async t => {
     const {keyboard, shell, session, look} = await open(t);
     const changed = validateSnapshot(document()).layers; changed[3][1] = 0x05;
-    keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(Buffer.from(document().profile, "base64"), "keymap", () => encodeKeymapDomain(changed)));
     assert.equal(await look(), true);
     assert.match(lastMessage(shell).notice, /changed by itself/);
     assert.deepEqual(shell.errors, []);
@@ -125,12 +125,22 @@ test("a replug in Live edit keeps what the keyboard saved, and says so", async t
     assert.match(lastMessage(shell).notice, /before it saved your last edits/);
 });
 
+test("a restart the watch sees is said at once, in Read keyboard's words, and not again", async t => {
+    const {keyboard, shell, loop, key, look} = await open(t);
+    await key(0, 15, "KC_S");
+    keyboard.replug();
+    assert.equal(await look(), true);
+    assert.match(lastMessage(shell).notice, /before it saved your last edits/);
+    await loop.handleMessage({type: "refresh"});
+    assert.doesNotMatch(lastMessage(shell).notice, /restarted/, "the read that told it said it");
+});
+
 test("under a Review and save draft, a key adjustment the keyboard saved is read again; one still unsaved opens live and goes back to Review and save once saved", async t => {
     const {keyboard, shell, session, look} = await open(t, {mode: EDIT_MODE.APPLY});
     assert.equal(session.draft.live, null);
     assert.equal(await look(), false, "the first look only notes where the keyboard is");
     const changed = validateSnapshot(document()).layers; changed[3][2] = 0x06;
-    keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(Buffer.from(document().profile, "base64"), "keymap", () => encodeKeymapDomain(changed)));
     assert.equal(await look(), false, "unsaved: the keyboard saves it after its quiet moment");
     keyboard.autoSave();
     assert.equal(await look(), true);
@@ -142,9 +152,8 @@ test("under a Review and save draft, a key adjustment the keyboard saved is read
     // Revert could settle it), and returns to Review and save once the
     // keyboard saved it.
     changed[3][2] = 0x07;
-    keyboard.externalEdit(replaceDomain(Buffer.from(document().profile, "base64"), 0x60, () => encodeKeymapDomain(changed)));
-    await session.service.readKeyboardProfile();
-    require("../../core/session/panel-session").observePortable(session, require("../../core/session/demo-session").panelState(session));
+    keyboard.externalEdit(withPayload(Buffer.from(document().profile, "base64"), "keymap", () => encodeKeymapDomain(changed)));
+    assert.ok(await require("../../core/session/draft-follow").readAndFollow(session));
     assert.ok(session.draft.live);
     keyboard.autoSave();
     assert.equal(await look(), true);
@@ -200,7 +209,7 @@ for (const flag of ["stopped", "slaveStopped"]) test(`under a Review and save dr
 test("an automatic save racing a reread is read again at once, and the draft synchronizes", async t => {
     const {keyboard, session, look} = await open(t);
     const changed = validateSnapshot(document()).layers; changed[3][1] = 0x05;
-    keyboard.externalEdit(replaceDomain(keyboard.saved, 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(keyboard.saved, "keymap", () => encodeKeymapDomain(changed)));
     const answer = keyboard.answer;
     let raced = false;
     keyboard.answer = report => {
@@ -232,6 +241,25 @@ test("a read that keeps racing stays eligible and synchronizes on the next poll"
     assert.equal(session.draft.live.revision, keyboard.revision);
 });
 
+test("what the watch's own read again tells is said with it, and not again", async t => {
+    const {keyboard, shell, loop, session, look} = await open(t);
+    keyboard.externalEdit(keyboard.saved);
+    const answer = keyboard.answer;
+    let races = 3;
+    keyboard.answer = report => {
+        // The first look's read is moved under three times, so the draft waits, stale.
+        if (races > 0 && report[0] === 0x08 && report[2] === 0x22) {races--; keyboard.externalEdit(keyboard.saved);}
+        return answer(report);
+    };
+    await look();
+    assert.equal(session.draft.stale, true);
+    assert.equal(await look(), true);
+    assert.equal(session.draft.stale, false);
+    assert.match(lastMessage(shell).notice, /not what Ark last saw/, "the read that told it says it");
+    await loop.handleMessage({type: "refresh"});
+    assert.doesNotMatch(lastMessage(shell).notice, /not what Ark last saw/);
+});
+
 test("persistent coherence failures exhaust a bounded automatic reread budget", async t => {
     const {keyboard, session, look} = await open(t);
     keyboard.externalEdit(keyboard.saved);
@@ -254,7 +282,7 @@ for (const dirty of [false, true]) test(`the first look under a Review and save 
     if (dirty) await key(0, 11, "KC_R");
     const kept = session.draft.current.document.profile;
     const changed = validateSnapshot(document()).layers; changed[3][2] = 0x06;
-    keyboard.externalEdit(replaceDomain(keyboard.saved, 0x60, () => encodeKeymapDomain(changed)));
+    keyboard.externalEdit(withPayload(keyboard.saved, "keymap", () => encodeKeymapDomain(changed)));
     keyboard.autoSave();
     assert.equal(await look(), true, "compare the very first status to the successful snapshot");
     if (dirty) {

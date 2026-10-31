@@ -1,6 +1,7 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {keyDisplayName, keyName, pointingMacro} from "../../view/keyvalues.mjs";
+import {keyDisplayName, pointingMacro} from "../../view/keyvalues.mjs";
+import {keycodeName} from "../../view/key-identity.mjs";
 import {modifierGrid} from "../modifier-grid.mjs";
 import {render} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
@@ -29,7 +30,7 @@ export function formControls(model, slot, canEdit, stageCurrent) {
     };
     /** @param {string} label @param {import("../../../contracts/edits.js").Scalar | undefined} code @param {string} key @param {import("../surface-types.js").ShortcutOptions} [options] */
     const shortcut = (label, code, key, options = {}) => {
-        const name = options.name ?? keyName(model, Number(code ?? 0));
+        const name = options.name ?? keycodeName(model, Number(code ?? 0));
         // The field shows the key as the picker names it. Left as shown it
         // stages the stored keycode; a QMK name or alias typed over it stages
         // that.

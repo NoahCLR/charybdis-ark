@@ -254,3 +254,28 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
     });
     await expect(cell(pane(page).locator('tr[data-reach="here:4"]'), 5).locator(".reach-line")).toHaveText([/^Navigation ?Hold$/]);
 });
+
+// The Key tab says why a key cannot be edited in a box under the key, and
+// draws no box when the gate has nothing to say: while the draft is busy, the
+// commit bar says so.
+test("the Key tab says why a key cannot be edited, and draws no empty box", async ({page}) => {
+    await openPreview(page);
+    await tab(page, "key").click();
+    const box = page.locator(".key-unavailable");
+    await expect(box).toHaveCount(0);
+    /** @param {object} draft */
+    const publish = (draft) => page.evaluate(async (draft) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.draft, {editable: false}, draft);
+        store.setModel(model);
+        store.render();
+    }, draft);
+    await publish({busy: true, reason: "busy"});
+    await expect(page.locator("#keycodeField")).toBeDisabled();
+    await expect(box).toHaveCount(0);
+    await publish({reason: "connection-changed"});
+    await expect(box).toHaveText("Review the draft against the current keyboard before editing further.");
+    await publish({matching: false, connected: false, reason: "unsupported"});
+    await expect(box).toHaveText("This keyboard's firmware is not current, and Ark supports only current firmware. Update both halves, then read the keyboard again.");
+});

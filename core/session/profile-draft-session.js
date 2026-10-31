@@ -3,26 +3,19 @@
 
 const {validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
 const {layerOrderReview, profileReview} = require("../model/profile-review");
-const {compose, inverse, isIdentity, layerUnit, rearranged} = require("../model/layer-order");
+const {compose, inverse, isIdentity, rearranged} = require("../model/layer-order");
+const {UNIT, unitByLayer} = require("../model/review-units");
 const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
-const {keyPlacementProblem} = require("../model/profile-placement");
 const {LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
 const {draftProfileChecks} = require("../model/profile-checks");
-const {editSettings} = require("../model/settings-editor");
-const {editMacro} = require("../model/macro-editor");
-const {editCustomKey} = require("../model/custom-key-editor");
-const {editKeyboardName} = require("../model/keyboard-name");
-const {editDeviceProfile} = require("../model/device-profile-edits");
-const {profileComboReadback} = require("../model/profile-model");
-const {DRAFT_EDITS, editedBy, draftEditLabel} = require("../model/draft-edits");
-const {actionName, knownActionAbi, layerOfRef} = require("../schema/actions");
-const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, LAYER_IDENTITY, matrixPosition} = require("../data/charybdis-layout");
-const keycodes = require("../schema/keycodes");
+const {applyDraftEdit} = require("../model/draft-editor");
+const {draftEditLabel} = require("../model/draft-edits");
+const {actionName, knownActionAbi} = require("../schema/actions");
+const {LAYERS, LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {liveKeyboardStatus} = require("./live-profile-session");
-const {LIVE_RESULT_WORDS, PROFILE_FULL_WORDS, quietWords} = require("../model/vocabulary");
+const {LIVE_RESULT_WORDS, quietWords} = require("../model/vocabulary");
 
 // What the panel shows of the keyboard's own saving and its halves.
 /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
@@ -56,18 +49,6 @@ const freeze = value => {
 };
 /** @param {string} text */
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
-// An edit a byte format refused as too large for the keyboard: the person's
-// edit, said in words (PROFILE_FULL_WORDS), by the count it went past where
-// the format names one (its `limit` and `most`), its own text kept
-// beneath for the diagnostics. Any other refusal is left as it is.
-/** @param {unknown} error */
-const fullProfile = error => {
-    const details = /** @type {{code?: unknown, limit?: unknown, most?: unknown} | null | undefined} */ (error);
-    if (details?.code !== "CAPACITY_EXCEEDED") return error;
-    const counted = typeof details.limit === "string" && typeof details.most === "number" && Object.hasOwn(PROFILE_FULL_WORDS.counts, details.limit)
-        ? PROFILE_FULL_WORDS.counts[details.limit](details.most) : undefined;
-    return Object.assign(new Error(counted ?? PROFILE_FULL_WORDS.profile), {code: "PROFILE_FULL", cause: error});
-};
 /**
  * A document a live edit would leave the keyboard with, and how the history
  * takes it once the keyboard confirms it.
@@ -152,10 +133,6 @@ class ProfileDraftSession {
     checksCache;
     /** @type {boolean | undefined} */
     needsRead;
-    /** @type {{kept: boolean, mode: number} | undefined} A live keyboard restarted while Ark knew of unsaved edits; the next read says whether they were kept (saved by the keyboard first) or are gone. */
-    restartedWithUnsaved;
-    /** @type {boolean | undefined} A live keyboard's working copy changed under the same session without Ark (another app, a lost answer, an edit that did not land as sent); the next read says the draft started again. */
-    changedElsewhere;
     /** @type {LiveExpectation | undefined} Ark's own live edit the keyboard took whole but whose outcome Ark has not heard (live-edits.js): the next read confirms it if it shows exactly that edit. */
     expectedLive;
     now() {return Date.now();}
@@ -271,10 +248,13 @@ class ProfileDraftSession {
         if ((state.connectionToken ?? null) !== this.connectionToken) return "connection-changed";
         return "";
     }
-    /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] @param {import("../model/types.js").ProfileDestination} [capabilities] */
+    // The draft takes a read of its keyboard. What it told that a person
+    // should hear is returned (a live keyboard's restart or a change made
+    // without Ark, observeLive), for the read that says it (draft-follow.js).
+    /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] @param {import("../model/types.js").ProfileDestination} [capabilities] @returns {import("./types.js").ReadNews | undefined} */
     observe(snapshot, deviceId, connectionToken = null, capabilities = this.capabilities) {
         if (!snapshot || deviceId !== this.deviceId) return;
-        if (this.live) {this.observeLive(snapshot, connectionToken, capabilities); return;}
+        if (this.live) return this.observeLive(snapshot, connectionToken, capabilities);
         this.latestCapabilities = copy(capabilities);
         const dirty = this.dirty;
         if (!dirty && !snapshot.incomplete && JSON.stringify(capabilities) !== JSON.stringify(this.capabilities)) {
@@ -307,8 +287,11 @@ class ProfileDraftSession {
     // keyboard vouches for it by its session and revision); anything else
     // (another client's edit, a key adjustment, a restart, a Save elsewhere)
     // starts the draft again from what the keyboard has, with no history it
-    // cannot vouch for, and says so.
-    /** @param {Snapshot} snapshot @param {import("./types.js").ConnectionToken} connectionToken @param {import("../model/types.js").ProfileDestination} capabilities */
+    // cannot vouch for, and says so: a restart over unsaved edits, kept (the
+    // keyboard saved them first) or gone, or a working copy changed under the
+    // same session without Ark (another app, a lost answer, an edit that did
+    // not land as sent).
+    /** @param {Snapshot} snapshot @param {import("./types.js").ConnectionToken} connectionToken @param {import("../model/types.js").ProfileDestination} capabilities @returns {import("./types.js").ReadNews | undefined} */
     observeLive(snapshot, connectionToken, capabilities) {
         const token = connectionToken ?? null;
         this.latestConnectionToken = token;
@@ -338,9 +321,12 @@ class ProfileDraftSession {
             return;
         }
         // A new session is a restart: whatever was unsaved is gone (D-F32).
-        if (liveSnapshot.live.session !== live.session) {if (live.unsaved) this.restartedWithUnsaved = {kept: liveSnapshot.saved.fingerprint === this.current.fingerprint, mode: liveSnapshot.live.mode};}
-        else if (liveSnapshot.live.revision !== live.revision || liveSnapshot.fingerprint !== this.current.fingerprint) this.changedElsewhere = true;
+        /** @type {import("./types.js").ReadNews | undefined} */
+        let news;
+        if (liveSnapshot.live.session !== live.session) {if (live.unsaved) news = {restarted: {kept: liveSnapshot.saved.fingerprint === this.current.fingerprint, mode: liveSnapshot.live.mode}};}
+        else if (liveSnapshot.live.revision !== live.revision || liveSnapshot.fingerprint !== this.current.fingerprint) news = {changedElsewhere: true};
         this.resetLive(liveSnapshot);
+        return news;
     }
     // Whether a read shows exactly the edit Ark sent, published: the same
     // session, one revision on, its transaction the last the keyboard
@@ -420,10 +406,9 @@ class ProfileDraftSession {
         this.cursor = this.history.length - 1;
         this.revision++; this.reviewedRevision = null;
     }
-    // Each edit goes to the editor model/draft-edits.js names for its type.
-    // The whole-document editors check the form against the draft it was
-    // drawn from, this revision when it names none; the profile's domain
-    // editors check the identity the form was read with.
+    // Each edit is made by applyDraftEdit (model/draft-editor.js), which
+    // checks the form against this draft; the session checks its revision
+    // and records it.
     /** @param {Edit} message */
     stage(message) {
         if (this.live) throw fail("This keyboard takes edits live; Ark sends each one to it.");
@@ -436,49 +421,10 @@ class ProfileDraftSession {
     // (live-edits.js).
     /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
     propose(message) {
-        try {return this.proposed(message);} catch (error) {throw fullProfile(error);}
-    }
-    /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
-    proposed(message) {
         this.assertRevision(message.draftRevision);
-        const current = this.current, before = current.fingerprint;
-        let document;
-        if (editedBy(message, "settings")) document = editSettings(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (editedBy(message, "macro")) document = editMacro(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (editedBy(message, "customKey")) {
-            document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-            // A custom key made for a shortcut is put to use in the same step
-            // (a layout key, a behaviour cell, a combo's output), so one undo
-            // takes both back (D-L63).
-            const then = "then" in message ? message.then : undefined;
-            if (then) document = this.editFollowing(then, document);
-        }
-        else if (editedBy(message, "keyboardName")) document = editKeyboardName(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (editedBy(message, "keymap")) document = this.editLayout(message);
-        else if (editedBy(message, "profile")) document = this.editProfile(message, current.document);
-        else throw fail("Unsupported draft edit.");
-        return {document: validateSnapshot(document, this.capabilities).document, label: draftEditLabel(message, current.document), previousFingerprint: before};
-    }
-    // One profile-domain edit, checked against the draft's base, on `base`.
-    /** @param {import("../model/device-profile-edits.js").ProfileEdit} message @param {Document} base @returns {Document} */
-    editProfile(message, base) {
-        const expected = "expectedBase" in message ? message.expectedBase : undefined;
-        if (expected && (/** @type {const} */ (["source", "generation", "digest", "originHalf"])).some(key => expected[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
-        return {...base, profile: editDeviceProfile(Buffer.from(base.profile, "base64"), message, {
-            capabilities: this.capabilities,
-            combos: this.combos(), maximumBrightness: this.current.limits?.brightnessMax,
-        }).toString("base64")};
-    }
-    // The edit a custom key made for a shortcut carries: a layout key, a
-    // behaviour or a combo, staged on the document that already holds the key
-    // (D-L63).
-    /** @param {{type: string}} message @param {Document} base @returns {Document} */
-    editFollowing(message, base) {
-        if (message.type === "updateLayoutKeys") return this.editLayout(/** @type {import("../../contracts/edits.js").EditOf<"updateLayoutKeys">} */ (message), base);
-        if (["saveBehavior", "addCombo", "saveCombo"].includes(message.type)) {
-            return this.editProfile(/** @type {Extract<import("../model/device-profile-edits.js").ProfileEdit, {type: "saveBehavior" | "addCombo" | "saveCombo"}>} */ (message), base);
-        }
-        throw fail("A custom key made for a shortcut goes on a key, in a behaviour or in a combo.");
+        const current = this.current;
+        const document = applyDraftEdit(current, message, {capabilities: this.capabilities, identity: this.identity()});
+        return {document, label: draftEditLabel(message, current.document), previousFingerprint: current.fingerprint};
     }
     // A Rename & Reorder save: its document, and the order it saved, which
     // rearranges this revision. An order and each name are separate
@@ -487,25 +433,6 @@ class ProfileDraftSession {
     editLayers(document, revision, step) {
         const before = this.current.decoded.settings.names, after = validateSnapshot(document, this.capabilities).settings.names;
         this.replace(document, revision, "layers", layersLabel(step, before, after), compose(this.order, step));
-    }
-    // A layout message is untrusted like any other: its layer and every key
-    // are checked before anything is written.
-    /** @param {Pick<import("../../contracts/edits.js").EditOf<"updateLayoutKeys">, "layer" | "changes">} message @param {Document} [base] */
-    editLayout({layer: reference, changes}, base = this.document) {
-        const layer = layerOfRef(reference);
-        if (layer === undefined || !(layer < LAYERS) || !Array.isArray(changes)) throw fail("Choose a layer reported by this keyboard.");
-        const document = copy(base);
-        const layers = validateSnapshot(base).layers;
-        for (const change of changes) {
-            const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
-            const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
-            if (!position || code === undefined || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
-            const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
-            if (misplaced) throw fail(misplaced);
-            layers[layer][matrixPosition(change.layoutIndex)] = code;
-        }
-        document.profile = require("../schema/profile-domains").replaceDomain(Buffer.from(base.profile, "base64"), 0x60, () => require("../schema/keymap-domain-v1").encodeKeymapDomain(layers)).toString("base64");
-        return document;
     }
     // The keyboard's profile rearranged into an order, with the order it
     // stands for; the keyboard's own profile, and no order, when the order
@@ -548,14 +475,14 @@ class ProfileDraftSession {
         const current = this.current;
         if (this.base.incomplete) return [{area: "Recovery", unit: null, title: "Complete profile", status: "changed", group: null, place: null,
             fields: [{label: "", before: "Interrupted profile; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
-        const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => layerUnit(row.unit, this.order)));
+        const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => unitByLayer(row.unit, this.order)));
         const parent = new Map([...shown].map(unit => [unit, unit]));
         /** @param {string} unit @returns {string} */
         const find = unit => {while (parent.get(unit) !== unit) unit = /** @type {string} */ (parent.get(unit)); return unit;};
         const steps = [];
         for (let step = 1; step <= this.cursor; step++) {
             if (this.history[step].origin !== "edit") continue;
-            const touched = this.stepUnits(step).map(unit => layerUnit(unit, this.history[step].order)).filter(unit => shown.has(unit));
+            const touched = this.stepUnits(step).map(unit => unitByLayer(unit, this.history[step].order)).filter(unit => shown.has(unit));
             for (const unit of touched.slice(1)) parent.set(find(unit), find(touched[0]));
             if (touched.length) steps.push({label: this.history[step].label, unit: touched[0]});
         }
@@ -572,7 +499,7 @@ class ProfileDraftSession {
         const title = list => !list?.length ? null : list.length === 1 ? list[0] : `${list[0]} and ${list.length - 1} more edit${list.length === 2 ? "" : "s"}`;
         const groups = new Map();
         return rows.map(row => {
-            const root = find(layerUnit(row.unit, this.order));
+            const root = find(unitByLayer(row.unit, this.order));
             if (!groups.has(root)) groups.set(root, groups.size);
             return placed({...row, group: groups.get(root), groupTitle: title(titles.get(root))});
         });
@@ -642,7 +569,7 @@ class ProfileDraftSession {
         // moves with its layer and stays; anything else goes back to the
         // reference, so the order stays.
         let document, order = this.order;
-        if (units.has("layerOrder")) {
+        if (units.has(UNIT.layerOrder)) {
             if (units.size > 1) throw fail("Discard the layer priority on its own.");
             document = rearranged(this.current.document, inverse(order));
             order = LAYER_IDENTITY;
@@ -650,8 +577,8 @@ class ProfileDraftSession {
         // Some bytes carry no row of their own, such as reserved macro-bank padding. Once nothing described is left, the draft is
         // the keyboard's profile again, not an indescribable difference.
         const left = this.describe(validateSnapshot(document, this.capabilities).document, order);
-        if (left.every(row => row.unit === "profile")) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = LAYER_IDENTITY;}
-        const label = units.has("layerOrder") ? "Put the layer priority back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
+        if (left.every(row => row.unit === UNIT.profile)) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = LAYER_IDENTITY;}
+        const label = units.has(UNIT.layerOrder) ? "Put the layer priority back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
         return {document: validateSnapshot(document, this.capabilities).document, label, order, reviewed};
     }
     // Discard the whole draft as one more step, so undo brings it back: the
@@ -847,13 +774,6 @@ class ProfileDraftSession {
             session: status.session, revision: status.revision};
     }
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor].document).fingerprint, originHalf: this.deviceId};}
-    // The draft's combos as the keyboard would report them
-    // (profile-model.js). The constructor gates the action ABI, so every
-    // stored action has a native code.
-    /** @returns {Extract<import("./types.js").ComboRead, {state: "read"}>} */
-    combos() {
-        return profileComboReadback(this.decode(this.history[this.cursor].document).decoded);
-    }
     /** @param {import("./types.js").DraftDeviceContext} state */
     view(state) {
         const matching = state.selectedDeviceId === this.deviceId, connected = matching && state.connected;
