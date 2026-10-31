@@ -41,7 +41,6 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
         const {mark, marked} = await import("/webview/ui/marks.mjs");
         const {groupRowsTable} = await import("/webview/ui/lighting/led-rows.mjs");
         const {reviewItem} = await import("/webview/ui/review-items.mjs");
-        const {actionLabel} = await import("/webview/view/keyface.mjs");
         const model = getModel();
         // The page takes markup only through the panel's policy (Trusted Types).
         const {html} = await import("/webview/lib/dom.mjs");
@@ -141,7 +140,7 @@ test("a layer or pointing-mode action is named with its tag, a layer-tap by its 
         const {getModel} = await import("/webview/store.mjs");
         const {actionMarked, keyNameMarked} = await import("/webview/ui/marks.mjs");
         const {reviewItem} = await import("/webview/ui/review-items.mjs");
-        const {actionLabel} = await import("/webview/view/keyface.mjs");
+        const {keyIdentity} = await import("/webview/view/key-identity.mjs");
         const {html} = await import("/webview/lib/dom.mjs");
         const model = getModel();
         const slot = model.pdModes.find((entry) => entry.id === ZOOM);
@@ -156,7 +155,7 @@ test("a layer or pointing-mode action is named with its tag, a layer-tap by its 
                 {label: "Tap", status: "changed", before: "/ / Navigation", after: "Lock Navigation", beforeMark: {kind: "layer", layer: NAVIGATION}, afterMark: {kind: "layer", layer: NAVIGATION}},
             ]}),
             // A behaviour is titled by its key, named as that key is everywhere.
-            reviewTitle: reviewItem(model, {unit: "y", title: actionLabel(model, slot.keys.hold), status: "removed",
+            reviewTitle: reviewItem(model, {unit: "y", title: keyIdentity(model, slot.keys.hold).label, status: "removed",
                 place: {kind: "behaviour", keycode: slot.keys.hold}, fields: []}),
         };
         for (const [name, markup] of Object.entries(drawn)) document.body.insertAdjacentHTML("beforeend", html(`<div data-drawn="${name}">${markup}</div>`));

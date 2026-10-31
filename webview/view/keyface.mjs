@@ -12,17 +12,18 @@ import {vocabulary} from "./vocabulary.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 
 // A layer key's second line is in the vocabulary's words (keyCapLayerVerbs),
-// and which keys act on a layer, and how, is core's (qmkKeyLayerForms), as is
-// which key is transparent or disabled (qmkKeyKinds), so every caller passes
-// the model it has.
+// and which keys act on a layer, and how, is core's (keyIdentity's
+// layerForm), as is which key is transparent or disabled (its kind), so every
+// caller passes the model it has.
 /** @param {ViewModel} model @returns {import("./keyface-types.js").KeyFace} */
 export function keyFace(/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position, model) {
     if (!position) return {main: "", sub: "", kind: "none"};
     const keycode = position.keycode || "";
-    const kind = keyIdentity(model, keycode).kind;
+    const key = keyIdentity(model, keycode);
+    const kind = key.kind;
     if (kind === "transparent") return {main: "▽", sub: "", kind};
     if (kind === "disabled") return {main: "", sub: "", kind};
-    const form = layerFormOf(model, position);
+    const form = key.layerForm;
     const layerTap = form === "LT";
     const verb = form && form !== "LT" ? vocabulary(model).keyCapLayerVerbs[form] : undefined;
     // The line across a cap marks a dual-role key: what it taps above, what
@@ -40,52 +41,14 @@ export function keyFace(/** @type {import("../../contracts/panel.js").Position |
     };
 }
 
-// The layer a keycode acts on, as the core names it beside its label
-// (qmkKeyLayers, from core/model/key-names.js keyLayer): MO(3), LOCK_LAYER(3)
-// and LT(3,KC_F) all name layer 3. Read under the stored name, the name the
-// core knows it by (QK_USER_31 → LOCK_LAYER(3)), or however the expression is
-// spelled. Null for any other key: the interface never works a layer out of a
-// keycode itself.
-/** @param {ViewModel} model @param {string} keycode @returns {number | null} */
-export const layerOfKeycode = (model, keycode) => keyIdentity(model, keycode).lookUp(model?.qmkKeyLayers, (layer) => Number.isInteger(layer)) ?? null;
-
-// What a table core keys by keycode name says of a keycode, read under each
-// of its spellings in turn (key-identity.mjs lookUp), a bare number however
-// it is cased included. Undefined when it says nothing.
-/** @template T @param {Readonly<Record<string, T>> | null | undefined} table @param {ViewModel} model @param {string} name @returns {T | undefined} */
-const factOf = (table, model, name) => keyIdentity(model, name).lookUp(table);
-
-// What a key, or a keycode by name, does to the layer it acts on, as core
-// names it (qmkKeyLayerForms, from core/model/key-names.js keyLayerForm):
-// read under the stored name, the profile's name for it, or however the
-// expression is spelled. Undefined for any other key.
-/** @param {ViewModel} model @param {Position | string | null | undefined} key @returns {import("../../contracts/model.js").LayerForm | undefined} */
-export function layerFormOf(model, key) {
-    for (const name of typeof key === "string" ? [key] : [key?.keycode, key?.semantic]) {
-        const form = name ? factOf(model?.qmkKeyLayerForms, model, name) : undefined;
-        if (form) return form;
-    }
-    return undefined;
-}
-
-// The modifiers a layer-mod (LM) holds with its layer, in the words its name
-// ends in, as core publishes them (qmkKeyLayerMods, from
-// core/model/key-names.js layerModWords). Undefined for any other key.
-/** @param {ViewModel} model @param {string} keycode @returns {string | undefined} */
-export const layerModsOf = (model, keycode) => keycode ? factOf(model?.qmkKeyLayerMods, model, keycode) : undefined;
-// The key a layer-tap (LT) taps, by the name its own name starts with, as
-// core publishes it (qmkKeyLayerTaps, from core/model/key-names.js
-// layerTapWords). Undefined for any other key.
-/** @param {ViewModel} model @param {string} keycode @returns {string | undefined} */
-export const layerTapOf = (model, keycode) => keycode ? factOf(model?.qmkKeyLayerTaps, model, keycode) : undefined;
-
 // A dual-role key's two halves: what a tap sends, and what a hold does — hold
 // a layer on, or a modifier. Null for any other key.
 /** @param {ViewModel} model @param {Position | null | undefined} position @returns {{tap: string, hold: {layer: number, name: string} | {modifier: string}} | null} */
 export function dualRole(model, position) {
     if (!position) return null;
-    const layer = layerFormOf(model, position) === "LT" ? layerOfKeycode(model, position.keycode) : null;
-    if (layer !== null) return {tap: position.display || "", hold: {layer, name: position.layerLabel || ""}};
+    const key = keyIdentity(model, position.keycode);
+    const layer = key.layerForm === "LT" ? key.layer : undefined;
+    if (layer !== undefined) return {tap: position.display || "", hold: {layer, name: position.layerLabel || ""}};
     return position.modifierLabel ? {tap: position.display || "", hold: {modifier: position.modifierLabel}} : null;
 }
 
@@ -124,17 +87,9 @@ export const visibleKeycode = (model, name) => {
 // where that says something the words do not.
 /** @param {ViewModel} model @param {string} name */
 export function actionNaming(model, name) {
-    const words = actionLabel(model, name), stored = visibleKeycode(model, name);
+    const words = keyIdentity(model, name).label, stored = visibleKeycode(model, name);
     return {words, stored: stored && stored !== words ? stored : ""};
 }
-
-// How a keycode name is spoken in prose: the label the keyboard's own
-// vocabulary gives it, so a behaviour row, a reach line and the key cap all
-// call one key the same thing. Names the vocabulary does not cover — a device
-// action outside the advertised ABI — keep their numeric identity. A name is
-// read under each of its spellings, so 0x7f00 reads as the custom key it is.
-/** @param {ViewModel} model @param {string} name */
-export const actionLabel = (model, name) => (name ? factOf(model?.qmkKeyLabels, model, String(name)) : undefined) || String(name ?? "");
 
 // What a behaviour cell reads as in the grid: the name a person knows the key
 // by, so it says "#", "Shift+Enter" and "Hold Numbers" where the keyboard
@@ -145,8 +100,9 @@ export const actionLabel = (model, name) => (name ? factOf(model?.qmkKeyLabels, 
 /** @param {ViewModel} model @param {import("../../contracts/panel.js").Branch | null | undefined} branch */
 export function cellLabel(model, branch) {
     const action = String(branch?.action ?? "");
-    if (keyIdentity(model, action).kind === "customKey" && branch?.label) return branch.label;
-    const named = actionLabel(model, action);
+    const key = keyIdentity(model, action);
+    if (key.kind === "customKey" && branch?.label) return branch.label;
+    const named = key.label;
     return named !== action ? named : branch?.label || action;
 }
 

@@ -77,16 +77,25 @@ export interface LayerView {
     };
 }
 // Which key a spelling is (view/key-identity.mjs): `name`, the name the profile knows it by (QK_USER_16 → PD_MODE_0);
-// `canonical`, one spelling per key, however an expression is spelled; `spellings`, the names core may publish a fact
-// under; `macro` and `customKey`, the name the profile lists it by when core says it is one, or ''; `behaviour`, the row
+// `canonical`, one spelling per key, however an expression is spelled; `label` and `shortLabel`, how it is spoken, else
+// the spelling; `kind`, where the interface treats it apart; `layer`, `layerForm`, `layerMods` and `layerTap`, what a
+// layer key does to which layer; `turnsOn`, the layers it turns on as a mask; `legends`, what the host layout prints on
+// it; `macro` and `customKey`, the name the profile lists it by when core says it is one, or ''; `behaviour`, the row
 // keyed exactly by this spelling; `listening`, the row keyed by this key however either is spelled; `pointing`, the slot
-// it holds or locks, and `variant`, which of the two.
+// it holds or locks, and `variant`, which of the two. Each fact core publishes is read under every name the key goes by.
 export interface KeyIdentity {
     readonly spelling: string;
     readonly name: string;
     readonly canonical: string;
-    readonly spellings: string[];
+    readonly label: string;
+    readonly shortLabel: string;
     readonly kind: import('../../contracts/model.js').KeyKind | undefined;
+    readonly layer: number | undefined;
+    readonly layerForm: import('../../contracts/model.js').LayerForm | undefined;
+    readonly layerMods: string | undefined;
+    readonly layerTap: string | undefined;
+    readonly turnsOn: number;
+    readonly legends: string[] | undefined;
     readonly value: number | undefined;
     readonly entry: import('../../contracts/panel.js').CatalogEntry | undefined;
     readonly macro: string;
@@ -95,8 +104,6 @@ export interface KeyIdentity {
     readonly listening: BehaviorView | undefined;
     readonly pointing: PointingSlot | undefined;
     readonly variant: 'hold' | 'lock';
-    /** What a table core keys by keycode name says of the key, under each of its spellings in turn: the first entry `found` accepts (any but an empty one by default). */
-    lookUp<T>(table: Readonly<Record<string, T>> | null | undefined, found?: (value: T | undefined) => boolean): T | undefined;
 }
 export type NamesOf = (keycode: string | undefined) => string[];
 // `times`: sent once per press of that many; `first`: the row's own first tap, not the key's.

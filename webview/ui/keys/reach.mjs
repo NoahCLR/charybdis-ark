@@ -7,7 +7,7 @@
 // the "Reached by" words every reach table shares.
 
 import {esc} from "../../lib/dom.mjs";
-import {actionLabel, keyMeaning, keyName} from "../../view/keyface.mjs";
+import {keyMeaning, keyName} from "../../view/keyface.mjs";
 import {placementsOf, reachText} from "../../view/reach.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
@@ -89,7 +89,7 @@ export const keysReach = (keys, {names = true, branches} = {}) => {
 // name, with the keycode beside it when the two differ.
 /** @param {Model} model @param {string} keycode */
 const namedKey = (model, keycode) => {
-    const label = actionLabel(model, keycode);
+    const label = keyIdentity(model, keycode).label;
     return label === String(keycode) ? esc(label) : `${actionMarked(model, keycode, label)} <code class="dim">${esc(keycode)}</code>`;
 };
 // The cells a branch sits in, as Review and the grid head them: the branch's

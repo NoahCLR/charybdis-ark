@@ -106,12 +106,14 @@ Around the core:
   index)`, `webview/view/key-reach.mjs`.
 - Which key a spelling is (the name the profile knows it by, one spelling
   per key, the macro, custom key or pointing slot it is, and the behaviour
-  row keyed exactly by it or listening to it however it is spelled), and
-  whether two spellings are one key: `keyIdentity(model, spelling)` and
-  `sameKey`, `webview/view/key-identity.mjs`. Nothing else in the interface
-  reads the alias table, and a table core keys by keycode name
-  (`qmkKeyLabels`, `qmkKeyKinds`, …) is read under a key's spellings only
-  through its `lookUp`.
+  row keyed exactly by it or listening to it however it is spelled), what
+  core publishes of it (its label, kind, layer and what it does to it, the
+  layers it turns on, the host layout's legends), and whether two spellings
+  are one key: `keyIdentity(model, spelling)` and `sameKey`,
+  `webview/view/key-identity.mjs`. Nothing else in the interface reads the
+  alias table or a table core keys by keycode name (`qmkKeyLabels`,
+  `qmkKeyKinds`, …, `hostLayoutLegends`): each is a fact of the key, read
+  under every name it goes by.
 - Whether an area takes an edit now, and what to say when it does not (or
   nothing, while the draft is busy): `editGate(model, area)`,
   `webview/view/edit-gate.mjs`. A screen disables its controls by it and
@@ -135,8 +137,8 @@ row here for a kind of rule points there rather than repeating it.
 | The keyboard's own keycode blocks: custom keys, pointing-mode keys, layer locks, and the names Ark writes for a custom key and a macro slot (`customKeyName`, `macroName`) | `core/data/user-keycodes.js`, `core/data/pd-mode-keys.js`, `macroName` beside `macroOfName` in `rules/qmk-keycodes.mjs`; the Charybdis pointer keys (`QK_KB`) are the keycode catalog's; the interface's copy of the layer-lock block in `webview/view/keycode-expression.mjs` | `tests/data/user-keycodes.test.js`, `tests/data/pd-mode-keys.test.js`, `tests/view/enum-drift.test.mjs`, `tests/scripts/conventions.test.js` |
 | Keycode names, labels and aliases | the keycode catalog, `core/data/keycode-catalog.js`, vendored from `upstream/qmk/`; a keycode read and written by them in `core/schema/keycodes.js` | `tests/data/keycode-catalog.test.js`, `tests/schema/keycodes.test.js`, `npm run keycodes -- --check` |
 | Which keycodes the keycode picker offers: not those of features this firmware does not build, the retired user block, QMK's own macro names or Charybdis's own drag scroll | `core/data/offered-keycodes.js`, published on each `qmkKeycodes` entry as `offered` and read by `pickable` in `webview/view/picker-sections.mjs` | `tests/data/offered-keycodes.test.js`, `tests/view/picker-sections.test.mjs` |
-| What each layer key does to its layer, by QMK's function (`MO` … `PDF`, `LT`, `LM`, `LOCK_LAYER`), the modifiers a layer-mod holds with it and what a layer-tap taps | `keyLayerForm`, `layerModWords` and `layerTapWords` in `core/model/key-names.js` (a layer-mod's and a mod-tap's modifiers from the keycode's own bits, `heldModifierWords`), published as `qmkKeyLayerForms`, `qmkKeyLayerMods` and `qmkKeyLayerTaps` beside `qmkKeyLayers` and read through `layerFormOf`, `layerModsOf` and `layerTapOf` in `webview/view/keyface.mjs` | `tests/model/profile-model.test.js`, `tests/view/keyface.test.mjs` |
-| Which key a keycode spelling is, by the names core publishes for it (`qmkKeycodeAliases`): the name the profile knows it by, one canonical spelling per key, the names a fact may be published under, and whether two spellings are one key | `keyIdentity` and `sameKey` in `webview/view/key-identity.mjs`, the only interface module reading the alias table beside the keycode grammar's reader (`webview/view/keycode-expression.mjs`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
+| What each layer key does to its layer, by QMK's function (`MO` … `PDF`, `LT`, `LM`, `LOCK_LAYER`), the modifiers a layer-mod holds with it and what a layer-tap taps | `keyLayerForm`, `layerModWords` and `layerTapWords` in `core/model/key-names.js` (a layer-mod's and a mod-tap's modifiers from the keycode's own bits, `heldModifierWords`), published as `qmkKeyLayerForms`, `qmkKeyLayerMods` and `qmkKeyLayerTaps` beside `qmkKeyLayers` and read as `keyIdentity(model, spelling).layerForm`, `.layerMods`, `.layerTap` and `.layer` in `webview/view/key-identity.mjs` | `tests/model/profile-model.test.js`, `tests/view/key-identity.test.mjs`, `tests/view/keyface.test.mjs` |
+| Which key a keycode spelling is, by the names core publishes for it (`qmkKeycodeAliases`): the name the profile knows it by, one canonical spelling per key, what core publishes of it under every name it goes by, and whether two spellings are one key | `keyIdentity` and `sameKey` in `webview/view/key-identity.mjs`, the only interface module reading the alias table beside the keycode grammar's reader (`webview/view/keycode-expression.mjs`), and the only one reading a table core keys by keycode name | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
 | Which keys the interface treats apart: transparent (`KC_TRANSPARENT`), disabled (`KC_NO`), a macro's and a custom key's | `keyKind` in `core/model/key-names.js`, published by every name a keycode is read under as `qmkKeyKinds` and read as `keyIdentity(model, spelling).kind` in `webview/view/key-identity.mjs` | `tests/model/key-names.test.js`, `tests/model/profile-model.test.js`, `tests/view/keyface.test.mjs` |
 | Actions, native keycodes and layer references | `core/schema/actions.js` | `tests/schema/actions.test.js` |
 | Macro limits | `MACRO_DOMAIN_V1` in `core/schema/macro-domain-v1.js`; the keys held at once and the longest delay, `MACRO_LIMITS` in `rules/macro-payload.mjs`, which core and the interface both read | `tests/schema/macro-domain-v1.test.js`, `tests/rules/macro-payload.test.mjs` |

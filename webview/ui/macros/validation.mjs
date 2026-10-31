@@ -5,7 +5,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {macroLocalState, samePayload, unreleased} from "../../view/macro.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
-import {actionLabel} from "../../view/keyface.mjs";
+import {keyIdentity} from "../../view/key-identity.mjs";
 import {listed, vocabulary} from "../../view/vocabulary.mjs";
 import {getModel, macroForm, post, setMacroForm, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
@@ -90,7 +90,7 @@ export function paintFeedback(card, model, slot) {
     const held = unreleased(parsed.steps, model);
     /** @type {import("../../../contracts/messages.js").MacroValidation | null | undefined} */
     const inspection = matchingValidation(form, model, slot) ? form.validation?.validation : null;
-    const error = form.stepError || parsed.error || (held.length ? `Release ${listed(held.map(key => actionLabel(model, key)))} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
+    const error = form.stepError || parsed.error || (held.length ? `Release ${listed(held.map(key => keyIdentity(model, key).label))} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
     const note = error ? (local ? "Fix this edit before it can be kept in your draft." : `Change ${sectionPath(model, "host")} or fix the macro before playing it.`) : local && !inspection ? "Checking this edit…" : "";
     const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
     feedback.hidden = !error && !note;

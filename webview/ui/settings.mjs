@@ -19,7 +19,7 @@ import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 import {githubMark} from "../view/shell-panel.mjs";
-import {actionLabel} from "../view/keyface.mjs";
+import {keyIdentity} from "../view/key-identity.mjs";
 import {keycodePlacements, reachLine} from "../view/placements.mjs";
 import {durationControl} from "./duration.mjs";
 import {layerSwitchGrid} from "./layer-switches.mjs";
@@ -284,7 +284,7 @@ function snipingKeys(model, canEdit) {
         <div class="sect-h"><h4>Sniping keys</h4></div>
         <p class="note">Sniping is on while one of these keys is held or toggled, and while one of the auto-sniping layers is on.</p></div>`);
     for (const keycode of ["SNIPING", "SNP_TOG"]) {
-        const words = actionLabel(model, keycode);
+        const words = keyIdentity(model, keycode).label;
         const row = el(`<div class="row gap-10 sniping-key">
             <span class="sniping-name">${esc(words)}</span>
             <span class="note">${esc(reachLine(keycodePlacements(model, [keycode])))}</span>

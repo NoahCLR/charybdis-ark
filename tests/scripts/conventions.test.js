@@ -116,8 +116,32 @@ test("markup reaches the page's HTML sinks only through its Trusted Types policy
     assert.deepEqual(HTML_SINK_ALLOWED.filter(allow => !found.some(sink => isAllowed([allow], sink))), [], "drop an allowed line the check no longer finds");
 });
 
+// A position's stored keycode name is how the keyboard spells it; a behaviour
+// row, a macro and a pointing slot are keyed by what it means. An argument may
+// hold one level of parentheses (`position.keycode || ""`, a call), and a fact
+// may be read off the identity or destructured from it.
+const STORED_NAME = String.raw`\((?:[^;\n()]|\([^()\n]*\))*\b(?:position|pos)\.keycode\b(?:[^;\n()]|\([^()\n]*\))*\)`;
+const SEMANTIC_FACT = "behaviour|pointing|macro|customKey";
+const badLookup = new RegExp([
+    String.raw`keyIdentity${STORED_NAME}\s*\.\s*(?:${SEMANTIC_FACT})\b`,
+    String.raw`\{[^}]*\b(?:${SEMANTIC_FACT})\b[^}]*\}\s*=\s*keyIdentity${STORED_NAME}`,
+    String.raw`(?:macroNamesOf|placementsOf)\([^;\n]*\b(?:position|pos)\.keycode\b`,
+    String.raw`(?<![!=])===(?!=)\s*(?:position|pos)\.keycode\b`,
+].join("|"));
+
+test("the semantic lookup check catches a stored keycode name however the fact is reached", () => {
+    for (const sample of ["const row = keyIdentity(model, position.keycode).behaviour;", "const {behaviour} = keyIdentity(model, position.keycode);",
+        'const slot = keyIdentity(model, pos.keycode || "").pointing;', "const {macro, customKey: key} = keyIdentity(lookup(model), pos.keycode ?? fallback);",
+        "if (row.keycode === position.keycode) return row;", "const names = macroNamesOf(model, position.keycode);"]) {
+        assert.ok(badLookup.test(sample), sample);
+    }
+    for (const sample of ["const key = keyIdentity(model, position.keycode);", "const kind = keyIdentity(model, position.keycode).kind;",
+        "const row = keyIdentity(model, keyMeaning(position)).behaviour;", "const {behaviour} = keyIdentity(model, keyMeaning(position));"]) {
+        assert.ok(!badLookup.test(sample), sample);
+    }
+});
+
 test("semantic domain lookups do not use a position's stored keycode name", () => {
-    const badLookup = /keyIdentity\([^;\n]*\b(?:position|pos)\.keycode\)\.(?:behaviour|pointing|macro|customKey)\b|(?:macroNamesOf|placementsOf)\([^;\n]*\b(?:position|pos)\.keycode\b|(?<![!=])===(?!=)\s*(?:position|pos)\.keycode\b/;
     // inputOn accepts native or semantic combo input names: it checks both.
     // The action-use matcher also accepts native catalogue names/values.
     const compatibilityLines = [
@@ -321,33 +345,37 @@ const staleAllowed = (directories, pattern, allowed) => {
 };
 
 // A table core keys by keycode name (qmkKeyLabels, qmkKeyShortLabels,
-// qmkKeyKinds, qmkKeyLayers, qmkKeyTurnsOn, …) holds a key under the names
-// core knows it by, so it is read under each of the key's spellings, by
-// keyIdentity(model, spelling).lookUp (or .kind) in
-// webview/view/key-identity.mjs; keyface.mjs's factOf is that call. Every
-// other module hands lookUp the table, never indexes it. Syntactic: any
-// mention of such a table but as lookUp's or factOf's table.
-const KEY_TABLE = /(?<!(?:\.lookUp|\bfactOf)\(\s*model\?\.\s*)\bqmkKey[A-Z]\w*/g;
+// qmkKeyKinds, qmkKeyLayers, qmkKeyTurnsOn, …, and the host layout's
+// hostLayoutLegends) holds a key under the names core knows it by, so it is
+// read under each of the key's spellings, and only
+// webview/view/key-identity.mjs reads one: every other module asks
+// keyIdentity(model, spelling) for the fact (`label`, `kind`, `layer`, …).
+// Syntactic: any mention of such a table outside a comment.
+const KEY_TABLE = /\b(?:qmkKey[A-Z]\w*|hostLayoutLegends)\b/g;
 const KEY_TABLE_ALLOWED = [
     // The keys core names a layer for, to find the one a text names: a walk
     // of the whole table, which reads no spelling.
     {file: "webview/ui/marks.mjs", line: "const keycodes = marker?.kind === \"layer\" ? Object.entries(model?.qmkKeyLayers || {}).flatMap(([keycode, layer]) => layer === marker.layer ? [keycode] : [])"},
+    // Whether the host layout prints legends of its own at all, to explain
+    // them under the board: the table's presence, which reads no key.
+    {file: "webview/ui/picker.mjs", line: "${model?.hostLayoutLegends ? `<p class=\"note pk-note\">Shift above; ${esc(vocabulary(model).thirdLevel)} on the right. ◌ marks a dead key: press it, then a letter.</p>` : \"\"}"},
 ];
 
-test("the key table check catches a table read under one spelling", () => {
+test("the key table check catches a keycode-keyed table read outside the key identity", () => {
     for (const sample of ["const spoken = model?.qmkKeyLabels?.[source.value];", "return model.qmkKeyKinds[known] === \"macro\";",
-        "const table = model?.qmkKeyTurnsOn || {};", "const {qmkKeyShortLabels} = model;"]) {
+        "const table = model?.qmkKeyTurnsOn || {};", "const {qmkKeyShortLabels} = model;", "const legend = model?.hostLayoutLegends?.[source.value];",
+        "const spoken = labelIn(model?.qmkKeyLabels, key);"]) {
         assert.equal(uncommented(sample).match(KEY_TABLE)?.length, 1, sample);
     }
-    for (const sample of ["const spoken = keyIdentity(model, key).lookUp(model?.qmkKeyLabels);", "const tap = factOf(model?.qmkKeyLayerTaps, model, keycode);",
-        "const kind = keyIdentity(model, keycode).kind;", "// as core publishes it (qmkKeyKinds)", "const entry = model?.qmkKeycodes?.[0];"]) {
+    for (const sample of ["const spoken = keyIdentity(model, key).label;", "const kind = keyIdentity(model, keycode).kind;",
+        "// as core publishes it (qmkKeyKinds)", "const entry = model?.qmkKeycodes?.[0];", "const legend = identity.legends;"]) {
         assert.equal(uncommented(sample).match(KEY_TABLE), null, sample);
     }
 });
 
-test("only the key identity reads a keycode-keyed table under a spelling", () => {
+test("only the key identity reads a keycode-keyed table", () => {
     const violations = literals(["webview"], KEY_TABLE, KEY_TABLE_ALLOWED).filter(found => !found.startsWith("webview/view/key-identity.mjs:"));
-    assert.deepEqual(violations, [], "read it with keyIdentity(model, spelling).lookUp(table) in webview/view/key-identity.mjs");
+    assert.deepEqual(violations, [], "ask keyIdentity(model, spelling) in webview/view/key-identity.mjs for the fact");
     assert.deepEqual(staleAllowed(["webview"], KEY_TABLE, KEY_TABLE_ALLOWED), [], "drop an allowed line the check no longer finds");
 });
 

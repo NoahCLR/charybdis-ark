@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
+import {actionNaming, dualRole, keyFace, keyName, visibleKeycode, cellLabel, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import {createRequire} from "node:module";
 import keyNames from "../../core/model/key-names.js";
 import {behaviourEditorRow} from "../../webview/view/behavior-editor.mjs";
@@ -105,18 +105,6 @@ test("a key's name outside a cap is the core's whole name, not the cap's short l
     assert.equal(keyName(cap("KC_A"), words), "A");
     assert.equal(keyName(cap("KC_TRANSPARENT"), words), "Transparent");
     assert.equal(keyName(cap("KC_NO"), words), "Unmapped");
-});
-
-test("a layer key knows the layer the core says it acts on, however the keyboard stores it", () => {
-    const model = {qmkKeycodeAliases: {QK_USER_31: "LOCK_LAYER(3)", KC_ENT: "KC_ENTER"},
-        qmkKeyLayers: {"MO(3)": 3, "LT(2,KC_J)": 2, "LOCK_LAYER(3)": 3, "LGUI(KC_3)": undefined}};
-    assert.equal(layerOfKeycode(model, "MO(3)"), 3);
-    assert.equal(layerOfKeycode(model, "LT(2,KC_J)"), 2);
-    assert.equal(layerOfKeycode(model, "LT(2, KC_J)"), 2, "however the expression is spaced");
-    assert.equal(layerOfKeycode(model, "QK_USER_31"), 3, "a layer lock stored as a user slot");
-    assert.equal(layerOfKeycode(model, "KC_ENT"), null);
-    assert.equal(layerOfKeycode(model, "LGUI(KC_3)"), null, "a number inside a keycode is not a layer");
-    assert.equal(layerOfKeycode(model, "MO(4)"), null, "a layer the core has not named is not worked out here");
 });
 
 test("a layer-tap cap names its layer on the second line, as the core names it", () => {
