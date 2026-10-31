@@ -9,7 +9,6 @@ import {modifierPick, pickerModifierProblem} from "./keyvalues.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "./picker-sections.mjs";
 import {macroMatches} from "./macro.mjs";
 import {shortcutModifiers, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
-import {layerFormOf, layerOfKeycode} from "./keyface.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 
@@ -72,13 +71,13 @@ export const isPicked = (model, picker, value) => {
 /** @param {Model} model @param {Picker} picker @param {string} value */
 export function isLayerKeyPicked(model, picker, value) {
     if (isPicked(model, picker, value)) return true;
-    const verbs = vocabulary(model).layerKeyVerbs, layer = layerOfKeycode(model, value);
+    const verbs = vocabulary(model).layerKeyVerbs, layer = keyIdentity(model, value).layer;
     /** @param {string} key */
     const verb = (key) => {
-        const form = layerFormOf(model, key);
+        const form = keyIdentity(model, key).layerForm;
         return form ? verbs[form] : undefined;
     };
-    return layer !== null && verb(value) !== undefined && picker.keys.some((key) => layerOfKeycode(model, key) === layer && verb(key) === verb(value));
+    return layer !== undefined && verb(value) !== undefined && picker.keys.some((key) => keyIdentity(model, key).layer === layer && verb(key) === verb(value));
 }
 
 // Modifiers alone, or with a modifier key, are one set of modifiers, stored as

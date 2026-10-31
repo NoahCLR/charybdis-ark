@@ -56,28 +56,20 @@ export function pointingReachInView(view) {
 // pressed is startedRoutes', which knows the layers on there.
 /** @param {ViewModel} model @returns {import("./keyface-types.js").NamesOf} */
 const pointingNamesOf = (model) => (keycode) => {
-    const slot = keyIdentity(model, keycode).pointing;
-    const turnsOn = layersTurnedOn(model, keycode);
+    const {pointing: slot, turnsOn} = keyIdentity(model, keycode);
     const started = turnsOn ? (model?.pdModes || []).filter((entry) => entry !== slot
         && (entry.linkStarts || []).some((start) => turnsOn & 2 ** start.layer)) : [];
     return [...(slot ? [slot] : []), ...started].map((entry) => String(entry.id));
 };
 
-// The layers a keycode turns on, as the core publishes them (qmkKeyTurnsOn,
-// core/model/layer-effects.js keycodeLayersOn), read under the stored name, the
-// name the core knows it by, or however the expression is spelled.
-/** @param {ViewModel} model @param {string | undefined} keycode */
-function layersTurnedOn(model, keycode) {
-    return (keyIdentity(model, keycode).lookUp(model?.qmkKeyTurnsOn, (layers) => Number.isInteger(layers)) ?? 0) >>> 0;
-}
-
 // The layers by which `keycode` starts a slot's mode, as a mask: the layers it
-// turns on that start the mode (slot.linkStarts, core/model/pointing-links.js),
+// turns on, as core publishes them (keyIdentity's turnsOn), that start the
+// mode (slot.linkStarts, core/model/pointing-links.js),
 // each only while no layer ending a start from it is on, with `on` (the layers
 // on where it is pressed) and the layers it turns on. Zero for none.
 /** @param {ViewModel} model @param {PointingSlot} slot @param {string | undefined} keycode @param {number} on */
 function pointingStartsVia(model, slot, keycode, on) {
-    const turnsOn = layersTurnedOn(model, keycode), active = on | turnsOn;
+    const turnsOn = keyIdentity(model, keycode).turnsOn, active = on | turnsOn;
     return (slot.linkStarts || []).reduce((mask, start) =>
         turnsOn & 2 ** start.layer && linkStartHolds(start, active) ? mask | 2 ** start.layer : mask, 0) >>> 0;
 }

@@ -9,6 +9,13 @@
 // spelling and model, worked out once on first read (a model is replaced,
 // never mutated, so the answers are kept as long as it is).
 //
+// What core says of a key, it publishes in tables keyed by keycode name
+// (qmkKeyLabels, qmkKeyKinds, qmkKeyLayers, …), under the names it knows the
+// key by. This module alone reads them, under each of a key's spellings in
+// turn, and gives each one fact (`label`, `kind`, `layer`, …) with its own
+// rule for when an entry is no answer: an empty label is none, layer 0 is a
+// layer.
+//
 // Two ways of matching a key stay apart. A behaviour row is keyed exactly by
 // the name the profile uses (`behaviour`: the key a position means, or the
 // output a combo sends, as it is). A key a person picks or types is matched
@@ -51,8 +58,6 @@ function identityOf(model, spelling) {
     // expression is spelled (canonical), and a bare number as core keys one
     // (0x7f00 → 0x7F00).
     const spellings = once(() => [spelling, aliases?.[spelling] ?? "", canonical(), hexSpelling(spelling)].filter(Boolean));
-    // What core says the key is where the interface treats it apart
-    // (qmkKeyKinds): transparent, disabled, a macro's or a custom key's.
     // What a table core keys by keycode name says of the key, read under
     // each spelling in turn: the first entry `found` accepts (any but an
     // empty one unless it says otherwise), or undefined.
@@ -61,7 +66,33 @@ function identityOf(model, spelling) {
         for (const spelled of spellings()) if (found(table?.[spelled])) return table?.[spelled];
         return undefined;
     };
+    // How the key is spoken (qmkKeyLabels), so a behaviour row, a reach line
+    // and the key cap call one key the same thing; a name the vocabulary does
+    // not cover keeps the spelling as written. Its short form for a tight
+    // space (qmkKeyShortLabels), else the same words.
+    const label = once(() => lookUp(model?.qmkKeyLabels) || spelling);
+    const shortLabel = once(() => lookUp(model?.qmkKeyShortLabels) || label());
+    // What core says the key is where the interface treats it apart
+    // (qmkKeyKinds): transparent, disabled, a macro's or a custom key's.
     const kind = once(() => lookUp(model?.qmkKeyKinds));
+    // The layer a layer key acts on (qmkKeyLayers, from core/model/key-names.js
+    // keyLayer): MO(3), LOCK_LAYER(3) and LT(3,KC_F) all name layer 3, and 0
+    // is a layer. What it does to that layer, by QMK's function
+    // (qmkKeyLayerForms, keyLayerForm); the modifiers a layer-mod holds with
+    // it, in the words its name ends in (qmkKeyLayerMods, layerModWords); and
+    // the key a layer-tap taps (qmkKeyLayerTaps, layerTapWords). The
+    // interface never works any of these out of a keycode itself.
+    const layer = once(() => lookUp(model?.qmkKeyLayers, (at) => Number.isInteger(at)));
+    const layerForm = once(() => lookUp(model?.qmkKeyLayerForms));
+    const layerMods = once(() => lookUp(model?.qmkKeyLayerMods));
+    const layerTap = once(() => lookUp(model?.qmkKeyLayerTaps));
+    // The layers pressing the key turns on, as a mask, 0 for none
+    // (qmkKeyTurnsOn, core/model/layer-effects.js keycodeLayersOn).
+    const turnsOn = once(() => (lookUp(model?.qmkKeyTurnsOn, (mask) => Number.isInteger(mask)) ?? 0) >>> 0);
+    // What the host layout prints on the key (hostLayoutLegends): plain,
+    // Shift, Option/AltGr, then both; undefined on US, or for a key it does
+    // not print.
+    const legends = once(() => lookUp(model?.hostLayoutLegends));
     const value = once(() => keycodeValue(model, spelling));
     // The keyboard's catalogue entry for the key, by the name the profile
     // knows it by or any alias it lists, as written or as that name.
@@ -90,8 +121,15 @@ function identityOf(model, spelling) {
         spelling,
         name,
         get canonical() { return canonical(); },
-        get spellings() { return spellings(); },
+        get label() { return label(); },
+        get shortLabel() { return shortLabel(); },
         get kind() { return kind(); },
+        get layer() { return layer(); },
+        get layerForm() { return layerForm(); },
+        get layerMods() { return layerMods(); },
+        get layerTap() { return layerTap(); },
+        get turnsOn() { return turnsOn(); },
+        get legends() { return legends(); },
         get value() { return value(); },
         get entry() { return entry(); },
         get macro() { return macro(); },
@@ -100,7 +138,6 @@ function identityOf(model, spelling) {
         get listening() { return listening(); },
         get pointing() { return pointing(); },
         get variant() { return variant(); },
-        lookUp,
     };
 }
 

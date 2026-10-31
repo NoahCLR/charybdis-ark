@@ -17,7 +17,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {macroMatches, macroPeekSteps} from "../view/macro.mjs";
 import {readMacro} from "../view/macro-cache.mjs";
-import {actionLabel} from "../view/keyface.mjs";
+import {keyIdentity} from "../view/key-identity.mjs";
 import {getModel, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
@@ -65,7 +65,7 @@ export function screenMacros() {
     bank.forEach((row, index) => {
         if (!macroMatches(row, query)) return;
         const {steps} = readMacro(model, row.keycode, row.payload, "grid");
-        const peek = macroPeekSteps(readMacro(model, row.keycode, row.payload, "peek").steps, (name) => actionLabel(model, name));
+        const peek = macroPeekSteps(readMacro(model, row.keycode, row.payload, "peek").steps, (name) => keyIdentity(model, name).label);
         const out = row.available === false;
         const tip = out ? `Slot ${index} · unavailable: macro memory keeps its free room for the lower empty slots. Shorten or clear a macro to make it available.`
             : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"} · ${row.payload}`;

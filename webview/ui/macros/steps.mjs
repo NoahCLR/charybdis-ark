@@ -5,7 +5,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {MAX_DELAY, MAX_KEYS, describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
 import {withStepFocus} from "../../view/macro-focus.mjs";
-import {actionLabel} from "../../view/keyface.mjs";
+import {keyIdentity} from "../../view/key-identity.mjs";
 import {appendSequenceStep, moveSequenceStep, sequenceFace, sequenceInsertionAt, sequenceIssues} from "../../view/macro-sequence.mjs";
 import {getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
@@ -40,7 +40,7 @@ export function saveSteps(slot, steps, stage = false, group = null) {
     const model = getModel();
     const {payload, error} = macroStepsInput(steps, model);
     rememberMacroEdit(slot, payload, steps, group);
-    const issues = sequenceIssues(steps, model, key => actionLabel(model, key));
+    const issues = sequenceIssues(steps, model, key => keyIdentity(model, key).label);
     setMacroForm(slot.keycode, {steps, draft: payload, stepError: error || issues.find(Boolean) || "", cancelBlur: false});
     const raw = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`[data-raw-payload="${slot.keycode}"]`));
     if (raw && document.activeElement !== raw) raw.value = payload;
@@ -106,7 +106,7 @@ export function sequenceEditor(model, slot, steps, canEdit) {
 /** @param {HTMLElement} node @param {import('../../../contracts/panel.js').PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps */
 function paintTiles(node, model, slot, steps) {
     const editable = node.closest("[data-macro-sequence]")?.getAttribute("data-editable") === "true";
-    const issues = sequenceIssues(steps, model, key => actionLabel(model, key));
+    const issues = sequenceIssues(steps, model, key => keyIdentity(model, key).label);
     /** @type {string | null} */
     let dragged = null;
     const clearDrop = () => node.querySelectorAll(".drop-before, .drop-after").forEach(item => item.classList.remove("drop-before", "drop-after"));
@@ -210,7 +210,7 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
             <button class="btn tiny ghost" data-close-step aria-label="Close step editor">×</button></span></div>
         ${step.kind === "text" ? `<label class="field"><textarea data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:text" aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${esc(index)}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
             : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${esc(index)}" type="number" min="0" max="${esc(MAX_DELAY)}" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
-            : `<div class="row"><span class="tok">${esc(describeStep(step, key => actionLabel(model, key))) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
+            : `<div class="row"><span class="tok">${esc(describeStep(step, key => keyIdentity(model, key).label)) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
     </div>`);
     const input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (node.querySelector("textarea, input"));
     input?.addEventListener("input", () => {

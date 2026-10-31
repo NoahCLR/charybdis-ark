@@ -1,7 +1,6 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {macroNamed, vocabulary} from "./vocabulary.mjs";
-import {actionLabel} from "./keyface.mjs";
 import {keyIdentity, keycodeName, macroIndex} from "./key-identity.mjs";
 import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MOD_BITS, MOD_RIGHT, QK, inBlock, macroName, modsOf} from "../../rules/qmk-keycodes.mjs";
 
@@ -17,7 +16,7 @@ export function keyDisplayName(/** @type {Model} */ model, /** @type {number} */
     if (!code) return "";
     const macro = pointingMacro(model, code);
     if (macro) return macro.name;
-    return actionLabel(model, keyIdentity(model, keycodeName(model, code)).canonical);
+    return keyIdentity(model, keyIdentity(model, keycodeName(model, code)).canonical).label;
 }
 
 // The modifiers a compact keycode carries (0x0100–0x1fff, as KC_EXLM is

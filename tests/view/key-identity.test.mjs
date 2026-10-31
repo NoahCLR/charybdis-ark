@@ -6,7 +6,8 @@ import {keyMeaning} from "../../webview/view/keyface.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
 
 const require = createRequire(import.meta.url);
-const {keyAt, publishedModel} = require("../fixtures/published-model.js");
+const {keyAt, profileDocument, publishedModel} = require("../fixtures/published-model.js");
+const {buildDeviceModel} = require("../../core/session/device-model");
 
 // Which key a spelling is reads what core publishes: its alias table, the
 // kinds of key it treats apart, its behaviours, macros, custom keys and
@@ -41,14 +42,94 @@ test("a key's catalogue entry is found by its name or any alias the catalogue li
     assert.equal(keyIdentity({qmkKeycodes: [enter]}, "KC_ENT").entry?.keycode, enter.keycode);
 });
 
-test("a table keyed by keycode name is read under each spelling in turn, the first it accepts winning", () => {
-    const model = {...publishedModel(), qmkKeycodeAliases: {KC_ENT: "KC_ENTER"}};
-    assert.equal(keyIdentity(model, "KC_ENT").lookUp({KC_ENTER: "by its name"}), "by its name");
-    assert.equal(keyIdentity(model, "KC_ENT").lookUp({KC_ENT: "as written", KC_ENTER: "by its name"}), "as written");
-    assert.equal(keyIdentity(model, "0x7f00").lookUp({"0x7F00": "a bare number"}), "a bare number", "a number however it is cased");
-    assert.equal(keyIdentity(model, "KC_ENT").lookUp({KC_ENT: "", KC_ENTER: "not empty"}), "not empty", "an empty entry is no answer");
-    assert.equal(keyIdentity(model, "KC_ENT").lookUp({KC_ENT: 0}, (layer) => Number.isInteger(layer)), 0, "unless the reader accepts it");
-    assert.equal(keyIdentity(model, "KC_ENT").lookUp(undefined), undefined);
+test("a key is spoken by core's label under any name it goes by, and as written where core gives none", () => {
+    const model = {qmkKeycodeAliases: {KC_ENT: "KC_ENTER", KC_ESC: "KC_ESCAPE", KC_J: "KC_J"},
+        qmkKeyLabels: {KC_ENTER: "Enter", KC_ESC: "", KC_ESCAPE: "Esc", "0x7F00": "Right Thumb", "LT(2,KC_J)": "J / Symbols"}};
+    assert.equal(keyIdentity(model, "KC_ENT").label, "Enter", "by the name the profile knows it by");
+    assert.equal(keyIdentity({...model, qmkKeyLabels: {KC_ENT: "as written", KC_ENTER: "Enter"}}, "KC_ENT").label, "as written", "as written first");
+    assert.equal(keyIdentity(model, "LT(2, KC_J)").label, "J / Symbols", "however the expression is spelled");
+    assert.equal(keyIdentity(model, "0x7f00").label, "Right Thumb", "a bare number however it is cased");
+    assert.equal(keyIdentity(model, "KC_ESC").label, "Esc", "an empty label is none");
+    assert.equal(keyIdentity(model, "QK_BOOT").label, "QK_BOOT", "a name core does not label keeps its spelling");
+    assert.equal(keyIdentity(null, "KC_ENT").label, "KC_ENT");
+    assert.equal(keyIdentity(model, undefined).label, "");
+    // As core publishes it: a named custom key by its name, under its number.
+    assert.equal(keyIdentity(publishedModel(), "0x7f00").label, publishedModel().qmkKeyLabels.CUSTOM_KEY_0);
+});
+
+test("a key's short label is core's short form, else its label", () => {
+    const model = {qmkKeycodeAliases: {KC_LCMD: "KC_LGUI"}, qmkKeyLabels: {KC_LGUI: "Left Command", KC_C: "C"}, qmkKeyShortLabels: {KC_LGUI: "L Cmd"}};
+    assert.equal(keyIdentity(model, "KC_LGUI").shortLabel, "L Cmd");
+    assert.equal(keyIdentity(model, "KC_LCMD").shortLabel, "L Cmd", "under any name it goes by");
+    assert.equal(keyIdentity(model, "KC_C").shortLabel, "C", "no short form: the label");
+    assert.equal(keyIdentity(model, "KC_X").shortLabel, "KC_X", "no label: the spelling");
+});
+
+test("a layer key acts on the layer core says, however the keyboard stores it, layer 0 included", () => {
+    const model = {qmkKeycodeAliases: {QK_USER_31: "LOCK_LAYER(3)", KC_ENT: "KC_ENTER"},
+        qmkKeyLayers: {"MO(3)": 3, "LT(2,KC_J)": 2, "LOCK_LAYER(3)": 3, "DF(0)": 0, "LGUI(KC_3)": undefined}};
+    assert.equal(keyIdentity(model, "MO(3)").layer, 3);
+    assert.equal(keyIdentity(model, "LT(2, KC_J)").layer, 2, "however the expression is spaced");
+    assert.equal(keyIdentity(model, "QK_USER_31").layer, 3, "a layer lock stored as a user slot");
+    assert.equal(keyIdentity(model, "DF(0)").layer, 0, "Base is a layer");
+    assert.equal(keyIdentity(model, "KC_ENT").layer, undefined);
+    assert.equal(keyIdentity(model, "LGUI(KC_3)").layer, undefined, "a number inside a keycode is not a layer");
+    assert.equal(keyIdentity(model, "MO(4)").layer, undefined, "a layer the core has not named is not worked out here");
+});
+
+// A profile with these keys on Base, as core publishes it: layers Base,
+// Numbers, Symbols and Navigation.
+const LAYER_KEYS = ["MO(1)", "LT(2,KC_F)", "LM(1,MOD_LSFT)", "TG(3)", "DF(0)", 0x7ec3, "KC_A", "PD_MODE_5", "CUSTOM_KEY_2", "KC_TRANSPARENT"];
+const layerKeys = publishedModel(profileDocument({keys: {0: Object.fromEntries(LAYER_KEYS.entries())}}));
+const [hold, layerTap, layerMod, toggle, base, lock, plain] = layerKeys.layers[0].positions;
+
+test("what a layer key does to its layer is core's, by QMK's function", () => {
+    assert.deepEqual([hold, layerTap, layerMod, toggle, base, lock, plain].map((position) => keyIdentity(layerKeys, position.keycode).layerForm),
+        ["MO", "LT", "LM", "TG", "DF", "LOCK_LAYER", undefined]);
+    assert.equal(lock.keycode, "0x7EC3", "a layer lock is stored as a user slot, and reads as one by that name");
+});
+
+test("a layer-mod holds its modifiers in the words its name ends in", () => {
+    assert.equal(keyIdentity(layerKeys, layerMod.keycode).layerMods, "Shift");
+    assert.equal(keyIdentity(layerKeys, "LM(1, MOD_LSFT)").layerMods, "Shift", "however the expression is spaced");
+    assert.equal(keyIdentity(layerKeys, hold.keycode).layerMods, undefined);
+});
+
+test("a layer-tap taps the key core names", () => {
+    assert.equal(keyIdentity(layerKeys, layerTap.keycode).layerTap, "F");
+    assert.equal(keyIdentity(layerKeys, "LT(2, KC_F)").layerTap, "F", "however the expression is spaced");
+    assert.equal(keyIdentity(layerKeys, hold.keycode).layerTap, undefined);
+    assert.equal(keyIdentity(layerKeys, plain.keycode).layerTap, undefined);
+});
+
+test("the layers a key turns on are core's, as a mask, and none is 0", () => {
+    const model = {qmkKeycodeAliases: {QK_USER_16: "PD_MODE_0"}, qmkKeyTurnsOn: {"MO(3)": 1 << 3, PD_MODE_0: 1 << 5, "TO(0)": 1}};
+    assert.equal(keyIdentity(model, "MO(3)").turnsOn, 1 << 3);
+    assert.equal(keyIdentity(model, "QK_USER_16").turnsOn, 1 << 5, "by the name the profile knows it by");
+    assert.equal(keyIdentity(model, "TO(0)").turnsOn, 1, "Base is a layer");
+    assert.equal(keyIdentity(model, "KC_A").turnsOn, 0);
+    assert.equal(keyIdentity(null, "MO(3)").turnsOn, 0);
+    assert.equal(keyIdentity(layerKeys, "MO(1)").turnsOn, 1 << 1, "as core publishes it");
+});
+
+test("a key's legends are what the host layout prints on it, and none on US", () => {
+    const german = buildDeviceModel({settingsView: {host: {effective: 2, layout: 9}}});
+    assert.deepEqual(keyIdentity(german, "KC_Y").legends, ["Z", "", "", ""], "a German board reads Z where QMK says KC_Y");
+    assert.equal(keyIdentity(german, "KC_ESC").legends, undefined, "a key the layout does not print");
+    assert.equal(keyIdentity(buildDeviceModel(), "KC_Y").legends, undefined);
+});
+
+test("a position's facts read the same by the keycode it stores as by what it means", () => {
+    // What a value means (keyMeaning) is the name core knows its keycode by,
+    // which is one of the names every fact is read under.
+    for (const model of [layerKeys, publishedModel()]) {
+        for (const position of model.layers.flatMap((layer) => layer.positions)) {
+            const [stored, meant] = [position.keycode, keyMeaning(position)].map((spelling) => keyIdentity(model, spelling));
+            for (const fact of /** @type {const} */ (["kind", "layer", "layerForm", "layerMods", "layerTap", "turnsOn", "macro", "customKey", "pointing"])) {
+                assert.deepEqual(stored[fact], meant[fact], `${position.keycode} (${keyMeaning(position)}): ${fact}`);
+            }
+        }
+    }
 });
 
 test("one key is one canonical spelling, however its expression is spelled", () => {
@@ -71,8 +152,6 @@ test("a value the keyboard names by its hex is the key core knows it as, however
     assert.equal(keyIdentity(model, "0x7E86").canonical, "PD_MODE_6");
     assert.equal(keyIdentity(model, "0x7F7F").canonical, "CUSTOM_KEY_127");
     assert.equal(keyIdentity(model, "0x0041").canonical, "0x0041", "a value nothing names stays as written");
-    assert.deepEqual(keyIdentity(model, "0x7f00").spellings, ["0x7f00", "CUSTOM_KEY_0", "0x7F00"],
-        "the names a fact may be published under: as written, as resolved, and the bare number as core keys it");
 });
 
 test("a behaviour row is keyed exactly; a picked key finds the row listening to it however either is spelled", () => {

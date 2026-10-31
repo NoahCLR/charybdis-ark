@@ -1,7 +1,6 @@
 // @ts-check
 // A branch or combo action read as the thing the person set up that it acts
 // on — a pointing mode, a layer or a macro — for the names keyface gives keys.
-import {actionLabel, layerFormOf, layerModsOf, layerOfKeycode, layerTapOf} from "./keyface.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {layerCalledAt, macroNamed, slotNamed, vocabulary} from "./vocabulary.mjs";
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
@@ -35,31 +34,31 @@ export function macroAction(model, action) {
 
 // A branch or combo action read as the layer it acts on: the layer, the name
 // it goes by, and what the action does to it, by what core says the key does
-// to its layer (qmkKeyLayerForms), in the words its name reads by ("Hold",
-// "Lock"; vocabulary.layerKeyVerbs). A layer-mod holds its layer with
-// modifiers, so it reads by them, as its name ends ("+ Shift"; core's
-// qmkKeyLayerMods). Null for any other action, for a layer-tap, which is a
+// to its layer (keyIdentity's layerForm), in the words its name reads by
+// ("Hold", "Lock"; vocabulary.layerKeyVerbs). A layer-mod holds its layer
+// with modifiers, so it reads by them, as its name ends ("+ Shift"; its
+// layerMods). Null for any other action, for a layer-tap, which is a
 // tap and a layer at once, and for a layer the model has not.
 /** @param {ViewModel} model @param {string} action */
 function layerAction(model, action) {
-    const at = layerOfKeycode(model, action), form = layerFormOf(model, action);
-    const name = at === null ? "" : layerCalledAt(model, at);
-    if (at === null || !form || form === "LT" || !name) return null;
+    const key = keyIdentity(model, action), at = key.layer, form = key.layerForm;
+    const name = at === undefined ? "" : layerCalledAt(model, at);
+    if (at === undefined || !form || form === "LT" || !name) return null;
     if (form !== "LM") return {layer: at, name, how: vocabulary(model).layerKeyVerbs[form] ?? ""};
-    const mods = layerModsOf(model, action);
+    const mods = key.layerMods;
     return {layer: at, name, how: mods ? `+ ${mods}` : ""};
 }
 
 // A layer-tap read as its two halves, as core names it ("/ / Navigation"):
-// the key it taps (qmkKeyLayerTaps) and the layer its hold turns on, by the
+// the key it taps (keyIdentity's layerTap) and the layer its hold turns on, by the
 // name it goes by, so a screen marks the layer without cutting the name.
 // Null for any other key, for a layer the model has not, and for a name core
 // does not give it in these two halves.
 /** @param {ViewModel} model @param {string} action @returns {{tap: string, layer: number, name: string} | null} */
 export function layerTapAction(model, action) {
-    const at = layerOfKeycode(model, action), tap = layerTapOf(model, action);
-    const name = at === null ? "" : layerCalledAt(model, at);
-    if (at === null || layerFormOf(model, action) !== "LT" || tap === undefined || !name || actionLabel(model, action) !== `${tap} / ${name}`) return null;
+    const key = keyIdentity(model, action), at = key.layer, tap = key.layerTap;
+    const name = at === undefined ? "" : layerCalledAt(model, at);
+    if (at === undefined || key.layerForm !== "LT" || tap === undefined || !name || key.label !== `${tap} / ${name}`) return null;
     return {tap, layer: at, name};
 }
 

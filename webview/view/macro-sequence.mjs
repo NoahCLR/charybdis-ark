@@ -2,17 +2,16 @@
 // Reading, diagnosing and moving the editor's sequence without changing its
 // encoding. Focus IDs belong to the editor; moves preserve every step object.
 import {describeStep} from "./macro.mjs";
-import {actionLabel} from "./keyface.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 /** @typedef {import('./types.js').MacroStep} Step */
 /** @typedef {Partial<import('../../contracts/panel.js').PublishedModel> | null} Model */
 
 /** @param {Model} model @param {Step} step */
 export function sequenceFace(model, step) {
-    const full = describeStep(step, key => actionLabel(model, key));
+    const full = describeStep(step, key => keyIdentity(model, key).label);
     const label = step.kind === "text" ? step.text.replaceAll("\n", " ↵ ").replaceAll("\t", " ⇥ ")
         : step.kind === "delay" ? String(step.delay)
-        : step.keys.map(key => keyIdentity(model, key).lookUp(model?.qmkKeyShortLabels) || actionLabel(model, key)).join(" + ");
+        : step.keys.map(key => keyIdentity(model, key).shortLabel).join(" + ");
     const kind = step.kind === "tap" && step.keys.length > 1 ? "chord" : step.kind;
     return {full, label, wide: step.kind === "text" || ("keys" in step && step.keys.length > 1), kind};
 }

@@ -8,7 +8,7 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {scrollContentTo} from "../../lib/scroll.mjs";
-import {actionLabel, visibleKeycode} from "../../view/keyface.mjs";
+import {visibleKeycode} from "../../view/keyface.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {customKeyOf, customKeySendsNote, customKeyShortcutOnly, hasShortcut, shortcutPickLabel} from "../../view/custom-key.mjs";
 import {closeComboBuilder, currentView, getModel, layers, post, render, state} from "../../store.mjs";
@@ -23,7 +23,7 @@ import {comboFull, comboMissing} from "../../view/combo-form.mjs";
 // A builder input by the name the core gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
 /** @param {Model} model @param {string} name */
-export const comboInputLabel = (model, name) => actionLabel(model, name);
+export const comboInputLabel = (model, name) => keyIdentity(model, name).label;
 
 /** @param {boolean} canEdit @param {() => string} holdTerm */
 export function comboBuilder(canEdit, holdTerm) {

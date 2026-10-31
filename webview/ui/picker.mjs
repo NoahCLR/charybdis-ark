@@ -97,14 +97,14 @@ function sectionBody(model) {
     const section = shownSection(model, picker);
     if (section.kind === "board") {
         const keys = PICKER_BOARD.keys.filter(source => pickAllowed(model, picker, source.value)).map((source) => {
-            const spoken = keyIdentity(model, source.value).lookUp(model?.qmkKeyLabels);
+            const spoken = keyIdentity(model, source.value).label;
             // The host layout's legends replace the ANSI board's, so a German
             // board reads Z where QMK says KC_Y; the key it stores is unchanged.
             const key = pickerBoardKey(source, model);
             const on = picked(key.value);
             const shifted = key.labels[1] && key.labels[1].length <= 3;
             const extra = key.labels[2] || key.labels[3];
-            return `<g class="pkb-key ${on ? "on" : ""}" data-pick="${esc(key.value)}" tabindex="0" role="button" aria-label="${esc(spoken || key.value)}">
+            return `<g class="pkb-key ${on ? "on" : ""}" data-pick="${esc(key.value)}" tabindex="0" role="button" aria-label="${esc(spoken)}">
                 <rect x="${esc(key.x)}" y="${esc(key.y)}" width="${esc(key.w)}" height="${esc(key.h)}" rx="8"></rect>
                 ${extra
                     ? key.labels.map((label, index) => label ? `<text class="${index === 0 ? `pkb-main ${label.length > 1 ? "sm" : ""}` : "pkb-alt"}" x="${key.x + key.w * (index < 2 ? 0.26 : 0.74)}" y="${key.y + key.h * (index % 2 ? 0.36 : 0.74)}">${esc(label)}</text>` : "").join("")

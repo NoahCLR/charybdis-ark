@@ -6,7 +6,8 @@
 // tier drawn as the grid it is, with the cell editor under it.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {actionLabel, behaviourGridSteps, cellLabel, impliedBranch, inheritedBranch} from "../../view/keyface.mjs";
+import {behaviourGridSteps, cellLabel, impliedBranch, inheritedBranch} from "../../view/keyface.mjs";
+import {keyIdentity} from "../../view/key-identity.mjs";
 import {getModel, layers, post, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import {definitionControls} from "../participation.mjs";
@@ -140,7 +141,7 @@ export function behaviourEditor(behaviour) {
         <div class="beh-head">
             <div>
                 <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
-                    ${actionLabel(model, behaviour.keycode) === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
+                    ${keyIdentity(model, behaviour.keycode).label === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
                 <p class="note">${esc(timingDefaultsNote(model, behaviour))}</p>
                 ${storageNotes(behaviour).map((note) => `<p class="note">${esc(note)}</p>`).join("")}
             </div>

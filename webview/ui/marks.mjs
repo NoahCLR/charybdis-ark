@@ -13,11 +13,11 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
-import {actionLabel, layerOfKeycode, visibleKeycode} from "../view/keyface.mjs";
+import {visibleKeycode} from "../view/keyface.mjs";
 import {macroChips} from "../view/macro.mjs";
 import {sequenceFace} from "../view/macro-sequence.mjs";
 import {layerTapAction, namedAction} from "../view/named-action.mjs";
-import {slotKeycodeNames} from "../view/key-identity.mjs";
+import {keyIdentity, slotKeycodeNames} from "../view/key-identity.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {SCREENS} from "../view/screens.mjs";
 import {layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
@@ -146,7 +146,7 @@ export function mark(model, value) {
 // layer's alone is that layer, marked. Any other name is left as it is.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} text @param {string} keycode */
 export function keyNameMarked(model, text, keycode) {
-    return namedInline(model, keycode, text) || layerTapInline(model, keycode, text) || layerNamed(model, layerOfKeycode(model, keycode), text) || esc(text);
+    return namedInline(model, keycode, text) || layerTapInline(model, keycode, text) || layerNamed(model, keyIdentity(model, keycode).layer, text) || esc(text);
 }
 
 // A layer or pointing-mode action, drawn as that thing when `text` is the
@@ -154,7 +154,7 @@ export function keyNameMarked(model, text, keycode) {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} text */
 function namedInline(model, keycode, text) {
     const kind = namedAction(model, keycode)?.kind;
-    return (kind === "layer" || kind === "pointing") && String(text ?? "") === actionLabel(model, keycode) ? sends(model, keycode, {inline: true}) : "";
+    return (kind === "layer" || kind === "pointing") && String(text ?? "") === keyIdentity(model, keycode).label ? sends(model, keycode, {inline: true}) : "";
 }
 
 // A value that names a layer or a pointing mode by its words alone, as the
@@ -182,7 +182,7 @@ export function valueMarked(model, marker, text) {
 // An action by its words with its layer marked, as every surface names one:
 // "Hold ▦ Numbers", "Lock ▦ Symbol". The plain words when it acts on no layer.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} [text] */
-export const actionMarked = (model, keycode, text = actionLabel(model, keycode)) => keyNameMarked(model, text, keycode);
+export const actionMarked = (model, keycode, text = keyIdentity(model, keycode).label) => keyNameMarked(model, text, keycode);
 
 // What a combo sends and the keys that press it, named the same way.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
@@ -197,7 +197,7 @@ export const comboInputsMarked = (model, combo) =>
 // or a name the core did not give.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} text */
 function layerTapInline(model, keycode, text) {
-    const tap = String(text ?? "") === actionLabel(model, keycode) ? layerTapAction(model, keycode) : null;
+    const tap = String(text ?? "") === keyIdentity(model, keycode).label ? layerTapAction(model, keycode) : null;
     return tap ? `${esc(tap.tap)} / ${marked(model, {kind: "layer", layer: tap.layer}, tap.name)}` : "";
 }
 
