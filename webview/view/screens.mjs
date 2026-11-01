@@ -22,9 +22,11 @@ export const configureReady = (model) => model?.load?.state === "ready";
 const screen = (definition) => Object.freeze(definition);
 
 export const SCREENS = Object.freeze({
+    // A keyboard: a row of keys over a space bar. The keys are filled squares,
+    // as a stroke that short draws nothing.
     keys: screen({
         label: "Keymap", group: "Configure", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M4 6.5h.01M6.5 6.5h.01M9 6.5h.01M11.5 6.5h.01M5 9.5h6"/></svg>',
+        icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><g fill="currentColor" stroke="none"><rect x="3.6" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="5.9" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="8.2" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="10.5" y="5.6" width="1.5" height="1.5" rx=".35"/></g><path d="M5 9.8h6"/></svg>',
         available: configureReady, render: renderers => renderers.screenKeys(),
     }),
     lighting: screen({
@@ -32,9 +34,11 @@ export const SCREENS = Object.freeze({
         icon: '<svg viewBox="0 0 16 16"><path d="M8 1.8v1.6M13 3l-1.1 1.1M14.2 8h-1.6M3 13l1.1-1.1M2 8h1.6M3 3l1.1 1.1"/><circle cx="8" cy="8.4" r="3.2"/></svg>',
         available: configureReady, render: renderers => renderers.screenLighting(),
     }),
+    // A robot: a macro does the typing for you. Its eyes and antenna tip are
+    // filled, as an outline circle that small closes up.
     macros: screen({
         label: "Macros", group: "Configure", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h7M2.5 11.5h9"/></svg>',
+        icon: '<svg viewBox="0 0 16 16"><rect x="3" y="5" width="10" height="8.5" rx="2"/><path d="M8 5V2.8M1.5 8v2.5M14.5 8v2.5"/><g fill="currentColor" stroke="none"><circle cx="8" cy="2.2" r="1.1"/><circle cx="6" cy="9" r="1.05"/><circle cx="10" cy="9" r="1.05"/></g></svg>',
         available: configureReady, render: renderers => renderers.screenMacros(),
     }),
     customKeys: screen({
