@@ -16,7 +16,7 @@ import {layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot} from "../../view/review.mjs";
 import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
 import {comboInputLabel} from "./combo-builder.mjs";
-import {shortcut} from "../../view/shortcuts.mjs";
+import {modifierKey, shortcut} from "../../view/shortcuts.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
 // order they win. Clicking any tab goes back to one layer.
@@ -90,6 +90,9 @@ export function legend(model) {
 function shortcutList(editable) {
     /** @param {string} keys @param {string} does */
     const row = (keys, does) => `<dt>${esc(keys)}</dt><dd>${esc(does)}</dd>`;
+    // Previewing layers together reads the board, so it is listed whether or
+    // not the board can be edited (ui/layerbar.mjs, view/layer-set.mjs).
+    const layers = row(`${modifierKey()}-click a layer`, "Preview it on with the others");
     return `<div class="shortcuts-pop" id="board-shortcuts" role="group" aria-label="Board shortcuts"><dl>${editable
         ? row("Double-click", "Pick a keycode")
             + row("Drag onto a key", "Swap the two keys")
@@ -97,8 +100,10 @@ function shortcutList(editable) {
             + row("Delete", "Make the selected key transparent")
             + row(`${shortcut("Z")}, ${shortcut("Z", {shift: true})}`, "Undo, redo")
             + row("Enter", "Open the picker for the selected key")
+            + layers
         : row("Click", "Select a key to read it")
-            + row(shortcut("C"), "Copy the selected key")}</dl></div>`;
+            + row(shortcut("C"), "Copy the selected key")
+            + layers}</dl></div>`;
 }
 
 function closeBoardShortcuts() {

@@ -31,8 +31,9 @@ On a key face:
 - A small dot in the corner marks a key changed in your draft.
 
 The legend under the board explains each mark. Its **Shortcuts** button
-lists what the board takes from the mouse and the keys (below); Escape or a
-click elsewhere closes the list.
+lists what the board takes from the mouse and the keys (below), ⌘-clicking a
+layer tab to [preview layers together](#previewing-layers-together) included;
+Escape or a click elsewhere closes the list.
 
 ## The hover card
 

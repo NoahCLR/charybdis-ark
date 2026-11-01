@@ -110,8 +110,10 @@ The same kind of control looks and sits the same on every screen.
   sentence case like the captions over it. What the board takes from the
   mouse and the keys is in the list its **Shortcuts** button opens: a button
   with `aria-expanded`, whose list Escape or a press outside closes, the focus
-  back on the button. While the board takes no edit, the list says only what
-  still works, selecting a key and copying it, in this computer's shortcut
+  back on the button. It names ⌘-clicking (Ctrl-clicking) a layer to preview
+  layers together, which reads the board, whether or not the board takes an
+  edit; while it takes none, the rest of the list says only what still
+  works, selecting a key and copying it, all in this computer's shortcut
   words (`legend`, `webview/ui/keys/board-card.mjs`;
   `browser-tests/shortcut-glyphs.spec.js`).
 - A number field's unit rides inside the input (`.affix.unit`), so its label
