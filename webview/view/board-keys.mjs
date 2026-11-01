@@ -10,7 +10,12 @@
 // layer's. It wears the answering key's behaviour dots and the badges of the
 // combos it fires in the view (view.combos.badgesAt).
 //
-// Dots and badges mark only what runs: a behaviour or combo that a switch
+// A key also wears an icon for each kind of thing it reaches, a macro, a
+// custom key or a pointing mode: its own keycode's first, then what its
+// behaviour's branches send, in tap order. One per kind however many it
+// reaches, so a key never wears more than three; the hover card names them.
+//
+// Dots, badges and icons mark only what runs: a behaviour or combo that a switch
 // keeps off for the key, on the layer that supplies it, marks nothing there
 // (firmware's participation policy).
 //
@@ -19,11 +24,12 @@
 
 import {isOff} from "../lib/colour.mjs";
 import {behaviourTiers, keyFace, keyMeaning, keyName} from "./keyface.mjs";
-import {keyIdentity} from "./key-identity.mjs";
+import {keyIdentity, reachKind} from "./key-identity.mjs";
 import {behaviourRuns} from "./participation.mjs";
 import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trackballLight} from "./lighting.mjs";
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
 /** @typedef {import("../lib/colour.mjs").Colour} Colour */
+/** @typedef {import("./key-identity.mjs").ReachKind} KeyIcon */
 /** @typedef {{mode?: "light" | "leds", faces?: boolean, pdActive?: import("./types.js").LightOptions["pdActive"] | null}} BoardShows */
 
 /**
@@ -39,6 +45,7 @@ import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trac
  * @property {Colour | null} light the colour it shows, none in the LED selector
  * @property {{kind: import("./keyface-types.js").Tier, count: number, colour: Colour | null}[]} tiers one dot per tier, with the colour it flashes, none when key feedback leaves it dark
  * @property {{text: string, lit: Colour | null}[]} badges one per combo, lit in the combo feedback colour
+ * @property {KeyIcon[]} icons one per kind of thing it reaches: a macro, a custom key, a pointing mode
  * @property {string} main
  * @property {string} sub
  */
@@ -74,6 +81,7 @@ export function boardKeys(view, {mode = "light", faces = true, pdActive = null} 
                 return {...tier, colour: feedbackOn && !isOff(colour) ? colour : null};
             }) : [],
             badges: marks ? view.combos.badgesAt(index).map((combo) => ({text: combo.badge || "C", lit: comboLit})) : [],
+            icons: marks ? keyIcons(model, keyMeaning(shown), runs ? behaviour : undefined) : [],
             main: leds ? String(keyLed(model, index) ?? index) : face.main,
             sub: leds ? "" : face.sub,
         };
@@ -95,3 +103,18 @@ export function boardTrackball(view, {mode = "light", pdActive = null} = {}) {
 // them by place, which is the same number (layer-view.mjs).
 /** @param {LayerView} view */
 const heldIds = ({held, stack}) => held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
+
+// The icons a key wears: its own keycode's, then each branch's of the
+// behaviour that runs there, tap, hold and long hold in tap order.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} meaning @param {import("../../contracts/panel.js").BehaviorView | undefined} behaviour @returns {KeyIcon[]} */
+function keyIcons(model, meaning, behaviour) {
+    const actions = [meaning, ...(behaviour?.steps || []).flatMap((step) =>
+        [step.tap, step.hold, step.longHold].map((branch) => String(branch?.action ?? "")))];
+    /** @type {Set<KeyIcon>} */
+    const icons = new Set();
+    for (const action of actions) {
+        const kind = action ? reachKind(model, action) : "";
+        if (kind) icons.add(kind);
+    }
+    return [...icons];
+}

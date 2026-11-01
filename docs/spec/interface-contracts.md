@@ -346,7 +346,8 @@ hold what they name.
 ## Marks
 
 Each thing with a colour of its own has exactly one mark, drawn by
-`webview/ui/marks.mjs` wherever the thing is named (D-L31):
+`webview/ui/marks.mjs` wherever the thing is named (D-L31), and so do a
+macro and a custom key, which have none:
 
 | Thing | Mark |
 | --- | --- |
@@ -355,6 +356,8 @@ Each thing with a colour of its own has exactly one mark, drawn by
 | Every tap count at once (what the Multi tap window governs) | a branch badge counting "N×", its border and fill split into an equal, hard-edged share per tap-branch colour, in tap order (`branchesBadge`) |
 | A layer | the board's icon in its layer colour (`kindIcon`); in a set of layers, before each layer's name (`valueMarked`) |
 | A pointing mode | the Pointing modes screen's icon in the light its slot paints (`kindIcon`, `slotLight`) |
+| A macro | the Macros screen's icon in the words' colour (`plainIcon`, `REACH_ICONS`), wherever a key or action names one, the review's values included (core's `keyMark`); not in the Macros screen's own list |
+| A custom key | the Custom keys screen's icon in the words' colour (`plainIcon`, `REACH_ICONS`), wherever a key or action names one, the review's values included (core's `keyMark`); not in the Custom keys screen's own list |
 | A combo | its badge in the combo feedback colour (`comboBadge`) |
 | A lighting stage | its on/off dot |
 
@@ -400,7 +403,7 @@ Each thing with a colour of its own has exactly one mark, drawn by
   `tests/view/keyface.test.mjs`).
 - In the behaviour grid and the hover card, a branch or combo action that acts
   on a layer, runs a pointing mode or plays a macro reads as that thing
-  (`sends`): its mark (a macro has none), then its name and its tags
+  (`sends`): its mark, then its name and its tags
   ("Navigation `HOLD`", "Arrow `LOCK`"), and the line under it leads with its
   kind ("layer", "pointing mode"; `namedAction` in
   `webview/view/named-action.mjs`). A layer action's tag is what it does to
@@ -416,6 +419,17 @@ Each thing with a colour of its own has exactly one mark, drawn by
 - Where marked labels share a fixed mark slot (`marked(…, {slot: true})`), a
   layer's or pointing mode's icon fills the whole slot and ends where the tier
   dots do, so the words after it still start at one edge (no test).
+- A board key wears an icon for each kind of thing it reaches, a macro, a
+  custom key or a pointing mode, in a row under the legend, which rises to
+  make room: along the bottom of the cap, or on a key with a line, between
+  its tap and the line (`keyFaceRows`' `icons`): its own keycode's
+  first, then its running behaviour's branches', tap, hold and long hold in
+  tap order; one per kind, so never more than three. Each is its screen's
+  rail icon in the legend's colour. It says what kind of thing the key
+  reaches, not which, so a pointing mode's is not its mark and wears no
+  slot's light; the hover card names each (`boardKeys`' `icons`;
+  `tests/view/board-keys.test.mjs`, `tests/view/geometry.test.mjs`,
+  `browser-tests/marks.spec.js`).
 - The draft's dot is not one of these marks
   ([Draft marks](#draft-marks-and-draft-history)).
 
@@ -464,7 +478,7 @@ here: its home and tests are in
 | Which key a spelling is, and whether two spellings are one key: the name the profile knows it by, one canonical spelling per key, what core publishes of it in a table keyed by keycode name (its label and short label, kind, layer, layer form, a layer-mod's modifiers, a layer-tap's tap, the layers it turns on, the host layout's legends), read under every name it goes by with each fact's own rule for an empty entry, the macro, custom key or pointing slot (held or locked) it is, and two ways of finding a behaviour row kept apart, the row keyed exactly by the spelling (what a key means, what a combo sends) and the row listening to the key however either is spelled (a picked or typed key); worked out once per model and spelling | `webview/view/key-identity.mjs` (`keyIdentity`, `sameKey`, `keycodeName`, `macroIndex`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
 | The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, and what a search finds (at most `SEARCH_ROWS` keycodes), drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs` |
 | What reaches one key and what it uses, which the hover card and the Key tab both draw: the layer's own key shown alone, the key answering it from below, and of its behaviour row whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold; drawn by `webview/ui/hover-card.mjs` (placed by `webview/ui/hover.mjs`) and `webview/ui/keys/key-tab.mjs` | `webview/view/key-reach.mjs` (`keyReachAt`, `keyReach`, `keyBehaviour`) | `tests/view/key-reach.test.mjs`, `browser-tests/participation.spec.js` |
-| What the board shows at each key and on the trackball: the key that answers in the view and the layer supplying it, glass or solid, its light, the dots and badges of what runs there, and in the LED selector each LED's index; drawn by `webview/ui/board.mjs` | `webview/view/board-keys.mjs` (`boardKeys`, `boardTrackball`) | `tests/view/board-keys.test.mjs`, `browser-tests/marks.spec.js`, `browser-tests/participation.spec.js`, `browser-tests/lighting-controls.spec.js` |
+| What the board shows at each key and on the trackball: the key that answers in the view and the layer supplying it, glass or solid, its light, the dots, badges and icons of what runs there, and in the LED selector each LED's index; drawn by `webview/ui/board.mjs` | `webview/view/board-keys.mjs` (`boardKeys`, `boardTrackball`) | `tests/view/board-keys.test.mjs`, `browser-tests/marks.spec.js`, `browser-tests/participation.spec.js`, `browser-tests/lighting-controls.spec.js` |
 | Empty layers (D-L76): a layer that is not the base or a default layer, has no name of its own (core's `named`), maps no key, is turned on by no key (`layersAnyKeyTurnsOn`), starts no pointing mode, is not the pointer layer, is in no Combo layer matching but its own, has no layer colour that paints or LED override, has no key with Use behaviour or Join combos off, and whose Settings switches read as most empty layers' do (an even split counts as set); worked out once per model, and folded where a place does not keep it | `webview/view/empty-layers.mjs` (`emptyLayers`, `foldEmptyLayers`), drawn by `webview/ui/empty-layers.mjs` | `tests/view/empty-layers.test.mjs`, `tests/model/profile-model.test.js`, `browser-tests/empty-layers.spec.js` |
 | One view of the layer stack: the layer the board shows and the layers previewed with it, by their place in the stack, which is each published layer's `index`; what answers and what shows at each key in it, and the combos and behaviours it reaches, each worked out once per model and view. Screens ask the current one (`currentView()`, `webview/store.mjs`) rather than passing the layer and the preview | `webview/view/layer-view.mjs` (`layerView`, read through `view.answerAt`, `view.shownAt`, `view.combos`, `view.behaviours`) | `tests/view/layer-view.test.mjs`, `tests/view/combo-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs` |
 | What a layer view reaches as each Keymap tab lists it: the tab's groups, what each lists and says when empty, the tab's count, and the group a row asked for by name is picked under | `webview/view/tab-reach.mjs` (`tabReach`), whose lists, the view's behaviours included, sort the one walk of its routes (`routesOf`, `webview/view/reach-routes.mjs`): each key, behaviour and combo, and the behaviour a combo's output runs, worked out once per view | `tests/view/tab-reach.test.mjs`, `tests/view/reach.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |

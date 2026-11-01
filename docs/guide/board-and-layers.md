@@ -27,6 +27,13 @@ On a key face:
 - Badges such as **C0** mark the combos that fire from the key here. A combo
   a switch keeps off, or that can't form because another of its keys can't
   join it, has no badge ([Where combos run](combos.md#where-combos-run)).
+- Small icons under a key's name, above the line on a key that has one,
+  mark a key that reaches a macro (a robot), a custom key (a square with a
+  plus) or a pointing mode (a crosshair): what the key is itself, and
+  whatever its behaviour's taps and holds send. Each shows once, however
+  many macros or pointing modes the key reaches; hover it to see which. A
+  behaviour a switch keeps off on this layer adds no icon, as it adds no
+  dots.
 - A frosted key is transparent: it falls through to the layer below.
 - A small dot in the corner marks a key changed in your draft.
 
@@ -111,7 +118,8 @@ A key's name that doesn't fit its cap on one line takes two, such as
 Where Ark names a layer in passing (a key's name, a combo, the review), a
 small drawing of the board in the layer's colour sits before its name. A
 pointing mode has the Pointing modes icon in its light. A grey icon means
-that colour, or its lighting, is off. Lists of layers alone, such as these
+that colour, or its lighting, is off. A macro has the robot and a custom key
+the square with a plus, in the colour of the words. Lists of layers alone, such as these
 tabs, show just the colour. A key or combo that acts on a layer or a pointing
 mode reads the same way everywhere, as the behaviour grid draws it: the icon,
 the name and a tag for what it does, such as **HOLD** or **LOCK**. A layer-tap

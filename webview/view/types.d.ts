@@ -24,6 +24,9 @@ export interface FaceRows {
     comboY?: number;
     separatorY?: number;
     subY?: number;
+    /** The top of the row of icons, and how tall they are, when the key has any. */
+    iconY?: number;
+    iconSize?: number;
 }
 
 export interface ReviewBlock {

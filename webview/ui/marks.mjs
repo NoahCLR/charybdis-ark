@@ -6,6 +6,8 @@
 // tap-branch colour), a layer is the board's icon in its layer colour, a
 // pointing mode is the Pointing modes icon in the light its slot paints, a
 // combo is its badge in the combo colour, a lighting stage is its on/off dot.
+// A macro and a custom key have no colour, so their mark is their screen's
+// icon in the text around it, wherever a key or action names one.
 // The grid, the hover card, Settings and the draft review all draw these from
 // here, so a colour means one thing on every surface — and a stage that is off
 // draws its marks off. Where the colour itself is shown, or every item is a
@@ -18,9 +20,9 @@ import {visibleKeycode} from "../view/keyface.mjs";
 import {macroChips} from "../view/macro.mjs";
 import {sequenceFace} from "../view/macro-sequence.mjs";
 import {layerTapAction, namedAction} from "../view/named-action.mjs";
-import {keyIdentity, slotKeycodeNames} from "../view/key-identity.mjs";
+import {keyIdentity, reachKind, slotKeycodeNames} from "../view/key-identity.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
-import {SCREENS} from "../view/screens.mjs";
+import {REACH_ICONS} from "../view/screens.mjs";
 import {layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {layerSwatch} from "./layerbar.mjs";
@@ -89,16 +91,21 @@ export function slotLight(model, slot) {
 // itself, every key and the trackball as the rail draws Ark's mark
 // (boardOutlineMarkup, view/geometry.mjs); a pointing mode is the Pointing
 // modes screen's icon. With no colour, because its stage or colour is off,
-// the icon looks off. A macro has none.
+// the icon looks off.
 const LAYER_ICON = boardOutlineMarkup("board-icon");
 /** @param {string} kind @param {string | null} colour */
 function kindIcon(kind, colour) {
     const look = colour ? ` style="color:${colour}"` : "";
     const off = colour ? "" : " off";
     if (kind === "layer") return `<span class="kind-icon layer${off}"${look} aria-hidden="true">${LAYER_ICON}</span>`;
-    if (kind === "pointing") return `<span class="kind-icon pointing${off}"${look} aria-hidden="true">${SCREENS.pointing.icon}</span>`;
+    if (kind === "pointing") return `<span class="kind-icon pointing${off}"${look} aria-hidden="true">${REACH_ICONS.pointing}</span>`;
     return "";
 }
+
+// A macro's or a custom key's mark: its screen's rail icon in the words'
+// colour, since neither has a colour of its own (D-L31).
+/** @param {"macro" | "customKey"} kind */
+const plainIcon = (kind) => `<span class="kind-icon plain" data-kind="${esc(kind)}" aria-hidden="true">${REACH_ICONS[kind]}</span>`;
 
 // A layer's icon with no colour, for a line that stands for several layers at
 // once (the layer stack's folded run), so it lines up with the marks around it.
@@ -116,8 +123,8 @@ export function sends(model, action, {inline = false} = {}) {
     const named = namedAction(model, action);
     if (!named) return "";
     const marker = named.kind === "layer" ? {kind: "layer", layer: named.layer}
-        : named.kind === "pointing" ? {kind: "pointing", slot: named.slot.id} : null;
-    return `<span class="sends${inline ? " inline" : ""}">${mark(model, /** @type {import("../../contracts/model.js").ReviewMark | null} */ (marker))}${tagged(named.name, named.tags)}</span>`;
+        : named.kind === "pointing" ? {kind: "pointing", slot: named.slot.id} : {kind: "macro"};
+    return `<span class="sends${inline ? " inline" : ""}">${mark(model, /** @type {import("../../contracts/model.js").ReviewMark} */ (marker))}${tagged(named.name, named.tags)}</span>`;
 }
 // A name and the tags that qualify it, as `sends` draws them after the mark.
 /** @param {string} name @param {string[]} tags */
@@ -138,9 +145,10 @@ export const slotNamedWithKeycodes = (name, keycodes) => `<span class="sends inl
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
 // A mark as the core describes it: {kind: "tier", tier, branch?} · {kind:
-// "branches"} · {kind: "layer", layer} · {kind: "pointing", slot} ·
-// {kind: "combo", badge?} · {kind: "stage", on}. Anything else draws nothing;
-// a set of layers marks each name instead (valueMarked).
+// "branches"} · {kind: "layer", layer} · {kind: "pointing", slot} · {kind:
+// "macro"} · {kind: "customKey"} · {kind: "combo", badge?} · {kind: "stage",
+// on}. Anything else draws nothing; a set of layers marks each name instead
+// (valueMarked).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value */
 export function mark(model, value) {
     switch (value?.kind) {
@@ -148,6 +156,7 @@ export function mark(model, value) {
         case "branches": return branchesBadge(model);
         case "layer": return kindIcon("layer", layerSwatch(model, {index: value.layer}).colour);
         case "pointing": return kindIcon("pointing", slotLight(model, {id: value.slot}).colour);
+        case "macro": case "customKey": return plainIcon(value.kind);
         case "combo": return comboBadge(model, value.badge);
         case "stage": return `<i class="stagedot ${value.on ? "on" : ""}"></i>`;
         default: return "";
@@ -160,10 +169,19 @@ export function mark(model, value) {
 // name and what the action does as a tag, never the action's word as text.
 // A layer-tap named in the core's words is drawn from its halves with its
 // layer marked, "F / ▦ Navigation" (layerTapAction), and a name that is the
-// layer's alone is that layer, marked. Any other name is left as it is.
+// layer's alone is that layer, marked. A macro's or a custom key's name
+// follows its icon. Any other name is left as it is.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} text @param {string} keycode */
 export function keyNameMarked(model, text, keycode) {
-    return namedInline(model, keycode, text) || layerTapInline(model, keycode, text) || layerNamed(model, keyIdentity(model, keycode).layer, text) || esc(text);
+    return namedInline(model, keycode, text) || layerTapInline(model, keycode, text) || layerNamed(model, keyIdentity(model, keycode).layer, text)
+        || thingNamed(model, keycode, text) || esc(text);
+}
+
+// A macro's or a custom key's name after its mark; empty for any other key.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} text */
+function thingNamed(model, keycode, text) {
+    const kind = reachKind(model, keycode);
+    return kind === "macro" || kind === "customKey" ? marked(model, {kind}, text) : "";
 }
 
 // A layer or pointing-mode action, drawn as that thing when `text` is the

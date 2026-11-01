@@ -45,6 +45,16 @@ export function keyIdentity(model, spelling) {
 /** @param {ViewModel} model @param {string | null | undefined} a @param {string | null | undefined} b */
 export const sameKey = (model, a, b) => keyIdentity(model, a).canonical === keyIdentity(model, b).canonical;
 
+// What a key reaches that has a screen of its own: a macro, a custom key or a
+// pointing mode, or "" for any other key. The board's icons and the marks of
+// a macro and a custom key are drawn by it.
+/** @typedef {"macro" | "customKey" | "pointing"} ReachKind */
+/** @param {ViewModel} model @param {string | null | undefined} spelling @returns {ReachKind | ""} */
+export function reachKind(model, spelling) {
+    const key = keyIdentity(model, spelling);
+    return key.macro ? "macro" : key.customKey ? "customKey" : key.pointing ? "pointing" : "";
+}
+
 /** @param {ViewModel} model @param {string} spelling @returns {KeyIdentity} */
 function identityOf(model, spelling) {
     const aliases = model?.qmkKeycodeAliases;

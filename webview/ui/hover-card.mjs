@@ -123,8 +123,9 @@ function reachSections(reach, position, {foot = true} = {}) {
     if (reach.macros.length) {
         sections.push(`<div class="hc-sect"><div class="hc-h">Macro</div>${reach.macros.map(({keycode, slot}) => {
             if (!slot) return `<div class="hc-sub">${esc(keycode)} · not reported by the keyboard</div>`;
-            if (!slot.payload) return `<div class="hc-sub">${esc(macroNamed(slot, keycode))} · empty</div>`;
-            return macroSteps(model, slot.payload);
+            // Named as the Pointing mode section names its mode: its mark, its
+            // name and, when it holds no steps, its empty tag; then its steps.
+            return `<div class="hc-flow">${sends(model, keycode) || esc(macroNamed(slot, keycode))}</div>${slot.payload ? macroSteps(model, slot.payload) : ""}`;
         }).join("")}</div>`);
     }
     if (reach.pointing) {

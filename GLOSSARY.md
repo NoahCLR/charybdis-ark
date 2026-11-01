@@ -188,11 +188,13 @@ _Avoid_: key picker, keycode chooser, selector
 
 **Mark**:
 The small sign Ark draws beside anything with a colour of its own on the
-keyboard, in that colour (D-L31): a tier's dot, a branch badge (for the Multi
-tap window, "N×" in every tap-branch colour), a combo badge, a stage's dot,
-and the board icon for a layer or the Pointing modes icon for a pointing mode. A **swatch** is a plain square of a colour, shown where the
-colour itself is the subject or where only the colour tells the items apart;
-it is not a mark.
+keyboard, in that colour, and beside a macro or a custom key (D-L31): a
+tier's dot, a branch badge (for the Multi tap window, "N×" in every
+tap-branch colour), a combo badge, a stage's dot, the board icon for a layer
+or the Pointing modes icon for a pointing mode, and the Macros or Custom keys
+icon, in the words' colour, for a macro or a custom key, which have no colour.
+A **swatch** is a plain square of a colour, shown where the colour itself is
+the subject or where only the colour tells the items apart; it is not a mark.
 _Avoid_: tag, chip (for a mark), dot (for a layer's mark)
 
 **Layer preview**:

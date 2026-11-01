@@ -85,8 +85,13 @@ export function trackballInLocality(locality, triggerIndex) {
 // a running offset: how far the legend drops depends on how many rows sit above
 // it, and each case was tuned against the others. Lifted from the app's own
 // board, so the two cannot drift.
-/** @param {number} y @param {{tiers?: boolean, combos?: boolean, sub?: boolean}} [options] */
-export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}) {
+// A row of icons (`icons`: the macro, custom key or pointing mode a key
+// reaches) sits under the legend: along the bottom of the cap, or on a key
+// with a line, between its tap and the line, since they belong to what it
+// taps. The rows above, and the line and the hold, keep their places; the
+// legend rises to make room.
+/** @param {number} y @param {{tiers?: boolean, combos?: boolean, sub?: boolean, icons?: boolean}} [options] */
+export function keyFaceRows(y, {tiers = false, combos = false, sub = false, icons = false} = {}) {
     /** @type {Partial<import("./types.js").FaceRows> & {comboHeight: number}} */
     const rows = {comboHeight: 8.2};
     if (tiers && combos) { rows.tierY = y + 6.3; rows.comboY = y + 14.2; }
@@ -94,7 +99,17 @@ export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}
     else if (combos) { rows.comboY = y + 7.2; }
 
     const above = (tiers ? 1 : 0) + (combos ? 1 : 0);
-    if (sub) {
+    if (icons && sub) {
+        rows.iconSize = [8.5, 8.5, 7.4][above];
+        rows.iconY = [y + 25.5, y + 29.8, y + 33.8][above];
+        rows.mainY = [y + 17, y + 22.5, y + 28][above];
+        rows.separatorY = [y + 37.4, y + 40.8, y + 43.4][above];
+        rows.subY = [y + 48.8, y + 51.8, y + 53.5][above];
+    } else if (icons) {
+        rows.iconSize = 8.5;
+        rows.iconY = y + GEO.keyH - 3.8 - rows.iconSize;
+        rows.mainY = [y + 23, y + 30.5, y + 35.2][above];
+    } else if (sub) {
         rows.mainY = [y + 24.5, y + 29.3, y + 32.2][above];
         rows.separatorY = [y + 37.4, y + 40.8, y + 43.4][above];
         rows.subY = [y + 48.8, y + 51.8, y + 53.5][above];
@@ -103,6 +118,15 @@ export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}
     }
     // Every layout above sets mainY; the other rows exist only when drawn.
     return /** @type {import("./types.js").FaceRows} */ (rows);
+}
+
+// Where each of a key's `count` icons stands in its row (keyFaceRows' iconY
+// and iconSize): their left edges, the row centred on the cap's middle `cx`.
+const ICON_GAP = 2;
+/** @param {number} cx @param {number} count @param {number} size */
+export function keyIconsX(cx, count, size) {
+    const left = cx - (count * size + (count - 1) * ICON_GAP) / 2;
+    return Array.from({length: count}, (_, order) => left + order * (size + ICON_GAP));
 }
 
 // Roughly how wide a legend runs, so a label can be sized to fit its row rather

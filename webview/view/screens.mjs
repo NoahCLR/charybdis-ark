@@ -88,6 +88,12 @@ export const SCREENS = Object.freeze({
         unavailable: {title: "Keyboard status unavailable", detail: "Read the keyboard to see its connection and diagnostics."},
     }),
 });
+// Each kind of thing a key reaches (key-identity.mjs reachKind) by its
+// screen's rail icon: what the board draws on a key that reaches one, and a
+// macro's or a custom key's mark wherever one is named.
+/** @type {Readonly<Record<import("./key-identity.mjs").ReachKind, string>>} */
+export const REACH_ICONS = Object.freeze({macro: SCREENS.macros.icon, customKey: SCREENS.customKeys.icon, pointing: SCREENS.pointing.icon});
+
 
 /** @param {unknown} id @returns {id is ScreenId} */
 export const isScreenId = (id) => typeof id === "string" && Object.hasOwn(SCREENS, id);

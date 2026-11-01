@@ -37,7 +37,9 @@ an icon for what it is (the board's outline for a layer, the Pointing modes
 icon for a pointing mode) in its colour, its name and a tag for what the
 action does, such as **HOLD** or **LOCK**. An icon with no colour means that
 colour, or its lighting, is off. The line under it starts with **layer** or
-**pointing mode**. The hover card names them the same way.
+**pointing mode**. A macro has the Macros icon (a robot) and a custom key the
+Custom keys icon (a square with a plus), in the colour of the words, since
+neither has a colour of its own. The hover card names them the same way.
 
 ### What an empty cell does
 

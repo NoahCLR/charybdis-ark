@@ -27,7 +27,8 @@ a computer; connecting a keyboard needs Chrome or Edge.
   keyboard layout, or search every key the firmware supports. Drag one key
   onto another to swap them. Rename and reorder the 16 layers, make any of
   them the base, and preview several stacked the way the keyboard resolves
-  them.
+  them. A small icon on a key shows when it plays a macro, sends a custom
+  key or runs a pointing mode.
 - **Behaviours.** What a key does on tap, hold and long hold, for each tap
   count, in one grid with its timing.
 - **Combos.** Keys pressed together, with their own timing and layers.

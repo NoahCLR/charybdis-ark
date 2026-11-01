@@ -12,11 +12,21 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText} from "../lib/colour.mjs";
-import {GEO, fitLegend, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
+import {GEO, fitLegend, fitText, keyFaceRows, keyIconsX, keyVisual} from "../view/geometry.mjs";
 import {boardKeys, boardTrackball} from "../view/board-keys.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
+import {REACH_ICONS} from "../view/screens.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
+
+// A key's icons stand in a centred row under the legend, above the line on a
+// key with one (keyFaceRows, keyIconsX): one per kind of thing it reaches.
+// Each is its screen's rail icon, in the legend's colour: it says what kind
+// of thing the key reaches, not which, so a pointing mode's is not its mark
+// and wears no slot's light.
+/** @param {import("../view/board-keys.mjs").KeyIcon} kind @param {number} x @param {number} y @param {number} size @param {string} ink */
+const reachIcon = (kind, x, y, size, ink) => `<svg class="kc-icon" data-kind="${esc(kind)}" x="${esc(x)}" y="${esc(y)}"
+    width="${esc(size)}" height="${esc(size)}" viewBox="0 0 16 16" style="stroke:${ink};color:${ink}">${REACH_ICONS[kind]}</svg>`;
 
 /** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(view, options = {}) {
@@ -25,7 +35,7 @@ export function board(view, options = {}) {
 
     let glow = "", keys = "";
     for (const key of boardKeys(view, {mode, faces, pdActive})) {
-        const {index, from, glass, tiers, badges, sub} = key;
+        const {index, from, glass, tiers, badges, icons, sub} = key;
         const visual = keyVisual(index);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
         const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";
@@ -46,7 +56,7 @@ export function board(view, options = {}) {
         }
 
         const rows = keyFaceRows(visual.y,
-            {tiers: tiers.length > 0, combos: badges.length > 0, sub: Boolean(sub)});
+            {tiers: tiers.length > 0, combos: badges.length > 0, sub: Boolean(sub), icons: icons.length > 0});
 
         let marks = "";
         const step = 9.6, startX = cx - ((tiers.length - 1) * step) / 2;
@@ -78,6 +88,12 @@ export function board(view, options = {}) {
                 x += width + gap;
                 return drawn;
             }).join("");
+        }
+
+        if (rows.iconY !== undefined && rows.iconSize !== undefined) {
+            const {iconY, iconSize} = rows;
+            marks += keyIconsX(cx, icons.length, iconSize)
+                .map((x, order) => reachIcon(icons[order], x, iconY, iconSize, text || "var(--light-detail)")).join("");
         }
 
         // The selection and indication rings ride on top: the light owns the key
