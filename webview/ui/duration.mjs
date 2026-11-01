@@ -11,7 +11,7 @@ const UNITS = [["seconds", "seconds"], ["minutes", "minutes"]];
 export function durationControl(field, editable, submit) {
     let unit = state.settingsDurationUnits[field.macro] || durationUnit(field.value);
     const node = el(`<div class="input-row duration-control">
-        <input class="input mono" inputmode="decimal" aria-label="${esc(field.label)}" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(durationValue(field.value, unit))}" ${editable ? "" : "disabled"}>
+        <input class="input mono num" inputmode="decimal" aria-label="${esc(field.label)}" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(durationValue(field.value, unit))}" ${editable ? "" : "disabled"}>
         ${segmented({label: `${field.label} unit`, f: `setting:${field.macro}:unit`, choices: UNITS, current: unit, disabled: !editable, hideLabel: true})}</div>`);
     const input = /** @type {HTMLInputElement} */ (node.querySelector("input"));
     const units = /** @type {HTMLElement} */ (node.querySelector(".segmented"));

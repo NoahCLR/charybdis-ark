@@ -42,7 +42,7 @@ export function cellEditor(behaviour, step, kind) {
                     ${holdStyles(getModel(), kind).map(([value, text]) => `<option value="${esc(value)}" ${shown?.style === value ? "selected" : ""}>${esc(text)}</option>`).join("")}
                 </select></label>`}
             ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.style === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate</span>
-                <span class="affix unit"><input class="input mono" inputmode="numeric" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:repeat" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown?.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}><i>Hz</i></span></label>`}
+                <span class="affix unit"><input class="input mono num" inputmode="numeric" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:repeat" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown?.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}><i>Hz</i></span></label>`}
             <p class="note ce-actions">Changes are kept in the draft automatically.</p>
         </div>
     </div>`);
