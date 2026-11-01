@@ -83,10 +83,10 @@ for (const theme of ["dark", "light"]) {
         const popup = await opened;
         await expect(popup).toHaveURL("https://github.com/samhocevar/wincompose");
         await popup.close();
-        await host.locator('[data-macro="hostOs"]').selectOption("1");
+        await host.locator('label:has([data-macro="hostOs"][value="1"])').click();
         await stagePosted();
         await expect(link).toHaveCount(0);
-        await host.locator('[data-macro="hostOs"]').selectOption("2");
+        await host.locator('label:has([data-macro="hostOs"][value="2"])').click();
         await stagePosted();
         await expect(link).toBeVisible();
         await host.locator('label.sw:has([data-macro="unicodeEnabled"])').click();

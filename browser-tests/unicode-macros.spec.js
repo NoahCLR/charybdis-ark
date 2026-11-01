@@ -18,7 +18,7 @@ for (const theme of ["dark", "light"]) {
         // The preview detects macOS: a keyboard layout and the ISO option, and
         // Unicode entry is the Unicode Hex Input layout rather than a switch.
         await expect(page.locator('[data-macro="unicodeEnabled"]')).toHaveCount(0);
-        await page.locator('[data-macro="hostOs"]').selectOption("2");
+        await page.locator('label:has([data-macro="hostOs"][value="2"])').click();
         expect(await page.evaluate(() => window.__posted.at(-1))).toEqual(expect.objectContaining({type: "updateConfigDefaults", sectionId: "host", fields: [{macro:"hostOs",value:"2"},{macro:"hostLayout",value:"0"},{macro:"macosIso",enabled:false}]}));
         await page.locator('[data-macro="hostLayout"]').selectOption("3");
         expect(await page.evaluate(() => window.__posted.at(-1).fields)).toEqual([{macro:"hostOs",value:"2"},{macro:"hostLayout",value:"3"},{macro:"macosIso",enabled:false}]);
