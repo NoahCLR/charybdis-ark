@@ -584,7 +584,11 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
     },
     pointing: {
-        kinds: [[0, "Empty"], [1, "Directional keys / shortcuts"], [2, "Scrolling"]],
+        kinds: [[0, "Empty"], [1, "Send keys"], [2, "Scroll"]],
+        // What each movement does, said beside it where a mode picks it, and
+        // what that choice is called.
+        kindsDo: [[1, "Each direction sends a key or shortcut."], [2, "The ball scrolls the page."]],
+        movementLabel: "What the ball does",
         // A directional mode's shortcuts, by where the record keeps each: the
         // straight directions, and the diagonals eight directions add.
         directions: [["left", "Left"], ["right", "Right"], ["up", "Up"], ["down", "Down"]],
@@ -598,13 +602,13 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // layers its key turns on while it runs the mode, and what ends a mode
         // its layers started: a layer above the highest of them that is on, or
         // any layer outside both sets, neither the pointer layer nor a default
-        // layer. The editor's two columns of switches, and Review's fields.
-        // Each column title describes the layer in its row; "already starts"
+        // layer. Review's fields; the editor's What starts it step heads its
+        // lists with `keyTurnsOnShort` and `endsWhen`, and "already starts"
         // names the other mode a layer starts. The Keys workbench's Pointing
         // modes tab heads a column for each part of the link (`startedBy`,
         // `endsWhen`, `keyTurnsOnShort`), marks a layer the keyboard ignores in
         // it (`ignored`), and tags a mode its link starts (`started`).
-        linkLabels: {starts: "Starts this pointing mode", keyTurnsOn: "Turned on by this pointing mode's key", startsOther: "already starts",
+        linkLabels: {startsOther: "already starts",
             linkedLayers: "Layers that start this pointing mode", linkTurnsOn: "Layers turned on by this pointing mode's key", linkEnds: "Ends when another layer turns on",
             startedBy: "Started by", endsWhen: "Ends when", keyTurnsOnShort: "Its key turns on", ignored: "ignored", started: "started"},
         linkEnds: [[0, "Never"], [1, "A higher layer"], [2, "Any layer"]],
@@ -625,13 +629,46 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         modifierPolicy: [[0, "Inherit modifiers"], [1, "Ignore"], [2, "Exact shortcut"]],
         scrollFields: [
             ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
-            ["divisorH", "Movement per wheel step ↔"], ["divisorV", "Movement per wheel step ↕"],
-            ["intervalMs", "Minimum interval (ms)"], ["expireMs", "Gesture expiry (ms)"], ["lockMs", "Axis lock timeout (ms)"],
+            ["divisorH", "Sideways: ball movement per step"], ["divisorV", "Up and down: ball movement per step"],
+            ["intervalMs", "Fastest repeat (ms)"], ["expireMs", "Leftover movement kept for (ms)"], ["lockMs", "Axis kept after the ball stops (ms)"],
             ["startNumerator", "Axis selection ratio · numerator"], ["startDenominator", "Axis selection ratio · denominator"],
             ["sustainNumerator", "Axis retention ratio · numerator"], ["sustainDenominator", "Axis retention ratio · denominator"],
             ["decayDivisor", "Cross-axis decay divisor"],
         ],
         heldModifiers: "Hold modifiers while scrolling",
+        // What each setting of a mode does, by the field it sets, as the
+        // firmware runs it (its pointing spec; pointing_mode_dragscroll.c for
+        // the scroll fields): said as the field's tip wherever it is drawn. A
+        // ratio's tip is its numerator's; a directional threshold's is by how
+        // often the mode sends (thresholdEvery, thresholdOnce).
+        tips: {
+            axis: "Which movement this mode turns into keys. Switching to one axis empties the other axis's keys.",
+            emptyDirection: "Moving toward a direction with no key: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing.",
+            directionOutput: "Every step sends the key again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; a movement starts again after a 150 ms pause, and only turning more than 90 degrees from the direction that sent sends again before then.",
+            thresholdEvery: "How far the ball must move for each key a direction sends: one key per this distance. Lower sends more often.",
+            thresholdOnce: "How far the ball must move before a direction sends its key; it sends once however far the ball goes.",
+            scrollAxes: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis.",
+            dpi: "Sensor DPI while this mode runs.",
+            pointerLayer: "Keep the pointer layer active: the pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on. Return to the typing layer: starting the mode turns the pointer layer off, and it stays off while the mode runs. A mode its layers started never keeps the pointer layer on.",
+            linkedLayers: "While one of these layers is on, held or locked, it starts this pointing mode. A mode started by its key wins over one its layers started.",
+            linkTurnsOn: "While this pointing mode's key runs it, held or locked, these layers stay on; each goes off when the mode ends unless something else keeps it.",
+            linkEnds: "A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and starts or is turned on by neither. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended.",
+            thresholdH: "How far the ball must move sideways, in sensor counts, before a scroll can go sideways. When both axes are below their thresholds, the scroll lets go of its axis.",
+            thresholdV: "How far the ball must move up or down, in sensor counts, before a scroll can go up or down. When both axes are below their thresholds, the scroll lets go of its axis.",
+            divisorH: "Sensor counts of sideways movement for one scroll step. Lower scrolls faster.",
+            divisorV: "Sensor counts of up-and-down movement for one scroll step. Lower scrolls faster.",
+            intervalMs: "The shortest time between two scrolls sent. 0 leaves no wait: a scroll is sent as soon as the ball has moved a whole step.",
+            lockMs: "How long a scroll keeps its axis once the ball stops. Move again within it and it carries on the same way; after it, the next movement picks its axis afresh.",
+            expireMs: "Movement that has not yet made a whole scroll step is kept this long after the ball stops, so a slow movement still adds up; then it is forgotten. At least the axis time.",
+            decayDivisor: "Each scroll sent divides the other axis's leftover movement by this, and drops it once it is below that axis's threshold, so drift across a scroll fades instead of building up. Higher fades faster; at least 2.",
+            invert: "Reverses which way the page scrolls for that axis: sideways, up and down, or both.",
+            heldModifiers: "Modifiers held down while the mode scrolls, for apps that scroll differently with them: Shift to scroll sideways in some, Command or Ctrl to zoom in others.",
+            startNumerator: "To pick an axis, its movement must be at least this many times the other axis's: 7 : 4 is 1.75 times. Higher needs a straighter movement before a scroll starts; when neither axis wins, it waits.",
+            sustainNumerator: "A scroll keeps its axis while that axis moves at least this many times the other (5 : 4 is 1.25 times, never more than the selection ratio). Below it, the other axis takes over only if it reaches the selection ratio; otherwise the scroll stays on its axis through the wobble.",
+        },
+        // What the pointer layer does while a mode its key started runs: on,
+        // or off so the typing layer's keys stay under the hand.
+        pointerLayerLabel: "Pointer layer",
     },
     modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
         [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"]],

@@ -25,12 +25,13 @@ for (const theme of ["dark", "light"]) {
         await openControls(page, "pointing", {pointingSlot: 4, pdAdvanced: true}, theme);
         await publish();
         await clearPosts(page);
-        await page.locator('[data-f="pointing:4:axis"]').selectOption("3");
+        await page.locator('label:has([data-f="pointing:4:axis:3"])').click();
         await stagePosts();
 
         for (const [field, macro] of [["dir:left", 0], ["diag:upLeft", 127]]) {
             await clearPosts(page);
-            await page.locator(`label:has(input[data-f="pointing:4:${field}"]) button`).click();
+            const [group, name] = field.split(":");
+            await page.locator(`.pd-arm.${name} .pd-key`).click();
             const picker = page.getByRole("dialog", {name: "Pick a keycode"});
             await picker.locator('[data-sec="macros"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(128);
@@ -41,21 +42,20 @@ for (const theme of ["dark", "light"]) {
             await picker.locator('[data-mod="C"]').click();
             await picker.locator('[data-act="use"]').click();
             const message = await stagePosts();
-            const [group, name] = field.split(":");
             expect(message.config[group === "dir" ? "directions" : "diagonals"][name])
                 .toEqual({keycode: `MACRO_${macro}`, modifierPolicy: 0, mask: 0});
-            await expect(page.locator(`[data-f="pointing:4:${field}"]`)).toHaveValue(macro === 0 ? "Greeting <&>" : "Macro 127");
+            await expect(page.locator(`.pd-arm.${name} .pd-key`)).toHaveText(macro === 0 ? "Greeting <&>" : "Macro 127");
         }
-        await expect(page.locator(".pd-cross")).toContainText("Empty macro: does nothing yet");
-        await expect(page.locator(".pd-cross")).toContainText("Busy triggers are dropped");
+        await expect(page.locator(".pd-compass")).toContainText("Empty macro: does nothing yet");
+        await expect(page.locator(".pd-compass")).toContainText("Busy triggers are dropped");
         await expect(page.locator('[data-f="pointing:4:dirPolicy:left"]')).toHaveCount(0);
         await expect(page.locator('[data-f="pointing:4:diagPolicy:upLeft"]')).toHaveCount(0);
         await expect(page.locator(".pd-taps")).toContainText("The macro continues after its trigger");
 
         await clearPosts(page);
-        await page.locator('[data-f="pointing:4:directionOutput"]').selectOption("1");
+        await page.locator('label:has([data-f="pointing:4:directionOutput:1"])').click();
         await stagePosts();
-        await expect(page.locator(".pd-cross")).not.toContainText("Busy triggers are dropped");
+        await expect(page.locator(".pd-compass")).not.toContainText("Busy triggers are dropped");
         expect(validateSnapshot(draft.document).pdModes[4].directions.left.keycode).toBe(0x7700);
     });
 }

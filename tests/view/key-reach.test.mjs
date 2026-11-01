@@ -85,7 +85,7 @@ test("a key reaches its macro, by the slot the keyboard reported", () => {
 
 test("a pointing key reaches its mode, said by its kind in the vocabulary's words and where it paints", () => {
     const {pointing} = reachOf(11);
-    assert.deepEqual([pointing?.slot.id, pointing?.kind, pointing?.paints], [0, "scrolling", "right half"]);
+    assert.deepEqual([pointing?.slot.id, pointing?.kind, pointing?.paints], [0, "scroll", "right half"]);
     const empty = reachOf(12).pointing;
     assert.deepEqual([empty?.slot.id, empty?.kind, empty?.paints], [6, "", ""], "an empty slot has no kind and paints nowhere");
 });

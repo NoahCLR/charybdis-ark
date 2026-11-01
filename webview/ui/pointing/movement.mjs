@@ -1,62 +1,126 @@
 // @ts-check
+// Step 2 of a mode: what the ball does as it moves. A directional mode draws
+// each direction it reads as a key placed where the ball sends it, around the
+// ball; a click opens the picker and × clears it. A scrolling mode groups its
+// fields as which way, speed and feel.
 import {el, esc} from "../../lib/dom.mjs";
 import {AXIS, DIAGONALS, DIRECTIONS, axisReads, scrollAxesOf, tapPlaceWord} from "../../view/pointing-config.mjs";
-import {ARROWS, SCROLL_LEAD, scrollLabel, words} from "./common.mjs";
+import {keyDisplayName, pointingMacro} from "../../view/keyvalues.mjs";
+import {keycodeName} from "../../view/key-identity.mjs";
+import {render} from "../../store.mjs";
+import {openPicker} from "../picker.mjs";
+import {ARROWS, SCROLL_LEAD, scrollLabel, tipFor, words} from "./common.mjs";
+import {word} from "../../view/vocabulary.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
-/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} scrolling @param {FormControls} controls */
-export function movement(model, slot, scrolling, {field, select, shortcut, modifiers}) {
-    // ── movement ──────────────────────────────────────────────────────────
-    if (!scrolling) {
-        const reads = axisReads(slot.axis);
-        const card = el(`<div class="card">
-            <div class="card-h"><h3>What each direction sends</h3><span class="right" data-axis></span></div>
-            <div class="card-b stack"><div class="pd-cross ${slot.axis === AXIS.EIGHT ? "eight" : reads.length === 4 ? "" : reads.includes("up") ? "vertical" : "horizontal"}"></div></div></div>`);
-        /** @type {HTMLElement} */ (card.querySelector("[data-axis]")).append(select("Reads", words(model).axes, slot.axis, "axis", {inline: true,
-            tip: "Which movement this mode turns into keys. Switching to one axis empties the other axis's shortcuts."}));
-        const cross = /** @type {HTMLElement} */ (card.querySelector(".pd-cross"));
-        for (const direction of DIRECTIONS) {
-            const label = tapPlaceWord(model, "directions", direction);
-            if (reads.includes(direction)) {
-                cross.append(shortcut(label, slot.directions?.[direction]?.keycode, `dir:${direction}`, {
-                    klass: `arm ${direction}`, labelHtml: `<b>${ARROWS[direction]}</b> ${esc(label)}`,
-                }));
-            }
-        }
-        if (slot.axis === AXIS.EIGHT) {
-            for (const diagonal of DIAGONALS) {
-                const label = tapPlaceWord(model, "diagonals", diagonal);
-                cross.append(shortcut(label, slot.diagonals?.[diagonal]?.keycode, `diag:${diagonal}`, {
-                    klass: `arm ${diagonal}`, labelHtml: `<b>${ARROWS[diagonal]}</b> ${esc(label)}`,
-                }));
-            }
-        }
-        // Every directional mode: what moving toward a direction with no
-        // shortcut does.
-        /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(select("When a direction is empty", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
-            {tip: "Moving toward a direction with no shortcut: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing."}));
-        /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(select("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
-            {tip: "Every step sends the shortcut again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; it sends again when the ball moves back the other way, or after a 150 ms pause. Turning toward another direction sends nothing more."}));
-        /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(el(`<p class="note">Directions can also click mouse buttons 1–8. A button already held gets no new click and stays held; the computer decides what each button does.</p>`));
-        cross.append(el(`<div class="hub" aria-hidden="true"><svg viewBox="0 0 64 64">
-            <circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="3"/>
-            ${reads.includes("up") ? `<path d="M32 4l-4 5h8z"/>` : ""}${reads.includes("down") ? `<path d="M32 60l-4-5h8z"/>` : ""}
-            ${reads.includes("left") ? `<path d="M4 32l5-4v8z"/>` : ""}${reads.includes("right") ? `<path d="M60 32l-5-4v8z"/>` : ""}
-            ${slot.axis === AXIS.EIGHT ? `<path d="M12 12l7 1-6 6z"/><path d="M52 12l-7 1 6 6z"/><path d="M12 52l7-1-6-6z"/><path d="M52 52l-7-1 6-6z"/>` : ""}
-            </svg><span class="tag">trackball</span></div>`));
-        return card;
-    } else {
-        const card = el(`<div class="card">
-            <div class="card-h"><h3>Scrolling</h3></div>
-            <div class="card-b stack"><div class="pd-grid4"></div><div class="pd-split"></div></div></div>`);
-        const steps = /** @type {HTMLElement} */ (card.querySelector(".pd-grid4"));
-        for (const [key, unit] of SCROLL_LEAD) steps.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
-        const lower = /** @type {HTMLElement} */ (card.querySelector(".pd-split"));
-        lower.append(select("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
-            {tip: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis."}));
-        lower.append(select("Reverse scrolling", words(model).invert, slot.scroll?.invert, "invert"));
-        lower.append(modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers"));
-        return card;
-    }
+/** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
+/** @typedef {import("../surface-types.js").PresentedSlot} PresentedSlot */
 
+/** @param {Model} model @param {PresentedSlot} slot @param {boolean} scrolling @param {FormControls} controls @param {() => void} stage */
+export function movement(model, slot, scrolling, controls, stage) {
+    return scrolling ? scrollingFields(model, slot, controls) : directions(model, slot, controls, stage);
+}
+
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls @param {() => void} stage */
+function directions(model, slot, {choice, form, disabled}, stage) {
+    const reads = axisReads(slot.axis);
+    const eight = slot.axis === AXIS.EIGHT;
+    const shape = eight ? "eight" : reads.length === 4 ? "four" : reads.includes("up") ? "vertical" : "horizontal";
+    const node = el(`<div class="pd-directions">
+        <div class="pd-direction-reads"></div>
+        <div class="pd-compass ${shape}" role="group" aria-label="What each direction sends">
+            <div class="pd-ball" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="30"/><circle cx="40" cy="40" r="4"/></svg></div></div>
+        <div class="pd-direction-fields"></div></div>`);
+    const compass = /** @type {HTMLElement} */ (node.querySelector(".pd-compass"));
+    /** @type {[("directions" | "diagonals"), string][]} */
+    const places = [...DIRECTIONS.filter((name) => reads.includes(name)).map((name) => /** @type {["directions", string]} */ (["directions", name])),
+        ...(eight ? DIAGONALS.map((name) => /** @type {["diagonals", string]} */ (["diagonals", name])) : [])];
+    for (const [group, name] of places) {
+        compass.append(directionKey(model, slot, group, name, {form, disabled, stage}));
+    }
+    /** @type {HTMLElement} */ (node.querySelector(".pd-direction-reads")).append(choice("Reads", words(model).axes, slot.axis, "axis",
+        {tip: tipFor(model, "axis")}));
+    const fields = /** @type {HTMLElement} */ (node.querySelector(".pd-direction-fields"));
+    fields.append(choice("When a direction has no key", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
+        {tip: tipFor(model, "emptyDirection")}));
+    fields.append(choice("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
+        {tip: tipFor(model, "directionOutput")}));
+    fields.append(el(`<p class="note">A direction can also click mouse buttons 1–8 or play a macro; both are in the picker.</p>`));
+    return node;
+}
+
+// One direction's key. Its form reader is the keycode name it holds: the
+// stored one until the picker or × changes it.
+/** @param {Model} model @param {PresentedSlot} slot @param {"directions" | "diagonals"} group @param {string} name @param {{form: FormControls["form"], disabled: string, stage: () => void}} controls */
+function directionKey(model, slot, group, name, {form, disabled, stage}) {
+    const code = Number(slot[group]?.[name]?.keycode ?? 0);
+    const key = `${group === "diagonals" ? "diag" : "dir"}:${name}`;
+    let held = keycodeName(model, code);
+    form[key] = () => held;
+    const label = tapPlaceWord(model, group, name);
+    const shown = code ? keyDisplayName(model, code) : "";
+    const macro = pointingMacro(model, code);
+    const notes = macro ? [
+        macro.empty ? "Empty macro: does nothing yet" : "",
+        slot.directionOutput === 0 ? "Busy triggers are dropped · try Once per movement" : "",
+    ].filter(Boolean) : [];
+    const node = el(`<div class="pd-arm ${esc(name)}" data-direction="${esc(name)}">
+        <span class="pd-arm-dir" aria-hidden="true">${ARROWS[name]} ${esc(label)}</span>
+        <span class="pd-keywrap"><button type="button" class="pd-key ${shown ? "" : "unset"}" data-direction-key="${esc(key)}" ${esc(disabled)}
+            aria-label="${esc(`${label}: ${shown || "no key"}`)}" data-tip="${esc(shown ? `${label} sends ${shown}${held && held !== shown ? `, stored as ${held}` : ""}. Click to change it.` : `Pick a key for ${label}.`)}">${shown ? esc(shown) : "+ Key"}</button>
+        ${shown ? `<button type="button" class="pd-key-clear" data-clear="${esc(key)}" aria-label="${esc(`Clear ${label}`)}" ${esc(disabled)}>×</button>` : ""}</span>
+        ${notes.map((note) => `<span class="note">${esc(note)}</span>`).join("")}</div>`);
+    /** @type {HTMLButtonElement} */ (node.querySelector("[data-direction-key]")).addEventListener("click", () => {
+        // Only what the keyboard sends from a pointing mode is offered
+        // (model.pdModeEditing.tapKeys); a key is checked when it is staged.
+        openPicker({
+            title: label, context: `${slot.name} · slot ${slot.id}`,
+            seed: held ? [held] : [],
+            allowedKeys: model.pdModeEditing?.tapKeys?.plain ?? null,
+            modifiable: model.pdModeEditing?.tapKeys?.modified ?? null,
+            onPick: (expression) => { held = expression; stage(); render(); },
+        });
+    });
+    /** @type {HTMLButtonElement | null} */ (node.querySelector("[data-clear]"))?.addEventListener("click", () => { held = ""; stage(); });
+    return node;
+}
+
+// The scroll fields the step shows itself; Advanced shows the rest of the
+// record. A field drawn twice registers its reader twice, and the second
+// input silently wins, so the two never overlap (common.mjs SCROLL_LEAD).
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls */
+function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}) {
+    const node = el(`<div class="pd-scrolling stack">
+        <div class="pd-pair" data-group="which"></div>
+        <div class="sect-h pd-sub"><h5>Speed</h5><span class="note">How far the ball moves for one scroll step. Lower scrolls faster.</span></div>
+        <div class="pd-pair" data-group="speed"></div>
+        <div class="sect-h pd-sub"><h5>Feel</h5></div>
+        <div class="pd-pair" data-group="feel"></div></div>`);
+    const group = (/** @type {string} */ name) => /** @type {HTMLElement} */ (node.querySelector(`[data-group="${name}"]`));
+    group("which").append(choice("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
+        {tip: tipFor(model, "scrollAxes")}),
+    reverse(model, slot, form, disabled));
+    // The fields this step draws are SCROLL_LEAD's, the divisors as Speed
+    // and the rest as Feel; Advanced draws the others.
+    for (const [key, unit] of SCROLL_LEAD) {
+        group(key.startsWith("divisor") ? "speed" : "feel").append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: tipFor(model, key)}));
+    }
+    const held = modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers");
+    held.setAttribute("data-tip", tipFor(model, "heldModifiers"));
+    node.append(held);
+    return node;
+}
+
+// Reverse scrolling is one switch per axis, named as the vocabulary names
+// each bit alone (the same words Review reads): the record keeps it as two bits,
+// sideways (1) and up and down (2), which the vocabulary names together.
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls["form"]} form @param {string} disabled */
+function reverse(model, slot, form, disabled) {
+    const invert = Number(slot.scroll?.invert ?? 0);
+    const P = words(model);
+    /** @param {number} bit */
+    const axis = (bit) => `<label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:invert:${bit}" data-bit="${bit}" ${invert & bit ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">${esc(word(P.invert, bit))}</span></label>`;
+    const node = el(`<div class="field" data-tip="${esc(tipFor(model, "invert"))}"><span>Reverse scrolling</span><div class="pd-switches">${axis(1)}${axis(2)}</div></div>`);
+    form.invert = () => [...node.querySelectorAll("input:checked")].reduce((mask, input) => mask | Number(/** @type {HTMLInputElement} */ (input).dataset.bit), 0);
+    return node;
 }

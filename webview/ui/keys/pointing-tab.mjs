@@ -26,7 +26,7 @@ export function tabPointing(body, right) {
 
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
     const words = vocabulary(model).pointing;
-    // The mode's link (firmware D-F62), as its How it starts card sets it, a
+    // The mode's link (firmware D-F62), as its What starts it step sets it, a
     // column each: the layers that start it, what ends a mode they started,
     // and the layers its key turns on (linkRows). A layer the keyboard
     // ignores in the link is marked so, the card's reason on it. A dash for none.

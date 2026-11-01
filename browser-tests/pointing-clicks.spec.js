@@ -19,7 +19,7 @@ for (const theme of ["dark", "light"]) {
         await publish();
         for (const [direction, button] of [["left", 3], ["right", 4]]) {
             await clearPosts(page);
-            await page.locator(`label:has(input[data-f="pointing:4:dir:${direction}"]) button`).click();
+            await page.locator(`.pd-arm.${direction} .pd-key`).click();
             const picker = page.getByRole("dialog", {name: "Pick a keycode"});
             await picker.locator('[data-sec="mouse"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(8);
@@ -36,22 +36,24 @@ for (const theme of ["dark", "light"]) {
             draft.stage(messages[0]);
             expect(validateSnapshot(draft.document).pdModes[4].directions[direction].keycode).toBe(0xd0 + button);
             await publish();
-            await expect(page.locator(`[data-f="pointing:4:dir:${direction}"]`)).toHaveValue(`Mouse Button ${button}`);
+            await expect(page.locator(`.pd-arm.${direction} .pd-key`)).toHaveText(`Mouse Button ${button}`);
         }
-        // A QMK name or alias typed into a field stages that keycode; the
-        // fields left as shown keep theirs.
+        // A QMK name or alias searched in the picker finds the key; the
+        // directions not picked keep theirs.
         for (const [direction, typed] of [["up", "MS_BTN3"], ["down", "QK_MOUSE_BUTTON_3"]]) {
             await clearPosts(page);
-            const input = page.locator(`[data-f="pointing:4:dir:${direction}"]`);
-            await input.fill(typed);
-            await input.dispatchEvent("change");
+            await page.locator(`.pd-arm.${direction} .pd-key`).click();
+            const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+            await picker.locator("#pickerSearch").fill(typed);
+            await picker.locator('[data-pick="QK_MOUSE_BUTTON_3"]').first().click();
+            await picker.locator('[data-act="use"]').click();
             const messages = await posted(page);
             expect(messages).toHaveLength(1);
-            expect(messages[0].config.directions).toMatchObject({[direction]: {keycode: typed}, left: {keycode: "QK_MOUSE_BUTTON_3"}, right: {keycode: "QK_MOUSE_BUTTON_4"}});
+            expect(messages[0].config.directions).toMatchObject({[direction]: {keycode: "QK_MOUSE_BUTTON_3"}, left: {keycode: "QK_MOUSE_BUTTON_3"}, right: {keycode: "QK_MOUSE_BUTTON_4"}});
             draft.stage(messages[0]);
             expect(validateSnapshot(draft.document).pdModes[4].directions[direction].keycode).toBe(0xd3);
             await publish();
-            await expect(input).toHaveValue("Mouse Button 3");
+            await expect(page.locator(`.pd-arm.${direction} .pd-key`)).toHaveText("Mouse Button 3");
         }
         expect(draft.changes().find(row => row.unit === "pd:4").fields.filter(field => ["Left", "Right"].includes(field.label)).map(field => field.after))
             .toEqual(["Mouse Button 3 · Inherit modifiers", "Mouse Button 4 · Inherit modifiers"]);
