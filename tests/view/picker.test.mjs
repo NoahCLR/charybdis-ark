@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {SEARCH_ROWS, foldedPick, heldModifiers, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, pickAllowed, pickProblem, pickValue,
-    pickedExpression, pickerMatches, shownSection, storedPick} from "../../webview/view/picker.mjs";
+    dropKey, openingPick, pickKey, pickModifier, pickedExpression, pickerMatches, shownSection, storedPick} from "../../webview/view/picker.mjs";
 import {pickerSections} from "../../webview/view/picker-sections.mjs";
 
 const {demoDocument, publishedModel} = createRequire(import.meta.url)("../fixtures/published-model");
@@ -98,4 +98,51 @@ test("a layer key lights the button for the same act on its layer, as core words
     assert.equal(isLayerKeyPicked(model, picker({keys: ["MO(3)"]}), "LOCK_LAYER(3)"), false, "another act");
     assert.equal(isLayerKeyPicked(model, picker({keys: ["TO(3)"]}), "MO(3)"), false);
     assert.equal(isLayerKeyPicked(model, picker(), "LOCK_LAYER(3)"), false, "nothing picked");
+});
+
+test("in a picker for one key a modifier key is its button in the row, as in a shortcut", () => {
+    const command = picker({mods: ["G"], keys: []});
+    assert.equal(isPicked(model, command, "KC_LEFT_GUI"), true, "the row's Command lights the board's Left Command");
+    assert.equal(isPicked(model, picker(), "KC_LEFT_GUI"), false);
+    assert.equal(isPicked(model, picker({mods: ["G"], keys: ["KC_A"]}), "KC_A"), true, "the key stays lit beside it");
+    assert.deepEqual(heldModifiers(model, picker(), "KC_LEFT_GUI"), {key: "", mods: 8}, "a modifier key is read through the row");
+    assert.equal(heldModifiers(model, picker(), "KC_EXLM"), null, "a shifted symbol stays a key of its own");
+    assert.equal(heldModifiers(model, picker({mode: "list"}), "KC_LEFT_GUI"), null, "a list picks keys, modifiers among them");
+    assert.equal(heldModifiers(model, picker({layerTap: "2"}), "KC_LEFT_GUI"), null);
+    // Clicking either stores the same key: Command alone is the Left Command key.
+    assert.equal(pickedExpression(model, command), "KC_LEFT_GUI");
+    assert.equal(pickAllowed(model, picker({allowedKeys: ["KC_A"]}), "KC_LEFT_GUI"), false, "a limited field still takes only its keys");
+});
+
+test("a picker for one key opens on the stored key with its modifiers lit in the row", () => {
+    assert.deepEqual(openingPick(model, {mode: "single"}, ["G(KC_A)"]), {keys: ["KC_A"], mods: ["G"]});
+    assert.deepEqual(openingPick(model, {mode: "single"}, ["KC_LEFT_GUI"]), {keys: [], mods: ["G"]}, "a modifier key is its button");
+    assert.deepEqual(openingPick(model, {mode: "single"}, ["KC_EXLM"]), {keys: ["KC_EXLM"], mods: []}, "a symbol the catalogue names stays that key");
+    assert.deepEqual(openingPick(model, {mode: "single"}, ["KC_A"]), {keys: ["KC_A"], mods: []});
+    assert.deepEqual(openingPick(model, {mode: "list"}, ["G(KC_A)"]), {keys: ["G(KC_A)"], mods: []});
+    assert.deepEqual(openingPick(model, {mode: "single", shortcut: true}, ["KC_LEFT_GUI"]), {keys: ["KC_LEFT_GUI"], mods: []});
+    // Opened and used unchanged, it stores the same keycode.
+    assert.equal(pickedExpression(model, picker(openingPick(model, {mode: "single"}, ["G(KC_A)"]))), "G(KC_A)");
+    assert.equal(pickedExpression(model, picker(openingPick(model, {mode: "single"}, ["KC_LEFT_GUI"]))), "KC_LEFT_GUI");
+});
+
+test("a modifier key that is the stored key itself opens lit, as the key it is", () => {
+    // LCTL(KC_LSFT): Left Shift is the key, Ctrl lit around it.
+    const opened = picker(openingPick(model, {mode: "single"}, ["C(KC_LEFT_SHIFT)"]));
+    assert.deepEqual([opened.keys, opened.mods], [["KC_LEFT_SHIFT"], ["C"]]);
+    assert.equal(isPicked(model, opened, "KC_LSFT"), true, "the board's Left Shift, under its short name");
+    assert.equal(isPicked(model, opened, "KC_LCTL"), true, "and Left Ctrl, lit in the row");
+    assert.equal(pickedExpression(model, opened), "C(KC_LEFT_SHIFT)", "used unchanged, it stores the same keycode");
+});
+
+test("a click picks by the picker's kind: one key alone, a list in order up to its limit, a modifier key as its button", () => {
+    assert.deepEqual(pickKey(model, picker({keys: ["KC_A"]}), "KC_B"), {keys: ["KC_B"]}, "a picker for one key picks it alone");
+    const withA = pickKey(model, picker({keys: ["KC_A"]}), "KC_LGUI");
+    assert.deepEqual([withA?.keys, withA?.mods], [["KC_A"], ["G"]], "a modifier key lights its button and keeps the key");
+    assert.deepEqual(pickKey(model, picker({mode: "list", keys: ["KC_A"]}), "KC_B"), {keys: ["KC_A", "KC_B"]});
+    assert.deepEqual(pickKey(model, picker({mode: "list", keys: ["KC_A", "KC_B"]}), "KC_A"), {keys: ["KC_B"]}, "a second click takes it out");
+    assert.equal(pickKey(model, picker({mode: "list", maxKeys: 2, keys: ["KC_A", "KC_B"]}), "KC_C"), null, "a full list picks nothing");
+    assert.deepEqual(pickKey(model, picker({mode: "list", maxKeys: 1, keys: ["KC_A"]}), "KC_C"), {keys: ["KC_C"]}, "a list of one swaps");
+    assert.deepEqual(pickModifier(picker({mods: ["G"]}), "G").mods, [], "the row's button unlights");
+    assert.deepEqual(dropKey(picker({mode: "list", keys: ["KC_A", "KC_B"]}), 0), {keys: ["KC_B"]});
 });

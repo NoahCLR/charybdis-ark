@@ -490,12 +490,16 @@ test("modifier buttons and a modifier key fold into the simplest keycode", async
         if (key) await page.locator(`.picker [data-pick="${key}"]`).first().click();
     };
     const value = page.locator(".picker .pk-value");
-    // Command and the Left Command key: just Left Command.
-    await pick(["G"], "KC_LGUI");
+    // Command, or the Left Command key, which is the same button: just Left Command.
+    await pick(["G"]);
     await expect(value).toHaveText("KC_LEFT_GUI");
     await page.locator('.picker [data-act="cancel"]').first().click();
-    // Command, Right Command and the Left Command key: both Commands, a keycode.
-    await pick(["G", "RGUI"], "KC_LGUI");
+    await pick([], "KC_LGUI");
+    await expect(value).toHaveText("KC_LEFT_GUI");
+    await expect(page.locator('.picker [data-mod="G"]')).toHaveAttribute("aria-pressed", "true");
+    await page.locator('.picker [data-act="cancel"]').first().click();
+    // Right Command and the Left Command key: both Commands, a keycode.
+    await pick(["RGUI"], "KC_LGUI");
     await expect(value).toHaveText("RGUI(KC_LEFT_GUI)");
     await expect(page.locator(".picker .pk-problem")).toHaveCount(0);
     await expect(page.locator('.picker [data-act="use-custom-key"]')).toHaveCount(0);

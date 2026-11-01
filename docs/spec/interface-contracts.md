@@ -706,6 +706,14 @@ A name the catalog gives a key is what the key does wherever it is placed
   or more on each side are refused, with a custom key's shortcut offered
   instead where the field allows one (`tests/view/keyvalues.test.mjs`,
   `tests/view/keycode-expression.test.mjs`).
+- In a picker for one key, a modifier key on the board is its modifier's
+  button in the row, as in a shortcut: clicking either lights both and leaves
+  the picked key, and modifiers alone store as the simplest keycode
+  (`heldModifiers`, `modifierPick`); what a click picks is `pickKey`,
+  `pickModifier` and `dropKey`, so the sheet only draws. It opens on the stored key with the
+  modifiers it carries lit (`openingPick`), a key the catalogue names itself
+  (`KC_EXLM`) staying that key (`tests/view/picker.test.mjs`,
+  `browser-tests/picker-modifiers.spec.js`).
 - A key on the board is named as the board names it, never by its layout
   index: a layout key's picker says which key on which layer ("For Esc on
   Base", `onLayer`), and a board key's accessible name is what it shows, or

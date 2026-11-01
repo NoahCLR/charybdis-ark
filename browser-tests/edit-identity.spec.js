@@ -126,7 +126,7 @@ const forms = [
     {name: "behaviour moved to another key, in the picker", screen: "keys", state: {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"}, shown: "#pickerSearch",
         open: page => page.locator('[data-act="rekey"]').click(),
         commit: async page => {
-            await page.locator('.picker [data-remove="0"]').click();
+            await page.locator('.picker [data-act="clear"]').click();
             await page.locator("#pickerSearch").fill("KC_F13");
             await page.locator('.picker [data-pick="KC_F13"]').first().click();
             await page.locator('.picker [data-act="use"]').click();

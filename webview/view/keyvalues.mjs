@@ -2,7 +2,7 @@
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {macroNamed, vocabulary} from "./vocabulary.mjs";
 import {keyIdentity, keycodeName, macroIndex} from "./key-identity.mjs";
-import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MOD_BITS, MOD_RIGHT, QK, inBlock, macroName, modsOf} from "../../rules/qmk-keycodes.mjs";
+import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MOD_BITS, MOD_RIGHT, QK, inBlock, keyOf, macroName, modsOf} from "../../rules/qmk-keycodes.mjs";
 
 // Keycodes as values: a stored shortcut named for a person, the modifiers a
 // keycode carries, and a picker selection folded into one keycode. Pointing
@@ -28,6 +28,21 @@ export const compactModifierMask = (code) => {
     const compact = modsOf(code);
     return compact & MOD_RIGHT ? (compact & MOD_BITS) << 4 : compact & MOD_BITS;
 };
+
+// A keycode as the key it presses and the modifiers it holds, as the
+// eight-bit mask the picker's controls use: a modifier key is its modifier
+// and no key (Left Shift is Left Shift); a compact keycode is its base key in
+// the catalogue and its modifiers (KC_EXLM is Left Shift and KC_1). Null for
+// any other keycode. The shortcut picker and the picker for one key both read
+// keycodes through it.
+/** @param {Model} model @param {number} code @returns {{key: string, mods: number} | null} */
+export function keycodeModifiers(model, code) {
+    if (inBlock(code, MODIFIER_KEYS)) return {key: "", mods: 1 << (code - MODIFIER_KEYS.first)};
+    const mods = compactModifierMask(code);
+    if (!mods) return null;
+    const base = (model?.qmkKeycodes || []).find((row) => row.keycode === keyOf(code));
+    return base ? {key: base.value, mods} : null;
+}
 
 // Labels arrive with the current model; never retain a translated name.
 export const modifierBits = (/** @type {Model} */ model) => vocabulary(model).modifiers;

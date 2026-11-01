@@ -11,9 +11,9 @@ import {layerCalledAt, sentence, vocabulary} from "./vocabulary.mjs";
 import {placementsOf} from "./reach.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
-import {compactModifierMask} from "./keyvalues.mjs";
+import {keycodeModifiers} from "./keyvalues.mjs";
 import {LAYERS} from "./layout.mjs";
-import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, TAPPING_TOGGLE, inBlock, keyOf} from "../../rules/qmk-keycodes.mjs";
+import {MODIFIER_KEY_SIDES, TAPPING_TOGGLE} from "../../rules/qmk-keycodes.mjs";
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {import("../../contracts/panel.js").CustomKey} CustomKey */
@@ -222,12 +222,8 @@ export function shortcutKeyCode(model, expression) {
 /** @param {Model} model @param {string} name @returns {{key: string, mods: number} | null} */
 export function shortcutModifiers(model, name) {
     const code = keyIdentity(model, name).entry?.keycode;
-    if (code === undefined) return null;
-    if (inBlock(code, MODIFIER_KEYS)) return {key: "", mods: 1 << (code - MODIFIER_KEYS.first)};
-    const mods = compactModifierMask(code);
-    if (!mods) return null;
-    const base = (model?.qmkKeycodes || []).find((row) => row.keycode === keyOf(code));
-    return base && shortcutKeyCode(model, base.value) !== null ? {key: base.value, mods} : null;
+    const held = code === undefined ? null : keycodeModifiers(model, code);
+    return held && (!held.key || shortcutKeyCode(model, held.key) !== null) ? held : null;
 }
 
 // The keycode picker sets a shortcut as it wraps any key: the modifier row
