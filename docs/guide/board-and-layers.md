@@ -174,7 +174,7 @@ The base is always on underneath every other layer; to put another layer
 there, use **Make base** (above). Ark doesn't edit QMK's other default
 layers: a keyboard that keeps more than the base always on keeps them, a
 layer a pointing mode's link uses still can't be one
-([How it starts](pointing.md#how-it-starts)), and Review lists a difference
+([What starts it](pointing.md#3-what-starts-it)), and Review lists a difference
 in them that a backup brings. A key on the keyboard can change them until
 the keyboard restarts.
 
@@ -201,7 +201,7 @@ Under the board, the workbench works on the selected key. Its tabs are:
   heads it: "from Right Option · 1× tap". When that key is already in the
   row, the branch follows it: "Dragscroll hold · 2× hold sends Dragscroll
   lock". A pointing mode's row also has its link
-  ([How it starts](pointing.md#how-it-starts)) in three columns: **Started
+  ([What starts it](pointing.md#3-what-starts-it)) in three columns: **Started
   by**, the layers that start it (one the keyboard ignores, such as the
   pointer layer, is marked ignored), **Ends when**, and **Its key turns on**.
   Turning on a layer that starts a mode starts it, so the mode is listed on

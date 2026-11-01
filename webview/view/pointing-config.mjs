@@ -191,7 +191,7 @@ export function readConfig(slot, form, model = null) {
     return config;
 }
 
-// A slot's link as the keyboard stores it, from the How it starts card. What ends
+// A slot's link as the keyboard stores it, from the What starts it step. What ends
 // the mode goes back to Never with the last layer that starts it, which it
 // needs.
 /** @param {PointingSlot} slot @param {import("../../contracts/edits.js").PdForm} form @returns {Pick<PdConfig, "linkedLayers" | "linkTurnsOn" | "linkEnds">} */

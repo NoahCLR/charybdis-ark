@@ -111,9 +111,9 @@ test("the Lighting list and the pointing link fold the empty layers too", async 
     await list.locator('[data-empty-layers="lighting-layers"]').click();
     await expect(list.locator(".rowitem")).toHaveCount(16);
 
+    // A pointing mode's Add layer menu puts the empty layers in their own group at its end.
     await page.locator('[data-screen="pointing"]').click();
-    const table = page.locator(".pd-starts .layer-table");
-    await expect(table.locator(".layer-table-row:not(.layer-table-head):visible")).toHaveCount(8);
-    await table.locator('[data-empty-layers="pointing-link"]').click();
-    await expect(table.locator(".layer-table-row:not(.layer-table-head):visible")).toHaveCount(16);
+    const menu = page.locator(".pd-starts select.pd-add").first();
+    await expect(menu.locator(":scope > option:not([value=''])")).toHaveCount(8);
+    await expect(menu.locator('optgroup[label="Empty layers"] option')).toHaveCount(8);
 });

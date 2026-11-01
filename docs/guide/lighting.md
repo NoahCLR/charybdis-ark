@@ -87,7 +87,7 @@ Each pointing mode can light while it runs, over whatever the layer paints.
 A mode linked to layers paints beneath the lowest of them that is on instead
 (a layer that starts it or one its key turns on),
 however the mode started: those layers' own colours show over it, and higher
-layers cover both (see [Pointing](pointing.md#how-it-starts)). Pick a mode,
+layers cover both (see [Pointing](pointing.md#3-what-starts-it)). Pick a mode,
 give it a colour, and choose where it paints:
 
 - **Both halves**, **Left half** or **Right half**: that area, whichever key

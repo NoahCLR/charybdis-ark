@@ -51,7 +51,6 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/keys/key-tab.mjs", ["stackRows(model, layer, position)"], "the layer stack's rows, markup templates joined"],
     ["webview/ui/layerbar.mjs", ["tint"], "a style attribute holding layerSwatch()'s css() colour"],
     ["webview/ui/pointing/empty-slot.mjs", ["listed(parts)"], "the ways still reaching an empty slot, joined in prose (view/vocabulary.mjs listed): each a template of counts, escaped layer names and marked actions"],
-    ["webview/ui/pointing/form-controls.mjs", ["options.labelHtml"], "the movement arms' labels: an arrow constant and an escaped label (pointing/movement.mjs)"],
     ["webview/ui/review-items.mjs", ['head.map(row).join("")', 'rest.map(row).join("")', "show", "discard"], "field rows from field(), and the Show and Discard buttons the review overlay builds"],
     ["webview/ui/marks.mjs", ["SCREENS.pointing.icon", "look"], "the Pointing modes screen's authored SVG icon (view/screens.mjs), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],
     ["webview/ui/frame.mjs", ["definition.icon"], "a screen's authored SVG icon (view/screens.mjs)"],

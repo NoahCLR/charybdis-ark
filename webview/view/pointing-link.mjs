@@ -1,5 +1,5 @@
 // @ts-check
-// A pointing slot's link, as the How it starts card offers it: a row per layer with
+// A pointing slot's link, as the What starts it step offers it: a row per layer with
 // whether it starts this pointing mode and whether this pointing mode's key
 // turns it on, and why
 // a switch cannot be used. The core publishes the rule
@@ -55,3 +55,7 @@ export function pointerLayerCovers(model, slot) {
     const covered = Array.from({length: pointer}, (_, index) => index).filter((index) => covers & 2 ** index).map((index) => layerCalledAt(model, index));
     return {pointer: layerCalledAt(model, pointer), covered};
 }
+
+// A link's layer set with one layer put in or taken out: bit n is layer n.
+/** @param {number} mask @param {number} layer @param {boolean} on */
+export const withLayer = (mask, layer, on) => on ? mask | 2 ** layer : mask & ~(2 ** layer);
