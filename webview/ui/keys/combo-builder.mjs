@@ -71,7 +71,7 @@ export function comboBuilder(canEdit, holdTerm) {
                 </div>
             </div>
             <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window</span>
-                <div class="input-row"><span class="affix unit"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-window inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
+                <div class="input-row"><span class="affix unit"><input class="input mono num" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-window inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
                     data-tip="${esc(`Follow the default combo window (${vocabulary(model).settingsScreens.combos}) again, so this combo changes with it.`)}">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="field">

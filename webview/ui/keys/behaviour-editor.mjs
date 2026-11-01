@@ -80,7 +80,7 @@ export function behaviourEditor(behaviour) {
     const timingControl = (name) => {
         const field = behaviourTimingField(behaviour, name);
         return `<label class="field bterm-field" data-tip="${esc(thresholdTips[name])}"><span>${esc(sentence(thresholdNames[name]))}</span>
-            <span class="affix unit"><input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
+            <span class="affix unit"><input class="input mono num" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
                 placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 

@@ -67,7 +67,7 @@ export function stageBase(model) {
     };
     const speed = field("effectSpeed");
     const speedControl = speed ? el(`<label class="field" data-tip="${esc([speed.tooltip, speed.hint].filter(Boolean).join(" "))}"><span>${esc(speed.label)}</span>
-        <input class="input mono" inputmode="numeric" data-macro="${esc(speed.macro)}" data-f="setting:${esc(speed.macro)}" value="${esc(speed.value)}" ${editable && !speed.readOnly ? "" : "disabled"}>
+        <input class="input mono num" inputmode="numeric" data-macro="${esc(speed.macro)}" data-f="setting:${esc(speed.macro)}" value="${esc(speed.value)}" ${editable && !speed.readOnly ? "" : "disabled"}>
         <span class="hint">${esc(speed.hint || "")}. Effects without animation ignore it.</span></label>`) : el(`<span></span>`);
     speedControl.querySelector("input")?.addEventListener("change", (event) => {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
