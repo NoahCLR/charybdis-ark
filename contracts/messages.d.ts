@@ -1,5 +1,5 @@
 import type {PanelEdit, DraftIdentity} from './edits.js';
-import type {ApplyView, CountedProgress, MacroInspection, PhaseId} from './model.js';
+import type {ApplyView, CountedProgress, EditMode, MacroInspection, PhaseId} from './model.js';
 
 /** Every field a layer-editor message may carry; a shape leaves the ones it does not name absent. */
 type LayerFields = {keysFollow?: never; names?: never; id?: never; name?: never; makeBase?: never; to?: never; direction?: never};
@@ -36,7 +36,7 @@ export interface ControlPayloads {
         /** Cancel edit: abort the live edit the keyboard holds until no key is held. */
         abortLiveEdit: Record<never, never>;
         /** How edits reach the keyboard; `pending` says what happens to work in progress first. */
-        setEditMode: {mode: 0 | 1 | 2; pending?: 'save' | 'revert' | 'send' | 'discard'; /** The question showed the draft's traps and warnings and the person went ahead. */ confirmChecks?: boolean};
+        setEditMode: {mode: EditMode; pending?: 'save' | 'revert' | 'send' | 'discard'; /** The question showed the draft's traps and warnings and the person went ahead. */ confirmChecks?: boolean};
         /** Restart both halves (firmware D-F34), keeping unsaved edits to put back. */
         restartKeyboard: Record<never, never>;
     };
@@ -96,7 +96,9 @@ export type PanelRequest = PanelCommand & Partial<DraftIdentity>;
 export type ReadStep = 'layout' | 'profile' | 'combos' | 'baseRgb';
 export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProgress} | {source: 'portable'; progress: string}) & {operationId: number; phase: PhaseId; selectedDeviceId: string; connectionToken: number | string | null};
 export type MacroValidation = MacroInspection | {error: string; code: string};
-export type PanelResponse<M = import('./panel.js').PublishedModel> =
+/** What the shell posts to the panel. The catalog comes before the first model, and again after each `ready`; a model leaves out what it holds. */
+export type PanelResponse<M = import('./panel.js').PostedModel> =
+    | {type: 'catalog'; catalog: import('./panel.js').PanelCatalog}
     | {type: 'model'; model: M; notice?: string; failed?: boolean; resetDraftForms?: boolean; acceptedEdit?: {message: {type: string}; previousFingerprint: string; fingerprint: string}}
     | ({type: 'applyProgress'; apply: ApplyView} & Partial<DraftIdentity>)
     | ({type: 'readProgress'; read: ReadProgress} & Partial<DraftIdentity>)

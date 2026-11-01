@@ -6,21 +6,53 @@
 // data-f identity authored on every form control. Other focusable elements
 // keep their existing authored hooks. Afterwards the matching control gets
 // focus back, with its caret where it was.
+//
+// A text field commits on change, so what is typed into it is only on screen
+// until then. The redraw keeps that text when it draws the field with the
+// same value as before, and commits it once, on Enter or when the field is
+// left. Chrome commits a typed field as it is thrown away, so that change is
+// held back while the redraw decides: kept, the text commits later; not
+// kept (the redraw draws another value, an edit having landed, or the field
+// closed or gone), the held change goes on, as it would have. A field drawn
+// closed (disabled, read-only) takes no edit, so it keeps no text.
 
-/** @typedef {{selector: string, index: number, unique: boolean, caret: [number, number | null] | null}} CapturedFocus */
+/** @typedef {{value: string, rendered: string, field: HTMLInputElement | HTMLTextAreaElement, held: boolean, hold: (event: Event) => void}} Typed */
+/** @typedef {{selector: string, index: number, unique: boolean, caret: [number, number | null] | null, typed: Typed | null}} CapturedFocus */
 /** @typedef {HTMLElement & {selectionStart?: number | null, selectionEnd?: number | null, setSelectionRange?: (start: number, end: number | null) => void}} FocusControl */
 
 const ACTION_NAMES = [
     "id", "data-key", "data-custom-key", "data-trackball", "data-cell", "data-term", "data-macro", "data-channel", "data-row",
     "data-edit", "data-editmacro", "data-editpd", "data-pick", "data-lt", "data-mod", "data-screen", "data-tab",
     "data-ltab", "data-slot", "data-b", "data-style", "data-repeat", "data-output", "data-target", "data-owner",
-    "data-source", "data-mode", "data-anchor", "data-act", "data-step-text", "data-step-delay", "data-raw-payload",
+    "data-source", "data-mode", "data-anchor", "data-act", "data-step-text", "data-step-delay", "data-raw-payload", "data-empty-layers",
+    "data-all-slots", "data-row-pick",
 ];
 
-/** @param {Element} root @returns {CapturedFocus | null} */
-export function captureFocus(root) {
-    const active = /** @type {FocusControl | null} */ (root.ownerDocument?.activeElement);
-    if (!active || active === root.ownerDocument.body || !root.contains(active)) return null;
+// While a redraw draws, a field it throws away is not being left.
+let redrawing = false;
+
+// `draw` replaces what `root` shows; the control focused before it is
+// focused again after it, its caret and typed text kept. Whether `draw`
+// finishes or throws, the redraw is over when this returns, so a kept field
+// commits when it is left.
+/** @param {Element} root @param {() => void} draw */
+export function redrawKeepingFocus(root, draw) {
+    const captured = captureFocus(root);
+    const outer = redrawing;
+    redrawing = true;
+    try {
+        draw();
+    } finally {
+        redrawing = outer;
+        restoreFocus(root, captured);
+    }
+}
+
+// Where a control is found again once a redraw has thrown it away: by its
+// data-f identity, unique, or by its authored hook and its place among the
+// controls sharing it.
+/** @param {Element} root @param {Element} active @returns {{selector: string, index: number, unique: boolean} | null} */
+function identityOf(root, active) {
     const name = active.matches("input, select, textarea") ? "data-f"
         : ACTION_NAMES.find((attribute) => active.hasAttribute(attribute));
     if (!name || !active.hasAttribute(name)) return null;
@@ -29,19 +61,68 @@ export function captureFocus(root) {
     const matches = [...root.querySelectorAll(selector)];
     const unique = name === "data-f";
     if (unique && matches.length !== 1) return null;
-    const index = matches.indexOf(active);
+    return {selector, index: matches.indexOf(active), unique};
+}
+
+/** @param {Element} root @returns {CapturedFocus | null} */
+function captureFocus(root) {
+    const active = /** @type {FocusControl | null} */ (root.ownerDocument?.activeElement);
+    if (!active || active === root.ownerDocument.body || !root.contains(active)) return null;
+    const identity = identityOf(root, active);
+    if (!identity) return null;
+    const {selector, index, unique} = identity;
     /** @type {CapturedFocus["caret"]} */
     const caret = typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd ?? null] : null;
-    return {selector, index, unique, caret};
+    const text = caret && unique && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) ? active : null;
+    /** @type {Typed | null} */
+    const typed = text && text.value !== text.defaultValue ? {value: text.value, rendered: text.defaultValue, field: text, held: false,
+        hold: (event) => {event.stopImmediatePropagation(); if (typed) typed.held = true;}} : null;
+    typed?.field.addEventListener("change", typed.hold, {capture: true});
+    return {selector, index, unique, caret, typed};
+}
+
+// The typed field's own change goes on: it is not held back any more, and
+// one already held is sent as the browser sent it.
+/** @param {Typed | null} typed */
+function letGo(typed) {
+    if (!typed) return;
+    typed.field.removeEventListener("change", typed.hold, {capture: true});
+    if (typed.held) typed.field.dispatchEvent(new Event("change", {bubbles: true}));
+}
+
+// `field` keeps what was typed: the field it was typed in, kept by the
+// redraw, or one drawn anew in its place, which takes the text, its own
+// listeners following it as they followed the typing (a name's byte count);
+// the field thrown away stays held back. Text set from code, or whose change
+// was held, is no longer typed, so the browser would commit it neither on
+// Enter nor on blur. The change is sent here instead, once: unless more was
+// typed and the browser sends its own, or the next redraw takes the text over.
+/** @param {Typed} typed @param {HTMLInputElement | HTMLTextAreaElement} field */
+function keepTyped(typed, field) {
+    if (field === typed.field) {
+        field.removeEventListener("change", typed.hold, {capture: true});
+        if (!typed.held) return;
+    } else {
+        field.value = typed.value;
+        field.dispatchEvent(new Event("input", {bubbles: true}));
+    }
+    const commit = () => {
+        field.removeEventListener("blur", commit);
+        field.removeEventListener("keydown", enter);
+        if (!redrawing && field.isConnected && field.value === typed.value) field.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+    /** @param {Event} event */
+    const enter = (event) => {if (/** @type {KeyboardEvent} */ (event).key === "Enter" && field instanceof HTMLInputElement) commit();};
+    field.addEventListener("blur", commit);
+    field.addEventListener("keydown", enter);
 }
 
 /** @param {Element} root @param {CapturedFocus | null} captured */
-export function restoreFocus(root, captured) {
+function restoreFocus(root, captured) {
     if (!captured) return;
     const matches = root.querySelectorAll(captured.selector);
-    if (captured.unique && matches.length !== 1) return;
     const target = /** @type {FocusControl | undefined} */ (matches[captured.index] || matches[0]);
-    if (!target || typeof target.focus !== "function") return;
+    if ((captured.unique && matches.length !== 1) || !target || typeof target.focus !== "function") {letGo(captured.typed); return;}
     // A redraw may rebuild a disclosure closed. The field that had focus
     // stays reachable inside it, just as before that redraw.
     if (captured.unique) {
@@ -50,6 +131,9 @@ export function restoreFocus(root, captured) {
         }
     }
     target.focus({preventScroll: true});
+    const typed = captured.typed, field = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement ? target : null;
+    if (typed && field && !field.disabled && !field.readOnly && field.defaultValue === typed.rendered) keepTyped(typed, field);
+    else letGo(typed);
     if (captured.caret && typeof target.setSelectionRange === "function") {
         try { target.setSelectionRange(...captured.caret); } catch { /* a number input has no caret */ }
     }
@@ -57,10 +141,32 @@ export function restoreFocus(root, captured) {
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]';
 
+// What a sheet or a dialog is, for giving the focus back when it closes: one
+// over the screen (.scrim) or one opened on it (Rename & reorder's panel).
+const DIALOGS = ".scrim, .layerpanel";
+// The control that opened the dialog on screen, found again by its identity.
+/** @type {{selector: string, index: number} | null} */
+let opener = null;
+
 // A dialog that opens takes focus: whatever was focused behind it is not
-// something the keyboard should keep acting on.
+// something the keyboard should keep acting on. The control that had the
+// focus as it opened is remembered, and when the last dialog closes with the
+// focus gone with it, the focus goes back to that control, or to the one
+// drawn in its place.
 /** @param {Element} root */
 export function focusDialog(root) {
+    const active = root.ownerDocument.activeElement;
+    const lost = !active || active === root.ownerDocument.body || !root.contains(active);
+    const open = [...root.querySelectorAll(DIALOGS)];
+    if (!open.length) {
+        const back = opener;
+        opener = null;
+        if (!back || !lost) return;
+        const target = /** @type {HTMLElement | SVGElement | undefined} */ (root.querySelectorAll(back.selector)[back.index]);
+        target?.focus({preventScroll: true});
+        return;
+    }
+    if (!opener && !lost && active && !open.some((dialog) => dialog.contains(active))) opener = identityOf(root, active);
     const dialogs = root.querySelectorAll(".scrim");
     const dialog = dialogs[dialogs.length - 1];
     if (!dialog || dialog.contains(root.ownerDocument.activeElement)) return;

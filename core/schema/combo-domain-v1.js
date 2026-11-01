@@ -1,12 +1,16 @@
 // @ts-check
 "use strict";
 const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
-const {LAYERS} = require("../data/charybdis-layout");
+const {ALL_LAYERS, LAYERS} = require("../data/charybdis-layout");
 const {encodeSemanticAction, decodeSemanticAction} = require("./profile-blob-v1");
 const {nativeCode} = require("./actions");
 const {canonical} = require("./bytes");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_COMBO_DOMAIN"});
+// A refusal that names the format's bytes rather than a person's choice: Ark's
+// own fault where Ark wrote them (schema/bytes.js protocolError).
+/** @param {string} message */
+const malformed = message => Object.assign(fail(message), {fault: "ark"});
 
 // Domain 0x30, version 3, the only one the keyboard stores (firmware D-F14).
 // A combo table is its rows and the two values QMK keeps for all combos,
@@ -20,7 +24,6 @@ const HEADER_SIZE = 8;
 const ROW_FIXED_SIZE = 12;
 const COMBO_LIMITS = Object.freeze({maxRows: 128, maxInputs: 16, maxLayers: LAYERS});
 const FLAG = Object.freeze({HOLD: 1, TAP: 2, ORDERED: 4, DISABLED: 8, OUTPUT_BYPASS: 16});
-const ALL_LAYERS = 2 ** COMBO_LIMITS.maxLayers - 1;
 /** @param {number | null} value @param {number} min @returns {value is number} */
 const ms = (value, min) => typeof value === "number" && Number.isInteger(value) && value >= min && value <= 65535;
 /** @param {number} inputs */
@@ -29,7 +32,7 @@ const rowSize = inputs => ROW_FIXED_SIZE + 4 * inputs;
 /** @param {import("./types.js").ComboInput} table @param {import("./types.js").ActionOptions} [options] */
 function encodeComboDomain(table, options = {}) {
     const {version = COMBO_DOMAIN_VERSION, defaultTermMs = null, holdTermMs = null, rows} = table || {};
-    if (version !== COMBO_DOMAIN_VERSION) throw fail(`Unknown combo format version ${version}.`);
+    if (version !== COMBO_DOMAIN_VERSION) throw malformed(`Unknown combo format version ${version}.`);
     if (!Array.isArray(rows) || rows.length > COMBO_LIMITS.maxRows) throw fail(`At most ${COMBO_LIMITS.maxRows} combos are supported.`);
     // QMK fires a combo only inside its window: a zero default would
     // silently stop every combo that follows it.
@@ -69,11 +72,11 @@ function encodeComboDomain(table, options = {}) {
 /** @param {Uint8Array} value @param {import("./types.js").ActionOptions} [options] */
 function decodeComboDomain(value, options = {}) {
     const bytes = Buffer.from(value);
-    if (bytes.length < HEADER_SIZE || bytes[0] > COMBO_LIMITS.maxRows || bytes[1] || bytes[2] || bytes[3]) throw fail("Malformed combo header.");
+    if (bytes.length < HEADER_SIZE || bytes[0] > COMBO_LIMITS.maxRows || bytes[1] || bytes[2] || bytes[3]) throw malformed("Malformed combo header.");
     let offset = HEADER_SIZE;
     const rows = Array.from({length: bytes[0]}, (_, id) => {
         const count = bytes[offset];
-        if (offset + ROW_FIXED_SIZE > bytes.length || count < 2 || count > COMBO_LIMITS.maxInputs || offset + rowSize(count) > bytes.length || bytes[offset + 1] & ~31) throw fail("Malformed combo row.");
+        if (offset + ROW_FIXED_SIZE > bytes.length || count < 2 || count > COMBO_LIMITS.maxInputs || offset + rowSize(count) > bytes.length || bytes[offset + 1] & ~31) throw malformed("Malformed combo row.");
         /** @param {number} start */
         const readAction = start => decodeSemanticAction(bytes.subarray(start, start + 4), options);
         const termMs = bytes.readUInt16LE(offset + 2), flags = bytes[offset + 1];
@@ -83,9 +86,9 @@ function decodeComboDomain(value, options = {}) {
         offset += rowSize(count);
         return row;
     });
-    if (offset !== bytes.length) throw fail("Combo rows do not end at the domain's end.");
+    if (offset !== bytes.length) throw malformed("Combo rows do not end at the domain's end.");
     const table = {version: /** @type {typeof COMBO_DOMAIN_VERSION} */ (COMBO_DOMAIN_VERSION), defaultTermMs: bytes.readUInt16LE(4), holdTermMs: bytes.readUInt16LE(6), rows};
-    return canonical(bytes, table, value => encodeComboDomain(value, options), () => fail("Noncanonical combo data."));
+    return canonical(bytes, table, value => encodeComboDomain(value, options), () => malformed("Noncanonical combo data."));
 }
 
 // The window a row runs with.
@@ -98,4 +101,4 @@ const effectiveComboWindow = (table, row) => row.termMs ?? table.defaultTermMs;
 const runningComboRows = table => table.rows.map(row => ({...row, termMs: effectiveComboWindow(table, row), followsDefault: row.termMs === null,
     inputs: row.inputs.map(action => /** @type {number} */ (nativeCode(action))), output: /** @type {number} */ (nativeCode(row.output))}));
 
-module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboWindow, runningComboRows};
+module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, encodeComboDomain, decodeComboDomain, effectiveComboWindow, runningComboRows};

@@ -13,7 +13,6 @@
 
 const {reorderLayers, validateSnapshot} = require("./portable-profile");
 
-const IDENTITY = Object.freeze(Array.from({length: 16}, (_, layer) => layer));
 /** @param {readonly number[]} order */
 const isIdentity = order => order.every((layer, slot) => layer === slot);
 // `step` rearranges a document already in `order`, as reorderLayers reads it:
@@ -36,19 +35,4 @@ function rearranged(document, step) {
     return reorderLayers(document, [...step], step.map(slot => names[slot]), {keysFollow: true});
 }
 
-// A review unit named by the layer it belongs to rather than the slot it sits
-// in, so edits made before and after a reorder link by what they touched.
-/** @param {string} unit @param {readonly number[]} order */
-function layerUnit(unit, order) {
-    const layout = /^layout:(\d+):(\d+)$/.exec(unit);
-    if (layout) return `layout@${order[Number(layout[1])]}:${layout[2]}`;
-    const placement = /^placement:(\d+):(\d+)$/.exec(unit);
-    if (placement) return `placement@${order[Number(placement[1])]}:${placement[2]}`;
-    const name = /^layerName:(\d+)$/.exec(unit);
-    if (name) return `layerName@${order[Number(name[1])]}`;
-    const colour = /^rgb:layer:(\d+)$/.exec(unit);
-    if (colour) return `rgb:layer@${order[Number(colour[1])]}`;
-    return unit;
-}
-
-module.exports = {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged};
+module.exports = {compose, inverse, isIdentity, rearranged};

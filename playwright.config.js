@@ -14,4 +14,8 @@ module.exports = defineConfig({
         reuseExistingServer: false,
     },
     projects: [{name: "chromium", use: {browserName: "chromium"}}],
+    // Node itself loads the shared rules, as in core and its tests: core
+    // require()s them and the interface imports them, and Playwright's own
+    // compiler would hand both the code it compiled for whichever came first.
+    build: {external: ["**/rules/**"]},
 });

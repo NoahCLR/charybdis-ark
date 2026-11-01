@@ -11,7 +11,7 @@
 // read compatibility.
 const {LAYERS} = require("../data/charybdis-layout");
 const {knownActionAbi} = require("../schema/actions");
-const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
+const {PROFILE_BLOB_V1, firmwareUpdateRequired} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_LIMITS} = require("../schema/key-behavior-domain-v1");
 const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
@@ -51,14 +51,11 @@ const canApply = capabilities => canEdit(capabilities) && hasAll(capabilities.fe
 /** @param {Partial<Caps> | null | undefined} capabilities */
 const canRead = capabilities => evaluateProfileCompatibility(capabilities).compatible;
 
-// Keep the old entry point for portable-session clients while panels import
-// this module directly rather than loading the Apply orchestrator for a gate.
-const supportsCompleteProfile = canEdit;
-
 /** @param {Partial<Caps> | null | undefined} capabilities @param {boolean} [writing] @returns {asserts capabilities is Partial<Caps>} */
 function requireReady(capabilities, writing = false) {
     if (!(writing ? canApply(capabilities) : canEdit(capabilities))) {
-        throw Object.assign(new Error("Complete profile backups and saving need current firmware on both halves. Your current keyboard configuration has not been changed."), {code: "FIRMWARE_UPDATE_REQUIRED"});
+        // Its own words: the keyboard reads, so reading it again would not help.
+        throw firmwareUpdateRequired({words: "Complete profile backups and saving need current firmware on both halves. Your keyboard's profile has not been changed."});
     }
 }
 
@@ -205,7 +202,7 @@ function firmwareView(capabilities) {
 }
 
 module.exports = {firmwareView, canRead, canEdit, canApply, isCurrentBase, hasCurrentLayers, editableDomains, canSnapshot,
-    canReadIdentity, identityStateFlags, supportsCompleteProfile, requireReady,
+    canReadIdentity, identityStateFlags, requireReady,
     evaluateProfileCompatibility, evaluateLiveMutationCompatibility, PROFILE_DOMAIN_FLAGS,
     SUPPORTED_PROFILE_PROTOCOL, SUPPORTED_PROFILE_SCHEMA, REQUIRED_PROFILE_DOMAIN_MASK,
     REQUIRED_LIVE_MUTATION_FEATURES};

@@ -2,6 +2,7 @@
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {post, render as rerender, state} from "../store.mjs";
+import {dialogFoot} from "./dialog-foot.mjs";
 
 // Leaving the demo, or replacing its file, with edits not exported: asked
 // once, with Export offered first.
@@ -11,9 +12,8 @@ export function leaveDemoOverlay() {
     const node = el(`<div class="scrim"><div class="sheet leave-demo" role="alertdialog" aria-modal="true" aria-label="${esc(leave.ask.title)}">
         <div class="sheet-h"><h2>${esc(leave.ask.title)}</h2></div>
         <div class="sheet-b"><p>${esc(leave.ask.detail)}</p></div>
-        <div class="sheet-f"><button class="btn ghost" data-act="stay">Stay in the demo</button>
-            <span class="right"><button class="btn" data-act="confirm-leave">${esc(leave.ask.confirm)}</button>
-                <button class="btn primary" data-act="export">Export…</button></span></div>
+        <div class="sheet-f">${dialogFoot('<button class="btn primary" data-act="export">Export profile…</button>', {back: "Stay in the demo", act: "stay"},
+            "", `<button class="btn" data-act="confirm-leave">${esc(leave.ask.confirm)}</button>`)}</div>
     </div></div>`);
     const close = () => {state.overlay = null; state.leaveDemo = null; rerender();};
     node.addEventListener("click", (event) => {

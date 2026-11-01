@@ -7,9 +7,9 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {hasStarted, readOnceStarted, stillStarting, STARTING, STARTING_WORDS} = require("../../core/session/keyboard-starting");
-const {openPanelLoop} = require("../../core/session/panel-loop");
+const {notices, openLoop} = require("../fixtures/panel-loop");
 const {LOST_WORDS} = require("../../core/session/keyboard-reconnect");
-const {BOOT, booting, fakeKeyboard, fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {BOOT, booting, fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {writableKeyboard} = require("../fixtures/writable-keyboard");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
@@ -54,26 +54,11 @@ test("a read refused once the wait's bound is over is read once more only if the
     await assert.rejects(readOnceStarted(ended, {deadline: 0}, async () => {throw other;}), other, "anything else is not read again");
 });
 
-function fakeShell() {
-    const shell = {posted: [], recoveries: [],
-        post: (message) => {shell.posted.push(message);}, showError: () => {},
-        saveRecovery: async (doc) => {shell.recoveries.push(doc); return `/recovery/${shell.recoveries.length}.json`;},
-        saveExport: async () => undefined};
-    return shell;
-}
-
 /** @param {import("node:test").TestContext} t @param {import("../fixtures/types.js").FakeKeyboard} inner */
 async function open(t, inner) {
-    const keyboard = booting(inner);
-    const shell = fakeShell(), clock = {now: 0};
-    const adapter = fakeKeyboardAdapter({keyboard});
-    // The service's clock moves only as it waits.
-    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 300, now: () => clock.now, sleep: async (ms) => {clock.now += ms;},
-        reconnect: {sleep: () => new Promise((resolve) => setTimeout(resolve, 5)), waitMs: 5000}});
-    t.after(() => loop.close());
-    await loop.handleMessage({type: "refresh"});
+    const opened = await openLoop(t, {keyboard: booting(inner)});
+    const {keyboard, shell, clock, adapter} = opened;
     const models = () => shell.posted.filter((message) => message.type === "model").map((message) => message.model);
-    const notices = () => shell.posted.filter((message) => message.notice).map((message) => message.notice);
     const waited = () => models().some((model) => model.load.state === "loading" && model.load.phase === PHASE.STARTING);
     // Unplugged and plugged back in: it drops off USB and starts again,
     // listed under a new device id when the test says (node-hid's new path).
@@ -83,10 +68,9 @@ async function open(t, inner) {
         keyboard.boot();
         adapter.devices = [];
         adapter.lastConnection().emitDisconnect(new Error("Unplugged."));
-        setTimeout(() => {adapter.devices = devices;}, 15);
+        clock.at(clock.now() + 15, () => {adapter.devices = devices;});
     };
-    const send = (message) => loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, ...message});
-    return {keyboard, shell, clock, adapter, loop, models, notices, waited, replug, send};
+    return {...opened, models, notices: () => notices(shell), waited, replug};
 }
 
 test("Read keyboard waits for a keyboard still starting, then reads it", async (t) => {
@@ -97,20 +81,20 @@ test("Read keyboard waits for a keyboard still starting, then reads it", async (
     const model = models().at(-1);
     assert.equal(model.load.state, "ready");
     assert.equal(model.device.health.error, "");
-    assert.equal(notices().at(-1), "Read the layout and committed profile generation 42.");
+    assert.equal(notices().at(-1), "Read the keyboard's saved profile, generation 42.");
 });
 
 test("a keyboard without its slave half is told so in the usual words, once the wait is over", async (t) => {
     const {clock, loop, models, notices} = await open(t, fakeKeyboard({document: document(), slaveKnown: false}));
-    const since = clock.now;
+    const since = clock.now();
     await loop.handleMessage({type: "refresh"});
-    assert.ok(clock.now - since >= STARTING.WAIT_MS, "it waited the bound");
+    assert.ok(clock.now() - since >= STARTING.WAIT_MS, "it waited the bound");
     assert.match(notices().at(-1), /The slave half is not connected\. Connect the cable between the halves and read again\./);
     assert.doesNotMatch(notices().at(-1), /finished starting/);
     assert.equal(models().at(-1).load.state, "unavailable");
 });
 
-test("a replugged keyboard is read once it has started: the back words, no health error, the halves agreeing; and an Apply draft then applies", async (t) => {
+test("a replugged keyboard is read once it has started: the back words, no health error, the halves agreeing; and a Review and save draft then applies", async (t) => {
     const {loop, models, notices, replug, send} = await open(t, writableKeyboard({document: document()}));
     replug({newId: true});
     loop.serviceChanged();
@@ -136,15 +120,15 @@ test("within the wait, a read refused because the keyboard was not ready yet is 
     await loop.handleMessage({type: "refresh"});
     assert.equal(models().at(-1).load.state, "ready");
     assert.equal(models().at(-1).device.health.error, "");
-    assert.equal(notices().at(-1), "Read the layout and committed profile generation 42.");
+    assert.equal(notices().at(-1), "Read the keyboard's saved profile, generation 42.");
 });
 
 test("Read keyboard of a keyboard that never finishes starting says so, not that the read failed", async (t) => {
     const {keyboard, clock, loop, models, notices} = await open(t, fakeKeyboard({document: document()}));
     keyboard.boot([{activeKind: 3, stateFlags: 0xb2, reads: Infinity}]);
-    const since = clock.now;
+    const since = clock.now();
     await loop.handleMessage({type: "refresh"});
-    assert.ok(clock.now - since >= STARTING.WAIT_MS);
+    assert.ok(clock.now() - since >= STARTING.WAIT_MS);
     assert.equal(notices().at(-1), STARTING_WORDS.timeout);
     assert.equal(models().at(-1).device.health.error, STARTING_WORDS.timeout);
     assert.equal(models().at(-1).load.state, "unavailable");

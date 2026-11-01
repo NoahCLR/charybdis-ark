@@ -3,10 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const {
-    buildCanonicalStudioProfileV1,
-    semanticActionForExpression,
-} = require("../../core/schema/compiled-profile-v1");
+const {semanticActionForExpression} = require("../../core/schema/compiled-profile-v1");
 
 function minimalStudioModel() {
     return {
@@ -61,7 +58,8 @@ test("the native resolver refuses expressions whose bits would land on another k
     const {resolveNativeQmkExpression: resolve} = require("../../core/schema/compiled-profile-v1");
     // Well-formed expressions still resolve, including nested modifiers.
     assert.equal(resolve("C(S(0x04))", {}), 0x0304);
-    assert.equal(resolve("LT(15,0x04)", {}), 0x4f04);
+    assert.equal(resolve("LT(15,KC_A)", {qmkKeycodeValues: {KC_A: 4}}), 0x4f04);
+    assert.equal(resolve("LT(15,0x04)", {}), undefined, "a tap is a key's name, as QMK spells it");
     assert.equal(resolve("LOCK_LAYER(15)", {}) - resolve("LOCK_LAYER(0)", {}), 15);
     // Each of these used to OR into an unrelated keycode: a dead user keycode,
     // a macro with Ctrl dropped, RIGHT_THUMB, TO(4), QK_BOOTLOADER, MO(1)+mods.
@@ -78,7 +76,7 @@ test("authored compact expressions cannot silently switch a modifier's side", ()
     for (const expression of ["RSFT(C(KC_A))", "C(RSFT(KC_A))", "RALT(KC_EXLM)",
         "MT(MOD_LCTL|MOD_RSFT, KC_A)", "OSM(MOD_RSFT|MOD_LCTL)"]) {
         assert.equal(resolve(expression, model), undefined, expression);
-        assert.throws(() => semanticActionForExpression(expression, model), /cannot be represented/);
+        assert.throws(() => semanticActionForExpression(expression, model), {code: "UNSUPPORTED_ACTION", message: `${expression} is not a key this keyboard can store.`});
     }
     assert.equal(resolve("S(C(KC_A))", model), 0x0304);
     assert.equal(resolve("RSFT(RCTL(KC_A))", model), 0x1304);

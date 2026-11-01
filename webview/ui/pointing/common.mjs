@@ -5,6 +5,9 @@ import {vocabulary, word} from "../../view/vocabulary.mjs";
 // model (model.vocabulary.pointing), so this editor and the review agree.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model */
 export const words = (model) => vocabulary(model).pointing;
+// What a setting does, by the field it sets (vocabulary pointing.tips).
+/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} key */
+export const tipFor = (model, key) => words(model).tips?.[key] || "";
 // A scroll field's label; a field that shows its unit beside it drops the
 // "(ms)" its label carries elsewhere.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {string} key @param {string} [unit] */
@@ -23,5 +26,3 @@ export const SCROLL_LEAD = [["divisorH"], ["divisorV"], ["intervalMs", "ms"], ["
 // the two axis ratios, each as one numerator : denominator pair.
 export const SCROLL_SINGLES = [["thresholdH"], ["thresholdV"], ["expireMs", "ms"], ["decayDivisor"]];
 export const SCROLL_RATIOS = [["startNumerator", "startDenominator"], ["sustainNumerator", "sustainDenominator"]];
-/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {number} axis */
-export const axisLabel = (model, axis) => word(words(model).axes, axis);

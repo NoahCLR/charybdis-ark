@@ -189,3 +189,76 @@ test("a move to several layers locks them alone and lets every other lock go", (
     const home = analyzeLayerStates({always: 1, transitions: [...transitions, {kind: "move", layer: 0, when: true}], queries: []});
     assert.deepEqual([home.complete, home.trapCount], [true, 0]);
 });
+
+// An anchor's oracle: the lock sets an entry is offered in, every key let go,
+// and those from which its own transitions, with any held layer let go,
+// never reach `ends`, its layers kept on and off as it says.
+function anchorOracle(input, anchor) {
+    const reached = [0], seen = new Set(reached);
+    const operations = [...input.transitions, ...Array.from({length: 16}, (_, layer) => ({kind: "release", layer, when: true}))];
+    for (const state of reached) for (const op of operations) {
+        if (!matches(op.when, active(state & 65535, state >>> 16, input.always))) continue;
+        const to = apply(state, op); if (!seen.has(to)) {seen.add(to); reached.push(to);}
+    }
+    const starts = new Set(reached.filter(state => anchor.entries.some(entry => matches(entry.when, active(state & 65535, state >>> 16, input.always)))).map(state => state & 65535));
+    const on = state => {
+        let mask = (active(state & 65535, state >>> 16, input.always) | (anchor.always || 0)) & ~(anchor.never || 0);
+        if (anchor.unless) mask = mask & anchor.unless.layers ? mask & ~(1 << anchor.unless.layer) : mask | (1 << anchor.unless.layer);
+        return mask;
+    };
+    const steps = [...anchor.transitions, ...Array.from({length: 16}, (_, layer) => ({kind: "release", layer, when: true}))];
+    const escapes = start => {
+        const queue = [start], visited = new Set(queue);
+        for (const state of queue) {
+            if (matches(anchor.ends, on(state))) return true;
+            for (const op of steps) if (matches(op.when, on(state))) {const to = apply(state, op); if (!visited.has(to)) {visited.add(to); queue.push(to);}}
+        }
+        return false;
+    };
+    return new Set([...starts].filter(locks => !escapes(locks)));
+}
+const bits = mask => {let count = 0; for (; mask; mask &= mask - 1) count++; return count;};
+
+test("an anchor is trapped exactly when some lock set it is entered with cannot reach its end", () => {
+    let seed = 0x5eed1; const random = max => {seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return (seed >>> 8) % max;};
+    for (let example = 0; example < 150; example++) {
+        const condition = () => {const on = random(16), off = random(16) & ~on; return {on, off};};
+        const transitions = Array.from({length: 7}, () => ({kind: ["hold", "lock", "move"][random(3)], layer: random(4), when: condition()}));
+        const anchor = {entries: [{kind: "anchor", layer: 0, when: condition()}], ends: condition(),
+            transitions: transitions.filter(() => random(4) !== 0), always: random(3) === 0 ? 2 : 0, never: random(4) === 0 ? 4 : 0,
+            ...(random(3) === 0 ? {unless: {layer: 3, layers: 2}} : {})};
+        const input = {always: 1, transitions, queries: [], anchors: [anchor]};
+        const trapped = anchorOracle(input, anchor), [result] = analyzeLayerStates(input).anchors;
+        assert.equal(result.trapped, trapped.size > 0, `example ${example}`);
+        if (!result.trapped) continue;
+        assert.ok(trapped.has(result.locks), `example ${example}: a trapped lock set`);
+        assert.equal(bits(result.locks), Math.min(...[...trapped].map(bits)), `example ${example}: one of the smallest`);
+        let state = 0;
+        for (const effect of result.path.slice(0, -1)) {
+            assert(matches(effect.when, active(state & 65535, state >>> 16, 1)), `witness in example ${example}`);
+            state = apply(state, effect);
+        }
+        assert.equal(state & 65535, result.locks);
+        assert.equal(result.path.at(-1), anchor.entries[0]);
+        assert(matches(anchor.entries[0].when, active(state & 65535, state >>> 16, 1)), `the entry answers in example ${example}`);
+    }
+});
+
+test("an anchor keeps its layers on whatever the locks do, and only its end lets it go", () => {
+    // Entered from rest, it keeps layer 1 on; layer 1 offers TO(0) and its
+    // own toggle, neither of which ends it. Its end is offered on layer 2,
+    // which layer 1 covers; a hold of 3 on layer 1 uncovers it.
+    const transitions = [{kind: "move", layer: 0, when: {on: 2}}, {kind: "lock", layer: 1, when: {on: 2}}];
+    const anchor = {entries: [{kind: "anchor", layer: 0, when: true}], ends: {on: 8}, always: 2, transitions};
+    assert.equal(analyzeLayerStates({always: 1, transitions, anchors: [anchor]}).anchors[0].trapped, true);
+    const hold = {kind: "hold", layer: 3, when: {on: 2}};
+    assert.equal(analyzeLayerStates({always: 1, transitions, anchors: [{...anchor, transitions: [...transitions, hold]}]}).anchors[0].trapped, false);
+    // `never` keeps a layer off however it is held, and `unless` keeps one on
+    // unless another is.
+    assert.equal(analyzeLayerStates({always: 1, transitions, anchors: [{...anchor, never: 8, transitions: [...transitions, hold]}]}).anchors[0].trapped, true);
+    const derived = {...anchor, always: 0, ends: {off: 2}, unless: {layer: 1, layers: 4}};
+    assert.equal(analyzeLayerStates({always: 1, transitions, anchors: [derived]}).anchors[0].trapped, true, "layer 1 stays on");
+    assert.equal(analyzeLayerStates({always: 1, transitions, anchors: [{...derived, transitions: [{kind: "hold", layer: 2, when: true}]}]}).anchors[0].trapped, false, "holding layer 2 turns it off");
+    // An anchor no reachable state enters is never trapped.
+    assert.equal(analyzeLayerStates({always: 1, transitions, anchors: [{...anchor, entries: [{kind: "anchor", layer: 0, when: {on: 16}}]}]}).anchors[0].trapped, false);
+});

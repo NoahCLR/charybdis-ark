@@ -3,20 +3,24 @@
 // swapping two keys by dragging one onto the other.
 
 import {keyMeaning} from "../../view/keyface.mjs";
-import {currentLayer, getModel, layerName, positionAt, post, state, writable} from "../../store.mjs";
+import {currentLayer, getModel, positionAt, post, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
+import {layerCalled} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
 
 /** @param {number} layoutIndex */
 export function pickKeycodeFor(layoutIndex) {
-    if (!writable()) return;
+    if (!editGate(getModel(), "keys").editable) return;
     const layer = currentLayer();
     if (!layer) return;
     const position = positionAt(layer, layoutIndex);
     state.selected = layoutIndex;
     openPicker({
-        title: `Keycode on ${layerName(layer)}`,
-        context: `index ${layoutIndex}`,
+        // Named as the board names the key, never by its layout index.
+        title: `Key on ${layerCalled(layer)}`,
+        contextKeycode: position ? keyMeaning(position) : undefined,
+        onLayer: layerCalled(layer),
         seed: position ? [keyMeaning(position)] : [],
         layoutKey: true,
         onPick: (expression) => {

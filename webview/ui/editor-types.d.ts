@@ -2,6 +2,8 @@ export interface PickerOptions {
     title: string;
     context?: string;
     contextKeycode?: string;
+    /** A layout key's layer, by its name: the header then names the key on it ("For Esc on Base"), never its layout index. */
+    onLayer?: string;
     seed?: string[];
     mode?: 'single' | 'list';
     allowedKeys?: string[] | null;

@@ -19,13 +19,55 @@
 // index.html, _headers and content-hashed .js and .css files, as plain files,
 // no folders or links. _headers must mark exactly those hashed files immutable
 // and keep the page itself out of the cache, and keep every file out of search
-// engines.
+// engines, and send every file EVERY_FILE's headers. The page's Content
+// Security Policy must be in force both ways: in index.html's <meta> tag and as
+// a header on every file, the header with frame-ancestors, each keeping at
+// least the directives in REQUIRED_POLICY, none of them twice.
 
 const fs = require("node:fs");
 const path = require("node:path");
 
 const HASHED = /^[a-z]+-[A-Z0-9]{8}\.(js|css)$/;
 const SERVER_CODE = ["_worker.js", "functions", "_routes.json"];
+// What any policy the page carries must say; only a header can say who may
+// frame it. The trusted-types directive names exactly the policies the page
+// creates (webview/lib/dom.mjs, web/page.mjs): no `default`, which every raw
+// sink would pass through, no 'allow-duplicates' and no `*`.
+const REQUIRED_POLICY = ["default-src 'none'", "script-src 'self'", "require-trusted-types-for 'script'", "trusted-types ark-html ark-worker"];
+const HEADER_ONLY_POLICY = ["frame-ancestors 'none'"];
+// What every file (/*) is sent with besides its policy, each once: a browsing
+// context group no opener shares, and HTTPS, which WebHID needs, for a year or
+// more, for the page's own host only (web/_headers).
+/** @type {readonly [name: string, what: string, holds: (value: string) => boolean][]} */
+const EVERY_FILE = [
+    ["Cross-Origin-Opener-Policy", "same-origin", (value) => value === "same-origin"],
+    ["Strict-Transport-Security", "a max-age of a year or more and nothing else", (value) => Number(/^max-age=(\d+)$/.exec(value)?.[1]) >= 31536000],
+];
+
+// The directives of a policy as written, `name value…` each.
+/** @param {string} policy */
+const directives = (policy) => policy.split(";").map((part) => part.trim().replace(/\s+/g, " ")).filter(Boolean);
+
+/** @param {string} where @param {string | undefined} policy @param {readonly string[]} required */
+function policyProblems(where, policy, required) {
+    if (policy === undefined) return [`${where} carries no Content-Security-Policy`];
+    const written = directives(policy);
+    // A browser keeps the first of two directives of one name and ignores the
+    // second, so a second is never what the policy says.
+    const names = written.map((directive) => directive.split(" ")[0].toLowerCase());
+    const twice = [...new Set(names.filter((name, index) => names.indexOf(name) !== index))];
+    return [
+        ...required.filter((directive) => !written.includes(directive)).map((directive) => `${where}'s Content-Security-Policy lacks ${directive}`),
+        ...twice.map((name) => `${where}'s Content-Security-Policy names ${name} twice`),
+    ];
+}
+
+// index.html's policy, as its <meta> tag carries it, HTML-unescaped.
+/** @param {string} html */
+function pagePolicyOf(html) {
+    const tag = html.match(/<meta\s+http-equiv=["']?Content-Security-Policy["']?\s+content="([^"]*)"\s*\/?>/i);
+    return tag?.[1].replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/&amp;/g, "&");
+}
 
 // _headers as {path: [header lines]}, comments and blank lines skipped.
 /** @param {string} text @returns {Map<string, string[]>} */
@@ -67,6 +109,13 @@ function headerProblems(text, hashedFiles) {
     if (!rules.has("/*")) problems.push("_headers sets no headers for every file (/*)");
     else if (!(rules.get("/*") || []).some((line) => /^x-robots-tag:.*\bnoindex\b/i.test(line))) problems.push("_headers lets search engines index the page: /* sends no X-Robots-Tag: noindex");
     if (rules.has("/*") && cacheOf("/*").length) problems.push("_headers sets Cache-Control for every file (/*), which joins every other rule's");
+    for (const [name, what, holds] of rules.has("/*") ? EVERY_FILE : []) {
+        const sent = (rules.get("/*") || []).filter((line) => line.toLowerCase().startsWith(`${name.toLowerCase()}:`)).map((line) => line.slice(name.length + 1).trim());
+        if (sent.length !== 1 || !holds(sent[0])) problems.push(`_headers (/*) does not send ${name} once, with ${what}`);
+    }
+    const policies = (rules.get("/*") || []).filter((line) => /^content-security-policy:/i.test(line));
+    if (policies.length > 1) problems.push("_headers sends two Content-Security-Policy headers for every file (/*)");
+    else if (rules.has("/*")) problems.push(...policyProblems("_headers (/*)", policies[0]?.replace(/^[^:]*:/, ""), [...REQUIRED_POLICY, ...HEADER_ONLY_POLICY]));
     return problems;
 }
 
@@ -93,6 +142,9 @@ function checkStaticSite(site, {project = process.cwd()} = {}) {
     }
     if (entries.some((entry) => entry.name === "_headers" && entry.isFile())) {
         problems.push(...headerProblems(fs.readFileSync(path.join(site, "_headers"), "utf8"), hashed));
+    }
+    if (entries.some((entry) => entry.name === "index.html" && entry.isFile())) {
+        problems.push(...policyProblems("index.html", pagePolicyOf(fs.readFileSync(path.join(site, "index.html"), "utf8")), REQUIRED_POLICY));
     }
     return problems;
 }

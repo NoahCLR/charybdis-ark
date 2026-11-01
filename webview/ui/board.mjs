@@ -3,54 +3,35 @@
 // show for this layer, draws the legend on top in whichever of black or white
 // stays readable, and marks what each key reaches.
 //
-// With layers previewed on under it (`held`, positions in the stack), each key
-// shows what the keyboard would answer with instead of what this layer stores:
-// a transparent key shows the key of the highest layer below that is on. Its
-// cap is frosted like any transparent key's, since this layer is glass there
-// and the key is seen through it; its legend stays sharp, and the light it
-// shows is the answering layer's, so its colour names that layer. It wears the
-// answering key's behaviour dots and the badges of the combos it fires in this
-// preview (combosInPreview). Selection and
-// edits still name this layer's own position.
+// It draws one view of the stack (view/layer-view.mjs) as view/board-keys.mjs
+// says each key shows it: with layers previewed under the viewed layer, a key
+// answered from below is frosted like any transparent key, keeps its legend
+// sharp and shows the answering layer's light, its dots and its badges; dots
+// and badges mark only what runs. Selection and edits still name this layer's
+// own position.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {css, idealText, isOff} from "../lib/colour.mjs";
-import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
-import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
-import {combosShownAt} from "../view/combo-reach.mjs";
-import {resolvedPositions} from "../view/layer-resolution.mjs";
-import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
+import {css, idealText} from "../lib/colour.mjs";
+import {GEO, fitLegend, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
+import {boardKeys, boardTrackball} from "../view/board-keys.mjs";
+import {layerCalled} from "../view/vocabulary.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer | undefined} layer @param {import("./surface-types.js").BoardOptions} [options] */
-export function board(model, layer, options = {}) {
+/** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
+export function board(view, options = {}) {
     const {selected, mode = "light", picks = [], reach = [], pdActive = null, drafted = null,
-        faces = true, trackball = false, held = [], onKey, onOpen, onSwap, onTrackball} = options;
-    const positions = layer?.positions || [];
-    const stack = model?.layers || [];
-    const heldIds = held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
-    const answering = layer && held.length && mode !== "leds"
-        ? new Map(resolvedPositions(stack, stack.indexOf(layer), held).map((entry) => [entry.position.layoutIndex, entry]))
-        : null;
-    const feedbackOn = stageEnabled(model, "key");
-    const comboColour = model?.rgb?.comboFeedback?.color;
-    const comboLit = stageEnabled(model, "combo") && comboColour && !isOff(comboColour);
+        faces = true, trackball = false, onKey, onOpen, onSwap, onTrackball} = options;
 
     let glow = "", keys = "";
-    for (const position of positions) {
-        const index = position.layoutIndex;
+    for (const key of boardKeys(view, {mode, faces, pdActive})) {
+        const {index, from, glass, tiers, badges, sub} = key;
         const visual = keyVisual(index);
-        const answer = answering?.get(index);
-        const shown = answer?.position || position;
-        const from = answer?.fellThrough ? answer.layer : null;
-        const face = keyFace(shown);
-        const glass = face.kind === "transparent" || Boolean(from);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
         const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";
         const classes = ["kc",
-            face.kind === "transparent" ? "kc-trns" : "",
-            face.kind === "disabled" ? "kc-none" : "",
+            key.kind === "transparent" ? "kc-trns" : "",
+            key.kind === "disabled" ? "kc-none" : "",
             from ? "kc-under" : "",
             options.picking ? "pickable" : ""].filter(Boolean).join(" ");
 
@@ -58,50 +39,44 @@ export function board(model, layer, options = {}) {
         if (mode === "leds") {
             picked = picks.includes(index) ? " picked" : "";
         } else {
-            const light = keyLight(model, layer, position, {pdActive, held: heldIds});
-            text = idealText(light.colour);
-            const paint = css(light.colour);
+            text = idealText(key.light);
+            const paint = css(key.light);
             fill = ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
             glow += `<rect class="kc-glow${glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
         }
 
-        const showMarks = faces && mode !== "leds";
-        const tiers = showMarks ? behaviourTiers(behaviourFor(model, keyMeaning(shown))) : [];
-        const combos = showMarks ? combosShownAt(model, stack, layer?.index ?? 0, held, index) : [];
-        const sub = mode === "leds" ? "" : face.sub;
         const rows = keyFaceRows(visual.y,
-            {tiers: tiers.length > 0, combos: combos.length > 0, sub: Boolean(sub)});
+            {tiers: tiers.length > 0, combos: badges.length > 0, sub: Boolean(sub)});
 
         let marks = "";
         const step = 9.6, startX = cx - ((tiers.length - 1) * step) / 2;
         marks += tiers.map((tier, order) => {
             const x = startX + order * step;
-            const colour = tierColour(model, tier.kind);
-            if (!feedbackOn || isOff(colour)) {
+            if (!tier.colour) {
                 return `<circle cx="${esc(x)}" cy="${esc(rows.tierY)}" r="3.9" fill="none" stroke="${text || "var(--light-detail)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
             }
-            return `<circle cx="${esc(x)}" cy="${esc(rows.tierY)}" r="3.9" fill="${css(colour)}" stroke="${text || "var(--light-detail)"}" stroke-width="1.1"></circle>`
-                + (tier.count > 1 ? `<text x="${esc(x)}" y="${esc(/** @type {number} */ (rows.tierY) + 0.5)}" class="kc-dotn" fill="${idealText(colour)}">${esc(tier.count)}</text>` : "");
+            return `<circle cx="${esc(x)}" cy="${esc(rows.tierY)}" r="3.9" fill="${css(tier.colour)}" stroke="${text || "var(--light-detail)"}" stroke-width="1.1"></circle>`
+                + (tier.count > 1 ? `<text x="${esc(x)}" y="${esc(/** @type {number} */ (rows.tierY) + 0.5)}" class="kc-dotn" fill="${idealText(tier.colour)}">${esc(tier.count)}</text>` : "");
         }).join("");
 
-        if (combos.length) {
+        if (badges.length) {
             // Each badge is as wide as its own text, and the row scales down
             // together when it would overrun the cap — three badges never reach
             // the edges the way a fixed width makes them.
             const gap = 1.5;
-            const natural = combos.map((combo) => Math.max(11.5, 5 + String(combo.badge || "C").length * 3.2));
-            const room = GEO.keyW - 8, between = gap * (combos.length - 1);
+            const natural = badges.map((badge) => Math.max(11.5, 5 + String(badge.text).length * 3.2));
+            const room = GEO.keyW - 8, between = gap * (badges.length - 1);
             const total = natural.reduce((sum, width) => sum + width, 0);
             const scale = total + between > room ? Math.max(0.68, (room - between) / total) : 1;
             const widths = natural.map((width) => width * scale);
             const fontSize = Math.max(4.9, 5.8 * scale);
             let x = cx - (widths.reduce((sum, width) => sum + width, 0) + between) / 2;
-            marks += combos.map((combo, order) => {
+            marks += badges.map((badge, order) => {
                 const width = widths[order];
-                const badge = `<rect x="${esc(x)}" y="${esc(rows.comboY)}" width="${esc(width)}" height="${esc(rows.comboHeight)}" rx="${rows.comboHeight * 0.22}" fill="var(--badge-ink)" stroke="${comboLit ? css(comboColour) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
-                    + `<text x="${x + width / 2}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
+                const drawn = `<rect x="${esc(x)}" y="${esc(rows.comboY)}" width="${esc(width)}" height="${esc(rows.comboHeight)}" rx="${rows.comboHeight * 0.22}" fill="var(--badge-ink)" stroke="${badge.lit ? css(badge.lit) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
+                    + `<text x="${x + width / 2}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(badge.text)}</text>`;
                 x += width + gap;
-                return badge;
+                return drawn;
             }).join("");
         }
 
@@ -109,36 +84,48 @@ export function board(model, layer, options = {}) {
         // face, so state is never told by recolouring it.
         /** @param {string} name */
         const ring = (name) => `<rect class="${name}" x="${visual.x + 1.4}" y="${visual.y + 1.4}" width="${GEO.keyW - 2.8}" height="${GEO.keyH - 2.8}" rx="${GEO.radius - 1}"></rect>`;
-        const main = mode === "leds" ? String(LED_INDEX[index] ?? index) : face.main;
-        const above = (tiers.length ? 1 : 0) + (combos.length ? 1 : 0);
+        const {main} = key;
+        const above = (tiers.length ? 1 : 0) + (badges.length ? 1 : 0);
         // A legend is sized to the room its row leaves, so one typeface at one
         // weight carries every cap instead of stepping between faces by length.
-        const mainFit = fitText(main, sub
-            ? (above ? {max: 9.1, min: 6.4, width: GEO.keyW - 12} : {max: 12, min: 7, width: GEO.keyW - 12})
-            : {max: 12, min: 7, width: GEO.keyW - 10});
+        // Alone on its cap it never shrinks past LEGEND_MIN: a long name takes
+        // two lines instead, either side of the row's middle (fitLegend).
+        const tap = sub
+            ? fitText(main, above ? {max: 9.1, min: 6.4, width: GEO.keyW - 12} : {max: 12, min: 7, width: GEO.keyW - 12})
+            : null;
+        const legend = tap ? {size: tap.size, lines: [{text: main, squeeze: tap.squeeze}]} : fitLegend(main, {max: 12, width: GEO.keyW - 10});
         const subFit = sub ? fitText(sub, above
             ? {max: 6.4, min: 5.2, width: GEO.keyW - 12}
             : {max: 8, min: 6.2, width: GEO.keyW - 12}) : null;
-        /** @param {ReturnType<typeof fitText>} fit */
+        /** @param {{squeeze: number}} fit */
         const squeeze = (fit) => fit.squeeze ? ` textLength="${esc(fit.squeeze)}" lengthAdjust="spacingAndGlyphs"` : "";
+        const fillText = text ? ` style="fill:${text}"` : "";
+        /** @param {number} order */
+        const lineY = (order) => rows.mainY + (order - (legend.lines.length - 1) / 2) * legend.size * 1.1;
+        const label = `<text class="kc-label" font-size="${esc(legend.size)}"${fillText}>${legend.lines.map((line, order) =>
+            `<tspan x="${cx}" y="${esc(lineY(order))}"${squeeze(line)}>${esc(line.text)}</tspan>`).join("")}</text>`;
 
-        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"
-            aria-label="${esc(keyMeaning(shown))} at index ${esc(index)}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
+        // What the rings and dots say, said to a screen reader too: the
+        // selected key is the current one, a picked LED is pressed, and a
+        // key the draft changed says so after its name.
+        const said = mode === "leds" ? ` aria-pressed="${Boolean(picked)}"` : selected === index ? ' aria-current="true"' : "";
+        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"${said}
+            aria-label="${esc(key.name)}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.has(index) ? ", changed in your draft" : ""}"${transform}>
             <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${esc(rows.separatorY)}" x2="${visual.x + GEO.keyW - 8}" y2="${esc(rows.separatorY)}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
-            <text class="kc-label" x="${cx}" y="${esc(rows.mainY)}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
-            ${subFit ? `<text class="kc-sub" x="${cx}" y="${esc(rows.subY)}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
+            ${label}
+            ${subFit ? `<text class="kc-sub" x="${cx}" y="${esc(rows.subY)}" font-size="${subFit.size}"${squeeze(subFit)}${fillText}>${esc(sub)}</text>` : ""}
         </g>`;
     }
 
     // The trackball LED is index 56 and belongs to no key, but it is lit like
     // every other LED, so it is drawn with the light it emits rather than as an
     // outline of where the ball sits.
-    const ball = trackballGlyph(model, layer, {mode, pdActive, held: heldIds, trackball, clickable: Boolean(onTrackball)});
+    const ball = trackballGlyph(boardTrackball(view, {mode, pdActive}), {mode, trackball, clickable: Boolean(onTrackball)});
     if (ball.glow) glow += ball.glow;
     const node = /** @type {import("./surface-types.js").BoardNode} */ (el(`<div class="board ${options.picking ? "picking" : ""}">
         <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`));
@@ -222,22 +209,20 @@ function dragToSwap(node, group, index, onSwap) {
 // the keys follow: solid when its light is the viewed layer's own — an
 // all-keys colour or one of its LED groups, a previewed pointing mode, or
 // anything at all on base, which nothing lies under — and frosted when it is
-// seen through the viewed layer from underneath (view/lighting.mjs ownLight).
+// seen through the viewed layer from underneath (view/board-keys.mjs).
 // A mapped-keys-only layer never reaches it, since no key maps to it. In the LED
 // selector it shows its index and whether the pending group has picked it, the
 // same two things every key shows there.
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer | undefined} layer @param {import("./surface-types.js").TrackballOptions} options */
-function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickable}) {
+/** @param {ReturnType<typeof boardTrackball>} ball @param {import("./surface-types.js").TrackballOptions} options */
+function trackballGlyph({led, light, glass}, {mode, trackball, clickable}) {
     const {x, y, r} = GEO.trackball;
-    const light = trackballLight(model, layer, {pdActive, held});
-    const paint = css(light.colour);
-    const glass = mode !== "leds" && !ownLight(light, layer?.index ?? 0);
+    const paint = css(light);
     // Picking LEDs, the ball is drawn like a key (.kc-ball.leds); otherwise in its light.
     const lit = mode === "leds" ? "" : ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
     const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}${mode === "leds" ? " leds" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
-        aria-label="Trackball LED ${TRACKBALL_LED}">
+        aria-label="Trackball LED ${esc(led)}">
         <circle cx="${esc(x)}" cy="${y}" r="${r}"${lit}></circle>
-        ${mode === "leds" ? `<text class="kc-label sm" x="${esc(x)}" y="${y}">${TRACKBALL_LED}</text>` : ""}</g>`;
+        ${mode === "leds" ? `<text class="kc-label sm" x="${esc(x)}" y="${y}">${esc(led)}</text>` : ""}</g>`;
     return {
         markup,
         glow: mode === "leds" ? "" : `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${esc(x)}" cy="${y}" r="${r}" fill="${paint}"></circle>`,

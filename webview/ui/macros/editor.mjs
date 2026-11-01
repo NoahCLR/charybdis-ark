@@ -2,20 +2,21 @@
 /** @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model */
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
-import {el, esc} from "../../lib/dom.mjs";
+import {choiceField} from "../segmented.mjs";
+import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
-import {STEP_KINDS, addStepLabel, macroLocalState, samePayload} from "../../view/macro.mjs";
-import {macroPlacements} from "../../view/reach.mjs";
+import {STEP_KINDS, addStepLabel, macroLocalState, macroShortName, protectionChoiceLabel, samePayload} from "../../view/macro.mjs";
 import {titleName, attachTitleName} from "../title-name.mjs";
-import {ROUTE_WORDS, setReachGroupOpen} from "../../view/reach-groups.mjs";
-import {getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../../store.mjs";
+import {getModel, macroForm, post, render, setMacroForm, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
-import {layerSwatch} from "../layerbar.mjs";
-import {vocabulary, word} from "../../view/vocabulary.mjs";
+import {sectionPath} from "../../view/settings-layout.mjs";
+import {macroNamed, vocabulary, word} from "../../view/vocabulary.mjs";
 import {insertStep, sequenceEditor, saveSteps, focusSteps} from "./steps.mjs";
 import {inspectEdit, paintFeedback, matchingValidation, requestInspection} from "./validation.mjs";
 import {ensureMacroHistory, finishMacroHistoryGroup, rememberMacroEdit} from "./history.mjs";
 import {cancelRecording, recorder} from "./recorder.mjs";
+import {placementChipsMarkup, showPlacements} from "../keys/reach.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function editor(model, slot, canEdit) {
     const form = macroForm(slot.keycode);
@@ -25,41 +26,39 @@ export function editor(model, slot, canEdit) {
     let steps = focusSteps(slot, form.steps ?? parsed.steps);
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
-    const dirty = form.draft !== undefined && !samePayload(payload, slot.payload, model.qmkKeycodeAliases);
+    const dirty = form.draft !== undefined && !samePayload(payload, slot.payload, model);
     const chip = macroLocalState(model.draft?.changes, slot.keycode, dirty);
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
-    const wrap = el(`<div class="stack"></div>`);
+    const wrap = el(`<div class="stack"></div>`), uninterruptible = vocabulary(model).macroUninterruptible;
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
         <div class="card-h name-titlebar macro-titlebar">${nameField(model, slot, canEdit)}
-            <span class="tag">M${esc(slot.keycode.split("_").at(-1))}</span>
+            <span class="tag">${esc(macroShortName(slot))}</span>
             <span class="right row actions"><span class="chip" data-local-state><i class="dot ${chip.dot}"></i>${chip.text}</span>
-                <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button>
-                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"}>Discard local edits</button>
+                <button class="btn tiny ghost" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key…</button>
+                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"} data-tip="Put this macro back to what your draft holds, dropping the edit made here that is not in the draft yet.">Back to draft</button>
                 <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}
-            <label class="macro-protection"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
-                ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label></div>
+            ${protectionField(model, slot, canEdit)}</div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
-                ${STEP_KINDS.map(([value]) => `<button class="btn" data-insert-kind="${esc(value)}" data-act="macro-insert:${esc(slot.keycode)}:${esc(value)}" ${editable ? "" : "disabled"}>${esc(addStepLabel(value))}</button>`).join("")}
-                <label class="sw macro-raw-toggle"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:raw-toggle" data-raw-toggle aria-controls="macro-raw-${esc(slot.keycode)}" ${rawOpen ? "checked" : ""}><span class="track"></span><span>Raw payload</span></label>
+                ${STEP_KINDS.map((value) => `<button class="btn" data-insert-kind="${esc(value)}" data-act="macro-insert:${esc(slot.keycode)}:${esc(value)}" ${editable ? "" : "disabled"}>${esc(addStepLabel(model, value))}</button>`).join("")}
+                <label class="sw macro-raw-toggle"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:raw-toggle" data-raw-toggle aria-controls="macro-raw-${esc(slot.keycode)}" ${rawOpen ? "checked" : ""}><span class="track"></span><span>Edit as text</span></label>
             </div>
             <details class="macro-raw" id="macro-raw-${esc(slot.keycode)}" data-raw ${rawOpen ? "open" : ""}>
-                <summary hidden>Raw payload</summary>
-                <label class="field"><span>Raw payload</span><textarea class="input mono" rows="3" data-f="macro:${esc(slot.keycode)}:raw" data-raw-payload="${esc(slot.keycode)}" ${canEdit && !state.recording ? "" : "disabled"}>${esc(payload)}</textarea></label>
-                <p class="note">Commands use {KC_A}, {+KC_A}, {-KC_A} and {120}. Literal braces use {{ and }}. Text steps escape them automatically.</p>
+                <summary hidden>Macro as text</summary>
+                <label class="field"><span>Macro as text</span><textarea class="input mono" rows="3" data-f="macro:${esc(slot.keycode)}:raw" data-raw-payload="${esc(slot.keycode)}" ${canEdit && !state.recording ? "" : "disabled"}>${esc(payload)}</textarea></label>
+                <p class="note">{KC_A} taps, {+KC_A} presses, {-KC_A} releases, {120} waits 120 ms; {{ and }} type braces.</p>
             </details>
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}Your computer ↗</button>
-                <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">Typing & playback help</button>
+            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}${esc(vocabulary(model).settingsSections.host)} →</button>
+                <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">${DISCLOSURE}Typing & playback help</button>
             </div>
-            <details class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "open" : ""}>
-                <summary>Typing & playback help</summary>${unicodeSetup(model, slot)}
-                <p class="note">Automatic turns protection on when this layout needs Unicode entry. Protected playback starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.</p>
-            </details>
+            <div class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "" : "hidden"}>${unicodeSetup(model, slot)}
+                <p class="note">${esc(word(vocabulary(model).macroProtection, "auto"))} turns ${esc(uninterruptible.label)} on when this layout needs Unicode entry. A macro that plays uninterruptibly starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.</p>
+            </div>
             </div>
         </div></div>`);
     // Pointer actions that discard/clear this input take precedence over the
@@ -67,24 +66,31 @@ export function editor(model, slot, canEdit) {
     card.addEventListener("pointerdown", event => {
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="discard"], [data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
-    // Your computer, on Host.
+    // The host section, on Host settings.
     /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => {
         Object.assign(state, {screen: "host", reveal: '.settings-group[data-section="host"]'});
         render();
     });
-    /** @type {HTMLSelectElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLSelectElement} */ (event.target).value), model.macroEditing.identity)));
+    /** @type {HTMLElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => {
+        event.stopPropagation();
+        post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLInputElement | HTMLSelectElement} */ (event.target).value), model.macroEditing.identity));
+    });
     if (model.macroNameSpace) attachTitleName(card, {stored: slot.name || "", perName: model.macroNameSpace.perName,
         rename: name => post(edits.macroNameMessage(slot.keycode, name, getModel()?.macroEditing?.identity))});
-    /** @type {NodeListOf<HTMLElement>} */ (card.querySelectorAll("[data-goto-layer]")).forEach(button => button.addEventListener("click", () => showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
+    showPlacements(card, "macros", slot.keycode);
     /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="place"]')).addEventListener("click", () => {
         state.placement = {keycode: slot.keycode}; state.screen = "keys"; state.tab = "key"; render();
     });
     /** @type {HTMLElement} */ (card.querySelector("[data-macro-steps]")).append(sequenceEditor(model, slot, steps, editable));
     card.querySelectorAll("[data-insert-kind]").forEach(button => button.addEventListener("click", () => insertStep(model, slot, steps, /** @type {MacroStep['kind']} */ (/** @type {HTMLElement} */ (button).dataset.insertKind))));
-    const guidance = /** @type {HTMLDetailsElement} */ (card.querySelector("[data-guidance]"));
+    // One button opens and closes the help, and says which it is.
+    const guidance = /** @type {HTMLElement} */ (card.querySelector("[data-guidance]"));
     const helpButton = /** @type {HTMLButtonElement} */ (card.querySelector("[data-show-help]"));
-    helpButton.addEventListener("click", () => {guidance.open = !guidance.open; setMacroForm(slot.keycode, {guidanceOpen: guidance.open}); helpButton.setAttribute("aria-expanded", String(guidance.open));});
-    guidance.addEventListener("toggle", () => {if (guidance.isConnected) {setMacroForm(slot.keycode, {guidanceOpen: guidance.open}); helpButton.setAttribute("aria-expanded", String(guidance.open));}});
+    helpButton.addEventListener("click", () => {
+        guidance.hidden = !guidance.hidden;
+        setMacroForm(slot.keycode, {guidanceOpen: !guidance.hidden});
+        helpButton.setAttribute("aria-expanded", String(!guidance.hidden));
+    });
     const raw = /** @type {HTMLTextAreaElement} */ (card.querySelector("[data-raw-payload]"));
     raw.addEventListener("input", () => {
         rememberMacroEdit(slot, raw.value, undefined, raw.dataset.f || null);
@@ -128,15 +134,25 @@ export function editor(model, slot, canEdit) {
     return wrap;
 }
 
+// Uninterruptible playback: its few choices on show, as view/choices.mjs's
+// rule has them, else a menu.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
+function protectionField(model, slot, canEdit) {
+    const label = vocabulary(model).macroUninterruptible.label;
+    /** @type {[string, string][]} */
+    const options = (model.macroProtectionChoices || []).map((choice) => [choice.value, protectionChoiceLabel(model, choice, slot.uninterruptible)]);
+    return `<div class="macro-protection" data-protection><span aria-hidden="true">${esc(label)}</span>${choiceField({label, f: `macro:${slot.keycode}:protection`,
+        choices: options, current: slot.protection, disabled: !canEdit, hideLabel: true})}</div>`;
+}
+
 // Every slot can hold a full-length name. The core enforces the rule; the
 // counter says where the name stands in bytes, which is what the keyboard
 // counts.
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */
 function nameField(model, slot, canEdit) {
     const space = model?.macroNameSpace;
-    const number = slot.keycode.split("_").at(-1);
-    if (!space) return `<h3>${esc(slot.name || `Macro ${number}`)}</h3>`;
-    return titleName({f: `macro:${slot.keycode}:name`, value: slot.name || "", placeholder: `Macro ${number}`,
+    if (!space) return `<h3>${esc(macroNamed(slot))}</h3>`;
+    return titleName({f: `macro:${slot.keycode}:name`, value: slot.name || "", placeholder: slot.defaultName,
         label: "Macro name", perName: space.perName, canEdit});
 }
 
@@ -148,44 +164,17 @@ function nameField(model, slot, canEdit) {
 
 /** @param {Model} model @param {MacroSlot} slot */
 function placedOn(model, slot) {
-    const chips = macroPlacements(model, layers(), slot.keycode).map(({layer, at, routes}) => {
-        const swatch = layerSwatch(model, layer);
-        const how = routes.map((route) => {
-            const count = route.keys.length;
-            return `${ROUTE_WORDS[route.group]}${route.group === "here" && count > 1 ? ` ×${count}` : ""}`;
-        }).join(" · ");
-        return `<button class="layer-chip link" data-goto-layer="${esc(at)}"
-            data-tip="${esc(swatch.tip)} · reached by ${esc(how)} · show on the board">${swatch.html}
-            <span>${esc(layerName(layer))}</span><span class="idx">${esc(how)}</span></button>`;
-    }).join("");
+    const chips = placementChipsMarkup(model, "macros", slot.keycode);
     return chips ? `<div class="row layer-chips" aria-label="Used on layers">${chips}</div>`
         : `<span class="note" data-tip="No key, behaviour or combo sets this macro off. Place it on a key to use it.">Not placed yet</span>`;
 }
 
-/** @param {string} keycode @param {number} at */
-function showOnLayer(keycode, at) {
-    const placement = macroPlacements(getModel(), layers(), keycode).find((entry) => entry.at === at);
-    const route = placement?.routes[0];
-    if (!route) return;
-    Object.assign(state, {screen: "keys", tab: "macros", layer: at, placement: null});
-    if (route.keys.length) state.selected = route.keys[0];
-    state.reachRow.macros = `${route.group}:${keycode}`;
-    state.reachGroups = setReachGroupOpen(state.reachGroups, route.group, true);
-    render();
-}
-
 /** @param {Model} model @param {MacroSlot} slot */
 function unicodeSetup(model, slot) {
-    const {mode, os, layout, layoutFits, layoutName} = model?.macroUnicode || {mode: 0};
+    const {os, layout, layoutFits, layoutName, entry} = model?.macroUnicode || {mode: 0};
     const typed = layoutFits === false
-        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Host → Your computer, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
-        : `Text types through the ${layoutName} layout chosen in Host → Your computer, accented letters included; keep that layout active on the computer.`;
-    const entry = mode
-        ? ["", "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source.",
-            "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",
-            "Other characters use Unicode entry: use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode]
-        : os === 1 ? "Characters it cannot type, such as emoji, need the Unicode Hex Input layout."
-            : "Characters it cannot type, such as emoji, need Unicode playback on and a known host OS.";
+        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in ${sectionPath(model, "host")}, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
+        : `Text types through the ${layoutName} layout chosen in ${sectionPath(model, "host")}, accented letters included; keep that layout active on the computer.`;
     const typing = slot?.uninterruptible ? "" : " Avoid typing while a text macro plays.";
-    return `<p class="note">${esc(typed)} ${esc(entry)} The keyboard cannot check your input setup.${esc(typing)}</p>`;
+    return `<p class="note">${esc(typed)} ${esc(entry || "")} The keyboard cannot check your input setup.${esc(typing)}</p>`;
 }

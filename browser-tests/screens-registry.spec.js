@@ -11,6 +11,7 @@ test("every registered screen opens from the rail with its own title and keeps t
     });
     await expect(page.locator(".rail-group")).toHaveText(["Configure", "Settings", "Keyboard"]);
     await expect(page.locator(".rail [data-screen]")).toHaveCount(screens.length);
+    const heights = new Set();
     for (const {id, label} of screens) {
         const button = page.locator(`.rail [data-screen="${id}"]`);
         await expect(button).toHaveText(label);
@@ -20,7 +21,20 @@ test("every registered screen opens from the rail with its own title and keeps t
         if (id === "device") await expect(page.locator('.main > .topbar [data-f="keyboard:name"]')).toHaveCount(1);
         else await expect(page.locator(".main > .topbar h1")).toHaveText(label);
         await expect(page.locator(".read-placeholder")).toHaveCount(0);
+        // Every header is as tall as every other, so nothing below it jumps
+        // between screens; the Keyboard screen's renamable title included.
+        heights.add(await page.locator(".main > .topbar").evaluate((node) => node.getBoundingClientRect().height));
     }
+    await page.locator('.main > .topbar [data-f="keyboard:name"]').focus();
+    heights.add(await page.locator(".main > .topbar").evaluate((node) => node.getBoundingClientRect().height));
+    expect([...heights]).toHaveLength(1);
+});
+
+test("a screen waiting for a keyboard is titled as the rail item it highlights", async ({page}) => {
+    await page.goto("/preview/index.html?shell=none");
+    await expect(page.locator(".read-placeholder")).toBeVisible();
+    const current = page.locator('.rail [data-screen][aria-current="true"]');
+    await expect(page.locator(".main > .topbar h1")).toHaveText(await current.innerText());
 });
 
 test("an unknown screen shows an unavailable surface and recovers through a known rail choice", async ({page}) => {

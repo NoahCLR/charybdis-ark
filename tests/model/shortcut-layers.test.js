@@ -3,16 +3,16 @@
 // the base layer and the default layers, as the editor offers them and a
 // staged shortcut, settings change or layer reorder is judged.
 const test = require("node:test"), assert = require("node:assert/strict");
-const {shortcutLayerReason, shortcutLayerTargets, shortcutRefusal, settingsShortcutRefusal, reorderShortcutRefusal} = require("../../core/model/shortcut-layers");
+const {shortcutLayerTargets, shortcutRefusal, settingsShortcutRefusal, reorderShortcutRefusal} = require("../../core/model/shortcut-layers");
 const {settings} = require("../fixtures/portable-profile");
 
 test("the base layer and the default layers are always on, and say so by name", () => {
     const value = settings();
-    assert.match(shortcutLayerReason(value, 0), /^Base is the base layer: it is always on, so a shortcut cannot turn it on/);
-    assert.equal(shortcutLayerReason(value, 3), "");
+    assert.match(shortcutLayerTargets(value)[0].refusal, /^Base is the base layer: it is always on, so a shortcut cannot turn it on/);
+    assert.equal(shortcutLayerTargets(value)[3].refusal, "");
     value.values[23] = (1 << 0) | (1 << 2);
-    assert.match(shortcutLayerReason(value, 2), /^Symbols is a default layer: it is always on/);
     const targets = shortcutLayerTargets(value);
+    assert.match(targets[2].refusal, /^Symbols is a default layer: it is always on/);
     assert.equal(targets.length, 16);
     assert.deepEqual(targets.filter(target => target.refusal).map(target => target.layer), [0, 2]);
     assert.deepEqual(targets[3], {layer: 3, refusal: "", alwaysOn: ""});

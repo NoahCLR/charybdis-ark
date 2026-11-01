@@ -4,9 +4,13 @@
 // Compile which layer can answer each physical position. The selected top
 // layer is on; every lower non-transparent key is an alternative answer only
 // while its layer is on and higher answering layers are off. KC_NO answers
-// and blocks lower keys, just like any other non-transparent value.
+// and blocks lower keys, just like any other non-transparent value. Which
+// compiled answer answers under the layers that are on is the shared rule in
+// rules/layer-answers.mjs, which the interface runs too (D-L73).
 
 /** @typedef {import("../../contracts/panel.js").LayerAnswer} LayerAnswer */
+const {answeringCandidate} = require("../../rules/layer-answers.mjs");
+
 const TRANSPARENT = 0x0001;
 
 /** @param {readonly (readonly (number | undefined)[])[]} layers @returns {LayerAnswer[][][]} */
@@ -28,7 +32,7 @@ function compileLayerAnswers(layers) {
 
 /** @param {readonly LayerAnswer[] | undefined} answers @param {number} active */
 function answeringLayer(answers, active) {
-    return answers?.find(answer => (active & answer.active) !== 0 && (active & answer.blocked) === 0)?.layer ?? null;
+    return answeringCandidate(answers, active)?.layer ?? null;
 }
 
 module.exports = {compileLayerAnswers, answeringLayer};

@@ -3,6 +3,8 @@
 // order, and which screen a section is edited on.
 // Pure: it reads the published sections and returns them and ids.
 
+import {vocabulary} from "./vocabulary.mjs";
+
 /** @typedef {import("../../contracts/panel.js").PresentedSection} Section */
 /** @typedef {import("../../contracts/panel.js").PresentedField} Field */
 
@@ -24,6 +26,11 @@ export const SETTINGS_SCREENS = Object.freeze({
 /** @param {unknown} screen @returns {screen is SettingsScreen} */
 const isSettingsScreen = (screen) => typeof screen === "string" && Object.hasOwn(SETTINGS_SCREENS, screen);
 
+// The sections the keyboard's model files in an area ("Lighting"), which a
+// screen outside Settings draws, in the model's order.
+/** @param {{configDefaults?: readonly Section[]} | null | undefined} model @param {string} area @returns {Section[]} */
+export const sectionsIn = (model, area) => (model?.configDefaults || []).filter((section) => section.area === area);
+
 // The sections a Settings screen draws, in its order; one the keyboard has
 // not reported is left out.
 /** @param {readonly Section[]} sections @param {string} screen @returns {Section[]} */
@@ -41,6 +48,17 @@ export function screenOfSection(id) {
         if (id && SETTINGS_SCREENS[screen].includes(id)) return screen;
     }
     return null;
+}
+
+// Where a person finds a section, as a note names it: the screen as a
+// Settings screen is named outside the rail ("Behaviour settings"), then the
+// section's heading ("Behaviour settings → Tap & hold timing"), each in the
+// vocabulary's words, so the path is whole before any setting is read. A
+// part not known is left out.
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} id */
+export function sectionPath(model, id) {
+    const screen = screenOfSection(id), words = vocabulary(model);
+    return [screen && words.settingsScreens[screen], words.settingsSections[id]].filter(Boolean).join(" → ");
 }
 
 // A section's one-per-layer switches are one setting to a person, drawn as

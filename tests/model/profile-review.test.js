@@ -7,11 +7,12 @@ const {fingerprint,reorderLayers} = require("../../core/model/portable-profile")
 const snapshot = document => ({document,fingerprint:fingerprint(document)});
 
 test("idle timeout review uses human units while comparing stored milliseconds", () => {
-    const {settingsEditorView, editSettings} = require("../../core/model/settings-editor");
+    const {settingsEditorView} = require("../../core/model/settings-editor");
+    const {draftEdit} = require("../fixtures/draft-edit");
     let before = snapshot(document());
     for (const [value, expected] of [["60000", "1 minute"], ["90000", "90 seconds"], ["777", "0.777 seconds"], ["1000", "1 second"], ["0", "Always on"], ["86400000", "1440 minutes"]]) {
         const section = settingsEditorView(before).sections.find(row => row.id === "lightingPower");
-        const after = snapshot(editSettings(before, {sectionId: section.id, expectedFingerprint: before.fingerprint,
+        const after = snapshot(draftEdit(before, {type: "updateConfigDefaults", sectionId: section.id,
             fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: field.enabled} : {macro: field.macro, value: field.macro === "lightingTimeout" ? value : field.value})}));
         const change = profileReview(before, after).find(row => row.unit === "settings:lightingPower");
         assert.equal(change.fields.find(field => field.label === "Idle timeout").after, expected);
@@ -28,7 +29,7 @@ test("Host changes review affected text macros while leaving key steps and ident
     assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
     for (const row of effects) {
         assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
-        assert.match(row.note, /because of Host → Your computer\. Discard it together with that change\./);
+        assert.match(row.note, /because of Host settings → Your computer\. Discard it together with that change\./);
         const typing = row.fields.find(field => field.label === "Text entry");
         assert.match(typing.before, /layout keys: "é"/);
         assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
@@ -89,11 +90,11 @@ test("a key changed to a layer key carries that layer's mark, and one changed to
 });
 
 test("a key's participation is named where the key sits, as its layout change is", () => {
-    const {editDeviceProfile}=require("../../core/model/device-profile-edits");
+    const {applyDraftEdit}=require("../../core/model/draft-editor");
     const {matrixPosition}=require("../../core/data/charybdis-layout");
-    const before=snapshot(document()), after=structuredClone(before.document);
-    editLayers(after, layers => layers[0][matrixPosition(7)]=0x05); // KC_B
-    after.profile=editDeviceProfile(Buffer.from(after.profile,"base64"),{type:"updatePlacementPolicy",layer:0,layoutIndex:7,useBehavior:false,joinCombos:true}).toString("base64");
+    const before=snapshot(document()), keyed=structuredClone(before.document);
+    editLayers(keyed, layers => layers[0][matrixPosition(7)]=0x05); // KC_B
+    const after=applyDraftEdit({document:keyed},{type:"updatePlacementPolicy",layer:0,layoutIndex:7,useBehavior:false,joinCombos:true});
     const rows=profileReview(before,snapshot(after));
     const key=rows.find(row=>row.unit.startsWith("layout:")), placement=rows.find(row=>row.unit.startsWith("placement:"));
     assert.equal(key.title,"Base · Right · row 1, column 5");
@@ -265,8 +266,8 @@ test("a settings section is listed under the screen it is edited on", () => {
     const timing=items.find(entry=>entry.unit==="settings:keyTiming"), mouse=items.find(entry=>entry.unit==="settings:autoMouse");
     assert.equal(timing.area,"Settings");
     assert.deepEqual(timing.place,{kind:"settings",section:"keyTiming",area:"Settings"});
-    assert.equal(mouse.area,"Mouse","auto-mouse is listed under Mouse");
-    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Mouse"});
+    assert.equal(mouse.area,"Pointer","auto-mouse is listed under Pointer, the screen that edits it");
+    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Pointer"});
 });
 test("clearing a pointing mode is a change to the slot, not to every behaviour that reaches it", () => {
     const base=pdDocument(), slots=validateSnapshot(base).pdModes;
@@ -342,7 +343,8 @@ test("layer-mod labels use each Review side's host vocabulary and profile layer 
 
 test("Space Cadet modifiers use current host names on the board and in Review", () => {
     const {buildDeviceModel}=require('../../core/session/device-model');
-    const {resolve,lookup}=require('../../core/data/keycode-catalog');
+    const {lookup}=require('../../core/data/keycode-catalog');
+    const {resolve}=require('../../core/schema/keycodes');
     for(const [detected,alt] of [[0,'Alt'],[1,'Option'],[2,'Alt'],[3,'Alt']]) {
         const before=snapshot(document()), after=snapshot(document());
         before.hostOs=after.hostOs={detected};
@@ -358,7 +360,7 @@ test("Space Cadet modifiers use current host names on the board and in Review", 
 test("layout and Review labels follow the host layout on each side, including macOS ISO", () => {
     const settings = require("../../core/schema/settings-domain-v1");
     const {buildDeviceModel} = require("../../core/session/device-model");
-    const {resolve} = require("../../core/data/keycode-catalog");
+    const {resolve} = require("../../core/schema/keycodes");
     const withHost = (word) => withDomain(document(), 64, settings.decodeSettings, settings.encodeSettings,
         value => ({...value, values: value.values.map((v, i) => i === 27 ? word : v)}));
     for (const [host, word, code, label] of [

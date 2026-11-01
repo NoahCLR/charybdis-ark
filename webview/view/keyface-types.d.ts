@@ -3,7 +3,8 @@ import type {BehaviorView, Branch, ComboView, Layer, Position, PublishedModel} f
 export type ViewModel = Partial<PublishedModel> | null | undefined;
 export type PointingSlot = PublishedModel['pdModes'][number];
 export type BehaviorStep = BehaviorView['steps'][number];
-export type Tier = 'tap' | 'hold' | 'long';
+import type {Tier} from '../../contracts/edits.js';
+export type {Tier};
 export type BehaviorRoute = 'view' | 'here' | 'through' | 'combos' | 'belowCombos';
 export interface ResolvedKey {position: Position; layer: Layer; fellThrough: boolean; whileHeld: boolean; reference?: boolean}
 export interface ComboRoute {combo: ComboView; keys: ResolvedKey[]}
@@ -12,15 +13,108 @@ export interface BranchCell {branch: number; tier: Tier}
 export interface ReachedBehavior {keycode: string; action: string; layer: Layer | null; whileHeld: boolean; cells: BranchCell[]}
 export interface ReachedCombo extends ComboRoute {via: string | null; action: string; cells: BranchCell[]}
 // For a pointing reach only: `starts`, the layers that start the mode by turning on (its link); `startVia`, by
-// keycode, the layers through which the entry's routes start it (view/reach.mjs startedRoutes).
+// keycode, the layers through which the entry's routes start it (view/pointing-reach.mjs startedRoutes).
 export interface ReachEntry {name: string; keys: ResolvedKey[]; behaviours: ReachedBehavior[]; combos: ReachedCombo[]; starts?: Layer[]; startVia?: Record<string, number>}
 export interface ReachGroup {onKeys: ReachEntry[]; fromBranches: ReachEntry[]; fromCombos: ReachEntry[]; throughKeys: ReachEntry[]; fromBranchesBelow: ReachEntry[]; fromCombosBelow: ReachEntry[]; elsewhere: string[]}
 export interface SortableReach {layer?: Layer | null; keys?: ResolvedKey[]; behaviours?: ReachedBehavior[]; combos?: ComboRoute[]}
 export interface BehaviorCombo {row: BehaviorView; combos: ComboRoute[]}
 export interface ComboGroupEntry extends ComboRoute {inputs: number; covered: number; held: Layer[]}
 export interface ComboGroups {onKeys: ComboGroupEntry[]; throughKeys: ComboGroupEntry[]; fromBranches: never[]; fromBranchesBelow: never[]; elsewhere: ComboGroupEntry[]}
-export interface ReachRecord {directKeys: ResolvedKey[]; fellKeys: ResolvedKey[]; directRows: ReachedBehavior[]; belowRows: ReachedBehavior[]; directCombos: ReachedCombo[]; belowCombos: ReachedCombo[]}
-export type ReachOf = (model: ViewModel, stack: Layer[], at: number) => ReachGroup;
+// What a behaviour's branch sends, and the cell of its grid it sits in.
+export interface BranchSend {action: string; cell: BranchCell}
+// One way a layer view reaches something (view/reach-routes.mjs): a key and what it sends; a behaviour, on a key in the
+// view or once for how the layer reaches it, and what its branches send; or a combo and what it sends, with the behaviour
+// that output runs and what its branches send. `below`: reached only under a transparent key, and a behaviour reached
+// so names the layer answering with it.
+export type ReachRoute =
+    | {how: 'key'; below: boolean; key: ResolvedKey; action: string}
+    | {how: 'behaviour'; below: false; row: BehaviorView; key?: ResolvedKey; layer: Layer | null; whileHeld: boolean; sends: BranchSend[]}
+    | {how: 'behaviour'; below: true; row: BehaviorView; key?: ResolvedKey; layer: Layer; whileHeld: boolean; sends: BranchSend[]}
+    | {how: 'combo'; below: boolean; combo: ComboView; keys: ResolvedKey[]; action: string; row: BehaviorView | undefined; sends: BranchSend[]};
+// Whether a combo fires from a key in one view, and the words for why not.
+export interface ComboUse {fires: boolean; reasons: string[]}
+// The combos the board marks on each key in one view, by layout index, and whether each fires from it there.
+export interface ComboMarks {keys: Map<number, ComboView[]>; uses: Map<number, Map<ComboView, ComboUse>>}
+export interface BehaviourGroups {here: BehaviorView[]; through: {row: BehaviorView; layer: Layer; whileHeld: boolean}[]; combos: BehaviorCombo[]; combosBelow: BehaviorCombo[]; elsewhere: BehaviorView[]}
+export interface BehaviourInView {row: BehaviorView; keys: ResolvedKey[]; combos: ComboRoute[]}
+// What one layer view reaches, as a Keymap tab lists it (view/tab-reach.mjs). A behaviour's row: the keys in view
+// carrying it and the combos sending it, or the layer below a transparent key answers from, as its group says.
+export interface BehaviourReachEntry {name: string; row: BehaviorView; keys: ResolvedKey[]; combos: ComboRoute[]; layer: Layer | null; whileHeld: boolean}
+export type ComboReachEntry = ComboRoute & Partial<Pick<ComboGroupEntry, 'inputs' | 'covered' | 'held'>> & {name: string};
+export interface ReachRows {macros: ReachEntry; customKeys: ReachEntry; pointing: ReachEntry; behaviours: BehaviourReachEntry; combos: ComboReachEntry}
+export type ReachTab = keyof ReachRows;
+export interface TabReachGroup<E> {readonly id: string; readonly empty: string; readonly entries: E[]}
+export interface TabReach<E> {
+    readonly groups: TabReachGroup<E>[];
+    readonly count: number;
+    keysFor(rowId: string | null | undefined): number[];
+    groupOf(name: string | number): string | undefined;
+}
+// The key whose behaviour a pick on the board opens, and the layer below that answers with it, if one does.
+export interface BehaviourKey {keycode: string; from: Layer | null}
+// One view of the layer stack (view/layer-view.mjs): `at` on top, by its place in the stack, with `held` previewed on under it.
+export interface LayerView {
+    readonly model: ViewModel;
+    readonly stack: Layer[];
+    readonly at: number;
+    readonly held: number[];
+    readonly layer: Layer | undefined;
+    readonly previewing: boolean;
+    readonly alone: LayerView;
+    under(held: readonly number[] | null | undefined): LayerView;
+    readonly answers: ResolvedKey[];
+    readonly shown: ResolvedKey[];
+    readonly reachable: ResolvedKey[];
+    answerAt(layoutIndex: number | undefined): ResolvedKey | undefined;
+    shownAt(layoutIndex: number | undefined): ResolvedKey | undefined;
+    readonly combos: {
+        readonly groups: ComboGroups;
+        readonly inView: ComboRoute[];
+        readonly answers: Map<number, Position>;
+        readonly marks: ComboMarks;
+        shownAt(layoutIndex: number): ComboView[];
+        useAt(layoutIndex: number, combo: ComboView): ComboUse;
+        badgesAt(layoutIndex: number): ComboView[];
+        onKey(layoutIndex: number): {position: Position | null; combos: ComboView[]};
+        inputKeys(inputs: string[]): number[];
+        inputShown(name: string): boolean;
+    };
+    readonly behaviours: {
+        readonly groups: BehaviourGroups;
+        readonly inView: BehaviourInView[];
+        routeKeys(keycode: string, route?: BehaviorRoute | null): number[];
+        keyAt(layoutIndex: number | undefined): BehaviourKey;
+    };
+}
+// Which key a spelling is (view/key-identity.mjs): `name`, the name the profile knows it by (QK_USER_16 → PD_MODE_0);
+// `canonical`, one spelling per key, however an expression is spelled; `label` and `shortLabel`, how it is spoken, else
+// the spelling; `kind`, where the interface treats it apart; `layer`, `layerForm`, `layerMods` and `layerTap`, what a
+// layer key does to which layer; `turnsOn`, the layers it turns on as a mask; `legends`, what the host layout prints on
+// it; `macro` and `customKey`, the name the profile lists it by when core says it is one, or ''; `behaviour`, the row
+// keyed exactly by this spelling; `listening`, the row keyed by this key however either is spelled; `pointing`, the slot
+// it holds or locks, and `variant`, which of the two. Each fact core publishes is read under every name the key goes by.
+export interface KeyIdentity {
+    readonly spelling: string;
+    readonly name: string;
+    readonly canonical: string;
+    readonly label: string;
+    readonly shortLabel: string;
+    readonly kind: import('../../contracts/model.js').KeyKind | undefined;
+    readonly layer: number | undefined;
+    readonly layerForm: import('../../contracts/model.js').LayerForm | undefined;
+    readonly layerMods: string | undefined;
+    readonly layerTap: string | undefined;
+    readonly turnsOn: number;
+    readonly legends: string[] | undefined;
+    readonly value: number | undefined;
+    readonly entry: import('../../contracts/panel.js').CatalogEntry | undefined;
+    readonly macro: string;
+    readonly customKey: string;
+    readonly behaviour: BehaviorView | undefined;
+    readonly listening: BehaviorView | undefined;
+    readonly pointing: PointingSlot | undefined;
+    readonly variant: 'hold' | 'lock';
+}
 export type NamesOf = (keycode: string | undefined) => string[];
 // `times`: sent once per press of that many; `first`: the row's own first tap, not the key's.
 export type InheritedBranch = Branch & {times?: number; first?: boolean};

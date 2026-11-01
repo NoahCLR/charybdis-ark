@@ -7,7 +7,7 @@ const {CAPABILITIES_32, document32} = require("../fixtures/pointing-slots-32");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {buildSnapshotModel} = require("../../core/session/device-model");
-const {editKeyBehaviors} = require("../../core/model/key-behavior-edits");
+const {applyDraftEdit} = require("../../core/model/draft-editor");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 
 function draftOf(value, caps) {
@@ -54,9 +54,8 @@ test("the eight-slot action vocabulary cannot open a draft", () => {
 
 test("behaviour edits accept every current slot and refuse slots past the bank", () => {
     const wide = document32();
-    const blob = decodeProfileBlob(Buffer.from(wide.profile, "base64"));
-    const payload = blob.domains.find(domain => domain.id === 0x20).payload;
     const message = action => ({type: "saveBehavior", behavior: {keycode: "KC_F14", steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action}}]}});
-    assert.ok(editKeyBehaviors(payload, message("PD_MODE_31"), CAPABILITIES_32).length > payload.length);
-    assert.throws(() => editKeyBehaviors(payload, message("PD_MODE_32"), CAPABILITIES_32));
+    const edited = validateSnapshot(applyDraftEdit({document: wide}, message("PD_MODE_31"), {capabilities: CAPABILITIES_32}), CAPABILITIES_32);
+    assert.deepEqual(edited.behaviors.rows.find(row => row.target.operand === 0x69).steps[0].tap, {kind: 4, flags: 0, operand: 31});
+    assert.throws(() => applyDraftEdit({document: wide}, message("PD_MODE_32"), {capabilities: CAPABILITIES_32}));
 });

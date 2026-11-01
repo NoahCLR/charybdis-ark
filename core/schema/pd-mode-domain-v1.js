@@ -14,7 +14,10 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 // 9..10 and 16..31 are zero.
 const {NAME_MAX_BYTES, validName, nameOfBytes} = require("./profile-name");
 const {canonical} = require("./bytes");
-const PD_DOMAIN = Object.freeze({ID: PROFILE_DOMAIN_IDS.PD_MODES, VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.PD_MODES], SLOTS: 32, HEADER_SIZE: 8, RECORD_SIZE: 128, NAME_OFFSET: 96, NAME_MAX_BYTES, MAX_SIZE: 8 + 32 * 128});
+const {QK, modsOf} = require("../../rules/qmk-keycodes.mjs");
+const {LAYERS} = require("../data/charybdis-layout");
+const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
+const PD_DOMAIN = Object.freeze({ID: PROFILE_DOMAIN_IDS.PD_MODES, VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.PD_MODES], SLOTS: POINTING_SLOT_COUNT, HEADER_SIZE: 8, RECORD_SIZE: 128, NAME_OFFSET: 96, NAME_MAX_BYTES, MAX_SIZE: 8 + POINTING_SLOT_COUNT * 128});
 const PD_KIND = Object.freeze({DISABLED: 0, DIRECTIONAL: 1, SCROLLING: 2});
 const PD_AXIS = Object.freeze({VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3});
 // Which axes a scrolling mode scrolls, in the same byte (firmware D-F08).
@@ -30,7 +33,8 @@ const PD_MODIFIERS = Object.freeze({INHERIT: 0, MASK: 1, EXACT: 2});
 // both sets, may end a mode its layers started. Every link byte zero is no
 // link. No layer starts two modes; the layers keys turn on may repeat.
 const PD_LINK_ENDS = Object.freeze({NOTHING: 0, HIGHER_LAYER: 1, OTHER_LAYER: 2});
-const PD_LINK_LAYERS = 16;
+// A link names layers of the bank; its 16-bit masks hold every one.
+const PD_LINK_LAYERS = LAYERS;
 const DIRECTIONS = ["left", "right", "up", "down"];
 // Eight directions keep their diagonals in bytes 70..85, which any other
 // directional record leaves zero. Byte 86 is what every directional mode does
@@ -40,14 +44,19 @@ const DIAGONALS = ["upLeft", "upRight", "downLeft", "downRight"];
 const SCROLL_U16 = ["thresholdH", "thresholdV", "divisorH", "divisorV", "intervalMs", "expireMs", "lockMs"];
 const SCROLL_U8 = ["startNumerator", "startDenominator", "sustainNumerator", "sustainDenominator", "decayDivisor", "invert"];
 
-/** @param {string} code @param {number} offset @param {string} message @returns {never} */
-function fail(code, offset, message) {
-    throw Object.assign(new Error(message), {code, offset});
+// The refusals that name the format's bytes rather than a person's choice:
+// Ark's own fault where Ark wrote them (schema/bytes.js protocolError). A
+// name or a parameter a person set says itself; a parameter's layout in the
+// record, which no person sets, is marked where it is refused (`laidOut`).
+const MALFORMED = new Set(["INVALID_ARGUMENT", "INVALID_LENGTH", "INVALID_HEADER", "RESERVED", "INVALID_ID", "NONCANONICAL", "INVALID_POLICY", "INVALID_ACTION"]);
+/** @param {string} code @param {number} offset @param {string} message @param {boolean} [laidOut] @returns {never} */
+function fail(code, offset, message, laidOut = false) {
+    throw Object.assign(new Error(message), {code, offset}, laidOut || MALFORMED.has(code) ? {fault: "ark"} : {});
 }
 /** @param {Uint8Array} bytes */
 function zero(bytes) { return bytes.every(byte => byte === 0); }
 // A tap may click a plain mouse button 1–8 (firmware D-F22) or run a macro.
-const PD_MACROS = Object.freeze({FIRST: 0x7700, LAST: 0x777f});
+const PD_MACROS = Object.freeze({FIRST: QK.MACRO.first, LAST: QK.MACRO.last});
 /** @param {number} keycode */
 const isPdMacro = keycode => Number.isInteger(keycode) && keycode >= PD_MACROS.FIRST && keycode <= PD_MACROS.LAST;
 const PD_CLICKS = Object.freeze({FIRST: 0xd1, LAST: 0xd8});
@@ -57,8 +66,8 @@ const isPdClick = keycode => Number.isInteger(keycode) && keycode >= PD_CLICKS.F
 function isPdTapKey(keycode) {
     if (!Number.isInteger(keycode) || keycode < 0 || keycode > 0xffff) return false;
     if ((keycode >= 4 && keycode <= 0xc2) || isPdClick(keycode) || isPdMacro(keycode)) return true;
-    const mods = keycode >>> 8, key = keycode & 255;
-    return mods <= 0x1f && (mods & 15) !== 0 && key >= 4 && key <= 0xa4;
+    const key = keycode & 255;
+    return keycode <= QK.MODS.last && (modsOf(keycode) & 15) !== 0 && key >= 4 && key <= 0xa4;
 }
 // Why a keycode cannot be a pointing-mode tap, or "" when it can. The words
 // name what a person would have picked.
@@ -66,11 +75,11 @@ function isPdTapKey(keycode) {
 function pdTapProblem(keycode) {
     if (isPdTapKey(keycode)) return "";
     const key = keycode & 255, modified = keycode > 0xff;
-    if (keycode <= 0x1fff && key >= 0xcd && key <= 0xdf) {
+    if (keycode <= QK.MODS.last && key >= 0xcd && key <= 0xdf) {
         return modified && isPdClick(key) ? "A mouse-button click cannot carry modifiers in its keycode. Choose the button alone."
             : "A pointing mode can click mouse buttons 1–8, but not move the pointer, scroll or change mouse acceleration.";
     }
-    if (modified && keycode <= 0x1fff && key > 0xa4 && key <= 0xc2) return "Only keyboard keys take modifiers in a pointing mode; send a media or system key on its own.";
+    if (modified && keycode <= QK.MODS.last && key > 0xa4 && key <= 0xc2) return "Only keyboard keys take modifiers in a pointing mode; send a media or system key on its own.";
     return "A pointing mode sends keys, shortcuts, media and system keys, mouse buttons 1–8 and supported macros, not layer, pointing-mode or keyboard controls.";
 }
 /** @param {Buffer} bytes */
@@ -90,8 +99,8 @@ function readName(p, offset) {
 }
 /** @param {Buffer} p @param {number} slot @param {number} offset @param {number} [slots] */
 function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
-    /** @param {string} code @param {number} at @param {string} message @returns {never} */
-    const reject = (code, at, message) => fail(code, offset + at, message);
+    /** @param {string} code @param {number} at @param {string} message @param {boolean} [laidOut] @returns {never} */
+    const reject = (code, at, message, laidOut) => fail(code, offset + at, message, laidOut);
     if (p[0] !== slot) reject("INVALID_ID", 0, `Pointing slots must appear exactly once in ID order 0–${slots - 1}.`);
     // Reserved: byte 7, bytes 9..10 before the link, version 2's name field
     // past the link (bytes 16..31,
@@ -103,7 +112,7 @@ function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
     if (p[1] > 2 || p[2] > 1 || p[3] > PD_AXIS.EIGHT) reject("INVALID_POLICY", 1, "Unknown engine, layer policy or axis policy.");
     if (p[11] > PD_LINK_ENDS.OTHER_LAYER) reject("INVALID_POLICY", 11, "Unknown choice of what ends a mode its layers started.");
     if (p[1] === PD_KIND.DISABLED) {
-        if (!zero(p.subarray(2, 8)) || !zero(p.subarray(11, 16)) || !zero(p.subarray(32, PD_DOMAIN.NAME_OFFSET))) reject("INVALID_PARAMETER", 2, "Disabled slots retain only their ID and name.");
+        if (!zero(p.subarray(2, 8)) || !zero(p.subarray(11, 16)) || !zero(p.subarray(32, PD_DOMAIN.NAME_OFFSET))) reject("INVALID_PARAMETER", 2, "Disabled slots retain only their ID and name.", true);
         return;
     }
     if (!name) reject("INVALID_NAME", 8, "Configured modes need a name.");
@@ -114,7 +123,7 @@ function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
     }
     const x = p.readUInt16LE(32), y = p.readUInt16LE(34);
     if (p[1] === PD_KIND.DIRECTIONAL && p[3] === PD_AXIS.EIGHT) {
-        if (p[6]) reject("INVALID_PARAMETER", 6, "Directional modes cannot carry owned scroll modifiers.");
+        if (p[6]) reject("INVALID_PARAMETER", 6, "Directional modes cannot carry owned scroll modifiers.", true);
         if (!x || !y) reject("INVALID_PARAMETER", 32, "Enabled axes need a nonzero movement threshold.");
         for (let at = 70; at < 86; at += 4) {
             if (!validTap(p.subarray(at, at + 4))) reject("INVALID_ACTION", at, "Unsupported diagonal tap or modifier policy.");
@@ -123,15 +132,15 @@ function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
         if (p[87] > PD_DIRECTION_OUTPUT.ONCE) reject("INVALID_POLICY", 87, "Unknown directional output policy.");
         if (!zero(p.subarray(88, 90))) reject("RESERVED", 88, "Reserved PD bytes must be zero.");
     } else if (p[1] === PD_KIND.DIRECTIONAL) {
-        if (p[6] || !zero(p.subarray(70, 86))) reject("INVALID_PARAMETER", 6, "Directional modes cannot carry scroll settings or owned scroll modifiers.");
+        if (p[6] || !zero(p.subarray(70, 86))) reject("INVALID_PARAMETER", 6, "Directional modes cannot carry scroll settings or owned scroll modifiers.", true);
         if (p[86] > PD_EMPTY_DIRECTION.NOTHING) reject("INVALID_POLICY", 86, "Unknown empty-direction policy.");
         if (p[87] > PD_DIRECTION_OUTPUT.ONCE) reject("INVALID_POLICY", 87, "Unknown directional output policy.");
         if (!zero(p.subarray(88, 90))) reject("RESERVED", 88, "Reserved PD bytes must be zero.");
         if ((p[3] !== PD_AXIS.VERTICAL && !x) || (p[3] !== PD_AXIS.HORIZONTAL && !y)) reject("INVALID_PARAMETER", 32, "Enabled axes need a nonzero movement threshold.");
         if ((p[3] === PD_AXIS.VERTICAL && (x || !zero(p.subarray(36, 44)))) ||
-            (p[3] === PD_AXIS.HORIZONTAL && (y || !zero(p.subarray(44, 52))))) reject("INVALID_PARAMETER", 32, "Unused axes must have zero thresholds and outputs.");
+            (p[3] === PD_AXIS.HORIZONTAL && (y || !zero(p.subarray(44, 52))))) reject("INVALID_PARAMETER", 32, "Unused axes must have zero thresholds and outputs.", true);
     } else {
-        if (p[3] > PD_SCROLL_AXES.VERTICAL || !zero(p.subarray(32, 52))) reject("INVALID_PARAMETER", 3, "Scrolling modes cannot carry directional settings.");
+        if (p[3] > PD_SCROLL_AXES.VERTICAL || !zero(p.subarray(32, 52))) reject("INVALID_PARAMETER", 3, "Scrolling modes cannot carry directional settings.", true);
         if (![70, 72, 74, 76, 82].every(at => p.readUInt16LE(at) > 0) || p.readUInt16LE(80) < p.readUInt16LE(82) ||
             ![84, 85, 86, 87].every(at => p[at] > 0) || p[84] < p[85] || p[86] < p[87] ||
             p[86] * p[85] > p[84] * p[87] || p[88] < 2 || p[89] > 3) reject("INVALID_PARAMETER", 70, "Invalid scrolling thresholds, ratios, divisors or timing.");
@@ -210,7 +219,7 @@ function object(value, keys, label) {
 function optional(value, fallback) { return value === undefined ? fallback : value; }
 /** @param {number} value @param {number} max */
 function integer(value, max) {
-    if (!Number.isInteger(value) || value < 0 || value > max) fail("INVALID_PARAMETER", 0, `PD value must be an integer from 0 to ${max}.`);
+    if (!Number.isInteger(value) || value < 0 || value > max) fail("INVALID_PARAMETER", 0, `PD value must be an integer from 0 to ${max}.`, true);
     return value;
 }
 /** @param {Buffer} p @param {number} at @param {Partial<import("./types.js").PdTap>} [value] */
@@ -286,4 +295,4 @@ function validatePdRecord(bytes, id, offset = 0) {
     validateRecord(bytes, id, offset);
 }
 
-module.exports = {PD_DOMAIN, PD_KIND, PD_LINK_ENDS, PD_LINK_LAYERS, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, DIAGONALS, PD_CLICKS, isPdClick, PD_MACROS, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};
+module.exports = {PD_DOMAIN, PD_KIND, PD_LINK_ENDS, PD_LINK_LAYERS, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, DIRECTIONS, DIAGONALS, PD_MACROS, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};

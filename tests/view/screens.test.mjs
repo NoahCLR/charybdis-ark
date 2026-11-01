@@ -9,12 +9,12 @@ test("the registry owns every rail screen and renderer in the existing order", (
         ["Keyboard", ["profile", "device"]],
     ]);
     assert.deepEqual(Object.values(SCREENS).map((definition) => definition.label), ["Keymap", "Lighting", "Macros", "Custom keys", "Pointing modes",
-        "Behaviours", "Combos", "Pointer settings", "Host", "Backups", "Keyboard"]);
+        "Behaviours", "Combos", "Pointer", "Host", "Backups", "Keyboard"]);
     const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "CustomKeys", "Pointing", "Behaviours", "Combos", "Pointer", "Host", "Profile", "Device"]
         .map(name => [`screen${name}`, () => name[0].toLowerCase() + name.slice(1)]));
     for (const [id, definition] of Object.entries(SCREENS)) {
         assert.equal(definition.render(renderers), id, `${id} selects its own screen`);
-        assert.ok(definition.label && definition.title && definition.icon.startsWith("<svg"), id);
+        assert.ok(definition.label && definition.icon.startsWith("<svg"), id);
         assert.equal(isScreenId(id), true);
         assert.equal(screenDefinition(id), definition);
         assert.ok(Object.isFrozen(definition), id);
@@ -57,4 +57,12 @@ test("unavailable screens offer backups before device diagnostics and never link
     assert.equal(secondaryScreen({...connected, portable: {available: false}}, "device"), null);
     assert.equal(secondaryScreen({...connected, load: {state: "loading"}}, "keys"), null);
     assert.equal(secondaryScreen(null, "keys"), null);
+});
+
+test("every Settings screen has the name a link to it uses, its rail label and settings", async () => {
+    const {createRequire} = await import("node:module");
+    const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
+    const settings = screenGroups().find(({group}) => group === "Settings")?.items || [];
+    assert.deepEqual(Object.keys(VOCABULARY.settingsScreens), settings.map(({id}) => id));
+    for (const {id} of settings) assert.match(VOCABULARY.settingsScreens[id], / settings$/, id);
 });

@@ -1,17 +1,17 @@
 // @ts-check
 "use strict";
-const {editLayers, editMacros} = require("../fixtures/profile-document");
+const {editLayers, editMacros, withPayload} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {document} = require("../fixtures/portable-profile");
 const {profileReview} = require("../../core/model/profile-review");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {PROFILE_DOMAINS, replaceDomain} = require("../../core/schema/profile-domains");
+const {PROFILE_DOMAINS} = require("../../core/schema/profile-domains");
 const {SETTING_FIELDS: FIELDS} = require("../../core/schema/settings-domain-v1");
 const {matrixPosition} = require("../../core/data/charybdis-layout");
 
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const rewrite = (value, codec, decoded, options) => ({...value,
-    profile: replaceDomain(Buffer.from(value.profile, "base64"), codec.id, () => codec.encode(decoded, options)).toString("base64")});
+    profile: withPayload(Buffer.from(value.profile, "base64"), codec.key, () => codec.encode(decoded, options)).toString("base64")});
 
 // Populate optional records as well as the compiled fixture's ordinary ones.
 // The eight-way slot exposes every direction, diagonal and modifier field;

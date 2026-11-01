@@ -4,12 +4,13 @@
  */
 
 import {el, esc} from "../../lib/dom.mjs";
-import {behaviourListeningTo, canonicalKeycode} from "../../view/keyface.mjs";
+import {keyIdentity, sameKey} from "../../view/key-identity.mjs";
 import {getModel, post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
 import {actionMarked} from "../marks.mjs";
 import {shortcut} from "../../view/shortcuts.mjs";
+import {dialogFoot} from "../dialog-foot.mjs";
 
 // A behaviour belongs to the key it listens to, so changing that key moves the
 // whole row. A key that already has a row is never replaced silently: the
@@ -22,9 +23,9 @@ export function pickBehaviourKey(behaviour) {
         seed: [behaviour.keycode],
         onPick: (expression) => {
             const model = getModel();
-            const to = canonicalKeycode(model, expression);
-            if (!to || to === canonicalKeycode(model, behaviour.keycode)) { render(); return; }
-            const existing = behaviourListeningTo(model, expression);
+            const picked = keyIdentity(model, expression);
+            if (!picked.canonical || sameKey(model, expression, behaviour.keycode)) { render(); return; }
+            const existing = picked.listening;
             if (existing) { state.retarget = {from: behaviour.keycode, to: expression, existing: existing.keycode}; render(); return; }
             retargetBehaviour(behaviour.keycode, expression);
         },
@@ -35,8 +36,8 @@ export function pickBehaviourKey(behaviour) {
 function retargetBehaviour(from, to, conflict) {
     const model = getModel();
     state.retarget = null;
-    const row = conflict === "swap" || conflict === "overwrite"
-        ? behaviourListeningTo(model, to)?.keycode || canonicalKeycode(model, to) : canonicalKeycode(model, to);
+    const key = keyIdentity(model, to);
+    const row = (conflict === "swap" || conflict === "overwrite" ? key.listening?.keycode : "") || key.canonical;
     // The editor that moved it follows it to its new key: the Keymap screen's
     // open row, or on Custom keys the key now holding it if that is one. Moved
     // from Custom keys to any other key, it opens on the Keymap screen, where
@@ -66,10 +67,9 @@ export function retargetPrompt(behaviour) {
             <ul class="note">
                 <li><b>Overwrite</b> replaces it; ${actionMarked(model, behaviour.keycode)} then sends its plain keycode.</li>
                 <li><b>Swap</b> gives each key the other's behaviour.</li></ul></div>
-        <div class="sheet-f"><span class="note">Both are one step in the draft, so ${shortcut("Z")} takes them back.</span>
-            <span class="right"><button class="btn" data-act="cancel">Cancel</button>
-                <button class="btn" data-act="swap">Swap</button>
-                <button class="btn primary" data-act="overwrite">Overwrite</button></span></div>
+        <div class="sheet-f">${dialogFoot('<button class="btn primary" data-act="overwrite">Overwrite</button>', {},
+            '<button class="btn" data-act="swap">Swap</button>', "",
+            `<span class="note">Both are one step in the draft, so ${esc(shortcut("Z"))} takes them back.</span>`)}</div>
     </div></div>`);
     node.addEventListener("click", (event) => {
         const act = event.target === node ? "cancel" : /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-act]"))?.dataset.act;

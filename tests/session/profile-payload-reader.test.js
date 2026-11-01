@@ -2,7 +2,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
-const {ProfilePayloadReader, encodeCompiledRead, decodeCompiledRead} = require("../../core/session/profile-payload-reader");
+const {ProfilePayloadReader, CompiledDefaults, encodeCompiledRead, decodeCompiledRead} = require("../../core/session/profile-payload-reader");
 const {payloadOf, payloadDevice} = require("../fixtures/profile-payload");
 
 test("a verified payload is reused only when explicitly allowed and fresh metadata matches", async () => {
@@ -98,6 +98,26 @@ test("compiled defaults kept between runs come back only whole and verified", as
         JSON.stringify({...stored, metadata: {...stored.metadata, generation: 9}}), JSON.stringify({...stored, metadata: {...stored.metadata, payloadLength: 1e9}}), "x".repeat(300000)]) {
         assert.equal(decodeCompiledRead(bad), undefined);
     }
+});
+
+test("the compiled defaults are kept across connections, and stored only when they change", async () => {
+    const device = payloadDevice({bytes: payloadOf(60), generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
+    /** @type {import("../../core/protocol/types.js").PayloadRead[]} */
+    const kept = [];
+    await new ProfilePayloadReader(device, {onCompiled: read => kept.push(read)}).readCompiled();
+    const store = {value: /** @type {unknown} */ (undefined), sets: 0, get() {return this.value;}, /** @param {string} value */ set(value) {this.value = value; this.sets++;}};
+    const defaults = new CompiledDefaults(store);
+    assert.equal(defaults.current(), undefined, "nothing stored, nothing known");
+    defaults.keep(kept[0]);
+    defaults.keep({metadata: kept[0].metadata, bytes: Buffer.from(kept[0].bytes)});
+    assert.equal(store.sets, 1, "the same defaults are not stored again");
+    const reopened = new CompiledDefaults(store);
+    assert.deepEqual(reopened.current(), decodeCompiledRead(store.value), "a new run starts from the shell's copy");
+    assert.equal(new CompiledDefaults({get: () => {throw new Error("denied");}, set: () => {throw new Error("quota");}}).current(), undefined);
+    const unwritable = new CompiledDefaults({get: () => undefined, set: () => {throw new Error("quota");}});
+    assert.doesNotThrow(() => unwritable.keep(kept[0]));
+    assert.equal(unwritable.current(), kept[0], "a store that cannot be written still leaves the copy known");
+    assert.equal(new CompiledDefaults({get: () => store.value}).store, undefined, "a store needs both get and set");
 });
 
 test("a commit during metadata-only reuse retries with fresh bytes", async () => {

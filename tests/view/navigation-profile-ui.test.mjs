@@ -37,7 +37,7 @@ test("profile management leads with working import and export cards", () => {
     assert(actions >= 0 && recovery > actions, "backup actions must precede the recovery copies");
     assert.match(profile, /class="card profile-action"/);
     assert.match(profile, /Export profile…/);
-    assert.match(profile, /Choose profile…/);
+    assert.match(profile, /Import profile…/);
     assert.match(profile, /exportPortableProfile/);
     assert.match(profile, /choosePortableProfile/);
     assert.doesNotMatch(profile, /Layer priority/);

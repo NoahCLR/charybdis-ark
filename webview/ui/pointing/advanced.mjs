@@ -1,17 +1,17 @@
 // @ts-check
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
-import {AXIS, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, thresholdDistance} from "../../view/pointing-config.mjs";
+import {AXIS, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, modifierPolicyTip, readsHorizontal, readsVertical, tapPlaceWord, thresholdDistance} from "../../view/pointing-config.mjs";
 import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
 import {word} from "../../view/vocabulary.mjs";
 import {state} from "../../store.mjs";
-import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} from "./common.mjs";
+import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, tipFor, words} from "./common.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} scrolling @param {FormControls} controls */
-export function advancedControls(model, slot, scrolling, {form, disabled, field, select, modifiers}) {
+export function advancedControls(model, slot, scrolling, {form, disabled, field, choice, modifiers}) {
     // ── advanced ──────────────────────────────────────────────────────────
     const advanced = /** @type {HTMLDetailsElement} */ (el(`<details class="card pd-advanced" ${state.pdAdvanced ? "open" : ""}><summary class="card-h">
-        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">thresholds, ratios, held modifiers</span></summary>
+        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">${scrolling ? "thresholds, ratios, decay, expiry" : "distance, held modifiers"}</span></summary>
         <div class="card-b stack"></div></details>`));
     const advancedBody = /** @type {HTMLElement} */ (advanced.querySelector(".card-b"));
     /** @param {string} title */
@@ -21,22 +21,26 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         return node;
     };
 
-    const behaviour = el(`<div class="pd-grid3"></div>`);
-    behaviour.append(select("After this mode ends", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
+    // How far the ball moves per key, for a mode that sends keys. (A key's
+    // behaviour is something else in Ark, so the section is named for what
+    // it sets.)
     if (!scrolling) {
+        const distances = el(`<div class="pd-grid3"></div>`);
         // An axis the mode does not read has no threshold to set. Sending
         // once per movement, the threshold is how far a movement has to go.
-        const per = slot.directionOutput === 1 ? "movement before it sends" : "movement per tap";
+        const per = word(words(model).directionStep, slot.directionOutput);
         const dpi = modeDpi(slot, model.configDefaults);
+        // What the threshold does, by how often the mode sends, then how far it is.
+        const does = tipFor(model, slot.directionOutput === 1 ? "thresholdOnce" : "thresholdEvery");
         /** @param {number} counts */
         const distance = (counts) => {
             const shown = thresholdDistance(counts, dpi);
-            return shown ? {unit: shown.short, wide: true, tip: shown.long} : {tip: "Sensor counts at this mode's pointer speed."};
+            return shown ? {unit: shown.short, wide: true, tip: `${does} ${shown.long}`} : {tip: `${does} In sensor counts at this mode's pointer speed.`};
         };
-        if (readsHorizontal(slot.axis)) behaviour.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
-        if (readsVertical(slot.axis)) behaviour.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
+        if (readsHorizontal(slot.axis)) distances.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
+        if (readsVertical(slot.axis)) distances.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
+        section("Distance").append(distances);
     }
-    section("Behaviour").append(behaviour);
 
     if (!scrolling) {
         // Each shortcut's own handling of modifiers held while it sends. A
@@ -48,7 +52,8 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             && Number(slot[group]?.[name]?.keycode));
         if (rows.length) {
             const table = el(`<div class="pd-taps"><span class="h">Direction</span><span class="h">While modifiers are held</span><span class="h">Left out</span></div>`);
-            for (const {key, group, name, label} of rows) {
+            for (const {key, group, name} of rows) {
+                const label = tapPlaceWord(model, group, name);
                 const tap = unfinished[key] || /** @type {import("../../../contracts/edits.js").PdTap} */ (slot[group]?.[name]);
                 const prefix = group === "diagonals" ? "diag" : "dir";
                 const macro = pointingMacro(model, tap.keycode);
@@ -57,9 +62,8 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
                         el(`<span class="note">${esc(word(words(model).modifierPolicy, MODIFIER_POLICY.INHERIT))}</span>`), el(`<span class="note">The macro continues after its trigger.</span>`));
                     continue;
                 }
-                const policy = select(`${label} with held modifiers`, words(model).modifierPolicy, tap.modifierPolicy ?? 0, `${prefix}Policy:${name}`,
-                    {tip: "Inherit: modifiers you hold apply to the shortcut, so Shift with an arrow selects. Ignore: the modifiers chosen below are left out while it sends. Exact: it sends exactly its shortcut, whatever you hold."});
-                /** @type {HTMLElement} */ (policy.querySelector("span")).classList.add("sr");
+                const policy = choice(`${label} with held modifiers`, words(model).modifierPolicy, tap.modifierPolicy ?? 0, `${prefix}Policy:${name}`,
+                    {tip: modifierPolicyTip(model), hideLabel: true});
                 const masking = tap.modifierPolicy === MODIFIER_POLICY.MASK;
                 const left = masking ? modifierNames(model, tap.mask).join(", ") || "choose at least one below" : "—";
                 table.append(el(`<span class="n">${ARROWS[name]} ${esc(label)}</span>`), policy, el(`<span class="note">${esc(left)}</span>`));
@@ -79,15 +83,15 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         const tuning = el(`<div class="pd-grid3"></div>`);
         const drawn = new Set(SCROLL_LEAD.map(([key]) => key));
         for (const [key, unit] of SCROLL_SINGLES) {
-            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
+            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: tipFor(model, key)}));
             drawn.add(key);
         }
         for (const [top, bottom] of SCROLL_RATIOS) {
             const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
-            const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
+            const pair = el(`<div class="field" data-tip="${esc(tipFor(model, top))}"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
-                const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
+                const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono num" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
                     aria-label="${esc(`${label} ${index ? "denominator" : "numerator"}`)}" ${esc(disabled)}>`));
                 form[`scroll:${key}`] = () => input.value;
                 if (index) inputs.append(el(`<i>:</i>`));

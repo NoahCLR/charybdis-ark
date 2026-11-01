@@ -16,12 +16,12 @@ const {
 } = require("../../core/schema/key-behavior-domain-v1");
 const {
     PROFILE_ACTION_KINDS,
-    PROFILE_DOMAIN_IDS,
     crc32,
     decodeProfileBlob,
     encodeProfileBlob,
     fnv1a32,
 } = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
 
 function fixtures() {
     const values = new Map(fs.readFileSync(path.join(__dirname, "../../upstream/firmware/tests/fixtures/key_behavior_domain_v1.fixture"), "utf8")

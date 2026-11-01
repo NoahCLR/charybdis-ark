@@ -31,7 +31,7 @@ for (const theme of ["dark", "light"]) {
         await page.locator('[data-name]').fill("Sequence test");
         await page.locator('[data-name]').press("Tab");
         await expect.poll(() => updates(page).then(rows => rows.find(m => m.name)?.name)).toBe("Sequence test");
-        await page.locator('[data-protection]').selectOption("on");
+        await page.locator('[data-protection] label:has(input[value="on"])').click();
         await expect.poll(() => updates(page).then(rows => rows.find(m => m.protection)?.protection)).toBe("on");
         await expect(page.locator('[data-act="place"]')).toBeVisible();
         await expect(page.locator('[data-preserve-hold-timing]')).toBeVisible();
@@ -43,7 +43,7 @@ for (const theme of ["dark", "light"]) {
         await expect(page.locator('[data-step-tile="0"] .macro-token-label')).toHaveText("L Cmd");
         await expect(page.locator('[data-step-tile="0"]')).toHaveAccessibleName(/Left Command/);
         await page.locator('[data-raw-toggle]').click();
-        await page.locator('[data-close-step]').filter({visible: true}).click();
+        await page.locator('.macro-step [data-act="done"]').filter({visible: true}).click();
         await page.setViewportSize({width: 1600, height: 1400});
         await page.locator('[data-macro-editor]').screenshot({path: `/tmp/ark-macro-sequence-${theme}.png`});
     });

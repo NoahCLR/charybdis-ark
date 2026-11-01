@@ -5,7 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
+const {encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
 const {
     CANDIDATE_ADMISSION,
     CANDIDATE_ERROR,

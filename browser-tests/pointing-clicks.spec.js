@@ -2,31 +2,24 @@
 const {test, expect} = require("@playwright/test");
 const {openControls, clearPosts, posted} = require("./control-preview");
 const {document} = require("../tests/fixtures/pd-profile");
-const {fingerprint, summary, validateSnapshot} = require("../core/model/portable-profile");
-const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildSnapshotModel} = require("../core/session/device-model");
-const {draftBinding} = require("../core/session/panel-session-state");
-const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
+const {validateSnapshot} = require("../core/model/portable-profile");
+// The panel's whole model for the draft, published as the shell posts it.
+const {openDraft, panelModel} = require("../tests/fixtures/published-model");
 
 for (const theme of ["dark", "light"]) {
     test(`pointing picks post and stage mouse buttons 3/4 (${theme})`, async ({page}) => {
-        const value = document();
-        const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
-        const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
-        const connection = {connected: true, selectedDeviceId: "board", capabilities};
+        const {draft, state} = openDraft(document());
         const publish = async () => {
-            const editing = draftBinding({draft}, connection);
-            const patch = {...buildSnapshotModel(draft.current, capabilities, editing, connection), draft: {...draft.view(connection), ...editing}};
-            await page.evaluate(async patch => {
+            await page.evaluate(async model => {
                 const store = await import("/webview/store.mjs");
-                store.setModel({...store.getModel(), ...patch}); store.render();
-            }, patch);
+                store.setModel(model); store.render();
+            }, panelModel(draft, state));
         };
         await openControls(page, "pointing", {pointingSlot: 4}, theme);
         await publish();
         for (const [direction, button] of [["left", 3], ["right", 4]]) {
             await clearPosts(page);
-            await page.locator(`label:has(input[data-f="pointing:4:dir:${direction}"]) button`).click();
+            await page.locator(`.pd-arm.${direction} .pd-key`).click();
             const picker = page.getByRole("dialog", {name: "Pick a keycode"});
             await picker.locator('[data-sec="mouse"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(8);
@@ -43,22 +36,24 @@ for (const theme of ["dark", "light"]) {
             draft.stage(messages[0]);
             expect(validateSnapshot(draft.document).pdModes[4].directions[direction].keycode).toBe(0xd0 + button);
             await publish();
-            await expect(page.locator(`[data-f="pointing:4:dir:${direction}"]`)).toHaveValue(`Mouse Button ${button}`);
+            await expect(page.locator(`.pd-arm.${direction} .pd-key`)).toHaveText(`Mouse Button ${button}`);
         }
-        // A QMK name or alias typed into a field stages that keycode; the
-        // fields left as shown keep theirs.
+        // A QMK name or alias searched in the picker finds the key; the
+        // directions not picked keep theirs.
         for (const [direction, typed] of [["up", "MS_BTN3"], ["down", "QK_MOUSE_BUTTON_3"]]) {
             await clearPosts(page);
-            const input = page.locator(`[data-f="pointing:4:dir:${direction}"]`);
-            await input.fill(typed);
-            await input.dispatchEvent("change");
+            await page.locator(`.pd-arm.${direction} .pd-key`).click();
+            const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+            await picker.locator("#pickerSearch").fill(typed);
+            await picker.locator('[data-pick="QK_MOUSE_BUTTON_3"]').first().click();
+            await picker.locator('[data-act="use"]').click();
             const messages = await posted(page);
             expect(messages).toHaveLength(1);
-            expect(messages[0].config.directions).toMatchObject({[direction]: {keycode: typed}, left: {keycode: "QK_MOUSE_BUTTON_3"}, right: {keycode: "QK_MOUSE_BUTTON_4"}});
+            expect(messages[0].config.directions).toMatchObject({[direction]: {keycode: "QK_MOUSE_BUTTON_3"}, left: {keycode: "QK_MOUSE_BUTTON_3"}, right: {keycode: "QK_MOUSE_BUTTON_4"}});
             draft.stage(messages[0]);
             expect(validateSnapshot(draft.document).pdModes[4].directions[direction].keycode).toBe(0xd3);
             await publish();
-            await expect(input).toHaveValue("Mouse Button 3");
+            await expect(page.locator(`.pd-arm.${direction} .pd-key`)).toHaveText("Mouse Button 3");
         }
         expect(draft.changes().find(row => row.unit === "pd:4").fields.filter(field => ["Left", "Right"].includes(field.label)).map(field => field.after))
             .toEqual(["Mouse Button 3 · Inherit modifiers", "Mouse Button 4 · Inherit modifiers"]);

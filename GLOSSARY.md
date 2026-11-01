@@ -1,11 +1,12 @@
 # Charybdis Ark
 
 The words for the app: how a person reads the keyboard, edits it in a draft,
-reviews and keeps changes, and backs them up. The keyboard's own words (profile,
-half, generation, working copy, edit mode, Save, Apply, behaviour, pointing
-mode and the rest) are in the [firmware's glossary](upstream/firmware/GLOSSARY.md),
-which Ark imports at a pinned commit. A person sees the keyboard's Apply and
-its Save both as **Save** (D-L72).
+reviews and keeps changes, and backs them up. The keyboard's own words
+(profile, half, generation, working copy, edit mode, Save, Apply, behaviour,
+pointing mode and the rest) are in the [firmware's
+glossary](upstream/firmware/GLOSSARY.md), which Ark imports at a pinned
+commit. A person sees the keyboard's Apply and its Save both as **Save**
+(D-L72).
 
 ## Reading the keyboard
 
@@ -83,7 +84,8 @@ whether the draft made it, the keyboard already had it, or the draft fixes it.
 _Avoid_: lint, validation (for this), issue, problem
 
 **Trap**:
-A layer that can be locked on with no way back to the base layer.
+A layer that can be locked on with no way back to the base layer, or a
+pointing mode that can be locked with no way to turn it off.
 _Avoid_: dead end, stuck layer, layer lock-in
 
 **Blocker**:
@@ -135,14 +137,16 @@ _Avoid_: restore (alone), load, upload
 **Screen**:
 One of Ark's top-level views chosen from the rail, in three groups: Keymap,
 Lighting, Macros, Custom keys and Pointing modes under Configure; Behaviours,
-Combos, Pointer settings and Host under Settings; Backups and Keyboard under
-Keyboard.
+Combos, Pointer and Host under Settings; Backups and Keyboard under
+Keyboard. Outside the rail, a Settings screen is named with "settings" after
+it (Behaviour settings, Combo settings, Pointer settings, Host settings),
+since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
 
 **Area**:
-The part of the profile Review groups its changes under, mostly one screen's.
-Two keep older names: Mouse is what Pointer settings edits, and Settings what
-the rest of the Settings group edits.
+The part of the profile Review groups its changes under, mostly one screen's,
+and named as that screen is: Pointer is what Pointer settings edits. Settings
+is what the rest of the Settings group edits.
 _Avoid_: section, domain (for this), category
 
 **Frame**:
@@ -184,9 +188,9 @@ _Avoid_: key picker, keycode chooser, selector
 
 **Mark**:
 The small sign Ark draws beside anything with a colour of its own on the
-keyboard, in that colour (D-L31): a tier's dot, a branch badge, a combo badge,
-a stage's dot, and the board icon for a layer or the Pointing modes icon for a
-pointing mode. A **swatch** is a plain square of a colour, shown where the
+keyboard, in that colour (D-L31): a tier's dot, a branch badge (for the Multi
+tap window, "N×" in every tap-branch colour), a combo badge, a stage's dot,
+and the board icon for a layer or the Pointing modes icon for a pointing mode. A **swatch** is a plain square of a colour, shown where the
 colour itself is the subject or where only the colour tells the items apart;
 it is not a mark.
 _Avoid_: tag, chip (for a mark), dot (for a layer's mark)
@@ -195,6 +199,12 @@ _Avoid_: tag, chip (for a mark), dot (for a layer's mark)
 Showing several layers stacked on the board the way the keyboard would
 resolve them.
 _Avoid_: layer stack, overlay view
+
+**Empty layer**:
+A layer with nothing in it: not the base or a default layer, no name of its
+own, no key mapped, and nothing that uses it (D-L76). Lists of layers fold
+them behind one disclosure at their end.
+_Avoid_: unused layer, spare layer, blank layer
 
 ## Where Ark runs
 

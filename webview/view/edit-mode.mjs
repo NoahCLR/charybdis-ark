@@ -10,9 +10,11 @@ import {shortcut} from "./shortcuts.mjs";
 import {RESTART_NEEDED} from "./keyboard-view.mjs";
 import {demoOf} from "./demo.mjs";
 
-export const APPLY = 0;
-export const LIVE = 1;
-export const LIVE_REVIEW = 2;
+// The edit modes as the keyboard stores them; they are the keyboard's numbers
+// (core/protocol/profile-edit-v1.js EDIT_MODE, pinned by
+// tests/view/enum-drift.test.mjs).
+export const EDIT_MODE = Object.freeze({APPLY: 0, LIVE: 1, LIVE_REVIEW: 2});
+export const {APPLY, LIVE, LIVE_REVIEW} = EDIT_MODE;
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {NonNullable<Model["draft"]>} Draft */
@@ -115,7 +117,7 @@ export function liveSaveState(draft, {adjustment = true} = {}) {
         detail: "Its edits still run, unsaved; unplugging it now loses them. Save again, or Revert to the saved profile.", action: "save"};
     if (live.mode !== LIVE) return null;
     if (live.unsaved && keyboard?.saving) return {kind: "saving", tone: "draft", title: "Saving on the keyboard",
-        detail: keyboard.storagePaused ? "The keyboard writes flash once no key is held." : "The keyboard is writing these edits to both halves.", action: null};
+        detail: keyboard.storagePaused ? "The keyboard finishes saving once no key is held." : "The keyboard is saving these edits on both halves.", action: null};
     if (live.unsaved) return {kind: "pending", tone: "draft", title: "Not saved yet",
         detail: `The keyboard saves these edits by itself after ${quietWords(keyboard)} without typing, with or without Ark. Unplugging it sooner loses them.`, action: null};
     if (keyboard?.savedByKeyboard) return {kind: "saved", tone: "ok", title: "Saved by the keyboard",
@@ -171,8 +173,8 @@ export const renameNote = (draft) => liveMode(draft) === null
 /** @param {Draft | null | undefined} draft */
 export function importNote(draft) {
     const mode = liveMode(draft);
-    return `Choose or drop a complete backup here and review its differences first. ${mode === null
-        ? "Import replaces the local draft; nothing is written to the keyboard until you review and save it."
+    return `Choose or drop a backup to compare it first. ${mode === null
+        ? "It replaces your draft; nothing reaches the keyboard until you review and save it."
         : `Use as draft sends it to the keyboard at once ${unsavedEdits(mode)}`}`;
 }
 
@@ -180,6 +182,6 @@ export function importNote(draft) {
 /** @param {Draft | null | undefined} draft */
 export function importCallout(draft) {
     const mode = liveMode(draft);
-    return mode === null ? "Nothing is written to the keyboard until you review and save; the review shows every change field by field."
+    return mode === null ? "Nothing reaches the keyboard until you review and save; the review shows every change field by field."
         : `Use as draft sends it to the keyboard at once ${unsavedEdits(mode)}`;
 }

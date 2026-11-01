@@ -9,11 +9,21 @@
 // item knows how to go to its editor.
 
 import {screenOfSection} from "./settings-layout.mjs";
+import {draftBlockWords, listed, stageOrder, vocabulary} from "./vocabulary.mjs";
 
-// The order areas are read in, as the rail lists the screens they live on.
-export const AREAS = ["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
+// The review units read here by name: core's (core/model/review-units.js),
+// copied since the interface may not import core and pinned by
+// tests/view/enum-drift.test.mjs.
+export const LAYER_ORDER_UNIT = "layerOrder", OTHER_KEY_OPTIONS_UNIT = "settings:otherKeyOptions";
+
+// The order areas are read in, as the rail lists the screens they live on,
+// each named as its screen is: core's REVIEW_AREAS (core/model/vocabulary.js),
+// copied since the interface may not import core and pinned by
+// tests/view/enum-drift.test.mjs.
+export const AREAS = Object.freeze(["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Pointer", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"]);
+// An area's place in that order; one the rail does not list comes last.
 /** @param {string} area */
-const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
+export const areaRank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 
 // Items by area, in rail order, and within an area as blocks in the order the
 // core listed them. A group whose items span areas is shown in each area as
@@ -38,11 +48,11 @@ export function reviewBlocks(changes) {
         if (!blocks.has(key)) {
             const group = change.group === null || change.group === undefined ? {size: 1, areas: new Set([change.area])} : /** @type {{size: number, areas: Set<string>}} */ (reach.get(change.group));
             blocks.set(key, {group: change.group, title: change.groupTitle || null, area: change.area, size: group.size,
-                elsewhere: [...group.areas].filter((area) => area !== change.area).sort((left, right) => rank(left) - rank(right)), items: []});
+                elsewhere: [...group.areas].filter((area) => area !== change.area).sort((left, right) => areaRank(left) - areaRank(right)), items: []});
         }
         blocks.get(key)?.items.push(change);
     });
-    return [...sections.keys()].sort((left, right) => rank(left) - rank(right)).map((area) => {
+    return [...sections.keys()].sort((left, right) => areaRank(left) - areaRank(right)).map((area) => {
         const blocks = [.../** @type {Map<number | string, import("./types.js").ReviewBlock>} */ (sections.get(area)).values()];
         return {area, blocks, count: blocks.reduce((total, block) => total + block.items.length, 0)};
     });
@@ -66,23 +76,32 @@ export const statusBesideCount = (changes) => changes.every((change) => change.s
 // its screen is, and the Settings sections filed with what they tune (Key
 // Timing with keys, Lighting Feedback with lighting). A section edited on a
 // lighting stage counts with that stage. `names` are the file's layer names;
-// `stages` the lighting stages in paint order, as the vocabulary words them.
-export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
+// the lighting stages, in paint order, and the settings sections are named as
+// the vocabulary words them (`stages`, `fileSections`). Core words an
+// unnamed layer's name (ProfileSummary.names).
+const CATEGORIES = ["Keys", "Lighting", "Macros", "Pointer", "Pointing modes", "Other"];
 // A custom key's name is counted with the keys, where its behaviour is too.
-/** @type {Readonly<Record<string, [string, string, number]>>} */
-const SECTIONS = {
-    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Default layers", 22], behaviorSettings: ["Keys", "Behaviour settings", 32], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
-    keyboardOptions: ["Keys", "Key swaps & typing", 50], lightingPower: ["Lighting", "All lighting", -1], rgbAppearance: ["Lighting", "Background effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
-    normalPointerSpeed: ["Mouse", "Pointer speed", 1], sniping: ["Mouse", "Auto-sniping", 2], autoMouse: ["Mouse", "Auto-mouse", 3],
+// Each settings section's category and its row's place there; its words are
+// the vocabulary's (tests/view/review.test.mjs holds the two to one set).
+/** @type {Readonly<Record<string, [string, number]>>} */
+export const SECTION_ROWS = {
+    keyTiming: ["Keys", 31], startupLayers: ["Keys", 22], behaviorSettings: ["Keys", 32], comboSettings: ["Keys", 40], comboReferences: ["Keys", 41],
+    keyboardOptions: ["Keys", 50], lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15],
+    normalPointerSpeed: ["Pointer", 1], sniping: ["Pointer", 2], autoMouse: ["Pointer", 3],
 };
+/** @param {string} id @param {Readonly<Record<string, string>>} sections @returns {[string, string, number] | undefined} */
+function sectionRow(id, sections) {
+    const row = Object.hasOwn(SECTION_ROWS, id) ? SECTION_ROWS[id] : undefined;
+    return row && [row[0], sections[id] || id, row[1]];
+}
 // Where one difference is counted: its category, its row's words, and the
 // row's place within the category.
-/** @param {import("../../contracts/model.js").ReviewSummary} item @param {readonly string[]} names @param {readonly {id: string, label: string}[]} stages @returns {[string, string, number]} */
-function categoryOf(item, names, stages) {
+/** @param {import("../../contracts/model.js").ReviewSummary} item @param {readonly string[]} names @param {readonly {id: string, label: string}[]} stages @param {Readonly<Record<string, string>>} sections @returns {[string, string, number]} */
+function categoryOf(item, names, stages, sections) {
     const place = item.place;
     switch (place?.kind) {
-        case "key": return ["Keys", `Keys on ${names[place.layer] || `Layer ${place.layer}`}`, place.layer];
-        case "layers": return item.unit === "layerOrder" ? ["Keys", "Layer priority", 20] : ["Keys", "Layer names", 21];
+        case "key": return ["Keys", `Keys on ${names[place.layer] ?? ""}`, place.layer];
+        case "layers": return item.unit === LAYER_ORDER_UNIT ? ["Keys", "Layer priority", 20] : ["Keys", "Layer names", 21];
         case "behaviour": return ["Keys", "Behaviours", 30];
         case "combo": return ["Keys", "Combos", 40];
         case "macro": return ["Macros", "Macros", 0];
@@ -93,7 +112,8 @@ function categoryOf(item, names, stages) {
             if (place.stage === "groups") return ["Lighting", "LED groups", 20];
             return stageRow(place.stage, stages);
         }
-        case "settings": return place.stage ? stageRow(place.stage, stages) : SECTIONS[place.section || ""] || (item.unit === "settings:otherKeyOptions" ? SECTIONS.keyboardOptions : ["Other", item.title, 0]);
+        case "settings": return place.stage ? stageRow(place.stage, stages) : sectionRow(place.section || "", sections)
+            || (item.unit === OTHER_KEY_OPTIONS_UNIT ? sectionRow("keyboardOptions", sections) : undefined) || ["Other", item.title, 0];
         default: return ["Other", item.title, 0];
     }
 }
@@ -102,12 +122,13 @@ function stageRow(id, stages) {
     const index = stages.findIndex((stage) => stage.id === id);
     return ["Lighting", stages[index]?.label || id, 10 + Math.max(index, 0)];
 }
-/** @param {readonly import("../../contracts/model.js").ReviewSummary[]} items @param {{names?: readonly string[], stages?: readonly {id: string, label: string}[]}} [options] */
-export function categorySummary(items, {names = [], stages = []} = {}) {
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {readonly import("../../contracts/model.js").ReviewSummary[]} items @param {{names?: readonly string[]}} [options] */
+export function categorySummary(model, items, {names = []} = {}) {
+    const stages = stageOrder(model), sections = vocabulary(model).fileSections;
     /** @type {Map<string, {items: import("../../contracts/model.js").ReviewSummary[], rows: Map<string, {label: string, order: number, count: number}>}>} */
     const categories = new Map();
     for (const item of items) {
-        const [category, label, order] = categoryOf(item, names, stages);
+        const [category, label, order] = categoryOf(item, names, stages, sections);
         if (!categories.has(category)) categories.set(category, {items: [], rows: new Map()});
         const entry = /** @type {NonNullable<ReturnType<typeof categories.get>>} */ (categories.get(category));
         entry.items.push(item);
@@ -135,8 +156,6 @@ export const discardLabel = (block) => block.size === 1 ? "Discard" : block.size
 export const groupNote = (block) => block.items.length === block.size
     ? `${block.size} changes, discarded together`
     : `${block.items.length} of ${block.size} here, the rest in ${listed(block.elsewhere)} · discarded together`;
-/** @param {readonly string[]} names */
-const listed = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 
 // Where an item is edited, as the state that shows it. Nothing for an item
 // with no editor of its own. `reveal` names the element the next render
@@ -154,8 +173,8 @@ export function placeState(place, layers = []) {
         // Which group lists a combo depends on the layer shown, so the combo is
         // asked for by id and the tab picks it where it finds it.
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};
-        case "macro": return {screen: "macros", macroSlot: `MACRO_${place.index}`};
-        case "customKey": return {screen: "customKeys", customKey: `CUSTOM_KEY_${place.index}`};
+        case "macro": return {screen: "macros", macroSlot: place.keycode};
+        case "customKey": return {screen: "customKeys", customKey: place.keycode};
         case "pointing": return {screen: "pointing", pointingSlot: place.slot, pdKind: null, pdTaps: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
         // A section is edited on the screen that draws it: a lighting stage
@@ -212,8 +231,8 @@ function computeMarks(changes) {
             marks.layers.add(place.layer);
         } else if (place.kind === "behaviour") marks.behaviours.add(place.keycode);
         else if (place.kind === "combo") marks.combos.add(place.index);
-        else if (place.kind === "macro") marks.macros.add(`MACRO_${place.index}`);
-        else if (place.kind === "customKey") marks.customKeys.add(`CUSTOM_KEY_${place.index}`);
+        else if (place.kind === "macro") marks.macros.add(place.keycode);
+        else if (place.kind === "customKey") marks.customKeys.add(place.keycode);
         else if (place.kind === "pointing") marks.pointing.add(place.slot);
         else if (place.kind === "lighting") {
             if (place.stage) marks.lighting.add(place.stage);
@@ -241,3 +260,23 @@ export const draftDot = (tip = "Changed in your draft", place = "") => `<i class
 // What a stale draft's bar says it keeps: "your 1 change is kept".
 /** @param {number} count */
 export const changesKept = (count) => `your ${count} change${count === 1 ? " is" : "s are"} kept`;
+
+// The blockers the draft keeps: values the keyboard would refuse, which keep
+// Save off until they are fixed (D-L36).
+/** @param {readonly import("../../contracts/model.js").Check[]} [checks] */
+export const activeBlockers = (checks = []) => checks.filter((check) => check.level === "blocker" && check.status !== "fixed");
+
+// Why the review's Save is off, said beside it, or "" while it can save. A
+// blocker names itself, so the reason is readable without finding it among
+// the checks; core refuses the same saves on its own. Until core has the
+// review for this revision (`reviewed`) the wait is said too.
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {Pick<import("../../contracts/panel.js").DraftView, "connected" | "stale" | "reviewed" | "checks">} draft */
+export function saveOffReason(model, draft) {
+    if (!draft.connected) return "Connect the keyboard to save.";
+    if (draft.stale) return `${draftBlockWords(model, "stale")?.title || "The keyboard changed since this draft began"}. Close Review and review against the keyboard.`;
+    const blockers = activeBlockers(draft.checks);
+    if (blockers.length === 1) return `Fix the blocker first: ${blockers[0].title}.`;
+    if (blockers.length) return `Fix the ${blockers.length} blockers in Checks first.`;
+    if (!draft.reviewed) return "Getting the review ready…";
+    return "";
+}

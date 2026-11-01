@@ -3,7 +3,7 @@
 const {test, expect} = require("@playwright/test");
 const {openPreview} = require("./shell-page");
 const {buildDeviceModel} = require("../core/session/device-model");
-const {resolve} = require("../core/data/keycode-catalog");
+const {resolve} = require("../core/schema/keycodes");
 const {hostKeyLabel} = require("../core/model/key-names");
 
 async function sendHost(page, hostOs) {
@@ -96,7 +96,9 @@ for(const theme of ["dark", "light"]) {
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
             await expect(page.locator('.picker .sheet-h')).toContainText(hostKeyLabel('Left GUI',host));
-            await expect(page.locator('.picker [data-remove="0"]')).toContainText('KC_LEFT_GUI');
+            // Left GUI opens as its button in the row, stored as that key.
+            await expect(page.locator('.picker [data-mod="G"]')).toHaveAttribute('aria-pressed','true');
+            await expect(page.locator('.picker .pk-value')).toHaveText('KC_LEFT_GUI');
         }
         await page.locator('.picker [data-act="clear"]').click();
         await page.locator('.pkb-key[data-pick="KC_A"]').click();

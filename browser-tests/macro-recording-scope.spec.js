@@ -26,7 +26,7 @@ test("compact recording captures Command+A as one chord in the original slot", a
 });
 
 test("compact recording retains a modifier across shortcuts without stray modifier taps", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
+    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false, allSlotsShown: ["macros"]});
     await page.locator('[data-act="record"]').click();
     await page.keyboard.down("Control");
     await page.keyboard.press("a");
@@ -91,7 +91,7 @@ test("Preserve hold timing records a held key even when ordinary delay recording
 
 for (const destination of ["screen", "slot", "editor"]) {
     test(`leaving the recorder for another ${destination} finishes only the original slot`, async ({page}) => {
-        await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
+        await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false, allSlotsShown: ["macros"]});
         await page.locator('[data-act="record"]').click();
         await page.keyboard.press("a");
         expect((await take(page)).payload).toBe("{KC_A}");
@@ -111,7 +111,7 @@ for (const destination of ["screen", "slot", "editor"]) {
 }
 
 test("ending an explicit take releases captured held keys and Clear take restores it", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false, recordPreserveHoldTiming: true, recordDelayThreshold: 1000});
+    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false, recordPreserveHoldTiming: true, recordDelayThreshold: 1000, allSlotsShown: ["macros"]});
     await page.locator('[data-insert-kind="text"]').click();
     await page.locator('[data-step-text]').fill("before");
     await page.locator('[data-step-text]').press("Tab");
@@ -129,21 +129,47 @@ test("ending an explicit take releases captured held keys and Clear take restore
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("before");
 });
 
-test("recorder options and ordinary rerenders keep a take running; Escape stops it", async ({page}) => {
+test("recorder options and ordinary rerenders keep a take running; a tapped Escape records, a held one stops it", async ({page}) => {
     await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
     await page.locator('[data-act="record"]').click();
     await page.locator('label:has([data-delays])').click();
     expect((await take(page)).recording).toBe("MACRO_17");
     await page.keyboard.press("a");
     await page.keyboard.press("Escape");
+    expect((await take(page)).recording).toBe("MACRO_17");
+    await page.keyboard.down("Escape");
     await expect.poll(() => take(page).then(value => value.recording)).toBeNull();
+    await page.keyboard.up("Escape");
     await page.keyboard.press("b");
-    expect((await take(page)).payload).toBe("{KC_A}");
+    expect((await take(page)).payload).toBe("{KC_A}{KC_ESC}");
+});
+
+test("while a take records, Enter, Space and Tab are its keys, not the page's", async ({page}) => {
+    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
+    const record = page.locator('[data-act="record"]');
+    await record.click();
+    await record.focus();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press(" ");
+    await page.keyboard.press("Tab");
+    expect(await take(page)).toEqual({recording: "MACRO_17", payload: "{KC_ENT}{KC_SPC}{KC_TAB}"});
+    await expect(record).toBeFocused();
+});
+
+test("leaving the page mid-chord finishes the take without the unfinished chord", async ({page}) => {
+    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
+    await page.locator('[data-act="record"]').click();
+    await page.keyboard.press("a");
+    await page.keyboard.down("Alt");
+    await page.evaluate(() => dispatchEvent(new FocusEvent("blur")));
+    await page.keyboard.up("Alt");
+    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("{KC_A}");
+    expect((await take(page)).recording).toBeNull();
 });
 
 for (const ending of ['stop', 'escape', 'screen', 'slot', 'editor']) {
     test(`ending a held key via ${ending} preserves elapsed hold timing`, async ({page}) => {
-        await openControls(page, 'macros', {macroSlot: 'MACRO_17', recordPreserveHoldTiming: true, recordDelays: false});
+        await openControls(page, 'macros', {macroSlot: 'MACRO_17', recordPreserveHoldTiming: true, recordDelays: false, allSlotsShown: ['macros']});
         await page.locator('[data-act="record"]').click();
         await page.evaluate(() => {
             window.__realRecordingNow = Date.now;
@@ -152,7 +178,11 @@ for (const ending of ['stop', 'escape', 'screen', 'slot', 'editor']) {
             Date.now = () => 12000;
         });
         if (ending === 'stop') await page.locator('[data-act="record"]').click();
-        if (ending === 'escape') await page.keyboard.press('Escape');
+        if (ending === 'escape') {
+            await page.keyboard.down('Escape');
+            await expect.poll(() => take(page).then(value => value.recording)).toBeNull();
+            await page.keyboard.up('Escape');
+        }
         if (ending === 'screen') await page.locator('[data-screen="host"]').click();
         if (ending === 'slot') await page.locator('[data-slot="MACRO_18"]').click();
         if (ending === 'editor') await page.locator('[data-raw-toggle]').click();
@@ -195,7 +225,7 @@ test('Discard during a take restores an existing macro and preserves its name/pr
     await page.locator('.macro-editor-card [data-act="discard"]').click();
     await expect(page.locator('[data-step-text]')).toHaveValue('original');
     await expect(page.locator('[data-name]')).toHaveValue('Keep me');
-    await expect(page.locator('[data-protection]')).toHaveValue('off');
+    await expect(page.locator('[data-protection] input[value="off"]')).toBeChecked();
     expect(await updates(page)).toEqual([]);
     await expect.poll(() => take(page).then(value => value.recording)).toBeNull();
     await page.locator('[data-sequence-tiles]').focus(); await page.keyboard.press('Control+z');

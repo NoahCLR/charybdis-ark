@@ -87,11 +87,13 @@ test("every tab is as tall as the Behaviours tab, before it is ever opened", asy
     }
     for (const name of ["key", "combos", "macros", "customKeys", "pointing"]) expect(heights[name], name).toBe(heights.behaviours);
 
-    // Narrowed, the editor wraps taller, and the open tab follows it.
+    // Narrowed, the editor wraps taller, and the open tab follows it. Its
+    // cells keep one size (two lines of how each runs), so it takes a window
+    // narrow enough for the rest of the editor to wrap.
     const page = await context.newPage();
     await openPreview(page);
     await tab(page, "combos").click();
-    await page.setViewportSize({width: 1000, height: 900});
+    await page.setViewportSize({width: 900, height: 900});
     const height = () => page.locator(".keys-bench").evaluate((node) => /** @type {HTMLElement} */ (node).offsetHeight);
     await expect.poll(height, "the narrow editor is taller than the wide one").toBeGreaterThan(heights.behaviours);
     const narrowed = await height();
@@ -115,7 +117,7 @@ test("a behaviour row opens its behaviour, by click or from the keyboard", async
 test("a key picked on the board scrolls its row into the list, and unfolding a group keeps the list's place", async ({page}) => {
     await openPreview(page);
     await tab(page, "behaviours").click();
-    await page.locator('.board [aria-label^="KC_ENTER at"]').click();
+    await page.locator('.board [aria-label="Enter"]').click();
     const row = page.locator('.bench-pane tr[data-row="KC_ENTER"][data-picked]');
     await expect(row).toHaveCount(1);
     const inView = () => row.evaluate((node) => {
@@ -192,7 +194,7 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
     // Mode, then a column for each part of the link, headed in the words the
     // vocabulary gives them.
     await expect(pane(page).locator("thead th")).toHaveText(["Slot", "Mode", "Started by", "Ends when", "Its key turns on", "Reached by", ""]);
-    await expect(cell(here, 1)).toHaveText("Directional · 400 DPI");
+    await expect(cell(here, 1)).toHaveText("Send keys · 400 DPI");
     // The pointer layer is in the link but ignored, said with the card's reason.
     await expect(cell(here, 2)).toHaveText(/^Navigation, Pointer ignored$/);
     await expect(cell(here, 2).locator(".kind-icon.layer")).toHaveCount(2);
@@ -253,4 +255,29 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
     });
     await expect(cell(pane(page).locator('tr[data-reach="here:4"]'), 5).locator(".reach-line")).toHaveText([/^Navigation ?Hold$/]);
+});
+
+// The Key tab says why a key cannot be edited in a box under the key, and
+// draws no box when the gate has nothing to say: while the draft is busy, the
+// commit bar says so.
+test("the Key tab says why a key cannot be edited, and draws no empty box", async ({page}) => {
+    await openPreview(page);
+    await tab(page, "key").click();
+    const box = page.locator(".key-unavailable");
+    await expect(box).toHaveCount(0);
+    /** @param {object} draft */
+    const publish = (draft) => page.evaluate(async (draft) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.draft, {editable: false}, draft);
+        store.setModel(model);
+        store.render();
+    }, draft);
+    await publish({busy: true, reason: "busy"});
+    await expect(page.locator("#keycodeField")).toBeDisabled();
+    await expect(box).toHaveCount(0);
+    await publish({reason: "connection-changed"});
+    await expect(box).toHaveText("Review the draft against the current keyboard before editing further.");
+    await publish({matching: false, connected: false, reason: "unsupported"});
+    await expect(box).toHaveText("This keyboard's firmware is not current, and Ark supports only current firmware. Update both halves, then read the keyboard again.");
 });

@@ -2,8 +2,10 @@
 "use strict";
 
 const catalog = require("../data/keycode-catalog");
+const keycodes = require("./keycodes");
 const {layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
 const MACRO_PROTECTION = Object.freeze({AUTO: "auto", ON: "on", OFF: "off"});
+const {MACRO_LIMITS, readMacroPayload} = require("../../rules/macro-payload.mjs");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
 /** @param {unknown} key @returns {key is number} */
@@ -11,7 +13,7 @@ const validKey = key => typeof key === "number" && Number.isInteger(key) && ((ke
 /** @param {string} text */
 const escapeText = text => text.replace(/[{}]/g, brace => brace + brace);
 /** @param {number} key */
-const keyName = key => catalog.resolve(key).name;
+const keyName = key => keycodes.resolve(key).name;
 
 function macroKeycodes() {
     return catalog.entries().filter(entry => validKey(entry.value)).flatMap(entry => [entry.name, ...entry.aliases]);
@@ -21,57 +23,30 @@ function macroModifierKeycodes() {
     return catalog.entries().filter(entry => entry.value >= 0xE0 && entry.value <= 0xE7).flatMap(entry => [entry.name, ...entry.aliases]);
 }
 
-// The existing recorder and step builder use text plus {key}, {+key}, {-key}
-// and {milliseconds}. Doubled braces preserve literal text from device bytes.
-// The keyboard types text through the host layout and the rest by host
-// Unicode entry, which an ordinary key held across it would corrupt.
+// A stored macro's steps, read in the shared macro grammar
+// (rules/macro-payload.mjs) by keycode: a key is the keycode its name encodes
+// to, and only a basic key or modifier may be sent, by the names the step
+// editor offers (macroKeycodes), never by number. A name a macro cannot send
+// stays itself, so it is never the same key as another and is refused by
+// name, as the step editor refuses it. A macro that does not read is refused
+// with the grammar's reason (`problem`), which the model words from the
+// vocabulary (wordedMacroError); a macro that leaves a key held is refused
+// too.
+/** @type {Set<string> | undefined} */
+let sendableNames;
+/** @param {string} name */
+const sendable = name => (sendableNames ??= new Set(macroKeycodes())).has(name);
 /** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] @returns {import("./types.js").MacroStep[]} */
 function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT} = {}) {
     if (typeof payload !== "string") throw fail("Enter a macro as text.");
-    /** @type {import("./types.js").MacroStep[]} */
-    const steps = [];
-    /** @type {Set<number>} */
-    const held = new Set();
-    let text = "";
-    const flush = () => {
-        if (textEntry && [...text].some(character => !layoutTypes(layout, character)) && [...held].some(key => key < 0xE0)) throw fail("Release ordinary keys before text your keyboard layout cannot type, which needs Unicode entry; modifier holds are supported.");
-        if (text) steps.push({kind: "text", text}); text = "";
-    };
-    for (let index = 0; index < payload.length;) {
-        const char = payload[index++];
-        if ((char === "{" || char === "}") && payload[index] === char) {text += char; index++; continue;}
-        if (char === "}") throw fail("Unexpected }. Use }} for a literal closing brace.");
-        if (char !== "{") {
-            // The loop has just read this character, so its index is in range.
-            const code = /** @type {number} */ (payload.codePointAt(index - 1));
-            if (!(code === 9 || code === 10 || (code >= 32 && code <= 126) || (code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF)))) throw fail("Macro text must contain valid Unicode characters, tabs or newlines; control characters and unpaired surrogates are unsupported.");
-            if (code > 0xFFFF) {text += payload.slice(index - 1, index + 1); index++;} else text += char;
-            continue;
-        }
-        flush();
-        const end = payload.indexOf("}", index);
-        if (end < 0) throw fail("Missing } for a macro command.");
-        const command = payload.slice(index, end).trim(); index = end + 1;
-        if (/^\d+$/.test(command)) {
-            const delay = Number(command);
-            if (delay > 65535) throw fail("A macro delay must be between 0 and 65,535 milliseconds.");
-            steps.push({kind: "delay", delay}); continue;
-        }
-        const kind = command[0] === "+" ? "down" : command[0] === "-" ? "up" : "tap";
-        const names = (kind === "tap" ? command : command.slice(1)).split(",").map(name => name.trim());
-        const keys = names.map(name => catalog.encode(name));
-        if (!keys.length || keys.length > 16 || !keys.every(validKey) || new Set(keys).size !== keys.length || (kind !== "tap" && keys.length !== 1)) throw fail("Choose up to 16 distinct basic keys for a chord, or one key for a press or release.");
-        if (kind === "up") {
-            if (!held.delete(keys[0])) throw fail("A macro releases a key that is not held.");
-        } else {
-            if (keys.some(key => held.has(key)) || held.size + keys.length > 16) throw fail("A macro presses a held key or holds more than 16 keys.");
-            if (kind === "down") held.add(keys[0]);
-        }
-        steps.push({kind, keys});
-    }
-    flush();
-    if (held.size) throw fail("Release every held key before the macro ends.");
-    return steps;
+    const {steps, error} = readMacroPayload(payload, {
+        identity: name => sendable(name) ? keycodes.encode(name) : name, sendable,
+        textEntry, needsEntry: character => !layoutTypes(layout, character), ordinary: key => /** @type {number} */ (key) < 0xE0,
+        skipEmptyNames: true, stopAtTextHold: true, releaseAll: true,
+    });
+    if (error) throw Object.assign(fail(`This macro does not read (${error.code}).`), {problem: error});
+    return steps.map(step => step.kind === "text" || step.kind === "delay" ? step
+        : {kind: step.kind === "press" ? "down" : step.kind === "release" ? "up" : "tap", keys: /** @type {number[]} */ (step.ids)});
 }
 
 // A macro as the bytes QMK stores: text as is, then 1 and an opcode for a
@@ -118,7 +93,7 @@ function chordAt(commands, at) {
     const keyOf = /** @param {number} index */ index => /** @type {{key: number}} */ (commands[index]).key;
     for (let start = at; start < end; start++) {
         const held = end - start, total = held + (tap === undefined ? 0 : 1);
-        if (total < 2 || total > 16) continue;
+        if (total < 2 || total > MACRO_LIMITS.maxHeldKeys) continue;
         let matched = true;
         for (let index = 0; index < held && matched; index++) {
             const up = commands[ups + index];

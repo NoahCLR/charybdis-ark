@@ -2,29 +2,29 @@
 // Reading, diagnosing and moving the editor's sequence without changing its
 // encoding. Focus IDs belong to the editor; moves preserve every step object.
 import {describeStep} from "./macro.mjs";
-import {actionLabel} from "./keyface.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 /** @typedef {import('./types.js').MacroStep} Step */
 /** @typedef {Partial<import('../../contracts/panel.js').PublishedModel> | null} Model */
 
 /** @param {Model} model @param {Step} step */
 export function sequenceFace(model, step) {
-    const full = describeStep(step, key => actionLabel(model, key));
+    const full = describeStep(step, key => keyIdentity(model, key).label);
     const label = step.kind === "text" ? step.text.replaceAll("\n", " ↵ ").replaceAll("\t", " ⇥ ")
         : step.kind === "delay" ? String(step.delay)
-        : step.keys.map(key => model?.qmkKeyShortLabels?.[key] || model?.qmkKeyShortLabels?.[model?.qmkKeycodeAliases?.[key] ?? ""] || actionLabel(model, key)).join(" + ");
+        : step.keys.map(key => keyIdentity(model, key).shortLabel).join(" + ");
     const kind = step.kind === "tap" && step.keys.length > 1 ? "chord" : step.kind;
     return {full, label, wide: step.kind === "text" || ("keys" in step && step.keys.length > 1), kind};
 }
 
-/** @param {readonly Step[]} steps @param {Record<string, string>} [aliases] @param {(key: string) => string} [label] */
-export function sequenceIssues(steps, aliases = {}, label = key => key) {
+/** @param {readonly Step[]} steps @param {Model | undefined} [model] @param {(key: string) => string} [label] */
+export function sequenceIssues(steps, model, label = key => key) {
     const issues = steps.map(() => "");
     /** @type {Map<string, {index: number, key: string}>} */
     const held = new Map();
     steps.forEach((step, index) => {
         if (!("keys" in step)) return;
         for (const key of step.keys) {
-            const id = aliases[key] || key;
+            const id = keyIdentity(model, key).name;
             if (step.kind === "release") {
                 if (!held.delete(id)) issues[index] ||= `${label(key)} is released before it is pressed. Move its release after its press.`;
             } else if (held.has(id)) {

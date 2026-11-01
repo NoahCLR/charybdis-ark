@@ -1,7 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, interruption, saveResult} = require("../../core/session/interruption");
+const {interruption, saveResult} = require("../../core/session/interruption");
+const {APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS} = require("../../core/model/vocabulary");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
 
 // Words a person never reads in a notice about an Apply or a Save cut short.

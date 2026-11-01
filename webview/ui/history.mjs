@@ -19,7 +19,7 @@ export function openHistory() {
     render();
 }
 
-export function closeHistory() {
+function closeHistory() {
     state.overlay = null;
     post(controls.control("closeProfileDraftHistory"));
     render();

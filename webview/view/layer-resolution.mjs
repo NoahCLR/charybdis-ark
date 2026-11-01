@@ -1,29 +1,17 @@
 // @ts-check
+import {alwaysOnMask, answeringCandidate} from "../../rules/layer-answers.mjs";
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
-// Every activation this layer can be the top of: layer 0 is always on, this
-// layer is held, and any set of the layers between may be held alongside.
-// Sixteen layers make up to 16,384 sets. Combo grouping excludes layers that
-// cannot change an answer before enumerating them.
-//
-// Layer 0 stands in for the default layer. The keyboard can move that with
-// NOAH_SETTING_DEFAULT_LAYERS and does not report it, but layer 0 is also what
-// the firmware falls back to when nothing active answers, so the set of layers
-// that can answer is right either way — only whether an answer needs a layer
-// held would be misread, and only on a keyboard whose default has moved.
-/** @param {number} at */
-export function activations(at) {
-    return activationSets(Array.from({length: Math.max(0, at - 1)}, (_, index) => index + 1));
-}
-
-/** @param {number[]} layers */
-export function activationSets(layers) {
-    /** @type {number[][]} */
-    const sets = [[]];
-    for (const layer of layers) {
-        for (const held of [...sets]) sets.push([...held, layer]);
-    }
-    return sets;
-}
+// The layers always on: base, and every default layer the keyboard keeps, as
+// core publishes them on each layer (alwaysOn).
+/** @param {readonly Layer[]} stack */
+const layersAlwaysOn = (stack) => {
+    const always = alwaysOnMask(stack);
+    return stack.length ? stack.flatMap((_, index) => always & (1 << index) ? [index] : []) : [0];
+};
+// The layers on in the view the board shows: a layer shown alone is the view
+// by itself; the layers always on join once layers are previewed with it.
+/** @param {readonly Layer[]} stack @param {number} at @param {readonly number[]} held */
+export const viewLayers = (stack, at, held) => held.length ? [...layersAlwaysOn(stack), at, ...held] : [at];
 
 /**
  * What each key of this layer answers with under one activation.
@@ -31,22 +19,22 @@ export function activationSets(layers) {
  * The firmware resolves a press by scanning the layers whose bit is set,
  * highest first, and taking the first that is not transparent. An inactive
  * layer is skipped entirely — it neither answers nor blocks — so `held` names
- * the layers on besides layer 0 and this one.
+ * the layers on besides those always on and this one.
  */
 export function resolvedPositions(/** @type {Layer[]} */ stack, /** @type {number} */ at, /** @type {number[]} */ held = []) {
-    return answeredUnder(stack, at, [0, at, ...held]);
+    return answeredUnder(stack, at, [...layersAlwaysOn(stack), at, ...held]);
 }
 
 /**
  * What each key answers with in the view the board shows: only the layers on
  * in it. A layer shown alone is the view by itself, its transparent keys
- * answering nothing; base joins once layers are previewed together, as the
- * layer bar shows it on (layer-set.mjs). This is what **On this view** lists.
- * The keyboard itself always has base on: what a transparent key does when
- * pressed, or shows through to, is resolvedPositions.
+ * answering nothing; the layers always on join once layers are previewed
+ * together, as the layer bar shows base on (layer-set.mjs). This is what **On
+ * this view** lists. The keyboard itself always has them on: what a
+ * transparent key does when pressed, or shows through to, is resolvedPositions.
  */
 export function viewPositions(/** @type {Layer[]} */ stack, /** @type {number} */ at, /** @type {number[]} */ held = []) {
-    return answeredUnder(stack, at, held.length ? [0, at, ...held] : [at]);
+    return answeredUnder(stack, at, viewLayers(stack, at, held));
 }
 
 /** @param {Layer[]} stack @param {number} at @param {number[]} on */
@@ -54,8 +42,7 @@ function answeredUnder(stack, at, on) {
     const active = on.reduce((mask, layer) => mask | (1 << layer), 0);
     const answeredKey = sourceKeys(stack, at);
     return (stack[at]?.positions || []).flatMap(position => {
-        const answer = stack[at]?.answers?.[position.layoutIndex]?.find(candidate =>
-            (active & candidate.active) !== 0 && (active & candidate.blocked) === 0);
+        const answer = answeringCandidate(stack[at]?.answers?.[position.layoutIndex], active);
         const key = answer ? answeredKey(position.layoutIndex, answer.layer) : null;
         return key ? [key] : [];
     });
@@ -73,8 +60,8 @@ function answeredUnder(stack, at, on) {
  *
  * Anything reached through a single key — a behaviour, and so the macros and
  * pointing modes its branches send — is exact here. Combos are not: their
- * inputs have to answer at the same time, under one activation, so they
- * enumerate instead.
+ * inputs have to answer at the same time, under one activation, so core tries
+ * the activations for them (comboReach, core/model/combo-reach.js).
  */
 /** @param {Layer[]} stack @param {number} at */
 export function reachablePositions(stack, at) {
@@ -92,6 +79,7 @@ export function reachablePositions(stack, at) {
 function sourceKeys(stack, at) {
     /** @type {Map<number, Map<number, import("../../contracts/panel.js").Position>>} */
     const sources = new Map();
+    const always = alwaysOnMask(stack);
     /** @param {number} layoutIndex @param {number} from */
     return (layoutIndex, from) => {
         const layer = stack[from];
@@ -101,7 +89,7 @@ function sourceKeys(stack, at) {
             sources.set(from, positions);
         }
         const position = positions.get(layoutIndex);
-        return position ? {position, layer, fellThrough: from !== at, whileHeld: from !== at && from !== 0} : null;
+        return position ? {position, layer, fellThrough: from !== at, whileHeld: from !== at && !(always & (1 << from))} : null;
     };
 }
 
@@ -119,14 +107,3 @@ const sourceRank = (entry) => Math.min(
 );
 /** @template {import("./keyface-types.js").SortableReach} T @param {T[]} entries */
 export const downTheStack = (entries) => [...entries].sort((one, other) => sourceRank(one) - sourceRank(other));
-
-// Only a transparent key on the top layer can change with a lower hold. A
-// lower layer matters if it answers any such position, including KC_NO: that
-// blocks an input below. Omitting every other layer preserves all answers and
-// their smallest held sets, without enumerating duplicate views of the board.
-/** @param {Layer[]} stack @param {number} at */
-export function comboActivations(stack, at) {
-    const relevant = new Set((stack[at]?.answers || []).flat()
-        .filter(answer => answer.layer > 0 && answer.layer < at).map(answer => answer.layer));
-    return activationSets([...relevant].sort((one, other) => one - other));
-}

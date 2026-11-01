@@ -2,13 +2,14 @@
 const {editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {exportedProfile, openPanelLoop} = require("../../core/session/panel-loop");
+const {exportedProfile, openPanelLoop, postedModel} = require("../../core/session/panel-loop");
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 const {document: currentDocument} = require("../fixtures/portable-profile");
 const {fakeKeyboardAdapter, fakeKeyboard} = require("../fixtures/fake-keyboard");
+const {fakeShell} = require("../fixtures/panel-loop");
 const {PHASE} = require("../../core/model/vocabulary");
 
 const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
@@ -25,7 +26,7 @@ test("Apply progress updates do not rebuild or post the complete panel model", (
     const apply = {id: 777, state: "applying", current: "stage", steps: [], bytes: {completed: 12, total: 120}};
     loop.session.service.reportApplyProgress(apply);
     assert.deepEqual(shell.posted, [{type: "applyProgress", apply, draftId: "draft-777", draftRevision: 3}]);
-    assert.deepEqual(loop.session.service.liveApply, apply, "full snapshots retain the latest progress");
+    assert.deepEqual(loop.session.service.snapshot().liveApply, apply, "full snapshots retain the latest progress");
 });
 
 test("read progress posts only a small operation-correlated view", async t => {
@@ -64,26 +65,12 @@ test("a keyboard storing settings in another version is not read, and is told to
     assert.equal(loop.session.draft, undefined, "no draft opens");
     assert.equal(model.load.state, "unavailable");
     assert.match(notice, /Ark supports only current firmware\. Update both halves/);
-    assert.equal(loop.session.service.layout, undefined, "nothing more is read");
+    assert.equal(loop.session.service.snapshot().layout, null, "nothing more is read");
     await loop.handleMessage({type: "updateCustomKey", keycode: "CUSTOM_KEY_1", name: "Late"});
     assert.match(last(shell).notice, /no editable draft/);
     assert.deepEqual(adapter.keyboard.mutations, []);
 });
 
-// A shell that records everything the loop hands it.
-function fakeShell(extra = {}) {
-    const shell = {
-        posted: [], errors: [], recoveries: [], exports: [],
-        post: (message) => {shell.posted.push(message);},
-        showError: (text) => {shell.errors.push(text);},
-        progress: async (title, work) => work(),
-        saveRecovery: async (doc) => {shell.recoveries.push(doc); return `/recovery/${shell.recoveries.length}.json`;},
-        chooseProfile: async () => undefined,
-        saveExport: async (file) => {shell.exports.push(file); return "/exports/" + file.fileName;},
-        ...extra,
-    };
-    return shell;
-}
 const last = (shell) => shell.posted[shell.posted.length - 1];
 
 test("dropped files use the chooser's validation and review without opening a shell dialog or writing", async () => {
@@ -129,9 +116,7 @@ function fakeService(extra = {}) {
     const service = {
         calls, capabilities, portable: snapshot(),
         snapshot: () => state,
-        enumerate: record("enumerate"), connect: record("connect"), refresh: record("refresh"),
-        readLayout: record("readLayout"), readCommittedProfile: record("readCommittedProfile"),
-        readBaseRgb: record("readBaseRgb"), readCombos: record("readCombos"),
+        readForEditor: record("readForEditor", async () => ({kind: "read", portable: await service.readKeyboardProfile()})),
         readKeyboardProfile: record("readKeyboardProfile", () => service.portable),
         readPortableProfile: record("readPortableProfile", () => service.portable),
         close: record("close"),
@@ -232,14 +217,13 @@ test("a keyboard that never answers becomes a failure notice and a shell error",
     await loop.close();
 });
 
-test("a read connects, reads in order and publishes what it read", async () => {
+test("a read publishes what it read", async () => {
     const shell = fakeShell();
     const service = fakeService();
     const loop = openPanelLoop(shell, {service});
     await loop.handleMessage({type: "ready"});
-    assert.deepEqual(service.calls, ["enumerate", "refresh", "readKeyboardProfile"]);
-    assert.equal(shell.posted.length, 1, "one answer");
-    assert.match(last(shell).notice, /committed profile generation 7/);
+    assert.deepEqual(shell.posted.map((message) => message.type), ["catalog", "model"], "one answer, after the catalog");
+    assert.match(last(shell).notice, /saved profile, generation 7/);
     assert.equal(loop.session.readReady, true);
     assert.ok(last(shell).model.draft, "the model carries the draft the read opened");
 });
@@ -521,24 +505,137 @@ test("a retained dirty draft adopts the reconnected keyboard's capabilities at r
     assert.equal(last(shell).model.macros[0].payload.length, 600);
 });
 
-test("a read lets go of a keyboard that left the list and connects the one listed", async () => {
-    const shell = fakeShell();
-    const chosen = {...device, id: "chosen"};
-    const service = fakeService();
-    service.snapshot().devices = [chosen];
-    service.connect = async (id) => {service.calls.push(`connect ${id}`);};
-    const loop = openPanelLoop(shell, {service});
+// What every model of a build starts from goes to the panel once, as the
+// catalog, and each model without it, saying what it lays over it
+// (panel-loop.js postedModel); the panel lays it back (webview/catalog.mjs).
+const {buildPanelModel} = require("../../core/session/panel-session");
+const {buildDeviceModel} = require("../../core/session/device-model");
+const {panelState} = require("../../core/session/demo-session");
+const {panelCatalog} = require("../../core/model/profile-model");
+const {withCatalog} = require("../../webview/catalog.mjs");
+const types = (shell) => shell.posted.map((message) => message.type);
+
+test("the catalog goes before the first model, once, and again after each ready", async () => {
+    const shell = fakeShell(), loop = openPanelLoop(shell, {service: fakeService()});
+    loop.publish();
+    loop.publish();
+    assert.deepEqual(types(shell), ["catalog", "model", "model"]);
+    assert.equal(shell.posted[0].catalog, panelCatalog(), "the one the build made");
+    shell.posted.length = 0;
+    await loop.handleMessage({type: "ready"});
+    assert.deepEqual(types(shell), ["catalog", "model"], "a panel that loaded again gets it again, before its answer");
+    shell.posted.length = 0;
     await loop.handleMessage({type: "refresh"});
-    assert.deepEqual(service.calls.slice(0, 2), ["enumerate", "connect chosen"]);
-    await loop.close();
+    assert.deepEqual(types(shell), ["model"]);
+    shell.posted.length = 0;
+    loop.ready();
+    assert.deepEqual(types(shell), ["catalog", "model"], "and so does one its shell answers itself");
 });
 
-test("a read keeps the connected keyboard while it is still listed", async () => {
-    const shell = fakeShell();
-    const service = fakeService();
-    service.snapshot().devices = [{...device, id: "other"}, device];
-    const loop = openPanelLoop(shell, {service});
-    await loop.handleMessage({type: "refresh"});
-    assert.ok(!service.calls.includes("connect"), "the connected keyboard stays chosen");
+test("a posted model leaves the catalog's fields out, and laid back under it is the model core built", async () => {
+    const shell = fakeShell(), loop = loopWithDraft(shell), catalog = panelCatalog();
+    for (const what of ["a keyboard's draft", "the demo"]) {
+        if (what === "the demo") {
+            loop.session.service.snapshot().connected = false;
+            await loop.handleMessage({type: "openDemo"});
+            assert.ok(loop.session.demo);
+        } else loop.publish();
+        const posted = last(shell).model;
+        for (const field of Object.keys(catalog)) assert.ok(!(field in posted), `${what}: ${field} is the catalog's`);
+        assert.deepEqual(withCatalog(posted, shell.catalog), buildPanelModel(loop.session, panelState(loop.session)), what);
+        const laid = posted.catalogOverlay;
+        assert.ok(laid.qmkKeycodes.length < catalog.qmkKeycodes.length / 2, `${what}: only the entries its profile names (${laid.qmkKeycodes.length})`);
+        assert.ok(Object.keys(laid.qmkKeyLabels).length < Object.keys(catalog.qmkKeyLabels).length, `${what}: and the labels`);
+        assert.equal(laid.leds, undefined, `${what}: nothing over what no profile changes`);
+        assert.equal(laid.qmkSpellings, undefined);
+        assert.equal(laid.qmkKeyKinds, undefined, `${what}: nor over what its keys are`);
+    }
+});
+
+test("a host's own modifier names are laid over the catalog's words; a host with none lays nothing", () => {
+    const catalog = panelCatalog();
+    const plain = postedModel(buildDeviceModel({})), mac = buildDeviceModel({settingsView: {host: {effective: 1}}});
+    assert.equal(plain.catalogOverlay.vocabulary, undefined);
+    const posted = postedModel(mac);
+    assert.deepEqual(Object.keys(posted.catalogOverlay.vocabulary).sort(), ["modifiers", "pickerModifiers", "thirdLevel"]);
+    assert.deepEqual(withCatalog(posted, catalog), mac);
+    assert.equal(withCatalog(posted, catalog).vocabulary.pickerModifiers.find(({value}) => value === "G").label, "Command");
+    assert.equal(withCatalog(posted, catalog).vocabulary.thirdLevel, "Option", "a Mac's third level is typed with Option");
+    assert.equal(panelCatalog().vocabulary.thirdLevel, "AltGr");
+});
+
+test("a field that does not start from the catalog's is posted whole", () => {
+    const catalog = panelCatalog();
+    const model = buildPanelModel({service: {portable: null}}, {connected: false, devices: [], phase: PHASE.EMPTY});
+    const {KC_A: _, ...labels} = model.qmkKeyLabels;
+    const odd = {...model, qmkKeyLabels: labels, qmkKeycodes: model.qmkKeycodes.slice(1), qmkKeycodeSource: "another catalogue"};
+    const posted = postedModel(odd);
+    assert.equal(posted.qmkKeyLabels, labels, "a record without one of the catalog's keys");
+    assert.equal(posted.qmkKeycodes, odd.qmkKeycodes, "an array shorter than the catalog's");
+    assert.equal(posted.qmkKeycodeSource, "another catalogue");
+    for (const field of ["qmkKeyLabels", "qmkKeycodes", "qmkKeycodeSource"]) assert.equal(posted.catalogOverlay[field], undefined, field);
+    assert.ok(!("leds" in posted) && !("qmkSpellings" in posted), "the catalog's own are still left out");
+    assert.deepEqual(withCatalog(posted, catalog), odd);
+});
+
+test("the catalog is built once and frozen, and a model shares what its profile names nothing on", () => {
+    const catalog = panelCatalog(), model = buildDeviceModel({});
+    assert.equal(panelCatalog(), catalog);
+    for (const value of [catalog, catalog.qmkKeycodes, catalog.qmkKeycodes[0], catalog.qmkKeyLabels, catalog.vocabulary, catalog.leds]) assert.ok(Object.isFrozen(value));
+    const at = catalog.qmkKeycodes.findIndex((entry) => entry.value === "KC_A");
+    assert.equal(model.qmkKeycodes[at], catalog.qmkKeycodes[at]);
+    assert.equal(model.leds, catalog.leds);
+    assert.equal(catalog.qmkKeycodes.find((entry) => entry.value === "QK_MACRO_0").offered, false, "the picker's offer is the catalog's");
+});
+
+test("what each key is, by every name, is the catalog's for a profile on current firmware; a model without those names posts its own", () => {
+    const {openDraft, panelModel} = require("../fixtures/published-model");
+    const catalog = panelCatalog(), {draft, state} = openDraft();
+    assert.equal(panelModel(draft, state).qmkKeyKinds, catalog.qmkKeyKinds, "the catalog's own object");
+    assert.ok(Object.isFrozen(catalog.qmkKeyKinds));
+    assert.deepEqual(["KC_TRANSPARENT", "KC_NO", "MACRO_0", "MACRO_127", "CUSTOM_KEY_127"].map((name) => catalog.qmkKeyKinds[name]),
+        ["transparent", "disabled", "macro", "macro", "customKey"]);
+    const empty = buildDeviceModel({}), posted = postedModel(empty);
+    assert.ok(!("MACRO_0" in empty.qmkKeyKinds), "no profile names its macros");
+    assert.equal(posted.qmkKeyKinds, empty.qmkKeyKinds, "so its kinds are posted whole");
+    assert.deepEqual(withCatalog(posted, catalog), empty);
+});
+
+// Keyboards that come and go while an operation runs are looked at again
+// once it ends; a loop closed before then looks no more.
+test("a closed panel loop does not look at the keyboards again after a running operation", async t => {
+    t.mock.timers.enable({apis: ["setTimeout"]});
+    let enumerated = 0;
+    const loop = openPanelLoop(fakeShell(), {service: fakeService({enumerate: async () => {enumerated++;}})});
+    loop.session.service.snapshot().busy = true;
+    await loop.keyboardsChanged();
     await loop.close();
+    loop.session.service.snapshot().busy = false;
+    t.mock.timers.tick(1000);
+    await new Promise(setImmediate);
+    assert.equal(enumerated, 0);
+});
+
+// The loop's session as a test sets it, for what closing would lose.
+const leaving = (session) => {
+    const loop = openPanelLoop(fakeShell(), {service: /** @type {any} */ ({})});
+    Object.assign(loop.session, session);
+    return loop.leaving();
+};
+
+test("closing asks first with unapplied edits or an Apply running", () => {
+    assert.equal(leaving({}), false);
+    assert.equal(leaving({draft: {dirty: false}}), false);
+    assert.equal(leaving({draft: {dirty: true}}), true);
+    assert.equal(leaving({applyRunning: true}), true);
+    assert.equal(leaving({service: {phase: "restore-complete"}}), true);
+    assert.equal(leaving({service: {phase: "read-layout"}}), false);
+});
+
+test("in the demo, closing asks only about edits not exported", () => {
+    const draft = (print) => ({dirty: true, current: {fingerprint: print}});
+    assert.equal(leaving({demo: {exported: null}, draft: draft(1)}), true);
+    assert.equal(leaving({demo: {exported: 1}, draft: draft(1)}), false, "exported as they are");
+    assert.equal(leaving({demo: {exported: 1}, draft: draft(2)}), true, "edited since");
+    assert.equal(leaving({demo: {exported: null}, draft: {dirty: false}}), false);
 });

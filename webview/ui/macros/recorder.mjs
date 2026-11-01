@@ -3,8 +3,10 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {canEdit, getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
-import {recordedKeycode, recordedTakePayload, takeStands} from "../../view/macro-recording.mjs";
+import {getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
+import {capturedKey, finishedPart, recordedKeycode, recordedTakePayload, takeStands} from "../../view/macro-recording.mjs";
+import {onMac} from "../../view/shortcuts.mjs";
 import {rememberMacroEdit} from "./history.mjs";
 import {stageMacro} from "./validation.mjs";
 /* ── the recorder ──────────────────────────────────────────────────────── */
@@ -14,6 +16,11 @@ import {stageMacro} from "./validation.mjs";
 let skippedKeys = [];
 /** @type {import('../../view/macro-recording.mjs').RecordedKey[]} */
 let recordedEvents = [];
+// Escape is a key a macro can send, so a tap records it; holding it this long
+// finishes the take, the way a browser leaves a full screen that keeps keys.
+const ESCAPE_HOLD_MS = 1000;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let escapeHold;
 
 const recordingOptions = () => ({explicit: state.recordPreserveHoldTiming,
     delays: state.recordPreserveHoldTiming || state.recordDelays !== false,
@@ -24,22 +31,22 @@ export function recorder(model, slot, canEdit) {
     const recording = state.recording?.slot === slot.keycode;
     const delays = state.recordPreserveHoldTiming || state.recordDelays !== false;
     const node = el(`<div class="card" data-recorder="${esc(slot.keycode)}">
-        <div class="card-h"><h3>Record</h3><span class="tag">${recording ? "recording" : "idle"}</span>
-            <button class="btn ${recording ? "" : "primary"} right" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></div>
+        <div class="card-h"><h3>Record</h3>${recording ? `<span class="tag">recording</span>` : state.lastTake?.slot === slot.keycode ? `<span class="tag">recorded</span>` : ""}
+            <button class="btn right" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></div>
         <div class="card-b stack">
             ${skippedKeys.length && (recording || state.lastTake?.slot === slot.keycode) ? `<p class="note warn" data-skipped-keys>Not recorded: ${esc(skippedKeys.join(", "))}. A macro cannot send ${skippedKeys.length === 1 ? "this key" : "these keys"}.</p>` : ""}
             <div class="row record-opts">
                 <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${delays ? "checked" : ""} ${state.recordPreserveHoldTiming ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Record delays</span></label>
-                <label class="field ms-field"><span>After</span><span class="affix unit"><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
-                <label class="field ms-field"><span>Round to</span><span class="affix unit"><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
+                <label class="field ms-field"><span>After</span><span class="affix unit"><input class="input mono num" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
+                <label class="field ms-field"><span>Round to</span><span class="affix unit"><input class="input mono num" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
                 <label class="sw" data-tip="Keeps individual presses and releases with their timing. Record delays stays on; After and Round to set its precision."><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Preserve hold timing</span></label>
             </div>
-            <p class="note">${state.recordPreserveHoldTiming ? "Preserving hold timing: keeps every press and release, with recorded delays." : "Overlapping keys become one chord; held modifiers join each shortcut. Complex rolling overlaps keep press and release steps."}</p>
+            <p class="note">${state.recordPreserveHoldTiming ? "Preserving hold timing: keeps every press and release, with recorded delays." : "Overlapping keys become one chord; held modifiers join each shortcut."}</p>
             <div class="row gap-8">
-                <span class="note">${recording ? "Typing is captured for this slot. Escape, Stop or clicking outside this recorder finishes the take." : "Appends key steps. Leaving this recorder finishes the take."}</span>
-                <button class="btn ghost right" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
+                <span class="note">${recording ? "Typing is captured for this slot, Escape included. Holding Escape, Stop or clicking outside this recorder finishes the take." : "Appends key steps. Leaving this recorder finishes the take."}</span>
+                <button class="btn tiny ghost right" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
             </div>
         </div></div>`);
 
@@ -90,14 +97,17 @@ function startRecording(slot, before) {
     document.addEventListener("keydown", onRecordKey, true);
     document.addEventListener("keyup", onRecordKey, true);
     document.addEventListener("click", onRecordClick);
+    addEventListener("blur", onRecordBlur);
     render();
 }
 
 function detachCapture() {
     recordedEvents = [];
+    clearTimeout(escapeHold);
     document.removeEventListener("keydown", onRecordKey, true);
     document.removeEventListener("keyup", onRecordKey, true);
     document.removeEventListener("click", onRecordClick);
+    removeEventListener("blur", onRecordBlur);
 }
 
 // Discard cancels its active take before resetting the form. The outside-click
@@ -131,11 +141,11 @@ export function reconcileRecording() {
     const model = getModel(), bank = model?.macros || [];
     const selected = bank.find(slot => slot.keycode === state.macroSlot) || bank[0];
     if (state.recording && (state.screen !== "macros" || state.overlay || state.picker
-        || selected?.keycode !== state.recording.slot || !canEdit("macros") || selected?.available === false)) {
+        || selected?.keycode !== state.recording.slot || !editGate(model, "macros").editable || selected?.available === false)) {
         stopRecording(model, null, false);
     }
     const take = state.lastTake, taken = take && bank.find(slot => slot.keycode === take.slot);
-    if (take && !(taken && takeStands(take, taken.keycode, macroForm(taken.keycode).draft ?? taken.payload ?? "", model?.qmkKeycodeAliases))) {
+    if (take && !(taken && takeStands(take, taken.keycode, macroForm(taken.keycode).draft ?? taken.payload ?? "", model))) {
         state.lastTake = null;
     }
 }
@@ -155,27 +165,47 @@ function onRecordClick(event) {
     }, 0);
 }
 
+// Leaving the page (⌘Tab, Alt+Tab, another window) finishes the take: keys
+// pressed elsewhere never arrive, nor do the releases of keys still down.
+/** @param {FocusEvent} event */
+function onRecordBlur(event) {
+    if (event.target !== window || !state.recording) return;
+    recordedEvents = finishedPart(recordedEvents);
+    stopRecording();
+}
+
 /** @param {KeyboardEvent} event */
 function onRecordKey(event) {
     const recording = state.recording;
-    if (!recording?.slot) return;
-    if (event.key === "Escape" && event.type === "keydown") { event.preventDefault(); stopRecording(); return; }
+    if (!recording?.slot || (event.type !== "keydown" && event.type !== "keyup")) return;
+    // Every key is the take's while it records: nothing else on the page acts
+    // on it, the page's own Escape and Enter included.
+    event.preventDefault();
+    event.stopPropagation();
     const keycode = recordedKeycode(event.code);
     if (!keycode) {
-        // Captured, so the page does not scroll or act on it, and named in
-        // the recorder rather than passing as a pause.
+        // Named in the recorder rather than passing as a pause.
         if (event.type !== "keydown" || !event.code) return;
-        event.preventDefault();
         const name = event.key && event.key !== "Unidentified" && event.key.length > 1 ? event.key : event.code;
         if (!skippedKeys.includes(name)) { skippedKeys = [...skippedKeys, name]; render(); }
         return;
     }
-    if (event.repeat) { event.preventDefault(); return; }
-    if (event.type !== "keydown" && event.type !== "keyup") return;
-    event.preventDefault();
-    const now = Date.now();
-    recordedEvents.push({keycode, type: event.type, time: now});
+    if (event.repeat) return;
+    recordedEvents = capturedKey(recordedEvents,
+        {keycode, type: event.type, time: Date.now(), altGraph: event.getModifierState?.("AltGraph")}, {mac: onMac()});
+    if (keycode === "KC_ESC") holdEscape(event.type === "keydown" ? recordedEvents.at(-1) : undefined);
     setMacroForm(recording.slot, {steps: undefined, stepError: "",
         draft: recordedTakePayload(recording.before, recordedEvents, {...recordingOptions(), finished: false})});
     render();
+}
+
+// An Escape press held to the end finishes the take and is not part of it.
+/** @param {import('../../view/macro-recording.mjs').RecordedKey | undefined} press */
+function holdEscape(press) {
+    clearTimeout(escapeHold);
+    if (!press) return;
+    escapeHold = setTimeout(() => {
+        recordedEvents = recordedEvents.filter(event => event !== press);
+        stopRecording();
+    }, ESCAPE_HOLD_MS);
 }

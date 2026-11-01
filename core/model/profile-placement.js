@@ -10,8 +10,10 @@
 
 /** @typedef {{layerCount?: number, capabilities?: import("./types.js").ProfileDestination}} PlacementOptions */
 
-const {PLACEMENT, actionName, keycodeAction, placementProblem} = require("../schema/actions");
-const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
+const {actionName, keycodeAction, placementProblem} = require("../schema/actions");
+const {PLACEMENT} = require("../../rules/layer-placement.mjs");
+const {decodeProfileBlob} = require("../schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");

@@ -1,12 +1,12 @@
 # Charybdis Ark core
 
 The app without a shell: no DOM and no shell import (D-L71), layers that
-import one way (D-L10, [architecture](../docs/architecture/README.md)). This page maps the modules
-and the contracts a shell or adapter must keep. The rules for reading, the
-draft, Apply and the live modes are in
-[reading, applying and progress](../docs/architecture/profile-snapshot-and-progress.md);
-the draft binding, panel controls and model are in the
-[interface contracts](../docs/spec/interface-contracts.md).
+import one way (D-L10, [architecture](../docs/architecture/README.md)). This
+page maps the modules and the contracts a shell or adapter must keep. The
+rules for reading, the draft, Apply and the live modes are in [reading,
+applying and progress](../docs/architecture/profile-snapshot-and-progress.md);
+the draft binding, panel controls and model are in the [interface
+contracts](../docs/spec/interface-contracts.md).
 
 ## How data flows
 
@@ -16,27 +16,33 @@ build requests and decode answers; `schema/` decodes the stored bytes.
 `session/profile-device-service.js` owns the connection and publishes what it
 holds as `snapshot()`. Its complete read, `readKeyboardProfile`, takes one
 verified snapshot: `snapshotProfile` (`session/portable-profile-session.js`)
-for a keyboard in Review and save, `snapshotLive` (`session/live-profile-session.js`) for
-one in a live edit mode or still running unsaved live edits; that read also
-keeps the working copy's exact bytes, which live edits splice against.
+for a keyboard in Review and save, `snapshotLive`
+(`session/live-profile-session.js`) for one in a live edit mode or still
+running unsaved live edits; that read also keeps the working copy's exact
+bytes, which live edits splice against.
 
 **Editing.** The snapshot seeds `ProfileDraftSession`
-(`session/profile-draft-session.js`): one complete document with its history.
+(`session/profile-draft-session.js`): one complete document with its history,
+which follows each later read (`session/draft-follow.js`).
 `session/panel-session.js` routes each message the panel posts; an edit
-reaches `stage()`, which finds its editor through `model/draft-edits.js` and
-rewrites one domain. Review (`model/profile-review.js`) and the checks
-(`model/profile-checks.js`, `model/layer-reach.js`) compare the draft with
+reaches `stage()`, which makes it with `applyDraftEdit` (`model/draft-editor.js`):
+the form checked once against the draft, then the editor `model/draft-edits.js`
+names for its type. Review (`model/profile-review.js`) and the checks
+(`model/profile-checks.js`, `model/compare-findings.js`) compare the draft with
 the keyboard. `buildPanelModel` projects the draft through
-`session/device-model.js` into the model the panel draws.
+`session/device-model.js` into the model the panel draws: the profile's part
+from `model/profile-model.js`, the keyboard's header and diagnostics its own.
 
 **Applying.** In Review and save, `session/panel-controls.js` hands the reviewed
 document to the service's `restorePortableProfile`, which runs
 `restoreProfile` (`session/portable-profile-session.js`): recovery copy first,
-then one candidate through `session/candidate-upload-coordinator.js` and
+then one candidate through `session/candidate-upload-coordinator.js` (what
+each status says of the operation sent: `session/candidate-status.js`) and
 `protocol/profile-candidate-v1.js`. In the live modes,
 `session/live-edits.js` computes each target with the same editors and sends
 it through the service's `postLiveEdit`; `session/live-edit-coordinator.js`
-splices it per domain (`schema/profile-splices.js`), and
+sends the edit `liveEditPlan` (`schema/profile-splices.js`) makes of it, its
+splices per domain or the whole profile, and
 `session/live-watch.js` looks at the keyboard between edits.
 
 ## The panel loop
@@ -63,7 +69,7 @@ released with it (D-L44, D-L50).
 | Profile schema | 4.3, exactly | `PROFILE_BLOB_V1` in `schema/profile-blob-v1.js` |
 | Domain versions | RGB 4, key behaviours 2, combos 3, settings 11, PD 4, keymap 1, macros 1 | `schema/profile-domains.js` |
 | Store format | 6 (implied by Profile Wire 2, not on the wire) | `PROFILE_CANDIDATE_V1` in `protocol/profile-candidate-v1.js` |
-| Profile size | 130,048 bytes; lengths and offsets 32 bits | `PROFILE_CANDIDATE_V1`, `PROFILE_BLOB_V1` |
+| Profile size | 130,048 bytes; lengths and offsets 32 bits | `PROFILE_BLOB_V1` in `schema/profile-blob-v1.js`, which `PROFILE_CANDIDATE_V1` reads |
 | Action vocabulary | `0x67df11b3` | `ACTION_ABI` in `schema/actions.js` |
 | Feature word | split, saves, pointing (bits 0–2) | `PROFILE_WIRE_FEATURES` in `protocol/profile-wire-v1.js` |
 | Backup | version 5; 196,608-byte file limit | `DOCUMENT_VERSION`, `FILE_MAX_BYTES` in `model/portable-profile.js` |
@@ -83,6 +89,18 @@ and is also recorded in `snapshot()`, so the panel shows it whoever awaited
 it; the optional reads (base RGB, combos) never reject and record
 `{state: "unavailable"}` instead. The full convention is the class comment.
 (`tests/session/service-operation-lock.test.js`)
+
+The class runs each operation, and holds what it knows of the connection as
+one record, `session/connection-state.js`, cleared when the connection ends
+and published in `snapshot()`. Only that module writes it: each operation is
+given the writer for the connection it started on, whose methods say what a
+read means for the record and keep nothing once that connection is lost or
+replaced. Each operation past connecting states in the
+class what it needs before it starts and what it resolves with; its work is
+grouped by what it does, each given only the operation, never the service:
+the profile reads in `session/read-operations.js`, the working copy's in
+`session/live-edit-operations.js` and the reads between operations in
+`session/background-reads.js`.
 
 ## Domain codecs
 
@@ -120,19 +138,18 @@ anything else is `INVALID_REPORT`. Every adapter matches the same four Raw HID
 identifiers (`transport/device-adapter.js`), and every error carries a stable
 `code` from `LIVE_LINK_ERROR_CODES`: branch on it, never on the message.
 
-The device service has no default adapter: `new ProfileDeviceService({adapter})`
-takes the one its caller passes, and throws a `TypeError` without one, so the
-page can never reach for a native module.
+`new ProfileDeviceService({adapter})` throws a `TypeError` without an
+adapter; which caller passes which adapter is in
+[architecture](../docs/architecture/README.md#the-layers).
 
 **Native** (`NodeHidDeviceAdapter`), for development: Node scripts and agents
-pass it to drive a keyboard (`scripts/probe-live-link.js`,
-`npm run preview -- --device`); node-hid is a development dependency and the
-web build refuses it. node-hid loads at the first
-`listDevices()` or `connect()`, not on `require`, so a missing native module
-is `NATIVE_MODULE_UNAVAILABLE`, not a crash. It opens only a path its last
-enumeration returned, and on macOS opens it non-exclusively. node-hid wants a
-zero report-id byte: writes get it, reads accept 32 bytes or 33 with it, and
-any other report ends the connection. (`tests/transport/node-hid-adapter.test.js`)
+pass it to drive a keyboard; node-hid is an optional dependency. It loads at
+the first `listDevices()` or `connect()`, not on `require`, so a missing
+native module is `NATIVE_MODULE_UNAVAILABLE`, not a crash. It opens only a
+path its last enumeration returned, and on macOS opens it non-exclusively.
+node-hid wants a zero report-id byte: writes get it, reads accept 32 bytes or
+33 with it, and any other report ends the connection.
+(`tests/transport/node-hid-adapter.test.js`)
 
 **Browser** (`WebHidDeviceAdapter`). It takes `navigator.hid` as its `hid`
 option and never names `navigator`; without one every call is
@@ -162,4 +179,5 @@ When nothing on the keyboard handles a request, firmware echoes it with byte 0
 set to `0xFF`. `protocol/raw-hid-unhandled.js` takes exactly that echo of the
 request just sent as a definite refusal (`UNHANDLED`) and keeps the
 connection; any other `0xFF` report is never an answer.
-(`tests/transport/transport.test.js`, `tests/protocol/raw-hid-unhandled.test.js`)
+(`tests/transport/transport.test.js`,
+`tests/protocol/raw-hid-unhandled.test.js`)

@@ -5,21 +5,20 @@ const {test, expect} = require("@playwright/test");
 const {openPreview} = require("./shell-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildSnapshotModel} = require("../core/session/device-model");
-const {draftBinding} = require("../core/session/panel-session-state");
+// The panel's whole model for the draft, published as the shell posts it.
+const {connectedState, panelModel} = require("../tests/fixtures/published-model");
 
 for (const theme of ["dark", "light"]) {
     test(`macOS Unicode Hex Input warns about Option shortcuts (${theme})`, async ({page}) => {
         const {snapshot, capabilities} = hostMacros(1 | (2 << 16), []);
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
-        const connection = {connected: true, selectedDeviceId: "board", capabilities};
+        const state = connectedState(capabilities);
         const publish = async () => {
-            const patch = {...buildSnapshotModel(draft.current, draft.capabilities, draftBinding({draft}, connection), connection), draft: {...draft.view(connection), ...draftBinding({draft}, connection)}};
-            await page.evaluate(async patch => {
+            await page.evaluate(async model => {
                 const store = await import("/webview/store.mjs");
-                store.setModel({...store.getModel(), ...patch});
+                store.setModel(model);
                 store.state.screen = "host"; store.render();
-            }, patch);
+            }, panelModel(draft, state));
         };
         const selectLayout = async value => {
             await page.locator('[data-section="host"] [data-macro="hostLayout"]').selectOption(value);
@@ -50,14 +49,13 @@ for (const theme of ["dark", "light"]) {
         const {snapshot, capabilities} = hostMacros(0, []);
         snapshot.hostOs.detected = 2;
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
-        const connection = {connected: true, selectedDeviceId: "board", capabilities};
+        const state = connectedState(capabilities);
         const publish = async () => {
-            const patch = {...buildSnapshotModel(draft.current, draft.capabilities, draftBinding({draft}, connection), connection), draft: {...draft.view(connection), ...draftBinding({draft}, connection)}};
-            await page.evaluate(async patch => {
+            await page.evaluate(async model => {
                 const store = await import("/webview/store.mjs");
-                store.setModel({...store.getModel(), ...patch});
+                store.setModel(model);
                 store.state.screen = "host"; store.render();
-            }, patch);
+            }, panelModel(draft, state));
         };
         const stagePosted = async () => {
             const message = await page.evaluate(() => window.__posted.at(-1));
@@ -85,10 +83,10 @@ for (const theme of ["dark", "light"]) {
         const popup = await opened;
         await expect(popup).toHaveURL("https://github.com/samhocevar/wincompose");
         await popup.close();
-        await host.locator('[data-macro="hostOs"]').selectOption("1");
+        await host.locator('label:has([data-macro="hostOs"][value="1"])').click();
         await stagePosted();
         await expect(link).toHaveCount(0);
-        await host.locator('[data-macro="hostOs"]').selectOption("2");
+        await host.locator('label:has([data-macro="hostOs"][value="2"])').click();
         await stagePosted();
         await expect(link).toBeVisible();
         await host.locator('label.sw:has([data-macro="unicodeEnabled"])').click();

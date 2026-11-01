@@ -7,12 +7,14 @@ const {liveKeyboard} = require("../fixtures/live-keyboard");
 const {document} = require("../fixtures/portable-profile");
 const {editLayers} = require("../fixtures/profile-document");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
+const {testClock} = require("../fixtures/panel-loop");
 
 /** @param {import("node:test").TestContext} t @param {object} [options] */
 async function live(t, options = {}) {
     const keyboard = liveKeyboard({document: document(), ...options});
-    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
-    return {service, keyboard, snapshot: () => snapshotLive(service.connection, service.requestIds, service.capabilities)};
+    const {now, sleep} = testClock();
+    const {service} = await connectedService(t, {keyboard}, {now, sleep});
+    return {service, keyboard, snapshot: () => snapshotLive(service.state.connection, service.state.requestIds, service.state.capabilities)};
 }
 
 test("over compiled defaults, the saved profile is the compiled one", async t => {
@@ -93,13 +95,14 @@ for (const during of [0x04, 0x21]) test(`an automatic save landing during the ${
 
 test("a read waits while the keyboard reports a save running, then reads what it saved", async t => {
     const keyboard = liveKeyboard({document: document(), mode: EDIT_MODE.LIVE});
-    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const {service} = await connectedService(t, {keyboard}, {now, sleep});
     const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
     keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
     keyboard.startAutoSave();
     let waits = 0;
     const said = [];
-    const read = await snapshotLive(service.connection, service.requestIds, service.capabilities, {
+    const read = await snapshotLive(service.state.connection, service.state.requestIds, service.state.capabilities, {
         onProgress: text => said.push(text),
         sleep: async () => {if (++waits === 3) keyboard.autoSave();},
     });
@@ -111,11 +114,12 @@ test("a read waits while the keyboard reports a save running, then reads what it
 
 test("a read waits while the keyboard is still taking an edit, then reads what it settled on", async t => {
     const keyboard = liveKeyboard({document: document()});
-    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const {service} = await connectedService(t, {keyboard}, {now, sleep});
     const {buildEditBeginRequest, buildEditAbortRequest} = require("../../core/protocol/profile-edit-v1");
     keyboard.answer(buildEditBeginRequest(9, {session: keyboard.session, revision: keyboard.revision, splices: 1, insertTotal: 1}));
     let waits = 0;
-    const read = await snapshotLive(service.connection, service.requestIds, service.capabilities, {
+    const read = await snapshotLive(service.state.connection, service.state.requestIds, service.state.capabilities, {
         // Someone releases the held key: the edit ends after a few polls.
         sleep: async () => {if (++waits === 3) keyboard.answer(buildEditAbortRequest(9));},
     });
@@ -125,13 +129,14 @@ test("a read waits while the keyboard is still taking an edit, then reads what i
 
 test("a save that does not end is waited for a bounded time, then left to the person", async t => {
     const keyboard = liveKeyboard({document: document(), mode: EDIT_MODE.LIVE});
-    const {service} = await connectedService(t, {keyboard}, {sleep: async () => {}});
+    const {now, sleep} = testClock();
+    const {service} = await connectedService(t, {keyboard}, {now, sleep});
     const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
     keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
     // A held key keeps the keyboard's own save from finishing.
     keyboard.startAutoSave();
     let waits = 0;
-    await assert.rejects(snapshotLive(service.connection, service.requestIds, service.capabilities, {sleep: async () => {waits++;}}),
+    await assert.rejects(snapshotLive(service.state.connection, service.state.requestIds, service.state.capabilities, {sleep: async () => {waits++;}}),
         error => error.code === "LIVE_SAVE_PENDING" && /still saving/.test(error.message));
     assert.equal(waits, 600, "at least 30 s of polls 50 ms apart");
 });

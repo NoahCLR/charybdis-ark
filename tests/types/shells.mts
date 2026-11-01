@@ -15,6 +15,10 @@ function shells(environment: WebEnvironment, response: PanelResponse) {
     channel.post({type: 'model', model: {layers: []}});
     // @ts-expect-error A browser reply cannot stand in for an authored panel request.
     api.postMessage({type: 'macroValidation', keycode: 'MACRO_0', payload: '', requestId: 1, validation: {error: '', code: ''}});
+    // The shell takes a worker that can fail, or none.
+    const worker: WebEnvironment['worker'] = {onmessage: null, postMessage: () => {}, onerror: null, onmessageerror: null};
+    startWebShell({...environment, worker});
+    startWebShell({...environment, worker: undefined});
 }
 void shells;
 

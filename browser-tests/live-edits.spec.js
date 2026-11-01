@@ -34,7 +34,7 @@ test("the rail says how edits reach the keyboard, and the bar says what runs uns
     await expectPost(page, {type: "revertProfileDraft"});
 });
 
-test("leaving Live + review with unsaved edits asks Save or Revert; Cancel posts nothing", async ({page}) => {
+test("leaving Live preview + save with unsaved edits asks Save or Revert; Cancel posts nothing", async ({page}) => {
     await openLive(page, "keys");
     await chooseEditMode(page, 0);
     const ask = page.locator(".sheet.edit-mode-ask");
@@ -51,7 +51,7 @@ test("leaving Live + review with unsaved edits asks Save or Revert; Cancel posts
     await expectPost(page, {type: "setEditMode", mode: 0, pending: "revert"});
 });
 
-test("going from Apply to Live + review with a draft asks Send or Discard; without one it switches at once", async ({page}) => {
+test("going from Review and save to Live preview + save with a draft asks Send or Discard; without one it switches at once", async ({page}) => {
     await page.goto("/preview/index.html");
     expect(await currentEditMode(page)).toBe(0);
     await page.evaluate(() => {window.__posted.length = 0;});
@@ -116,6 +116,15 @@ test("an edit that would add a trap asks first; Go back and Send anyway post the
     await expectPost(page, {type: "confirmLiveEdit", proposal: 7});
 });
 
+test("Escape on a live edit's question is its Go back, even with the board's Shortcuts list open under it", async ({page}) => {
+    await openLive(page, "keys", {boardShortcuts: true});
+    await expect(page.locator("#board-shortcuts")).toBeVisible();
+    await withModel(page, model => {model.liveProposal = {id: 8, label: "Set Base · Q to TG(2)", checks: [{kind: "trap", level: "trap", status: "new", key: "trap:2", layers: [2], title: "Layer 2 has no way back", detail: "", fix: ""}]};});
+    await expect(page.locator(".sheet.live-ask")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expectPost(page, {type: "cancelLiveEdit", proposal: 8});
+});
+
 test("combos turned off by a key show beside the switch, not as a change", async ({page}) => {
     await openLive(page, "combos");
     const mark = page.locator('.off-by-key');
@@ -124,15 +133,17 @@ test("combos turned off by a key show beside the switch, not as a change", async
     await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });
 
+// The change goes in as the expression Playwright evaluates: the page runs
+// under Trusted Types, which refuses `new Function` on a string.
 /** @param {import("@playwright/test").Page} page @param {(model: any) => void} change */
 async function withModel(page, change) {
-    await page.evaluate(async source => {
+    await page.evaluate(`(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        new Function("model", source)(model);
+        (${change.toString()})(model);
         store.setModel(model); store.render();
         window.__posted.length = 0;
-    }, `(${change.toString()})(model)`);
+    })()`);
 }
 
 test("halves apart: the rail says so and the bar offers Revert, not Save", async ({page}) => {
@@ -198,7 +209,7 @@ test("pointing: a scrolling field posts its record", async ({page}) => {
     await change(page.locator('[data-f="pointing:0:scroll:divisorH"]'), 71);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "savePdMode"})]);
 });
-test("pointer settings: a pointer setting posts", async ({page}) => {
+test("Pointer: a pointer setting posts", async ({page}) => {
     await openLive(page, "pointer");
     await change(page.locator('[data-f="setting:mouseTimeout"]'), 900);
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateConfigDefaults"})]);
@@ -213,6 +224,8 @@ test("macros: a macro's name posts", async ({page}) => {
 });
 test("behaviours: a custom key's behaviour posts", async ({page}) => {
     await openLive(page, "customKeys");
+    // An unused key, under the bank's Show all.
+    await page.locator('[data-all-slots="customKeys"]').click();
     await page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_5"]').click();
     await page.locator('.custom-key-behaviour [data-cell="0-long"]').click();
     await clearPosts(page);
@@ -227,7 +240,7 @@ test("custom keys: a name posts", async ({page}) => {
 
 // Live edit (the keyboard saves by itself): the switch into it, an edit, and
 // the bar saying what the keyboard has not saved yet, with no Save.
-test("switching into Live from Live + review asks Save or Revert; from Apply with nothing pending it switches at once", async ({page}) => {
+test("switching into Live edit from Live preview + save asks Save or Revert; from Review and save with nothing pending it switches at once", async ({page}) => {
     await openLive(page, "keys");
     // The menu lists the modes in the order the keyboard offers them, each with its words.
     const words = await page.evaluate(async () => {
@@ -248,7 +261,7 @@ test("switching into Live from Live + review asks Save or Revert; from Apply wit
     await expectPost(page, {type: "setEditMode", mode: 1});
 });
 
-test("in Live an edit posts as in Live + review, the bar has no Save, and leaving Live asks nothing", async ({page}) => {
+test("in Live edit an edit posts as in Live preview + save, the bar has no Save, and leaving Live edit asks nothing", async ({page}) => {
     await page.goto("/preview/index.html?shell=live-auto");
     await page.locator('[data-screen="pointer"]').click();
     expect(await currentEditMode(page)).toBe(1);
@@ -272,7 +285,7 @@ test("in Live an edit posts as in Live + review, the bar has no Save, and leavin
     await expectPost(page, {type: "setEditMode", mode: 2});
 });
 
-test("in Live the keyboard's own save, a failed one and halves apart each say what to do", async ({page}) => {
+test("in Live edit the keyboard's own save, a failed one and halves apart each say what to do", async ({page}) => {
     await page.goto("/preview/index.html?shell=live-auto");
     /** @param {object} keyboard @param {boolean} [unsaved] */
     const set = (keyboard, unsaved = true) => page.evaluate(async ([keyboard, unsaved]) => {
@@ -359,7 +372,7 @@ test("a keyboard that stopped saving says so, for either half, and Restart posts
 
 // The same under a Review and save draft: the look between edits reads the
 // same flags, and Restart is the one action, not Review and save.
-test("an Apply draft's keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
+test("a Review and save draft's keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
     await page.goto("/preview/index.html?shell=apply-stopped");
     const bar = page.locator(".commit.stopped");
     await expect(bar).toContainText("The keyboard stopped saving");
@@ -429,4 +442,48 @@ test("a keyboard that stopped saving and needs a restart shows one bar, the stop
     await expect(page.locator(".commit.stopped")).toContainText("The keyboard stopped saving");
     await expect(page.locator(".commit.stopped")).toContainText("1 change in your draft");
     await expect(page.locator(".commit.restart-needed")).toHaveCount(0);
+});
+
+// The review leads with the changes: checks the keyboard already has fold
+// behind one line with their count, and stay as a person sets them while the
+// review redraws; a Save that is off says why beside it, a blocker by its
+// title, and still takes the pointer so its tip can show.
+test("the review lists the changes first, folds what the keyboard already has, and says why Save is off", async ({page}) => {
+    await openLive(page, "keys");
+    await page.locator('.commit [data-act="review"]').click();
+    const sheet = page.locator(".sheet.rv, .sheet:has(.rv)");
+    await expect(sheet.locator(".rv > section").first().locator("h4")).toHaveText("Keys");
+    await expect(sheet.locator(".rv > section").last().locator("h4")).toHaveText("Checks");
+    const existing = sheet.locator('details[data-check-group="existing"]');
+    await expect(existing.locator("summary")).toContainText("Already on the keyboard");
+    await expect(existing.locator("summary .tag")).toHaveText("8");
+    await expect(existing).not.toHaveAttribute("open", "");
+    await existing.locator("summary").click();
+    await expect(existing).toHaveAttribute("open", "");
+    await withModel(page, () => {});
+    await expect(page.locator('details[data-check-group="existing"]')).toHaveAttribute("open", "", {timeout: 2000});
+
+    const save = page.locator('.sheet-f [data-act="apply"]');
+    await withModel(page, model => {model.draft.reviewed = true; model.draft.checks.push({kind: "effectBlocker", level: "blocker", status: "existing",
+        layers: [], key: "effectBlocker:9", title: "Background effect 9 is unavailable on this keyboard", detail: "", fix: ""});});
+    await expect(save).toBeDisabled();
+    await expect(page.locator("#review-save-why")).toHaveText("Fix the blocker first: Background effect 9 is unavailable on this keyboard.");
+    await expect(save).toHaveAttribute("aria-describedby", "review-save-why");
+    await expect(page.locator('details[data-check-group="existing"]')).toHaveAttribute("open", "", {timeout: 2000});
+    expect(await save.evaluate((button) => getComputedStyle(button).pointerEvents)).not.toBe("none");
+
+    await withModel(page, model => {model.draft.reviewed = true; model.draft.checks = model.draft.checks.filter((check) => check.level !== "blocker");});
+    await expect(save).toBeEnabled();
+    await expect(page.locator("#review-save-why")).toHaveCount(0);
+    await withModel(page, model => {model.draft.connected = false;});
+    await expect(page.locator("#review-save-why")).toHaveText("Connect the keyboard to save.");
+});
+
+test("a Restart that is off says why beside it", async ({page}) => {
+    await page.goto("/preview/index.html?shell=live-stopped");
+    await withModel(page, model => {model.draft.connected = false;});
+    const restart = page.locator('.commit [data-act="restart"]');
+    await expect(restart).toBeDisabled();
+    await expect(page.locator("#restart-why")).toHaveText("Connect the keyboard to restart it.");
+    await expect(restart).toHaveAttribute("aria-describedby", "restart-why");
 });

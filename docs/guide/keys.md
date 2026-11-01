@@ -5,27 +5,41 @@ does on this layer and lets you change it.
 
 ## The Key tab
 
-**This position** shows the key's **Keycode** and what it **Does**. Change it
+**This key on this layer** (the layer's name follows, as in *This key on this
+layer (Number)*) shows the key's **Keycode** and what it **Does**. Change it
 by typing a keycode or with **Pick…**. The field takes QMK's spellings, such
-as `LCTL_T(KC_A)` or `SGUI(KC_S)`. A keycode the keyboard can't store stays in
-the field with the reason under it, and nothing changes.
+as `LCTL_T(KC_A)`, `SGUI(KC_S)` or `OSM(MOD_MEH)`, the keyboard's own names,
+such as `MACRO_3`, `LOCK_LAYER(2)` or `CUSTOM_KEY_5`, a layer by its number,
+as in `MO(2)`, and a keycode as up to four hex digits, `0x0004`. A number in
+decimal isn't a keycode, inside a call or on its own, and neither are
+spellings QMK doesn't have, such as `LAS()`, or a slot written with a leading
+zero, such as `MACRO_03`. The field and the picker take exactly the same
+keycodes. A keycode the keyboard can't store stays in the field with the
+reason under it, and nothing changes; so does a lock of a layer this keyboard
+doesn't have.
 
 **Where it is stored** unfolds the key's matrix row and column, layout index
 and LED index. Once open, it stays open as you select other keys.
 
-**Use behaviour** and **Join combos** switch this key, on this layer, out of
-behaviours and combos. Turn off Use behaviour on a gaming layer, for example,
-so the key sends its plain keycode at once. The line under the switches says
-whether the behaviour runs here and the key can join combos, and if not,
-which switch keeps it off. A transparent key takes its switches from the
-layer it falls through to; **Open source placement** goes there.
+**Behaviour and combos for this key on this layer** holds **Use behaviour**
+and **Join combos**. They switch only this key, on this layer, out of
+behaviours and combos: the same key on another layer, and other keys on this
+one, keep theirs. Turn off Use behaviour on a gaming layer, for example, so
+the key sends its plain keycode at once. To switch a behaviour or a combo off
+on every key, use its own **Use this behaviour** or **Use this combo**; to
+switch a whole layer, Settings. The line under the switches says whether the
+behaviour runs here and the key can join combos, and if not, which switch
+keeps it off. A key transparent on this layer takes its switches from the
+layer it falls through to; **Open this key on** that layer goes there.
 
-**This key on every layer** lists this position on all 16 layers, highest
-first. Three or more transparent layers in a row fold into one line; click it
-to see each. Click a row to switch to that layer.
+**This key on every layer** lists this position on every layer in use,
+highest first, with the [empty layers](board-and-layers.md#empty-layers)
+folded at its end. Three or more transparent layers in a row fold into one
+line; click it to see each. Click a row to switch to that layer.
 
 **What this key reaches** links to its behaviour, its combos (or **New** to
-start one with this key) and any pointing mode it runs.
+start one with this key) and any pointing mode it runs. A behaviour or combo
+a switch keeps off here says **not used**, and which switch.
 
 When you preview layers together and the key is answered from a lower layer,
 the Key tab says so. A keycode you set here goes on the top layer and wins.
@@ -34,8 +48,8 @@ the Key tab says so. A keycode you set here goes on the top layer and wins.
 
 **Pick…**, or double-clicking a key, opens the keycode picker. It starts with
 a board labelled for your computer's keyboard layout (set in
-[Settings → Host](macros.md#your-computer)), with Shift above each
-legend and Option or AltGr on the right. Below it are sections by task:
+[Host settings](macros.md#your-computer)), with Shift above each legend and
+Option or AltGr on the right. Below it are sections by task:
 **Symbols**, **Navigation**, **Numpad**, **Layers**, **Pointing modes**,
 **Macros**, **Mouse**, **Media**, **Lighting**, **Magic** and **Custom keys**,
 then **More keys**, **Other QMK** and **All keycodes**. **Search every
@@ -54,16 +68,21 @@ built with are left out.
 | **Tap-hold** | `LT` | taps a key, holds the layer; pick the tap key next |
 | **Tap-toggle** | `TT` | holds the layer, or toggles it when tapped |
 | **One-shot** | `OSL` | the layer is on for the next key |
-| **Move** | `TO` | switches to the layer |
+| **Move to** | `TO` | switches to the layer |
 
 **Pointing modes** offers each mode as **Hold** (on while the key is down) or
-**Toggle** (on until pressed again).
+**Lock** (on until pressed again).
 
 ### Modifiers
 
-The row of modifiers above the board wraps the key you pick: Command + C
-stores `G(KC_C)`. The footer shows the keycode you'll get, and **Use keycode**
-stores it.
+A modifier picked in the row above the board is held down with the key you
+pick: Command and C make one key that sends Command+C (stored as `G(KC_C)`).
+A modifier key on the board is the same button as its modifier in the row,
+as in a custom key's shortcut: clicking either lights both, and the key you
+picked stays. A modifier alone is that modifier's key. Opening the picker on
+a key that holds modifiers shows them lit in the row, with its key on the
+board.
+The footer shows the keycode you'll get, and **Use keycode** stores it.
 
 Modifiers picked with no other key are stored with one of them as the key,
 wrapped in the rest: Left Ctrl + Left Shift stores `S(KC_LEFT_CTRL)`, and
@@ -91,9 +110,11 @@ The **Custom keys** screen holds 128 keys you name yourself. Each can send a
 shortcut, have its own taps and holds, and go on any key or combo. The picker
 lists them under **Custom keys**.
 
-Pick one from the list (**Search by name** finds it by name or number). Its
-name is the editor's title: click it to rename, Enter to keep, Escape to put
-it back.
+The list opens on the keys in use, each by its name or what it sends.
+**+ New custom key** opens the first free one with its name ready to type,
+and **Show all 128 slots** lists the rest. Pick one from the list (**Search
+by name** finds it by name or number, through every key). Its name is the
+editor's title: click it to rename, Enter to keep, Escape to put it back.
 
 **Shortcut** is what the key sends: up to six keys held together, any
 modifiers and any layers. The keys and modifiers are held while you hold the
@@ -106,14 +127,14 @@ click one again to take it out. A symbol such as `!` is its key with Shift,
 and a shortcut has one set of modifiers, so that Shift is held for the whole
 shortcut: `!` then `a` sends Shift + 1 + A, which types "!A". Taking a symbol
 out takes its Shift with it, unless another symbol still needs it or you
-turned Shift on yourself. A shortcut holds at most six keys, one media
-key and one system key, since the computer reads one of each at a time: the
-picker says so under the keys and keeps **Use shortcut** off until the choice
-fits. A media key in a shortcut plays wherever the shortcut is sent: behind a
+turned Shift on yourself. A shortcut holds at most six keys, one media key and
+one system key, since the computer reads one of each at a time: the picker
+says so under the keys and keeps **Use shortcut** off until the choice fits. A
+media key in a shortcut plays wherever the shortcut is sent: behind a
 behaviour, from a bypassed key or as a combo's output. Here left and right
-modifiers mix freely, so Left Ctrl + Right Option + K is fine. Its **Layers** section switches on the layers the shortcut turns on, as
-many as you like, and **Turns them on as** says how, all of them alike, as a
-layer key would:
+modifiers mix freely, so Left Ctrl + Right Option + K is fine. Its **Layers**
+section switches on the layers the shortcut turns on, as many as you like, and
+**Turns them on as** says how, all of them alike, as a layer key would:
 
 - **Hold**, as `MO()`: Left Cmd + Navigation + Extra holds Command and both
   layers while you hold the key. They go off when you let go, unless a lock,
@@ -134,9 +155,9 @@ Tap-toggle and one-shot keys are layer keys like `TT()` and `OSL()`: their
 layers are on from every press, even with a behaviour on the key, and they
 wait the dual-role tap / hold threshold. With the other kinds, a behaviour on
 the key sends the shortcut where it leaves a tap or a hold empty, so a lock or
-a move happens from either. The base layer and the default layers are always on, so
-their rows are dimmed and say so. Modifiers alone, a key alone or layers alone
-are a shortcut too. **Clear** removes it.
+a move happens from either. The base layer and the default layers are always
+on, so their rows are dimmed and say so. Modifiers alone, a key alone or
+layers alone are a shortcut too. **Clear** removes it.
 
 **What it does** says whether the key sends its shortcut, its behaviour, both
 or nothing yet, and holds the same behaviour editor as the Keymap screen. It
@@ -159,7 +180,7 @@ as the key's own do.
 
 ## Key swaps & typing
 
-**Key swaps & typing**, on **Settings → Host** below Your computer, holds
+**Key swaps & typing**, on **Host settings** below Your computer, holds
 keyboard-wide options that apply on every layer:
 
 - **Modifiers**: swap left Ctrl and Caps Lock, use Caps Lock as left Ctrl,

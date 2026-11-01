@@ -6,10 +6,7 @@
 // These arrange them for reading: newest on top, a step's items in rail order
 // with the area each lives in, and a time a person can place.
 
-import {AREAS} from "./review.mjs";
-
-/** @param {string} area */
-const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
+import {areaRank} from "./review.mjs";
 
 // Steps newest first; within one, its items in rail order, each noting its
 // area, since a step's items are not sectioned by area as the review's are.
@@ -19,7 +16,7 @@ export function historyEntries(steps = []) {
         ...step,
         changes: step.changes === null ? null : step.changes
             .map((change, index) => ({change, index}))
-            .sort((left, right) => rank(left.change.area) - rank(right.change.area) || left.index - right.index)
+            .sort((left, right) => areaRank(left.change.area) - areaRank(right.change.area) || left.index - right.index)
             .map(({change}) => ({...change, note: change.note ? `${change.area} · ${change.note}` : change.area})),
     }));
 }

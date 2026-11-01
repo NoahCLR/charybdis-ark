@@ -11,9 +11,9 @@ import {vocabulary, word} from "./vocabulary.mjs";
 /** @type {readonly {field: Exclude<keyof Figures, "physicalHalf">, label: string, hint: string}[]} */
 const FIGURES = [
     {field: "longestEraseUs", label: "Longest sector erase", hint: "The longest the half stopped to erase a 4 KiB sector of its flash."},
-    {field: "longestProgramUs", label: "Longest page program", hint: "The longest the half stopped to write a 256-byte page of its flash."},
+    {field: "longestProgramUs", label: "Longest page program", hint: "The longest the half stopped to program a 256-byte page of its flash."},
     {field: "longestStorageStepUs", label: "Most flash in one scan", hint: "The most flash time in one keyboard scan's storage step."},
-    {field: "lastSaveUs", label: "Last save", hint: "The half's last save, from its start until it finished writing, including the transfer and any wait for a quiet keyboard."},
+    {field: "lastSaveUs", label: "Last save", hint: "The half's last save, from its start until it finished, including the transfer and any wait for a quiet keyboard."},
     {field: "lastSaveFlashUs", label: "Flash in the last save", hint: "How much of the last save the half spent stopped for its flash."},
     {field: "saves", label: "Saves since boot", hint: "How many saves the half has made since it started."},
 ];

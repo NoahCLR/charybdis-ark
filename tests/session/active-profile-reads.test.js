@@ -47,9 +47,9 @@ async function recoveryKeyboard(t, {compiled = false, mismatch, afterDownload} =
 for (const method of ["readLayout", "readCommittedProfile"]) {
     test(`${method} refuses a newer committed payload during post-decision recovery`, async t => {
         const {service} = await recoveryKeyboard(t);
-        assert.equal(service.status.activeGeneration, 4);
-        assert.equal(service.status.committedGeneration, 5);
-        assert.equal(service.status.candidatePending, true);
+        assert.equal(service.snapshot().status.activeGeneration, 4);
+        assert.equal(service.snapshot().status.committedGeneration, 5);
+        assert.equal(service.snapshot().status.candidatePending, true);
         await assert.rejects(service.readKeyboardProfile(), {code: "KEYBOARD_NOT_READY"});
         await assert.rejects(service[method](), {code: "ACTIVE_PROFILE_UNAVAILABLE"});
         assert.notEqual(service.snapshot().layout?.state, "read");

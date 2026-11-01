@@ -5,6 +5,8 @@
 // Core owns the defaults; before the first model the panel offers no picker,
 // since the tab may turn out to be blocked.
 
+import {vocabulary} from "./vocabulary.mjs";
+
 /** @type {import("../../contracts/model.js").ShellPanel} */
 const BEFORE_FIRST_MODEL = {chooseKeyboard: false, blocked: null, theme: "dark", recoveries: [], build: null, progress: null, words: {}};
 
@@ -50,18 +52,14 @@ export function savedWhen(savedAt) {
     return Number.isNaN(date.getTime()) ? String(savedAt ?? "") : date.toLocaleString("en-GB", {day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"});
 }
 
-// What made a recovery copy, as its title says it. Both keyboard saves read
-// as Save (D-L72), so the title tells them apart by what was saved: a whole
-// draft (the keyboard's Apply) or the live modes' unsaved edits.
-/** @type {Readonly<Record<import("../../contracts/model.js").RecoveryCause, string>>} */
-const MADE_BY = Object.freeze({apply: "Before saving a draft", restore: "Before restoring a backup", save: "Before saving live edits", restart: "Before Restart", "leave-live": "Before leaving Live edit"});
-
-// A recovery copy named by what made it, the keyboard it came from and when.
-// A copy stored before those were recorded is named only by when, rather
-// than by a guessed cause or the keyboard selected now.
-/** @param {Pick<import("../../contracts/model.js").RecoveryCopy, "cause" | "keyboard" | "savedAt">} copy */
-export function copyTitle({cause, keyboard, savedAt}) {
-    const made = cause && Object.hasOwn(MADE_BY, cause) ? MADE_BY[cause] : "";
+// A recovery copy named by what made it (the vocabulary's words), the
+// keyboard it came from and when. A copy stored before those were recorded is
+// named only by when, rather than by a guessed cause or the keyboard selected
+// now.
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {Pick<import("../../contracts/model.js").RecoveryCopy, "cause" | "keyboard" | "savedAt">} copy */
+export function copyTitle(model, {cause, keyboard, savedAt}) {
+    const madeBy = vocabulary(model).recoveryCauses;
+    const made = cause && Object.hasOwn(madeBy, cause) ? madeBy[cause] : "";
     return (made ? [made, keyboard, savedWhen(savedAt)] : ["Recovery copy", savedWhen(savedAt)]).filter(Boolean).join(" · ");
 }
 

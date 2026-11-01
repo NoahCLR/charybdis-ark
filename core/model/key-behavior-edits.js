@@ -3,14 +3,14 @@
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 
 const {nativeCode} = require("../schema/actions");
-const keycodes = require("../data/keycode-catalog");
+const keycodes = require("../schema/keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
+const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression} = require("../schema/compiled-profile-v1");
-const {actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
-const {POINTING_SLOT_COUNT} = require("../data/pd-mode-keys");
+const {actionName, isOwnedLayerCode, knownActionAbi, momentaryCall} = require("../schema/actions");
+const {LAYERS} = require("../data/charybdis-layout");
 const {behaviorPlacementProblem} = require("./profile-placement");
-const {profileDepthOptions} = require("../schema/profile-depth");
+const {VOCABULARY} = require("./vocabulary");
 
 /**
  * @typedef {import("../schema/types.js").SemanticAction} Action
@@ -34,12 +34,17 @@ function integer(value, max, label, optional = false) {
     return result;
 }
 
-/** @param {Buffer} payload @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
-function editKeyBehaviors(payload, message, capabilities = {}) {
+// A behaviour's own timing as a refusal starts with it ("Tap / hold
+// threshold must be…"), in the vocabulary's words.
+/** @param {import("../../contracts/edits.js").TimingTerm} term */
+const timingName = (term) => VOCABULARY.thresholdNames[term].charAt(0).toUpperCase() + VOCABULARY.thresholdNames[term].slice(1);
+
+// One behaviour edit, made in place on the opened behaviours domain
+// (portable-profile.js editProfileDomains encodes it).
+/** @param {{rows: Row[]}} behaviors @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
+function editKeyBehaviors(behaviors, message, capabilities = {}) {
     if (!((capabilities.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS)) throw invalid("This firmware does not support saving key behaviours.");
-    const maxPdModes = POINTING_SLOT_COUNT;
-    /** @type {{rows: Row[]}} */
-    const {rows} = decodeKeyBehaviorDomain(payload, profileDepthOptions(capabilities).behaviors);
+    const {rows} = behaviors;
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest ?? 0);
     /** @param {Action} action */
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
@@ -49,17 +54,11 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         || (native(left) !== undefined && native(left) === native(right));
     // The keyboard refuses a profile whose actions sit where it cannot run
     // them, so every row is checked, not only the one being edited.
-    const layerCount = capabilities.compiledLayerCount ?? 16;
-    /** @param {Row[]} rows */
-    const checkPlacements = (rows) => {
+    const layerCount = capabilities.compiledLayerCount ?? LAYERS;
+    const checkPlacements = () => {
         const problem = behaviorPlacementProblem(rows, {layerCount});
         if (problem) throw invalid(problem);
     };
-    /** @param {Row[]} rows */
-    const encode = (rows) => checkPlacements(rows) ?? encodeKeyBehaviorDomain({rows}, {
-        limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
-        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxMacroSlots: capabilities.macroSlots, maxCustomKeys: capabilities.customKeySlots},
-    });
     /** @param {unknown} value @param {Action} [previous] @returns {Action} */
     const action = (value, previous) => {
         const name = String(value ?? "").trim();
@@ -68,7 +67,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         /** @type {Action} */
         let result;
         const encoded = keycodes.encode(name);
-        if (encoded !== undefined && !/^MO\s*\(/.test(name)) {
+        if (encoded !== undefined && !momentaryCall(name)) {
             // Where an owned layer keycode may go is checked with the rest of the
             // row (behaviorPlacementProblem); only keycodes the keyboard does not
             // run through its layer ownership are refused here.
@@ -80,7 +79,8 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
             result = semanticActionForExpression(name, {});
             if (result.kind === ACTION.QMK_KEYCODE) {
                 // Native expressions must pass the catalog's structural
-                // checks; the legacy compiler accepts invalid modifier wraps.
+                // checks, so only a bare name the keyboard knows besides
+                // (DPI_MOD) gets through here.
                 if (!/^[A-Z][A-Z0-9_]*$/.test(name)) throw invalid(`Unsupported key expression: ${name}.`);
                 if (!knownAbi) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
             }
@@ -119,7 +119,8 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         } else {
             rows[from.index] = {...rows[from.index], target: to.target};
         }
-        return encode(rows);
+        checkPlacements();
+        return;
     }
 
     /** @type {BehaviorInput} */
@@ -175,9 +176,9 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         if (typeof enabled !== "boolean") throw invalid("The behaviour must be enabled or disabled.");
         const row = {
             target: previous?.target ?? target,
-            tapHoldTerm: integer(form.tapHoldTerm, 65535, "Tap/hold time", true),
-            longHoldTerm: integer(form.longHoldTerm, 65535, "Long-hold time", true),
-            multiTapTerm: integer(form.multiTapTerm, 65535, "Multi-tap time", true),
+            tapHoldTerm: integer(form.tapHoldTerm, 65535, timingName("tapHoldTerm"), true),
+            longHoldTerm: integer(form.longHoldTerm, 65535, timingName("longHoldTerm"), true),
+            multiTapTerm: integer(form.multiTapTerm, 65535, timingName("multiTapTerm"), true),
             keepsAutoMouseAnchored: anchored,
             enabled,
             allowedLayers: integer(form.allowedLayers ?? previous?.allowedLayers ?? (2 ** layerCount - 1), 2 ** layerCount - 1, "Allowed layers"),
@@ -186,7 +187,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         if (previous) rows[index] = row;
         else rows.push(row);
     }
-    return encode(rows);
+    checkPlacements();
 }
 
 // Whether a behaviour saved for this key finds a row already there, found as

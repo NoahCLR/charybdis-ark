@@ -26,13 +26,8 @@ export type DraftEdit = Extract<import('../../contracts/edits.js').PanelEdit, {t
 
 export type DeviceCapabilities = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeCapabilityPages>;
 export type ProfileStatus = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeStatusPages>;
-export interface ReadDomains {
-    rgb?: import('../schema/types.js').RgbProfile;
-    keyBehaviors?: {rows: import('../schema/types.js').BehaviorRow[]};
-    settings?: import('../schema/types.js').SettingsDomain;
-    pdModes?: import('../schema/types.js').PointingSlot[];
-    combos?: ReturnType<typeof import('../schema/combo-domain-v1.js').decodeComboDomain>;
-}
+/** The profile's domains as read, which the profile model presents (model/types.d.ts). */
+export type ReadDomains = import('../model/types.js').ReadDomains;
 export interface CommittedRead {
     state?: 'unread' | 'reading' | 'unavailable' | 'read';
     source?: string;
@@ -47,7 +42,7 @@ export interface CommittedRead {
     schema?: {major: number; minor: number};
     domainIds?: number[];
 }
-export interface LayoutKey {layoutIndex: number; row: number; column: number; keycode: number; resolved: import('../data/types.js').ResolvedKeycode}
+export type LayoutKey = import('../model/types.js').LayoutKey;
 export type LayoutRead = PendingRead | {state: 'read'; progress?: import('../../contracts/model.js').CountedProgress | null; readAt?: string; catalog?: ReturnType<typeof import('../data/keycode-catalog.js').metadata>; layers: {layer: number; keys: LayoutKey[]}[]};
 /** Readback facts consumed by presentation, including partially loaded devices. */
 export interface DeviceModelInput {
@@ -74,6 +69,8 @@ export interface DeviceModelInput {
     runtime?: import('../protocol/types.js').RuntimeRead | null;
     /** Each half's flash pauses as last read (GET 0x0D); null until read on this connection. */
     flashPauses?: import('../../contracts/model.js').FlashPausesView | null;
+    /** The device service's diagnostics log, oldest first and bounded (profile-device-service.js addDiagnostic). */
+    diagnostics?: string[];
 }
 
 export type CandidateStatus = Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus>>;
@@ -124,7 +121,10 @@ export interface RestoreOptions {
     baseSnapshot?: ReadSnapshot;
     onProgress?: (text: string) => void;
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;
+    /** The wait between polls; the timer's when omitted. */
     sleep?: (ms: number) => Promise<void>;
+    /** The clock the save and its upload are timed on; Date.now when omitted. */
+    now?: () => number;
 }
 export interface OperationFailure extends Error {code?: string; cause?: OperationFailure; progress?: CandidateProgress; deviceError?: CandidateStatus["error"]}
 
@@ -137,7 +137,6 @@ export interface PanelDeviceState extends DeviceModelInput, Omit<DraftDeviceCont
     /** Ark's own live edit or Revert the keyboard holds until no key is held, while it waits. */
     liveWaiting?: LiveWaiting | null;
     operationId?: number;
-    diagnostics?: string[];
 }
 /** Why the open draft takes no edit now, or '' when it does (panel-session-state.js draftBinding). */
 export type DraftBlock = import('../../contracts/panel.js').DraftBlock;
@@ -155,9 +154,12 @@ export interface DemoSession {
     noticeFailed?: boolean;
     portableReview?: unknown;
     portableLayers?: unknown;
+    /** The read the open draft last followed (draft-follow.js). */
     observedPortable?: import('../model/types.js').ProfileSnapshot;
     service: {capabilities?: Partial<DeviceCapabilities> | null; snapshot(): PanelDeviceState};
 }
+/** What a read told the draft that a person should hear (ProfileDraftSession.observe): a live keyboard restarted over unsaved edits, kept (saved first) or gone, in the edit mode it came back in; or its working copy changed without Ark. */
+export interface ReadNews {restarted?: {kept: boolean; mode: number}; changedElsewhere?: boolean}
 export type ActiveDemoSession = DemoSession & {demo: DemoMetadata; draft: NonNullable<DemoSession['draft']>};
 export interface ProfileChooser {chooseProfile?: () => string | {text: string; name?: string} | undefined | Promise<string | {text: string; name?: string} | undefined>}
 
@@ -169,27 +171,28 @@ export interface PortableReview {document: import('../model/types.js').PortableD
 export interface PanelShell extends ProfileChooser {words?: Record<string, string>; panel?: () => Partial<import('../../contracts/model.js').ShellPanel>}
 export interface PanelSession extends DemoSession {
     shell?: PanelShell;
+    /** The panel holds the catalog the loop posted (panel-loop.js); a panel that says it is ready has lost it. */
+    catalogPosted?: boolean;
     portableBusy?: boolean;
     portableReview?: PortableReview;
     portableLayers?: LayerEditState;
     acceptedEdit?: ReturnType<NonNullable<DemoSession['draft']>['stage']>;
-    /** A live edit waiting on its trap check (plan answer 2): sent on confirmLiveEdit, dropped on cancelLiveEdit. */
-    /** What the live watch last saw of a keyboard under a Review and save draft (live-watch.js). */
+    /** The failed reads the live watch has retried for a stale draft (draft-follow.js). */
     liveReadRetry?: {draftId: string; attempts: number};
+    /** What the read a draft last heard news from told that is not said yet, with that read (draft-follow.js takeNews). */
+    readNews?: ReadNews & {draftId: string; read: import('../model/types.js').ProfileSnapshot};
+    /** What the live watch last saw of a keyboard under a Review and save draft (live-watch.js). */
     applyWatch?: {draftId: string; session: number; revision: number; savedGeneration: number};
+    /** A live edit waiting on its trap check (plan answer 2): sent on confirmLiveEdit, dropped on cancelLiveEdit. */
     liveProposal?: {id: number; draftId: string; revision: number; target: import('./profile-draft-session.js').LiveTarget;
         checks: import('../../contracts/model.js').Check[]; accepted?: ReturnType<NonNullable<DemoSession['draft']>['stage']>; replaceWhenLarge?: boolean};
     applyRunning?: boolean;
     postApplyReadStep?: import('../../contracts/messages.js').ReadStep;
     reconnect?: ExpectedReconnect;
-    /** A Save cut short (live-edits.js): the edits' fingerprint and where Ark kept them, until a read says what became of them. */
-    saveCutShort?: {deviceId: string; serialNumber: string; edits: string; recovery?: string};
     /** When Ark last connected a lost keyboard again by itself (keyboard-reconnect.js). */
     lostAt?: number;
-    /** What the keyboard held before the last successful Apply, for "Put back what it had". */
-    beforeApply?: {document: import('../model/types.js').PortableDocument; deviceId: string | null | undefined; savedAt: string};
-    /** A restart Ark asked for (keyboard-restart.js): the unsaved edits it keeps to send back once the keyboard is read again, and their recovery copy. */
-    restart?: {deviceId: string | null | undefined; serialNumber: string; kept?: import('../model/types.js').PortableDocument; recovery?: string; slaveAcknowledged: boolean};
+    /** What Ark keeps for one keyboard until a read of it says what became of it (kept.js). */
+    kept?: KeptRecords;
     service: DemoSession['service'] & {portable?: import('../model/types.js').ProfileSnapshot | null};
 }
 /** Model publication reads portable data without invoking device operations. */
@@ -265,8 +268,8 @@ export type LiveSnapshot = import('../model/types.js').CompleteSnapshot & import
 export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profile-session.js').restoreProfile>> & import('../model/types.js').SnapshotFacts;
 /**
  * The device service as the panel's controls use it. A failed operation
- * rejects (and leaves its error in `snapshot().error`); `readCombos` and
- * `readBaseRgb` are optional reads that never reject.
+ * rejects (and leaves its error in `snapshot().error`); the editor's read
+ * resolves with what it found, a keyboard it read no further included.
  */
 export interface ControlService extends DraftApplyService {
     capabilities?: Partial<DeviceCapabilities> | null;
@@ -274,15 +277,13 @@ export interface ControlService extends DraftApplyService {
     portable?: import('../model/types.js').ProfileSnapshot | null;
     snapshot(): PanelDeviceState & {devices: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[]};
     enumerate(): Promise<unknown>;
-    connect(id: string): Promise<unknown>;
     disconnect(): Promise<unknown>;
-    refresh(): Promise<unknown>;
-    /** Waits until the keyboard has finished starting, within `deadline` (keyboard-starting.js). */
-    awaitStarted?(options?: {deadline?: number}): Promise<{started: boolean; deadline: number; late: boolean}>;
-    readLayout(): Promise<unknown>;
-    readCommittedProfile(options?: {reuse?: boolean}): Promise<unknown>;
-    readCombos(): Promise<unknown>;
-    readBaseRgb(): Promise<unknown>;
+    /** Adds a line to the device service's diagnostics log (profile-device-service.js). */
+    addDiagnostic?(message: string): void;
+    /** The editor's read: connect, refresh, wait for the start, then the complete profile or, failing it, the independent reads (profile-device-service.js). */
+    readForEditor(deviceId?: string, hooks?: EditorReadHooks): Promise<EditorRead>;
+    /** Everything the panel shows, read again after a save; rejects with what failed. */
+    readBack(onStep?: (step: import('../../contracts/messages.js').ReadStep) => void): Promise<void>;
     readKeyboardProfile(): Promise<CompleteReadSnapshot>;
     readPortableProfile(options?: {forRestore?: false; reuseReadback?: boolean}): Promise<CompleteReadSnapshot>;
     readPortableProfile(options: {forRestore: true; reuseReadback?: boolean}): Promise<ReadSnapshot>;
@@ -312,8 +313,34 @@ export interface ControlService extends DraftApplyService {
     /** The keyboard the connection was last lost to unexpectedly, once (keyboard-reconnect.js). */
     takeLost?(): LostKeyboard | undefined;
 }
+/** The editor read's slow steps, each run behind the shell's progress indicator. */
+export type EditorReadStep = 'complete' | 'layout' | 'profile';
+export interface EditorReadHooks {
+    progress?: <T>(step: EditorReadStep, work: () => Promise<T>) => Promise<T>;
+    /** The complete read failed with `error`; the independent reads run next. */
+    failed?: (error: unknown) => void;
+}
+/** What the editor's read found (`readForEditor`). */
+export type EditorRead =
+    | {kind: 'none'}
+    | {kind: 'starting'}
+    | {kind: 'firmware'; failure?: Error}
+    | {kind: 'read'; portable: CompleteReadSnapshot; failure?: undefined}
+    | {kind: 'read'; portable?: undefined; failure: unknown};
 /** A keyboard whose connection was lost unexpectedly: what it was, and what happened. */
 export interface LostKeyboard {deviceId: string; serialNumber: string; product: string; otherDevices: readonly {id: string; product?: string}[]; what: string; /** It left a request unanswered: Ark closed the connection, the keyboard stayed. */ unanswered: boolean}
+/** What Ark keeps for one keyboard (kept.js), by kind. */
+export interface KeptValues {
+    /** A restart Ark asked for (keyboard-restart.js): the unsaved edits it keeps to send back once the keyboard is read again, and their recovery copy. */
+    restart: {kept?: import('../model/types.js').PortableDocument; recovery?: string; slaveAcknowledged: boolean};
+    /** A Save cut short (live-edits.js): the edits' fingerprint and where Ark kept them. */
+    saveCutShort: {edits: string; recovery?: string};
+    /** What the keyboard held before the last successful Apply, for "Put back what it had". */
+    beforeApply: {document: import('../model/types.js').PortableDocument; savedAt: string};
+}
+export type KeptKind = keyof KeptValues;
+/** Each record with the keyboard it is for: its device id, and its serial number where that names it (kept.js). */
+export type KeptRecords = {[K in KeptKind]?: KeptValues[K] & {deviceId: string | null | undefined; serialNumber: string}};
 /** A renamed keyboard the panel waits to see again (keyboard-reconnect.js). */
 export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string; /** Restarted because Ark asked, rather than renamed. */ restart?: boolean; /** Said after how the wait ended: what followed the read. */ after?: string}
 export interface ControlShell extends PanelShell {
@@ -334,11 +361,12 @@ export type DeviceServiceTransport =
 export type DeviceServiceOptions = DeviceServiceTransport & DeviceServiceSettings;
 export interface DeviceServiceSettings {
     defaultTimeoutMs?: number;
-    /** How long each request of a background look waits (profile-device-service.js). */
+    /** How long each request of a background look waits (background-reads.js). */
     watchTimeoutMs?: number;
     requestIdStart?: number;
+    /** The shell's wait between polls (the page's sleep worker, which a hidden tab does not slow); the timer's when omitted. It always settles: the page's falls back to its timer when the worker fails (web/sleep.mjs). */
     sleep?: (ms: number) => Promise<void>;
-    /** The clock a live edit's waits are measured on; Date.now when omitted. */
+    /** The clock a live edit's waits and a save's upload are measured on; Date.now when omitted. */
     now?: () => number;
     readCandidateStatus?: typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus;
     onChange?: (state?: PanelDeviceState) => void;

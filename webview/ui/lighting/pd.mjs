@@ -1,9 +1,10 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
-import {post, render, state, writable} from "../../store.mjs";
+import {post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import {offWording, POINTING_MODE_IDS, pdColourRow} from "../../view/lighting.mjs";
-import {slotCalled as slotName, vocabulary} from "../../view/vocabulary.mjs";
+import {slotCalled as slotName, slotNamed, vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourControl, localityLabel, section, stack} from "./common.mjs";
@@ -12,7 +13,7 @@ import {groupRowsTable} from "./led-rows.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stagePointing(model) {
     const node = el(`<div></div>`);
-    const canEdit = writable();
+    const canEdit = editGate(model, "lighting").editable;
     const marks = draftMarks(model?.draft?.changes);
 
     node.className = "tab-split";
@@ -22,7 +23,7 @@ export function stagePointing(model) {
         const row = pdColourRow(model, slot.id);
         const lit = row && !isOff(row.color);
         const item = el(`<button class="rowitem ${slot.id === state.pointingSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${esc(slot.id)}">
-            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
+            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slotNamed(slot))}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
             <span class="m">${esc(!row ? "not reported" : lit ? localityLabel(row.locality).toLowerCase() : "no colour")}</span></button>`);
         item.addEventListener("click", () => { state.pointingSlot = slot.id; render(); });
         list.append(item);
@@ -32,7 +33,7 @@ export function stagePointing(model) {
     const colour = section(`${slotName(model, state.pointingSlot)} colour`);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${slotName(model, state.pointingSlot)} while active`,
-        ...offWording("pd"),
+        ...offWording(model, "pd"),
         onChange: (next) => { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], row.locality, next)); },
     }));
     const where = section("Where it paints");
@@ -48,7 +49,7 @@ export function stagePointing(model) {
     where.append(stack(locality, previewSwitch));
     const note = section("What this stage does");
     note.className = "span";
-    note.append(el(`<p class="note stage-about">A pointing-mode colour is an overlay that exists only while the mode is held or locked. It replaces whatever the layer paints inside its locality for as long as the mode runs, the key that started it included when the locality holds it.</p>`));
+    note.append(el(`<p class="note stage-about">While the mode runs, its colour paints over the layer's colour in the area chosen above.</p>`));
     note.append(groupRowsTable(model.rgb.pdModeLedGroups, "pdMode"));
     main.append(colour, where, note);
     node.append(list, main);

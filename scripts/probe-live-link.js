@@ -2,13 +2,13 @@
 // @ts-check
 "use strict";
 
+const {NodeHidDeviceAdapter} = require("../core/transport/node-hid-adapter");
 const {
     CHARYBDIS_PRODUCT_ID,
     CHARYBDIS_VENDOR_ID,
-    NodeHidDeviceAdapter,
     QMK_RAW_HID_USAGE,
     QMK_RAW_HID_USAGE_PAGE,
-} = require("../core/transport/node-hid-adapter");
+} = require("../core/transport/device-adapter");
 
 const TARGET = Object.freeze({
     vendorId: CHARYBDIS_VENDOR_ID,

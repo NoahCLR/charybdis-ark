@@ -37,11 +37,13 @@ test("a backup from older firmware is refused, never upgraded: the keyboard stor
     // pointing-mode evidence older backups carried.
     assert.throws(() => validateSnapshot({...source, version: 1}), older);
     for (const actionAbiDigest of [0x837cf479, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0xf79c6151]) assert.throws(() => validateSnapshot({...source, actionAbiDigest}), older);
-    assert.throws(() => validateSnapshot({...source, pdModeSource: {version: 1}}), /unsupported fields/);
-    assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 8)}), /unsupported fields/);
+    assert.throws(() => validateSnapshot({...source, pdModeSource: {version: 1}}), {code: "INVALID_PORTABLE_PROFILE", message: /holds more than a backup from current firmware/});
+    assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 8)}), {code: "INVALID_PORTABLE_PROFILE", message: /holds more than a backup from current firmware/});
     const truncated = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     truncated.domains.find(d => d.id === 96).payload = Buffer.alloc(480);
-    assert.throws(() => validateSnapshot({...source, profile: encodeProfileBlob(truncated).toString("base64")}), /1,?920|1920/);
+    // Said as a damaged file; the decoder's own words are its cause, for the diagnostics.
+    assert.throws(() => validateSnapshot({...source, profile: encodeProfileBlob(truncated).toString("base64")}),
+        (error) => error.code === "INVALID_PORTABLE_PROFILE" && /damaged/.test(error.message) && /1,?920|1920/.test(error.cause?.message));
     // A current envelope around a retired domain version.
     const blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     const raw = Buffer.from(source.profile, "base64");
@@ -209,9 +211,9 @@ test("Make base keeps an existing old-base colour, while overlay reorders keep e
 
 test("partial, incompatible, over-capacity and malformed profiles fail before restore", () => {
     const source = document();
-    assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 4)}), /unsupported fields/);
-    assert.throws(() => validateSnapshot({...source, profile: source.profile + "!"}), /profile data/);
-    assert.throws(() => validateSnapshot(source, {compiledLayerCount: 16, supportedDomainMask: 15, actionAbiDigest: 1}), /vocabulary/);
+    assert.throws(() => validateSnapshot({...source, layers: profileLayers(source).slice(0, 4)}), {code: "INVALID_PORTABLE_PROFILE", message: /holds more than a backup from current firmware/});
+    assert.throws(() => validateSnapshot({...source, profile: source.profile + "!"}), {code: "INVALID_PORTABLE_PROFILE", message: /profile in this file is damaged/});
+    assert.throws(() => validateSnapshot(source, {compiledLayerCount: 16, supportedDomainMask: 15, actionAbiDigest: 1}), {code: "INVALID_PORTABLE_PROFILE", message: /firmware cannot take this profile/});
     assert.throws(() => reorderLayers(source, [1, 1, 2, 3, 4, 5, 6, 7]), /every layer once/);
 });
 module.exports = {settings, document};
@@ -334,4 +336,127 @@ test("a custom key's shortcut layers follow their layers through a reorder, Make
     // Keys following, neither can happen.
     assert.doesNotThrow(() => reorderLayers(merging, [1, 2, 3, 0, ...rest]));
     assert.doesNotThrow(() => reorderLayers(numbersDefault, [1, 2, 3, 0, ...rest]));
+});
+
+// The macro codecs read a delay's digits up to its '|'; the model's walk reads
+// as many digits as 65,535 has. A zero-padded delay longer than that is a
+// macro the codecs keep and the model refuses. This pins today's behaviour so
+// a change to either side is a choice, not drift.
+test("a delay with more digits than the longest delay is refused by the model alone", () => {
+    const {validateMacro} = require("../../core/model/portable-profile");
+    const {decodeMacroPayload} = require("../../core/schema/macro-payload");
+    const {MACRO_LIMITS} = require("../../rules/macro-payload.mjs");
+    const padded = Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${"0".repeat(String(MACRO_LIMITS.maxDelayMs).length)}1|`)]);
+    assert.equal(decodeMacroPayload(padded), "{000001}");
+    assert.throws(() => validateMacro(padded), {code: "INVALID_PORTABLE_PROFILE", message: "A macro in this profile has a delay the keyboard cannot play."});
+    assert.doesNotThrow(() => validateMacro(Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${MACRO_LIMITS.maxDelayMs}|`)])));
+});
+
+// What a refused profile says is read by a person: plain words about what is
+// wrong with it, never a codec's, and the same code for the code that acts on it.
+test("a refused profile says what is wrong with it in plain words, under its stable code", () => {
+    const {QK} = require("../../rules/qmk-keycodes.mjs");
+    const said = (run) => {
+        try {run();} catch (error) {
+            assert.equal(error.code, "INVALID_PORTABLE_PROFILE");
+            return error.message;
+        }
+        assert.fail("refused");
+    };
+    // MO(20): a layer key past the keyboard's layers, refused when the layers move.
+    const beyond = editLayers(document(), layers => {layers[1][0] = QK.MOMENTARY.first + 20;});
+    const words = [
+        said(() => reorderLayers(beyond, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])),
+        said(() => validateSnapshot({...document(), profile: "!"})),
+        said(() => validateSnapshot({...document(), extra: 1})),
+        said(() => validateSnapshot(document(), {compiledLayerCount: 8, supportedDomainMask: 127, actionAbiDigest: document().actionAbiDigest})),
+    ];
+    assert.equal(words[0], "A key in this profile reaches a layer the keyboard does not have.");
+    for (const sentence of words) assert.doesNotMatch(sentence, /layer bank|layer-mod|portable profile|action vocabulary|domain|RGB|Invalid|Unbalanced|Unsupported/, sentence);
+});
+
+test("changing a document's domains encodes only those it opens, decoded once and kept", () => {
+    const {editProfileDomains, readProfileDomains} = require("../../core/model/portable-profile");
+    const {PROFILE_DOMAINS} = require("../../core/schema/profile-domains");
+    const source = editMacros(document(), macros => {macros[0] = Buffer.from("hello").toString("base64");});
+    const domains = value => decodeProfileBlob(Buffer.from(value.profile, "base64")).domains;
+    // Opening every domain and changing nothing writes the same bytes.
+    assert.deepEqual(editProfileDomains(source, {}, open => PROFILE_DOMAINS.forEach(domain => open(domain.key))), source);
+    let opened;
+    const renamed = editProfileDomains(source, {}, open => {
+        opened = open("settings"); opened.names[1] = "New name";
+        assert.equal(open("settings"), opened, "a domain opened twice is the one model");
+    });
+    assert.equal(validateSnapshot(renamed).settings.names[1], "New name");
+    assert.deepEqual(domains(renamed).filter(row => row.id !== 0x40), domains(source).filter(row => row.id !== 0x40));
+    assert.notEqual(renamed, source);
+    assert.deepEqual(editProfileDomains(source, {}, () => {}), source, "nothing opened is nothing changed");
+    // Reading never writes: the source's own settings are unchanged.
+    assert.equal(readProfileDomains(source)("settings").names[1], "Numbers");
+    assert.equal(readProfileDomains(renamed)("settings").names[1], "New name");
+});
+
+test("a change reads the document as it stands, checked once and never written back, and knows which domains it opened", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const source = document(), decoded = validateSnapshot(source);
+    const renamed = editProfileDomains(source, {decoded}, (open, read) => {
+        assert.equal(read(), decoded, "the caller's decoded form of this very document is read");
+        assert.equal(read(), read(), "and read once");
+        assert.equal(open.isOpen("settings"), false);
+        open("settings").names[1] = "New name";
+        assert.equal(open.isOpen("settings"), true);
+        assert.equal(open.isOpen("behaviors"), false);
+        assert.equal(read().settings.names[1], "Numbers", "reading never sees what is opened");
+        read().settings.names[2] = "Never written";
+    });
+    assert.deepEqual(validateSnapshot(renamed).settings.names.slice(1, 3), ["New name", validateSnapshot(source).settings.names[2]]);
+    // Another document's decoded form is never read for this one.
+    editProfileDomains(renamed, {decoded}, (open, read) => {
+        assert.notEqual(read(), decoded);
+        assert.equal(read().settings.names[1], "New name");
+    });
+    // Nothing opened is the document itself, checked as read.
+    assert.equal(editProfileDomains(source, {decoded}, () => {}), source);
+});
+
+test("a document's domains are read and written with its keyboard's depth and brightness, and a behaviour edit with its action slots", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
+    const source = document();
+    const brighten = value => open => {open("rgb").layerColors[0].color.v = value;};
+    assert.equal(validateSnapshot(editProfileDomains(source, {limits: {brightnessMax: 200}}, brighten(200))).rgb.layerColors[0].color.v, 200);
+    assert.throws(() => editProfileDomains(source, {limits: {brightnessMax: 200}}, brighten(201)), {code: "BRIGHTNESS_EXCEEDED"});
+    // A behaviour edit checks that every row sends only a macro slot the keyboard has.
+    const macroTap = open => {open("behaviors").rows[0].steps = [{tapIndex: 0, tap: {kind: 6, flags: 0, operand: 40}}];};
+    const capabilities = {...CURRENT_CAPABILITIES, actionAbiDigest: source.actionAbiDigest};
+    assert.doesNotThrow(() => editProfileDomains(source, {capabilities: {...capabilities, macroSlots: 41}, checkActions: true}, macroTap));
+    assert.throws(() => editProfileDomains(source, {capabilities: {...capabilities, macroSlots: 40}, checkActions: true}, macroTap), /macro slot 40/);
+    // Any other edit keeps a row it does not touch, though the keyboard now has fewer slots.
+    const sendsMacro40 = editProfileDomains(source, {capabilities: {...capabilities, macroSlots: 41}, checkActions: true}, macroTap);
+    const fewer = {capabilities: {...capabilities, macroSlots: 16}};
+    const timed = editProfileDomains(sendsMacro40, fewer, open => {open("behaviors").rows[0].tapHoldTerm = 180;});
+    assert.equal(validateSnapshot(timed).behaviors.rows[0].tapHoldTerm, 180);
+    assert.throws(() => editProfileDomains(sendsMacro40, {...fewer, checkActions: true}, open => {open("behaviors");}), /macro slot 40/, "a behaviour edit still checks every row");
+    // So is the profile it makes: checked as any document is.
+    assert.throws(() => editProfileDomains(source, {}, open => {open("rgb").layerColors.pop();}), /does not cover all 16 layers/);
+});
+
+test("a change past what the keyboard holds says the profile is full, by the count it went past, and any other refusal is left as it is", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
+    const {PROFILE_BLOB_V1} = require("../../core/schema/profile-blob-v1");
+    const source = document();
+    const overflow = open => {open("macros")[0] = Buffer.alloc(PROFILE_BLOB_V1.MAX_SIZE, 0x41);};
+    assert.throws(() => editProfileDomains(source, {}, overflow), error => error.code === "PROFILE_FULL" && failureSentence(error) === PROFILE_FULL_WORDS.profile && error.cause.code === "CAPACITY_EXCEEDED");
+    // A name's edit says so in a name's words.
+    assert.throws(() => editProfileDomains(source, {full: PROFILE_FULL_WORDS.name}, overflow), error => error.code === "PROFILE_FULL" && error.message === PROFILE_FULL_WORDS.name);
+    // A count the format names is said by that count, whatever the edit.
+    const rows = validateSnapshot(source).behaviors.rows.length;
+    const more = open => {const {rows: all} = open("behaviors"); all.push({...all[0], target: {kind: 1, flags: 0, operand: 0x68}});};
+    assert.throws(() => editProfileDomains(source, {full: PROFILE_FULL_WORDS.name, capabilities: {maxBehaviorRows: rows}}, more), error => failureSentence(error) === PROFILE_FULL_WORDS.counts.behaviours(rows));
+    // A count the words do not know is the profile as a whole.
+    const unknown = Object.assign(new Error("Some table is full."), {code: "CAPACITY_EXCEEDED", limit: "constructor", most: 1});
+    assert.throws(() => editProfileDomains(source, {}, () => {throw unknown;}), error => failureSentence(error) === PROFILE_FULL_WORDS.profile && error.cause === unknown);
+    const conflict = Object.assign(new Error("Read the keyboard before editing."), {code: "PROFILE_DRAFT_CONFLICT"});
+    assert.throws(() => editProfileDomains(source, {}, () => {throw conflict;}), error => error === conflict);
 });

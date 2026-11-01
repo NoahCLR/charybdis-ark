@@ -12,10 +12,11 @@ test("whole-profile checks report inert actions and destination blockers", () =>
     decoded.macroSlots[0] = Buffer.from("é");
     const checks = profileFindings(decoded, {brightnessMax: 100, effects: [{id: 2}]});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.count, 2);
+    assert.equal(checks.find(row => row.kind === "inertPointing")?.title, "2 actions reach Slot 7, an empty pointing slot", "the slot as Pointing modes names it");
     const unplayable = checks.find(row => row.kind === "unplayableMacro");
     assert.equal(unplayable?.place.index, 0);
     assert.equal(unplayable?.title, "Macro 0 cannot play with the settings in Your computer");
-    assert.equal(unplayable?.fix, "Fix the macro or change Host → Your computer before playing it.");
+    assert.equal(unplayable?.fix, "Fix the macro or change Host settings → Your computer before playing it.");
     assert.deepEqual(checks.filter(row => row.level === "blocker").map(row => row.kind), ["brightnessBlocker", "effectBlocker"]);
 });
 
@@ -25,6 +26,7 @@ test("whole-profile findings retain new and fixed status beside the keyboard", (
     draft.danglingPointingKeys = {7: 1};
     const checks = draftProfileChecks(keyboard, draft, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], {});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.status, "new");
+    assert.equal(checks.find(row => row.kind === "inertPointing")?.title, "1 action reaches Slot 7, an empty pointing slot");
 });
 
 test("timing changes report new, existing and fixed findings, including inherited defaults", () => {

@@ -41,9 +41,10 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
         const {mark, marked} = await import("/webview/ui/marks.mjs");
         const {groupRowsTable} = await import("/webview/ui/lighting/led-rows.mjs");
         const {reviewItem} = await import("/webview/ui/review-items.mjs");
-        const {actionLabel} = await import("/webview/view/keyface.mjs");
         const model = getModel();
-        const box = (html) => Object.assign(document.createElement("div"), {innerHTML: html});
+        // The page takes markup only through the panel's policy (Trusted Types).
+        const {html} = await import("/webview/lib/dom.mjs");
+        const box = (markup) => Object.assign(document.createElement("div"), {innerHTML: html(markup)});
         const read = (node) => ({
             icons: [...node.querySelectorAll(".kind-icon")].map((icon) =>
                 `${icon.classList.contains("layer") ? "layer" : "pointing"}${icon.getAttribute("style")?.includes("color:") ? "" : " off"}`),
@@ -113,7 +114,8 @@ test("the layer bar keeps its swatches, Settings' per-layer switches mark their 
         const {mark} = await import("/webview/ui/marks.mjs");
         const model = structuredClone(getModel());
         model.rgb.stages.forEach((stage) => { if (stage.id === "layers") stage.enabled = false; });
-        const node = Object.assign(document.createElement("div"), {innerHTML: mark(model, {kind: "layer", layer: NAVIGATION})});
+        const {html} = await import("/webview/lib/dom.mjs");
+        const node = Object.assign(document.createElement("div"), {innerHTML: html(mark(model, {kind: "layer", layer: NAVIGATION}))});
         return node.querySelector(".kind-icon")?.className;
     }, NAVIGATION);
     expect(off).toBe("kind-icon layer off");
@@ -138,7 +140,8 @@ test("a layer or pointing-mode action is named with its tag, a layer-tap by its 
         const {getModel} = await import("/webview/store.mjs");
         const {actionMarked, keyNameMarked} = await import("/webview/ui/marks.mjs");
         const {reviewItem} = await import("/webview/ui/review-items.mjs");
-        const {actionLabel} = await import("/webview/view/keyface.mjs");
+        const {keyIdentity} = await import("/webview/view/key-identity.mjs");
+        const {html} = await import("/webview/lib/dom.mjs");
         const model = getModel();
         const slot = model.pdModes.find((entry) => entry.id === ZOOM);
         const drawn = {
@@ -152,10 +155,10 @@ test("a layer or pointing-mode action is named with its tag, a layer-tap by its 
                 {label: "Tap", status: "changed", before: "/ / Navigation", after: "Lock Navigation", beforeMark: {kind: "layer", layer: NAVIGATION}, afterMark: {kind: "layer", layer: NAVIGATION}},
             ]}),
             // A behaviour is titled by its key, named as that key is everywhere.
-            reviewTitle: reviewItem(model, {unit: "y", title: actionLabel(model, slot.keys.hold), status: "removed",
+            reviewTitle: reviewItem(model, {unit: "y", title: keyIdentity(model, slot.keys.hold).label, status: "removed",
                 place: {kind: "behaviour", keycode: slot.keys.hold}, fields: []}),
         };
-        for (const [name, html] of Object.entries(drawn)) document.body.insertAdjacentHTML("beforeend", `<div data-drawn="${name}">${html}</div>`);
+        for (const [name, markup] of Object.entries(drawn)) document.body.insertAdjacentHTML("beforeend", html(`<div data-drawn="${name}">${markup}</div>`));
     }, {NAVIGATION, ZOOM});
     const read = (name) => page.locator(`[data-drawn="${name}"]`).evaluate(namedIn);
     expect((await read("hold")).named).toEqual([{icon: "layer", name: "Navigation", tags: ["Hold"]}]);
@@ -224,4 +227,71 @@ test("the hover card's title, the Combos table and the Key and Pointing modes ta
     expect(await dragscroll.evaluate(namedIn)).toMatchObject({named: [{icon: "pointing", name: "Dragscroll", tags: ["hold"]}, {icon: "pointing", name: "Dragscroll", tags: ["lock"]}]});
     expect((await dragscroll.evaluate(namedIn)).text).toMatch(/· 2× ?hold sends Dragscroll ?lock ?PD_MODE_0_LOCK$/);
     expect((await dragscroll.evaluate(namedIn)).text).not.toContain("from");
+});
+
+// The Multi tap window governs every tap count past the first, so its mark is
+// the branch badge counting "N×", its border and fill split into an equal,
+// hard-edged share of each tap-branch colour in tap order (D-L31); and a
+// Settings row's one mark sits in the middle of its slot.
+test("Settings marks the Multi tap window with an N× badge in every tap-branch colour, each timing's mark centred in its slot", async ({page}) => {
+    await openControls(page, "behaviours");
+    const badge = page.locator('[data-section="keyTiming"] .setrow:has([data-f="setting:multiTapTerm"]) .mk-slot .bn');
+    await expect(badge).toHaveText("N×");
+
+    const offsets = await page.locator('[data-section="keyTiming"] .mk-slot:has(> *)').evaluateAll((slots) => slots.map((slot) => {
+        const box = slot.getBoundingClientRect(), mark = /** @type {Element} */ (slot.firstElementChild).getBoundingClientRect();
+        return Math.abs((mark.left + mark.right) / 2 - (box.left + box.right) / 2);
+    }));
+    expect(offsets).toHaveLength(3);
+    expect(offsets.every((offset) => offset < 1)).toBe(true);
+
+    // Red, an off colour, blue and green: four tap counts, so four quarters,
+    // the off one left empty. Drawn on its own and large, on a known ground,
+    // so each quarter is many pixels wide.
+    await page.evaluate(async () => {
+        const {getModel} = await import("/webview/store.mjs");
+        const {mark} = await import("/webview/ui/marks.mjs");
+        const {html} = await import("/webview/lib/dom.mjs");
+        const model = structuredClone(getModel());
+        model.rgb.keyBehaviorFeedback.tapBranchColors = [{h: "0", s: "255", v: "255"}, {h: "0", s: "255", v: "0"}, {h: "170", s: "255", v: "255"}, {h: "85", s: "255", v: "255"}];
+        const box = Object.assign(document.createElement("div"), {id: "drawn", innerHTML: html(`<span class="mk">${mark(model, {kind: "branches"})}</span>`)});
+        box.style.cssText = "position: fixed; left: 0; top: 0; z-index: 999; padding: 8px; background: rgb(20, 20, 20); zoom: 4";
+        document.body.appendChild(box);
+    });
+    const shot = (await page.locator("#drawn .bn").screenshot()).toString("base64");
+    const pixels = await page.evaluate(async (png) => {
+        const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+        const canvas = new OffscreenCanvas(image.width, image.height);
+        const context = /** @type {OffscreenCanvasRenderingContext2D} */ (canvas.getContext("2d"));
+        context.drawImage(image, 0, 0);
+        const at = (x, y) => [...context.getImageData(Math.round(x), Math.round(y), 1, 1).data.slice(0, 3)];
+        const {width: w} = image, quarter = w / 4;
+        return {
+            background: at(0, 0),
+            // The fill above the count, at each quarter's middle, and either side of each edge.
+            fill: [0, 1, 2, 3].map((i) => at(quarter * (i + .5), 8)),
+            nearEdges: [1, 2, 3].map((i) => [at(quarter * i - 3, 8), at(quarter * i + 3, 8)]),
+            // The border's top row, in the two middle quarters.
+            ring: [1, 2].map((i) => at(quarter * (i + .5), 1)),
+        };
+    }, shot);
+    const leads = ([r, g, b]) => r > g + 20 && r > b + 20 ? "red" : g > r + 20 && g > b + 20 ? "green" : b > r + 20 && b > g + 20 ? "blue" : "none";
+    const close = (a, b) => a.every((channel, i) => Math.abs(channel - b[i]) <= 3);
+    expect(pixels.fill.map(leads)).toEqual(["red", "none", "blue", "green"]);
+    expect(close(pixels.fill[1], pixels.background)).toBe(true);
+    // A hard switch: three pixels either side of an edge are each its own share's colour.
+    expect(pixels.nearEdges.map(([before, after]) => [leads(before), leads(after)])).toEqual([["red", "none"], ["none", "blue"], ["blue", "green"]]);
+    expect(close(pixels.nearEdges[2][0], pixels.fill[2]) && close(pixels.nearEdges[2][1], pixels.fill[3])).toBe(true);
+    expect(close(pixels.ring[0], pixels.background)).toBe(true);
+    expect(pixels.ring[1][2]).toBeGreaterThan(200);
+
+    // With key feedback off the badge is drawn unlit, as a tap count's is.
+    const off = await page.evaluate(async () => {
+        const {getModel} = await import("/webview/store.mjs");
+        const {mark} = await import("/webview/ui/marks.mjs");
+        const model = structuredClone(getModel());
+        model.rgb.stages.forEach((stage) => { if (stage.id === "key") stage.enabled = false; });
+        return mark(model, {kind: "branches"});
+    });
+    expect(off).toBe('<span class="bn">N×</span>');
 });

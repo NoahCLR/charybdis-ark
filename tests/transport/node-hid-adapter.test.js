@@ -5,16 +5,16 @@ const {EventEmitter} = require("node:events");
 const test = require("node:test");
 
 const {
+    CHARYBDIS_PRODUCT_ID,
+    CHARYBDIS_VENDOR_ID,
     LIVE_LINK_ERROR_CODES,
+    QMK_RAW_HID_USAGE,
+    QMK_RAW_HID_USAGE_PAGE,
     RAW_HID_REPORT_SIZE,
 } = require("../../core/transport/device-adapter");
 const {
-    CHARYBDIS_PRODUCT_ID,
-    CHARYBDIS_VENDOR_ID,
     NODE_HID_REPORT_SIZE,
     NodeHidDeviceAdapter,
-    QMK_RAW_HID_USAGE,
-    QMK_RAW_HID_USAGE_PAGE,
     addNodeHidReportId,
     normalizeNodeHidInputReport,
 } = require("../../core/transport/node-hid-adapter");

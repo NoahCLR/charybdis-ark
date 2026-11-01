@@ -35,7 +35,8 @@ Every stage uses the same colour editor: drag in the square and along the
 **Hue** strip, or type **H**, **S** and **V**. Brightness stops at the limit
 the keyboard reports.
 
-**Turn off** stores HSV(0, 0, 0), and what that does depends on the stage. A
+**Turn off** stores HSV(0, 0, 0), and the colour then reads **Off**; what
+that does depends on the stage. A
 layer with no colour paints nothing, so what is underneath shows through, and
 an LED row with none takes its stage's colour. Everywhere else black is
 black: a pointing mode, combo feedback or a key feedback colour turned off
@@ -58,7 +59,9 @@ shows it.
 
 ### Layer colours
 
-Pick a layer in the list to give it a colour. **Which keys light up**: **Keys
+Pick a layer in the list to give it a colour; the
+[empty layers](board-and-layers.md#empty-layers) are folded at its end, and
+one with a colour is not empty. **Which keys light up**: **Keys
 mapped on this layer only** leaves the keys that are transparent or empty on
 the layer unpainted, so what is beneath shows there; **All keys** paints
 every key. Transparent keys keep their ▽ on the board either way. A layer with
@@ -84,7 +87,7 @@ Each pointing mode can light while it runs, over whatever the layer paints.
 A mode linked to layers paints beneath the lowest of them that is on instead
 (a layer that starts it or one its key turns on),
 however the mode started: those layers' own colours show over it, and higher
-layers cover both (see [Pointing](pointing.md#how-it-starts)). Pick a mode,
+layers cover both (see [Pointing](pointing.md#3-what-starts-it)). Pick a mode,
 give it a colour, and choose where it paints:
 
 - **Both halves**, **Left half** or **Right half**: that area, whichever key
@@ -131,10 +134,15 @@ The **LED groups** tab paints single LEDs, over a stage's own colour.
    all of them), and its colour.
 3. **Keep row in draft**.
 
-**Save selection as a group** keeps the selected LEDs as a reusable group for
-other rows; with nothing selected there is nothing to save. Groups are
-numbered by the LEDs they hold, so saving or removing one can renumber the
-others; every row keeps its LEDs. **Used by** lists the tables and owners
-whose rows use a group, and a group in use cannot be removed. Rows apply in
-order, so a later row wins on an LED they share. A row whose colour is turned
-off takes its stage's colour.
+**Make a group from the selection** keeps the selected LEDs as a reusable
+group for other rows; with nothing selected there is nothing to group.
+Groups are numbered by the LEDs they hold, so making or removing one can
+renumber the others; every row keeps its LEDs. **Used by** lists the tables
+and owners whose rows use a group, and a group in use cannot be removed. Rows
+apply in order, so a later row wins on an LED they share. A row whose colour
+is turned off takes its stage's colour.
+
+The keyboard holds at most 16 groups and 32 rows across every stage's table
+(the **LED groups** and **LED overrides** under **Memory** on the Keyboard
+screen). Making one more is refused in the draft, saying which is full, before
+the keyboard sees it; remove one first.

@@ -15,12 +15,15 @@ function sourceFiles(root) {
         const name = path.join(directory, entry.name);
         return entry.isDirectory() ? walk(name) : /\.(m?js|sh)$/.test(name) ? [name] : [];
     });
-    return ["core", "tests", "web", "webview", "scripts", "browser-tests"].flatMap(walk)
+    return ["core", "rules", "tests", "web", "webview", "scripts", "browser-tests"].flatMap(walk)
         .concat(["playwright.config.js"]);
 }
 
 /** @param {string} root */
 function syntaxCoverage(root) {
+    // The compiler lists real paths, so a root reached through a link
+    // (macOS's /tmp) is compared by its real path too.
+    root = fs.realpathSync(root);
     const script = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts.typecheck;
     const configs = Array.from(script.matchAll(/tsc -p ([\w.-]+)/g), match => match[1]);
     if (!configs.length) throw new Error("No TypeScript checks found in scripts.typecheck.");

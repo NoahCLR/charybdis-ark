@@ -1,5 +1,5 @@
-import type {BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PointingSlot, Scalar} from './edits.js';
-import type {ApplyView, Check, DemoView, HistoryStep, ShellPanel, LoadView, Participation, PhaseId, ProfileUsage, ReviewChange, SettingField, SettingsSection, Vocabulary} from './model.js';
+import type {BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PointingSlot, Scalar, TimingTerm} from './edits.js';
+import type {ApplyView, Check, DemoView, HistoryStep, ShellPanel, LoadView, Participation, PhaseId, ProfileUsage, ReviewChange, SettingField, SettingsSection, TimingSource, Vocabulary} from './model.js';
 
 export interface Position {
     layoutIndex: number;
@@ -15,16 +15,16 @@ export interface Position {
 }
 /** One possible answer, while its layer is active and higher answering layers are absent. */
 export interface LayerAnswer {layer: number; active: number; blocked: number}
-export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]}
+export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]; /** Base, and each default layer the keyboard keeps, is always on. */ alwaysOn?: boolean; /** The profile gives it a name of its own; without one, `displayName` is core's words for it. */ named?: boolean}
 // What a key with no behaviour of its own runs on: its built-in actions, the
 // timing defaults it follows, with or without a row, which setting each comes
 // from, and whether a behaviour's timing alone does something on it (firmware
 // D-F27 "Rows without steps").
-export type TimingSource = "tappingTerm" | "tapHoldTerm" | "longHoldTerm" | "multiTapTerm";
+export type {TimingSource} from './model.js';
 export interface KeyBehaviorDefaults {
     builtIn: BuiltIn;
     timing: Record<string, Scalar | undefined>;
-    timingSources?: Record<string, TimingSource>;
+    timingSources?: Partial<Record<TimingTerm, TimingSource>>;
     timingAlone?: boolean;
 }
 export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean; fromPress?: boolean}
@@ -34,12 +34,16 @@ export interface BehaviorView extends Omit<Behavior, 'steps'> {
     builtIn?: BuiltIn;
     steps: {tapCount: number; tapCountName?: string; tap?: Branch; hold?: Branch; longHold?: Branch}[];
     timingDefaults?: Record<string, Scalar | undefined>;
-    timingWords?: Record<string, string>;
+    timingWords?: Partial<Record<TimingTerm, string>>;
     changesNothing?: boolean;
 }
-export interface ComboView extends Combo {inputPositions?: number[]; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
-export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string}
-export interface MacroSlot {keycode: string; name: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
+/** A key a combo is pressed on: the layer that answers it and its layout index; `fellThrough` when that is a lower layer, `whileHeld` when it has to be held, `reference` when Combo Layer Matching supplies it. */
+export interface ComboReachKey {layer: number; layoutIndex: number; fellThrough: boolean; whileHeld: boolean; reference?: boolean}
+/** Whether a combo fires from a layer: on `keys` under the smallest hold `held` (layer indexes) that covers all its inputs, or, when none does, the keys covering the most of them (`covered`). */
+export interface ComboReach {fires: boolean; covered: number; keys: ComboReachKey[]; held: number[]}
+export interface ComboView extends Combo {inputPositions?: number[]; /** The layers its output runs its behaviour on, judged from its last input's layer (core/model/participation.js). */ outputBehaviorLayers?: number; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
+export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string; /** False for an entry the keycode picker never offers (core/data/offered-keycodes.js). */ offered?: boolean}
+export interface MacroSlot {keycode: string; name: string; /** What it is called while it has no name of its own. */ defaultName: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
 /** A custom key's shortcut (firmware D-F26): a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI), its keys in press order (at most six, each once, at most one media and one system key), a mask of the layers it turns on, and how it turns them on (`layerKind`: 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers). */
 export interface CustomKeyShortcut {mods: number; keys: number[]; layers: number; layerKind: number}
 /** A cap on a shortcut's keys: at most `most` of the keys in `keycodes` (every key when null), or, with `each`, each of them at most `most` times; `refusal` says why when broken. */
@@ -74,7 +78,7 @@ export interface ProfileSummary {layers: number; behaviors: number; combos: numb
 export type DraftBlock = '' | 'no-draft' | 'other-keyboard' | 'disconnected' | 'connection-changed' | 'unsupported' | 'stale' | 'busy';
 export interface DraftView {
     id: string; revision: number; dirty: boolean; stale: boolean; connectionChanged: boolean; connected: boolean; matching: boolean; busy: boolean;
-    /** Whether core takes an edit to this draft now (core/session/panel-session-state.js draftBinding); the interface's canEdit reads it. */
+    /** Whether core takes an edit to this draft now (core/session/panel-session-state.js draftBinding); the interface's editGate reads it. */
     editable: boolean;
     /** Why it does not, or '' when it does. */
     reason: DraftBlock;
@@ -103,7 +107,7 @@ export interface LiveKeyboardView {
     quietWords: string;
 }
 export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
-export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]}
+export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]; /** For a layer LED group that one layer owns, that layer. */ ownerLayer?: number}
 export interface RgbView {
     stageEnableMask: number;
     stages: {id: string; label: string; bit?: number; enabled: boolean}[];
@@ -119,8 +123,22 @@ export interface RgbView {
     keyBehaviorFeedbackLedGroups: LedRow[];
 }
 export interface BaseRgbView {state: string; message?: string; enabled?: boolean; effectId?: number; hue?: number; saturation?: number; brightness?: number; speed?: number; readAt?: string; effectName?: string; brightnessPercent?: number; previewColor?: Colour}
+/** The fields every model of a build starts from, posted once as the catalog (core/model/profile-model.js panelCatalog). */
+export type CatalogField = 'vocabulary' | 'leds' | 'qmkKeycodes' | 'qmkKeyLabels' | 'qmkKeycodeAliases' | 'qmkKeyShortLabels' | 'qmkKeyKinds' | 'qmkKeycodeSource' | 'qmkSpellings';
+/** What every model of a build starts from: the keycode catalogue as the picker reads it, the words for stored values and what no profile changes. */
+export type PanelCatalog = Pick<PublishedModel, CatalogField>;
+/** What a model lays over the catalog, by field: an array's entries that differ, by index (past the catalog's end, those it adds), or a record's keys whose value differs. A field it lays nothing over is absent. */
+export type CatalogOverlay = {[F in CatalogField]?: PublishedModel[F] extends (infer E)[] ? [number, E][] : PublishedModel[F] extends object ? Partial<PublishedModel[F]> : never};
+/**
+ * A model as the panel loop posts it (core/session/panel-loop.js): without the catalog's fields, which `catalogOverlay` says how to lay over
+ * the catalog, except a field that does not start from the catalog's, posted whole. A model with no `catalogOverlay` is whole (the preview's).
+ */
+export type PostedModel = PublishedModel | (Omit<PublishedModel, CatalogField> & Partial<PanelCatalog> & {catalogOverlay: CatalogOverlay});
 export interface PublishedModel {
     vocabulary: Vocabulary & {pickerModifiers: {bit: number; value: string; label: string}[]};
+    /** The LED each key carries, by layout index, and the trackball's (core/data/charybdis-layout.js). */
+    leds: {keys: number[]; trackball: number};
+    /** In index order: a layer's place in the list is its `index` (tests/view/layer-view.test.mjs). */
     layers: Layer[];
     hostLayoutLegends: Record<string, string[]> | null;
     /** `pointerCovers`: the layers the slot's key turns on that the pointer layer covers while the mode keeps it, bit n layer n (core/model/pointing-links.js). */
@@ -135,12 +153,17 @@ export interface PublishedModel {
     profileIdentity: Partial<BaseIdentity> | null;
     rgb: Partial<RgbView> & {maximumBrightness?: number; baseEffect: BaseRgbView};
     combos: ComboView[];
+    /** Which layer's keys combos match while each layer is on top (Combo Layer Matching). */
+    comboReferenceLayers: number[];
+    /** Per layer, per combo in `combos`' order: whether it fires from that layer, and on which keys (core/model/combo-reach.js). */
+    comboReach: ComboReach[][];
     comboReadback: {layerReferences?: number[]; version?: number; state?: string; writable?: boolean; defaultTermMs?: number; holdTermMs?: number; enabled?: boolean; error?: {message?: string}};
     macros: MacroSlot[];
     macroNameSpace: {perName: number} | null;
     macroBank: {capacity: number; stored: number; free: number; available: number; slots: number; reserveTaps: number} | null;
     hostSettings: {selected: number; detected: number; effective: number; unicodeEnabled: boolean; unicodeMode: number; layout: number; layoutFits: boolean; macosIso: boolean} | null;
-    macroUnicode: {mode: number; enabled?: boolean; os?: number; layout?: number; layoutFits?: boolean; layoutName?: string; layoutChars?: string};
+    /** `entry`: what Unicode entry does for text the layout cannot type, or what it needs while off. */
+    macroUnicode: {mode: number; enabled?: boolean; os?: number; layout?: number; layoutFits?: boolean; layoutName?: string; layoutChars?: string; entry?: string};
     macroProtectionChoices: {value: 'auto' | 'on' | 'off'; label: string}[];
     macroEditing: {identity: string; writable: boolean};
     behaviorTimingDefaults: Record<string, string>;
@@ -164,15 +187,23 @@ export interface PublishedModel {
     qmkKeyLabels: Record<string, string>;
     /** Keycode name → the layer it acts on, beside its label in qmkKeyLabels (model/key-names.js keyLayer). */
     qmkKeyLayers: Record<string, number>;
-    /** The layers each keycode turns on as the key pressed, bit n layer n, by every name it is read under; a keycode that turns none on is absent (core/model/layer-reach.js keycodeLayersOn). */
+    /** Keycode name → what it does to that layer, by QMK's function, beside qmkKeyLayers (model/key-names.js keyLayerForm). */
+    qmkKeyLayerForms: Record<string, import("./model.js").LayerForm>;
+    /** Keycode name → the modifiers a layer-mod (LM) holds with its layer, in the host's words, as its label ends: "Shift" (model/key-names.js layerModWords). */
+    qmkKeyLayerMods: Record<string, string>;
+    /** Keycode name → the key a layer-tap (LT) taps, by its name in this profile, as its label starts: "/" (model/key-names.js layerTapWords). */
+    qmkKeyLayerTaps: Record<string, string>;
+    /** The layers each keycode turns on as the key pressed, bit n layer n, by every name it is read under; a keycode that turns none on is absent (core/model/layer-effects.js keycodeLayersOn). */
     qmkKeyTurnsOn: Record<string, number>;
+    /** What each keycode is that the interface treats apart from other keys, by every name it is read under: the stored name, the catalogue's other names, the profile's and the keyboard's hex (model/key-names.js keyKind). */
+    qmkKeyKinds: Record<string, import("./model.js").KeyKind>;
     qmkKeyShortLabels: Record<string, string>;
     qmkKeycodeAliases: Record<string, string>;
     qmkKeycodeSource: string;
     /** QMK spellings the encoder accepts beyond the catalogue: mod-tap shorthands (name → MT modifiers), deprecated wrappers (name → wrapper) and names (name → expression). */
     qmkSpellings: {modTaps: Record<string, string>; wrappers: Record<string, string>; names: Record<string, string>};
     diagnostics: string[];
-    /** `summary` names the saved profile's generation and digest (Diagnostics); `savedProfile` the same in words, without the digest. */
+    /** `summary` names the saved profile's generation and digest (Diagnostics); `savedProfile` says in words whether a profile is saved and how the halves stand, without either. */
     device: {connected: boolean; label: string; summary: string; savedProfile: string; subtitle: string; /** Each half's flash pauses as last read (GET 0x0D); null until read; the demo's are samples. */ flashPauses: import('./model.js').FlashPausesView | null; health: {profile: string; converged: boolean; halves: import('./model.js').HalvesId; recoveryPending: boolean; restartNeeded: boolean; earlierFormat: boolean; busy: boolean; phase: PhaseId; error: string}};
     devices: {id: string; label: string}[];
     selectedDeviceId: string;
@@ -181,7 +212,7 @@ export interface PublishedModel {
     apply: ApplyView | null;
     /** Core always sets `progress`, possibly undefined, which a JSON transport drops. */
     postApplyRead: {step: import('./messages.js').ReadStep; progress?: import('./model.js').CountedProgress | null} | null;
-    portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null; /** The file's profile bytes against this keyboard's memory. */ fits?: {used: number; capacity: number} | null} | null; layers: {key: string; order: number[]; names: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null; /** When the copy from before the last Apply on this keyboard was saved; Put back what it had uses it. */ putBack: string | null};
+    portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null; /** The file's profile bytes against this keyboard's memory. */ fits?: {used: number; capacity: number} | null} | null; layers: {key: string; order: number[]; names: string[]; /** Each layer as a person reads it: its name, or core's words for an unnamed one. */ titles: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null; /** When the copy from before the last Apply on this keyboard was saved; Put back what it had uses it. */ putBack: string | null};
     shell: ShellPanel;
     load: LoadView;
     /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */

@@ -1,7 +1,7 @@
 # Issue tracker
 
-Issues for this repository live in Noah's private notes vault, `charybdis-notes`,
-not on GitHub. From any checkout or worktree it is:
+Issues for this repository live in Noah's private notes vault,
+`charybdis-notes`, not on GitHub. From any checkout or worktree it is:
 
 ```sh
 "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/../charybdis-notes"

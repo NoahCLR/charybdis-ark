@@ -5,7 +5,8 @@
 // chooser, downloads, and the page itself for progress and errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {closingLoses, demoUnsaved, FILE_MAX_BYTES, openPanelLoop, WebHidDeviceAdapter, writingProfile} from "./core.mjs";
+import {FILE_MAX_BYTES, FILE_TOO_LARGE, openPanelLoop, VOCABULARY, WebHidDeviceAdapter} from "./core.mjs";
+import {copyTitle} from "../webview/view/shell-panel.mjs";
 import {connectPanel} from "./panel-channel.mjs";
 import {nativePopups} from "./native-popups.mjs";
 import {openRecoveries} from "./recoveries.mjs";
@@ -23,11 +24,26 @@ export const BLOCKED = Object.freeze({
         detail: "One tab holds the keyboard at a time. Keep working in the other Ark tab, or close it: this tab takes over when it does."}),
 });
 
-// A chosen file is held to the portable document's byte ceiling.
-export const PROFILE_FILE_LIMIT = FILE_MAX_BYTES;
-export const THEME_KEY = "charybdis-ark.theme";
+// What the page says when the panel's own file did not load (web/page.mjs),
+// in place of a blank page. Text goes in as text, never as markup.
+export const LOAD_FAILED = Object.freeze({title: "Ark did not finish loading",
+    detail: "Part of the page could not be loaded. Reload the page to try again."});
+/** @param {Pick<Document, "createElement">} document @param {Pick<Element, "replaceChildren">} root */
+export function showLoadFailure(document, root) {
+    const notice = document.createElement("main"), title = document.createElement("h1"), detail = document.createElement("p");
+    notice.className = "load-failure";
+    title.textContent = LOAD_FAILED.title;
+    detail.textContent = LOAD_FAILED.detail;
+    notice.append(title, detail);
+    root.replaceChildren(notice);
+    return notice;
+}
+
+const THEME_KEY = "charybdis-ark.theme";
 export const COMPILED_DEFAULTS_KEY = "charybdis-ark.compiled-defaults";
 const LOCK = "charybdis-ark.keyboard";
+// What a recovery copy that has gone from the browser's storage is told.
+const GONE = "That recovery copy is no longer in this browser.";
 
 // A saved choice wins; otherwise the system's setting.
 /** @param {string | null | undefined} saved @param {boolean} prefersLight @returns {"light" | "dark"} */
@@ -35,21 +51,12 @@ export function initialTheme(saved, prefersLight) {
     return saved === "light" || saved === "dark" ? saved : prefersLight ? "light" : "dark";
 }
 
-// Whether leaving the page would lose something: unapplied edits (in the
-// demo, edits not exported since), edits in Live preview + save not saved (in
-// Live edit the keyboard keeps and saves them, so only an edit on its way
-// counts), or an Apply, a Save (or a restore) part way through.
-/** @param {import("../core/session/types.js").PanelSession & {service: {phase?: import("../contracts/model.js").PhaseId}}} session */
-export function leaving(session) {
-    const edits = session.demo ? demoUnsaved(session) : closingLoses(session);
-    return Boolean(edits || writingProfile(session));
-}
-
 // A chosen profile file as the loop takes it, refused when it is too large.
 /** @param {Pick<File, "size" | "text" | "name"> | undefined} file */
 export async function readProfileFile(file) {
     if (!file) return undefined;
-    if (file.size > PROFILE_FILE_LIMIT) throw new Error("This profile file is too large.");
+    // A chosen file is held to the backup's byte ceiling.
+    if (file.size > FILE_MAX_BYTES) throw new Error(FILE_TOO_LARGE);
     return {text: await file.text(), name: file.name};
 }
 
@@ -65,7 +72,7 @@ export function startWebShell(env) {
     let recoveryList = [];
     /** @type {string | null} */
     let progress = null;
-    /** @type {Promise<(Error & {code?: string}) | null> | undefined} */
+    /** @type {Promise<unknown> | undefined} */
     let picking;
     /** @type {ReturnType<typeof readProfileFile> | undefined} */
     let choosing;
@@ -80,10 +87,13 @@ export function startWebShell(env) {
             try {return await work();}
             finally {progress = null;}
         },
+        // A copy is named as Backups lists it, never by the file it
+        // downloads as; core's sentences say it is on Backups.
         saveRecovery: async (copy, about) => {
-            const name = await recoveries.save(copy, about);
+            const savedAt = new Date();
+            await recoveries.save(copy, about, savedAt);
             recoveryList = await recoveries.list();
-            return `${name}, kept in this browser (Backups)`;
+            return copyTitle({vocabulary: VOCABULARY}, {...about, savedAt: savedAt.toISOString()});
         },
         chooseProfile: () => {
             const chosen = choosing || Promise.resolve(undefined);
@@ -101,7 +111,12 @@ export function startWebShell(env) {
     // A live keyboard's own saves and key adjustments show up between edits,
     // looked for only while the page can hear the answer (native-popups.mjs).
     loop.watch({paused: nativePopups(document).paused});
-    const panel = connectPanel({receive, gesture, target: window});
+    // A message whose handling failed still gets its answer, a notice; the
+    // fault itself goes to the console for whoever looks into it.
+    const panel = connectPanel({receive, gesture, target: window, failed: (error) => {
+        console.error(error);
+        loop.fail(error);
+    }});
 
     // Chrome opens its picker and file chooser only inside the click, so they
     // start here, before the message reaches the loop; the loop then waits
@@ -109,7 +124,8 @@ export function startWebShell(env) {
     /** @param {import("../contracts/messages.js").PanelRequest} message */
     function gesture(message) {
         if (message?.type === "chooseKeyboard" && hid && !blocked) {
-            picking = adapter.requestDevice().then(() => null, (error) => error);
+            picking = adapter.requestDevice();
+            picking.catch(() => {});
         }
         if (message?.type === "choosePortableProfile" || message?.type === "openDemoProfile") {
             choosing = chooseFile(document);
@@ -147,104 +163,55 @@ export function startWebShell(env) {
                 return loop.publish();
             case "downloadRecovery": {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
-                if (copy) download(document, window, copy.name, copy.text);
-                else Object.assign(loop.session, {notice: "Failed: That recovery copy is no longer in this browser.", noticeFailed: true});
+                if (!copy) return loop.fail(new Error(GONE));
+                download(document, window, copy.name, copy.text);
                 return loop.publish();
             }
             // A recovery copy opens as a backup file does: its comparison
             // with the keyboard first, then Use as draft.
             case "useRecovery": {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
-                if (!copy) {
-                    Object.assign(loop.session, {notice: "Failed: That copy is no longer in this browser.", noticeFailed: true});
-                    return loop.publish();
-                }
-                const draft = loop.session.draft;
-                return loop.handleMessage({type: "reviewPortableProfile", text: copy.text, name: copy.name, ...(draft ? {draftId: draft.id, draftRevision: draft.revision} : {})});
+                if (!copy) return loop.fail(new Error(GONE));
+                return loop.reviewProfile(copy);
             }
             case "deleteRecovery": {
-                await recoveries.delete(message.id).catch(() => {Object.assign(loop.session, {notice: "Failed: That copy could not be deleted.", noticeFailed: true});});
+                const deleted = await recoveries.delete(message.id).then(() => true, () => false);
                 recoveryList = await recoveries.list().catch(() => recoveryList);
-                return loop.publish();
+                return deleted ? loop.publish() : loop.fail(new Error("That recovery copy could not be deleted."));
             }
             case "chooseKeyboard": {
-                const failure = await picking;
+                const picked = picking;
                 picking = undefined;
-                if (failure === undefined) return loop.publish();
-                if (failure) {
-                    if (failure.code === "CANCELLED") loop.session.notice = "No keyboard was chosen.";
-                    else Object.assign(loop.session, {notice: `Failed: ${failure.message}`, noticeFailed: true});
-                    return loop.publish();
-                }
-                // The chosen keyboard lists first; select it by that, so the
-                // read opens it even while another one is connected. Choosing
-                // from the demo leaves it, as the panel asked; the read does that.
-                await loop.session.service.enumerate();
-                const chosen = loop.session.service.snapshot().devices[0]?.id;
-                const leave = message.discardDemo === true ? {discardDemo: true} : {};
-                return loop.handleMessage(chosen ? {type: "selectDevice", deviceId: chosen, ...leave} : {type: "refresh", ...leave});
+                // A tab that opened no picker has nothing to read.
+                return picked ? loop.chose(picked, message) : loop.publish();
             }
-            case "forgetKeyboard": {
-                const service = loop.session.service;
-                if (service.snapshot().busy) {
-                    loop.session.notice = "Wait for the keyboard to finish before disconnecting it.";
-                    return loop.publish();
-                }
-                await service.disconnect();
-                await adapter.forget();
-                loop.session.notice = "Disconnected. This page will not open that keyboard again until you choose it.";
-                return followAllowed();
-            }
+            case "forgetKeyboard":
+                return loop.forget(() => adapter.forget());
             case "ready": case "refresh": case "selectDevice":
                 await holding;
-                if (blocked) return loop.publish();
+                // A tab that reaches no keyboard reads none, but a panel that
+                // has loaded still gets the catalog before its model.
+                if (blocked) return message.type === "ready" ? loop.ready() : loop.publish();
                 return loop.handleMessage(message);
             default:
                 return loop.handleMessage(message);
         }
     }
 
-    // What the page shows follows what Chrome lets it open. Plugging in an
-    // allowed keyboard, unplugging one or disconnecting one lists them again,
-    // and with none open the first one left is connected: an allowed keyboard
-    // is always either the connected one or in the selector. The demo stays
-    // the demo; its selector still follows.
-    let following = false;
-    async function followAllowed() {
-        const service = loop.session.service;
-        if (following || blocked || !hid) return loop.publish();
-        // A keyboard renamed by a save drops off and comes back under its new
-        // name; the loop waits for that one (keyboard-reconnect.js) and must
-        // not have another connected in its place.
-        if (loop.session.reconnect) return loop.publish();
-        // A running read or Apply lists the keyboards itself; look again after it.
-        if (service.snapshot().busy) {
-            setTimeout(() => void followAllowed(), 500);
-            return;
-        }
-        following = true;
-        try {
-            await service.enumerate();
-            const state = service.snapshot();
-            if (!state.connected && state.devices.length && !loop.session.demo) return await loop.handleMessage({type: "refresh"});
-            loop.publish();
-        } catch {
-            loop.publish();
-        } finally {
-            following = false;
-        }
-    }
+    // What the page shows follows what Chrome lets it open: plugging in an
+    // allowed keyboard or unplugging one lists them again (the loop's
+    // keyboardsChanged).
     if (hid) {
         // After every listener on the event, so a keyboard that left has
         // already let go of its connection.
         /** @param {"connect" | "disconnect"} type */
-        const follow = (type) => hid.addEventListener(type, () => setTimeout(() => void holding.then(followAllowed), 0));
+        const follow = (type) => hid.addEventListener(type, () => setTimeout(() => void holding.then(loop.keyboardsChanged), 0));
         follow("connect");
         follow("disconnect");
     }
 
     window.addEventListener("beforeunload", (event) => {
-        if (!leaving(loop.session)) return;
+        if (!loop.leaving()) return;
         event.preventDefault();
         event.returnValue = "";
     });

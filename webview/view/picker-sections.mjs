@@ -3,7 +3,7 @@
 // but they are not a useful first navigation model for somebody configuring a
 // keyboard, so the picker presents task-shaped categories instead.
 
-/** @typedef {Pick<import("../../contracts/panel.js").CatalogEntry, "group"> & {value?: string, key?: string, name?: string}} Entry */
+/** @typedef {Pick<import("../../contracts/panel.js").CatalogEntry, "group"> & {value?: string, key?: string, name?: string, offered?: boolean}} Entry */
 
 const SYMBOLS = new Set([
     "KC_GRAVE", "KC_MINUS", "KC_EQUAL", "KC_LEFT_BRACKET", "KC_RIGHT_BRACKET",
@@ -19,37 +19,11 @@ const NAVIGATION = new Set([
 const valueOf = (entry) => entry.value || entry.key || entry.name || "";
 /** @param {string[]} groups @returns {(entry: Entry) => boolean} */
 const inGroups = (...groups) => (entry) => groups.includes(entry.group);
-// Macro slots are offered by their MACRO_n names in the Macros section.
-const NATIVE_MACRO = /^QK_MACRO_\d+$/;
-// QMK's User 0–31 entries occupy the retired, inert custom-key block.
-// Keep their catalogue names for readback; current custom keys have their own names.
-const RETIRED_USER = /^QK_USER_(?:[0-9]|[12][0-9]|3[01])$/;
-// Charybdis's own drag scroll ignores the pointing-mode settings; drag scroll
-// is the factory dragscroll pointing slot. A key already holding one still reads back
-// by name, but the picker does not offer it.
-const UNSUPPORTED = new Set(["DRGSCRL", "DRG_TOG"]);
-// Keycodes for QMK features this firmware does not build, so they do nothing
-// on any key: the build enables bootmagic, mouse keys, extra keys, RGB Matrix,
-// pointing, combos and VIA, with QMK's default Magic, Grave Escape and Space
-// Cadet. A stopgap written against that build until the keyboard reports its
-// features.
-const UNBUILT_GROUPS = new Set([
-    "audio", "backlight", "connection", "joystick", "led_matrix", "midi", "programmable_button",
-    "rgb", "sequencer", "steno", "swap_hands", "underglow",
-]);
-const UNBUILT = new RegExp("^(?:" + [
-    "QK_AUTO_SHIFT_", "QK_AUTOCORRECT_", "QK_CAPS_WORD_", "QK_DYNAMIC_MACRO_", "QK_DYNAMIC_TAPPING_TERM_",
-    "QK_HAPTIC_", "QK_KEY_OVERRIDE_", "QK_SECURE_", "QK_TRI_LAYER_", "QK_UNICODE_MODE_",
-    "QK_ALT_REPEAT_KEY$", "QK_LAYER_LOCK$", "QK_LEADER$", "QK_LOCK$", "QK_REPEAT_KEY$", "QK_VELOCIKEY_TOGGLE$",
-    "KC_LOCKING_",
-    // The QK_KB slots the Charybdis leaves unnamed.
-    "QK_KB_\\d+$",
-].join("|") + ")");
+// Whether the picker offers an entry at all, in any section or search: core
+// marks the ones it never offers (core/data/offered-keycodes.js), a key
+// already holding one still reading back by name.
 /** @param {Entry} entry */
-const unbuilt = (entry) => UNBUILT_GROUPS.has(entry.group) || UNBUILT.test(valueOf(entry));
-// Whether the picker offers an entry at all, in any section or search.
-/** @param {Entry} entry */
-export const pickable = (entry) => !NATIVE_MACRO.test(valueOf(entry)) && !RETIRED_USER.test(valueOf(entry)) && !UNSUPPORTED.has(valueOf(entry)) && !unbuilt(entry);
+export const pickable = (entry) => entry.offered !== false;
 // The Charybdis's own keys: DPI and sniping.
 const isKeyboardKey = inGroups("kb");
 // The keyboard's 128 custom keys, by the names the model gives them, and KC_NO/KC_TRNS.

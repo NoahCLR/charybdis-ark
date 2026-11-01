@@ -9,6 +9,7 @@ const {effectiveComboWindow} = require("../schema/combo-domain-v1");
 const {SETTING, SHORTCUT_LAYER_KINDS} = require("../schema/settings-domain-v1");
 const {nativeCode, actionName} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
+const {QK} = require("../../rules/qmk-keycodes.mjs");
 
 /**
  * @typedef {import("../schema/types.js").BehaviorStep} BehaviorStep
@@ -20,8 +21,12 @@ const SHORT_WINDOW_MS = 50; // advisory comfort heuristic, never a validity limi
 const transparent = action => nativeCode(action) === 1;
 /** @param {number | undefined} code @param {number} start @param {number} end */
 const within = (code, start, end) => code !== undefined && code >= start && code <= end;
-// QMK's dual-role keys: MT(), LT(), OSL(), OSM() and TT().
-const DUAL_ROLE = /** @type {const} */ ([[0x2000, 0x3fff], [0x4000, 0x4fff], [0x5280, 0x52df]]);
+// QMK's dual-role keys: MT(), LT(), OSL(), OSM() and TT(), the last three
+// side by side.
+const DUAL_ROLE = /** @type {const} */ ([[QK.MOD_TAP.first, QK.MOD_TAP.last], [QK.LAYER_TAP.first, QK.LAYER_TAP.last],
+    [QK.ONE_SHOT_LAYER.first, QK.LAYER_TAP_TOGGLE.last]]);
+/** Whether a keycode is one of QMK's dual-role keys. @param {number | undefined} code */
+const dualRole = code => DUAL_ROLE.some(([start, end]) => within(code, start, end));
 // The setting a key's Tap / hold threshold follows when its row sets none, or
 // when it has no row. A dual-role key follows the dual-role term either way,
 // every other row the behaviour term (firmware D-F27 "Every dual-role key",
@@ -38,7 +43,7 @@ function holdTermSetting(target, shortcuts) {
         const dual = Boolean(shortcut?.layers) && (shortcut?.layerKind === SHORTCUT_LAYER_KINDS.TAP_TOGGLE || shortcut?.layerKind === SHORTCUT_LAYER_KINDS.ONESHOT);
         return dual ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM;
     }
-    return DUAL_ROLE.some(([start, end]) => within(code, start, end)) ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM;
+    return dualRole(code) ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM;
 }
 /** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @param {KindedShortcuts} [shortcuts] @returns {{hold: number | T, long: number | T, repeat: number | T}} */
 function effectiveTimings(row, values, shortcuts) {
@@ -97,4 +102,4 @@ function gestureTimingFindings(decoded) {
     });
     return results;
 }
-module.exports = {holdTermSetting, effectiveTimings, releaseHoldUnreachable, gestureTimingFindings};
+module.exports = {dualRole, holdTermSetting, effectiveTimings, releaseHoldUnreachable, gestureTimingFindings};

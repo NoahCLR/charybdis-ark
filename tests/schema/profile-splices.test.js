@@ -2,9 +2,9 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {diffProfiles, applySplices, spliceEditFits} = require("../../core/schema/profile-splices");
+const {diffProfiles, applySplices, liveEditPlan} = require("../../core/schema/profile-splices");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const {PROFILE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
 const {document} = require("../fixtures/portable-profile");
 
 const blob = () => Buffer.from(document().profile, "base64");
@@ -65,7 +65,23 @@ test("applying refuses what the keyboard refuses", () => {
     assert.throws(() => applySplices(from, {splices: [{domainId: 0x60, offset: 0, remove: 0, insert: 2}], stream: Buffer.alloc(3)}), {code: "INVALID_SPLICE"});
 });
 
-test("an edit fits when its inserted bytes and the larger profile fit the slot", () => {
-    assert.equal(spliceEditFits(74801, 74801, 34903, 130048), true);
-    assert.equal(spliceEditFits(74801, 100000, 40000, 130048), false);
+test("a live edit sends nothing, its splices, or the whole profile when the splices do not fit beside it", () => {
+    const from = blob(), lacking = without(from, 0x30);
+    assert.deepEqual(liveEditPlan(from, from, {capacity: 1}), {kind: "unchanged"});
+    assert.deepEqual(liveEditPlan(lacking, from, {defaults: from, capacity: 1}), {kind: "unchanged"});
+    const to = withDomain(from, 0x70, payload => Buffer.concat([Buffer.from([0x01, 0x04]), payload]));
+    const {splices, stream} = diffProfiles(from, to);
+    // The inserted bytes are staged above both the current and the resulting
+    // profile (firmware D-F32).
+    const room = stream.length + Math.max(from.length, to.length);
+    assert.deepEqual(liveEditPlan(from, to, {capacity: room}), {kind: "splices", splices, stream, bytes: to});
+    assert.deepEqual(liveEditPlan(from, to, {capacity: room - 1}), {kind: "replace", stream: to, bytes: to});
+});
+
+test("a live edit never drops a domain the firmware requires", () => {
+    const from = blob();
+    for (const id of [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]) {
+        assert.throws(() => liveEditPlan(from, without(from, id), {capacity: 1 << 20}), {code: "REQUIRED_DOMAIN"});
+    }
+    assert.equal(liveEditPlan(from, without(from, 0x30), {capacity: 1 << 20}).kind, "splices");
 });

@@ -12,7 +12,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as controls from "../view/controls.mjs";
-import {esc} from "../lib/dom.mjs";
+import {esc, watchPressOutside} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {NOT_STORED_TIP, SETTLE_TIP, keyboardControl} from "../view/keyboard-menu.mjs";
 import {chooseKeyboard, forgetKeyboard} from "../view/shell-panel.mjs";
@@ -21,8 +21,8 @@ import {chooseMode} from "./edit-mode.mjs";
 // The items the arrows move between: a mode Ark does not offer is skipped.
 const ITEMS = '[role^="menuitem"]:not([disabled])';
 
-/** @type {((event: PointerEvent) => void) | null} */
-let dismiss = null;   // the outside-click listener for the open menu
+/** @type {(() => void) | null} */
+let stopWatching = null;   // stops the open menu's outside-press watch
 
 export function keyboardMenu() {
     const control = keyboardControl(getModel());
@@ -143,11 +143,10 @@ function focusButton() {
     /** @type {HTMLElement | null} */ (document.querySelector('[data-act="keyboard-menu"]'))?.focus();
 }
 
-export function closeKeyboardMenu() {
+function closeKeyboardMenu() {
     state.railMenu = false;
-    if (!dismiss) return;
-    document.removeEventListener("pointerdown", dismiss, true);
-    dismiss = null;
+    stopWatching?.();
+    stopWatching = null;
 }
 
 // Esc anywhere closes an open menu, focus back on its button.
@@ -164,14 +163,11 @@ export function escapeKeyboardMenu() {
 // rail, a key on the board).
 /** @param {HTMLElement} list @param {HTMLElement} trigger */
 function watchOutside(list, trigger) {
-    if (dismiss) document.removeEventListener("pointerdown", dismiss, true);
-    dismiss = (event) => {
-        const target = /** @type {Node | null} */ (event.target);
-        if (list.contains(target) || trigger.contains(target)) return;
+    stopWatching?.();
+    stopWatching = watchPressOutside([list, trigger], () => {
         closeKeyboardMenu();
         list.remove();
         trigger.setAttribute("aria-expanded", "false");
         trigger.removeAttribute("aria-controls");
-    };
-    document.addEventListener("pointerdown", dismiss, true);
+    });
 }

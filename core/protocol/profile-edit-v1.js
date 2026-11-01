@@ -8,7 +8,8 @@
 // the session's (core/session/live-edit-coordinator.js).
 
 const {u8, u16, u32, asBytes, protocolError} = require("../schema/bytes");
-const {crc32} = require("../schema/profile-blob-v1");
+const {PROFILE_BLOB_V1, crc32} = require("../schema/profile-blob-v1");
+const {MAX_SPLICES} = require("../schema/profile-splices");
 const {requestHandled} = require("./raw-hid-unhandled");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 const {PROFILE_WIRE_V1, buildProfileGetRequest, isUnknownPage, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
@@ -37,7 +38,7 @@ const PROFILE_EDIT_V1 = Object.freeze({
     ACTIVE_LAYOUT: 1,
     STATUS_PAGES: 4,
     AUTO_SAVE_LAYOUT: 1,
-    MAX_SPLICES: 8,
+    MAX_SPLICES,
     DATA_MAX: 22,
     PAGE_SIZE: PROFILE_WIRE_V1.PAYLOAD_SIZE,
 });
@@ -81,10 +82,13 @@ const KNOWN_EDIT_FLAGS = 0xffff;
 
 // How the client's edits reach the keyboard, stored on the keyboard outside
 // every profile. A keyboard never set is in Live preview + save.
+// Its numbers are contracts/model.d.ts EditMode (tests/protocol/profile-edit-v1.test.js).
 const EDIT_MODE = Object.freeze({APPLY: 0, LIVE: 1, LIVE_REVIEW: 2});
+/** @param {unknown} mode @returns {mode is import("../../contracts/model.js").EditMode} */
+const isEditMode = (mode) => (/** @type {unknown[]} */ (Object.values(EDIT_MODE))).includes(mode);
 const SPLICE_FLAGS = Object.freeze({CREATE: 1 << 0, DROP: 1 << 1});
 
-const ProfileEditProtocolError = protocolError("ProfileEditProtocolError");
+const ProfileEditProtocolError = protocolError("ProfileEditProtocolError", "answer");
 
 /** @param {number} value @param {number} transactionId */
 function header(value, transactionId) {
@@ -100,7 +104,7 @@ function header(value, transactionId) {
 function buildEditBeginRequest(transactionId, {session, revision, splices, insertTotal, replacement = false}) {
     const report = header(PROFILE_EDIT_V1.VALUE_BEGIN, transactionId);
     const count = u8(splices, "splice count");
-    if (replacement ? count !== 0 : count < 1 || count > PROFILE_EDIT_V1.MAX_SPLICES) throw new RangeError(replacement ? "A replacement has no splices." : "An edit has 1 to 8 splices.");
+    if (replacement ? count !== 0 : count < 1 || count > PROFILE_EDIT_V1.MAX_SPLICES) throw new RangeError(replacement ? "A replacement has no splices." : `An edit has 1 to ${MAX_SPLICES} splices.`);
     report.writeUInt32LE(u32(session, "session"), 5);
     report.writeUInt32LE(u32(revision, "revision"), 9);
     report[13] = count;
@@ -165,7 +169,7 @@ function buildRestartRequest(transactionId) {
 }
 /** @param {number} transactionId @param {number} mode */
 function buildEditModeRequest(transactionId, mode) {
-    if (!(/** @type {number[]} */ (Object.values(EDIT_MODE))).includes(mode)) throw new RangeError("Unknown edit mode.");
+    if (!isEditMode(mode)) throw new RangeError("Unknown edit mode.");
     const report = header(PROFILE_EDIT_V1.VALUE_MODE, transactionId);
     report[5] = mode;
     return report;
@@ -347,7 +351,7 @@ function decodeActiveMetadata(page) {
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions & {nextRequestId: () => number, onProgress?: (progress: {done: number, total: number}) => void, maxLength?: number}} options */
 async function readActiveProfile(connection, options) {
     const metadata = decodeActiveMetadata(await getPage(connection, PROFILE_EDIT_V1.VALUE_ACTIVE, 0, options));
-    if (metadata.length < 8 || metadata.length > (options.maxLength ?? 130048)) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", "The active profile's length is out of range.");
+    if (metadata.length < 8 || metadata.length > (options.maxLength ?? PROFILE_BLOB_V1.MAX_SIZE)) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", "The active profile's length is out of range.");
     const requireUnmoved = async () => {
         const after = decodeActiveMetadata(await getPage(connection, PROFILE_EDIT_V1.VALUE_ACTIVE, 0, options));
         if (JSON.stringify(after) !== JSON.stringify(metadata)) throw Object.assign(new Error("The keyboard's profile changed while it was being read. Read it again."), {code: "PROFILE_CHANGED"});
@@ -372,8 +376,8 @@ async function readActiveProfile(connection, options) {
     return {metadata, bytes};
 }
 
-module.exports = {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, EDIT_MODE, SPLICE_FLAGS, ProfileEditProtocolError,
+module.exports = {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, EDIT_MODE, isEditMode,
     buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest, buildEditAbortRequest,
-    buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, editReplyMatcher, decodeEditReply, sendEditRequest,
-    decodeEditStatusPages, decodeAutoSavePage, decodeSafeBoundaryPage, readEditStatus, readSafeBoundaryReasons, decodeEditProgress, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,
+    buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, decodeEditReply, sendEditRequest,
+    decodeEditStatusPages, decodeAutoSavePage, decodeSafeBoundaryPage, readEditStatus, readSafeBoundaryReasons, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,
     decodeActiveMetadata, readActiveProfile};

@@ -8,30 +8,29 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {scrollContentTo} from "../../lib/scroll.mjs";
-import {actionLabel, canonicalKeycode, visibleKeycode} from "../../view/keyface.mjs";
+import {visibleKeycode} from "../../view/keyface.mjs";
+import {keyIdentity} from "../../view/key-identity.mjs";
 import {customKeyOf, customKeySendsNote, customKeyShortcutOnly, hasShortcut, shortcutPickLabel} from "../../view/custom-key.mjs";
-import {comboInputShown} from "../../view/combo-reach.mjs";
-import {closeComboBuilder, getModel, heldLayers, layerName, layers, post, render, state} from "../../store.mjs";
+import {closeComboBuilder, currentView, getModel, layers, post, render, state} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
-import {keyNameMarked} from "../marks.mjs";
-import {vocabulary} from "../../view/vocabulary.mjs";
+import {keyNameMarked, keyNameText} from "../marks.mjs";
+import {sentence, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {comboFull, comboMissing} from "../../view/combo-form.mjs";
+import {closesInPlace} from "../inline-editor.mjs";
 
-/** @param {string} text */
-const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 // A builder input by the name the core gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
 /** @param {Model} model @param {string} name */
-export const comboInputLabel = (model, name) => actionLabel(model, name);
+export const comboInputLabel = (model, name) => keyIdentity(model, name).label;
 
 /** @param {boolean} canEdit @param {() => string} holdTerm */
 export function comboBuilder(canEdit, holdTerm) {
     const model = getModel();
     /** @param {string} name */
-    const shown = (name) => comboInputShown(model, layers(), state.layer, heldLayers(), name);
+    const shown = (name) => currentView().combos.inputShown(name);
     const editing = state.combo.editId !== null;
     const original = (model?.combos || []).find((combo) => combo.id === state.combo.editId);
     const form = state.combo.form;
@@ -49,7 +48,7 @@ export function comboBuilder(canEdit, holdTerm) {
     // what it will send comes from the offer, not from the key as it is now.
     const made = state.combo.madeKey && form.output === state.combo.madeKey.keycode ? state.combo.madeKey : null;
     const sendsNote = made ? `Custom key · sends ${shortcutPickLabel(model, made.shortcut)} once you keep this combo`
-        : customKeySendsNote(model, canonicalKeycode(model, form.output));
+        : customKeySendsNote(model, keyIdentity(model, form.output).canonical);
     const node = el(`<div class="card combo-builder">
         <div class="card-h"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
@@ -63,7 +62,7 @@ export function comboBuilder(canEdit, holdTerm) {
                     ${state.combo.inputs.length ? state.combo.inputs.map((input) => `<span class="chip"${shown(input) ? ""
                         : ` data-tip="No key on the board presses this from here, so nothing rings for it. It stays an input unless you remove it."`}>
                         <span class="mono">${keyNameMarked(model, comboInputLabel(model, input), input)}</span>
-                        <button data-remove="${esc(input)}">✕</button></span>`).join("")
+                        <button data-remove="${esc(input)}" aria-label="${esc(`Remove the input ${keyNameText(model, input)}`)}">✕</button></span>`).join("")
                         : `<span class="note">no inputs yet</span>`}
                 </div>
                 <div class="row combo-pick">
@@ -72,16 +71,16 @@ export function comboBuilder(canEdit, holdTerm) {
                 </div>
             </div>
             <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window</span>
-                <div class="input-row"><span class="affix unit"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-window inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
+                <div class="input-row"><span class="affix unit"><input class="input mono num" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-window inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
-                    data-tip="Follow the default combo window (Settings · Combos) again, so this combo changes with it.">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
+                    data-tip="${esc(`Follow the default combo window (${vocabulary(model).settingsScreens.combos}) again, so this combo changes with it.`)}">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="field">
                 <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                     <span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions.useOutputBehavior))}</span></label>
-                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output, made))} Settings · Behaviours · Enabled and Settings · Combos · Combo outputs use behaviours must also be on.</p>
+                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output, made))} ${esc(`Enabled in ${vocabulary(model).settingsScreens.behaviours} and Combo outputs use behaviours in ${vocabulary(model).settingsScreens.combos} must also be on.`)}</p>
             </div>
             <div class="row combo-flags">
-                ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],
+                ${[["mustHold", `Fires only once its keys are held past the combo hold threshold (${vocabulary(model).settingsScreens.combos}). Released sooner, the keys type themselves.`],
                    ["mustTap", "Fires only if its keys are released before the combo hold threshold. Held longer, the keys type themselves."],
                    ["ordered", "Fires only if its keys are pressed in the order listed above."]].map(([flag, tip]) =>
                     `<label class="sw" data-tip="${esc(tip)}"><input type="checkbox" data-f="combo:${esc(state.combo.editId ?? 'new')}:${esc(flag)}" data-${esc(flag.toLowerCase())} ${form[/** @type {"mustHold" | "mustTap" | "ordered"} */ (flag)] ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions[flag]))}</span></label>`).join("")}
@@ -94,7 +93,7 @@ export function comboBuilder(canEdit, holdTerm) {
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
         </div></div>`);
 
-    /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), form, canEdit,
+    /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerCalled(layer)})), form, canEdit,
         (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => Object.assign(form, permissions), `combo:${state.combo.editId ?? "new"}:definition`, "combo"), /** @type {HTMLElement} */ (node.querySelector(".card-b")).firstChild);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () => {
         state.combo.inputs = state.combo.inputs.filter((input) => input !== button.dataset.remove);
@@ -169,7 +168,16 @@ export function comboBuilder(canEdit, holdTerm) {
             }
         });
     }
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { closeComboBuilder(); render(); });
+    // Cancel or Escape drops the form, which is not in the draft until Keep,
+    // and the focus goes back to the combo's row, or to New combo.
+    const editedId = state.combo.editId;
+    closesInPlace(node, () => {
+        closeComboBuilder();
+        render();
+        const row = editedId === null ? null : /** @type {HTMLElement | null} */ (document.querySelector(`tr[data-combo="${editedId}"]`));
+        row?.focus();
+        if (!row || document.activeElement !== row) /** @type {HTMLElement | null} */ (document.querySelector('[data-act="new-combo"]'))?.focus();
+    }, '[data-act="cancel"]');
     // Keep and Delete close the builder once the core accepts them, so a
     // second press cannot add the combo twice, and a refused combo keeps its
     // fields for fixing.
@@ -194,7 +202,7 @@ export function comboBuilder(canEdit, holdTerm) {
 /** @param {Model} model @param {string} output @param {{shortcut: {mods: number, keys: readonly number[]}} | null} made */
 function bypassedOutput(model, output, made) {
     if (made) return `This custom key sends its shortcut, ${shortcutPickLabel(model, made.shortcut)}.`;
-    const key = customKeyOf(model, canonicalKeycode(model, output));
+    const key = customKeyOf(model, keyIdentity(model, output).canonical);
     if (!key) return "A custom key sends its shortcut, or nothing if it has none.";
     return hasShortcut(key) ? `This custom key ${customKeyShortcutOnly(key)}.` : "This custom key has no shortcut, so it sends nothing.";
 }

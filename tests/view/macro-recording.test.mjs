@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {recordedKeycode, recordedTakePayload, takeStands} from "../../webview/view/macro-recording.mjs";
+import {capturedKey, finishedPart, recordedKeycode, recordedTakePayload, takeStands} from "../../webview/view/macro-recording.mjs";
 import {parseMacro, unreleased} from "../../webview/view/macro.mjs";
 const {parsePayload, macroKeycodes} = createRequire(import.meta.url)("../../core/schema/macro-payload.js");
 
@@ -86,7 +86,47 @@ test("a finished take stands only while its macro holds exactly what the take pr
     assert.equal(takeStands(take, "MACRO_3", "hi"), false, "a step deleted after the take");
     assert.equal(takeStands(take, "MACRO_3", "ho{KC_A}"), false, "text typed after the take");
     // Another spelling of the same steps is no change.
-    assert.equal(takeStands({...take, after: "{KC_LCTL}"}, "MACRO_3", "{KC_LEFT_CTRL}", {KC_LCTL: "KC_LEFT_CTRL"}), true);
+    assert.equal(takeStands({...take, after: "{KC_LCTL}"}, "MACRO_3", "{KC_LEFT_CTRL}", {qmkKeycodeAliases: {KC_LCTL: "KC_LEFT_CTRL"}}), true);
     assert.equal(takeStands(take, "MACRO_4", "hi{KC_A}"), false, "another macro's take");
     assert.equal(takeStands(null, "MACRO_3", "hi{KC_A}"), false);
+});
+
+// Reports as a browser delivers them, captured one at a time.
+const capture = (reports, platform = {}) => reports.reduce((events, report) => capturedKey(events, report, platform), []);
+
+test("a Mac's lost releases under ⌘ are mended, so repeated shortcuts stay shortcuts", () => {
+    // ⌘ held, A twice, B: the Mac never reports A's or B's release.
+    const reports = [down("KC_LGUI", 0), down("KC_A", 10), down("KC_A", 50), down("KC_B", 90), up("KC_LGUI", 120), down("KC_C", 200), up("KC_C", 210)];
+    assert.equal(record(capture(reports, {mac: true})), "{KC_LGUI,KC_A}{KC_LGUI,KC_A}{KC_LGUI,KC_B}{KC_C}");
+    // A release that does come later adds nothing.
+    assert.equal(record(capture([...reports.slice(0, 5), up("KC_A", 130)], {mac: true})), "{KC_LGUI,KC_A}{KC_LGUI,KC_A}{KC_LGUI,KC_B}");
+});
+
+test("elsewhere, letting go of the GUI key leaves other keys down until they are released", () => {
+    const events = capture([down("KC_LGUI", 0), down("KC_A", 10), up("KC_LGUI", 20), up("KC_A", 30)]);
+    assert.deepEqual(events.map(event => `${event.type}:${event.keycode}`), ["keydown:KC_LGUI", "keydown:KC_A", "keyup:KC_LGUI", "keyup:KC_A"]);
+});
+
+test("each Caps Lock report on a Mac is one tap; elsewhere it is an ordinary key", () => {
+    assert.equal(record(capture([down("KC_CAPS", 0), down("KC_A", 10), up("KC_A", 20), up("KC_CAPS", 30)], {mac: true})), "{KC_CAPS}{KC_A}{KC_CAPS}");
+    assert.equal(record(capture([down("KC_CAPS", 0), up("KC_CAPS", 10)])), "{KC_CAPS}");
+});
+
+test("Print Screen reported only by its release records as a tap", () => {
+    assert.equal(record(capture([up("KC_PSCR", 0)])), "{KC_PSCR}");
+    assert.equal(record(capture([down("KC_PSCR", 0), up("KC_PSCR", 10)])), "{KC_PSCR}");
+});
+
+test("AltGr records as Right Alt, without the Left Ctrl Windows sends with it", () => {
+    const altGr = [down("KC_LCTL", 0), {...down("KC_RALT", 0), altGraph: true}, down("KC_Q", 10), up("KC_Q", 20), up("KC_LCTL", 30), up("KC_RALT", 30)];
+    assert.equal(record(capture(altGr)), "{KC_RALT,KC_Q}");
+    // A Left Ctrl pressed on its own, then Right Alt, is both.
+    assert.equal(record(capture([down("KC_LCTL", 0), {...down("KC_RALT", 200), altGraph: true}, up("KC_RALT", 210), up("KC_LCTL", 220)])), "{KC_LCTL,KC_RALT}");
+});
+
+test("a take left mid-chord keeps only what finished", () => {
+    const events = [down("KC_A", 0), up("KC_A", 10), down("KC_LALT", 50), down("KC_TAB", 60)];
+    assert.deepEqual(finishedPart(events), events.slice(0, 2));
+    assert.deepEqual(finishedPart([down("KC_LGUI", 0)]), []);
+    assert.deepEqual(finishedPart([up("KC_ENT", 0), down("KC_A", 5), up("KC_A", 9)]), [up("KC_ENT", 0), down("KC_A", 5), up("KC_A", 9)]);
 });

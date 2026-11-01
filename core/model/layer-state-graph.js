@@ -9,6 +9,14 @@
 // layers ({on, off}, {all}, {any}, {not}); callers own keyboard semantics.
 // The result contains proved reachability, traps and concrete paths, never the
 // decision graph. A budget failure is explicit and carries no absence claims.
+//
+// An anchor is an owner the state bits do not hold: entered by one of its
+// `entries` from a reachable state, it keeps its `always` layers on and its
+// `never` layers off (and `unless.layer` on while none of `unless.layers` is)
+// whatever the locks and holds, and lasts until a state where `ends` holds.
+// Its own `transitions` replace the walk's while it lasts. An anchor is
+// trapped when some set of locks it can be entered with, every key let go,
+// cannot reach `ends`.
 const {LAYERS} = require("../data/charybdis-layout");
 const LOCK_BITS = 0x55555555, HOLD_BITS = 0xaaaaaaaa;
 const LIMIT = Symbol("layer analysis budget");
@@ -156,7 +164,7 @@ const bitsOf = (mask, offset) => {let bits = 0; for (let n = 0; n < LAYERS; n++)
  * @param {import("./types.js").LayerAnalysisInput<T>} input
  * @returns {import("./types.js").LayerAnalysisResult<T>}
  */
-function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 4, limits}) {
+function analyzeLayerStates({always = 1, transitions, queries = [], anchors = [], trapLimit = 4, limits}) {
     /** @typedef {{kind: string, layer: number, layers: number, guard: number, sources: {guard: number, effect: T}[]}} Operation */
     const sets = new StateSets(limits);
     /** @type {Map<string, Operation>} */
@@ -180,57 +188,82 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
     }
     transitions.forEach(effect => {affectedLayers |= maskOf(effect); scope(effect.when);}); queries.forEach(scope);
     try {
-        /** @type {WeakMap<object, number>} */
-        let conditions = new WeakMap();
-        /** @param {import("./types.js").LayerCondition} value @returns {number} */
-        function condition(value) {
-            if (typeof value === "boolean") return Number(value);
-            const cached = conditions.get(value); if (cached !== undefined) return cached;
-            let root;
-            if (value.all) root = value.all.reduce((root, part) => sets.and(root, condition(part)), 1);
-            else if (value.any) root = value.any.reduce((root, part) => sets.or(root, condition(part)), 0);
-            else if (value.not !== undefined) root = sets.not(condition(value.not));
-            else {
-                affectedLayers |= (value.on || 0) | (value.off || 0);
-                root = (value.off || 0) & always ? 0 : 1;
-                for (let n = 0; n < LAYERS; n++) {
-                    if (always & (1 << n)) continue;
-                    const active = () => sets.or(sets.literal(2 * n), sets.literal(2 * n + 1));
-                    if ((value.on || 0) & (1 << n)) root = sets.and(root, active());
-                    if ((value.off || 0) & (1 << n)) root = sets.and(root, sets.not(active()));
+        // Conditions over active layers as decisions over the state bits: a
+        // layer is on while its lock or hold bit is, unless the context says
+        // otherwise (`always`, an anchor's `never` and `unless`).
+        /** @param {{always: number, never?: number, unless?: {layer: number, layers: number}}} context */
+        function compiler({always: on, never = 0, unless}) {
+            /** @param {number} n @returns {number} */
+            const bits = n => (on & (1 << n) ? 1 : never & (1 << n) ? 0 : sets.or(sets.literal(2 * n), sets.literal(2 * n + 1)));
+            /** @param {number} n @returns {number} */
+            const active = n => {
+                if (unless?.layer !== n || on & (1 << n) || never & (1 << n)) return bits(n);
+                let any = 0; for (let m = 0; m < LAYERS; m++) if (unless.layers & (1 << m) && m !== n) any = sets.or(any, bits(m));
+                return sets.not(any);
+            };
+            /** @type {WeakMap<object, number>} */
+            const cache = new WeakMap();
+            /** @param {import("./types.js").LayerCondition} value @returns {number} */
+            function condition(value) {
+                if (typeof value === "boolean") return Number(value);
+                const cached = cache.get(value); if (cached !== undefined) return cached;
+                let root;
+                if (value.all) root = value.all.reduce((root, part) => sets.and(root, condition(part)), 1);
+                else if (value.any) root = value.any.reduce((root, part) => sets.or(root, condition(part)), 0);
+                else if (value.not !== undefined) root = sets.not(condition(value.not));
+                else {
+                    affectedLayers |= (value.on || 0) | (value.off || 0);
+                    root = 1;
+                    for (let n = 0; n < LAYERS && root; n++) {
+                        if ((value.on || 0) & (1 << n)) root = sets.and(root, active(n));
+                        if ((value.off || 0) & (1 << n)) root = sets.and(root, sets.not(active(n)));
+                    }
                 }
+                cache.set(value, root); return root;
             }
-            conditions.set(value, root); return root;
+            return condition;
         }
+        let condition = compiler({always});
         // A lock of the base does nothing; a move locks its layers alone (the
         // base never), so TO(0)'s is the base alone: it lets every lock go.
         /** @param {T} effect */
         const layersFor = effect => effect.kind === "lock" ? maskOf(effect) & ~1 : maskOf(effect);
-        /** @type {Set<number>} */
-        const held = new Set();
-        for (const effect of transitions) {
-            if (!["hold", "lock", "move"].includes(effect.kind) || !layersFor(effect)) continue;
-            const layers = layersFor(effect), guard = condition(effect.when), key = `${effect.kind}:${layers}`;
-            compiled.push({guard, effect}); if (!guard) continue;
-            affectedLayers |= layers;
-            if (effect.kind === "hold") held.add(layers);
-            const op = operations.get(key) || {kind: effect.kind, layer: lowest(layers), layers, guard: 0, sources: []};
-            op.guard = sets.or(op.guard, guard); op.sources.push({guard, effect}); operations.set(key, op);
+        // Each hold, lock and move with the states it is offered in, grouped
+        // by what it does, and the holds made, under one condition compiler.
+        /** @param {readonly T[]} list @param {(value: import("./types.js").LayerCondition) => number} compile @param {{guard: number, effect: T}[]} [into] */
+        function operationsOf(list, compile, into) {
+            /** @type {Map<string, Operation>} */
+            const grouped = new Map();
+            /** @type {Set<number>} */
+            const holds = new Set();
+            for (const effect of list) {
+                if (!["hold", "lock", "move"].includes(effect.kind) || !layersFor(effect)) continue;
+                const layers = layersFor(effect), guard = compile(effect.when), key = `${effect.kind}:${layers}`;
+                into?.push({guard, effect}); if (!guard) continue;
+                affectedLayers |= layers;
+                if (effect.kind === "hold") holds.add(layers);
+                const op = grouped.get(key) || {kind: effect.kind, layer: lowest(layers), layers, guard: 0, sources: []};
+                op.guard = sets.or(op.guard, guard); op.sources.push({guard, effect}); grouped.set(key, op);
+            }
+            return {grouped, holds};
         }
         // What a hold turned on is let go together, while any of it is still
-        // held: another hold that shared a layer may have let that one go. A
-        // release joins the walk once its hold has been made from a state
+        // held: another hold that shared a layer may have let that one go.
+        /** @param {number} layers @returns {Operation} */
+        const releaseOf = layers => ({kind: "release", layer: lowest(layers), layers, guard: sets.not(sets.cube(bitsOf(layers, 1), 0)), sources: []});
+        const {grouped: operations, holds: held} = operationsOf(transitions, condition, compiled);
+        // A release joins the walk once its hold has been made from a state
         // reached, so a hold no person can make lets nothing go.
         /** @type {Map<number, Operation>} */
         const releases = new Map();
-        for (const layers of held) releases.set(layers, {
-            kind: "release", layer: lowest(layers), layers, guard: sets.not(sets.cube(bitsOf(layers, 1), 0)), sources: []});
+        for (const layers of held) releases.set(layers, releaseOf(layers));
         queries.forEach(query => queryRoots.push(condition(query)));
+        const entryRoots = anchors.map(anchor => anchor.entries.map(effect => condition(effect.when)));
         // Compilation is finished; collection can now recycle intermediate
         // condition nodes that are not referenced by an operation or query.
-        conditions = new WeakMap();
+        condition = compiler({always});
         const ops = [...operations.values()], zero = sets.cube(0xffffffff), heldZero = sets.cube(HOLD_BITS);
-        const permanent = [zero, heldZero, ...compiled.map(c => c.guard), ...queryRoots, ...ops.map(op => op.guard), ...[...releases.values()].map(op => op.guard)];
+        const permanent = [zero, heldZero, ...compiled.map(c => c.guard), ...queryRoots, ...entryRoots.flat(), ...ops.map(op => op.guard), ...[...releases.values()].map(op => op.guard)];
         /** @param {number} root @param {number} bits */
         const flips = (root, bits) => {for (let v = 0; v < 32; v++) if (bits & (1 << v)) root = sets.flip(root, v); return root;};
         // A lock of several layers turns them all on, or all off once all are
@@ -285,14 +318,77 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
             if (found) witnesses.add(activeOf(sets.witness(found), always)); return Boolean(found);
         }).map(({effect}) => effect);
         proved = {reachabilityComplete: true, reachedLayers, queries: queryResults, effects, witnesses};
+        /** @param {number} root @param {Map<number, number | undefined>} [cache] @returns {number | undefined} */
+        function smallest(root, cache = new Map()) {
+            if (!root) return undefined; if (root === 1) return 0;
+            if (cache.has(root)) return cache.get(root);
+            const {v, lo, hi} = sets.decision(root), left = smallest(lo, cache), right = smallest(hi, cache);
+            const high = right === undefined ? undefined : right | (1 << (v / 2));
+            const result = left === undefined ? high : high === undefined ? left
+                : countBits(left) < countBits(high) || (countBits(left) === countBits(high) && left < high) ? left : high;
+            cache.set(root, result); return result;
+        }
+        /** @param {Operation} op @param {number} source @returns {import("./types.js").LayerPathEffect<T>} */
+        function effectFor(op, source) {
+            return op.sources.find(({guard}) => sets.has(guard, source))?.effect || {kind: "release", layer: op.layer, layers: op.layers, when: true};
+        }
+        /** @param {number} state */
+        function pathTo(state) {
+            /** @type {import("./types.js").LayerPathEffect<T>[]} */
+            const path = [];
+            let depth = waves.findIndex(root => sets.has(root, state));
+            while (depth > 0) {
+                const target = sets.cube(0xffffffff, state);
+                for (const op of ops) {
+                    const candidates = sets.and(waves[depth - 1], sets.and(op.guard, backward(target, op)));
+                    if (!candidates) continue;
+                    const source = sets.witness(candidates); path.unshift(effectFor(op, source)); state = source; break;
+                }
+                depth--;
+            }
+            return path;
+        }
+
+        // Each anchor: the lock sets it can be entered with, every key let
+        // go, and whether its own transitions reach `ends` from each. Every
+        // hold can be let go there, made or not: an escape that needs a hold
+        // no person can make only hides a trap, never invents one.
+        phase = "anchors";
+        const anchorResults = anchors.map(/** @returns {import("./types.js").LayerAnchorResult<T>} */ (anchor, index) => {
+            const entry = entryRoots[index].reduce((root, guard) => sets.or(root, guard), 0), entered = sets.and(reachable, entry);
+            const start = sets.and(sets.forget(entered, HOLD_BITS), heldZero);
+            if (!start) return {trapped: false};
+            const compile = compiler({always: always | (anchor.always ?? 0), never: anchor.never, unless: anchor.unless});
+            const {grouped, holds} = operationsOf(anchor.transitions, compile);
+            const steps = [...grouped.values(), ...[...holds].map(releaseOf)], ends = compile(anchor.ends);
+            let escapes = ends;
+            for (;;) {
+                sets.collect([...permanent, ...waves, start, entered, ends, escapes, ...steps.map(op => op.guard)]);
+                let next = escapes;
+                for (const op of steps) next = sets.or(next, sets.and(op.guard, backward(escapes, op)));
+                if (next === escapes) break; escapes = next;
+            }
+            const trapped = sets.forget(sets.and(start, sets.not(escapes)), HOLD_BITS);
+            if (!trapped) return {trapped: false};
+            // The smallest lock set it is trapped with, and the first way in.
+            const locks = /** @type {number} */ (smallest(trapped)), target = sets.and(entered, sets.cube(LOCK_BITS, bitsOfLocks(locks)));
+            for (const wave of waves) {
+                const candidates = sets.and(wave, target);
+                if (!candidates) continue;
+                const source = sets.witness(candidates);
+                const effect = anchor.entries[entryRoots[index].findIndex(guard => sets.has(guard, source))];
+                return {trapped: true, locks, effect, path: [...pathTo(source), effect]};
+            }
+            throw new Error("A trapped anchor has no entry witness.");
+        });
+        phase = "escapes";
         // A permanent escape or universally available toggles prove every
         // state safe without a backwards search through all combinations.
         const reset = ops.some(op => op.kind === "move" && !(op.layers & ~1) && op.guard === 1);
         const lockTargets = ops.filter(op => op.kind === "lock" || (op.kind === "move" && op.layers & ~1));
         const reversible = lockTargets.every(op => [...Array(LAYERS).keys()].filter(n => op.layers & ~1 & (1 << n)).every(n => operations.get(`lock:${1 << n}`)?.guard === 1));
-        if (reset || reversible) return {complete: true, reachedLayers, queries: queryResults, effects, witnesses, traps: [], trapCount: 0};
+        if (reset || reversible) return {complete: true, reachedLayers, queries: queryResults, effects, witnesses, traps: [], trapCount: 0, anchors: anchorResults};
 
-        phase = "escapes";
         let home = zero;
         for (;;) {
             sets.collect([...permanent, ...waves, home]);
@@ -341,41 +437,11 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
             const result = 2 ** (next - layer) * (count(lo, next + 1) + count(hi, next + 1));
             counts.set(key, result); return result;
         }
-        /** @param {number} root @param {Map<number, number | undefined>} [cache] @returns {number | undefined} */
-        function smallest(root, cache = new Map()) {
-            if (!root) return undefined; if (root === 1) return 0;
-            if (cache.has(root)) return cache.get(root);
-            const {v, lo, hi} = sets.decision(root), left = smallest(lo, cache), right = smallest(hi, cache);
-            const high = right === undefined ? undefined : right | (1 << (v / 2));
-            const result = left === undefined ? high : high === undefined ? left
-                : countBits(left) < countBits(high) || (countBits(left) === countBits(high) && left < high) ? left : high;
-            cache.set(root, result); return result;
-        }
         const trapCount = count(entered), masks = [];
         for (let remaining = entered; remaining && masks.length < trapLimit;) {
             // A nonempty decision set always has a smallest witness.
             const mask = /** @type {number} */ (smallest(remaining)); masks.push(mask);
             remaining = sets.and(remaining, sets.not(sets.cube(LOCK_BITS, bitsOfLocks(mask))));
-        }
-        /** @param {Operation} op @param {number} source @returns {import("./types.js").LayerPathEffect<T>} */
-        function effectFor(op, source) {
-            return op.sources.find(({guard}) => sets.has(guard, source))?.effect || {kind: "release", layer: op.layer, layers: op.layers, when: true};
-        }
-        /** @param {number} state */
-        function pathTo(state) {
-            /** @type {import("./types.js").LayerPathEffect<T>[]} */
-            const path = [];
-            let depth = waves.findIndex(root => sets.has(root, state));
-            while (depth > 0) {
-                const target = sets.cube(0xffffffff, state);
-                for (const op of ops) {
-                    const candidates = sets.and(waves[depth - 1], sets.and(op.guard, backward(target, op)));
-                    if (!candidates) continue;
-                    const source = sets.witness(candidates); path.unshift(effectFor(op, source)); state = source; break;
-                }
-                depth--;
-            }
-            return path;
         }
         const traps = masks.slice(0, trapLimit).map(locks => {
             const target = sets.cube(LOCK_BITS, bitsOfLocks(locks));
@@ -387,7 +453,7 @@ function analyzeLayerStates({always = 1, transitions, queries = [], trapLimit = 
             }
             throw new Error("A trapped state has no entry witness.");
         });
-        return {complete: true, reachedLayers, queries: queryResults, effects, witnesses, traps, trapCount};
+        return {complete: true, reachedLayers, queries: queryResults, effects, witnesses, traps, trapCount, anchors: anchorResults};
     } catch (error) {
         if (error !== LIMIT) throw error;
         const partial = {complete: /** @type {const} */ (false), phase, affectedLayers: affectedLayers & ~always};

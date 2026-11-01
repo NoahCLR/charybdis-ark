@@ -3,24 +3,15 @@
 // The core keeps the gate closed across the small gaps between HID requests.
 
 import {configureReady, screenAvailable, screenDefinition} from "./screens.mjs";
-export {configureReady, screenAvailable};
 
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {import("../../contracts/model.js").CountedProgress} CountedProgress */
 
-import {phaseWords} from "./vocabulary.mjs";
+import {draftBlockWords, phaseWords, readStepWords} from "./vocabulary.mjs";
 
-/** @type {Readonly<Record<string, string>>} */
-const POST_APPLY_READ = {
-    layout: "Reading keys and layers",
-    profile: "Reading saved lighting, behaviours and settings",
-    combos: "Checking active combos",
-    baseRgb: "Checking base lighting",
-};
-
-/** @param {{step: string, progress?: CountedProgress | null} | null | undefined} read */
-export function postApplyReadText(read) {
-    const label = (read ? POST_APPLY_READ[read.step] : undefined) || "Confirming the completed save";
+/** @param {Parameters<typeof readStepWords>[0]} model @param {{step: string, progress?: CountedProgress | null} | null | undefined} read */
+export function postApplyReadText(model, read) {
+    const label = (read ? readStepWords(model, read.step) : undefined) || "Confirming the completed save";
     const progress = read?.progress;
     return progress && Number.isInteger(progress.done) && Number.isInteger(progress?.total) && progress.total > 0
         ? `${label} · ${progress.done} of ${progress.total}` : label;
@@ -58,22 +49,9 @@ export function readScreen(model, screen = "keys") {
     const halves = device.health?.halves;
     const halvesDetail = halves === "alone" || halves === "apart" ? model.vocabulary?.halves?.[halves]?.detail : "";
     if (halvesDetail || device.health?.error) return {state: "unavailable", title: "Keyboard not ready for edits", detail: halvesDetail || /** @type {string} */ (device.health?.error)};
-    // A read that worked, held by its draft: why, and what the bar offers.
-    const held = model.load?.held ? heldWords(model.load.held, Boolean(model.draft?.live)) : null;
-    return held ? {state: "unavailable", ...held}
-        : {state: "unavailable", title: "Keyboard not ready for edits", detail: "A complete profile could not be read. Read the keyboard again to retry."};
-}
-
-// Why editing is held by the open draft (D-L60), in the words the bar uses
-// for the same draft. A live draft is what the keyboard runs, so it is read
-// again rather than reviewed.
-/** @param {import("../../contracts/panel.js").DraftBlock} reason @param {boolean} live @returns {{title: string, detail: string} | null} */
-function heldWords(reason, live) {
-    const next = live ? "Choose Read keyboard in the bar: the draft is what the keyboard runs, so Ark reads it again before the next edit."
-        : "Your changes are kept. Choose Review against the keyboard in the bar to compare them with what it runs now, or discard the draft.";
-    if (reason === "stale") return {title: "The keyboard changed since this draft began", detail: next};
-    if (reason === "connection-changed") return {title: "Keyboard connection changed", detail: next};
-    if (reason === "other-keyboard") return {title: "Draft belongs to another keyboard",
-        detail: "Its changes are kept for that keyboard. Select it to continue editing, or discard the draft in the bar to edit this one."};
-    return null;
+    // A read that worked, held by its draft: why, and what the bar offers;
+    // otherwise the read failed (draftBlockWords words both).
+    const live = Boolean(model.draft?.live);
+    const words = draftBlockWords(model, model.load?.held, live) || draftBlockWords(model, "no-draft", live);
+    return {state: "unavailable", title: words?.title || "", detail: words?.detail || ""};
 }

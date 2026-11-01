@@ -64,7 +64,7 @@ test("complete Apply adds a split build that saves and keeps its refusal stable"
     assert.doesNotThrow(() => support.requireReady({...complete, featureFlags: 0}));
     assert.throws(() => support.requireReady({...complete, featureFlags: 0}, true), {
         code: "FIRMWARE_UPDATE_REQUIRED",
-        message: "Complete profile backups and saving need current firmware on both halves. Your current keyboard configuration has not been changed.",
+        message: "Complete profile backups and saving need current firmware on both halves. Your keyboard's profile has not been changed.",
     });
     assert.throws(() => support.requireReady({...complete, supportedDomainMask: DOMAINS.RGB}), {code: "FIRMWARE_UPDATE_REQUIRED"});
     assert.throws(() => support.requireReady({...complete, ...otherBases[0]}), {code: "FIRMWARE_UPDATE_REQUIRED"});
@@ -150,14 +150,15 @@ test("live mutation readiness keeps its additional transfer and slave-half diagn
         "The two keyboard halves have not established a converged profile state yet.");
 });
 
-test("legacy portable and service entry points reexport the single support implementation", () => {
+test("the support names have one home: neither the portable session nor the device service reexports them", () => {
     const portable = require("../../core/session/portable-profile-session");
     const service = require("../../core/session/profile-device-service");
-    assert.equal(portable.requireReady, support.requireReady);
-    assert.equal(portable.supportsCompleteProfile, support.canEdit);
-    for (const name of ["evaluateProfileCompatibility", "evaluateLiveMutationCompatibility", "SUPPORTED_PROFILE_SCHEMA",
+    // The support names are imported from firmware-support.js, their one home.
+    for (const name of ["requireReady", "canEdit", "evaluateProfileCompatibility", "evaluateLiveMutationCompatibility", "SUPPORTED_PROFILE_SCHEMA",
         "SUPPORTED_PROFILE_PROTOCOL", "PROFILE_DOMAIN_FLAGS", "REQUIRED_PROFILE_DOMAIN_MASK", "REQUIRED_LIVE_MUTATION_FEATURES"]) {
-        assert.equal(service[name], support[name], name);
+        assert.notEqual(support[name], undefined, name);
+        assert.equal(name in portable, false, name);
+        assert.equal(name in service, false, name);
     }
 });
 

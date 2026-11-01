@@ -3,6 +3,8 @@
 // its two halves and its firmware against this Ark. Pure: it reads the
 // published model.
 
+import {vocabulary} from "./vocabulary.mjs";
+
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 
 // Where to get the firmware, as the README says.
@@ -68,5 +70,5 @@ export function firmwareLine(model) {
     const version = firmware.version ? `charybdis-4x6 firmware ${firmware.version}` : "charybdis-4x6 firmware";
     return firmware.worksWithArk
         ? {version, works: true, words: "works with this Ark ✓"}
-        : {version, works: false, words: "Ark needs a newer firmware. Update both halves."};
+        : {version, works: false, words: vocabulary(model).firmwareUpdate};
 }

@@ -6,6 +6,7 @@ const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_MODE, buildEditBeginRequest, buildEdit
     buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, decodeEditReply, decodeEditStatusPages, decodeEditModePage,
     decodeRuntimePage, decodeActiveMetadata, readActiveProfile, sendEditRequest, decodeAutoSavePage, decodeSafeBoundaryPage} = require("../../core/protocol/profile-edit-v1");
 const {crc32} = require("../../core/schema/profile-blob-v1");
+const {contractUnion} = require("../fixtures/contract-unions");
 
 /** @param {string} hex */
 const frame = hex => {const bytes = Buffer.alloc(32); Buffer.from(hex.replace(/\s/g, ""), "hex").copy(bytes); return bytes;};
@@ -181,4 +182,13 @@ test("a page that no longer fits the active profile reads page 0 again before re
 test("an unhandled SET is a definite refusal, not a timeout", async () => {
     const keyboard = connection(request => {const echo = Buffer.from(request); echo[0] = 0xff; return echo;});
     await assert.rejects(sendEditRequest(keyboard, buildEditAbortRequest(1)), {code: "UNHANDLED"});
+});
+
+// The posted edit mode (setEditMode, the vocabulary's words) is the contract's
+// union; the keyboard's numbers are these.
+test("the edit modes the keyboard stores are exactly the contract's EditMode", () => {
+    const {isEditMode} = require("../../core/protocol/profile-edit-v1");
+    assert.deepEqual(Object.values(EDIT_MODE).sort(), contractUnion("model.d.ts", "EditMode").sort());
+    for (const mode of Object.values(EDIT_MODE)) assert.ok(isEditMode(mode), String(mode));
+    for (const other of [3, -1, "1", null, undefined]) assert.equal(isEditMode(other), false, String(other));
 });

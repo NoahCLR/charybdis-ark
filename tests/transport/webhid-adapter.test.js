@@ -11,7 +11,7 @@ const {
     QMK_RAW_HID_USAGE_PAGE,
     RAW_HID_REPORT_SIZE,
 } = require("../../core/transport/device-adapter");
-const nodeHidAdapter = require("../../core/transport/node-hid-adapter");
+const {failureSentence} = require("../../core/model/vocabulary");
 const {DeviceRequestCoordinator} = require("../../core/transport/request-coordinator");
 const {
     WebHidDeviceAdapter,
@@ -138,13 +138,6 @@ async function connectFirst(hid) {
     return {adapter, descriptor, connected: await adapter.connect(descriptor.id)};
 }
 
-test("both adapters match the same four Raw HID identifiers", () => {
-    assert.equal(nodeHidAdapter.CHARYBDIS_VENDOR_ID, CHARYBDIS_VENDOR_ID);
-    assert.equal(nodeHidAdapter.CHARYBDIS_PRODUCT_ID, CHARYBDIS_PRODUCT_ID);
-    assert.equal(nodeHidAdapter.QMK_RAW_HID_USAGE_PAGE, QMK_RAW_HID_USAGE_PAGE);
-    assert.equal(nodeHidAdapter.QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE);
-});
-
 test("without WebHID every call fails as unavailable", async () => {
     for (const hid of [undefined, {}, {getDevices() {}}]) {
         const adapter = new WebHidDeviceAdapter({hid});
@@ -244,6 +237,14 @@ test("connect opens only a listed interface and maps open failures", async () =>
     const brokenAdapter = new WebHidDeviceAdapter({hid: new FakeHid([broken])});
     const [descriptor] = await brokenAdapter.listDevices();
     await rejectsWithCode(brokenAdapter.connect(descriptor.id), LIVE_LINK_ERROR_CODES.CONNECT_FAILED);
+    // A person reads each as it is (model/vocabulary.js failureSentence): it
+    // names no device, which the error carries for the diagnostics.
+    for (const connecting of [adapter.connect("webhid:99"), brokenAdapter.connect(descriptor.id)]) {
+        const error = await connecting.catch((failure) => failure);
+        assert.equal(failureSentence(error), error.message);
+        assert.doesNotMatch(error.message, /webhid:|Raw HID|interface/);
+        assert.match(error.deviceId, /^webhid:/);
+    }
 });
 
 test("writes send 32 bytes with report id 0 and map send failures", async () => {

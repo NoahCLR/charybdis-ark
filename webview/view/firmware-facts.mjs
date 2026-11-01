@@ -31,7 +31,7 @@ export function firmwareFacts(model) {
     for (const field of dpi?.fields || []) {
         const steps = (field.choices || []).map((choice) => typeof choice === "object" ? choice.value : choice);
         if (steps.length) facts.push({label: `${field.label.replace(/ \(.*\)$/, "")} speed steps`, value: `${steps[0]}–${steps[steps.length - 1]} DPI, ${steps.length} steps`,
-            hint: `The DPI steps the Charybdis accepts for this speed; a trackball mode's own speed is not limited to them. ${BUILD}`});
+            hint: `The DPI steps the Charybdis accepts for this speed; a pointing mode's own speed is not limited to them. ${BUILD}`});
     }
     // Current firmware decides every key's tap or hold itself (firmware D-F27,
     // Profile Wire feature bit 31, which Ark requires).

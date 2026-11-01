@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {PHASE, editModeWords, heldWords, quietWords} = require("../model/vocabulary");
+const {PHASE, editModeWords, heldWords, layerName, quietWords} = require("../model/vocabulary");
 
 // The panel's side of a session.
 //
@@ -8,7 +8,8 @@ const {PHASE, editModeWords, heldWords, quietWords} = require("../model/vocabula
 // service, the draft, the layer editor, and the outbox the next model carries
 // (a notice, an accepted edit, a request to reset forms). Whether its draft
 // may be edited, and the changes that move several of its fields at once, are
-// panel-session-state.js's. Everything here is
+// panel-session-state.js's; how its draft follows what Ark reads is
+// draft-follow.js's. Everything here is
 // free of the page, so it is tested like the rest of core/; panel-loop.js runs
 // it, and the web shell (web/web-shell.mjs) keeps only the browser's picker,
 // storage, files and progress.
@@ -20,24 +21,27 @@ const {PHASE, editModeWords, heldWords, quietWords} = require("../model/vocabula
  * @typedef {import("./types.js").LayerEditState} LayerEdit
  * @typedef {import("../model/types.js").CompleteSnapshot} Snapshot
  */
+const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
 const {canEdit, firmwareView} = require("./firmware-support");
-const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
-const {buildDeviceModel, buildSnapshotModel, deviceLabels} = require("./device-model");
+const {ProfileDraftSession} = require("./profile-draft-session");
+const {DRAFT_EDITS} = require("../model/draft-edits");
+const {buildDeviceModel, buildSnapshotModel, deviceLabels, selectedDevice} = require("./device-model");
+const {keptFor} = require("./kept");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
-const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
+const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft} = require("./panel-session-state");
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
 const {LOST_WORDS, RECONNECT_WORDS, RESTART_WORDS} = require("./keyboard-reconnect");
+const {BUSY_REFUSAL} = require("./operation-failure");
 // Retained exports for shells that inspect the routes; never hand-maintained.
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
 const DEMO_MESSAGES = controlsOn("demo");
 // The routes that start work, which wait for the current operation.
 const WORK_ROUTES = new Set(["draft", "portable", "demo", "read"]);
-const BUSY_REFUSAL = "Wait for the current operation to finish before starting another.";
 
 // What the panel says and offers that depends on its shell, published as
 // `model.shell`. The web page is the one shell (D-L71); these defaults are
@@ -52,10 +56,11 @@ const BUSY_REFUSAL = "Wait for the current operation to finish before starting a
 //   recoveries       [{id, name, savedAt}]: the recovery copies Backups lists
 //   build            {version, commit} the page was built from
 //   progress         what the page is doing, where it has no indicator of its own
+// A control they name is named as its button reads, "Choose keyboard…".
 const SHELL_WORDS = Object.freeze({
-    noKeyboard: "No keyboard is connected. Choose keyboard to connect one.",
-    connectHint: "Plug in your Charybdis, then pick it in Chrome's list with Choose keyboard.",
-    noneFound: "Chrome has no Charybdis this page may open yet. Choose keyboard and pick yours.",
+    noKeyboard: "No keyboard is connected. Use Choose keyboard… to connect one.",
+    connectHint: "Plug in your Charybdis, then use Choose keyboard… and pick it in Chrome's list.",
+    noneFound: "Chrome has no Charybdis this page may open yet. Use Choose keyboard… and pick yours.",
 });
 /** @param {import("./types.js").PanelShell | null | undefined} shell @returns {import("../../contracts/model.js").ShellPanel} */
 function shellModel(shell) {
@@ -69,36 +74,6 @@ function shellModel(shell) {
         progress: offered.progress || null,
         words: {...SHELL_WORDS, ...shell?.words},
     };
-}
-
-// A complete read of a supported keyboard opens the draft, or refreshes the
-// one already open against what the keyboard now holds.
-/** @param {ModelSession} session @param {State} state @param {import("../model/types.js").ProfileSnapshot | null | undefined} [portable] */
-function observePortable(session, state, portable = session.service.portable) {
-    if (session.draft && state.connected && portable !== session.observedPortable) session.draft.follow(portable, state.selectedDeviceId);
-    if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !canEdit(state.capabilities))) {
-        setDraft(session, undefined);
-    }
-    if (!portable || portable === session.observedPortable || !state.connected || !canEdit(state.capabilities)) return;
-    if (portable.incomplete && !session.draft) return;
-    const live = "live" in portable && Boolean(portable.live);
-    // A keyboard whose edit mode changed under an open draft: an untouched
-    // draft starts again in the new mode; one with work waits, stale, for the
-    // person to discard it (switching modes here asks first).
-    if (session.draft && Boolean(session.draft.live) !== live && state.selectedDeviceId === session.draft.deviceId && !portable.incomplete) {
-        if (session.draft.live || !session.draft.dirty) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
-        else session.draft.needsRead = true;
-    } else if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
-    else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities);
-    session.observedPortable = portable;
-}
-
-// A service notification advances the draft lifecycle explicitly. Rendering
-// the same state again is only a projection and cannot perform this step.
-/** @param {ModelSession} session @param {State} state */
-function observeService(session, state) {
-    if (!session.demo) observePortable(session, state);
-    if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken ?? null);
 }
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
@@ -115,7 +90,7 @@ function discardDraftForDevice(session, state, snapshot) {
 // keyboard is read, so none is described.
 /** @param {ModelSession} session @param {State} state @returns {ReturnType<typeof buildDeviceModel> & import("./types.js").PanelModelExtras} */
 function buildPanelModel(session, state) {
-    const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
+    const device = selectedDevice(state);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
     const supported = canEdit(state.capabilities);
     const binding = draftBinding(session, state);
@@ -143,7 +118,7 @@ function buildPanelModel(session, state) {
         // Live edit's words say the quiet interval the keyboard reports.
         const quietMs = (draft.live?.keyboard || draft.keyboard)?.quietMs;
         if (quietMs && model.vocabulary) model.vocabulary = {...model.vocabulary, editModes: editModeWords(quietMs)};
-        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === 1
+        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === EDIT_MODE.LIVE
             ? `The keyboard runs these edits now · it saves them by itself after ${quietWords(quietMs)} without typing`
             : "The keyboard runs these edits now · Save makes them permanent; unplugging it puts back what is saved";
         else if (draft.dirty && draft.matching && !draft.live) model.device.subtitle = "Showing your local draft · the keyboard still runs its saved profile";
@@ -187,9 +162,9 @@ function buildPanelModel(session, state) {
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
             fileName: session.portableReview.fileName || null, differences: importDifferences({...session, portableReview: session.portableReview}),
             fits: fileFits(session.portableReview.document, state.capabilities)} : null,
-        layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
+        layers: portableLayersView(session.portableLayers),
         usage: usageOf(session, state, draft),
-        putBack: session.beforeApply && session.beforeApply.deviceId === state.selectedDeviceId ? session.beforeApply.savedAt : null,
+        putBack: keptFor(session, "beforeApply", state)?.savedAt ?? null,
     };
     if (!draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     // A read is ready while its draft could be edited once whatever runs now
@@ -317,7 +292,7 @@ function routeMessage(session, message, state) {
         // current) the app is read-only; an edit that reaches here is refused,
         // never written.
         if (!session.draft) {
-            throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to current firmware.");
+            throw new Error("This keyboard has no editable draft, so the change was not kept. Read the keyboard again; if it stays read-only, update both halves to current firmware.");
         }
         const draft = boundDraft(session, state, message, "Reconnect the keyboard this draft belongs to and wait for its current operation.");
         // Live preview + save sends the edit to the keyboard (live-edits.js);
@@ -350,7 +325,7 @@ function routeMessage(session, message, state) {
             throw new Error(BUSY_REFUSAL);
         }
         if (control.action === "select" && (!state.devices?.some((device) => device.id === deviceId) || !deviceId)) {
-            throw new Error("Choose a keyboard from the current device list.");
+            throw new Error("Choose a keyboard from the keyboard menu.");
         }
         if (control.action === "select" && deviceId !== state.selectedDeviceId) closeEditors(session, {resetForms: true});
         beginRead(session);
@@ -443,4 +418,12 @@ function applyLayerEdit(edit, message) {
 /** @param {LayerEdit} edit */
 const layerEditDocument = (edit) => rewriteLayers(edit, edit.names);
 
-module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, shellModel, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};
+// The Layers screen's edit as the model posts it: each layer's name as typed,
+// and as a person reads it (core's words for an unnamed one).
+/** @param {Session["portableLayers"]} edit */
+function portableLayersView(edit) {
+    return edit ? {key: edit.before.fingerprint, order: edit.order, names: edit.names,
+        titles: edit.names.map((/** @type {string} */ _, /** @type {number} */ index) => layerName(edit.names, index)), keysFollow: edit.keysFollow !== false} : null;
+}
+
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, SHELL_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, portableLayersView, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit};

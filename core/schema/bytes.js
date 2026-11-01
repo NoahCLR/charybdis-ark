@@ -41,19 +41,44 @@ function u32(value, label, options = {}) {
     return number;
 }
 
-/** @param {string} name */
-function protocolError(name) {
+// A protocol's error class. Its text names bytes and layouts, for the
+// diagnostics, and a person reads what the vocabulary says of such a failure
+// (core/model/vocabulary.js failureSentence): one that reads the keyboard's
+// answers marks its errors `fault: "answer"`, a byte format Ark encodes and
+// decodes alike `fault: "ark"` (where Ark reads the keyboard's bytes with
+// it, answerFault re-marks the refusal as the answer's).
+/** @param {string} name @param {"answer" | "ark"} [fault] */
+function protocolError(name, fault) {
     const ProtocolError = class extends Error {
         /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
         constructor(code, message, details = {}) {
             super(message);
             this.name = name;
             this.code = code;
+            if (fault) this.fault = fault;
             Object.assign(this, details);
         }
     };
     Object.defineProperty(ProtocolError, "name", {value: name});
     return ProtocolError;
+}
+
+// A refusal of bytes the keyboard sent, by a reader that also reads Ark's
+// own bytes and backups: one Ark coded (not the language's or the
+// platform's) is the keyboard's answer not reading, marked as such for what a
+// person reads (core/model/vocabulary.js failureSentence), even where its
+// reader marks its text as a developer's (`fault: "ark"`, protocolError);
+// its own text stays for the diagnostics.
+/** @template E @param {E} error @returns {E} */
+function answerFault(error) {
+    const details = /** @type {{code?: unknown, fault?: unknown}} */ (error);
+    if (error instanceof Error && (details.fault === undefined || details.fault === "ark") && typeof details.code === "string" && /^(?!ERR_)[A-Z]/.test(details.code)) details.fault = "answer";
+    return error;
+}
+// A reading of the keyboard's bytes, its refusal marked (answerFault).
+/** @template T @param {() => T} read @returns {T} */
+function answered(read) {
+    try {return read();} catch (error) {throw answerFault(error);}
 }
 
 /** @param {Uint8Array} bytes @param {number} start @param {number} end @param {(offset: number) => Error} error */
@@ -73,4 +98,4 @@ function canonical(bytes, value, encode, refuse) {
     return value;
 }
 
-module.exports = {asBytes, copyBytes, u8, u16, u32, zeroRange, protocolError, canonical};
+module.exports = {answerFault, answered, asBytes, copyBytes, u8, u16, u32, zeroRange, protocolError, canonical};

@@ -56,9 +56,10 @@ test("steps round-trip: decode(encode(steps)) gives the same steps", () => {
 });
 
 test("macro validation refuses stuck keys, ambiguous commands and oversized content", () => {
-    for (const payload of ["{+KC_A}", "{-KC_A}", "{+KC_A}{KC_A}{-KC_A}", "{KC_A,KC_A}", "{G(KC_N)}", "{MO(1)}", "{65536}", "{KC_A,}", "{", "}", "\u0000"]) {
-        assert.throws(() => encodeMacroPayload(payload), undefined, payload);
+    for (const payload of ["{+KC_A}", "{-KC_A}", "{+KC_A}{KC_A}{-KC_A}", "{KC_A,KC_A}", "{G(KC_N)}", "{MO(1)}", "{65536}", "{", "}", "\u0000"]) {
+        assert.throws(() => encodeMacroPayload(payload), (error) => typeof error.problem?.code === "string", payload);
     }
+    assert.deepEqual(encodeMacroPayload("{KC_A,}"), encodeMacroPayload("{KC_A}"), "an empty name is skipped, as the step editor skips it");
     assert.throws(() => decodeMacroPayload(Buffer.from([1, 4, 50])), /Truncated/);
     assert.ok(macroKeycodes().includes("KC_LGUI"));
     assert.ok(!macroKeycodes().includes("QK_BOOTLOADER"));
@@ -71,6 +72,14 @@ test("Unicode macros preserve scalars and count their UTF-8 bank bytes", () => {
         assert.equal(decodeMacroPayload(bytes), text);
     }
     assert.equal(encodeMacroPayload("🙂".repeat(128)).length, 512);
-    for (const text of ["\uD800", "\uDC00", "\u0000", "\u0001", "\u0080", "\u009F"]) assert.throws(() => encodeMacroPayload(text), /valid Unicode/);
+    for (const text of ["\uD800", "\uDC00", "\u0000", "\u0001", "\u0080", "\u009F"]) assert.throws(() => encodeMacroPayload(text), (error) => error.problem?.code === "unprintable");
     for (const bytes of [[0xC0,0xAF], [0xE0,0x80,0xAF], [0xED,0xA0,0x80], [0xF4,0x90,0x80,0x80], [0xF0,0x9F,0x99], [0x80], [0xFF]]) assert.throws(() => decodeMacroPayload(Buffer.from(bytes)), /UTF-8/);
+});
+
+test("a key a macro cannot send is refused by name, never mistaken for another key", () => {
+    const {parsePayload: read} = require("../../core/schema/macro-payload");
+    for (const [payload, key] of [["{KC_B,S(KC_A),LSFT(KC_A)}", "S(KC_A)"], ["{KC_RALT,0x04,KC_A}", "0x04"], ["{KC_FOO,KC_BAR}", "KC_FOO"]]) {
+        assert.throws(() => read(payload), (error) => error.problem?.code === "unknown" && error.problem.key === key, payload);
+    }
+    assert.throws(() => read("{KC_A,KC_A}"), (error) => error.problem?.code === "chord", "the same key twice is still one chord key twice");
 });

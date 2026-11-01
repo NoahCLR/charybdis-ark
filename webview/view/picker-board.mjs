@@ -1,15 +1,18 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
+import {MODIFIER_KEYS, inBlock} from "../../rules/qmk-keycodes.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 // The ANSI board the keycode picker draws, taken from the app that ships it so
 // a second interface cannot teach a different keyboard.
 
 // Layout legends already carry dead-key marks and the macOS ISO swap from the
 // model. Keep the stored value and board geometry while choosing what to draw.
 export function pickerBoardKey(/** @type {{x: number, y: number, w: number, h: number, value: string, labels: string[]}} */ source, /** @type {Model} */ model) {
-  const spoken = model?.qmkKeyLabels?.[source.value];
-  const modifier = /^KC_(?:LEFT_|RIGHT_|L|R)(?:CTL|SFT|ALT|GUI)$/.test(source.value);
-  const legend = model?.hostLayoutLegends?.[source.value];
-  return modifier ? {...source, labels: [(spoken || source.value).replace(/^(Left|Right) /, "")]} : legend ? {...source, labels: legend} : source;
+  const identity = keyIdentity(model, source.value);
+  const code = identity.entry?.keycode;
+  const modifier = code !== undefined && inBlock(code, MODIFIER_KEYS);
+  const legend = identity.legends;
+  return modifier ? {...source, labels: [identity.label.replace(/^(Left|Right) /, "")]} : legend ? {...source, labels: legend} : source;
 }
 
 // A key's one legend is drawn at full size when it fits the key, and smaller

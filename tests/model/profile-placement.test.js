@@ -2,7 +2,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {behaviorPlacementProblem, comboPlacementProblem, keyPlacementProblem, profilePlacementProblem} = require("../../core/model/profile-placement");
-const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
+const {encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-domains");
 const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {bytes} = require("../fixtures/device-profile");
 

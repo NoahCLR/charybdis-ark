@@ -9,10 +9,13 @@ export type MacroStep = ({focusId?: string} & (
     | {kind: 'release'; keys: string[]}));
 export interface MacroOptions {
     textEntry?: boolean;
-    aliases?: Readonly<Record<string, string>>;
+    /** The model whose names a key is read by (view/key-identity.mjs): KC_LGUI is KC_LEFT_GUI. */
+    model?: import('./keyface-types.js').ViewModel;
     keys?: readonly string[];
     modifierKeys?: readonly string[];
     layoutChars?: string | readonly string[];
+    /** The words for each reason a macro does not read (vocabulary.macroProblems). */
+    problems?: Readonly<Record<string, string>>;
 }
 export interface FaceRows {
     comboHeight: number;

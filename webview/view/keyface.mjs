@@ -7,48 +7,38 @@
 // The model already resolved each position to a display label; this adds the
 // layer-tap hint, the behaviour tiers and the combo badges, and nothing else.
 
-const TRANSPARENT = new Set(["KC_TRANSPARENT", "KC_TRNS", "_______"]);
-const DISABLED = new Set(["KC_NO", "XXXXXXX"]);
+import {keyMeaning} from "../../rules/combo-inputs.mjs";
+import {vocabulary} from "./vocabulary.mjs";
+import {keyIdentity} from "./key-identity.mjs";
 
-/** @returns {import("./keyface-types.js").KeyFace} */
-export function keyFace(/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position) {
+// A layer key's second line is in the vocabulary's words (keyCapLayerVerbs),
+// and which keys act on a layer, and how, is core's (keyIdentity's
+// layerForm), as is which key is transparent or disabled (its kind), so every
+// caller passes the model it has.
+/** @param {ViewModel} model @returns {import("./keyface-types.js").KeyFace} */
+export function keyFace(/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position, model) {
     if (!position) return {main: "", sub: "", kind: "none"};
     const keycode = position.keycode || "";
-    if (TRANSPARENT.has(keycode)) return {main: "▽", sub: "", kind: "transparent"};
-    if (DISABLED.has(keycode)) return {main: "", sub: "", kind: "disabled"};
-    const layerTap = /^LT\(\s*([A-Z0-9_]+)\s*,/.exec(keycode);
-    const layerKey = /^(MO|TO|TG|OSL|DF|PDF|TT)\(\s*([A-Z0-9_]+)\s*\)$/.exec(keycode);
-    const modTap = /^MT\(([^,]+),/.exec(keycode);
-    // A pointing key for a slot that holds nothing keeps its own name on the
-    // cap; that it is inert belongs on the second line, where a key cap says
-    // what is true of the key rather than of its label.
-    const emptySlot = /^(.+) \(empty\)$/.exec(position.display || "");
-    if (emptySlot) return {main: emptySlot[1], sub: "empty", kind: "key"};
-    // A layer keycode's cap names its layer, so the second line says what it
-    // does to that layer; a layer-tap's second line names its layer; a mod-tap reads as its tap key, so the second
-    // line names the modifier its hold sends — otherwise MT(Shift, A) and a
-    // plain A, or MO(1) and TG(1), would be indistinguishable on the board.
+    const key = keyIdentity(model, keycode);
+    const kind = key.kind;
+    if (kind === "transparent") return {main: "▽", sub: "", kind};
+    if (kind === "disabled") return {main: "", sub: "", kind};
+    const form = key.layerForm;
+    const layerTap = form === "LT";
+    const verb = form && form !== "LT" ? vocabulary(model).keyCapLayerVerbs[form] : undefined;
+    // The line across a cap marks a dual-role key: what it taps above, what
+    // it holds below. A layer-tap's second line names its layer; a mod-tap's
+    // the modifier its hold sends (modifierLabel); a dual-role layer key's
+    // (OSL(), TT()) what it does to the layer the cap names, in the
+    // vocabulary's words. Any other key reads on one line by core's name for
+    // it: a single-role layer key ("Hold Navigation"), and a pointing key for
+    // a slot that holds nothing ("Slot 6 · hold (empty)"). Otherwise
+    // MT(Shift, A) and a plain A would be indistinguishable on the board.
     return {
         main: position.display || keycode,
-        sub: layerTap ? position.layerLabel || shortLayer(layerTap[1]) : layerKey ? LAYER_VERBS[layerKey[1]] : modTap ? position.modifierLabel || modTap[1] : "",
-        kind: layerTap || layerKey ? "layer" : "key",
+        sub: layerTap ? position.layerLabel || "" : verb ?? position.modifierLabel ?? "",
+        kind: form ? "layer" : "key",
     };
-}
-
-// The layer a keycode acts on, as the core names it beside its label
-// (qmkKeyLayers, from core/model/key-names.js keyLayer): MO(3), LOCK_LAYER(3)
-// and LT(3,KC_F) all name layer 3. Read under the stored name, the name the
-// core knows it by (QK_USER_31 → LOCK_LAYER(3)), or however the expression is
-// spelled. Null for any other key: the interface never works a layer out of a
-// keycode itself.
-/** @param {ViewModel} model @param {string} keycode @returns {number | null} */
-export function layerOfKeycode(model, keycode) {
-    const layers = model?.qmkKeyLayers || {};
-    const name = String(keycode ?? "");
-    for (const key of [name, model?.qmkKeycodeAliases?.[name], canonicalKeycode(model, name)]) {
-        if (key && Number.isInteger(layers[key])) return layers[key];
-    }
-    return null;
 }
 
 // A dual-role key's two halves: what a tap sends, and what a hold does — hold
@@ -56,34 +46,31 @@ export function layerOfKeycode(model, keycode) {
 /** @param {ViewModel} model @param {Position | null | undefined} position @returns {{tap: string, hold: {layer: number, name: string} | {modifier: string}} | null} */
 export function dualRole(model, position) {
     if (!position) return null;
-    const layer = /^LT\(/.test(position.keycode) ? layerOfKeycode(model, position.keycode) : null;
-    if (layer !== null) return {tap: position.display || "", hold: {layer, name: position.layerLabel || `Layer ${layer}`}};
+    const key = keyIdentity(model, position.keycode);
+    const layer = key.layerForm === "LT" ? key.layer : undefined;
+    if (layer !== undefined) return {tap: position.display || "", hold: {layer, name: position.layerLabel || ""}};
     return position.modifierLabel ? {tap: position.display || "", hold: {modifier: position.modifierLabel}} : null;
 }
 
 // A key by its whole name, for anything that is not a key cap. A cap shows what
 // fits — "F" over "Navigation" — and the name is the core's for the keycode,
 // "F / Navigation" (core/model/key-names.js).
-/** @param {Position | null | undefined} position */
-export function keyName(position) {
-    const face = keyFace(position);
+/** @param {Position | null | undefined} position @param {ViewModel} model */
+export function keyName(position, model) {
+    const face = keyFace(position, model);
     if (face.kind === "transparent") return "Transparent";
     if (face.kind === "disabled" || face.kind === "none") return "Unmapped";
     return position?.editLabel || face.main || position?.keycode || "";
 }
 
-/** @type {Record<string, string>} */
-const LAYER_VERBS = {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"};
-// Only for a position the core has not named: the layer the keycode holds.
-/** @param {string} name */
-const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 
 // A position carries two names: the one the keyboard stores (`QK_USER_16`, or
 // bare hex for a value the shipped vocabulary never named) and the one the rest
 // of the profile uses (`PD_MODE_0`, `MACRO_0`, `LEFT_THUMB`). Behaviour
 // rows, macro slots and pointing slots are all keyed by the second, so every
-// lookup from a key to what it reaches goes through this.
-export const keyMeaning = (/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position) => position?.semantic || position?.keycode || "";
+// lookup from a key to what it reaches goes through this, the rule combos
+// match their inputs by (rules/combo-inputs.mjs).
+export {keyMeaning};
 
 // Macro slots have one profile name across all 64 slots, even though QMK's
 // catalogue names only the first 32 native values. A bare value the keyboard
@@ -92,27 +79,17 @@ export const keyMeaning = (/** @type {import("../../contracts/panel.js").Positio
 // use this when a screen prints that keycode to a person.
 /** @param {ViewModel} model @param {string} name */
 export const visibleKeycode = (model, name) => {
-    const semantic = model?.qmkKeycodeAliases?.[name] || "";
-    if (/^MACRO_(?:[0-9]|[1-5][0-9]|6[0-3])$/.test(semantic)) return semantic;
-    return semantic && /^0x[0-9a-f]+$/i.test(name) ? semantic : name || "";
+    const identity = keyIdentity(model, name);
+    return identity.kind === "macro" || /^0x[0-9a-f]+$/i.test(name) ? identity.name : name || "";
 };
 
 // An action as the hover card names it: its words, and the keycode it stores
 // where that says something the words do not.
 /** @param {ViewModel} model @param {string} name */
 export function actionNaming(model, name) {
-    const words = actionLabel(model, name), stored = visibleKeycode(model, name);
+    const words = keyIdentity(model, name).label, stored = visibleKeycode(model, name);
     return {words, stored: stored && stored !== words ? stored : ""};
 }
-
-// How a keycode name is spoken in prose: the label the keyboard's own
-// vocabulary gives it, so a behaviour row, a reach line and the key cap all
-// call one key the same thing. Names the vocabulary does not cover — a device
-// action outside the advertised ABI — keep their numeric identity.
-/** @param {ViewModel} model @param {string} name */
-export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
-    || model?.qmkKeyLabels?.[model?.qmkKeycodeAliases?.[name] ?? ""]
-    || String(name ?? "");
 
 // What a behaviour cell reads as in the grid: the name a person knows the key
 // by, so it says "#", "Shift+Enter" and "Hold Numbers" where the keyboard
@@ -123,45 +100,11 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 /** @param {ViewModel} model @param {import("../../contracts/panel.js").Branch | null | undefined} branch */
 export function cellLabel(model, branch) {
     const action = String(branch?.action ?? "");
-    if (/^CUSTOM_KEY_\d+$/.test(action) && branch?.label) return branch.label;
-    const named = actionLabel(model, action);
+    const key = keyIdentity(model, action);
+    if (key.kind === "customKey" && branch?.label) return branch.label;
+    const named = key.label;
     return named !== action ? named : branch?.label || action;
 }
-
-/** @param {ViewModel} model @param {string} keycode */
-export const behaviourFor = (model, keycode) =>
-    (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
-
-// One spelling per key: the picker says KC_ENT and G(KC_C) where a behaviour
-// row says KC_ENTER and LGUI(KC_C), and an expression may or may not space its
-// arguments or nest two modifiers either way round. Every name goes through the
-// keyboard's alias table, and every modifier wrapper becomes one ordered set.
-/** @type {Record<string, string[]>} */
-const WRAPPER_MODS = {
-    C: ["LCTL"], LCTL: ["LCTL"], S: ["LSFT"], LSFT: ["LSFT"], A: ["LALT"], LALT: ["LALT"], LOPT: ["LALT"],
-    G: ["LGUI"], LGUI: ["LGUI"], LCMD: ["LGUI"], LWIN: ["LGUI"],
-    RCTL: ["RCTL"], RSFT: ["RSFT"], RALT: ["RALT"], ROPT: ["RALT"], ALGR: ["RALT"], RGUI: ["RGUI"], RCMD: ["RGUI"], RWIN: ["RGUI"],
-    LCS: ["LCTL", "LSFT"], LCA: ["LCTL", "LALT"], LCG: ["LCTL", "LGUI"], LSA: ["LSFT", "LALT"], LSG: ["LSFT", "LGUI"],
-    LAG: ["LALT", "LGUI"], LCAG: ["LCTL", "LALT", "LGUI"], MEH: ["LCTL", "LSFT", "LALT"], HYPR: ["LCTL", "LSFT", "LALT", "LGUI"],
-};
-const MOD_ORDER = ["LCTL", "LSFT", "LALT", "LGUI", "RCTL", "RSFT", "RALT", "RGUI"];
-export function canonicalKeycode(/** @type {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} */ model, /** @type {string} */ expression) {
-    let text = String(expression ?? "").replace(/\s+/g, "");
-    /** @type {Set<string>} */
-    const mods = new Set();
-    for (let match; (match = /^([A-Z]+)\((.*)\)$/.exec(text)) && WRAPPER_MODS[match[1]];) {
-        WRAPPER_MODS[match[1]].forEach((mod) => mods.add(mod));
-        text = match[2];
-    }
-    const inner = text.replace(/[A-Za-z_][A-Za-z0-9_]*/g, (name) => model?.qmkKeycodeAliases?.[name] ?? name);
-    return MOD_ORDER.filter((mod) => mods.has(mod)).reduceRight((wrapped, mod) => `${mod}(${wrapped})`, inner);
-}
-
-// The behaviour row a picked expression would land on, however it is spelled.
-export const behaviourListeningTo = (/** @type {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} */ model, /** @type {string} */ expression) => {
-    const wanted = canonicalKeycode(model, expression);
-    return (model?.keyBehaviors || []).find((row) => canonicalKeycode(model, row.keycode) === wanted);
-};
 
 
 // One dot per tier the behaviour uses anywhere, carrying how many branches use
@@ -215,23 +158,6 @@ export function behaviourGridLayout(behaviour, advertisedMaximum = 5, all = fals
     return {rows, depth, typing: depth > 1 ? {taps: depth + 1} : null};
 }
 
-/** @param {string | undefined} action */
-const pointingSlotOf = (action) => {
-    const match = /^PD_MODE_(\d+)(?:_LOCK)?$/.exec(String(action ?? ""));
-    return match ? Number(match[1]) : null;
-};
-// A pointing-mode key holds its mode from the press unless a later tap count
-// holds another mode: then it waits for Tap / hold, so the two modes never
-// overlap (key_behavior_lookup.c, key_behavior_step_references_foreign_pointing_mode).
-/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").InheritedBranch} hold */
-function builtInHoldNow(behaviour, hold) {
-    const own = pointingSlotOf(hold.action);
-    if (!hold.fromPress || own === null) return hold;
-    const foreign = (behaviour?.steps || []).some((step) => step.tapCount > 0 && [step.hold, step.longHold]
-        .some((branch) => { const slot = pointingSlotOf(branch?.action); return slot !== null && slot !== own; }));
-    return foreign ? {...hold, fromPress: false} : hold;
-}
-
 // What the keyboard does for a tier the row leaves empty (core/model/
 // built-in-behavior.js). An empty first tap is the key's own. An empty later
 // tap repeats the first tap, the row's own (`first`) or else the key's, once
@@ -239,8 +165,8 @@ function builtInHoldNow(behaviour, hold) {
 // the row reaches, its deepest authored count; past that depth the keyboard
 // starts again at a single tap (behaviourDepth), so those cells stay empty.
 // The built-in hold belongs to the first press (`fromPress` when it
-// starts as the key goes down), and a fallback hold also gives way to an
-// authored long hold there. An authored cell and a key with nothing built in
+// starts as the key goes down, as core judges it for the row), and a
+// fallback hold also gives way to an authored long hold there. An authored cell and a key with nothing built in
 // inherit nothing.
 /** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").InheritedBranch | null} */
 export function inheritedBranch(behaviour, step, kind) {
@@ -257,7 +183,7 @@ export function inheritedBranch(behaviour, step, kind) {
     }
     if (kind === "hold") {
         if (!builtIn.hold || step.tapCount !== 0 || step.hold || (builtIn.hold.fallback && step.longHold)) return null;
-        return builtInHoldNow(behaviour, builtIn.hold);
+        return builtIn.hold;
     }
     return null;
 }

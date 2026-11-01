@@ -16,7 +16,7 @@ async function command(page, action) {
 
 
 async function openMacro(page, payload = '{KC_A}{KC_C}') {
-    await openControls(page, 'macros', {macroSlot: 'MACRO_17'});
+    await openControls(page, 'macros', {macroSlot: 'MACRO_17', allSlotsShown: ['macros']});
     await page.evaluate(async payload => {
         const store = await import('/webview/store.mjs'), model = structuredClone(store.getModel());
         Object.assign(model.macros[17], {payload, bytes: 6, empty: false});
@@ -190,7 +190,7 @@ test('text fields keep native undo and clipboard while typing; renames/protectio
     expect(await draftHistory(page)).toEqual([]);
     const title = page.getByRole('textbox', {name: 'Macro name', exact: true});
     await title.fill('Rename'); await title.press('Enter');
-    await page.locator('[data-protection]').selectOption('off');
+    await page.locator('[data-protection] label:has(input[value="off"])').click();
     expect((await history(page)).undo).toBe(0);
 });
 

@@ -4,6 +4,15 @@
 const LAYERS = 16, MATRIX_ROWS = 10, MATRIX_COLUMNS = 6;
 const MATRIX_KEYS = MATRIX_ROWS * MATRIX_COLUMNS;
 
+// A set of layers is a mask, bit n for layer n; ALL_LAYERS is the whole bank.
+const ALL_LAYERS = 2 ** LAYERS - 1;
+// Every layer in its own slot: the order no reorder has changed.
+const LAYER_IDENTITY = Object.freeze(Array.from({length: LAYERS}, (_, layer) => layer));
+/** @param {number} mask */
+const layersOfMask = mask => LAYER_IDENTITY.filter(layer => mask & (1 << layer));
+/** @param {number} layer */
+const layersAbove = layer => (ALL_LAYERS << (layer + 1)) & ALL_LAYERS;
+
 // The Charybdis 4x6 key layout: inert data every layer may read.
 //
 // QMK keyboard.json -> layouts.LAYOUT.layout, in the same order as the
@@ -29,4 +38,16 @@ function matrixPosition(layoutIndex) {
     return row * MATRIX_COLUMNS + column;
 }
 
-module.exports = {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_ROWS, MATRIX_COLUMNS, MATRIX_KEYS, matrixPosition};
+// The LED each key carries, by layout index, and the trackball's. The
+// keyboard numbers the left half's columns, its thumb keys, then the right
+// half's columns and thumb keys; a lighting group names LEDs by these numbers.
+const KEY_LEDS = Object.freeze([
+    0, 7, 8, 15, 16, 20, 49, 45, 44, 37, 36, 29,
+    1, 6, 9, 14, 17, 21, 50, 46, 43, 38, 35, 30,
+    2, 5, 10, 13, 18, 22, 51, 47, 42, 39, 34, 31,
+    3, 4, 11, 12, 19, 23, 52, 48, 41, 40, 33, 32,
+    26, 27, 28, 53, 54, 25, 24, 55,
+]);
+const TRACKBALL_LED = 56;
+
+module.exports = {CHARYBDIS_4X6_LAYOUT_MATRIX, KEY_LEDS, LAYERS, ALL_LAYERS, LAYER_IDENTITY, MATRIX_ROWS, MATRIX_COLUMNS, MATRIX_KEYS, TRACKBALL_LED, layersAbove, layersOfMask, matrixPosition};

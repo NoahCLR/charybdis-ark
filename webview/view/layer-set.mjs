@@ -14,7 +14,7 @@
 // and a layer added while base is the top goes on over it.
 
 /** @type {readonly number[]} */
-export const EMPTY = Object.freeze([]);
+const EMPTY = Object.freeze([]);
 
 // The layers still worth previewing from a remembered set, in a stack of
 // `count` layers.

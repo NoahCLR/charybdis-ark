@@ -1,7 +1,8 @@
 // @ts-check
-// The physical keyboard: where each of the 56 positions sits, which LED it
-// carries, and which half it belongs to. Lifted from the app's own board so a
-// second interface cannot teach a different keyboard.
+// The physical keyboard: where each of the 56 positions sits, and which half
+// it belongs to (which LED it carries is published, model.leds). Lifted from
+// the app's own board so a second interface cannot teach a different
+// keyboard.
 
 // The trackball is a 34mm sphere among 19.05mm key pitches, so it is nearly
 // two keys across — drawn at its own size rather than as a marker, and sitting
@@ -20,21 +21,6 @@ export const GEO = {
     },
     trackball: {x: 776, y: 480, r: 58},
 };
-
-/** @type {Readonly<Record<number, number>>} */
-export const LED_INDEX = {
-    0: 0, 1: 7, 2: 8, 3: 15, 4: 16, 5: 20,
-    12: 1, 13: 6, 14: 9, 15: 14, 16: 17, 17: 21,
-    24: 2, 25: 5, 26: 10, 27: 13, 28: 18, 29: 22,
-    36: 3, 37: 4, 38: 11, 39: 12, 40: 19, 41: 23,
-    6: 49, 7: 45, 8: 44, 9: 37, 10: 36, 11: 29,
-    18: 50, 19: 46, 20: 43, 21: 38, 22: 35, 23: 30,
-    30: 51, 31: 47, 32: 42, 33: 39, 34: 34, 35: 31,
-    42: 52, 43: 48, 44: 41, 45: 40, 46: 33, 47: 32,
-    48: 26, 49: 27, 50: 28, 51: 53, 52: 54, 53: 25, 54: 24, 55: 55,
-};
-
-export const TRACKBALL_LED = 56;
 
 const RIGHT_THUMBS = new Set([51, 52, 55]);
 
@@ -139,7 +125,50 @@ const charWidth = (char) => {
  */
 /** @param {unknown} text @param {{max: number, min: number, width: number}} bounds */
 export function fitText(text, {max, min, width}) {
-    const unit = [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
+    const unit = units(text);
     const preferred = unit > 0 ? Math.min(max, width / unit) : max;
     return {size: Math.round(Math.max(min, preferred) * 100) / 100, squeeze: unit * max > width ? width : 0};
+}
+
+/** @param {unknown} text */
+const units = (text) => [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
+
+// The smallest a legend with a cap to itself is drawn: past it a name stops
+// reading at a laptop's width, so it takes two lines instead.
+export const LEGEND_MIN = 8;
+// Two lines share the cap, so neither is drawn larger than this.
+const TWO_LINE_MAX = 9.5;
+
+/**
+ * A legend alone on its cap (no hold under a line): one line while it fits at
+ * LEGEND_MIN or more, as `fitText` sizes it; otherwise two, broken between
+ * words where the longer line comes out shortest, and a " · " the break falls
+ * on dropped, since the break already parts them ("Slot 6" over "hold
+ * (empty)"). Each line has its own `squeeze`, set only when a single word
+ * overruns the row even at LEGEND_MIN. The words are never cut, so the hover
+ * card and the key's label still read the whole name.
+ */
+/** @param {unknown} text @param {{max: number, width: number}} bounds @returns {{size: number, lines: {text: string, squeeze: number}[]}} */
+export function fitLegend(text, {max, width}) {
+    const whole = String(text ?? "");
+    const one = () => {
+        const fit = fitText(whole, {max, min: LEGEND_MIN, width});
+        return {size: fit.size, lines: [{text: whole, squeeze: fit.squeeze}]};
+    };
+    if (units(whole) * LEGEND_MIN <= width) return one();
+    const words = whole.split(" ").filter(Boolean);
+    /** @param {string[]} part */
+    const line = (part) => part.join(" ");
+    let best = {first: "", second: "", longest: Infinity};
+    for (let at = 1; at < words.length; at++) {
+        const first = words.slice(0, at), second = words.slice(at);
+        if (first.at(-1) === "·") first.pop();
+        if (second[0] === "·") second.shift();
+        if (!first.length || !second.length) continue;
+        const longest = Math.max(units(line(first)), units(line(second)));
+        if (longest < best.longest) best = {first: line(first), second: line(second), longest};
+    }
+    if (best.longest === Infinity) return one();
+    const size = Math.round(Math.max(LEGEND_MIN, Math.min(TWO_LINE_MAX, max, width / best.longest)) * 100) / 100;
+    return {size, lines: [best.first, best.second].map((part) => ({text: part, squeeze: units(part) * size > width ? width : 0}))};
 }

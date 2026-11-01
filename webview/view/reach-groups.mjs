@@ -3,12 +3,12 @@
 //
 // Every tab that answers "what does this layer reach" groups its rows the
 // same way and in the same order: what the layer holds itself, then what it
-// only reaches under a transparent key, then the rest of the board. The reach
-// functions in reach.mjs return one list per group; these name the groups,
-// order them, and say which list each reads.
+// only reaches under a transparent key, then the rest of the board. These
+// name the groups, order them, keep which are open, and name a picked row;
+// what each tab's groups list is tab-reach.mjs's.
 
 /** @type {Readonly<Record<string, string>>} */
-export const ROUTE_WORDS = Object.freeze({here: "key", branches: "behaviour", combos: "combo"});
+const ROUTE_WORDS = Object.freeze({here: "key", branches: "behaviour", combos: "combo"});
 
 export const GROUP_TITLES = {
     // The Combos tab's one cut across the others: what the selected key takes
@@ -38,13 +38,29 @@ export const initialReachGroups = () => Object.fromEntries(
 /** @param {Record<string, boolean>} groups @param {string} id @param {boolean} open */
 export const setReachGroupOpen = (groups, id, open) => ({...groups, [id]: open});
 
-// The reach list each group reads. `elsewhere` is a tab's own remainder.
-/** @typedef {"inView" | "onKeys" | "fromBranches" | "fromCombos" | "throughKeys" | "fromBranchesBelow" | "fromCombosBelow"} ReachField */
-/** @type {Partial<Record<string, ReachField>>} */
-export const REACH_FIELDS = {view: "inView", here: "onKeys", branches: "fromBranches", combos: "fromCombos", through: "throughKeys",
-    belowBranches: "fromBranchesBelow", belowCombos: "fromCombosBelow"};
-/** @template T @param {Partial<Record<ReachField, T[]>> | null | undefined} reach @param {string} group */
-export const reachEntries = (reach, group) => {
-    const field = REACH_FIELDS[group];
-    return field ? reach?.[field] || [] : [];
+// One thing can be listed under several routes, so a picked row names the
+// group it was picked under and what it lists, `group:name`: otherwise
+// picking it in one group would ring the keys of all of them.
+/** @param {string} group @param {string | number} name */
+export const reachRowId = (group, name) => `${group}:${name}`;
+
+// The layers a macro or custom key is placed on (placementsOf), as their
+// chips read: the layer, its place in the stack, and how it is reached there
+// ("key ×2 · combo").
+/** @param {ReturnType<typeof import("./reach.mjs").placementsOf>} placements */
+export const placementChips = (placements) => placements.map(({layer, at, routes}) => ({layer, at,
+    how: routes.map((route) => `${ROUTE_WORDS[route.group]}${route.group === "here" && route.keys.length > 1 ? ` ×${route.keys.length}` : ""}`).join(" · ")}));
+
+// Where a chip opens its layer in a Keymap tab: on the row of the first route
+// that reaches it there, the group that row is under open, with the first key
+// that route rings picked. Null for a layer it is not placed on.
+/** @param {ReturnType<typeof import("./reach.mjs").placementsOf>} placements @param {string} keycode @param {number} at */
+export function placementOpening(placements, keycode, at) {
+    const route = placements.find((entry) => entry.at === at)?.routes[0];
+    return route ? {layer: at, selected: route.keys[0], group: route.group, row: reachRowId(route.group, keycode)} : null;
+}
+/** @param {string} id */
+export const reachRowOf = (id) => {
+    const [group, ...rest] = String(id).split(":");
+    return {group, name: rest.join(":")};
 };

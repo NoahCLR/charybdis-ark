@@ -16,6 +16,8 @@ const empty = () => Array.from({length: 128}, () => Buffer.alloc(0));
 
 test("the macro domain is the 128 macros, each ended by a zero, slot 0 first", () => {
     assert.equal(MACRO_DOMAIN_V1.SLOTS, 128);
+    const {QK} = require("../../rules/qmk-keycodes.mjs");
+    assert.equal(QK.MACRO.last - QK.MACRO.first + 1, MACRO_DOMAIN_V1.SLOTS, "each slot has a keycode in QMK's macro block");
     assert.equal(MACRO_DOMAIN_V1.MAX_SIZE, 34903);
     assert.deepEqual(encodeMacroDomain(empty()), Buffer.alloc(128), "every slot its terminator alone");
     const macros = empty();

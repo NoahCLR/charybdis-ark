@@ -1,9 +1,9 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {post, render, state, writable} from "../../store.mjs";
-import {LED_INDEX, TRACKBALL_LED} from "../../view/geometry.mjs";
+import {post, render, state} from "../../store.mjs";
+import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
-import {offWording} from "../../view/lighting.mjs";
+import {keyLed, offWording, trackballLed} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {groupRowsTable, rowOwners, usageName} from "./led-rows.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
@@ -11,7 +11,7 @@ import {vocabulary} from "../../view/vocabulary.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageGroups(model) {
     const node = el(`<div class="tab-split builder"></div>`);
-    const canEdit = writable();
+    const canEdit = editGate(model, "lighting").editable;
     node.append(groupBuilder(model, canEdit), groupTables(model, canEdit));
     return node;
 }
@@ -23,7 +23,7 @@ function groupBuilder(model, canEdit) {
     const owners = rowOwners(model, draft.target);
     if (!owners.some(([value]) => value === draft.owner)) draft.owner = owners[0]?.[0] ?? "";
     if (draft.source && !groups.some((group) => group.name === draft.source)) draft.source = "";
-    const picked = ledIndices().length;
+    const picked = ledIndices(model).length;
     /** @param {string} value @param {string} text @param {string} current */
     const option = (value, text, current) => `<option value="${esc(value)}" ${value === current ? "selected" : ""}>${esc(text)}</option>`;
     const node = el(`<aside class="stack gap-12">
@@ -42,27 +42,30 @@ function groupBuilder(model, canEdit) {
     node.append(colourEditor({identity: "lighting:groups:draft",
         colour: state.rowColour || {h: "0", s: "0", v: "0"}, canEdit, title: "Row colour",
         maximumBrightness: model.rgb.maximumBrightness,
-        ...offWording("groups"),
+        ...offWording(model, "groups"),
         onChange: (next) => { state.rowColour = {h: String(next.h), s: String(next.s), v: String(next.v)}; render(); },
     }));
     const actions = el(`<div class="row gap-8">
         <button class="btn primary" data-act="keep" ${canEdit && (draft.source || picked) ? "" : "disabled"}
             data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Keep row in draft</button>
         <button class="btn ghost" data-act="save" ${canEdit && picked ? "" : "disabled"}
-            data-tip="${picked ? "Store the picked LEDs as a group other rows can point at. Groups are numbered by the LEDs they hold, so the others may renumber." : "Pick LEDs on the board first, then save them as a group."}">Save selection as a group</button></div>`);
+            data-tip="${picked ? "Store the picked LEDs as a group other rows can point at. Groups are numbered by the LEDs they hold, so the others may renumber." : "Pick LEDs on the board first, then make them a group."}">Make a group from the selection</button></div>`);
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => {
-        post(edits.ledRow(draft, ledIndices(), state.rowColour));
+        post(edits.ledRow(draft, ledIndices(model), state.rowColour));
     });
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="save"]')).addEventListener("click", () =>
-        post(edits.saveLedGroup(ledIndices())));
+        post(edits.saveLedGroup(ledIndices(model))));
     node.append(actions);
-    node.append(el(`<p class="note">Rows are applied in device order, so a later row wins on the LEDs it shares.</p>`));
+    node.append(el(`<p class="note">Rows paint in the order the keyboard stores them, so a later row wins on the LEDs it shares.</p>`));
     return node;
 }
 
-const ledIndices = () => {
-    const indices = state.ledPicks.map((index) => LED_INDEX[index]).filter((value) => value !== undefined);
-    return state.trackball ? [...indices, TRACKBALL_LED] : indices;
+// The LEDs picked on the board, by their numbers.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model */
+const ledIndices = (model) => {
+    const indices = state.ledPicks.map((index) => keyLed(model, index)).filter((value) => value !== undefined);
+    const trackball = trackballLed(model);
+    return state.trackball && trackball !== undefined ? [...indices, trackball] : indices;
 };
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {boolean} canEdit */

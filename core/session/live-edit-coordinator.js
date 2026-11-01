@@ -24,15 +24,10 @@
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest,
     buildEditCommitRequest, buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, sendEditRequest,
     readEditProgress, readEditStatus, readEditMode, readSafeBoundaryReasons} = require("../protocol/profile-edit-v1");
-const {diffProfiles, applySplices, spliceEditFits} = require("../schema/profile-splices");
-const {PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
-const {PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-domains");
+const {liveEditPlan} = require("../schema/profile-splices");
 const {LIVE_RESULT_WORDS} = require("../model/vocabulary");
 
 
-// The firmware never lets a profile lose these (D-F32: a required domain
-// cannot be dropped).
-const REQUIRED_DOMAINS = Object.freeze([PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]);
 const DEFAULT_TIMING = Object.freeze({
     pollMs: 5,
     // An edit being loaded and checked, and the slave half, are short on a
@@ -71,7 +66,7 @@ function refused(result, what, details = {}) {
     const name = EDIT_RESULT_NAMES[result] || `RESULT_${result}`;
     const stopped = result !== EDIT_RESULT.OK && Boolean((details.flags ?? 0) & (EDIT_FLAGS.STOPPED | EDIT_FLAGS.PEER_STOPPED));
     const code = stopped ? "LIVE_KEYBOARD_STOPPED" : result === EDIT_RESULT.STALE ? "LIVE_EDIT_STALE" : result === EDIT_RESULT.NOT_CLEAN ? "LIVE_EDIT_NOT_CLEAN" : "LIVE_EDIT_REFUSED";
-    const words = stopped ? LIVE_RESULT_WORDS.STOPPED : LIVE_RESULT_WORDS[name] || `the keyboard answered ${name}.`;
+    const words = stopped ? LIVE_RESULT_WORDS.STOPPED : LIVE_RESULT_WORDS[name] || LIVE_RESULT_WORDS.unknown;
     return new LiveEditError(code, `${what}: ${words}`, {result: name, ...details});
 }
 
@@ -215,22 +210,18 @@ class LiveEditCoordinator {
      * @param {WaitOptions & {onCommitted?: (transactionId: number) => void}} [options]
      * @returns {Promise<{bytes: Buffer, session: number, revision: number, converged: boolean, slaveRefused: boolean, sent: number, cancelled?: true, cancelTooLate?: true}>} */
     async post({from, to, defaults, identity, capacity, replaceWhenLarge = false}, {onWaiting, onCommitted} = {}) {
-        const diff = diffProfiles(from, to, {defaults, required: REQUIRED_DOMAINS});
-        if (!diff.splices.length) return {bytes: from, ...identity, converged: true, slaveRefused: false, sent: 0};
-        const result = applySplices(from, diff, {versions: PROFILE_DOMAIN_VERSIONS});
-        let replacement = false, stream = diff.stream;
-        if (!spliceEditFits(from.length, result.length, stream.length, capacity)) {
-            // Too large to stage beside the profile: only a whole replacement
-            // fits, and the keyboard takes one only with nothing unsaved.
-            if (!replaceWhenLarge) throw new LiveEditError("LIVE_EDIT_TOO_LARGE", "This change is too large to send as one edit while the keyboard has unsaved edits. Save or Revert first, then make it again.");
-            replacement = true; stream = Buffer.from(to);
-        }
+        const plan = liveEditPlan(from, to, {defaults, capacity});
+        if (plan.kind === "unchanged") return {bytes: from, ...identity, converged: true, slaveRefused: false, sent: 0};
+        // Too large to stage beside the profile: only a whole replacement
+        // fits, and the keyboard takes one only with nothing unsaved.
+        if (plan.kind === "replace" && !replaceWhenLarge) throw new LiveEditError("LIVE_EDIT_TOO_LARGE", "This change is too large to send as one edit while the keyboard has unsaved edits. Save or Revert first, then make it again.");
+        const replacement = plan.kind === "replace", splices = plan.kind === "splices" ? plan.splices : [], {stream} = plan;
         const before = await this.progress();
         const transactionId = this.transactionIds.next(before.lastTransactionId, before.transactionId);
-        const begin = await this.sendWhenFree(() => buildEditBeginRequest(transactionId, {...identity, splices: replacement ? 0 : diff.splices.length, insertTotal: stream.length, replacement}), "The keyboard did not take the edit");
+        const begin = await this.sendWhenFree(() => buildEditBeginRequest(transactionId, {...identity, splices: splices.length, insertTotal: stream.length, replacement}), "The keyboard did not take the edit");
         if (begin.result !== EDIT_RESULT.OK) throw refused(begin.result, "The keyboard did not take the edit", {session: begin.session, revision: begin.revision, flags: begin.flags});
         try {
-            if (!replacement) for (const [index, splice] of diff.splices.entries()) await this.expect(buildEditSpliceRequest(transactionId, index, splice), "The keyboard refused part of the edit");
+            for (const [index, splice] of splices.entries()) await this.expect(buildEditSpliceRequest(transactionId, index, splice), "The keyboard refused part of the edit");
             for (let offset = 0; offset < stream.length; offset += PROFILE_EDIT_V1.DATA_MAX) {
                 await this.expect(buildEditDataRequest(transactionId, offset, stream.subarray(offset, offset + PROFILE_EDIT_V1.DATA_MAX)), "The keyboard refused part of the edit");
             }
@@ -251,7 +242,7 @@ class LiveEditCoordinator {
             const details = done.lastResult === EDIT_RESULT.VALIDATION_REJECTED ? {refusal: status.refusal} : {};
             throw refused(done.lastResult, "The keyboard refused the edit", {session: done.session, revision: done.revision, flags: status.flags, ...details});
         }
-        const bytes = replacement ? Buffer.from(to) : result;
+        const {bytes} = plan;
         // A tripwire on Ark's own splicing: the keyboard's working copy must
         // be as long as the bytes Ark now takes it to hold.
         if (status.session !== done.session || status.revision !== done.revision || status.activeLength !== bytes.length) {
@@ -422,4 +413,4 @@ class LiveEditCoordinator {
     }
 }
 
-module.exports = {LiveEditCoordinator, LiveEditError, TransactionIds, REQUIRED_DOMAINS, DEFAULT_TIMING};
+module.exports = {LiveEditCoordinator, TransactionIds, DEFAULT_TIMING};

@@ -2,8 +2,9 @@
 // One mark per thing that has a colour of its own, drawn the same everywhere.
 //
 // A behaviour tier is the dot the keyboard flashes when it resolves, a tap
-// count is its branch badge, a layer is the board's icon in its layer colour,
-// a pointing mode is the Pointing modes icon in the light its slot paints, a
+// count is its branch badge (every tap count at once is "N×" in every
+// tap-branch colour), a layer is the board's icon in its layer colour, a
+// pointing mode is the Pointing modes icon in the light its slot paints, a
 // combo is its badge in the combo colour, a lighting stage is its on/off dot.
 // The grid, the hover card, Settings and the draft review all draw these from
 // here, so a colour means one thing on every surface — and a stage that is off
@@ -13,12 +14,14 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
-import {actionLabel, layerOfKeycode, visibleKeycode} from "../view/keyface.mjs";
+import {visibleKeycode} from "../view/keyface.mjs";
 import {macroChips} from "../view/macro.mjs";
 import {sequenceFace} from "../view/macro-sequence.mjs";
-import {namedAction, slotKeycodeNames} from "../view/reach.mjs";
+import {layerTapAction, namedAction} from "../view/named-action.mjs";
+import {keyIdentity, slotKeycodeNames} from "../view/key-identity.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {SCREENS} from "../view/screens.mjs";
+import {layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 
@@ -31,6 +34,22 @@ export function branchBadge(model, count, className = "") {
     const colour = feedbackColours(model).branches[count - 2];
     const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
     return `<span class="bn${lit ? " lit" : ""}${className ? ` ${esc(className)}` : ""}"${lit ? ` style="--tint:${css(colour)}"` : ""}>${esc(count)}×</span>`;
+}
+
+// Every tap count at once, as the Multi tap window governs them: the branch
+// badge, counting "N×", tinted with every tap-branch colour rather than one
+// (D-L31). Each tap count takes an equal share of the badge, left to right in
+// tap order, with a hard edge between colours. A colour that is off leaves its
+// share empty; with key feedback off, or every colour off, the badge is
+// drawn unlit.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model */
+export function branchesBadge(model) {
+    const colours = feedbackColours(model).branches;
+    if (!stageEnabled(model, "key") || colours.every(isOff)) return `<span class="bn">N×</span>`;
+    const share = 100 / colours.length;
+    const stops = colours.map((colour, i) =>
+        `${isOff(colour) ? "transparent" : css(colour)} ${+(i * share).toFixed(2)}% ${+((i + 1) * share).toFixed(2)}%`).join(", ");
+    return `<span class="bn lit all-counts" style="--tints:${esc(stops)}">N×</span>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind */
@@ -109,10 +128,6 @@ const tagged = (name, tags) => `<span class="sends-name">${esc(name)}</span>${ta
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} layer @param {string} name @param {string[]} tags @param {{inline?: boolean}} [options] */
 export const layerTagged = (model, layer, name, tags, {inline = false} = {}) =>
     `<span class="sends${inline ? " inline" : ""}">${mark(model, {kind: "layer", layer})}${tagged(name, tags)}</span>`;
-// The same, inline and without a mark, for a list where every item is one kind
-// and a swatch beside it stands in for the mark (D-L31): "Zoom `HOLD`".
-/** @param {string} name @param {string[]} tags */
-export const namedWithTags = (name, tags) => `<span class="sends inline">${tagged(name, tags)}</span>`;
 // A pointing slot by name, then each keycode that reaches it after its hold or
 // lock tag: "Dragscroll `HOLD` PD_MODE_0 `LOCK` PD_MODE_0_LOCK". A tag with no
 // keycode (null) stands alone: a mode its link starts, "Arrow `STARTED`".
@@ -123,14 +138,14 @@ export const slotNamedWithKeycodes = (name, keycodes) => `<span class="sends inl
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
 // A mark as the core describes it: {kind: "tier", tier, branch?} · {kind:
-// "branch", count} · {kind: "layer", layer} · {kind: "pointing", slot} ·
+// "branches"} · {kind: "layer", layer} · {kind: "pointing", slot} ·
 // {kind: "combo", badge?} · {kind: "stage", on}. Anything else draws nothing;
 // a set of layers marks each name instead (valueMarked).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value */
 export function mark(model, value) {
     switch (value?.kind) {
         case "tier": return `${value.branch ? branchBadge(model, value.branch) : ""}${tierDot(model, value.tier)}`;
-        case "branch": return branchBadge(model, value.count);
+        case "branches": return branchesBadge(model);
         case "layer": return kindIcon("layer", layerSwatch(model, {index: value.layer}).colour);
         case "pointing": return kindIcon("pointing", slotLight(model, {id: value.slot}).colour);
         case "combo": return comboBadge(model, value.badge);
@@ -143,13 +158,12 @@ export function mark(model, value) {
 // mode, named in the core's own words for it ("Hold Navigation", "Zoom ·
 // hold"), reads as that thing, as the grid draws it (sends): its mark, its
 // name and what the action does as a tag, never the action's word as text.
-// Any other name has the layer it acts on marked where the name says it:
-// "F / ▦ Navigation". The core names the layer (qmkKeyLayers) and puts its
-// name at one end of the key's name (core/model/key-names.js); one that does
-// not is left as it is.
+// A layer-tap named in the core's words is drawn from its halves with its
+// layer marked, "F / ▦ Navigation" (layerTapAction), and a name that is the
+// layer's alone is that layer, marked. Any other name is left as it is.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} text @param {string} keycode */
 export function keyNameMarked(model, text, keycode) {
-    return namedInline(model, keycode, text) || layerNameMarked(model, layerOfKeycode(model, keycode), text);
+    return namedInline(model, keycode, text) || layerTapInline(model, keycode, text) || layerNamed(model, keyIdentity(model, keycode).layer, text) || esc(text);
 }
 
 // A layer or pointing-mode action, drawn as that thing when `text` is the
@@ -157,15 +171,16 @@ export function keyNameMarked(model, text, keycode) {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} text */
 function namedInline(model, keycode, text) {
     const kind = namedAction(model, keycode)?.kind;
-    return (kind === "layer" || kind === "pointing") && String(text ?? "") === actionLabel(model, keycode) ? sends(model, keycode, {inline: true}) : "";
+    return (kind === "layer" || kind === "pointing") && String(text ?? "") === keyIdentity(model, keycode).label ? sends(model, keycode, {inline: true}) : "";
 }
 
 // A value that names a layer or a pointing mode by its words alone, as the
 // review compares them: an action on it ("Hold Navigation", "Zoom · lock")
 // reads as that action does on every other surface, its mark, name and tag.
 // The action is the one acting on that layer or slot that the core names
-// this way; with none (a layer-tap, a name from before a rename) the label
-// keeps the layer's mark before the layer's name, or is "" for the caller.
+// this way; a layer-tap the core names reads by its halves with its layer
+// marked, and the layer's name alone is marked. Anything else (a name from
+// before a rename) is "" for the caller.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} marker @param {string} text */
 export function valueMarked(model, marker, text) {
     // A set of layers reads as its names, each after its layer's mark.
@@ -175,18 +190,21 @@ export function valueMarked(model, marker, text) {
     const keycodes = marker?.kind === "layer" ? Object.entries(model?.qmkKeyLayers || {}).flatMap(([keycode, layer]) => layer === marker.layer ? [keycode] : [])
         : slot ? slotKeycodeNames(slot) : [];
     for (const keycode of keycodes) {
-        const named = namedInline(model, keycode, text);
+        const named = namedInline(model, keycode, text) || layerTapInline(model, keycode, text);
         if (named) return named;
     }
-    if (marker?.kind !== "layer") return "";
-    const inline = layerNameMarked(model, marker.layer, text);
-    return inline === esc(text) ? "" : inline;
+    return marker?.kind === "layer" ? layerNamed(model, marker.layer, text) : "";
 }
 
 // An action by its words with its layer marked, as every surface names one:
 // "Hold ▦ Numbers", "Lock ▦ Symbol". The plain words when it acts on no layer.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} [text] */
-export const actionMarked = (model, keycode, text = actionLabel(model, keycode)) => keyNameMarked(model, text, keycode);
+export const actionMarked = (model, keycode, text = keyIdentity(model, keycode).label) => keyNameMarked(model, text, keycode);
+
+// A key named where no mark can ride, in an accessible name (aria-label): the
+// words actionMarked shows, as text.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode */
+export const keyNameText = (model, keycode) => keyIdentity(model, keycode).label || keycode;
 
 // What a combo sends and the keys that press it, named the same way.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
@@ -196,19 +214,21 @@ export const comboOutputMarked = (model, combo) =>
 export const comboInputsMarked = (model, combo) =>
     (combo.inputs || []).map((input, at) => keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)).join(" + ");
 
-// A label starting or ending in a layer's name, with that layer's mark before
-// the name. Empty-handed (no layer, or a label that does not carry its name)
-// it is the label as it is.
+// A layer-tap by the core's name for it, built from its halves: the key it
+// taps, then its layer marked, "F / ▦ Navigation". Empty for any other key,
+// or a name the core did not give.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} text */
+function layerTapInline(model, keycode, text) {
+    const tap = String(text ?? "") === keyIdentity(model, keycode).label ? layerTapAction(model, keycode) : null;
+    return tap ? `${esc(tap.tap)} / ${marked(model, {kind: "layer", layer: tap.layer}, tap.name)}` : "";
+}
+
+// A layer's name alone, with its mark. Empty for no layer, or for words that
+// are not its name.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number | null | undefined} at @param {string} text */
-export function layerNameMarked(model, at, text) {
-    const layer = at === null || at === undefined ? null : model?.layers?.[at];
-    const name = layer ? layer.displayName || layer.name : "";
-    const label = String(text ?? "");
-    if (!layer || !name) return esc(label);
-    const shown = marked(model, {kind: "layer", layer: layer.index}, name);
-    if (label.endsWith(name)) return `${esc(label.slice(0, -name.length))}${shown}`;
-    if (label.startsWith(name)) return `${shown}${esc(label.slice(name.length))}`;
-    return esc(label);
+function layerNamed(model, at, text) {
+    const name = at === null || at === undefined ? "" : layerCalledAt(model, at);
+    return name && String(text ?? "") === name ? marked(model, {kind: "layer", layer: /** @type {number} */ (at)}, name) : "";
 }
 
 // A label with its mark in front, as a label reads everywhere. Where marked
@@ -228,9 +248,13 @@ export const stepMark = (kind) => kind === "press" ? "↓" : kind === "release" 
     : kind === "text" ? "“" : '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/></svg>';
 
 // The word under an editor tile, and what a screen reader says before a chip,
-// since the mark that tells press from release is not read out.
-/** @param {string} kind @param {boolean} [chord] */
-export const stepWord = (kind, chord = false) => kind === "delay" ? "wait" : kind === "tap" && chord ? "chord" : kind;
+// since the mark that tells press from release is not read out: the
+// vocabulary's short name for the step, a key or a chord for a tap.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind @param {boolean} [chord] */
+export const stepWord = (model, kind, chord = false) => {
+    const tiles = /** @type {Readonly<Record<string, string>>} */ (vocabulary(model).macroStepTiles);
+    return tiles[kind === "tap" ? chord ? "chord" : "key" : kind] || kind;
+};
 
 const THEN = '<span class="step-chip-then" aria-hidden="true">→</span>';
 
@@ -241,7 +265,7 @@ const THEN = '<span class="step-chip-then" aria-hidden="true">→</span>';
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} payload */
 export function macroSteps(model, payload) {
     const {chips, more} = macroChips(payload, (step) => sequenceFace(model, step));
-    const said = (/** @type {typeof chips[number]} */ chip) => `<span class="step-chip-said">${esc(stepWord(chip.kind, chip.chord))} </span>`;
+    const said = (/** @type {typeof chips[number]} */ chip) => `<span class="step-chip-said">${esc(stepWord(model, chip.kind, chip.chord))} </span>`;
     // Typed text reads as a string: its quotes stand in for the mark, and stay
     // in view when the chip is too narrow for the text.
     return `<div class="step-chips">${chips.map((chip) => `<span class="step-chip ${esc(chip.kind)}" data-tip="${esc(chip.full)}">${said(chip)}${chip.kind === "text"

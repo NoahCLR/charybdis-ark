@@ -5,26 +5,26 @@ import {profileLayers, profileMacros, editLayers, editMacros} from "../fixtures/
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {comboOutputProblem, isPlainKey, keyProblem, keycodeValue, takesModifiers} from "../../webview/view/keycode-expression.mjs";
-import {keyName} from "../../webview/view/keyvalues.mjs";
+import {comboOutputProblem, keyProblem, keycodeValue} from "../../webview/view/keycode-expression.mjs";
+import {compactModifierMask} from "../../webview/view/keyvalues.mjs";
+import {visibleKeycode} from "../../webview/view/keyface.mjs";
+import {keycodeName, sameKey} from "../../webview/view/key-identity.mjs";
 
 const require = createRequire(import.meta.url);
-const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
-const portable = require("../../core/model/portable-profile");
-const {buildSnapshotModel} = require("../../core/session/device-model");
+const {openDraft, publishedModel} = require("../fixtures/published-model");
 const {document: pdDocument} = require("../fixtures/pd-profile");
-const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
+const qmk = require("../../rules/qmk-keycodes.mjs");
+const catalog = require("../../core/data/keycode-catalog");
+const keycodes = require("../../core/schema/keycodes");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const doc = pdDocument();
-const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
-const model = buildSnapshotModel(snapshot, capabilities, {editable: true, reason: ""});
+const model = publishedModel(doc);
 const slotOf = (layoutIndex) => CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][1];
 
 // What the draft stores for an expression on a key, or undefined if it refuses.
 function drafted(expression) {
-    const draft = new ProfileDraftSession(snapshot, "test-device", capabilities);
+    const {draft} = openDraft(doc);
     try {
         draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 5, keycode: expression}]});
     } catch { return undefined; }
@@ -41,7 +41,8 @@ const EXPRESSIONS = [
     "MO(2)", "MO(15)", "MO(16)", "TG(1)", "TO(0)", "TT(3)", "OSL(4)", "DF(1)", "PDF(1)", "LOCK_LAYER(1)", "LOCK_LAYER(16)",
     "S(MO(2))", "G(PD_MODE_0)", "S(MACRO_0)", "G(A(S(C(LT(3,KC_F)))))", "C(PD_MODE_0)",
     "PD_MODE_0", "PD_MODE_0_LOCK", "PD_SLOT_0", "PD_SLOT_0_LOCK", "PD_SLOT_32", "MACRO_0", "MACRO_127", "MACRO_128", "CUSTOM_KEY_5",
-    "OSM(MOD_LSFT)", "LM(1, MOD_LSFT)", "LM(16, MOD_LSFT)", "0x0004", "0x5240", "4", "NOT_A_KEY", "", "LT(3,", "KC_A)",
+    "OSM(MOD_LSFT)", "OSM(MOD_RSFT)", "OSM(MOD_RCTL|MOD_RALT)", "OS_RSFT", "OS_RCS", "RCS(KC_A)", "LCSG(KC_A)", "RSAG(KC_A)", "LSA(KC_A)", "LAS(KC_A)",
+    "LM(1, MOD_LSFT)", "LM(16, MOD_LSFT)", "0x0004", "0x5240", "4", "NOT_A_KEY", "", "LT(3,", "KC_A)",
 ];
 
 test("the picker's check stores what the draft stores and refuses what it refuses", () => {
@@ -60,7 +61,7 @@ test("every name for a macro slot stores the same keycode, which reads as MACRO_
         assert.equal(drafted(expression), 0x7703, expression);
         assert.equal(keycodeValue(model, expression), 0x7703, expression);
     }
-    assert.equal(keyName(model, 0x7703), "MACRO_3");
+    assert.equal(keycodeName(model, 0x7703), "MACRO_3");
     assert.equal(drafted("VIA_MACRO_127"), 0x777f);
     assert.equal(keyProblem(model, "VIA_MACRO_128"), "VIA_MACRO_128 is not a key this keyboard can store.");
     assert.equal(drafted("VIA_MACRO_128"), undefined);
@@ -74,13 +75,13 @@ test("a pointing key typed by its former name stores its slot's keycode, which r
         assert.equal(keycodeValue(model, expression), code, expression);
         assert.equal(drafted(expression), code, expression);
     }
-    assert.equal(keyName(model, 0x7e83), "PD_MODE_3");
-    assert.equal(keyName(model, 0x7ea3), "PD_MODE_3_LOCK");
+    assert.equal(keycodeName(model, 0x7e83), "PD_MODE_3");
+    assert.equal(keycodeName(model, 0x7ea3), "PD_MODE_3_LOCK");
 });
 
 // What the draft stores as a new combo's output, or undefined if it refuses it.
 function comboDrafted(expression) {
-    const draft = new ProfileDraftSession(snapshot, "test-device", capabilities);
+    const {draft} = openDraft(doc);
     try {
         draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "addCombo", inputs: ["KC_Q", "KC_W"], output: expression, termMs: "50", holdTermMs: "200"});
     } catch { return undefined; }
@@ -104,9 +105,50 @@ test("every catalogue key the picker offers is one the draft stores, by the same
 });
 
 test("a tap with a hold is a plain key; modifiers wrap only basic or modified keys", () => {
-    assert.equal(isPlainKey(model, "KC_A"), true);
-    assert.equal(isPlainKey(model, "KC_EXLM"), false);
-    assert.equal(isPlainKey(model, "MO(1)"), false);
-    assert.equal(takesModifiers(model, "KC_EXLM"), true);
-    for (const key of ["MO(2)", "PD_MODE_0", "MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(takesModifiers(model, key), false, key);
+    // The shared grammar refuses the rest, so the draft never stores them.
+    for (const dual of ["LT(1,KC_A)", "MT(MOD_LSFT,KC_A)"]) assert.notEqual(keycodeValue(model, dual), undefined, dual);
+    for (const dual of ["LT(1,KC_EXLM)", "LT(1,MO(1))", "MT(MOD_LSFT,KC_EXLM)"]) assert.equal(keycodeValue(model, dual), undefined, dual);
+    assert.notEqual(keycodeValue(model, "LSFT(KC_EXLM)"), undefined);
+    for (const key of ["MO(2)", "PD_MODE_0", "MACRO_0", "CUSTOM_KEY_1", "LT(3, KC_F)", "QK_BOOT"]) assert.equal(keycodeValue(model, `LSFT(${key})`), undefined, key);
+});
+
+// The interface reads QMK's keycode layout from the shared rules
+// (rules/qmk-keycodes.mjs), as core does; these hold its readers to what the
+// keyboard reads back.
+const names = {
+    qmkKeycodes: catalog.entries().map((entry) => ({value: entry.name, keycode: entry.value, aliases: entry.aliases})),
+    qmkKeycodeAliases: catalog.aliasTable(),
+};
+
+// A behaviour row is keyed by the name the keyboard reads back, one long
+// wrapper per modifier (RCTL(RSFT(KC_A))); a picked expression finds that row
+// however it is spelled.
+test("every wrapper spelling reads as the keycode the keyboard reads back", () => {
+    for (const wrapper of Object.keys(qmk.MODIFIER_WRAPPERS)) {
+        const expression = `${wrapper}(KC_A)`;
+        const readBack = keycodes.resolve(/** @type {number} */ (keycodes.encode(expression))).name;
+        assert.ok(sameKey(names, expression, readBack), expression);
+        assert.equal(keycodeValue(names, expression), keycodes.encode(expression), expression);
+    }
+});
+
+test("a stored modified key is named with wrappers core encodes back to it", () => {
+    for (let code = qmk.QK.MODS.first; code <= qmk.QK.MODS.last; code++) {
+        // The side flag alone holds no modifier: no pointing tap stores it.
+        const name = keycodeName(names, code);
+        if (name.startsWith("0x") || !(qmk.modsOf(code) & 0x0f)) continue;
+        assert.equal(keycodes.encode(name), code, name);
+        const mods = qmk.modsOf(code);
+        assert.equal(compactModifierMask(code), mods & qmk.MOD_RIGHT ? (mods & 0x0f) << 4 : mods & 0x0f);
+    }
+});
+
+test("every macro slot in QMK's macro block reads by its macro name", () => {
+    const slots = qmk.QK.MACRO.last - qmk.QK.MACRO.first + 1;
+    for (let slot = 0; slot < slots; slot++) {
+        const stored = keycodes.resolve(qmk.QK.MACRO.first + slot).name;
+        assert.equal(visibleKeycode(model, stored), `MACRO_${slot}`, stored);
+        assert.equal(qmk.macroOfName(`MACRO_${slot}`), slot);
+    }
+    assert.equal(qmk.macroOfName(`MACRO_${slots}`), undefined);
 });

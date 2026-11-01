@@ -7,10 +7,13 @@
 // tap-toggled or one-shot. A behaviour on the key works on top of it, and a
 // behaviour step on another key that sends it sends the shortcut only, layers
 // included.
-import {vocabulary} from "./vocabulary.mjs";
-import {customKeyKeycodes, customKeyPlacements, reachGroups} from "./reach.mjs";
+import {layerCalledAt, sentence, vocabulary} from "./vocabulary.mjs";
+import {placementsOf} from "./reach.mjs";
+import {catalogEntry, keyIdentity} from "./key-identity.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
-import {compactModifierMask} from "./keyvalues.mjs";
+import {keycodeModifiers} from "./keyvalues.mjs";
+import {LAYERS} from "./layout.mjs";
+import {MODIFIER_KEY_SIDES, TAPPING_TOGGLE} from "../../rules/qmk-keycodes.mjs";
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {import("../../contracts/panel.js").CustomKey} CustomKey */
@@ -32,10 +35,8 @@ export const sameShortcut = (a, b) => (a.mods ?? 0) === (b.mods ?? 0) && (a.keys
 // How a shortcut turns its layers on (SHORTCUT_LAYER_KINDS): hold, lock, move
 // to, tap-toggle, one-shot; hold without layers.
 export const LAYER_KIND = Object.freeze({HOLD: 0, LOCK: 1, MOVE: 2, TAP_TOGGLE: 3, ONESHOT: 4});
-// QMK's TAPPING_TOGGLE: the tap of a tap-toggle key that locks its layers.
-const TAPPING_TOGGLE = 5;
 /** @param {CustomKey} key */
-export const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || LAYER_KIND.HOLD : LAYER_KIND.HOLD);
+const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || LAYER_KIND.HOLD : LAYER_KIND.HOLD);
 /** @param {CustomKey} key */
 const layersAlone = (key) => Boolean(key.shortcut?.layers) && !sendsKeys(key.shortcut);
 /** @param {CustomKey} key */
@@ -67,13 +68,11 @@ function shortcutRuns(key) {
         default: return "held while the key is held, tapped when it is tapped";
     }
 }
-/** @param {string} text */
-const upper = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 // A shortcut's limits in words, as core says them (model.
 // customKeyShortcutKeyLimits): "up to 6 keys held together, at most one media
 // key and one system key"; `start` begins a sentence with them.
 /** @param {Model} model @param {boolean} [start] */
-export const shortcutLimitWords = (model, start = false) => (start ? upper : String)(model?.customKeyShortcutKeyLimits?.words || "");
+export const shortcutLimitWords = (model, start = false) => (start ? sentence : String)(model?.customKeyShortcutKeyLimits?.words || "");
 
 // A slot in use: named, or sending a shortcut, or with a behaviour. Any other
 // is an empty slot, drawn as one on the Custom keys screen, and is not a key a
@@ -81,24 +80,22 @@ export const shortcutLimitWords = (model, start = false) => (start ? upper : Str
 /** @param {CustomKey | null | undefined} key */
 export const customKeyInUse = (key) => Boolean(key && (key.name || key.hasBehavior || hasShortcut(key)));
 
-// Custom keys, grouped the ways a layer reaches them, as macros are: a key
-// carrying one, a transparent key letting a lower one, a behaviour branch
-// sending one (which sends its shortcut only, D-L63), or a combo sending one.
-/** @param {Model} model @param {import("../../contracts/panel.js").Layer[]} stack @param {number} at */
-export const customKeyReach = (model, stack, at) => reachGroups(model, stack, at, customKeyKeycodes,
-    (model?.customKeys || []).filter(customKeyInUse).map((key) => key.keycode));
-
-// The custom key a keycode names, if it is one.
+// The custom key a keycode names, if it is one: one of the custom keys core
+// publishes, by its name or any other it is read by, the bare hex a combo
+// stores included (key-identity.mjs).
 /** @param {Model} model @param {string | null | undefined} keycode */
-export const customKeyOf = (model, keycode) => /^CUSTOM_KEY_\d+$/.test(String(keycode ?? ""))
-    ? (model?.customKeys || []).find((key) => key.keycode === keycode) : undefined;
+export const customKeyOf = (model, keycode) => {
+    if (!keycode) return undefined;
+    const name = keyIdentity(model, keycode).customKey || keycode;
+    return (model?.customKeys || []).find((key) => key.keycode === name);
+};
 
 // "What it does": its shortcut, its behaviour on top, both, or nothing yet.
 /** @param {CustomKey} key */
 export function customKeyDoes(key) {
     const sends = hasShortcut(key) ? key.shortcutLabel : "";
     if (sends && key.hasBehavior) return `Its behaviour, on top of ${sends}: a tap or hold the behaviour leaves empty ${shortcutAct(key)}${momentary(key) ? `, and ${FROM_EVERY_PRESS}` : ""}.`;
-    if (sends) return `${upper(shortcutAct(key))}: ${shortcutRuns(key)}. Set taps and holds in its grid to give it more.`;
+    if (sends) return `${sentence(shortcutAct(key))}: ${shortcutRuns(key)}. Set taps and holds in its grid to give it more.`;
     if (key.hasBehavior) return "Only what its behaviour says. Give it a shortcut to send one where the behaviour leaves a tap or hold empty.";
     return "Nothing yet. Give it a shortcut, or set taps and holds in its grid.";
 }
@@ -109,16 +106,18 @@ export function customKeyDoes(key) {
 /** @param {CustomKey} key */
 export function customKeyShortcutLine(key) {
     if (!hasShortcut(key)) return "No shortcut: it does only what its behaviour says.";
-    return key.hasBehavior ? `${upper(shortcutAct(key))} where its behaviour leaves a tap or hold empty${momentary(key) ? `; ${FROM_EVERY_PRESS}` : ""}.`
-        : `${upper(shortcutAct(key))}: ${shortcutRuns(key)}.`;
+    return key.hasBehavior ? `${sentence(shortcutAct(key))} where its behaviour leaves a tap or hold empty${momentary(key) ? `; ${FROM_EVERY_PRESS}` : ""}.`
+        : `${sentence(shortcutAct(key))}: ${shortcutRuns(key)}.`;
 }
 
 // A custom key under its name in the hover card: with no shortcut, only that,
 // since its behaviour shows below. A shortcut has its own section instead.
 /** @param {CustomKey | null | undefined} key */
 export function customKeyHeadline(key) {
-    if (!key || hasShortcut(key)) return "";
-    return key.hasBehavior ? "No shortcut" : "No shortcut and no behaviour yet: it sends nothing.";
+    if (!key || hasShortcut(key)) return null;
+    // Under a behaviour the missing shortcut is a quiet aside; alone, the key
+    // sends nothing, which the card says plainly.
+    return key.hasBehavior ? {text: "No shortcut", quiet: true} : {text: "No shortcut and no behaviour yet: it sends nothing.", quiet: false};
 }
 
 // When a custom key's shortcut runs on it, for the hover card's Shortcut
@@ -154,7 +153,7 @@ export function shortcutLayerUnder(key) {
 
 // The layers a shortcut holds on, lowest first.
 /** @param {CustomKey} key */
-export const shortcutLayerList = (key) => Array.from({length: 16}, (_, layer) => layer).filter((layer) => (key.shortcut?.layers ?? 0) & (1 << layer));
+export const shortcutLayerList = (key) => Array.from({length: LAYERS}, (_, layer) => layer).filter((layer) => (key.shortcut?.layers ?? 0) & (1 << layer));
 
 // Where only a custom key's shortcut runs (a behaviour step that sends the
 // key, or a combo output whose behaviour does not run), what it sends.
@@ -210,8 +209,7 @@ export function customKeyBypassText(key) {
 export function shortcutKeyCode(model, expression) {
     const name = String(expression ?? "").trim();
     if (!name || !(model?.customKeyShortcutKeys || []).includes(name)) return null;
-    const entry = (model?.qmkKeycodes || []).find((row) => row.value === name || row.aliases.includes(name));
-    return entry ? entry.keycode : null;
+    return keyIdentity(model, name).entry?.keycode ?? null;
 }
 
 // A catalogue key that is or carries modifiers is a shortcut too, though its
@@ -223,14 +221,9 @@ export function shortcutKeyCode(model, expression) {
 // `!` is Left Shift + 1. Null for any other key.
 /** @param {Model} model @param {string} name @returns {{key: string, mods: number} | null} */
 export function shortcutModifiers(model, name) {
-    const value = model?.qmkKeycodeAliases?.[name] || name;
-    const code = (model?.qmkKeycodes || []).find((row) => row.value === value || row.aliases.includes(value))?.keycode;
-    if (code === undefined) return null;
-    if (code >= 0xe0 && code <= 0xe7) return {key: "", mods: 1 << (code - 0xe0)};
-    const mods = compactModifierMask(code);
-    if (!mods) return null;
-    const base = (model?.qmkKeycodes || []).find((row) => row.keycode === (code & 0xff));
-    return base && shortcutKeyCode(model, base.value) !== null ? {key: base.value, mods} : null;
+    const code = keyIdentity(model, name).entry?.keycode;
+    const held = code === undefined ? null : keycodeModifiers(model, code);
+    return held && (!held.key || shortcutKeyCode(model, held.key) !== null) ? held : null;
 }
 
 // The keycode picker sets a shortcut as it wraps any key: the modifier row
@@ -324,11 +317,6 @@ export function shortcutPickKey(model, pick, name) {
     return next;
 }
 
-/** @param {Model} model @param {number} index */
-const layerWords = (model, index) => {
-    const layer = (model?.layers || []).find((entry) => entry.index === index);
-    return layer ? layer.displayName || layer.name : `Layer ${index}`;
-};
 
 // The picker's choice in words, for its footer: "Left Ctrl + Right Alt + K",
 // its keys in order ("Left Shift + A + S + Play"), then its layers by name, lowest first, led by their kind's verb unless held,
@@ -336,8 +324,8 @@ const layerWords = (model, index) => {
 /** @param {Model} model @param {{mods: number, keys: readonly number[], layers?: number, layerKind?: number}} shortcut */
 export function shortcutPickLabel(model, shortcut) {
     const mods = (vocabulary(model).modifiers || []).filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
-    const keys = shortcut.keys.map((code) => (model?.qmkKeycodes || []).find((row) => row.keycode === code)).map((entry) => entry ? entry.label || entry.value : "");
-    const layers = (model?.layers || []).map((layer) => layer.index).filter((index) => (shortcut.layers ?? 0) & 2 ** index).sort((a, b) => a - b).map((index) => layerWords(model, index));
+    const keys = shortcut.keys.map((code) => catalogEntry(model, code)).map((entry) => entry ? entry.label || entry.value : "");
+    const layers = (model?.layers || []).map((layer) => layer.index).filter((index) => (shortcut.layers ?? 0) & 2 ** index).sort((a, b) => a - b).map((index) => layerCalledAt(model, index));
     const verb = shortcut.layerKind ? (vocabulary(model).customKeys?.layerKinds || []).find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
     if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;
     return [...mods, ...keys, ...layers].filter(Boolean).join(" + ");
@@ -369,7 +357,7 @@ export function shortcutLayerRows(model, chosen) {
     return (model?.layers || []).map((layer) => {
         const target = targets.find((entry) => entry.layer === layer.index);
         const on = Boolean(chosen & 2 ** layer.index), unusable = Boolean(target?.refusal);
-        return {layer: layer.index, name: layerWords(model, layer.index), on, unusable,
+        return {layer: layer.index, name: layerCalledAt(model, layer.index), on, unusable,
             why: unusable && target?.alwaysOn && words ? words[target.alwaysOn] : "", tip: target?.refusal || ""};
     });
 }
@@ -385,7 +373,7 @@ export function shortcutOffer(model, {mods = [], keys = []}) {
     if (!mods.length || !keys.length || !(model?.customKeyShortcutKeys || []).length) return null;
     const shortcut = shortcutPick(model, {mods, keys});
     if (!shortcut.keys.length) return null;
-    return (shortcut.mods & 0x0f) && (shortcut.mods & 0xf0) ? shortcut : null;
+    return (shortcut.mods & MODIFIER_KEY_SIDES.LEFT) && (shortcut.mods & MODIFIER_KEY_SIDES.RIGHT) ? shortcut : null;
 }
 
 // A custom key that already holds exactly this shortcut, to use rather than
@@ -398,9 +386,9 @@ export const customKeyWithShortcut = (model, shortcut, {runsBehaviour = true} = 
 
 // The custom key such an offer takes: the first that does nothing yet, with no
 // name, behaviour or shortcut and on no layer or combo.
-/** @param {Model} model @param {import("../../contracts/panel.js").Layer[]} stack */
-export const unusedCustomKey = (model, stack) => (model?.customKeys || []).find((key) =>
-    !key.name && !key.hasBehavior && !hasShortcut(key) && !customKeyPlacements(model, stack, key.keycode).length);
+/** @param {Model} model */
+export const unusedCustomKey = (model) => (model?.customKeys || []).find((key) =>
+    !key.name && !key.hasBehavior && !hasShortcut(key) && !placementsOf(model, "customKeys", key.keycode).length);
 
 // What the picker offers for a shortcut no keycode holds (D-L63). A custom key
 // with exactly that shortcut is used if it does only that. Where the field
@@ -409,13 +397,13 @@ export const unusedCustomKey = (model, stack) => (model?.customKeys || []).find(
 // a behaviour step sends only the shortcut and never chains another
 // behaviour, so there any match is used as it is. With no match, an unused
 // key is made it.
-/** @param {Model} model @param {{mods: number, keys: readonly number[]}} shortcut @param {import("../../contracts/panel.js").Layer[]} stack @param {{runsBehaviour?: boolean}} [options] */
-export function customKeyChoice(model, shortcut, stack, {runsBehaviour = true} = {}) {
+/** @param {Model} model @param {{mods: number, keys: readonly number[]}} shortcut @param {{runsBehaviour?: boolean}} [options] */
+export function customKeyChoice(model, shortcut, {runsBehaviour = true} = {}) {
     const plain = customKeyWithShortcut(model, shortcut, {runsBehaviour});
     // A step sends only the shortcut, so a match's behaviour never runs there.
     if (plain) return {existing: plain, withBehaviour: false, spare: undefined};
     const behaved = runsBehaviour ? customKeyWithShortcut(model, shortcut, {runsBehaviour: false}) : undefined;
-    return {existing: behaved, withBehaviour: Boolean(behaved), spare: unusedCustomKey(model, stack)};
+    return {existing: behaved, withBehaviour: Boolean(behaved), spare: unusedCustomKey(model)};
 }
 
 // The name it gets: the shortcut in words if that fits a name, else written

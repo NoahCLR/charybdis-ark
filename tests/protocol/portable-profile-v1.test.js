@@ -28,6 +28,16 @@ test("settings in another version than current firmware's are refused, older or 
     const newer = Buffer.from(current); newer[0] = 12;
     await assert.rejects(readSettings(keyboard(newer), ids()), {code: "FIRMWARE_UPDATE_REQUIRED"});
 });
+test("settings in the current version that do not decode are the keyboard's answer not reading, said as one", async () => {
+    const {FAILURE_WORDS, failureSentence} = require("../../core/model/vocabulary");
+    const bytes = settings();
+    // A bank of layer names whose length byte runs past its slot: current
+    // version, coherent checksums, but not a form the keyboard writes.
+    bytes.fill(0xff, 8, 64);
+    const metadata = Buffer.alloc(12); metadata.set([1, 25]); metadata.writeUInt16LE(bytes.length, 2); metadata.writeUInt32LE(crc32(bytes), 4); metadata.writeUInt32LE(fnv1a32(bytes), 8);
+    const connection = {request: async request => {const page = request[4]; return response(request, page ? bytes.subarray((page - 1) * 25, page * 25) : metadata);}};
+    await assert.rejects(readSettings(connection, ids()), (error) => error.fault === "answer" && failureSentence(error) === FAILURE_WORDS.unreadable);
+});
 test("old firmware cannot silently produce a partial backup", async () => {
     await assert.rejects(readSettings({request: async () => Buffer.alloc(32,255)},ids()), /Update both halves/);
 });

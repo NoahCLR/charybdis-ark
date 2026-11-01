@@ -12,7 +12,7 @@ import {join} from "node:path";
 const PLAIN = [
     // Escaping anything that holds a key's name, unless the name is already
     // inside the helper that marks it.
-    [/esc\((?:(?!keyNameMarked\(|actionMarked\()[^;])*\b(?:actionLabel|cellLabel|keyName|comboInputLabel)\(/, "escapes a key's name instead of marking it"],
+    [/esc\((?:(?!keyNameMarked\(|actionMarked\()[^;])*(?:\b(?:cellLabel|keyName|comboInputLabel)\(|\bkeyIdentity\([^;]*\)\.(?:label|shortLabel)\b)/, "escapes a key's name instead of marking it"],
     [/esc\([^()]*\b(?:outputDisplay|inputDisplays|run\.shown)\b/, "escapes a combo's name instead of marking it"],
     [/\(\s*[\w.]+\.inputDisplays\s*\|\|/, "joins a combo's keys as plain text"],
 ];
@@ -22,8 +22,8 @@ const PLAIN_ON_PURPOSE = [
 ];
 
 test("the checks catch the plain names they are for", () => {
-    for (const snippet of ["${esc(actionLabel(model, row.keycode))}", "${esc(keyName(position))}", "${esc(cellLabel(model, tap))}",
-        "${esc(position ? keyName(position) : \"—\")}", "${esc([picker.contextKeycode ? actionLabel(model, picker.contextKeycode) : \"\", picker.context].join(\" · \"))}",
+    for (const snippet of ["${esc(keyIdentity(model, row.keycode).label)}", "${esc(keyName(position))}", "${esc(cellLabel(model, tap))}",
+        "${esc(position ? keyName(position) : \"—\")}", "${esc([picker.contextKeycode ? keyIdentity(model, picker.contextKeycode).label : \"\", picker.context].join(\" · \"))}",
         "${esc(combo.outputDisplay || combo.output)}", "${esc(run.shown)}", "${(combo.inputDisplays || combo.inputs || []).join(\" + \")}"]) {
         assert.ok(PLAIN.some(([pattern]) => pattern.test(snippet)), snippet);
     }

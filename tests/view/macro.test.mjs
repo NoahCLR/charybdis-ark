@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {sequenceFace} from "../../webview/view/macro-sequence.mjs";
-import {TEXT_CHIP, TEXT_TIP, describeStep, macroChips, macroMatches, macroPeek, parseMacro, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
+import {TEXT_CHIP, TEXT_TIP, describeStep, macroChips, macroMatches, macroNumber, macroShortName, macroPeekSteps, parseMacro as parseMacroWith, protectionChoiceLabel, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
+import {createRequire as requireFrom} from "node:module";
+// The step editor reads a macro with the vocabulary's words for what is wrong.
+const {VOCABULARY: WORDS} = requireFrom(import.meta.url)("../../core/model/vocabulary");
+/** @param {unknown} payload @param {object} [options] */
+const parseMacro = (payload, options = {}) => parseMacroWith(payload, {problems: WORDS.macroProblems, ...options});
 
 test("a payload reads back as the steps the keyboard will play", () => {
     const {steps, error} = parseMacro("noah@xomnia.com{120}{KC_ENT}");
@@ -51,6 +56,8 @@ test("a slot's cell shows what the macro sends, not the modifier they all start 
     // Twelve real slots all opened with {+KC_LEFT_GUI}, so every cell read
     // "KC_LEFT_…" and no slot could be told from another.
     const label = (name) => ({KC_SPACE: "Space", KC_DOT: ".", KC_X: "X", KC_LEFT_GUI: "Left GUI"})[name] || name;
+    // The cell reads the steps the peek parses, which the permissive parser gives.
+    const macroPeek = (payload, named) => macroPeekSteps(parseMacroWith(payload).steps, named);
     assert.equal(macroPeek("{+KC_LEFT_GUI}{KC_SPACE}{-KC_LEFT_GUI}", label), "Space");
     assert.equal(macroPeek("{+KC_LEFT_GUI}{+KC_LEFT_SHIFT}{KC_DOT}{-KC_LEFT_SHIFT}{-KC_LEFT_GUI}", label), ".");
     assert.equal(macroPeek("hello", label), "hello", "text still speaks for itself");
@@ -93,7 +100,7 @@ test("with Unicode playback on, only non-ASCII text refuses a held ordinary key,
 
 test("a macro is found by its name, and by its slot when it has none", () => {
     const named = {keycode: "MACRO_3", name: "Screenshot area"};
-    const unnamed = {keycode: "MACRO_12", name: ""};
+    const unnamed = {keycode: "MACRO_12", name: "", defaultName: "Macro 12"};
     assert.equal(macroMatches(named, "screen"), true, "part of the name, case ignored");
     assert.equal(macroMatches(named, "  AREA "), true, "surrounding spaces are not part of the search");
     assert.equal(macroMatches(named, "m3"), true, "the slot label the grid shows");
@@ -102,6 +109,11 @@ test("a macro is found by its name, and by its slot when it has none", () => {
     assert.equal(macroMatches(unnamed, "MACRO_12"), true, "and its keycode");
     assert.equal(macroMatches(unnamed, "screen"), false);
     assert.equal(macroMatches(unnamed, ""), true, "an empty search hides nothing");
+});
+
+test("a macro slot's number and short name come from the name its keycode goes by", () => {
+    assert.deepEqual([macroNumber("MACRO_0"), macroNumber("MACRO_127"), macroShortName({keycode: "MACRO_12"})], [0, 127, "M12"]);
+    for (const keycode of ["MACRO_128", "MACRO_03", "QK_MACRO_3", "KC_A", "", undefined]) assert.equal(macroNumber(keycode), null, String(keycode));
 });
 
 
@@ -119,9 +131,9 @@ test("editable text is literal, including command-looking braces, code and Unico
 
 test("incomplete steps keep their input and give a field error instead of inventing a valid edit", () => {
     for (const delay of ["", "-1", "1.5", "65536", "wat"]) {
-        const input = macroStepsInput([{kind: "delay", delay}]);
+        const input = macroStepsInput([{kind: "delay", delay}], {vocabulary: WORDS});
         assert.equal(input.payload, `{${delay}}`);
-        assert.match(input.error, /delay/i);
+        assert.equal(input.error, "A macro delay must be between 0 and 65,535 milliseconds.");
     }
     const input = macroStepsInput([{kind: "tap", keys: []}, {kind: "text", text: "after"}]);
     assert.equal(input.payload, "{}after");
@@ -131,15 +143,15 @@ test("incomplete steps keep their input and give a field error instead of invent
 
 test("canonical names and aliases are one key for holds, releases and chord limits", async () => {
     const {createRequire} = await import("node:module"), require = createRequire(import.meta.url);
-    const aliases = require("../../core/data/keycode-catalog.js").aliasTable();
+    const model = {qmkKeycodeAliases: require("../../core/data/keycode-catalog.js").aliasTable()};
     const keys = require("../../core/schema/macro-payload.js").macroKeycodes();
     const source = "{+KC_LGUI}{KC_A}{-KC_LEFT_GUI}";
-    const parsed = parseMacro(source, {aliases, keys});
+    const parsed = parseMacro(source, {model, keys});
     assert.equal(parsed.error, "");
-    assert.deepEqual(unreleased(parsed.steps, aliases), []);
+    assert.deepEqual(unreleased(parsed.steps, model), []);
     assert.equal(serializeMacro(parsed.steps), source, "alias identity checking preserves raw spelling");
-    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {aliases, keys}).error, /distinct/);
-    assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {aliases, keys}).error, /already held/);
+    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {model, keys}).error, /distinct/);
+    assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {model, keys}).error, /already held/);
 });
 
 test("a held key may span text the host layout types, in preview and core alike", async () => {
@@ -183,21 +195,24 @@ test("a macro's chips read it step by step, held, let go, tapped, typed and wait
 
 test("two payloads are the same macro when their keys differ only by alias", async () => {
     const {samePayload} = await import("../../webview/view/macro.mjs");
-    const aliases = {KC_LGUI: "KC_LEFT_GUI", KC_SPC: "KC_SPACE"};
-    assert.equal(samePayload("{KC_LGUI,KC_SPC}{KC_A}", "{KC_LEFT_GUI,KC_SPACE}{KC_A}", aliases), true);
-    assert.equal(samePayload("{KC_LGUI,KC_SPC}", "{KC_LEFT_GUI,KC_A}", aliases), false);
-    assert.equal(samePayload("{KC_LGUI", "{KC_LGUI", aliases), true);
-    assert.equal(samePayload("{KC_LGUI", "{KC_LEFT_GUI}", aliases), false);
+    const model = {qmkKeycodeAliases: {KC_LGUI: "KC_LEFT_GUI", KC_SPC: "KC_SPACE"}};
+    assert.equal(samePayload("{KC_LGUI,KC_SPC}{KC_A}", "{KC_LEFT_GUI,KC_SPACE}{KC_A}", model), true);
+    assert.equal(samePayload("{KC_LGUI,KC_SPC}", "{KC_LEFT_GUI,KC_A}", model), false);
+    assert.equal(samePayload("{KC_LGUI", "{KC_LGUI", model), true);
+    assert.equal(samePayload("{KC_LGUI", "{KC_LEFT_GUI}", model), false);
     assert.equal(samePayload("", undefined), true);
 });
 
 test("each macro step kind has one name, on its add button and in the step editor", async () => {
     const {STEP_KINDS, addStepLabel, stepKindName} = await import("../../webview/view/macro.mjs");
-    assert.deepEqual(STEP_KINDS.map(([kind]) => kind), ["text", "tap", "delay", "press", "release"]);
-    assert.deepEqual(STEP_KINDS.map(([, name]) => name), ["Text", "Key or chord", "Delay", "Press", "Release"], "the glossary's macro steps");
-    for (const [kind, name] of STEP_KINDS) {
-        assert.equal(stepKindName(kind), name);
-        assert.equal(addStepLabel(kind), `+ ${name}`);
+    const {createRequire} = await import("node:module");
+    const model = {vocabulary: createRequire(import.meta.url)("../../core/model/vocabulary").VOCABULARY};
+    assert.deepEqual(STEP_KINDS, ["text", "tap", "delay", "press", "release"]);
+    assert.deepEqual(model.vocabulary.macroSteps.map(([kind]) => kind), STEP_KINDS, "a word for every kind, in the order the buttons offer them");
+    assert.deepEqual(STEP_KINDS.map((kind) => stepKindName(model, kind)), ["Text", "Key or chord", "Delay", "Press", "Release"], "the glossary's macro steps");
+    for (const kind of STEP_KINDS) {
+        const name = stepKindName(model, kind);
+        assert.equal(addStepLabel(model, kind), `+ ${name}`);
     }
 });
 
@@ -216,10 +231,21 @@ test("a macro's chip tells an unkept edit, a change kept in the draft and the ma
     draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateMacro", keycode: "MACRO_0", payload: "Hi"});
     assert.deepEqual(macroLocalState(changes(), "MACRO_0", false), {state: "draft", dot: "draft", text: "changed in draft"});
     assert.equal(macroLocalState(changes(), "MACRO_1", false).text, "as read", "another macro is as read");
+    assert.equal(macroLocalState([{unit: "macro:null"}], "KC_A", false).text, "as read", "a keycode that names no slot names no unit");
     assert.equal(macroLocalState(changes(), "MACRO_0", true).text, "edited here", "an unkept edit over it still says so");
     draft.jump(draft.revision, 0);
     assert.equal(macroLocalState(changes(), "MACRO_0", false).text, "as read", "undone, it is as read again");
     // A playback change Your computer caused is listed under the macro, but it
     // is not a change to the macro.
     assert.equal(macroLocalState([{unit: "settings:host"}], "MACRO_0", false).text, "as read");
+});
+
+// The dropdown says Automatic as core does, with whether the macro plays
+// uninterruptibly now; a chosen setting says only its word.
+test("an Uninterruptible playback choice reads in core's words", () => {
+    const model = {vocabulary: WORDS};
+    const choices = WORDS.macroProtection.map(([value, label]) => ({value, label}));
+    assert.deepEqual(choices.map((choice) => protectionChoiceLabel(model, choice, true)), ["Automatic · on", "On", "Off"]);
+    assert.equal(protectionChoiceLabel(model, choices[0], false), "Automatic · off");
+    assert.equal(protectionChoiceLabel(null, choices[0], true), "Automatic", "without core's words, the choice's own");
 });

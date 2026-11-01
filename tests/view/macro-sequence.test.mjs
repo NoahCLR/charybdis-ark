@@ -13,15 +13,15 @@ test("sequence faces use published compact names and retain full accessible valu
 });
 
 test("invalid releases, repeated holds and unfinished holds name the affected steps, including aliases", () => {
-    const aliases = {KC_LEFT_GUI: "KC_LGUI"}, label = key => aliases[key] || key;
+    const aliases = {KC_LEFT_GUI: "KC_LGUI"}, model = {qmkKeycodeAliases: aliases}, label = key => aliases[key] || key;
     const valid = [{kind: "press", keys: ["KC_LEFT_GUI"]}, {kind: "tap", keys: ["KC_A"]}, {kind: "release", keys: ["KC_LGUI"]}];
-    assert.deepEqual(sequenceIssues(valid, aliases, label), ["", "", ""]);
+    assert.deepEqual(sequenceIssues(valid, model, label), ["", "", ""]);
     const bad = [valid[2], valid[0], valid[1]];
-    const issues = sequenceIssues(bad, aliases, label);
+    const issues = sequenceIssues(bad, model, label);
     assert.match(issues[0], /released before it is pressed/);
     assert.match(issues[1], /before the macro ends/);
     assert.equal(issues[2], "");
-    assert.match(sequenceIssues([valid[0], {kind: "tap", keys: ["KC_LGUI"]}, valid[2]], aliases)[1], /already held/);
+    assert.match(sequenceIssues([valid[0], {kind: "tap", keys: ["KC_LGUI"]}, valid[2]], model)[1], /already held/);
     assert.match(sequenceIssues([{kind: "tap", keys: ["KC_A"]}, {kind: "release", keys: ["KC_A"]}])[1], /released before/);
 });
 

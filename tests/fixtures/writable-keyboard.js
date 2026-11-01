@@ -6,6 +6,7 @@
 // decision and two VIA banks, not firmware scheduling or flash hardware.
 const assert = require("node:assert/strict");
 const {fakeKeyboard} = require("./fake-keyboard");
+const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
 const {createSnapshot, validateSnapshot} = require("../../core/model/portable-profile");
 const {crc32, fnv1a32, decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {PROFILE_WIRE_V1, PROFILE_STATE_FLAGS} = require("../../core/protocol/profile-wire-v1");
@@ -103,7 +104,8 @@ function writableKeyboard(options) {
         const reply = serve(request);
         faults.afterRequest?.(request, reply, keyboard);
         if (faults.loseReply === request[2] && mutation) {
-            delete faults.loseReply; throw Object.assign(Error("reply lost"), {code: "REQUEST_TIMEOUT"});
+            // Lost as the transport says it: the request timed out.
+            delete faults.loseReply; throw liveLinkError(LIVE_LINK_ERROR_CODES.TIMEOUT, "The keyboard did not answer in time.");
         }
         return [reply];
     }

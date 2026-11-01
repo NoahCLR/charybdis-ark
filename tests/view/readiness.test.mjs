@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {VOCABULARY} from "../../core/model/vocabulary.js";
-import {busyText, configureReady, postApplyReadText, readScreen, screenAvailable} from "../../webview/view/readiness.mjs";
+import {busyText, postApplyReadText, readScreen} from "../../webview/view/readiness.mjs";
+import {configureReady, screenAvailable} from "../../webview/view/screens.mjs";
 
 test("loading names the active read and never claims the board is ready", () => {
     assert.deepEqual(readScreen(null), {state: "loading", title: "Reading your keyboard", detail: "Looking for a keyboard"});
@@ -16,7 +17,7 @@ test("only a ready model releases Configure screens", () => {
     assert.equal(configureReady({load: {state: "unavailable"}}), false);
     assert.equal(configureReady({load: {state: "ready"}}), true);
     assert.equal(readScreen({load: {state: "ready"}}), null);
-    assert.match(readScreen({load: {state: "unavailable"}, device: {connected: true}}).detail, /complete profile/);
+    assert.match(readScreen({vocabulary: VOCABULARY, load: {state: "unavailable"}, device: {connected: true}}).detail, /complete profile/);
 });
 
 test("rail screens follow the read and the capability each screen needs", () => {
@@ -43,11 +44,12 @@ test("rail screens follow the read and the capability each screen needs", () => 
 });
 
 test("post-Apply readback names the current data instead of a generic operation", () => {
-    assert.equal(postApplyReadText(null), "Confirming the completed save");
-    assert.equal(postApplyReadText({step: "layout", progress: {done: 12, total: 56}}), "Reading keys and layers · 12 of 56");
-    assert.equal(postApplyReadText({step: "profile"}), "Reading saved lighting, behaviours and settings");
-    assert.equal(postApplyReadText({step: "combos"}), "Checking active combos");
-    assert.equal(postApplyReadText({step: "baseRgb"}), "Checking base lighting");
+    const model = {vocabulary: VOCABULARY};
+    assert.equal(postApplyReadText(model, null), "Confirming the completed save");
+    assert.equal(postApplyReadText(model, {step: "layout", progress: {done: 12, total: 56}}), "Reading keys and layers · 12 of 56");
+    assert.equal(postApplyReadText(model, {step: "profile"}), "Reading saved lighting, behaviours and settings");
+    assert.equal(postApplyReadText(model, {step: "combos"}), "Checking active combos");
+    assert.equal(postApplyReadText(model, {step: "baseRgb"}), "Checking the background effect");
 });
 
 test("a read or export names what it reads and claims nothing about saving", () => {
@@ -112,6 +114,7 @@ test("a draft that holds editing says why, not that the read failed", () => {
     const other = held("other-keyboard");
     assert.equal(other.title, "Draft belongs to another keyboard");
     assert.match(other.detail, /Select it to continue editing, or discard the draft/);
+    assert.equal(held("unsupported").detail, VOCABULARY.firmwareUpdate, "firmware Ark does not support says so, as the edit controls do");
 });
 
 test("only a read that failed says the complete profile could not be read; halves and errors keep their words", () => {

@@ -2,13 +2,14 @@
 /** @typedef {import('../../../contracts/panel.js').MacroSlot} Slot */
 /** @typedef {import('../../view/types.js').MacroStep} Step */
 /** @typedef {import('../../state.js').MacroHistoryEntry} Entry */
-import {canEdit, getModel, macroForm, render, setMacroForm, state} from '../../store.mjs';
+import {getModel, macroForm, render, setMacroForm, state} from '../../store.mjs';
+import {editGate} from '../../view/edit-gate.mjs';
 import {createMacroHistory, moveMacroHistory, rememberMacroHistory} from '../../view/macro-history.mjs';
 import {readMacro} from '../../view/macro-cache.mjs';
 import {withStepFocus} from '../../view/macro-focus.mjs';
 import {macroStepsInput} from '../../view/macro.mjs';
 import {sequenceIssues} from '../../view/macro-sequence.mjs';
-import {actionLabel} from '../../view/keyface.mjs';
+import {keyIdentity} from '../../view/key-identity.mjs';
 import {inspectEdit} from './validation.mjs';
 
 /** @param {Slot} slot @param {string} payload @param {Step[] | undefined} steps @returns {Entry} */
@@ -50,7 +51,7 @@ function restore(slot, snapshot) {
     const model = getModel(), steps = snapshot.steps;
     const encoded = steps ? macroStepsInput(steps) : null;
     const parsed = readMacro(model, slot.keycode, snapshot.payload, 'editor');
-    const stepError = encoded?.error || (steps ? parsed.error || sequenceIssues(steps, model?.qmkKeycodeAliases, key => actionLabel(model, key)).find(Boolean) : '') || '';
+    const stepError = encoded?.error || (steps ? parsed.error || sequenceIssues(steps, model, key => keyIdentity(model, key).label).find(Boolean) : '') || '';
     setMacroForm(slot.keycode, {draft: snapshot.payload, steps, stepFocus: steps ?? macroForm(slot.keycode).stepFocus,
         selectedStep: snapshot.selectedStep, selectionAnchor: snapshot.selectedStep, selectedSteps: snapshot.selectedSteps, stepError,
         validation: undefined, wantsStage: false, cancelBlur: false, moveNotice: ''});
@@ -70,7 +71,7 @@ function macroCommand(slot, action) {
         if (copied.length) state.macroClipboard = copied;
         return;
     }
-    if (!canEdit('macros') || slot.available === false) return;
+    if (!editGate(getModel(), "macros").editable || slot.available === false) return;
     if (action === 'paste') {
         if (!state.macroClipboard?.length || !form.steps && readMacro(getModel(), slot.keycode, form.draft ?? slot.payload, 'editor').error) return;
         const pasted = state.macroClipboard.map(step => ({...structuredClone(step), focusId: crypto.randomUUID()}));

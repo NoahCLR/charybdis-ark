@@ -8,8 +8,6 @@ const test = require("node:test");
 const {
     PROFILE_ACTION_KINDS,
     PROFILE_BLOB_V1,
-    PROFILE_DOMAIN_IDS,
-    PROFILE_DOMAIN_VERSIONS,
     crc32,
     decodeDomainEnvelope,
     encodeDomainEnvelope,
@@ -21,6 +19,7 @@ const {
     readDomainEnvelope,
     readSemanticAction,
 } = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
 
 function fixtures() {
     const values = new Map(fs.readFileSync(path.join(__dirname, "../../upstream/firmware/tests/fixtures/profile_blob_v1.fixture"), "utf8")

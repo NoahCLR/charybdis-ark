@@ -20,12 +20,14 @@ import {durationMilliseconds, durationValue} from "../../webview/view/duration.m
 import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, LINK_ENDS, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, SHIPPED_SCROLL, dpiOptions, scrollStarter, modeDpi, newMode, readConfig, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
+const {publishedModel} = require("../fixtures/published-model.js");
 const {SETTING} = require("../../core/schema/settings-domain-v1");
 const {customKeyCode} = require("../../core/data/user-keycodes");
 const here = path.dirname(fileURLToPath(import.meta.url));
 const {ProfileDraftSession} = require(path.join(here, "..", "..", "core", "session", "profile-draft-session"));
 const portable = require(path.join(here, "..", "..", "core", "model", "portable-profile"));
 const {settingsEditorView} = require(path.join(here, "..", "..", "core", "model", "settings-editor"));
+const {profileComboReadback} = require(path.join(here, "..", "..", "core", "model", "profile-model"));
 const {buildDeviceModel, buildSnapshotModel} = require(path.join(here, "..", "..", "core", "session", "device-model"));
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core", "data", "charybdis-layout"));
 const {RGB_LOCALITIES} = require(path.join(here, "..", "..", "core", "schema", "rgb-domain-v1"));
@@ -267,7 +269,7 @@ test("the editor removes exactly the rows the core's review notes as changing no
             stage(draft, {type: "saveBehavior", behavior: {keycode: row.keycode, steps: [], ...terms,
                 keepsAutoMouseAnchored: Boolean(fields.anchored), enabled: fields.enabled ?? true, allowedLayers: 0xffff}});
             const value = decoded(draft);
-            const code = require("../../core/data/keycode-catalog").encode(row.keycode) ?? resolveNativeQmkExpression(row.keycode, {});
+            const code = require("../../core/schema/keycodes").encode(row.keycode) ?? resolveNativeQmkExpression(row.keycode, {});
             const saved = value.behaviors.rows.find(entry => nativeCode(entry.target) === code);
             assert.ok(saved, `${keycode} is stored`);
             assert.equal(posted?.type === "deleteBehavior", changesNothing(saved, value.settings.customKeyShortcuts), `${keycode} ${JSON.stringify(fields)}`);
@@ -381,7 +383,7 @@ test("the default window and the hold threshold are each their own message, set 
         stage(draft, edits.comboMessage(null, {inputs, output, termMs: ""}));
     }
     stage(draft, edits.comboDefaultWindow("45"));
-    assert.deepEqual(draft.combos().rows.map((row) => [row.termMs, row.followsDefault]), [[45, true], [45, true]],
+    assert.deepEqual(profileComboReadback(draft.current.decoded).rows.map((row) => [row.termMs, row.followsDefault]), [[45, true], [45, true]],
         "the combos that follow the default run with its new value");
     assert.throws(() => stage(draft, edits.comboDefaultWindow("0")), /at least 1 ms/);
 });
@@ -683,6 +685,21 @@ test("a pointing slot is posted whole, with its shortcuts as names", () => {
     const after = decoded(draft).pdModes[1];
     assert.equal(after.thresholdY, 70, "the edited threshold reached the profile");
     assert.ok(after.directions.up.keycode > 0, "and the named shortcut became the keyboard's own value");
+});
+
+// A macro sent from a direction carries no modifiers, under whatever name it
+// is typed: QMK's own for the first 32 slots is the catalog's, read through
+// the model.
+test("a direction's macro shortcut posts with no modifiers, by any of its names", () => {
+    const draft = session();
+    const slot = decoded(draft).pdModes[1];
+    const typed = (keycode, model) => readConfig(slot, formOf({kind: KIND.DIRECTIONAL, name: "Volume", dpi: "0",
+        "dir:up": keycode, "dirPolicy:up": MODIFIER_POLICY.MASK, "dirMask:up": 2}), model).directions.up;
+    const model = publishedModel();
+    for (const keycode of ["MACRO_3", "QK_MACRO_3", "MC_3"]) {
+        assert.deepEqual(typed(keycode, model), {keycode, modifierPolicy: MODIFIER_POLICY.INHERIT, mask: 0}, keycode);
+    }
+    assert.deepEqual(typed("KC_A", model), {keycode: "KC_A", modifierPolicy: MODIFIER_POLICY.MASK, mask: 2}, "any other key keeps what it leaves out");
 });
 
 // The How it starts card's link: the layers that start the mode, the layers its key
@@ -1089,7 +1106,7 @@ test("the auto-mouse fade is posted as a share, and a new timeout rescales it in
     assert.equal(fade().whole, timeout);
     const last = draft.steps().at(-1).changes;
     assert.deepEqual(last.map((change) => [change.unit, change.area]).sort(),
-        [["settings:autoMouse", "Mouse"], ["settings:automouseFade", "Lighting"]], "the step says it moved the fade too");
+        [["settings:autoMouse", "Pointer"], ["settings:automouseFade", "Lighting"]], "the step says it moved the fade too");
     const place = last.find((change) => change.unit === "settings:automouseFade").place;
     assert.deepEqual(place, {kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"});
     const groups = draft.view({}).changes.filter((change) => ["settings:autoMouse", "settings:automouseFade"].includes(change.unit)).map((change) => change.group);

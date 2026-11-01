@@ -12,9 +12,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {PHASE} = require("../core/model/vocabulary");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildPanelModel, observeService, startLayerEdit} = require("../core/session/panel-session");
+const {buildPanelModel, portableLayersView, startLayerEdit} = require("../core/session/panel-session");
+const {followService} = require("../core/session/draft-follow");
 const portable = require("../core/model/portable-profile");
-const keycodes = require("../core/data/keycode-catalog");
+const keycodes = require("../core/schema/keycodes");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/data/charybdis-layout");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {document32} = require("../tests/fixtures/pointing-slots-32");
@@ -235,39 +236,33 @@ async function cutShortApply() {
     /** @type {import("../contracts/model.js").ApplyView | undefined} */
     let view;
     f.options.onApplyProgress = (/** @type {import("../contracts/model.js").ApplyView} */ applied) => {view = applied;};
-    f.options.saveRecovery = async () => "recovery-2026-10-24T09-12-00-000Z-before-apply-charybdis.charybdis.json";
+    // The shell names a copy as Backups lists it (web/web-shell.mjs).
+    f.options.saveRecovery = async () => "Before saving a draft · Charybdis 4x6 · 24 Oct 2026, 09:12";
     const failure = await f.restore().then(() => {throw new Error("the preview's Apply was meant to be cut short");}, (/** @type {Error} */ error) => error);
     return {view: /** @type {import("../contracts/model.js").ApplyView} */ (view), notice: failure.message};
 }
 
 // `--device` renders the interface against the keyboard that is plugged in,
-// read-only, the way the shell builds its model. Fixture data cannot show what a
-// real profile does to a surface — every naming inconsistency found so far came
-// from looking at this.
+// read-only, the way the shell builds its model: read as Read keyboard reads
+// it (`readForEditor`). Fixture data cannot show what a real profile does to a
+// surface — every naming inconsistency found so far came from looking at this.
 async function deviceModel() {
     const {ProfileDeviceService} = require("../core/session/profile-device-service");
     const {NodeHidDeviceAdapter} = require("../core/transport/node-hid-adapter");
     const service = new ProfileDeviceService({adapter: new NodeHidDeviceAdapter(), onChange: () => {}});
     try {
-        await service.enumerate();
-        const devices = service.snapshot().devices;
-        if (!devices.length) throw new Error("no Charybdis Raw HID interface found");
-        await service.connect(devices[0].id);
-        await service.refresh();
-        await service.readLayout();
-        await service.readCommittedProfile();
-        await service.readBaseRgb();
-        await service.readCombos();
-        if (require("../core/session/firmware-support").canEdit(service.capabilities)) await service.readKeyboardProfile();
+        const read = await service.readForEditor();
+        if (read.kind === "none") throw new Error("no Charybdis Raw HID interface found");
+        if (read.kind === "starting") throw new Error("the keyboard did not finish starting");
 
         // Exactly the model the panel would build for this keyboard.
         /** @type {import("../core/session/types.js").PanelSession} */
         // The page's shell, keeping no recovery copies: the fixture's are not this keyboard's.
         const panel = {service, shell: {panel: () => ({...OFFERED, recoveries: []})}};
-        observeService(panel, service.snapshot());
+        followService(panel, service.snapshot());
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
-        model.portable.layers = panel.portableLayers ? {key: panel.portableLayers.before.fingerprint, order: panel.portableLayers.order, names: panel.portableLayers.names, keysFollow: panel.portableLayers.keysFollow !== false} : null;
+        model.portable.layers = portableLayersView(panel.portableLayers);
         return model;
     } finally {
         await service.close();
@@ -290,8 +285,12 @@ for (const [name, shell] of Object.entries(shells)) {
     const web = name === "live" ? buildModel(shell, {live: true}) : name === "live-auto" ? buildModel(shell, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(shell, {live: true, stopped: true}) : name === "live-held" ? buildModel(shell, {live: true, held: true}) : name === "apply-stopped" ? buildModel(shell, {stopped: true}) : name === "demo" ? demoModel(shell) : name === "demo-edited" ? demoModel(shell, [DEMO_EDIT]) : emptyModel(shell);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
+// The preview requires Trusted Types as the web page does (scripts/build-web.js
+// POLICY), with the panel's policy alone, so a screen whose markup skips it
+// fails here too. The stand-in shell below starts no script by URL.
 const page = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'; trusted-types ark-html">
 <title>Charybdis Ark — preview</title>
 <link rel="stylesheet" href="../webview/styles.css?built=${Date.now()}">
 <script>

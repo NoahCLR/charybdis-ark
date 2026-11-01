@@ -40,6 +40,8 @@ export type TransportErrorCode =
 export interface TransportErrorOptions {
     cause?: unknown;
     deviceId?: string;
+    /** A fault in Ark: its text is for the diagnostics only. */
+    fault?: 'ark';
     /** A timeout: how long the request waited, and its first bytes in hex. */
     timeoutMs?: number;
     request?: string;

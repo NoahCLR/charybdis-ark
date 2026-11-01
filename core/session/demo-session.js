@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {PHASE} = require("../model/vocabulary");
-const {LAYERS} = require("../data/charybdis-layout");
+const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 
 // Ark without a keyboard: the demo (D-L53).
 //
@@ -29,9 +29,19 @@ const {LAYERS} = require("../data/charybdis-layout");
 const {panelControl} = require("./panel-control-registry");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
-const {validateSnapshot, fingerprint, summary} = require("./portable-profile-session");
+const {forgetRead} = require("./draft-follow");
+const {validateSnapshot, fingerprint, summary} = require("../model/portable-profile");
 const {ACTION_ABI} = require("../schema/actions");
-const {PROFILE_WIRE_KNOWN_MASKS} = require("../protocol/profile-wire-v1");
+const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
+const {KEY_BEHAVIOR_LIMITS} = require("../schema/key-behavior-domain-v1");
+const {COMBO_LIMITS} = require("../schema/combo-domain-v1");
+const {RGB_DOMAIN_V1} = require("../schema/rgb-domain-v1");
+const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
+const {NAME_MAX_BYTES} = require("../schema/profile-name");
+const {CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
+const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
+const {PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1} = require("../protocol/profile-wire-v1");
+const {PROFILE_CANDIDATE_V1} = require("../protocol/profile-candidate-v1");
 const DEMO_PROFILE = require("../data/demo-profile.charybdis.json");
 
 // The draft's keyboard, which is none. A device id is never this word.
@@ -39,39 +49,41 @@ const DEMO_DEVICE_ID = "demo";
 
 // What current firmware (the 32-slot pair) reports about itself, as the device
 // service decodes it, without what only a real keyboard has: its firmware
-// version and the digest of the profile it was compiled with.
+// version and the digest of the profile it was compiled with. Each limit is
+// the schema's or the wire's own; the slot size (a 128 KiB flash slot) and the
+// layer mask's width are the firmware's alone.
 // tests/session/demo-session.test.js holds this to what the simulated current
 // keyboard (tests/fixtures/fake-keyboard.js) reports.
 const DEMO_CAPABILITIES = Object.freeze({
-    responseVersion: 3,
-    protocol: Object.freeze({major: 2, minor: 0}),
-    schema: Object.freeze({major: 4, minor: 3}),
-    reportSize: 32,
-    candidateChunkMax: 20,
-    statusPageCount: 2,
+    responseVersion: PROFILE_WIRE_V1.CAPABILITY_LAYOUT,
+    protocol: Object.freeze({major: PROFILE_WIRE_V1.PROTOCOL_MAJOR, minor: PROFILE_WIRE_V1.PROTOCOL_MINOR}),
+    schema: Object.freeze({major: PROFILE_BLOB_V1.SCHEMA_MAJOR, minor: PROFILE_BLOB_V1.SCHEMA_MINOR}),
+    reportSize: RAW_HID_REPORT_SIZE,
+    candidateChunkMax: PROFILE_CANDIDATE_V1.CHUNK_MAX,
+    statusPageCount: PROFILE_WIRE_V1.STATUS_PAGE_COUNT,
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES,
     actionAbiDigest: ACTION_ABI,
-    compiledLayerCount: 16,
+    compiledLayerCount: LAYERS,
     maxLogicalLayers: LAYERS,
-    maxBehaviorRows: 128,
-    maxTapStepsPerBehavior: 5,
-    maxPopulatedBehaviorSteps: 640,
-    maxCombos: 128,
-    maxKeysPerCombo: 16,
-    maxReusableRgbGroups: 16,
-    maxRgbStageGroupRows: 32,
-    physicalLedCount: 58,
-    ledBitmapSize: 8,
-    customKeySlots: 128,
-    macroSlots: 128,
-    maxProfilePayload: 130048,
-    profileSlotPayload: 130048,
+    maxBehaviorRows: KEY_BEHAVIOR_LIMITS.maxRows,
+    maxTapStepsPerBehavior: KEY_BEHAVIOR_LIMITS.maxTapStepsPerBehavior,
+    maxPopulatedBehaviorSteps: KEY_BEHAVIOR_LIMITS.maxPopulatedSteps,
+    maxCombos: COMBO_LIMITS.maxRows,
+    maxKeysPerCombo: COMBO_LIMITS.maxInputs,
+    maxReusableRgbGroups: RGB_DOMAIN_V1.MAX_GROUPS,
+    maxRgbStageGroupRows: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS,
+    physicalLedCount: RGB_DOMAIN_V1.PHYSICAL_LED_COUNT,
+    ledBitmapSize: RGB_DOMAIN_V1.LED_BITMAP_SIZE,
+    customKeySlots: CUSTOM_KEY_SLOTS,
+    macroSlots: MACRO_DOMAIN_V1.SLOTS,
+    maxProfilePayload: PROFILE_BLOB_V1.MAX_SIZE,
+    profileSlotPayload: PROFILE_BLOB_V1.MAX_SIZE,
     profileSlotSize: 131072,
-    macroBytes: 34903,
+    macroBytes: MACRO_DOMAIN_V1.MAX_SIZE,
     supportedDomainMask: PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS,
-    nameMaxBytes: 32,
+    nameMaxBytes: NAME_MAX_BYTES,
     layerMaskBits: 32,
-    placementPositions: 60,
+    placementPositions: MATRIX_KEYS,
 });
 
 // What current firmware reports beside its profile, written here as data (it
@@ -100,8 +112,8 @@ const DEMO_OPTIONS = Object.freeze({
 // What core says in the demo: the device it is not, and why Save is not here.
 const DEMO_WORDS = Object.freeze({
     label: "Demo",
-    bundled: "the demo setup",
-    applyNeedsKeyboard: "Saving needs a keyboard. Export this setup, then import it on your keyboard to review and save it there.",
+    bundled: "the demo profile",
+    applyNeedsKeyboard: "Saving needs a keyboard. Export this profile, then import it on your keyboard to review and save it there.",
 });
 
 /** @param {string} text @param {string} [code] */
@@ -164,7 +176,7 @@ function openDemo(session, state, {value, fileName = null} = {}) {
 /** @param {Session} session @param {Session["draft"]} draft */
 function replaceDemoDraft(session, draft) {
     replaceDraft(session, draft);
-    session.observedPortable = undefined;
+    forgetRead(session);
     session.readReady = undefined;
 }
 
@@ -201,7 +213,7 @@ const DEMO_ACTIONS = Object.freeze({
         if (chosen === undefined) return;
         const name = typeof chosen === "string" ? null : chosen.name || null;
         openDemo(session, state, {value: typeof chosen === "string" ? chosen : chosen.text, fileName: name});
-        session.notice = `Opened ${name || "the profile file"} in the demo.`;
+        session.notice = `Opened ${name || "the backup"} in the demo.`;
         return;
     },
 });
@@ -294,13 +306,13 @@ function demoHeader(session, busy) {
 function demoDiagnostics(session) {
     return [
         `No keyboard is connected. The demo opened ${session.demo.name} as current firmware would hold it: sixteen layers, 32 pointing slots, 128 macros and 128 custom keys.`,
-        "Edits, checks and the review work as they would on a keyboard. Saving needs one: export the setup, then import it on your keyboard.",
+        "Edits, checks and the review work as they would on a keyboard. Saving needs one: export the profile, then import it on your keyboard.",
     ];
 }
 
 module.exports = {
     DEMO_ACTIONS,
     DEMO_CAPABILITIES, DEMO_DEVICE_ID, DEMO_LIMITS, DEMO_OPTIONS, DEMO_WORDS,
-    assertDemoMayClose, demoControl, demoDiagnostics, demoExport, demoHeader, demoModel, demoProfile, demoRefusal, demoSnapshot,
+    demoControl, demoDiagnostics, demoExport, demoHeader, demoModel, demoProfile, demoRefusal, demoSnapshot,
     demoState, demoUnsaved, leaveDemo, openDemo, panelCapabilities, panelState,
 };

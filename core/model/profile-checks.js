@@ -6,17 +6,18 @@
 // perform, and destination limits that would refuse the save.
 const {gestureTimingFindings} = require("./gesture-timing");
 const {inertBehaviorFindings} = require("./inert-behaviors");
-const {layerReach, compareFindings} = require("./layer-reach");
+const {layerReach} = require("./layer-reach");
+const {compareFindings} = require("./compare-findings");
 const {baseLighting} = require("./settings-editor");
 const {shortcutPresent} = require("../schema/settings-domain-v1");
-const {decodeMacroPayload} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
-const {inspectMacroPlayback} = require("./macro-input");
+const {inspectMacroPlayback, readStoredMacro} = require("./macro-input");
 const {pointingMacros} = require("./pointing-taps");
 const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {actionName} = require("../schema/actions");
-const {VOCABULARY, slotName} = require("./vocabulary");
+const {REVIEW_AREAS, VOCABULARY, macroDefaultName, settingsPath, slotName} = require("./vocabulary");
+const {macroName} = require("../../rules/qmk-keycodes.mjs");
 
 // A behaviour step that sends a custom key sends only its shortcut (firmware
 // D-F26). The keyboard accepts a step naming a custom key without one, which
@@ -50,7 +51,7 @@ function profileFindings(decoded, destination = {}) {
     for (const [slot, count] of Object.entries(decoded.danglingPointingKeys || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,
-            title: `${count} action${count === 1 ? "" : "s"} reach empty pointing slot ${Number(slot) + 1}`,
+            title: `${count} action${count === 1 ? " reaches" : "s reach"} ${slotName(undefined, Number(slot))}, an empty pointing slot`,
             detail: "Keys, behaviours or combo outputs still name this empty slot. The keyboard accepts them but does nothing when they run.",
             fix: "Configure the slot or replace the actions that reach it.", place: {kind: "pointing", slot: Number(slot)}});
     }
@@ -72,14 +73,14 @@ function profileFindings(decoded, destination = {}) {
     const emptyMacros = new Set();
     (decoded.macroSlots || []).forEach((bytes, index) => {
         if (!bytes.length) { emptyMacros.add(index); return; }
-        const payload = decodeMacroPayload(bytes);
+        const payload = readStoredMacro(bytes);
         if (!payload) emptyMacros.add(index);
         const playback = inspectMacroPlayback(payload, host);
         if (!playback.error) return;
         findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${playback.code}:${playback.error}`,
-            title: `Macro ${index} cannot play with the settings in Your computer`,
+            title: `${macroDefaultName(index)} cannot play with the settings in ${VOCABULARY.settingsSections.host}`,
             detail: `${playback.error} The keyboard stores this macro, but pressing it does nothing.`,
-            fix: "Fix the macro or change Host → Your computer before playing it.", place: {kind: "macro", index}});
+            fix: `Fix the macro or change ${settingsPath("host", "host")} before playing it.`, place: {kind: "macro", index, keycode: macroName(index)}});
     });
     for (const output of pointingMacros(decoded.pdModes || [])) {
         const where = {kind: /** @type {const} */ ("pointing"), slot: output.slot};
@@ -96,13 +97,13 @@ function profileFindings(decoded, destination = {}) {
         findings.push({kind: "brightnessBlocker", level: "blocker", layers: [], identity: String(lighting.brightness),
             title: `Background effect brightness exceeds this keyboard's limit of ${max}`,
             detail: `This profile stores brightness ${lighting.brightness}; the keyboard accepts at most ${max}, so it refuses the profile.`,
-            fix: `Set the background effect brightness to ${max} or lower.`, place: {kind: "settings", area: "Lighting", section: "rgbAppearance", stage: "base"}});
+            fix: `Set the background effect brightness to ${max} or lower.`, place: {kind: "settings", area: REVIEW_AREAS.lighting, section: "rgbAppearance", stage: "base"}});
     }
     if (Array.isArray(destination.effects) && !destination.effects.some(effect => effect.id === lighting.effect)) {
         findings.push({kind: "effectBlocker", level: "blocker", layers: [], identity: String(lighting.effect),
             title: `Background effect ${lighting.effect} is unavailable on this keyboard`,
             detail: "The connected firmware does not advertise this effect, so the keyboard refuses the profile.",
-            fix: "Choose a background effect this keyboard reports.", place: {kind: "settings", area: "Lighting", section: "rgbAppearance", stage: "base"}});
+            fix: "Choose a background effect this keyboard reports.", place: {kind: "settings", area: REVIEW_AREAS.lighting, section: "rgbAppearance", stage: "base"}});
     }
     return findings;
 }

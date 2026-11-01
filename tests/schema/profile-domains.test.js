@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {execFileSync} = require("node:child_process");
 const {DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK,
-    profileDomain, domainCodec, encodeProfileDomains, replaceDomain} = require("../../core/schema/profile-domains");
+    profileDomain, domainCodec} = require("../../core/schema/profile-domains");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const fixture = require("../fixtures/portable-profile");
@@ -21,8 +21,6 @@ test("one canonical registry pins every current domain's identity, version, wire
         {name: "MACROS", id: 112, key: "macros", readKey: undefined, version: 1, wireBit: 64, area: "macros"},
     ]);
     assert.equal(PROFILE_DOMAIN_MASK, 127);
-    assert.equal(require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_DOMAINS, PROFILE_WIRE_DOMAINS);
-    assert.equal(require("../../core/schema/profile-blob-v1").PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_VERSIONS);
     assert.ok(Object.isFrozen(PROFILE_DOMAINS));
     for (const domain of PROFILE_DOMAINS) {
         assert.ok(Object.isFrozen(domain));
@@ -53,7 +51,6 @@ test("registered codecs round-trip every fixture domain without changing canonic
         assert.deepEqual(value, models[codec.key], codec.key);
         assert.deepEqual(codec.encode(value, snapshot.codecOptions), domain.payload, codec.key);
     }
-    assert.deepEqual(encodeProfileBlob({domains: encodeProfileDomains(models, snapshot.codecOptions)}), snapshot.candidate);
 });
 
 // Each domain's error identity as it stands: the codecs share the canonical
@@ -162,26 +159,8 @@ test("metadata can be imported before any codec, avoiding partially initialized 
         const fixture = require('./tests/fixtures/portable-profile').document();
         const portable = require('./core/model/portable-profile');
         const value = portable.validateSnapshot(fixture);
-        assert.equal(registry.domainCodec('rgb').decode(registry.encodeProfileDomains({rgb: value.rgb})[0].payload).layerColors.length, 16);`;
+        assert.equal(registry.domainCodec('rgb').decode(registry.domainCodec('rgb').encode(value.rgb)).layerColors.length, 16);`;
     execFileSync(process.execPath, ["-e", source], {cwd: require("node:path").resolve(__dirname, "../..")});
-});
-
-test("replacing a domain preserves every other envelope and lets the caller retain capacity error wording", () => {
-    const snapshot = validateSnapshot(editMacros(fixture.document(), macros => macros[0] = Buffer.from("hello").toString("base64")));
-    let calls = 0;
-    const changed = replaceDomain(snapshot.profile, PROFILE_DOMAIN_IDS.SETTINGS, payload => {
-        calls++;
-        const settings = domainCodec("settings").decode(payload);
-        settings.names[1] = "New name";
-        return domainCodec("settings").encode(settings);
-    });
-    assert.equal(calls, 1);
-    const before = decodeProfileBlob(snapshot.profile), after = decodeProfileBlob(changed);
-    assert.deepEqual(after.domains.filter(row => row.id !== PROFILE_DOMAIN_IDS.SETTINGS), before.domains.filter(row => row.id !== PROFILE_DOMAIN_IDS.SETTINGS));
-    assert.equal(validateSnapshot({...snapshot.document, profile: changed.toString("base64")}).settings.names[1], "New name");
-    assert.deepEqual(replaceDomain(snapshot.profile, 0xff, () => {throw new Error("must not run");}), snapshot.profile);
-    const capacityError = Object.assign(new Error("The name does not fit."), {code: "PROFILE_FULL"});
-    assert.throws(() => replaceDomain(snapshot.profile, PROFILE_DOMAIN_IDS.SETTINGS, payload => payload, () => {throw capacityError;}), error => error === capacityError);
 });
 
 test("each domain is read only in the version current firmware stores, older or newer refused", () => {

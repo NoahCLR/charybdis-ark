@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 globalThis.acquirePanelApi = () => ({postMessage() {}});
-const {getModel, setModel, writable, state} = await import("../../webview/store.mjs");
+const {getModel, setModel, state} = await import("../../webview/store.mjs");
 const {createPanelMessages} = await import("../../webview/messages.mjs");
 const {SCREENS} = await import("../../webview/view/screens.mjs");
 
@@ -46,15 +46,6 @@ test("model publishes follow each registered screen's redraw policy, while accep
 });
 const read = (fields = {}) => ({type: "readProgress", draftId: "d1", draftRevision: 2,
     read: {source: "layout", progress: {done: 4, total: 56}, operationId: 3, phase: "layout", selectedDeviceId: "kb", connectionToken: 1, ...fields}});
-
-test("the renderer offers edits by core's published draft binding", () => {
-    setModel({...reading(), draft: {matching: true, stale: false, busy: false, editable: false, reason: "connection-changed"}});
-    assert.equal(writable(), false, "old presentation flags cannot reopen a blocked draft");
-    setModel({...reading(), device: {connected: false}, draft: {editable: true, reason: ""}, demo: {active: true}});
-    assert.equal(writable(), true, "a demo consumes the same binding as a connected draft");
-    setModel({...reading(), draft: undefined});
-    assert.equal(writable(), false);
-});
 
 test("a read counter of the current read updates its progress without a render", () => {
     const {receive, calls} = surface();
@@ -122,9 +113,9 @@ test("a notice the core marks as a failure is shown as one, whatever its first w
     receive({type: "model", model, notice: said, failed: true});
     assert.equal(state.error, said);
     assert.equal(state.notice, "");
-    receive({type: "model", model, notice: "Read the layout and committed profile generation 7."});
+    receive({type: "model", model, notice: "Read the keyboard's saved profile, generation 7."});
     assert.equal(state.error, "");
-    assert.equal(state.notice, "Read the layout and committed profile generation 7.");
+    assert.equal(state.notice, "Read the keyboard's saved profile, generation 7.");
     receive({type: "model", model, notice: "Failed: The keyboard did not answer."});
     assert.equal(state.error, "Failed: The keyboard did not answer.");
 });

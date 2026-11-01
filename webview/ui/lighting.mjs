@@ -6,20 +6,21 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {TRACKBALL_LED} from "../view/geometry.mjs";
-import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
-import {slotCalled, stageOrder} from "../view/vocabulary.mjs";
-import {canEdit as canEditArea, currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers} from "../store.mjs";
+import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect, trackballLed} from "../view/lighting.mjs";
+import {listed, slotCalled, stageOrder, layerCalled} from "../view/vocabulary.mjs";
+import {currentLayer, currentView, getModel, post, render, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
+import {linkTabPanel, rovingTabs} from "../lib/tabs.mjs";
 import {attachLayersControl} from "./layers.mjs";
-import {topbar, unavailable} from "./frame.mjs";
+import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {localityLabel} from "./lighting/common.mjs";
 import {stageBody} from "./lighting/stage-body.mjs";
 import {durationControl} from "./duration.mjs";
-import {sectionsIn} from "./settings.mjs";
+import {sectionsIn} from "../view/settings-layout.mjs";
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} id */
 const stageBit = (model, id) => (model?.rgb?.stages || []).find((stage) => stage.id === id)?.bit;
@@ -29,13 +30,14 @@ export function screenLighting() {
     if (!model?.rgb?.stages) {
         return el(`<div class="main">${topbar("Lighting", "Nothing read yet.")}
             <div class="content"><div class="pad"><div class="screen-stub"><h3>No lighting read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's lighting.")}</p></div></div></div></div>`);
+            <p class="note">${esc(editGate(model, "lighting").why || "Choose Read keyboard to read this keyboard's lighting.")}</p></div></div></div></div>`);
     }
     const onGroups = state.stage === "groups";
+    const view = currentView();
     const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
         "Lighting",
-        "What the keyboard lights, and when. Each stage paints over the one before it, and the board shows the result of your draft."
+        "What the keyboard lights, and when."
     )}</div>`);
     const power = powerControls(model);
     if (power) main.querySelector(".topbar-actions")?.prepend(power);
@@ -47,10 +49,9 @@ export function screenLighting() {
     const card = el(`<div class="board-card"></div>`);
     const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
         ? pdColourRow(model, state.pointingSlot) : null;
-    card.appendChild(board(model, layer, {
+    const drawn = card.appendChild(board(onGroups ? view.alone : view, {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
-        held: onGroups ? [] : heldLayers(),
         picks: state.ledPicks,
         trackball: state.trackball,
         pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: pdTrigger(model, layer, state.pointingSlot)?.layoutIndex} : null,
@@ -64,16 +65,16 @@ export function screenLighting() {
     card.appendChild(el(`<div class="board-foot">
         <b>${onGroups ? "LED selector" : "Preview"}</b>
         <span class="board-foot-text">${onGroups
-            ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerName(layer))}${heldLayers().some((at) => at > 0) && !onGroups
-                ? ` with ${esc(heldLayers().filter((at) => at > 0).reverse().map((at) => layerName(layers()[at])).join(", "))} on`
+            ? `Click LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
+            : `${esc(layerCalled(layer))}${view.held.some((at) => at > 0) && !onGroups
+                ? ` with ${esc(listed(view.held.filter((at) => at > 0).reverse().map((at) => layerCalled(view.stack[at]))))} on`
                 : ""} over the background effect${preview
                 ? ` · ${esc(slotName(model, state.pointingSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
                 : ""}`}</span>
         ${onGroups ? `<span class="right">
             <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
             <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
-                data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>`
+                data-tip="Add or remove the trackball LED, index ${esc(trackballLed(model))}, from this selection.">Trackball LED</button></span>`
             : ""}
     </div>`));
     /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="clearleds"]'))?.addEventListener("click", () => { state.ledPicks = []; render(); });
@@ -83,6 +84,7 @@ export function screenLighting() {
     const bar = layerBar();
     attachLayersControl(bar);
     card.append(bar);
+    linkTabPanel(/** @type {HTMLElement | null} */ (bar.querySelector(".layer-tabs")), drawn);
     pad.appendChild(card);
 
     const marks = draftMarks(model?.draft?.changes);
@@ -94,7 +96,7 @@ export function screenLighting() {
     const stageTab = (stage, index) => {
         const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
         const idle = stageIdle(model, stage.id);
-        return `<button role="tab" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}"
+        return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}"
             data-tip="Painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
             <span class="n">${esc(index + 1)}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
             <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
@@ -103,7 +105,7 @@ export function screenLighting() {
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
             ${stages.map(stageTab).join(`<span class="tab-step" aria-hidden="true">›</span>`)}
             <span class="tab-sep" aria-hidden="true"></span>
-            <button role="tab" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
+            <button role="tab" id="stage-tab-groups" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -117,6 +119,7 @@ export function screenLighting() {
     if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
     stageBody(/** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
     keepInView(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
+    rovingTabs(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")), /** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
     pad.appendChild(bench);
 
     main.appendChild(content);
@@ -135,7 +138,7 @@ function powerControls(model) {
     const toggle = section.fields.find((field) => field.macro === "lightingEnabled");
     const timeout = section.fields.find((field) => field.macro === "lightingTimeout");
     if (!toggle || !timeout) return null;
-    const editable = canEditArea("settings");
+    const editable = editGate(model, "settings").editable;
     const node = el(`<div class="settings-group lighting-power" data-section="${esc(section.id)}">
         <label class="sw" data-tip="${esc([toggle.hint, toggle.tooltip].filter(Boolean).join(" "))}"><input type="checkbox" data-macro="${esc(toggle.macro)}" data-f="setting:${esc(toggle.macro)}" ${toggle.enabled ? "checked" : ""} ${editable && !toggle.readOnly ? "" : "disabled"}>
             <span class="track"></span><span class="txt">${esc(toggle.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</span></label>
@@ -156,7 +159,7 @@ function powerControls(model) {
 function stageSwitch(model, id, bit) {
     const on = stageEnabled(model, id);
     const node = el(`<label class="sw" data-tip="Turn this whole stage off without losing the colours it stores.">
-        <input data-f="lighting:${esc(id)}:enabled" type="checkbox" ${on ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span>
+        <input data-f="lighting:${esc(id)}:enabled" type="checkbox" ${on ? "checked" : ""} ${editGate(model, "lighting").editable ? "" : "disabled"}><span class="track"></span>
         <span class="txt">${on ? "Stage on" : "Stage off"}</span></label>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
         const mask = model.rgb.stageEnableMask ?? 0;

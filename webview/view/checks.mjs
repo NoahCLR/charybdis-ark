@@ -10,27 +10,25 @@
 // already has them.
 
 import {DEMO_WORDS} from "./demo.mjs";
+import {listed, vocabulary} from "./vocabulary.mjs";
 
 const LEVEL_RANK = {blocker: 0, trap: 1, warning: 2, notice: 3};
-export const LEVEL_WORD = {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"};
-export const STATUS_WORD = {new: "new", existing: "on the keyboard", fixed: "fixed"};
-// In the demo nothing is on a keyboard: what the draft started from is the
-// demo setup.
-const DEMO_STATUS_WORD = {...STATUS_WORD, existing: DEMO_WORDS.existingCheck};
 
 /** @param {import("../../contracts/model.js").Check} a @param {import("../../contracts/model.js").Check} b */
 const byLevel = (a, b) => (LEVEL_RANK[a.level] ?? 3) - (LEVEL_RANK[b.level] ?? 3);
 
 // The groups the review lists, in reading order, leaving out empty ones. A
-// group opens by default when it has something to act on: what the draft adds,
-// and anything on the keyboard that is a trap.
+// group opens by default when it has something to act on in this draft: what
+// the draft adds, and a blocker that keeps Save off (D-L36). What is already
+// on the keyboard folds, so it never pushes the changes out of view; Save still
+// asks about its traps and warnings.
 /** @param {readonly import("../../contracts/model.js").Check[]} [checks] @param {{demo?: boolean}} [options] */
 export function checkGroups(checks = [], {demo = false} = {}) {
     /** @param {import("../../contracts/model.js").Check["status"]} status */
     const of = (status) => checks.filter((check) => check.status === status).sort(byLevel);
     return [
         {id: "new", title: "New in this draft", items: of("new"), open: true},
-        {id: "existing", title: demo ? DEMO_WORDS.existingChecks : "Already on the keyboard", items: of("existing"), open: of("existing").some((check) => ["trap", "blocker"].includes(check.level))},
+        {id: "existing", title: demo ? DEMO_WORDS.existingChecks : "Already on the keyboard", items: of("existing"), open: of("existing").some((check) => check.level === "blocker")},
         {id: "fixed", title: "Fixed by this draft", items: of("fixed"), open: false},
     ].filter((group) => group.items.length);
 }
@@ -56,6 +54,40 @@ export function checkSourceGroup(check, changes = []) {
     return matches.length === 1 && Number.isInteger(matches[0].group) ? matches[0].group : null;
 }
 
+// The new traps and warnings each draft edit group is the source of
+// (checkSourceGroup): which group a check points at, and what each group
+// counts.
+/** @param {readonly import("../../contracts/model.js").Check[]} [checks] @param {readonly import("../../contracts/model.js").ReviewChange[]} [changes] */
+export function checkSources(checks = [], changes = []) {
+    /** @type {Map<import("../../contracts/model.js").Check, number | null | undefined>} */
+    const groupOf = new Map();
+    /** @type {Map<number | null | undefined, import("../../contracts/model.js").Check[]>} */
+    const sourced = new Map();
+    for (const check of checks) {
+        const group = checkSourceGroup(check, changes);
+        if (group === null) continue;
+        groupOf.set(check, group);
+        sourced.set(group, [...(sourced.get(group) || []), check]);
+    }
+    return {groupOf, counts: new Map([...sourced].map(([group, list]) => [group, levelCounts(list)]))};
+}
+
+// How many traps and warnings the checks hold. One standing for the traps
+// past those named (`trapOverflow`) counts as that many.
+/** @param {readonly import("../../contracts/model.js").Check[]} checks */
+export const levelCounts = (checks) => checks.reduce((count, check) => {
+    if (check.level === "trap" || check.level === "warning") count[check.level] += check.kind === "trapOverflow" ? (check.count ?? 1) : 1;
+    return count;
+}, {trap: 0, warning: 0});
+
+// The counts as read: "2 traps and 1 warning", a level with none left out.
+/** @param {{trap: number, warning: number}} count */
+export const levelCountWords = ({trap, warning}) => {
+    /** @param {number} number @param {string} word */
+    const counted = (number, word) => `${number} ${word}${number === 1 ? "" : "s"}`;
+    return listed([trap ? counted(trap, "trap") : "", warning ? counted(warning, "warning") : ""].filter(Boolean));
+};
+
 // What the confirmation says before a save (or a live edit) goes ahead. The
 // keyboard's Apply and Save both read as Save (D-L72).
 /** @param {readonly import("../../contracts/model.js").Check[]} checks @param {'apply' | 'save' | 'send' | 'sendDraft'} [action] `send` is one live edit; `sendDraft` the whole draft, sent on switching to a live mode */
@@ -63,21 +95,25 @@ export function confirmText(checks, action = "apply") {
     if (!checks.length) return "";
     const traps = checks.filter((check) => check.level === "trap");
     const warnings = checks.filter((check) => check.level === "warning");
-    /** @param {number} number @param {string} word */
-    const count = (number, word) => `${number} ${word}${number === 1 ? "" : "s"}`;
-    const trapCount = traps.reduce((total, check) => total + (check.kind === "trapOverflow" ? /** @type {number} */ (check.count) : 1), 0);
-    const lead = checks.length === 1 ? checks[0].title : [traps.length && count(trapCount, "trap"), warnings.length && count(warnings.length, "warning")].filter(Boolean).join(" and ");
+    const lead = checks.length === 1 ? checks[0].title : levelCountWords(levelCounts(checks));
     const ask = {apply: "Save this profile", save: "Save these edits", send: "Send this edit", sendDraft: "Send your draft"}[action];
     return traps.length ? `${lead}. A trapped layer can leave no way back to Base until you unplug the keyboard. ${ask} anyway?`
         : `${lead}. ${ask} with ${warnings.length === 1 ? "this warning" : "these warnings"}?`;
 }
 
+// A check's level in the vocabulary's words ("Warning"); a level the table
+// does not know reads as itself.
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {import("../../contracts/model.js").Check["level"]} level */
+export const checkLevelWord = (model, level) => vocabulary(model).checkLevels[level] || level;
+
 // The line a check's header shows beside its title: its level, and where it
-// comes from unless it is new.
-/** @param {import("../../contracts/model.js").Check} check @param {{demo?: boolean}} [options] */
-export function checkTags(check, {demo = false} = {}) {
-    const words = demo ? DEMO_STATUS_WORD : STATUS_WORD;
-    return [LEVEL_WORD[check.level] || check.level, ...(check.status === "new" ? [] : [words[check.status] || check.status])];
+// comes from unless it is new, in the vocabulary's words. In the demo nothing
+// is on a keyboard: what the draft started from is the demo profile.
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {import("../../contracts/model.js").Check} check @param {{demo?: boolean}} [options] */
+export function checkTags(model, check, {demo = false} = {}) {
+    const {checkStatuses} = vocabulary(model);
+    const words = demo ? {...checkStatuses, existing: DEMO_WORDS.existingCheck} : checkStatuses;
+    return [checkLevelWord(model, check.level), ...(check.status === "new" ? [] : [words[check.status] || check.status])];
 }
 
 // Findings already use the behaviour's semantic keycode in their edit target.

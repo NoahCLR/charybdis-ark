@@ -1,10 +1,11 @@
 // @ts-check
-// A pointing slot's link, as the How it starts card offers it: a row per layer with
+// A pointing slot's link, as the What starts it step offers it: a row per layer with
 // whether it starts this pointing mode and whether this pointing mode's key
 // turns it on, and why
 // a switch cannot be used. The core publishes the rule
 // (model.pdModeEditing.linkTargets, core/model/pointing-links.js); this only
 // turns it into rows for one slot.
+import {layerCalled, layerCalledAt} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel} Model
@@ -13,11 +14,6 @@
  *   startLocked: boolean, keyLocked: boolean, startsOther: string, startTip: string}} LinkRow
  */
 
-/** @param {Model | null} model @param {number} index */
-const nameOf = (model, index) => {
-    const layer = (model?.layers || []).find((entry) => entry.index === index);
-    return layer ? layer.displayName || layer.name : `Layer ${index}`;
-};
 
 // Every layer the board has, in the tab order. A layer the keyboard ignores in
 // a link (a default layer, the pointer layer) is unusable: it says why in its
@@ -31,7 +27,7 @@ export function linkRows(model, slot) {
     const words = model?.vocabulary?.pointing?.linkInert, already = model?.vocabulary?.pointing?.linkLabels?.startsOther || "";
     return (model?.layers || []).map((layer) => {
         const target = targets.find((entry) => entry.layer === layer.index);
-        const name = layer.displayName || layer.name;
+        const name = layerCalled(layer);
         const starts = Boolean(slot.linkedLayers & 2 ** layer.index), key = Boolean(slot.linkTurnsOn & 2 ** layer.index);
         const unusable = Boolean(target?.refusal);
         const other = target && target.linkedBy !== null && target.linkedBy !== slot.id ? target.linkedByName : "";
@@ -56,6 +52,10 @@ export function linkIgnored(model, slot) {
 export function pointerLayerCovers(model, slot) {
     const pointer = model?.pdModeEditing?.pointerLayer, covers = slot.pointerCovers ?? 0;
     if (pointer === null || pointer === undefined || !covers) return null;
-    const covered = Array.from({length: pointer}, (_, index) => index).filter((index) => covers & 2 ** index).map((index) => nameOf(model, index));
-    return {pointer: nameOf(model, pointer), covered};
+    const covered = Array.from({length: pointer}, (_, index) => index).filter((index) => covers & 2 ** index).map((index) => layerCalledAt(model, index));
+    return {pointer: layerCalledAt(model, pointer), covered};
 }
+
+// A link's layer set with one layer put in or taken out: bit n is layer n.
+/** @param {number} mask @param {number} layer @param {boolean} on */
+export const withLayer = (mask, layer, on) => on ? mask | 2 ** layer : mask & ~(2 ** layer);

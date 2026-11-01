@@ -7,15 +7,15 @@ const {openControls, change, expectPost, clearPosts} = require("./control-previe
 const {openPreview} = require("./shell-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildSnapshotModel} = require("../core/session/device-model");
-const {draftBinding} = require("../core/session/panel-session-state");
+// The panel's whole model for a draft, published as the shell posts it.
+const {connectedState, panelModel} = require("../tests/fixtures/published-model");
 
 test("each Settings screen draws its own sections open, with nothing to fold and no search", async ({page}) => {
     await openControls(page, "keys");
     for (const [screen, title, sections] of [
         ["behaviours", "Behaviours", ["keyTiming", "behaviorSettings"]],
         ["combos", "Combos", ["comboSettings", "comboReferences"]],
-        ["pointer", "Pointer settings", ["normalPointerSpeed", "sniping", "autoMouse"]],
+        ["pointer", "Pointer", ["normalPointerSpeed", "sniping", "autoMouse"]],
         ["host", "Host", ["host", "keyboardOptions"]],
     ]) {
         await page.locator(`[data-screen="${screen}"]`).click();
@@ -73,14 +73,13 @@ test("Lighting's Auto-mouse link opens Pointer settings at Auto-mouse", async ({
 test("a review row for a setting shows it on the screen that holds it", async ({page}) => {
     const {snapshot, capabilities} = hostMacros(1 | (2 << 16), []);
     const draft = new ProfileDraftSession(snapshot, "board", capabilities);
-    const connection = {connected: true, selectedDeviceId: "board", capabilities};
+    const state = connectedState(capabilities);
     const publish = async () => {
-        const patch = {...buildSnapshotModel(draft.current, draft.capabilities, draftBinding({draft}, connection), connection), draft: {...draft.view(connection), ...draftBinding({draft}, connection)}};
-        await page.evaluate(async (patch) => {
+        await page.evaluate(async (model) => {
             const store = await import("/webview/store.mjs");
-            store.setModel({...store.getModel(), ...patch}); store.render();
+            store.setModel(model); store.render();
             window.__posted.length = 0;
-        }, patch);
+        }, panelModel(draft, state));
     };
     await openPreview(page);
     await publish();
@@ -123,7 +122,8 @@ test("Keyboard: the title renames the keyboard, and memory and diagnostics live 
     await expect(page.locator(".card.usage")).toHaveCount(1);
     await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
     await clearPosts(page);
-    await page.locator('[data-section="diagnostics"] [data-act="read"]').click();
+    // Read keyboard sits over the fold's title, outside its summary.
+    await page.locator('.diagnostics [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh"})]);
     await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
     await page.locator('[data-screen="host"]').click();
@@ -139,31 +139,39 @@ test("Keyboard: opening Diagnostics reads the flash pauses once, and its Read ke
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "readFlashPauses"})]);
     await expect(fold.locator(".flash-pauses-section")).toContainText("Not read yet.");
     await clearPosts(page);
-    await fold.locator('[data-act="read"]').click();
+    await page.locator('.diagnostics [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh", flashPauses: true})]);
     await expect(fold).toHaveAttribute("open", "");
     await clearPosts(page);
     await fold.locator("summary h3").click();
     await expect(fold).not.toHaveAttribute("open", "");
-    await fold.locator('[data-act="read"]').click();
+    await page.locator('.diagnostics [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([{type: "refresh", draftId: expect.any(String), draftRevision: expect.any(Number)}]);
 });
 
 test("Keyboard: an open Diagnostics reads the flash pauses of each connection once, when nothing holds the keyboard", async ({page}) => {
     await openControls(page, "device");
     await page.locator('[data-section="diagnostics"] summary h3').click();
+    // Each model carries a note of its own in the fold's diagnostics: once the
+    // page shows it, the page has drawn that model, and posted what drawing
+    // it asks for.
+    let published = 0;
     /** @param {{connectionToken: number, busy?: boolean, read?: boolean}} next */
-    const publish = (next) => page.evaluate(async ({connectionToken, busy, read}) => {
-        const {getModel} = await import("/webview/store.mjs");
-        const model = structuredClone(getModel());
-        model.load = {...model.load, connectionToken};
-        model.device.health.busy = Boolean(busy);
-        model.device.flashPauses = read ? {state: "unavailable", error: "x"} : null;
-        window.__posted.length = 0;
-        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        return window.__posted.map((message) => message.type);
-    }, next);
+    const publish = async (next) => {
+        const mark = `Published model ${++published}`;
+        await page.evaluate(async ({connectionToken, busy, read, mark}) => {
+            const {getModel} = await import("/webview/store.mjs");
+            const model = structuredClone(getModel());
+            model.load = {...model.load, connectionToken};
+            model.device.health.busy = Boolean(busy);
+            model.device.flashPauses = read ? {state: "unavailable", error: "x"} : null;
+            model.diagnostics = [mark];
+            window.__posted.length = 0;
+            window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+        }, {...next, mark});
+        await expect(page.locator('[data-section="diagnostics"] .list')).toHaveText(mark);
+        return page.evaluate(() => window.__posted.map((message) => message.type));
+    };
     expect(await publish({connectionToken: 7, busy: true})).toEqual([]);
     expect(await publish({connectionToken: 7})).toEqual(["readFlashPauses"]);
     expect(await publish({connectionToken: 7}), "asked once for this connection").toEqual([]);
@@ -197,12 +205,16 @@ test("Backups: a recovery copy is named by what made it and its keyboard, can be
     await page.locator(".recovery-row [data-use]").first().click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "useRecovery", id: 4})]);
     await clearPosts(page);
+    // Delete asks first, in its row.
     await page.locator(".recovery-row [data-delete]").first().click();
+    expect(await page.evaluate(() => window.__posted)).toEqual([]);
+    await page.locator('.recovery-row [data-act="confirm-delete"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "deleteRecovery", id: 4})]);
     // A copy stored before causes were recorded works as any other.
     for (const [attribute, type] of [["data-use", "useRecovery"], ["data-recovery", "downloadRecovery"], ["data-delete", "deleteRecovery"]]) {
         await clearPosts(page);
         await page.locator(`.recovery-row [${attribute}]`).nth(3).click();
+        if (attribute === "data-delete") await page.locator('.recovery-row [data-act="confirm-delete"]').click();
         await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type, id: 1})]);
     }
     await page.evaluate(async () => {

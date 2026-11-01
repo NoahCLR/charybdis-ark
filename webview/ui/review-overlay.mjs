@@ -1,14 +1,17 @@
 // @ts-check
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post, render as rerender, state, writable} from "../store.mjs";
+import {scrollMotion} from "../lib/scroll.mjs";
+import {getModel, post, render as rerender, state} from "../store.mjs";
+import {editGate} from "../view/edit-gate.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
-import {discardLabel, groupNote, placeState, reviewBlocks, statusBesideCount, stillShown} from "../view/review.mjs";
+import {discardLabel, groupNote, placeState, reviewBlocks, saveOffReason, statusBesideCount, stillShown} from "../view/review.mjs";
 import {reviewColumns, reviewItem} from "./review-items.mjs";
 import {checksSection} from "./checks.mjs";
-import {checkSourceGroup, checksToConfirm, confirmText} from "../view/checks.mjs";
+import {checkSources, checksToConfirm, confirmText, levelCountWords} from "../view/checks.mjs";
 import {shortcut} from "../view/shortcuts.mjs";
-import {quietWords} from "../view/edit-mode.mjs";
+import {LIVE, quietWords} from "../view/edit-mode.mjs";
+import {dialogFoot} from "./dialog-foot.mjs";
 
 export function reviewOverlay() {
     const model = getModel();
@@ -16,24 +19,12 @@ export function reviewOverlay() {
     if (!model || state.overlay !== "review" || !draft?.dirty) return null;
     // Discarding goes back to the keyboard's value; it waits while the draft
     // is out of step with the keyboard or busy, as editing does.
-    const canDiscard = writable();
-    /** @type {Map<import("../../contracts/model.js").Check, number | undefined>} */
-    const sourceByCheck = new Map();
-    /** @type {Map<number | null | undefined, {warning: number, trap: number}>} */
-    const sourceCounts = new Map();
-    for (const check of draft.checks) {
-        const group = checkSourceGroup(check, draft.changes);
-        if (group === null) continue;
-        sourceByCheck.set(check, group);
-        const count = sourceCounts.get(group) || {warning: 0, trap: 0};
-        if (check.level === "warning" || check.level === "trap") count[check.level] += check.kind === "trapOverflow" ? (check.count ?? 1) : 1;
-        sourceCounts.set(group, count);
-    }
+    const canDiscard = editGate(model, "discard").editable;
+    const {groupOf: sourceByCheck, counts: sourceCounts} = checkSources(draft.checks, draft.changes);
     /** @param {number | null | undefined} group */
     const sourceLabel = (group) => {
         const count = sourceCounts.get(group);
-        if (!count) return "";
-        return `Source of ${[count.trap && `${count.trap} trap${count.trap === 1 ? "" : "s"}`, count.warning && `${count.warning} warning${count.warning === 1 ? "" : "s"}`].filter(Boolean).join(" and ")}`;
+        return count ? `Source of ${levelCountWords(count)}` : "";
     };
     /** @param {import("../../contracts/model.js").ReviewChange} entry @param {number} index @param {string} discard @param {boolean} titleSlot @param {string} source */
     const item = (entry, index, discard, titleSlot, source) => reviewItem(model, entry, {discard, titleSlot, sourceLabel: source,
@@ -45,9 +36,9 @@ export function reviewOverlay() {
     const live = Boolean(draft.live);
     // In Live edit the keyboard saves by itself: the review only shows what is
     // not saved yet, with Revert, and Save again only once its own save failed.
-    const keyboardSaves = draft.live?.mode === 1;
+    const keyboardSaves = draft.live?.mode === LIVE;
     const columns = live ? reviewColumns("What changes", "Saved", "Running now")
-        : reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");
+        : reviewColumns("What changes", demo.active ? "In the demo profile" : "On the keyboard", "In your draft");
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
     /** @type {import("../../contracts/model.js").ReviewChange[]} */
     const shown = [];
@@ -71,52 +62,67 @@ export function reviewOverlay() {
     // Checks that point at a key or a combo open it as review items do.
     /** @type {import("../../contracts/model.js").Check[]} */
     const checked = [];
-    const checks = checksSection(draft.checks, (check) => check.status !== "fixed" && placeState(check.place, model.layers)
+    const checks = checksSection(model, draft.checks, (check) => check.status !== "fixed" && placeState(check.place, model.layers)
         ? `<button class="btn tiny ghost" data-show-check="${checked.push(check) - 1}" data-tip="Close the review and open this where it is edited.">Show</button>` : "",
     (check) => {
         const group = sourceByCheck.get(check);
         if (group === undefined) return "";
         const change = draft.changes.find((entry) => entry.group === group);
         if (!change) return "";
-        return `<button class="ck-source" data-check-source="${esc(group)}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↓</button>`;
-    }, demo.active);
+        return `<button class="ck-source" data-check-source="${esc(group)}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↑</button>`;
+    }, demo.active, checkGroupsOpened(draft.revision));
     // Ask about active warnings and traps for this revision before writing.
     const confirmChecks = checksToConfirm(draft.checks);
     const confirming = confirmChecks.length && state.confirmChecks === draft.revision;
     const hasTrap = confirmChecks.some((check) => check.level === "trap");
-    const blockers = draft.checks.filter((check) => check.level === "blocker" && check.status !== "fixed");
-    const canApply = draft.reviewed && draft.connected && !draft.stale && !blockers.length;
+    // A Save that is off says why beside it (and to a screen reader through
+    // aria-describedby), never only in a tip.
+    const why = saveOffReason(model, draft);
+    const canApply = !why;
+    const againWhy = saveOffReason(model, {...draft, checks: [], reviewed: true});
+    /** @param {string} reason */
+    const whyNote = (reason) => reason ? `<span class="note save-why" id="review-save-why">${esc(reason)}</span>` : "";
+    const describedBy = (/** @type {string} */ reason) => reason ? ' aria-describedby="review-save-why"' : "";
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>
             ${summary ? `<span class="note">${esc(summary)}</span>` : ""}
             <span class="right"><button class="btn ghost" data-act="close">Close</button></span></div>
         <div class="sheet-b rv">
-            ${checks}
             ${sections}
+            ${checks}
             <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
                 : keyboardSaves ? `The keyboard already runs these changes and saves them by itself after ${esc(quietWords(draft.live?.keyboard))} without typing. Revert puts back what is saved.`
-                : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then writes them as its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
-                : "Save keeps a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts the save, the recovery copy restores it."}</div></div>
+                : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then makes them its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
+                : "Save keeps a recovery copy, sends the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts the save, the recovery copy keeps what it held."}</div></div>
         </div>
         ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>
-            <span class="right"><button class="btn primary" data-act="export">Export…</button></span></div>`
+            <span class="right"><button class="btn primary" data-act="export">Export profile…</button></span></div>`
         : confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm profile checks">
             <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks, live ? "save" : "apply"))}</span>
-            <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
-                <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Save anyway</button></span></div>`
+            ${dialogFoot(`<button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}${describedBy(why)}>Save anyway</button>`, {back: "Go back", act: "unconfirm"}, whyNote(why))}</div>`
         : `<div class="sheet-f"><span class="note" data-tip="${esc(model?.device?.summary || "")}">${esc(model?.device?.label || "")} · ${esc(model?.device?.savedProfile || "")}</span>
-            <span class="right">${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc(`Put back what is saved. Nothing is written; Undo (${shortcut("Z")}) sends the edits again.`)}">Revert</button>` : ""}
-                ${keyboardSaves ? draft.live?.keyboard?.saveFailed ? `<button class="btn primary" data-act="save-again" ${draft.connected && !draft.stale ? "" : "disabled"}
+            <span class="right">${whyNote(keyboardSaves ? draft.live?.keyboard?.saveFailed ? againWhy : "" : why)}${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc(`Put back what is saved. The saved profile stays as it is; Undo (${shortcut("Z")}) sends the edits again.`)}">Revert</button>` : ""}
+                ${keyboardSaves ? draft.live?.keyboard?.saveFailed ? `<button class="btn primary" data-act="save-again" ${againWhy ? `disabled${describedBy(againWhy)}` : ""}
                     data-tip="${esc("The keyboard's own save failed. Ask it to save these edits again, after a recovery copy of what is saved now.")}">Save again</button>` : ""
-                : `<button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
-                    ${blockers.length ? `data-tip="Resolve the blockers in Checks before saving."` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>Save to keyboard</button>`}</span></div>`}
+                : `<button class="btn primary" data-act="apply" ${canApply ? "" : `disabled${describedBy(why)}`}
+                    ${!canApply ? "" : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is saved.")}"` : ""}>Save to keyboard</button>`}</span></div>`}
     </div></div>`);
-    // Pointing at a group's Discard lights what it takes back, in every area
-    // the group reaches.
+    // A check group opened or folded by hand stays so while the review shows
+    // this revision of the draft, whatever renders it again.
+    /** @type {NodeListOf<HTMLDetailsElement>} */ (node.querySelectorAll("details[data-check-group]")).forEach((group) => group.addEventListener("toggle", () => {
+        if (!group.isConnected) return;
+        state.checkGroupsOpen = {revision: draft.revision, open: {...checkGroupsOpened(draft.revision), [group.dataset.checkGroup || ""]: group.open}};
+    }));
+    // Pointing at a group's Discard, or reaching it with the keyboard, lights
+    // what it takes back, in every area the group reaches.
     /** @type {NodeListOf<HTMLButtonElement>} */ (node.querySelectorAll(".rv-block.grouped [data-discard]")).forEach((button) => {
         const parts = node.querySelectorAll(`.rv-block.grouped[data-group="${button.dataset.discard}"]`);
-        button.addEventListener("mouseenter", () => parts.forEach((part) => part.classList.add("lit")));
-        button.addEventListener("mouseleave", () => parts.forEach((part) => part.classList.remove("lit")));
+        const light = () => parts.forEach((part) => part.classList.add("lit"));
+        const unlight = () => parts.forEach((part) => part.classList.remove("lit"));
+        button.addEventListener("mouseenter", light);
+        button.addEventListener("mouseleave", () => {if (document.activeElement !== button) unlight();});
+        button.addEventListener("focus", light);
+        button.addEventListener("blur", () => {if (!button.matches(":hover")) unlight();});
     });
     node.addEventListener("click", (event) => {
         const target = event.target;
@@ -140,7 +146,7 @@ export function reviewOverlay() {
         const source = /** @type {HTMLButtonElement | null} */ (target.closest("[data-check-source]"));
         if (source) {
             const parts = node.querySelectorAll(`.rv-block[data-group="${source.dataset.checkSource}"]`);
-            parts[0]?.scrollIntoView({behavior: "smooth", block: "center"});
+            parts[0]?.scrollIntoView({behavior: scrollMotion(), block: "center"});
             parts.forEach((part) => part.classList.add("source-focus"));
             setTimeout(() => parts.forEach((part) => part.classList.remove("source-focus")), 2000);
             return;
@@ -196,3 +202,8 @@ export function reviewOverlay() {
     });
     return node;
 }
+
+// The check groups opened or folded by hand for `revision`; a new revision
+// starts from each group's own default again.
+/** @param {number} revision @returns {Readonly<Record<string, boolean>>} */
+const checkGroupsOpened = (revision) => (state.checkGroupsOpen?.revision === revision ? state.checkGroupsOpen.open : {});

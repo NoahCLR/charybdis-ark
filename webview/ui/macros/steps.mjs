@@ -3,14 +3,16 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
+import {MAX_KEYS, describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
 import {withStepFocus} from "../../view/macro-focus.mjs";
-import {actionLabel} from "../../view/keyface.mjs";
+import {keyIdentity} from "../../view/key-identity.mjs";
 import {appendSequenceStep, moveSequenceStep, sequenceFace, sequenceInsertionAt, sequenceIssues} from "../../view/macro-sequence.mjs";
 import {getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
 import {stepMark, stepWord} from "../marks.mjs";
+import {vocabulary} from "../../view/vocabulary.mjs";
 import {inspectEdit} from "./validation.mjs";
+import {DONE, closesInPlace} from "../inline-editor.mjs";
 import {finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
 
 // Like the board's deletion shortcut, consume Backspace before the shell turns
@@ -36,10 +38,10 @@ export function macroStepShortcut(event) {
 /** @param {MacroSlot} slot @param {MacroStep[]} steps @param {boolean} [stage] @param {string | null} [group] */
 export function saveSteps(slot, steps, stage = false, group = null) {
     steps = focusSteps(slot, steps);
-    const {payload, error} = macroStepsInput(steps);
-    rememberMacroEdit(slot, payload, steps, group);
     const model = getModel();
-    const issues = sequenceIssues(steps, model?.qmkKeycodeAliases, key => actionLabel(model, key));
+    const {payload, error} = macroStepsInput(steps, model);
+    rememberMacroEdit(slot, payload, steps, group);
+    const issues = sequenceIssues(steps, model, key => keyIdentity(model, key).label);
     setMacroForm(slot.keycode, {steps, draft: payload, stepError: error || issues.find(Boolean) || "", cancelBlur: false});
     const raw = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`[data-raw-payload="${slot.keycode}"]`));
     if (raw && document.activeElement !== raw) raw.value = payload;
@@ -68,8 +70,8 @@ export function insertStep(model, slot, steps, kind) {
     };
     if (kind === "text") insert({kind, text: ""});
     else if (kind === "delay") insert({kind, delay: 120});
-    else openPicker({title: stepKindName(kind), contextKeycode: slot.keycode,
-        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? 16 : 1,
+    else openPicker({title: stepKindName(model, kind), contextKeycode: slot.keycode,
+        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? MAX_KEYS : 1,
         onPick: expression => insert({kind, keys: expression.split(",").map(key => key.trim()).filter(Boolean)}),
     });
 }
@@ -81,9 +83,10 @@ export function sequenceEditor(model, slot, steps, canEdit) {
         const selected = steps[0]?.kind === "text" ? steps[0].focusId : null;
         setMacroForm(slot.keycode, {selectedStep: selected, selectionAnchor: selected, selectedSteps: selected ? [selected] : []});
     }
+    const tiles = vocabulary(model).macroStepTiles;
     const node = el(`<div class="macro-sequence-editor" data-macro-sequence>
         <div class="macro-sequence ${steps.length ? "" : "empty"}" data-sequence-tiles tabindex="0" data-act="macro-sequence:${esc(slot.keycode)}" aria-label="Macro step sequence"></div>
-        ${steps.length ? `<div class="macro-legend note"><span>↓ press</span><span>↑ release</span><span>• tap</span><span>+ chord</span><span>ms wait</span><span class="right">${canEdit ? "Click to edit · drag to reorder · Delete to remove" : "Click a step to inspect"}</span></div>` : ""}
+        ${steps.length ? `<div class="macro-legend note"><span>↓ ${esc(tiles.press)}</span><span>↑ ${esc(tiles.release)}</span><span>• ${esc(tiles.key)}</span><span>+ ${esc(tiles.chord)}</span><span>ms ${esc(tiles.delay)}</span><span class="right">${canEdit ? "Click to edit · drag to reorder · Delete to remove" : "Click a step to inspect"}</span></div>` : ""}
         <p class="note" data-sequence-notice role="status" aria-live="polite">${esc(form.moveNotice || "")}</p>
         <div data-step-inspectors></div>
     </div>`);
@@ -104,7 +107,7 @@ export function sequenceEditor(model, slot, steps, canEdit) {
 /** @param {HTMLElement} node @param {import('../../../contracts/panel.js').PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps */
 function paintTiles(node, model, slot, steps) {
     const editable = node.closest("[data-macro-sequence]")?.getAttribute("data-editable") === "true";
-    const issues = sequenceIssues(steps, model.qmkKeycodeAliases, key => actionLabel(model, key));
+    const issues = sequenceIssues(steps, model, key => keyIdentity(model, key).label);
     /** @type {string | null} */
     let dragged = null;
     const clearDrop = () => node.querySelectorAll(".drop-before, .drop-after").forEach(item => item.classList.remove("drop-before", "drop-after"));
@@ -134,7 +137,7 @@ function paintTiles(node, model, slot, steps) {
     }
     node.replaceChildren(...steps.map((step, index) => {
         const face = sequenceFace(model, step), selected = selectedStepIds(slot).includes(step.focusId || "");
-        const title = `${index + 1}. ${stepKindName(step.kind)}: ${face.full || "Choose a value"}${issues[index] ? ` · ${issues[index]}` : ""}`;
+        const title = `${index + 1}. ${stepKindName(model, step.kind)}: ${face.full || "Choose a value"}${issues[index] ? ` · ${issues[index]}` : ""}`;
         const content = "keys" in step && step.keys.length
             ? step.keys.map((key, at) => `<span class="macro-chord-part">${at ? "+ " : ""}${esc(sequenceFace(model, {kind: "tap", keys: [key]}).label)}</span>`).join(" ")
             : esc(face.label || (step.kind === "text" ? "Text…" : "Choose…"));
@@ -143,7 +146,7 @@ function paintTiles(node, model, slot, steps) {
             draggable="${editable}" aria-pressed="${esc(selected)}" aria-label="${esc(title)}" ${issues[index] ? 'aria-invalid="true"' : ""} data-tip="${esc(title)}">
             <span class="macro-token-index" aria-hidden="true">${esc(index + 1)}</span><span class="macro-token-mark" aria-hidden="true">${stepMark(step.kind)}</span>
             <span class="macro-token-label">${content}${step.kind === "delay" ? '<span class="macro-token-unit"> ms</span>' : ""}</span>
-            <span class="macro-token-kind">${esc(stepWord(step.kind, face.kind === "chord"))}</span>
+            <span class="macro-token-kind">${esc(stepWord(model, step.kind, face.kind === "chord"))}</span>
             ${issues[index] ? '<span class="macro-token-error" aria-hidden="true">!</span>' : ""}</button>
             ${index < steps.length - 1 ? '<span class="macro-connector" aria-hidden="true">→</span>' : ""}</div>`);
         const tile = /** @type {HTMLButtonElement} */ (wrap.querySelector("button"));
@@ -198,17 +201,17 @@ function removeStep(slot, steps, id) {
 }
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps @param {MacroStep} step @param {number} index @param {boolean} canEdit */
-export function stepEditor(model, slot, steps, step, index, canEdit) {
-    const label = stepKindName(step.kind);
+function stepEditor(model, slot, steps, step, index, canEdit) {
+    const label = stepKindName(model, step.kind);
     const node = el(`<div class="macro-step" data-step="${esc(index)}">
         <div class="row macro-step-head"><span class="kind">Step ${esc(index + 1)} · ${esc(label)}</span><span class="right row">
             <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step earlier">← Earlier</button>
             <button class="btn tiny ghost" data-move="1" ${canEdit && index < steps.length - 1 ? "" : "disabled"} aria-label="Move step later">Later →</button>
-            <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button>
-            <button class="btn tiny ghost" data-close-step aria-label="Close step editor">×</button></span></div>
+            ${DONE}
+            <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button></span></div>
         ${step.kind === "text" ? `<label class="field"><textarea data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:text" aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${esc(index)}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
-            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${esc(index)}" type="number" min="0" max="65535" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
-            : `<div class="row"><span class="tok">${esc(describeStep(step, key => actionLabel(model, key))) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
+            : step.kind === "delay" ? `<label class="field delay-field"><span>Delay</span><span class="affix unit"><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono num" data-step-delay="${esc(index)}" inputmode="numeric" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}><i>ms</i></span></label>`
+            : `<div class="row"><span class="tok">${esc(describeStep(step, key => keyIdentity(model, key).label)) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
     </div>`);
     const input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (node.querySelector("textarea, input"));
     input?.addEventListener("input", () => {
@@ -216,12 +219,13 @@ export function stepEditor(model, slot, steps, step, index, canEdit) {
         saveSteps(slot, next.map((item, at) => at === index ? {...item, ...(step.kind === "text" ? {text: input.value} : {delay: input.value})} : item), false, input.dataset.f || null);
     });
     input?.addEventListener("change", () => {finishMacroHistoryGroup(slot); inspectEdit(slot, true);});
-    /** @type {HTMLButtonElement} */ (node.querySelector("[data-close-step]")).addEventListener("click", () => {
+    // Done or Escape closes it, and the focus goes back to its step.
+    closesInPlace(node, () => {
         setMacroForm(slot.keycode, {selectedStep: null, selectionAnchor: null, selectedSteps: []}); render();
         /** @type {HTMLElement | null} */ (document.querySelector(`[data-step-id="${CSS.escape(step.focusId || "")}"]`))?.focus();
     });
     /** @type {HTMLElement | null} */ (node.querySelector("[data-pick-step]"))?.addEventListener("click", () => openPicker({
-        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? 16 : 1,
+        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? MAX_KEYS : 1,
         onPick: expression => {
             const next = macroForm(slot.keycode).steps ?? steps;
             saveSteps(slot, next.map((item, at) => at === index ? {...item, keys: expression.split(",").map(key => key.trim()).filter(Boolean)} : item), true); render();

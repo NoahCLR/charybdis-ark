@@ -100,6 +100,7 @@ test("RGB selectors and disabled stages are displayed without inventing enabled 
     const view = rgbForView(rgb);
     assert.ok(view.stages.every(stage => !stage.enabled));
     assert.deepEqual(view.layerLedGroups.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
+    assert.deepEqual(view.layerLedGroups.map(r => r.ownerLayer), [0, undefined], "a layer's own group names its layer by number");
     assert.equal(view.pdModeLedGroups[0].owner, "POINTING_MODE_DRAGSCROLL");
     assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
 });
@@ -119,4 +120,14 @@ test("authored and built-in behaviour labels use the profile's host naming rule"
         const builtIn = require("../../core/model/device-profile-view").builtInForView({kind:1, operand:0x3804}, {ownedTapping:true}, profileKeyNames({hostOs}));
         assert.equal(builtIn.hold.label, `Right ${gui}`);
     }
+});
+
+test("a behaviour row's built-in hold is judged with the row: a pointing mode held from the press waits when a later tap holds another", () => {
+    const {behaviorRowsForView} = require("../../core/model/device-profile-view");
+    const {PROFILE_ACTION_KINDS: ACTION} = require("../../core/schema/profile-blob-v1");
+    const mode = (slot) => ({kind: ACTION.POINTING_MODE_MOMENTARY, operand: slot});
+    const row = (steps) => ({target: mode(0), steps, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 0xffff});
+    const [alone, foreign] = behaviorRowsForView({rows: [row([]), row([{tapIndex: 1, hold: {style: 1, repeatHz: 0, action: mode(3)}}])]});
+    assert.equal(alone.builtIn.hold?.fromPress, true);
+    assert.equal(foreign.builtIn.hold?.fromPress, undefined);
 });

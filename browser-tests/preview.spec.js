@@ -9,7 +9,7 @@ for (const shell of ["", "?shell=demo"]) {
         await page.goto(`/preview/index.html${shell}`);
         await page.locator('[data-screen="profile"]').click();
         const card = page.locator("[data-profile-drop]");
-        await expect(card).toContainText("drop a complete backup here");
+        await expect(card).toContainText("Choose or drop a backup");
         await page.evaluate(() => {window.__posted.length = 0;});
         const file = {name: "777.charybdis.json", text: '{"sentinel":777}'};
         await card.evaluate((node) => {
@@ -19,10 +19,10 @@ for (const shell of ["", "?shell=demo"]) {
         });
         await expect(card).toHaveClass(/drag-over/);
         expect(await dropFiles(page, [file, file])).toBe(true);
-        await expect(card.locator('[role="status"]')).toHaveText("Drop one profile file at a time.");
+        await expect(card.locator('[role="status"]')).toHaveText("Drop one file at a time.");
         await expect(card).not.toHaveClass(/drag-over/);
         await dropFiles(page, [{...file, text: "x".repeat(262145)}]);
-        await expect(card.locator('[role="status"]')).toHaveText("This profile file is too large.");
+        await expect(card.locator('[role="status"]')).toHaveText("This file is too large for a backup.");
         await page.evaluate(() => {
             const text = File.prototype.text;
             File.prototype.text = () => Promise.reject(new Error("unreadable"));
@@ -122,14 +122,15 @@ for (const theme of ["dark", "light"]) {
             window.__posted.length = 0;
         });
         const input = page.getByRole("textbox", {name: "Idle timeout", exact: true});
-        const unit = page.getByRole("combobox", {name: "Idle timeout unit"});
+        const unit = page.getByRole("radiogroup", {name: "Idle timeout unit"});
+        const pickUnit = (name) => unit.locator("label").filter({hasText: name}).click();
         await expect(input).toHaveValue("1");
-        await expect(unit).toHaveValue("minutes");
-        await unit.selectOption("seconds");
+        await expect(unit.getByRole("radio", {name: "minutes"})).toBeChecked();
+        await pickUnit("seconds");
         await expect(input).toHaveValue("60");
         expect(await page.evaluate(() => window.__posted)).toEqual([]);
         for (const [units, value, ms] of [["seconds", "777", "777000"], ["minutes", "1.5", "90000"], ["seconds", "0.777", "777"], ["minutes", "0", "0"], ["minutes", "1440", "86400000"]]) {
-            await unit.selectOption(units);
+            await pickUnit(units);
             await page.evaluate(() => {window.__posted.length = 0;});
             await input.fill(value);
             await input.blur();
@@ -156,7 +157,7 @@ for (const theme of ["dark", "light"]) {
         await input.focus();
         await input.evaluate(node => node.setSelectionRange(0, 1));
         await page.evaluate(async () => (await import("/webview/store.mjs")).render());
-        await expect(unit).toHaveValue("minutes");
+        await expect(unit.getByRole("radio", {name: "minutes"})).toBeChecked();
         await expect(input).toBeFocused();
         expect(await input.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([0, 1]);
     });
@@ -365,7 +366,7 @@ test("the demo's controls post their messages", async ({page}) => {
     // a browser without WebHID still offers it.
     await page.goto("/preview/index.html?shell=none");
     const placeholder = page.locator(".read-placeholder");
-    await expect(placeholder.locator('[data-act="choose-keyboard"]')).toHaveText("Choose keyboard");
+    await expect(placeholder.locator('[data-act="choose-keyboard"]')).toHaveText("Choose keyboard…");
     await clear();
     await placeholder.locator('[data-act="explore-demo"]').click();
     await expect.poll(posted).toEqual([{type: "openDemo"}]);
@@ -432,4 +433,28 @@ test("the demo's controls post their messages", async ({page}) => {
     await page.locator('.sheet.leave-demo [data-act="export"]').click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "exportPortableProfile"})]);
     expect(errors).toEqual([]);
+});
+
+test("the commit bar covers none of the screen, and an Apply cut short is said once, by its bar", async ({page}) => {
+    // Where the scrolling area ends, and where the bar starts.
+    const edges = () => page.evaluate(() => [".main > .content", ".main > .commit"].map((selector) => document.querySelector(selector)?.getBoundingClientRect()));
+    await page.goto("/preview/index.html?shell=demo-edited");
+    await expect(page.locator(".main > .commit")).toBeVisible();
+    let [content, bar] = await edges();
+    expect(content?.bottom).toBeLessThanOrEqual(/** @type {DOMRect} */ (bar).top);
+
+    await page.goto("/preview/index.html?shell=apply-cut-short");
+    const failed = page.locator(".commit.failed");
+    await expect(failed).toContainText("Save stopped at:");
+    await expect(failed.locator(".ap-advice")).toContainText("on Backups (Before saving a draft");
+    await expect(page.locator(".rail-message")).toHaveCount(0);
+    [content, bar] = await edges();
+    expect(content?.bottom).toBeLessThanOrEqual(/** @type {DOMRect} */ (bar).top);
+    // Dismissed, it is gone, and the rail does not say it after it; what the
+    // keyboard's health still says stays the rail's.
+    await failed.locator('[data-act="dismiss"]').click();
+    await expect(failed).toHaveCount(0);
+    await expect(page.locator(".rail-message", {hasText: "Ark can't tell"})).toHaveCount(0);
+    [content, bar] = await edges();
+    expect(content?.bottom).toBeLessThanOrEqual(bar ? bar.top : Infinity);
 });

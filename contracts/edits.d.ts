@@ -6,6 +6,8 @@ export interface Colour {h?: Scalar; s?: Scalar; v?: Scalar}
 export interface BaseIdentity {source: string; generation: number; digest: Scalar; originHalf: Scalar}
 export interface DraftIdentity {draftId: string; draftRevision: number}
 export type Tier = 'tap' | 'hold' | 'long';
+/** A behaviour's own timings, each zero to follow its default. */
+export type TimingTerm = 'tapHoldTerm' | 'longHoldTerm' | 'multiTapTerm';
 export type HoldStyle = 'PRESS_AND_HOLD_UNTIL_RELEASE' | 'TAP_AT_HOLD_THRESHOLD' | 'TAP_ON_RELEASE_AFTER_HOLD' | 'REPEAT_WHILE_HELD';
 export type BranchStyle = HoldStyle | 'TAP_SENDS';
 export interface BehaviorBranch {style?: BranchStyle; action: string; repeatHz?: Scalar}

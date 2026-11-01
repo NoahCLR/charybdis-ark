@@ -11,7 +11,7 @@ const sources = directory => fs.readdirSync(path.join(root, directory), {withFil
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
 test("source modules explicitly opt into JavaScript type checking", () => {
-    const files = ["core", "webview", "web", "scripts"].flatMap(sources)
+    const files = ["core", "rules", "webview", "web", "scripts"].flatMap(sources)
         .concat(["playwright.config.js"]);
     assert.deepEqual(files.filter(file => !/^\/\/ @ts-check\s*$/m.test(read(file))), []);
 });
@@ -23,8 +23,168 @@ test("screen colours use the model or CSS ink tokens", () => {
     assert.deepEqual(sources("webview/ui").filter(file => literal.test(read(file))), []);
 });
 
+// The stylesheet draws its sizes, weights, radii, layers and colours from the
+// tokens in :root and the light theme's block (webview/styles.css's header).
+// What a rule may write instead: 0, 50%, inherit, a token, or a calc() on one.
+const STYLESHEET_ALLOWED = [
+    // SVG text on the board and the picker's board is sized in the drawing's own units.
+    {selector: /^\.(kc|pkb)-/, property: /^font-size$/},
+    // A strip's faded edge is an alpha mask: its black is coverage, not a colour.
+    {selector: /^\.more-/, property: /mask-image$/},
+    // Every tap count's badge masks its gradient to a ring the same way.
+    {selector: /^\.bn\.lit\.all-counts::after$/, property: /^mask-image$/},
+];
+const stylesheetLiterals = (css) => {
+    const found = [];
+    const derived = (part) => /^(0|50%|inherit|var\(--[\w-]+\))$/.test(part) || /^calc\(.*var\(--[\w-]+\)/.test(part);
+    for (const [, selectorText, body] of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selector = selectorText.trim().replace(/\s+/g, " ");
+        if (selector.startsWith(":root")) continue;
+        for (const [, property, raw] of body.matchAll(/(?:^|;)\s*([\w-]+)\s*:\s*([^;]+)/g)) {
+            const value = raw.trim();
+            if (STYLESHEET_ALLOWED.some(allowed => allowed.selector.test(selector) && allowed.property.test(property))) continue;
+            const parts = value.match(/calc\([^()]*(?:\([^()]*\)[^()]*)*\)|var\([^()]*\)|[^\s]+/g) || [];
+            const literal = property === "font"
+                ? value !== "inherit" && /\d/.test(value.replace(/var\([^()]*\)/g, "").replace(/\/\S+/, ""))
+                : /^(font-size|font-weight|z-index|border(-[a-z]+)*-radius)$/.test(property) ? !parts.every(derived)
+                : /#[\da-f]{3,8}\b|\b(rgb|hsl)a?\(/i.test(value);
+            if (literal) found.push(`${selector} { ${property}: ${value} }`);
+        }
+    }
+    return found;
+};
+
+test("the stylesheet writes no raw size, weight, radius, layer or colour outside its tokens", () => {
+    assert.deepEqual(stylesheetLiterals(read("webview/styles.css")), []);
+    // The check sees what it is meant to.
+    assert.deepEqual(stylesheetLiterals(`:root { --fs-md: 12.5px; --x: #fff; }
+        .a { font-size: 12px; border-radius: 0 6px; z-index: 3; font: 600 11px/1 var(--sans); color: rgba(0,0,0,.5); }
+        .b { font-size: var(--fs-md); border-radius: calc(var(--r-sheet) - 1px) 0; z-index: calc(var(--z-popover) + 1); font: var(--fs-md)/22px var(--mono); }
+        .kc-badge { font-size: 9px; }`), [
+        ".a { font-size: 12px }", ".a { border-radius: 0 6px }", ".a { z-index: 3 }",
+        ".a { font: 600 11px/1 var(--sans) }", ".a { color: rgba(0,0,0,.5) }",
+    ]);
+});
+
+// The page requires Trusted Types (scripts/build-web.js): markup reaches an
+// HTML sink only through webview/lib/dom.mjs `html`, and the one script the
+// page starts by URL is web/page.mjs's worker, so a sink that does neither
+// would fail in the page, not in Node's tests. The policy passes markup as it
+// is, so what it is handed is safe only because
+// tests/view/markup-escaped.test.mjs judges it, and that check sees only a
+// webview module setting `.innerHTML` or `.outerHTML` with `=` or calling
+// `.insertAdjacentHTML(…)`. Syntactic: markup set so, unless it is one html(…)
+// call and nothing more; a compound assignment, whose string joins what is
+// there; a sink named any other way (by a quoted name, as a key, as
+// Object.assign or Reflect.set take it, or insertAdjacentHTML not called
+// there and then), which the escape check never judges;
+// any HTML sink in web/, which that check does not read and which cannot reach
+// the panel's policy; and any sink the page never needs, which no policy here
+// passes: the unsafe HTML setters and parsers, document.write, srcdoc and a
+// worker or imported script started by URL.
+const HTML_SETTERS = [
+    /\.\s*(?:inner|outer)HTML\s*(=|\+=|\?\?=|\|\|=|&&=)(?!=)/g,
+    /\.\s*insertAdjacentHTML\s*\(/g,
+];
+const UNJUDGED_SINK = /(?<!\.\s*)\b(?:innerHTML|outerHTML|insertAdjacentHTML)\b|\.\s*insertAdjacentHTML\b(?!\s*\()/g;
+const UNPOLICED_SINK = /\b(?:setHTMLUnsafe|parseHTMLUnsafe|DOMParser|parseFromString|createContextualFragment|srcdoc|importScripts)\b|\bdocument\s*\.\s*write(?:ln)?\s*\(|\bnew\s+(?:Shared)?Worker\s*\(/g;
+// The page's own worker, started through its policy (web/page.mjs).
+const HTML_SINK_ALLOWED = [
+    {file: "web/page.mjs", line: "try {worker = new Worker(scripts ? scripts.createScriptURL(workerUrl) : workerUrl);} catch {worker = undefined;}"},
+];
+// The expression from `at` to where it ends: a `;` or `,` outside brackets, or
+// the bracket that closes around it.
+const expressionAt = (code, at) => {
+    let depth = 0;
+    for (let end = at; end < code.length; end++) {
+        const c = code[end];
+        if (c === '"' || c === "'" || c === "`") {
+            for (end++; end < code.length && code[end] !== c; end++) if (code[end] === "\\") end++;
+        } else if ("([{".includes(c)) depth++;
+        else if (")]}".includes(c)) { if (!depth--) return code.slice(at, end); }
+        else if ((c === ";" || c === ",") && !depth) return code.slice(at, end);
+    }
+    return code.slice(at);
+};
+const throughPolicy = expression => {
+    const value = expression.trim();
+    return value.startsWith("html(") && value === `html(${expressionAt(value, 5)})`;
+};
+// The lines of a module whose markup or script URL skips the page's policies,
+// or its escape check; in the shell (`shell`), every HTML sink.
+const htmlSinks = (source, shell = false) => {
+    const code = uncommented(source);
+    const unpoliced = HTML_SETTERS.flatMap(pattern => Array.from(code.matchAll(pattern)).filter(match => {
+        if (shell || match[1] && match[1] !== "=") return true;
+        let at = match.index + match[0].length;
+        if (match[0].endsWith("(")) at += expressionAt(code, at).length + 1;
+        return !throughPolicy(expressionAt(code, at));
+    }));
+    return [...new Set([...unpoliced, ...code.matchAll(UNJUDGED_SINK), ...code.matchAll(UNPOLICED_SINK)].map(match => lineAt(code, match.index)))].sort((a, b) => a - b);
+};
+
+test("the HTML sink check catches markup that skips the policy or the escape check", () => {
+    for (const sample of ["card.innerHTML = hoverCard(index);", "node.outerHTML = `<b>${name}</b>`;", "h3.insertAdjacentHTML(\"afterend\", mark(field));",
+        "card.innerHTML += raw;", "card.innerHTML += html(raw);", "card[\"innerHTML\"] = raw;", "card['outerHTML'] = raw;",
+        "card[\"innerHTML\"] = html(markup);", "card[`outerHTML`] = html(markup);", "card[\"insertAdjacentHTML\"](\"afterend\", html(markup));",
+        "Object.assign(card, {innerHTML: raw});", "Object.assign(card, {hidden: false, \"innerHTML\": raw});",
+        "Object.assign(card, {innerHTML: html(markup), hidden: false});", "Object.assign(card, {innerHTML});", "Reflect.set(card, \"innerHTML\", html(markup));",
+        "h3.insertAdjacentHTML?.(\"afterend\", raw);", "h3.insertAdjacentHTML.call(h3, \"afterend\", raw);",
+        "card.innerHTML = html(a) + raw;", "card.innerHTML = html(a)\n    + raw;", "card.innerHTML = raw || html(a);", "h3.insertAdjacentHTML(\"afterend\", html(a) + raw);",
+        "card.setHTMLUnsafe(raw);", "const doc = Document.parseHTMLUnsafe(raw);", "document.write(raw);", "document.writeln(raw);",
+        "const doc = new DOMParser().parseFromString(raw, \"text/html\");", "const doc = parser.parseFromString(raw, \"text/html\");",
+        "const part = document.createRange().createContextualFragment(raw);", "frame.srcdoc = raw;", "frame.setAttribute(\"srcdoc\", raw);",
+        "const second = new Worker(url);", "const shared = new SharedWorker(url);", "importScripts(url);"]) {
+        assert.equal(htmlSinks(sample).length, 1, sample);
+    }
+    for (const sample of ["card.innerHTML = html(hoverCard(index));", "h3.insertAdjacentHTML(\"afterend\", html(mark(field)));", "if (!card.innerHTML) return;", "side.hidden = !side.innerHTML;",
+        "if (card.innerHTML === \"\") return;", "if (card.innerHTML != last) return;", "card?.innerHTML === last;",
+        "card.innerHTML = html(`<b>${esc(name)}</b>`);", "card.innerHTML = html(hoverCard(index, {open: true}));", "// card.innerHTML = raw;", "/* document.write(raw) */"]) {
+        assert.deepEqual(htmlSinks(sample), [], sample);
+    }
+    // The shell sets no markup at all.
+    for (const sample of ["notice.innerHTML = html(`<b>${esc(name)}</b>`);", "root.insertAdjacentHTML(\"beforeend\", html(markup));"]) {
+        assert.equal(htmlSinks(sample, true).length, 1, sample);
+    }
+    assert.deepEqual(htmlSinks("if (!notice.innerHTML) return;", true), []);
+});
+
+test("markup reaches the page's HTML sinks only through its Trusted Types policy", () => {
+    const found = ["webview", "web"].flatMap(sources).map(posix).flatMap(file => {
+        const source = read(file), lines = source.split("\n");
+        return htmlSinks(source, file.startsWith("web/")).map(at => ({file, line: lines[at - 1].trim(), at}));
+    });
+    assert.deepEqual(found.filter(sink => !isAllowed(HTML_SINK_ALLOWED, sink)).map(sink => `${sink.file}:${sink.at}: ${sink.line}`), [],
+        "set markup in webview/ only, as .innerHTML = html(…) or .insertAdjacentHTML(…, html(…)) from webview/lib/dom.mjs; start no other script by URL");
+    assert.deepEqual(HTML_SINK_ALLOWED.filter(allow => !found.some(sink => isAllowed([allow], sink))), [], "drop an allowed line the check no longer finds");
+});
+
+// A position's stored keycode name is how the keyboard spells it; a behaviour
+// row, a macro and a pointing slot are keyed by what it means. An argument may
+// hold one level of parentheses (`position.keycode || ""`, a call), and a fact
+// may be read off the identity or destructured from it.
+const STORED_NAME = String.raw`\((?:[^;\n()]|\([^()\n]*\))*\b(?:position|pos)\.keycode\b(?:[^;\n()]|\([^()\n]*\))*\)`;
+const SEMANTIC_FACT = "behaviour|pointing|macro|customKey";
+const badLookup = new RegExp([
+    String.raw`keyIdentity${STORED_NAME}\s*\.\s*(?:${SEMANTIC_FACT})\b`,
+    String.raw`\{[^}]*\b(?:${SEMANTIC_FACT})\b[^}]*\}\s*=\s*keyIdentity${STORED_NAME}`,
+    String.raw`(?:macroNamesOf|placementsOf)\([^;\n]*\b(?:position|pos)\.keycode\b`,
+    String.raw`(?<![!=])===(?!=)\s*(?:position|pos)\.keycode\b`,
+].join("|"));
+
+test("the semantic lookup check catches a stored keycode name however the fact is reached", () => {
+    for (const sample of ["const row = keyIdentity(model, position.keycode).behaviour;", "const {behaviour} = keyIdentity(model, position.keycode);",
+        'const slot = keyIdentity(model, pos.keycode || "").pointing;', "const {macro, customKey: key} = keyIdentity(lookup(model), pos.keycode ?? fallback);",
+        "if (row.keycode === position.keycode) return row;", "const names = macroNamesOf(model, position.keycode);"]) {
+        assert.ok(badLookup.test(sample), sample);
+    }
+    for (const sample of ["const key = keyIdentity(model, position.keycode);", "const kind = keyIdentity(model, position.keycode).kind;",
+        "const row = keyIdentity(model, keyMeaning(position)).behaviour;", "const {behaviour} = keyIdentity(model, keyMeaning(position));"]) {
+        assert.ok(!badLookup.test(sample), sample);
+    }
+});
+
 test("semantic domain lookups do not use a position's stored keycode name", () => {
-    const badLookup = /(?:behaviourFor|pointingSlotFor|macroKeycodes|macroPlacements|customKeyPlacements)\([^;\n]*\b(?:position|pos)\.keycode\b|(?<![!=])===(?!=)\s*(?:position|pos)\.keycode\b/;
     // inputOn accepts native or semantic combo input names: it checks both.
     // The action-use matcher also accepts native catalogue names/values.
     const compatibilityLines = [
@@ -35,18 +195,18 @@ test("semantic domain lookups do not use a position's stored keycode name", () =
     assert.deepEqual(violations, []);
 });
 
-test("the page's profile file chooser uses the portable document's byte limit", () => {
-    assert.equal(require("../../core/session/panel-loop").FILE_MAX_BYTES, require("../../core/model/portable-profile").FILE_MAX_BYTES);
-    assert.match(read("web/web-shell.mjs"), /PROFILE_FILE_LIMIT = FILE_MAX_BYTES/);
+test("the page's backup chooser holds a file to the backup's byte limit", () => {
+    assert.match(read("web/web-shell.mjs"), /file\.size > FILE_MAX_BYTES\b/);
 });
 
 // Source with its comments blanked, so a rule can match across lines while
 // lines keep their numbers.
 const uncommented = source => source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, comment => comment.replace(/[^\n]/g, " "));
 const lineAt = (source, index) => source.slice(0, index).split("\n").length;
+const posix = file => file.split(path.sep).join("/");
 
-// Whether an area takes edits is the store's canEdit(area) and writable(),
-// which read the published draft.editable; every other module asks them,
+// Whether an area takes edits is editGate(model, area) (webview/view/edit-gate.mjs),
+// which reads the published draft.editable; every other module asks it,
 // never the draft.
 const draftEditable = [
     /\bdraft\s*(?:\?\.|\.)\s*editable\b/g,
@@ -65,17 +225,116 @@ test("the editable check catches a module reading the draft", () => {
         "const {\n    editable,\n    busy\n} = model.draft;", "const {draft: {\n    editable}} = model;", "const on = model.draft\n    .editable;"]) {
         assert.equal(readsDraftEditable(sample).length, 1, sample);
     }
-    for (const sample of ["const editable = canEdit(\"settings\");", "const editable = writable() && !field.readOnly;",
-        "export function durationControl(field, editable, submit) {", "// reads draft.editable through the store",
-        "/* draft.editable */ const on = writable();"]) {
+    for (const sample of ["const editable = editGate(model, \"settings\").editable;", "const editable = gate.editable && !field.readOnly;",
+        "export function durationControl(field, editable, submit) {", "// reads draft.editable through the edit gate",
+        "/* draft.editable */ const on = editGate(model, \"keys\").editable;"]) {
         assert.deepEqual(readsDraftEditable(sample), [], sample);
     }
 });
 
-test("only the store reads whether the draft takes edits", () => {
-    const violations = sources("webview").filter(file => file !== path.join("webview", "store.mjs"))
+test("only the edit gate reads whether the draft takes edits", () => {
+    const violations = sources("webview").filter(file => file !== path.join("webview", "view", "edit-gate.mjs"))
         .flatMap(file => readsDraftEditable(read(file)).map(line => `${file}:${line}`));
-    assert.deepEqual(violations, [], "ask canEdit(area) or writable() in webview/store.mjs");
+    assert.deepEqual(violations, [], "ask editGate(model, area) in webview/view/edit-gate.mjs");
+});
+
+// Which key a spelling is, and whether two spellings are one key, is
+// keyIdentity(model, spelling) (webview/view/key-identity.mjs), which reads
+// the published alias table; every other module asks it, never the table.
+// The keycode grammar's reader (keycode-expression.mjs) takes the whole table
+// into the names an expression stores by.
+test("only the key identity reads the keycode alias table", () => {
+    const allowed = ["key-identity.mjs", "keycode-expression.mjs"].map(name => path.join("webview", "view", name));
+    const violations = sources("webview").filter(file => !allowed.includes(file)).flatMap(file => {
+        const code = uncommented(read(file));
+        return Array.from(code.matchAll(/\bqmkKeycodeAliases\b/g), match => `${file}:${lineAt(code, match.index)}`);
+    });
+    assert.deepEqual(violations, [], "ask keyIdentity(model, spelling) in webview/view/key-identity.mjs");
+});
+
+// A draft edit is made by applyDraftEdit (core/model/draft-editor.js), which
+// checks the form was drawn from the draft before an editor runs, so it alone
+// runs an editor's edit; the profile's domains are run through PROFILE_EDITS,
+// which alone runs a behaviour edit. Each module's other exports (its view,
+// its budgets) stay anyone's. Tests edit as the panel does, through
+// applyDraftEdit (tests/fixtures/draft-edit.js), except the behaviour editor's
+// own, which edits a behaviours domain byte for byte, with no document around
+// it.
+const EDITOR_RUNNERS = {
+    editSettings: ["core/model/settings-editor.js", "core/model/draft-editor.js"],
+    editMacro: ["core/model/macro-editor.js", "core/model/draft-editor.js"],
+    editCustomKey: ["core/model/custom-key-editor.js", "core/model/draft-editor.js"],
+    editKeyboardName: ["core/model/keyboard-name.js", "core/model/draft-editor.js"],
+    PROFILE_EDITS: ["core/model/device-profile-edits.js", "core/model/draft-editor.js"],
+    editKeyBehaviors: ["core/model/key-behavior-edits.js", "core/model/device-profile-edits.js", "tests/model/key-behavior-edits.test.js"],
+};
+const runsEditors = (file, source) => {
+    const code = uncommented(source);
+    return Object.entries(EDITOR_RUNNERS).filter(([, allowed]) => !allowed.includes(file)).flatMap(([name]) =>
+        Array.from(code.matchAll(new RegExp(`\\b${name}\\b`, "g")), match => `${file}:${lineAt(code, match.index)}: ${name}`));
+};
+
+test("the editor check catches a module naming an editor", () => {
+    for (const sample of ['const {editSettings} = require("./settings-editor");', 'const next = require("./macro-editor").editMacro(snapshot, message);',
+        'import {editKeyBehaviors} from "./key-behavior-edits.js";', "const run = PROFILE_EDITS[domain];"]) {
+        assert.equal(runsEditors("core/session/sample.js", sample).length, 1, sample);
+    }
+    for (const sample of ['const {settingsEditorView, baseLighting} = require("./settings-editor");', "// editSettings checks the fingerprint",
+        'const {macroInputStatus} = require("./macro-editor");']) {
+        assert.deepEqual(runsEditors("core/session/sample.js", sample), [], sample);
+    }
+});
+
+test("only the draft editor runs an editor's edit", () => {
+    const violations = ["core", "rules", "webview", "web", "scripts", "tests", "browser-tests"].flatMap(sources).map(posix)
+        .filter(file => file !== "tests/scripts/conventions.test.js")
+        .flatMap(file => runsEditors(file, read(file)));
+    assert.deepEqual(violations, [], "make a draft edit with applyDraftEdit in core/model/draft-editor.js");
+});
+
+// What the device service holds of a connection is written only by
+// core/session/connection-state.js, through the writer held for the
+// connection, whose methods say what each read means for it: everything it
+// reads back or publishes, but for the two plain fields with one writer
+// each (the apply's steps and the live watch's missed looks). Its getters
+// refuse a write at run time and in the type check; this catches one in a
+// file neither reaches, such as a browser test's fixture. rules/ and the
+// interface never reach core (tests/layering.test.js), so hold none to write.
+const {ConnectionState, Held} = require("../../core/session/connection-state");
+const HELD_FIELDS = [...new Set([ConnectionState.prototype, Held.prototype].flatMap(prototype => Object.entries(Object.getOwnPropertyDescriptors(prototype))
+    .filter(([, descriptor]) => descriptor.get).map(([name]) => name)).concat(Object.keys(new ConnectionState().published())))]
+    .filter(name => name !== "liveApply" && name !== "missedLooks");
+// What a module writes through: the state, its writer, or a name it binds
+// the writer to (`const held = state.of()`).
+const HELD_ALIAS = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[\w$]+\s*\.\s*)*state\s*\.\s*of\s*\(\s*\)/g;
+/** @param {string[]} receivers */
+const heldWrite = receivers => new RegExp(`\\b(?:${receivers.join("|")})\\s*(?:\\.\\s*of\\s*\\(\\s*\\))?\\s*(?:\\.\\s*(?:${HELD_FIELDS.join("|")})\\b|\\[\\s*["'\`](?:${HELD_FIELDS.join("|")})["'\`]\\s*\\])\\s*(?:=|\\?\\?=|\\|\\|=|&&=|\\+=|-=|\\+\\+|--)(?!=)`, "g");
+const writesHeld = source => {
+    const code = uncommented(source);
+    const aliases = Array.from(code.matchAll(HELD_ALIAS), match => match[1]);
+    return Array.from(code.matchAll(heldWrite(["state", ...new Set(aliases)])), match => lineAt(code, match.index));
+};
+
+test("the connection state check catches a module writing what it holds", () => {
+    for (const sample of ["state.editMode = undefined;", "if (state.editMode) state.editMode = {...state.editMode, mode};",
+        "op.state.editModeUnknown = true;", "state.editModeUnknown ||= failed;", 'state["editMode"] = read;', "service.state.connection = {connected: true};",
+        "state.of().capabilities = capabilities;", "op.state.layout = {state: \"reading\"};", "state.portableProgress = \"\";",
+        "const held = state.of(); held.capabilities = caps;", "let writer = op.state.of();\nwriter.status = status;"]) {
+        assert.equal(writesHeld(sample).length, 1, sample);
+    }
+    for (const sample of ["if (state.editMode === undefined) return;", "const editMode = mode ? {mode: mode.mode} : null;",
+        "state.mode({read});", "// state.editMode = undefined", "editMode: this.editMode ? {...this.editMode} : null,",
+        "state.of().liveApply = view;", "state.missedLooks++;", "store.state.screen = \"keys\";", "state.keep({status});",
+        "const held = state.of(); held.liveApply = view; held.keep({status});", "const held = other(); held.capabilities = caps;"]) {
+        assert.deepEqual(writesHeld(sample), [], sample);
+    }
+});
+
+test("only connection-state.js writes what the device service holds of a connection", () => {
+    const violations = ["core", "web", "scripts", "browser-tests"].flatMap(sources).map(posix)
+        .filter(file => file !== "core/session/connection-state.js")
+        .flatMap(file => writesHeld(read(file)).map(line => `${file}:${line}`));
+    assert.deepEqual(violations, [], "write it through the connection's writer, ConnectionState.of() (core/session/connection-state.js)");
 });
 
 // A screen posts what a builder returns (webview/view/edits.mjs,
@@ -124,4 +383,231 @@ test("the posting check catches an object assembled inline", () => {
 test("screens post only builder output", () => {
     const violations = sources("webview").flatMap(file => postsInlineObjects(read(file)).map(line => `${file}:${line}`));
     assert.deepEqual(violations, [], "build the message in webview/view/edits.mjs, pointing-config.mjs or controls.mjs");
+});
+
+// Each fact below has one home (docs/architecture/README.md, "Facts and their
+// homes"); a module imports it from there. A check names its exceptions in an
+// allow-list, each with its reason, and a sample of what it catches.
+// Every match of `pattern` in a module's code, comments blanked, as
+// `file:line: text`, less the allowed lines: `{file, line}` pairs naming the
+// trimmed line exactly, so an allowed line that changes is checked again.
+const matches = (directories, pattern) => directories.flatMap(sources).map(posix).flatMap(file => {
+    const source = read(file), code = uncommented(source), lines = source.split("\n");
+    return [...new Set(Array.from(code.matchAll(pattern), match => lineAt(code, match.index)))]
+        .map(at => ({file, line: lines[at - 1].trim(), at}));
+});
+const isAllowed = (allowed, found) => allowed.some(allow => allow.file === found.file && allow.line === found.line);
+const literals = (directories, pattern, allowed = []) => matches(directories, pattern)
+    .filter(found => !isAllowed(allowed, found)).map(found => `${found.file}:${found.at}: ${found.line}`);
+// An allowed line the check no longer finds is stale.
+const staleAllowed = (directories, pattern, allowed) => {
+    const found = matches(directories, pattern);
+    return allowed.filter(allow => !found.some(match => isAllowed([allow], match)));
+};
+
+// A table core keys by keycode name (qmkKeyLabels, qmkKeyShortLabels,
+// qmkKeyKinds, qmkKeyLayers, qmkKeyTurnsOn, …, and the host layout's
+// hostLayoutLegends) holds a key under the names core knows it by, so it is
+// read under each of the key's spellings, and only
+// webview/view/key-identity.mjs reads one: every other module asks
+// keyIdentity(model, spelling) for the fact (`label`, `kind`, `layer`, …).
+// Syntactic: any mention of such a table outside a comment.
+const KEY_TABLE = /\b(?:qmkKey[A-Z]\w*|hostLayoutLegends)\b/g;
+const KEY_TABLE_ALLOWED = [
+    // The keys core names a layer for, to find the one a text names: a walk
+    // of the whole table, which reads no spelling.
+    {file: "webview/ui/marks.mjs", line: "const keycodes = marker?.kind === \"layer\" ? Object.entries(model?.qmkKeyLayers || {}).flatMap(([keycode, layer]) => layer === marker.layer ? [keycode] : [])"},
+    // Whether the host layout prints legends of its own at all, to explain
+    // them under the board: the table's presence, which reads no key.
+    {file: "webview/ui/picker.mjs", line: "${model?.hostLayoutLegends ? `<p class=\"note pk-note\">Shift above; ${esc(vocabulary(model).thirdLevel)} on the right. ◌ marks a dead key: press it, then a letter.</p>` : \"\"}"},
+];
+
+test("the key table check catches a keycode-keyed table read outside the key identity", () => {
+    for (const sample of ["const spoken = model?.qmkKeyLabels?.[source.value];", "return model.qmkKeyKinds[known] === \"macro\";",
+        "const table = model?.qmkKeyTurnsOn || {};", "const {qmkKeyShortLabels} = model;", "const legend = model?.hostLayoutLegends?.[source.value];",
+        "const spoken = labelIn(model?.qmkKeyLabels, key);"]) {
+        assert.equal(uncommented(sample).match(KEY_TABLE)?.length, 1, sample);
+    }
+    for (const sample of ["const spoken = keyIdentity(model, key).label;", "const kind = keyIdentity(model, keycode).kind;",
+        "// as core publishes it (qmkKeyKinds)", "const entry = model?.qmkKeycodes?.[0];", "const legend = identity.legends;"]) {
+        assert.equal(uncommented(sample).match(KEY_TABLE), null, sample);
+    }
+});
+
+test("only the key identity reads a keycode-keyed table", () => {
+    const violations = literals(["webview"], KEY_TABLE, KEY_TABLE_ALLOWED).filter(found => !found.startsWith("webview/view/key-identity.mjs:"));
+    assert.deepEqual(violations, [], "ask keyIdentity(model, spelling) in webview/view/key-identity.mjs for the fact");
+    assert.deepEqual(staleAllowed(["webview"], KEY_TABLE, KEY_TABLE_ALLOWED), [], "drop an allowed line the check no longer finds");
+});
+
+// QMK's keycode layout lives in rules/qmk-keycodes.mjs and the keyboard's
+// own blocks in core/data/user-keycodes.js. A number in QMK's keycode space
+// from the mod-taps up (0x2000–0x7fff: mod-taps, layer keys and their 0x52xx
+// forms, macros, the keyboard's blocks) is written only there; elsewhere it is
+// a block's `first` or a helper's result. Written in decimal it is caught
+// where it meets a keycode: compared with, assigned to or masked into a name
+// that says code (8192–32767 are too common elsewhere, as times and sizes).
+const KEYCODE_LITERAL = new RegExp([
+    String.raw`(?<![\w.])0x[2-7][\da-f]{3}(?![\w.])`,
+    String.raw`\b\w*code\w*(?:\??\.\w+)*\s*(?:[!=]==?|[<>]=?|\?\?|\|\||=(?!=)|[&|^](?![&|]))\s*(?:8(?:19[2-9]|[2-9]\d\d)|9\d{3}|[12]\d{4}|3[01]\d{3}|32[0-7]\d\d)(?![\w.])`,
+].join("|"), "gi");
+const KEYCODE_HOMES = new Set([
+    "rules/qmk-keycodes.mjs",
+    "core/data/user-keycodes.js",
+]);
+const KEYCODE_LITERAL_ALLOWED = [
+    // The interface may not import core: its copy of the keyboard's
+    // layer-lock block, pinned by tests/view/enum-drift.test.mjs.
+    {file: "webview/view/keycode-expression.mjs", line: "export const LAYER_LOCK_BASE = 0x7ec0, LAYER_LOCK_SLOTS = 16;"},
+];
+
+test("the keycode check catches a QMK keycode written as a number", () => {
+    for (const sample of ["const code = 0x5220 | layer;", "if (code >= 0x4000 && code <= 0x4FFF) return;", "return 0x7e00;",
+        "if (keycode === 20992) return;", "const code = 32448 + slot;", "if (entry.keycode >= 16384) return;"]) {
+        assert.equal(uncommented(sample).match(KEYCODE_LITERAL)?.length, sample.includes("0x4000") ? 2 : 1, sample);
+    }
+    for (const sample of ["const code = QK.MOMENTARY.first | layer;", "const mask = 0x1fff;", "const crc = 0xffffffff;", "// LT(1, KC_A) is 0x4104",
+        "const WAIT_MS = 15000;", "if (keycode < 256) return;", "const timeoutMs = 10000;"]) {
+        assert.equal(uncommented(sample).match(KEYCODE_LITERAL), null, sample);
+    }
+});
+
+test("QMK keycode numbers are written only in their homes", () => {
+    const violations = literals(["core", "rules", "webview", "web"], KEYCODE_LITERAL, KEYCODE_LITERAL_ALLOWED).filter(found => !KEYCODE_HOMES.has(found.split(":")[0]));
+    assert.deepEqual(violations, [], "import the block or helper from rules/qmk-keycodes.mjs or core/data/user-keycodes.js");
+    assert.deepEqual(staleAllowed(["webview"], KEYCODE_LITERAL, KEYCODE_LITERAL_ALLOWED), [], "drop an allowed line the check no longer finds");
+});
+
+// The layer count is LAYERS and the whole bank ALL_LAYERS, in
+// core/data/charybdis-layout.js, with layersOfMask and layersAbove beside
+// them. A layer set is masked with ALL_LAYERS, never 0xffff, and a count of
+// layers is LAYERS, never 16. Syntactic: 0xffff as a mask operand, 0xffff
+// beside a value that names layers, and a 16 that sizes or bounds layers.
+const LAYER_LITERAL = new RegExp([
+    String.raw`(?:\?\?|(?<![&|])[&|])\s*0xffff(?![\w.])`,
+    String.raw`(?<![\w.])0xffff\s*(?:[&|](?![&|])|<<|>>)`,
+    String.raw`\b\w*layers?\w*\s*,\s*0xffff(?![\w.])`,
+    String.raw`\{\s*length\s*:\s*16\s*\}`,
+    String.raw`\bnew\s+Array\(\s*16\s*\)`,
+    String.raw`\(\s*1\s*<<\s*16\s*\)\s*-\s*1(?![\w.])`,
+    String.raw`\b\w*layers?\w*(?:\??\.\w+)*\s*(?:=|[<>]=?|[!=]==?|\?\?|\|\|)\s*16(?![\w.])`,
+].join("|"), "gi");
+const LAYER_LITERAL_ALLOWED = [
+    // The homes: the layer count, and the keyboard's layer-lock block, one
+    // lock per layer it may have.
+    {file: "core/data/charybdis-layout.js", line: "const LAYERS = 16, MATRIX_ROWS = 10, MATRIX_COLUMNS = 6;"},
+    {file: "core/data/user-keycodes.js", line: "const CUSTOM_KEY_SLOTS = 128, LAYER_LOCK_SLOTS = 16;"},
+    // QMK's four-bit layer field in LT() and LM(), not the keyboard's count.
+    {file: "rules/qmk-keycodes.mjs", line: "const LAYER_FORM_LAYERS = 32, PACKED_LAYERS = 16;"},
+    // The interface's copies, pinned by tests/view/enum-drift.test.mjs.
+    {file: "webview/view/layout.mjs", line: "export const LAYERS = 16, ALL_LAYERS = 2 ** LAYERS - 1;"},
+    {file: "webview/view/keycode-expression.mjs", line: "export const LAYER_LOCK_BASE = 0x7ec0, LAYER_LOCK_SLOTS = 16;"},
+    // 16-bit fields that hold no layers: a transaction's sequence number and
+    // the firmware version's major part.
+    {file: "core/session/candidate-upload-coordinator.js", line: "const sequence = (baseline.operationSequence + admitted) & 0xffff;"},
+    {file: "core/session/firmware-support.js", line: "version: known ? `${(/** @type {number} */ (version) >>> 16) & 0xffff}.${(/** @type {number} */ (version) >>> 8) & 0xff}.${/** @type {number} */ (version) & 0xff}` : null,"},
+];
+
+test("the layer check catches a layer count or mask written as a number", () => {
+    for (const sample of ["const allowed = combo.allowedLayers ?? 0xffff;", "const locks = state & 0xffff;", "return wholeUpTo(layers, 0xffff);",
+        "const list = Array.from({length: 16}, (_, layer) => layer);", "const layers = model?.layers?.length || 16;", "function f({layerCount = 16} = {}) {}",
+        "if (layer >= 16) return;", "const above = (0xffff << (layer + 1)) & 0xffff;", "const slots = new Array(16).fill(0);", "const all = (1 << 16) - 1;"]) {
+        assert.ok(uncommented(sample).match(LAYER_LITERAL), sample);
+    }
+    for (const sample of ["const allowed = combo.allowedLayers ?? ALL_LAYERS;", "if (keycode > 0xffff) return false;", "const held = state >>> 16;",
+        "const maxInputs = 16;", "const header = Buffer.alloc(16);", "// layers & 0xffff", "return row !== 0xffff && row !== undefined;"]) {
+        assert.equal(uncommented(sample).match(LAYER_LITERAL), null, sample);
+    }
+});
+
+test("layer counts and masks come from the layout data", () => {
+    assert.deepEqual(literals(["core", "rules", "webview"], LAYER_LITERAL, LAYER_LITERAL_ALLOWED), [],
+        "import LAYERS, ALL_LAYERS, layersOfMask or layersAbove from core/data/charybdis-layout.js (in the interface, webview/view/layout.mjs)");
+    assert.deepEqual(staleAllowed(["core", "rules", "webview"], LAYER_LITERAL, LAYER_LITERAL_ALLOWED), [], "drop an allowed line the check no longer finds");
+});
+
+// The words for a value core publishes live in core/model/vocabulary.js and
+// reach the interface as model.vocabulary (D-L33). Syntactic: a table of three
+// or more entries whose every word is a quoted phrase a person reads (it has
+// a capital or a space), kept as a table (`const NAME = …`, frozen or not) or
+// indexed where it stands (`{…}[key]`). A table is an object of phrases
+// (`{off: "Off", …}`), an object of objects of phrases (`{macros: {label:
+// "Macros", what: "…"}, …}`), or a list of pairs, an id then its phrase
+// (`[["up", "Up"], …]`), a Map of them included. A table named as words
+// (`…_WORDS`, `…_LABELS`, `…_TITLES`) counts whatever its phrases look like.
+const phrase = String.raw`(?:"[^"\n]*"|'[^'\n]*'|\x60[^\x60\n$]*\x60)`;
+const key = String.raw`(?:[\w$]+|"[^"\n]*"|'[^'\n]*'|\[[\w$.]+\])`;
+const wordEntry = String.raw`${key}\s*:\s*${phrase}`;
+const objectEntry = String.raw`${key}\s*:\s*\{[^{}]*\}`;
+const pairEntry = String.raw`\[\s*(?:"[^"\n]*"|'[^'\n]*'|-?\d+|0x[\da-f]+)\s*,\s*${phrase}\s*\]`;
+const named = String.raw`(?:\b(?:const|let|var)\s+([\w$]+)\s*=\s*(?:Object\.freeze\(\s*|new\s+Map\(\s*)?)?`;
+/** @param {string} open @param {string} entry @param {string} close @param {number} [least] */
+const table = (open, entry, close, least = 3) => new RegExp(String.raw`${named}${open}\s*${entry}(?:\s*,\s*${entry}){${least - 1},}\s*,?\s*${close}(\s*\[)?`, "gi");
+const WORD_TABLE = table(String.raw`\{`, wordEntry, String.raw`\}`);
+const OBJECT_TABLE = table(String.raw`\{`, objectEntry, String.raw`\}`);
+// A list of pairs is a table from two: an object of two phrases is as often
+// one message (`{title: …, detail: …}`), a list of two pairs never.
+const PAIR_TABLE = table(String.raw`\[`, pairEntry, String.raw`\]`, 2);
+const readsAsWords = text => /[A-Z]/.test(text.charAt(0)) && /[a-z]/.test(text) || /^[A-Za-z]+(?: [^ ]+)+$/.test(text);
+const namedAsWords = name => /(?:WORDS|LABELS|TITLES)$/.test(name ?? "");
+const phrasesIn = text => Array.from(text.matchAll(new RegExp(String.raw`(?:^|[:,\[{]\s*)(${phrase})(?=\s*[,}\]])`, "g")), match => match[1].slice(1, -1));
+// Each table as `NAME` (or its keys or ids, when it has no name), less those
+// whose phrases are not all words. An object of objects is one whose every
+// entry holds a phrase; a list of pairs is read by its phrases alone.
+const wordTables = source => {
+    const code = uncommented(source);
+    /** @param {RegExp} pattern @param {(text: string) => string[][]} groups @param {(text: string) => string[]} ids */
+    const found = (pattern, groups, ids) => Array.from(code.matchAll(pattern)).filter(match => match[1] || match[2]).flatMap(match => {
+        const sets = groups(match[0]);
+        const words = sets.every(set => set.length) && (namedAsWords(match[1]) || sets.flat().every(readsAsWords));
+        return words ? [match[1] ?? ids(match[0]).join(",")] : [];
+    });
+    const keysOf = (text, pattern) => Array.from(text.matchAll(new RegExp(String.raw`(${key})\s*:\s*${pattern}`, "g")), match => match[1]);
+    return [
+        ...found(WORD_TABLE, text => [phrasesIn(text)], text => keysOf(text, phrase)),
+        ...found(OBJECT_TABLE, text => Array.from(text.slice(1).matchAll(/\{[^{}]*\}/g), inner => phrasesIn(inner[0])), text => keysOf(text.slice(1), String.raw`\{`)),
+        ...found(PAIR_TABLE, text => [Array.from(text.matchAll(new RegExp(pairEntry, "gi")), pair => phrasesIn(pair[0]).at(-1) ?? "")],
+            text => Array.from(text.matchAll(/\[\s*("[^"\n]*"|'[^'\n]*'|-?\d+|0x[\da-f]+)\s*,/gi), match => match[1])),
+    ];
+};
+const WORD_TABLES_ALLOWED = new Set([
+    // The demo's own panel text, which no keyboard stores.
+    "webview/view/demo.mjs#DEMO_WORDS",
+    // The Keys workbench's reach groups, what each says when it lists
+    // nothing, and the routes a Custom keys or Macros reach line counts, are
+    // the interface's own grouping of what the layers reach (reach-groups.mjs,
+    // tab-reach.mjs); no keyboard stores them.
+    "webview/view/reach-groups.mjs#GROUP_TITLES",
+    "webview/view/tab-reach.mjs#EMPTY_WORDS",
+    "webview/view/reach-groups.mjs#ROUTE_WORDS",
+    // The commit bar's own question before it saves or sends, one part of
+    // the sentence confirmText composes from the page's other words; it
+    // names no value the keyboard stores, as the page's buttons do not.
+    "webview/view/checks.mjs#ask",
+]);
+
+test("the word table check catches a table of words", () => {
+    for (const sample of ["const KIND_WORDS = {0: \"Off\", 1: \"Directional\", 2: \"Scrolling\"};", "export const AXES = Object.freeze({\n    0: \"Vertical\",\n    1: \"Horizontal\",\n    2: \"Dominant axis\",\n});",
+        "const word = {hold: \"on while held\", lock: \"locked on\", move: \"moved to\"}[kind];",
+        "const COUNTS = {\n    combos: {label: \"Combos\", what: \"Combos on any layer.\"},\n    macros: {label: \"Macros\", what: \"Macro slots with steps.\", fixed: true},\n    keys: {label: \"Custom keys\", what: \"Named keys.\"},\n};",
+        "export const STEPS = [\n    [\"text\", \"Text\"], [\"tap\", \"Key or chord\"], [\"delay\", \"Delay\"],\n];", "const ORDER = [[0, \"Off\"], [1, \"Directional\"], [2, \"Scrolling\"]];",
+        "export const ROUTE_WORDS = Object.freeze({here: \"key\", branches: \"behaviour\", combos: \"combo\"});",
+        "const TWO = [[\"up\", \"Up\"], [\"down\", \"Down\"]];", "const KINDS = new Map([[0, \"Off\"], [1, \"Directional\"], [2, \"Scrolling\"]]);"]) {
+        assert.equal(wordTables(sample).length, 1, sample);
+    }
+    for (const sample of ["return {title: \"Screen unavailable\", detail: \"Choose a screen.\", state: \"unavailable\"};", "const TIERS = {tap: \"tap\", hold: \"hold\", long: \"longHold\"};",
+        "const KEYS = {Space: \"KC_SPC\", Enter: \"KC_ENT\", Tab: \"KC_TAB\"};", "const words = {off: \"Off\", on: \"On\"};", "// const X = {a: \"A b\", b: \"B c\", c: \"C d\"};",
+        "const MODES = {a: {id: \"x_y\", kind: \"tap\"}, b: {id: \"z\", kind: \"hold\"}, c: {id: \"w\", kind: \"long\"}};", "const SIZES = {a: {w: 1, h: 2}, b: {w: 3, h: 4}, c: {w: 5, h: 6}};",
+        "const ALIASES = [[\"KC_A\", \"KC_B\"], [\"KC_C\", \"KC_D\"], [\"KC_E\", \"KC_F\"]];", "const SAID = {title: \"Save in progress\", detail: \"Wait for it.\"};",
+        "const KEYS_BY = {here: \"key\", branches: \"behaviour\", combos: \"combo\"};"]) {
+        assert.deepEqual(wordTables(sample), [], sample);
+    }
+});
+
+test("the interface keeps no table of words of its own", () => {
+    const violations = sources("webview").map(posix).flatMap(file => wordTables(read(file)).map(name => `${file}#${name}`))
+        .filter(table => !WORD_TABLES_ALLOWED.has(table));
+    assert.deepEqual(violations, [], "put the words in core/model/vocabulary.js and read them from model.vocabulary");
+    const found = new Set(sources("webview").map(posix).flatMap(file => wordTables(read(file)).map(name => `${file}#${name}`)));
+    assert.deepEqual([...WORD_TABLES_ALLOWED].filter(table => !found.has(table)), [], "drop an allowed table the check no longer finds");
 });

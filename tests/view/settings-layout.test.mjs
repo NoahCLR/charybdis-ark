@@ -3,16 +3,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionsOn} from "../../webview/view/settings-layout.mjs";
+import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn} from "../../webview/view/settings-layout.mjs";
 
 const require = createRequire(import.meta.url);
-const portable = require("../../core/model/portable-profile");
-const {buildSnapshotModel} = require("../../core/session/device-model");
-const {DEMO_CAPABILITIES, DEMO_LIMITS, DEMO_OPTIONS} = require("../../core/session/demo-session");
+const {publishedModel} = require("../fixtures/published-model");
 const {document} = require("../fixtures/pd-profile");
-const doc = document();
-const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: DEMO_LIMITS, options: DEMO_OPTIONS};
-const model = buildSnapshotModel(snapshot, DEMO_CAPABILITIES, {editable: true, reason: null});
+const model = publishedModel(document());
 const sections = model.configDefaults;
 const byId = (id) => sections.find((section) => section.id === id);
 const ids = (screen) => sectionsOn(sections, screen).map((section) => section.id);
@@ -21,18 +17,26 @@ test("each Settings screen draws its sections in the order a person reads them",
     assert.deepEqual(Object.keys(SETTINGS_SCREENS), ["behaviours", "combos", "pointer", "host"]);
     assert.deepEqual(ids("behaviours"), ["keyTiming", "behaviorSettings"], "Tap & hold timing, then where behaviours run");
     assert.deepEqual(ids("combos"), ["comboSettings", "comboReferences"], "Combos, then Combo layer matching");
-    assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything Mouse had");
+    assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything filed under Pointer");
     assert.deepEqual(ids("host"), ["host", "keyboardOptions"], "Your computer, then Key swaps & typing");
     assert.deepEqual(sectionsOn(sections, "keys"), [], "a screen that is not a Settings one draws none");
 });
 
-test("every section the keyboard's model files under Settings or Mouse is on one Settings screen, except Default layers", () => {
+test("every section the keyboard's model files under Settings or Pointer is on one Settings screen, except Default layers", () => {
     const drawn = Object.keys(SETTINGS_SCREENS).flatMap(ids);
     assert.equal(new Set(drawn).size, drawn.length, "no section is drawn twice");
-    const filed = sections.filter((section) => section.area === "Settings" || section.area === "Mouse").map((section) => section.id);
+    const filed = sections.filter((section) => section.area === "Settings" || section.area === "Pointer").map((section) => section.id);
     assert.deepEqual(filed.filter((id) => !drawn.includes(id)), ["startupLayers"], "moving the base layer stands in for a Default layers editor");
     assert.ok(byId("startupLayers"), "the stored value is still published, for the review and checks");
     assert.ok(!drawn.some((id) => byId(id).area === "Lighting"), "lighting is set on Lighting");
+});
+
+test("Lighting draws the sections the model files under it, in the model's order", () => {
+    const lighting = sectionsIn(model, "Lighting");
+    assert.deepEqual(lighting.map((section) => section.id), sections.filter((section) => section.area === "Lighting").map((section) => section.id));
+    assert.ok(["lightingPower", "rgbAppearance", "lightingFeedback"].every((id) => lighting.some((section) => section.id === id)), "the ones its stages draw");
+    assert.deepEqual(sectionsIn(model, "Nowhere"), []);
+    assert.deepEqual(sectionsIn(null, "Lighting"), []);
 });
 
 test("a section is edited on the screen that draws it", () => {
@@ -48,4 +52,23 @@ test("a section is edited on the screen that draws it", () => {
 test("Key swaps & typing lists its fields under what they change", () => {
     assert.deepEqual(fieldParts(byId("keyboardOptions").fields).map(({part, fields}) => [part, fields.length]), [["Modifiers", 7], ["Keys", 3], ["Typing", 3]]);
     assert.deepEqual(fieldParts(byId("keyTiming").fields).map(({part}) => part), [""], "a section without parts is one");
+});
+
+// The behaviour editor's timing note names where the defaults are edited,
+// from the rail's group, the screen's label and the section's.
+test("a section's path is the rail's group, its screen and its label", () => {
+    assert.equal(sectionPath(model, "keyTiming"), "Behaviour settings → Tap & hold timing");
+    assert.equal(sectionPath(model, "comboReferences"), "Combo settings → Combo layer matching");
+    assert.equal(sectionPath({vocabulary: model.vocabulary}, "keyTiming"), "Behaviour settings → Tap & hold timing", "whole before any setting is read");
+    for (const section of sections) assert.equal(model.vocabulary.settingsSections[section.id], section.label, `${section.id}'s heading is the vocabulary's`);
+});
+
+// A note core writes names a section's place as this does (vocabulary.js
+// settingsPath), so the macro editor and Review send a person to one place.
+test("core names a section's place as the interface's path does", () => {
+    const {settingsPath} = require("../../core/model/vocabulary");
+    for (const [screen, ids] of Object.entries(SETTINGS_SCREENS)) {
+        for (const id of ids) assert.equal(settingsPath(screen, id), sectionPath(model, id), id);
+    }
+    assert.equal(sectionPath(model, "host"), "Host settings → Your computer");
 });

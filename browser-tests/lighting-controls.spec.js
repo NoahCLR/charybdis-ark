@@ -78,10 +78,10 @@ for (const theme of ["dark", "light"]) {
     });
 }
 
-test("the layer colour note describes only the paint modes its select offers", async ({page}) => {
+test("the layer colour note describes only the paint modes it offers", async ({page}) => {
     await openStage(page, "layers");
-    const where = body(page).locator("section", {has: page.locator('[data-f="lighting:layer:1:mode"]')});
-    const offered = await where.locator("option").allInnerTexts();
+    const where = body(page).locator("section", {has: page.locator('[data-f="lighting:layer:1:mode:ALL_KEYS"]')});
+    const offered = await where.locator(".seg label").allInnerTexts();
     expect(offered).toEqual(["Keys mapped on this layer only", "All keys"]);
     const note = where.locator("p.note");
     for (const mode of offered) await expect(note).toContainText(mode);
@@ -98,7 +98,10 @@ test("all Lighting policy selects post the chosen policy and retained colour", a
         ["key", "Locality", "RGB_LEFT_HALF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({locality: "RGB_LEFT_HALF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
     ]) {
         await openStage(page, stage);
-        await body(page).locator("label.field").filter({has: page.getByText(label, {exact: true})}).locator("select").selectOption(value);
+        // A few short choices are on show; a longer list is a menu.
+        const onShow = body(page).locator(`.seg[aria-label="${label}"]`);
+        if (await onShow.count()) await onShow.locator("label").filter({has: page.locator(`input[value="${value}"]`)}).click();
+        else await body(page).locator("label.field").filter({has: page.getByText(label, {exact: true})}).locator("select").selectOption(value);
         await expectPost(page, message);
     }
 });
@@ -108,7 +111,7 @@ test("key feedback names each colour once, in the list and on the board", async 
     const listed = await body(page).locator(".rowlist [data-row]").allInnerTexts();
     const chips = await body(page).locator(".stage-chips .chip").allInnerTexts();
     expect(chips.map(text => text.trim())).toEqual(listed.map(text => text.replace(/\s*off$/, "").trim()));
-    const commit = body(page).locator('[data-f="lighting:key:tap-commit"] option');
+    const commit = body(page).locator('.seg[aria-label="Tap commit"] label');
     await expect(commit).toHaveText(["Off", "Double taps and more"]);
 });
 
@@ -237,6 +240,8 @@ test("the layer and pointing-mode lists scroll on their own and keep their place
     await openStage(page, "layers");
     const list = page.locator('[data-scroll-list="layers"]');
     const content = page.locator(".content");
+    // Every layer listed, the empty ones shown too, is too many for the card.
+    await list.locator('[data-empty-layers="lighting-layers"]').click();
     await expect(list).toHaveClass(/\bmany\b/);
     const layer = list.locator('[data-layer="12"]');
     await layer.scrollIntoViewIfNeeded();
