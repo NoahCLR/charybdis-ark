@@ -14,8 +14,8 @@ import {getModel, layers, render, state} from "../store.mjs";
 import {actionMarked, keyNameText} from "./marks.mjs";
 import {PICKER_BOARD, legendFits, pickerBoardKey} from "../view/picker-board.mjs";
 import {comboOutputProblem, keyProblem} from "../view/keycode-expression.mjs";
-import {foldedPick, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, pickAllowed, pickProblem, pickValue, pickedExpression, pickerMatches, shownSection} from "../view/picker.mjs";
-import {customKeyChoice, offeredName, shortcutLayerKinds, shortcutLayerRows, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutPickDrop, shortcutPickKey, shortcutPickModifier, shortcutLimitWords} from "../view/custom-key.mjs";
+import {dropKey, foldedPick, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, openingPick, pickAllowed, pickKey, pickModifier, pickProblem, pickValue, pickedExpression, pickerMatches, shownSection} from "../view/picker.mjs";
+import {customKeyChoice, offeredName, shortcutLayerKinds, shortcutLayerRows, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutLimitWords} from "../view/custom-key.mjs";
 import {layerSwitchTable, switchedLayers} from "./layer-switches.mjs";
 import {vocabulary, word, layerCalled, slotNamed} from "../view/vocabulary.mjs";
 import {macroShortName} from "../view/macro.mjs";
@@ -39,8 +39,10 @@ const modifierControls = model => vocabulary(model).pickerModifiers || [];
 // output), or sends only its shortcut (a behaviour step). `comboOutput` holds
 // the pick to what a combo can send: no Tap-hold, which needs a key of its own.
 export function openPicker({title, context, contextKeycode, onLayer, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false, comboOutput = false}) {
-    const keys = allowedKeys ? seed.map(key => keyIdentity(getModel(), key).name) : seed.slice();
-    const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : [];
+    const named = allowedKeys ? seed.map(key => keyIdentity(getModel(), key).name) : seed.slice();
+    const opening = openingPick(getModel(), {mode, shortcut: Boolean(shortcut)}, named);
+    const keys = opening.keys;
+    const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : opening.mods;
     state.picker = {title, context, contextKeycode, onLayer, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), own: mods.slice(), symbols: {}, layers: shortcut?.layers || 0, layerKind: shortcut?.layers ? shortcut.layerKind || 0 : 0, maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
     render();
 }
@@ -118,7 +120,7 @@ function sectionBody(model) {
         const gui = modifierControls(model).find(({value}) => value === "G")?.label || "GUI";
         return `<div class="pk-body"><div class="pkb"><svg viewBox="0 0 ${PICKER_BOARD.width} ${PICKER_BOARD.height}" xmlns="http://www.w3.org/2000/svg">${keys}</svg></div>
             ${model?.hostLayoutLegends ? `<p class="note pk-note">Shift above; ${esc(vocabulary(model).thirdLevel)} on the right. ◌ marks a dead key: press it, then a letter.</p>` : ""}
-            <p class="note pk-note">${picker.shortcut ? `Click the keys to hold together, in the order they go down, and the modifiers held with them, left and right mixed; click a key again to take it out. A symbol's modifiers are held for the whole shortcut. ${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}. ` : ""}Layers adds the layers it turns on, and how. Modifiers alone, a key alone or layers alone are a shortcut too.` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. A modifier picked above is held down with it: <code>${esc(gui)}</code> and <code>C</code> make one key that sends ${esc(gui)}+C.`}</p></div>`;
+            <p class="note pk-note">${picker.shortcut ? `Click the keys to hold together, in the order they go down, and the modifiers held with them, left and right mixed; click a key again to take it out. A symbol's modifiers are held for the whole shortcut. ${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}. ` : ""}Layers adds the layers it turns on, and how. Modifiers alone, a key alone or layers alone are a shortcut too.` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. A modifier, picked above or on the board, is held down with it: <code>${esc(gui)}</code> and <code>C</code> make one key that sends ${esc(gui)}+C.`}</p></div>`;
     }
     // A shortcut's layers are switches (shortcutLayerTable), placed once the
     // sheet is built.
@@ -276,7 +278,7 @@ export function pickerOverlay() {
         if (section) { picker.section = section.dataset.sec || "board"; picker.search = ""; return render(); }
         const modifier = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-mod]"));
         if (modifier) {
-            Object.assign(picker, shortcutPickModifier(picker, modifier.dataset.mod || ""));
+            Object.assign(picker, pickModifier(picker, modifier.dataset.mod || ""));
             return render();
         }
         const layerTap = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-lt]"));
@@ -286,14 +288,9 @@ export function pickerOverlay() {
         const unlayer = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-unlayer]"));
         if (unlayer) { setLayers((picker.layers || 0) & ~(2 ** Number(unlayer.dataset.unlayer))); return render(); }
         const remove = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-remove]"));
-        if (remove) {
-            const key = picker.keys[Number(remove.dataset.remove)];
-            if (picker.shortcut) Object.assign(picker, shortcutPickDrop(picker, key));
-            else picker.keys.splice(Number(remove.dataset.remove), 1);
-            return render();
-        }
+        if (remove) { Object.assign(picker, dropKey(picker, Number(remove.dataset.remove))); return render(); }
         const unmod = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-unmod]"));
-        if (unmod) { Object.assign(picker, shortcutPickModifier(picker, unmod.dataset.unmod || "")); return render(); }
+        if (unmod) { Object.assign(picker, pickModifier(picker, unmod.dataset.unmod || "")); return render(); }
         // The picker closes itself before handing the choice on, so every
         // caller only says what the choice does.
         if (existing && /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="use-existing-key"]'))) {
@@ -318,18 +315,9 @@ export function pickerOverlay() {
         if (pick) {
             const chosen = pickValue(getModel(), picker, pick.dataset.pick || "");
             if (!pickAllowed(getModel(), picker, chosen)) return;
-            // A shortcut's keys are a list in press order: a click adds a key
-            // or takes it out, a symbol with its modifiers, which stay while
-            // another symbol needs them or the person turned them on. One too
-            // many shows why, and Use waits.
-            if (picker.shortcut) {
-                Object.assign(picker, shortcutPickKey(getModel(), picker, chosen));
-                return render();
-            }
-            if (picker.mode === "list" && !picker.keys.includes(chosen) && picker.keys.length >= picker.maxKeys && picker.maxKeys !== 1) return;
-            picker.keys = picker.mode === "list"
-                ? (picker.keys.includes(chosen) ? picker.keys.filter((key) => key !== chosen) : picker.maxKeys === 1 ? [chosen] : [...picker.keys, chosen])
-                : [chosen];
+            const next = pickKey(getModel(), picker, chosen);
+            if (!next) return;
+            Object.assign(picker, next);
             render();
         }
     });

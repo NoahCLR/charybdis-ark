@@ -77,6 +77,11 @@ built with are left out.
 
 A modifier picked in the row above the board is held down with the key you
 pick: Command and C make one key that sends Command+C (stored as `G(KC_C)`).
+A modifier key on the board is the same button as its modifier in the row,
+as in a custom key's shortcut: clicking either lights both, and the key you
+picked stays. A modifier alone is that modifier's key. Opening the picker on
+a key that holds modifiers shows them lit in the row, with its key on the
+board.
 The footer shows the keycode you'll get, and **Use keycode** stores it.
 
 Modifiers picked with no other key are stored with one of them as the key,
