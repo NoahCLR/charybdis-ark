@@ -99,12 +99,11 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
     group("which").append(choice("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
         {tip: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis."}),
     reverse(model, slot, form, disabled));
-    group("speed").append(field(scrollLabel(model, "divisorH"), slot.scroll?.divisorH, "scroll:divisorH"),
-        field(scrollLabel(model, "divisorV"), slot.scroll?.divisorV, "scroll:divisorV"));
-    group("feel").append(field(scrollLabel(model, "intervalMs", "ms"), slot.scroll?.intervalMs, "scroll:intervalMs", {unit: "ms",
-        tip: "The shortest time between two scroll steps."}),
-    field(scrollLabel(model, "lockMs", "ms"), slot.scroll?.lockMs, "scroll:lockMs", {unit: "ms",
-        tip: "How long a scroll stays on the axis it started on before it may switch."}));
+    const tip = (/** @type {string} */ key) => words(model).scrollTips?.[key] || "";
+    group("speed").append(field(scrollLabel(model, "divisorH"), slot.scroll?.divisorH, "scroll:divisorH", {tip: tip("divisorH")}),
+        field(scrollLabel(model, "divisorV"), slot.scroll?.divisorV, "scroll:divisorV", {tip: tip("divisorV")}));
+    group("feel").append(field(scrollLabel(model, "intervalMs", "ms"), slot.scroll?.intervalMs, "scroll:intervalMs", {unit: "ms", tip: tip("intervalMs")}),
+    field(scrollLabel(model, "lockMs", "ms"), slot.scroll?.lockMs, "scroll:lockMs", {unit: "ms", tip: tip("lockMs")}));
     node.append(modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers"));
     return node;
 }

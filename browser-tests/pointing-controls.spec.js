@@ -47,9 +47,9 @@ test("every scrolling tuning field posts the visible value once, retaining the r
     await advanced(page);
     const fields = [
         ["Sideways: ball movement per step", "divisorH"], ["Up and down: ball movement per step", "divisorV"],
-        ["Fastest repeat ms", "intervalMs"], ["Stay on one axis for ms", "lockMs"],
+        ["Fastest repeat ms", "intervalMs"], ["Axis kept after the ball stops ms", "lockMs"],
         ["Horizontal activation threshold", "thresholdH"], ["Vertical activation threshold", "thresholdV"],
-        ["Gesture expiry ms", "expireMs"], ["Cross-axis decay divisor", "decayDivisor"],
+        ["Leftover movement kept for ms", "expireMs"], ["Cross-axis decay divisor", "decayDivisor"],
         ["Axis selection ratio numerator", "startNumerator"], ["Axis selection ratio denominator", "startDenominator"],
         ["Axis retention ratio numerator", "sustainNumerator"], ["Axis retention ratio denominator", "sustainDenominator"],
     ];
@@ -66,11 +66,11 @@ for (const [label, value, expected] of [
     ["Pointing mode name", "Scroll sentinel", {name: "Scroll sentinel"}],
     ["Pointer speed", "1400", {dpi: 1400}],
     ["Scrolls", "1", {axis: 1}],
-    ["After this mode ends", "1", {pointerLayer: 1}],
+    ["Pointer layer while it runs", "1", {pointerLayer: 1}],
 ]) {
     test(`scrolling ${label} posts its record`, async ({page}) => {
         await openControls(page, "pointing", {pointingSlot: 0});
-        if (label === "After this mode ends") await advanced(page);
+        if (label === "Pointer layer while it runs") await advanced(page);
         if (label === "Pointing mode name") await change(field(page, label), value);
         else if (label === "Pointer speed") await field(page, label).selectOption(value);
         else await choose(page, label, value);
@@ -129,7 +129,7 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
         await configPost(page, 4, {[key]: 777});
     }
     await clearPosts(page);
-    await choose(page, "After this mode ends", "0");
+    await choose(page, "Pointer layer while it runs", "0");
     await configPost(page, 4, {pointerLayer: 0});
     await clearPosts(page);
     await choose(page, "Reads", "0");
@@ -381,4 +381,20 @@ test("Pointer: auto-sniping's layers post one switch each, beside its master swi
     await expectPost(page, {type: "updateConfigDefaults", sectionId: "sniping", expectedFingerprint: expect.any(String), fields: expect.arrayContaining([
         {macro: "autoSniping", enabled: false}, {macro: "snipingOnLayer3", enabled: true},
     ])});
+});
+
+test("every setting in a mode says what it does, under Advanced too", async ({page}) => {
+    for (const slot of [0, 4]) {
+        await openControls(page, "pointing", {pointingSlot: slot, pdAdvanced: true});
+        // Every number field, and every few-option choice outside the
+        // per-direction table, carries a tip on the field itself.
+        const untipped = await editor(page).locator(".field").evaluateAll(fields => fields
+            .filter(field => field.querySelector("input.input, .seg") && !field.closest(".pd-taps"))
+            .filter(field => !(field.getAttribute("data-tip") || field.querySelector(".seg[data-tip]")?.getAttribute("data-tip")))
+            .map(field => field.querySelector("span")?.textContent));
+        expect(untipped, `slot ${slot}`).toEqual([]);
+    }
+    await openControls(page, "pointing", {pointingSlot: 0, pdAdvanced: true});
+    await expect(editor(page).locator(".field").filter({hasText: "Axis selection ratio"})).toHaveAttribute("data-tip", /1\.75 times/);
+    await expect(editor(page).locator(".field").filter({hasText: "Axis kept after the ball stops"})).toHaveAttribute("data-tip", /once the ball stops/);
 });

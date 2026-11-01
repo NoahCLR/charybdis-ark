@@ -626,12 +626,32 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         scrollFields: [
             ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
             ["divisorH", "Sideways: ball movement per step"], ["divisorV", "Up and down: ball movement per step"],
-            ["intervalMs", "Fastest repeat (ms)"], ["expireMs", "Gesture expiry (ms)"], ["lockMs", "Stay on one axis for (ms)"],
+            ["intervalMs", "Fastest repeat (ms)"], ["expireMs", "Leftover movement kept for (ms)"], ["lockMs", "Axis kept after the ball stops (ms)"],
             ["startNumerator", "Axis selection ratio · numerator"], ["startDenominator", "Axis selection ratio · denominator"],
             ["sustainNumerator", "Axis retention ratio · numerator"], ["sustainDenominator", "Axis retention ratio · denominator"],
             ["decayDivisor", "Cross-axis decay divisor"],
         ],
         heldModifiers: "Hold modifiers while scrolling",
+        // What each scroll field does, as the firmware's scrolling runs it
+        // (firmware pointing_mode_dragscroll.c): said as each field's tip, in
+        // the step and under Advanced alike. A ratio's tip is its numerator's.
+        scrollTips: {
+            thresholdH: "How far the ball must move sideways, in sensor counts, before a scroll can go sideways. When both axes are below their thresholds, the scroll lets go of its axis.",
+            thresholdV: "How far the ball must move up or down, in sensor counts, before a scroll can go up or down. When both axes are below their thresholds, the scroll lets go of its axis.",
+            divisorH: "Sensor counts of sideways movement for one scroll step. Lower scrolls faster.",
+            divisorV: "Sensor counts of up-and-down movement for one scroll step. Lower scrolls faster.",
+            intervalMs: "The shortest time between two scroll steps. 0 sends a step with every movement the sensor reports.",
+            lockMs: "How long a scroll keeps its axis once the ball stops. Move again within it and it carries on the same way; after it, the next movement picks its axis afresh.",
+            expireMs: "Movement that has not yet made a whole scroll step is kept this long after the ball stops, so a slow movement still adds up; then it is forgotten. At least the axis time.",
+            decayDivisor: "Each scroll step divides the other axis's leftover movement by this, and drops it once it is below that axis's threshold, so drift across a scroll fades instead of building up. Higher fades faster; at least 2.",
+            startNumerator: "To pick an axis, its movement must be at least this many times the other axis's: 7 : 4 is 1.75 times. Higher needs a straighter movement before a scroll starts; when neither axis wins, it waits.",
+            sustainNumerator: "A scroll keeps its axis while that axis moves at least this many times the other (5 : 4 is 1.25 times, never more than the selection ratio). Below it, the other axis takes over only if it reaches the selection ratio; otherwise the scroll stays on its axis through the wobble.",
+        },
+        // What the pointer layer does while a mode its key started runs: on,
+        // or off so the typing layer's keys stay under the hand. A mode its
+        // layers started never keeps the pointer layer on.
+        pointerLayerLabel: "Pointer layer while it runs",
+        pointerLayerTip: "Keep the pointer layer active: the pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on. Return to the typing layer: starting the mode turns the pointer layer off, and it stays off while the mode runs. A mode its layers started never keeps the pointer layer on.",
     },
     modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
         [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"]],

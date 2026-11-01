@@ -22,16 +22,20 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     };
 
     const behaviour = el(`<div class="pd-grid3"></div>`);
-    behaviour.append(choice("After this mode ends", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
+    behaviour.append(choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: words(model).pointerLayerTip}));
     if (!scrolling) {
         // An axis the mode does not read has no threshold to set. Sending
         // once per movement, the threshold is how far a movement has to go.
         const per = word(words(model).directionStep, slot.directionOutput);
         const dpi = modeDpi(slot, model.configDefaults);
+        // What the threshold does, by how often the mode sends, then how far it is.
+        const does = slot.directionOutput === 1
+            ? "How far the ball must move before a direction sends its key; it sends once however far the ball goes."
+            : "How far the ball must move for each key a direction sends: one key per this distance. Lower sends more often.";
         /** @param {number} counts */
         const distance = (counts) => {
             const shown = thresholdDistance(counts, dpi);
-            return shown ? {unit: shown.short, wide: true, tip: shown.long} : {tip: "Sensor counts at this mode's pointer speed."};
+            return shown ? {unit: shown.short, wide: true, tip: `${does} ${shown.long}`} : {tip: `${does} In sensor counts at this mode's pointer speed.`};
         };
         if (readsHorizontal(slot.axis)) behaviour.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
         if (readsVertical(slot.axis)) behaviour.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
@@ -79,12 +83,12 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         const tuning = el(`<div class="pd-grid3"></div>`);
         const drawn = new Set(SCROLL_LEAD.map(([key]) => key));
         for (const [key, unit] of SCROLL_SINGLES) {
-            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
+            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: words(model).scrollTips?.[key]}));
             drawn.add(key);
         }
         for (const [top, bottom] of SCROLL_RATIOS) {
             const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
-            const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
+            const pair = el(`<div class="field" data-tip="${esc(words(model).scrollTips?.[top] || "")}"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
                 const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"

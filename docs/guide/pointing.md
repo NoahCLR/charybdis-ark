@@ -111,7 +111,8 @@ For a scrolling mode:
 - **Speed**: how far the ball moves for one scroll step, **sideways** and
   **up and down**. Lower scrolls faster.
 - **Feel**: **Fastest repeat** is the shortest time between two scroll steps,
-  and **Stay on one axis for** keeps a scroll on the axis it started on.
+  and **Axis kept after the ball stops** is how long a scroll keeps its axis
+  once the ball stops: move again within it and it carries on the same way.
 - **Hold modifiers while scrolling**, for example Shift to scroll sideways in
   some apps.
 
@@ -189,15 +190,32 @@ that start it, since a layer starts only one mode; set those on the copy.
 **Advanced** holds the finer settings and stays open as you move between
 slots:
 
-- **After this mode ends**: keep the pointer layer on, or go back to the
-  typing layer.
+- **Pointer layer while it runs**: **Keep the pointer layer active** leaves
+  it on while the mode runs, and a locked mode keeps auto-mouse on. **Return
+  to the typing layer** turns it off as the mode starts, so your typing
+  layer's keys stay under your hand. A mode its layers started never keeps it
+  on.
 - How far the ball moves before a direction sends, shown in millimetres at
-  the mode's DPI.
+  the mode's DPI. With **Every step**, one key per this distance; with **Once
+  per movement**, how far it must go before the key is sent at all.
 - **Held modifiers**: what each direction does when you are already holding
   modifiers. **Inherit modifiers** adds them, **Ignore** leaves out the ones
   you pick, and **Exact shortcut** sends only its own. A macro always inherits.
-- **Scroll tuning** for scrolling modes: thresholds, gesture expiry and how it
-  picks an axis.
+- **Scroll tuning** for scrolling modes. Hover a setting for what it does:
+  - **Horizontal** and **Vertical activation threshold**: how far the ball
+    must move on an axis before a scroll can use it. When both axes are below
+    their thresholds, the scroll lets go of its axis.
+  - **Axis selection ratio**: to pick an axis, its movement must be at least
+    this many times the other's (7 : 4 is 1.75 times). Higher needs a
+    straighter movement before a scroll starts.
+  - **Axis retention ratio**: a scroll keeps its axis while that axis moves at
+    least this many times the other (5 : 4 is 1.25 times). Below it, the other
+    axis takes over only if it reaches the selection ratio.
+  - **Cross-axis decay divisor**: each scroll step divides the other axis's
+    leftover movement by this, so drift across a scroll fades instead of
+    building up.
+  - **Leftover movement kept for**: movement that hasn't yet made a whole
+    scroll step is kept this long after the ball stops, then forgotten.
 
 Mouse buttons 1–3 always click as they do without the mode. A click from a
 direction is one press and release, and a button already held stays held.

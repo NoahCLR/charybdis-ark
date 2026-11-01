@@ -10,9 +10,9 @@ export function formControls(model, slot, canEdit) {
     const disabled = canEdit ? "" : "disabled";
     /** @param {string} label @param {import("../../../contracts/edits.js").Scalar | null | undefined} value @param {string} key @param {import("../surface-types.js").FieldOptions} [options] */
     const field = (label, value, key, options = {}) => {
-        const node = el(`<label class="field"><span>${esc(label)}</span>
-            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
-            ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
+        // The tip is the whole field's, its label's as much as its box's.
+        const node = el(`<label class="field" ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}><span>${esc(label)}</span>
+            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
         form[key] = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).value;
         return node;
     };

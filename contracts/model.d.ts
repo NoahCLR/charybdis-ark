@@ -178,6 +178,9 @@ export interface Vocabulary {
         modifierPolicy: WordList<number>;
         scrollFields: WordList<string>;
         heldModifiers: string;
+        scrollTips: Readonly<Record<string, string>>;
+        pointerLayerLabel: string;
+        pointerLayerTip: string;
     };
     modifiers: WordList<number>;
     comboOptions: Readonly<Record<string, string>>;
