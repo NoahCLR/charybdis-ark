@@ -40,20 +40,25 @@ const codeName = (code) => {
         : keycodes.resolve(code)?.name || `0x${code.toString(16).toUpperCase().padStart(4, "0")}`;
 };
 
-// The pointing slots whose key turns layers on (firmware D-F62): a mode its
-// key runs, held or locked, turns on those layers for as long as it runs. So
-// the mode's hold key holds them, and its lock key toggles them as a layer
-// lock would, one more way onto them: all of them at once, as one effect, so
-// the walk never reaches a state where only some are on. Which source wins
-// while another mode runs is not walked. Each slot maps to its layers and its
-// name; each custom key whose shortcut turns layers on (firmware D-F26) to
-// its layers and how it turns them on.
-/** @typedef {Map<number, {layers: number, name: string}>} ModeLinks */
+// The pointing slots that hold a mode (firmware D-F62), each with the layers
+// its key turns on, none or several, which a mode its key runs, held or
+// locked, keeps on for as long as it runs, beside the key holds and layer
+// locks. So the mode's hold key holds them, all at once, as one effect, so
+// the walk never reaches a state where only some are on. Its lock key locks
+// the mode (`modeLock`), linked or not: only a pointing mode's key ends it,
+// and while it runs it keeps its layers on whatever TO() or TG() does
+// (layer-walk.js). Which source wins while another mode runs is not walked.
+// Each slot maps to its layers, its name and whether it keeps the pointer
+// layer on; each custom key whose shortcut turns layers on (firmware D-F26)
+// to its layers and how it turns them on.
+/** @typedef {Map<number, {layers: number, name: string, keepsPointer: boolean}>} ModeLinks */
 /** @typedef {{modes: ModeLinks, shortcuts: Map<number, {layers: number, layerKind: number}>}} LayerOwners */
 /** @param {number} slot @param {boolean} locked @param {LayerOwners | undefined} owners @returns {LayerEffect[]} */
 function modeEffects(slot, locked, owners) {
-    const link = owners?.modes.get(slot);
-    return link ? [{kind: locked ? "lock" : "hold", layer: lowest(link.layers), layers: link.layers, mode: link.name}] : [];
+    const mode = owners?.modes.get(slot);
+    if (!mode) return [];
+    const link = mode.layers ? {layer: lowest(mode.layers), layers: mode.layers, mode: mode.name} : {layer: 0, layers: 0};
+    return locked ? [{kind: "modeLock", ...link, slot}] : mode.layers ? [{kind: "hold", ...link}] : [];
 }
 // A custom key's shortcut layers (firmware D-F26), all at once, as its layer
 // key turns one on: held while it is held (a tap holds nothing), locked,
@@ -186,9 +191,26 @@ function keyEffects(code, row, values, links, said = actionName) {
     return effects;
 }
 
+// Whether a key that resolves to `code`, with its behaviour row if it runs
+// one, can press a pointing mode's key, held or locked, of a slot that holds
+// a mode: its own, unless its row replaces both its tap and its hold, or any
+// branch of the row. Any of them ends a locked mode (firmware D-F62), so a
+// press counted that cannot happen only hides a trap, never invents one.
+/** @param {number | undefined} code @param {BehaviorRow | undefined} row @param {LayerOwners} owners */
+function pressesModeKey(code, row, owners) {
+    /** @param {number | undefined} value */
+    const own = (value) => {const key = value === undefined ? undefined : pdModeKeyOfCode(value); return Boolean(key && owners.modes.has(key.slot));};
+    /** @param {Action | undefined} action */
+    const sends = (action) => Boolean(action && ((action.kind === ACTION.POINTING_MODE_MOMENTARY || action.kind === ACTION.POINTING_MODE_LOCK) ? owners.modes.has(action.operand)
+        : action.kind === ACTION.QMK_KEYCODE && own(action.operand)));
+    const first = row?.steps.find((step) => step.tapIndex === 0);
+    if (own(code) && !(first?.tap && first?.hold)) return true;
+    return (row?.steps || []).some((step) => [step.tap, step.hold?.action, step.longHold?.action].some(sends));
+}
+
 // Pointing links the keyboard runs (firmware D-F62; the pointer layer or
-// a default layer in a link does nothing): the slots whose key turns
-// layers on, and the linked layers that start a mode, each of which keeps
+// a default layer in a link does nothing): the slots that hold a mode and the
+// layers each one's key turns on, and the linked layers that start a mode, each of which keeps
 // a separate pointer layer off while it starts it, as a sniping layer
 // does. A link that a higher layer, or any other layer, ends starts its
 // mode from a linked layer only while none of those is on (linkStarts,
@@ -207,7 +229,7 @@ function linkFacts(decoded) {
     for (const slot of decoded.pdModes || []) {
         if (!slot.kind) continue;
         const turnsOn = live(slot.linkTurnsOn);
-        if (turnsOn.length) modes.set(slot.id, {layers: turnsOn.reduce((layers, layer) => layers | bit(layer), 0) >>> 0, name: slotName(slot)});
+        modes.set(slot.id, {layers: turnsOn.reduce((layers, layer) => layers | bit(layer), 0) >>> 0, name: slotName(slot), keepsPointer: slot.pointerLayer === 0});
         for (const {layer, ends} of linkStarts(decoded.settings, slot)) {
             if (ends) endedStarts.push({layer, ends});
             else layerStarted |= bit(layer);
@@ -235,4 +257,4 @@ function keycodeLayersOn(decoded) {
         effect.kind === "unowned" ? mask : mask | (effect.layers ?? bit(effect.layer)), 0) >>> 0;
 }
 
-module.exports = {bit, codeName, layerEffects, actionEffects, keyEffects, linkFacts, keycodeLayersOn};
+module.exports = {bit, codeName, layerEffects, actionEffects, keyEffects, linkFacts, keycodeLayersOn, pressesModeKey};

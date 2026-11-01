@@ -15,7 +15,7 @@ const {analyzeLayerStates, maskOf: layersOf, lowest} = require("./layer-state-gr
 const {compileLayerAnswers, answeringLayer} = require("./layer-resolution");
 const {participation} = require("./participation");
 const {linkStartHolds} = require("../../rules/pointing-link-starts.mjs");
-const {actionEffects, bit, codeName, keyEffects, linkFacts} = require("./layer-effects");
+const {actionEffects, bit, codeName, keyEffects, linkFacts, pressesModeKey} = require("./layer-effects");
 const {comboReferenceLayers} = require("./combo-reach");
 const {keyLabel, profileKeyNames} = require("./key-names");
 const {hostSettings} = require("../schema/host-settings");
@@ -134,10 +134,57 @@ const pointerStrip = (facts) => {
     return facts.pointer === undefined ? strip : (strip & ~bit(facts.pointer)) >>> 0;
 };
 
+// What a locked pointing mode keeps on and off while it runs (firmware
+// D-F62): the layers its key turns on, and the pointer layer. A mode that
+// keeps the pointer layer anchors it on, unless a sniping layer other than it
+// is on; one that returns to the typing layer keeps it off, unless it is a
+// sniping layer itself, when the trackball still wakes it while no other
+// sniping layer is on (pointer_layer_policy_apply). The links wait while a
+// key runs a mode, so no layer that starts one keeps the pointer layer off.
+/** @param {Facts} facts @param {{layers: number, keepsPointer: boolean}} mode */
+function lockedMode(facts, mode) {
+    let always = mode.layers, never = 0, others = 0, wakes = false;
+    /** @type {{layer: number, layers: number} | undefined} */
+    let unless;
+    const pointer = facts.pointer;
+    if (pointer !== undefined && pointer < LAYERS) {
+        others = (facts.sniping & ~bit(pointer)) >>> 0;
+        if (mode.keepsPointer) {
+            if (others) unless = {layer: pointer, layers: others}; else always |= bit(pointer);
+        } else if (facts.sniping & bit(pointer)) wakes = true;
+        else never |= bit(pointer);
+    }
+    return {always: always >>> 0, never: never >>> 0, unless, wakes, others,
+        // The layers on in a state while the mode runs.
+        /** @param {number} active */
+        active: (active) => {
+            const on = (active | always) & ~never;
+            return (unless ? (on & unless.layers ? on & ~bit(unless.layer) : on | bit(unless.layer)) : on) >>> 0;
+        }};
+}
+
+// Whether a pointing mode's key of a slot that holds a mode answers while
+// `active` layers are on, from a key or a combo (pressesModeKey).
+/** @param {Facts} facts @param {number} active */
+function modeKeyAnswers(facts, active) {
+    const owners = facts.modeLinks;
+    const pressed = facts.layers[0].some((_, position) => {
+        const at = resolve(facts, active, position);
+        if (!at) return false;
+        const row = facts.rows.get(at.code);
+        return pressesModeKey(at.code, facts.behaviorUsed(row, at.layer, position) ? row : undefined, owners);
+    });
+    if (pressed || !facts.combos.length) return pressed;
+    const present = comboCodes(facts, active);
+    return facts.combos.some((combo) => combo.inputs.length && combo.inputs.every((code) => (present.get(code) || []).some((layer) => combo.allowedLayers & bit(layer)))
+        && pressesModeKey(nativeCode(combo.output), facts.rows.get(/** @type {number} */ (nativeCode(combo.output))), owners));
+}
+
 // Everything that changes the layers from one state, each with where it came
-// from so a path can be told.
-/** @param {Facts} facts @param {number} active @param {Map<number, OfferedEffect[]>} cache @returns {OfferedEffect[]} */
-function offers(facts, active, cache) {
+// from so a path can be told. `wakes` says whether the trackball turns the
+// pointer layer on there, as it does with no pointing mode locked.
+/** @param {Facts} facts @param {number} active @param {Map<number, OfferedEffect[]>} cache @param {(active: number) => boolean} [wakes] @returns {OfferedEffect[]} */
+function offers(facts, active, cache, wakes) {
     const cached = cache.get(active); if (cached) return cached;
     /** @type {OfferedEffect[]} */
     const found = [];
@@ -173,8 +220,8 @@ function offers(facts, active, cache) {
     // Moving the trackball wakes the pointer layer, unless a sniping layer or
     // a layer that starts its mode is on and keeps it off
     // (pointer_layer_policy_apply).
-    const endedStrips = facts.endedStarts.some((start) => linkStartHolds(start, active));
-    if (facts.pointer !== undefined && facts.pointer < LAYERS && !(active & pointerStrip(facts)) && !endedStrips) {
+    const wakesHere = wakes ? wakes(active) : !(active & pointerStrip(facts)) && !facts.endedStarts.some((start) => linkStartHolds(start, active));
+    if (facts.pointer !== undefined && facts.pointer < LAYERS && wakesHere) {
         found.push({kind: "hold", layer: facts.pointer, from: {trackball: true}, how: `Move the trackball, which turns on ${layerName(facts.names, facts.pointer)}`});
     }
     cache.set(active, found);
@@ -194,6 +241,21 @@ function compactWalk(facts, limits) {
     /** @typedef {{position: number, layer: number, code: number, when: Condition}} Source */
     /** @type {Source[]} */
     const sources = [];
+    // Where a pointing mode's key answers, and each mode's lock keys by slot.
+    // For the walk a lock key holds the layers the mode's key turns on, as
+    // long as the mode runs, so it reaches what its hold key does; whether
+    // the mode can be turned off again is each mode's anchor (lockedMode).
+    /** @type {Condition[]} */
+    const modeKeys = [];
+    /** @type {Map<number, Transition[]>} */
+    const modeLocks = new Map();
+    /** @param {Transition} transition */
+    const offer = (transition) => {
+        if (transition.kind !== "modeLock") {transitions.push(transition); return;}
+        const slot = /** @type {number} */ (transition.slot);
+        modeLocks.set(slot, [...(modeLocks.get(slot) || []), transition]);
+        if (layersOf(transition)) transitions.push({...transition, kind: "hold"});
+    };
     facts.layers[0].forEach((_, position) => {
         let covered = 0;
         for (let layer = LAYERS - 1; layer >= 0; layer--) {
@@ -201,9 +263,10 @@ function compactWalk(facts, limits) {
             if (code === TRANSPARENT) continue;
             const when = {on: bit(layer), off: covered}; covered |= bit(layer);
             const source = {position, layer, code, when}; sources.push(source);
-            const row = facts.rows.get(code);
-            for (const effect of keyEffects(code, facts.behaviorUsed(row, layer, position) ? row : undefined, facts.values, facts.modeLinks, facts.said)) {
-                transitions.push({...effect, when, from: {layer, layoutIndex: position, code},
+            const row = facts.rows.get(code), used = facts.behaviorUsed(row, layer, position) ? row : undefined;
+            if (pressesModeKey(code, used, facts.modeLinks)) modeKeys.push(when);
+            for (const effect of keyEffects(code, used, facts.values, facts.modeLinks, facts.said)) {
+                offer({...effect, when, from: {layer, layoutIndex: position, code},
                     how: `${effect.how} on ${layerName(facts.names, layer)}${effect.note ? ` (${effect.note})` : ""}`});
             }
         }
@@ -245,18 +308,32 @@ function compactWalk(facts, limits) {
             {when: {all: [when, presence(owner, combo.allowedLayers & allowed)]}, effects: keyEffects(outputCode, row, facts.values, facts.modeLinks, facts.said)},
             {when: {all: [when, presence(owner, combo.allowedLayers & ~allowed)]}, effects: actionEffects(combo.output, facts.modeLinks)},
         ] : [{when, effects: actionEffects(combo.output, facts.modeLinks)}];
-        for (const variant of variants) for (const effect of variant.effects) transitions.push({...effect, when: variant.when,
+        for (const variant of variants) for (const effect of variant.effects) offer({...effect, when: variant.when,
             from: {combo: combo.index}, how: `Press combo ${combo.index} (${combo.inputs.map(codeName).join(" + ")}), which sends ${facts.said(combo.output)}`});
+        if (pressesModeKey(outputCode, row, facts.modeLinks)) modeKeys.push(when);
     }
-    if (facts.pointer !== undefined && facts.pointer < LAYERS) transitions.push({kind: "hold", layer: facts.pointer,
-        when: {all: [{off: pointerStrip(facts)}, ...facts.endedStarts.map(({layer, ends}) => ({not: {on: bit(layer), off: ends}}))]},
-        from: {trackball: true}, how: `Move the trackball, which turns on ${layerName(facts.names, facts.pointer)}`});
-    const result = analyzeLayerStates({always: facts.always, transitions, queries, trapLimit: MAX_TRAPS, limits});
+    /** @type {Omit<Transition, "when">} */
+    const ball = {kind: "hold", layer: facts.pointer ?? 0, from: {trackball: true}, how: `Move the trackball, which turns on ${layerName(facts.names, facts.pointer ?? 0)}`};
+    const keys = [...transitions];
+    if (facts.pointer !== undefined && facts.pointer < LAYERS) transitions.push({...ball,
+        when: {all: [{off: pointerStrip(facts)}, ...facts.endedStarts.map(({layer, ends}) => ({not: {on: bit(layer), off: ends}}))]}});
+    const slots = [...modeLocks.keys()];
+    const anchors = slots.map((slot) => {
+        const locked = lockedMode(facts, /** @type {{layers: number, keepsPointer: boolean}} */ (facts.modeLinks.modes.get(slot)));
+        return {entries: /** @type {Transition[]} */ (modeLocks.get(slot)), ends: {any: modeKeys}, always: locked.always, never: locked.never, unless: locked.unless,
+            transitions: locked.wakes ? [...keys, {...ball, when: {off: locked.others}}] : keys};
+    });
+    const result = analyzeLayerStates({always: facts.always, transitions, queries, anchors, trapLimit: MAX_TRAPS, limits});
     if (!result.complete && !result.reachabilityComplete) return {reachabilityComplete: false, affectedLayers: result.affectedLayers};
+    /** @type {import("./types.js").ModeTrap[]} */
+    const modeTraps = [];
+    if (result.complete) result.anchors.forEach((anchor, index) => {
+        if (anchor.trapped) modeTraps.push({slot: slots[index], locks: anchor.locks, effect: anchor.effect, path: anchor.path});
+    });
     return {reachabilityComplete: true, escapeComplete: result.complete, affectedLayers: result.complete ? 0 : result.affectedLayers,
         reachedLayers: result.reachedLayers, effects: result.effects,
         reachableCombos: new Set(comboQueries.filter(({query}) => result.queries[query]).map(({index}) => index)),
-        traps: result.complete ? result.traps : [], trapCount: result.complete ? result.trapCount : 0};
+        traps: result.complete ? result.traps : [], trapCount: result.complete ? result.trapCount : 0, modeTraps};
 }
 
 // A state is its locks and the layers held on top, a layer set each.
@@ -301,10 +378,61 @@ function boundedWalk(facts, affectedLayers) {
         const present = comboCodes(facts, active);
         for (const combo of facts.combos) if (combo.inputs.every(code => (present.get(code) || []).some(layer => combo.allowedLayers & bit(layer)))) reachableCombos.add(combo.index);
     }
-    return {reachabilityComplete: complete, escapeComplete: complete, affectedLayers: complete ? 0 : affectedLayers,
+    const modes = complete ? boundedModeTraps(facts, graph) : undefined;
+    const escapes = Boolean(modes);
+    return {reachabilityComplete: complete, escapeComplete: escapes, affectedLayers: escapes ? 0 : affectedLayers,
         reachedLayers: [...parent.keys()].reduce((mask, state) => mask | locksOf(state) | heldOf(state), facts.always),
         effects: [...cache.values()].flat(), reachableCombos,
-        ...(complete ? smallestTraps(graph) : {traps: [], trapCount: 0})};
+        ...(escapes ? smallestTraps(graph) : {traps: [], trapCount: 0}), modeTraps: modes || []};
+}
+
+// The bounded walk's locked modes, as the compact walk's anchors: from each
+// set of locks a mode's lock key answers in, every key let go, the states the
+// mode and the walk's keys reach, and whether a pointing mode's key answers in
+// one of them. Any held layer can be let go there. Undefined once the bound
+// is reached.
+/** @param {Facts} facts @param {LayerStateGraph} graph @returns {import("./types.js").ModeTrap[] | undefined} */
+function boundedModeTraps(facts, {cache, parent}) {
+    /** @type {import("./types.js").ModeTrap[]} */
+    const modeTraps = [];
+    for (const [slot, mode] of facts.modeLinks.modes) {
+        // Each lock set the lock key answers in, with the first way there.
+        /** @type {Map<number, {from: number, effect: OfferedEffect}>} */
+        const starts = new Map();
+        for (const state of parent.keys()) {
+            const effect = (cache.get(facts.always | locksOf(state) | heldOf(state)) || []).find((offered) => offered.kind === "modeLock" && offered.slot === slot);
+            if (effect && !starts.has(locksOf(state))) starts.set(locksOf(state), {from: state, effect});
+        }
+        if (!starts.size) continue;
+        const locked = lockedMode(facts, mode);
+        /** @type {Map<number, OfferedEffect[]>} */
+        const offered = new Map();
+        /** @param {number} active */
+        const wakes = (active) => locked.wakes && !(active & locked.others);
+        /** @type {Map<number, number[]>} */
+        const back = new Map();
+        const queue = [...starts.keys()].map((locks) => stateOf(locks, 0)), seen = new Set(queue), escapes = new Set();
+        for (let next = 0; next < queue.length; next++) {
+            const state = queue[next], active = locked.active(facts.always | locksOf(state) | heldOf(state));
+            if (modeKeyAnswers(facts, active)) {escapes.add(state); continue;}
+            const out = offers(facts, active, offered, wakes).filter((effect) => effect.kind === "hold" || effect.kind === "lock" || effect.kind === "move").map((effect) => step(state, effect));
+            for (const layer of layersOfMask(heldOf(state))) out.push(stateOf(locksOf(state), heldOf(state) & ~bit(layer)));
+            for (const to of out) {
+                /** @type {number[]} */ (back.get(to) || back.set(to, []).get(to)).push(state);
+                if (seen.has(to)) continue;
+                if (seen.size === MAX_WALK_STATES) return undefined;
+                seen.add(to); queue.push(to);
+            }
+        }
+        const pending = [...escapes];
+        while (pending.length) for (const from of back.get(/** @type {number} */ (pending.pop())) || []) if (!escapes.has(from)) {escapes.add(from); pending.push(from);}
+        const [trapped] = [...starts.keys()].filter((locks) => !escapes.has(stateOf(locks, 0)))
+            .sort((a, b) => layersOfMask(a).length - layersOfMask(b).length || a - b);
+        if (trapped === undefined) continue;
+        const start = /** @type {{from: number, effect: OfferedEffect}} */ (starts.get(trapped));
+        modeTraps.push({slot, locks: trapped, effect: start.effect, path: [...pathTo(parent, start.from), start.effect]});
+    }
+    return modeTraps;
 }
 
 // How to get from rest to a state, in steps a person takes; releases are not
@@ -382,6 +510,11 @@ function walkWith(facts, holds) {
         const out = [];
         for (const effect of offers(facts, active, cache)) {
             if (effect.kind === "unowned") continue;
+            // A lock key holds what its mode's key turns on, as in the compact walk.
+            if (effect.kind === "modeLock") {
+                if (layersOf(effect)) out.push({to: step(state, {...effect, kind: "hold"}), effect: {...effect, kind: "hold"}});
+                continue;
+            }
             out.push({to: step(state, effect), effect});
         }
         for (const layers of holds) {

@@ -84,7 +84,8 @@ whether the draft made it, the keyboard already had it, or the draft fixes it.
 _Avoid_: lint, validation (for this), issue, problem
 
 **Trap**:
-A layer that can be locked on with no way back to the base layer.
+A layer that can be locked on with no way back to the base layer, or a
+pointing mode that can be locked with no way to turn it off.
 _Avoid_: dead end, stuck layer, layer lock-in
 
 **Blocker**:

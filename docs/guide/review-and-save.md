@@ -145,8 +145,9 @@ keys, behaviours, combos, the trackball and pointing modes linked to layers.
 Each check says whether your draft made it, the keyboard already has it, or
 the draft fixes it.
 
-- A **Trap** is a layer that can lock on with no way back to the base layer.
-  Review shows the steps into it and a way out.
+- A **Trap** is a layer that can lock on with no way back to the base layer,
+  or a pointing mode that can lock with nothing left to turn it off. Review
+  shows the steps into it and a way out.
 - A **Blocker** keeps Save disabled until it is fixed, such as a lighting
   effect or brightness this keyboard can't show.
 - A **Warning** is something Ark asks about before saving: a layer nothing

@@ -60,8 +60,9 @@ edits in Ark until you review and save them.
 
 Whichever you pick, every edit goes into one draft with undo, redo and a full
 history. **Review** lists every change and checks what your layers let you
-reach, so you don't lock yourself into a layer with no way back. Saving keeps
-a recovery copy first and saves both halves as one complete profile.
+reach, so you don't lock yourself into a layer, or a pointing mode, with no
+way back. Saving keeps a recovery copy first and saves both halves as one
+complete profile.
 
 **Export profile** keeps your whole profile as one backup and **Import profile**
 brings it back, through the same review.

@@ -584,13 +584,73 @@ test("a mode whose key turns layers on reaches them through its hold and lock ke
     assert.deepEqual(kinds(profile({keys: {"5:3": KC_B}, combos: [combo], pdModes: [turnsOn(5)]})).includes("unreachable"), false);
 });
 
-test("a locked mode keeps its layer on like a layer lock, and is a trap when the layer covers its lock key", () => {
+// A locked mode (firmware D-F62) ends only by a pointing mode's key: its lock
+// key, its hold key, or another mode's key. While it runs it keeps the layers
+// its key turns on, and the pointer layer if it keeps it, whatever TO() and
+// TG() do.
+const modeTraps = (value) => layerReach(value).filter((finding) => finding.kind === "modeTrap");
+const lockAt = {"0:0": PD_MODE_LOCK(1)};
+test("a locked mode is a trap when the layers it keeps on cover every pointing mode's key", () => {
     const pdModes = [turnsOn(5)];
-    assert.deepEqual(traps(profile({keys: {"0:0": PD_MODE_LOCK(1), "5:3": KC_B}, pdModes})), [], "the lock key still answers on Extra 1");
-    const [trap] = traps(profile({keys: {"0:0": PD_MODE_LOCK(1), "5:0": KC_B}, pdModes}));
+    assert.deepEqual(traps(profile({keys: {...lockAt, "5:3": KC_B}, pdModes})), [], "the lock key still answers on Extra 1");
+    const [trap, ...more] = traps(profile({keys: {...lockAt, "5:0": KC_B}, pdModes}));
+    assert.deepEqual(more, [], "one trap, the mode's, not Extra 1's");
+    assert.equal(trap.kind, "modeTrap");
+    assert.equal(trap.title, "Volume can lock with no way to turn it off");
     assert.deepEqual(trap.layers, [5]);
+    assert.deepEqual(trap.place, {kind: "pointing", slot: 1});
     assert.deepEqual(trap.path, ["Tap PD_MODE_1_LOCK on Base (which runs Volume, whose key turns layers on)"]);
-    assert.deepEqual(traps(profile({keys: {"0:0": PD_MODE_LOCK(1), "5:0": KC_B, "5:1": TO(0)}, pdModes})), [], "with a way home on it");
+    assert.match(trap.detail, /keeps Extra 1 on/);
+    assert.match(trap.fix, /Make Extra 1 transparent where Volume's lock key is/);
+    // Neither TO(0) nor Extra 1's own toggle turns off a layer the mode keeps on.
+    assert.equal(modeTraps(profile({keys: {...lockAt, "5:0": KC_B, "5:1": TO(0)}, pdModes})).length, 1, "TO(0) leaves the mode running");
+    assert.equal(modeTraps(profile({keys: {...lockAt, "5:0": KC_B, "5:1": TG(5)}, pdModes})).length, 1, "TG(5) leaves the mode running");
+    // Any pointing mode's key ends it.
+    assert.deepEqual(traps(profile({keys: {...lockAt, "5:0": KC_B, "5:1": PD_MODE(1)}, pdModes})), [], "its hold key unlocks it");
+    assert.deepEqual(traps(profile({keys: {...lockAt, "5:0": KC_B, "5:1": PD_MODE(2)}, pdModes: [...pdModes, linked({id: 2, name: "Scroll"})]})), [], "another mode's key replaces it");
+    assert.equal(modeTraps(profile({keys: {...lockAt, "5:0": KC_B, "5:1": PD_MODE(2)}, pdModes: [...pdModes, linked({id: 2, kind: 0})]})).length, 1, "an empty slot's key does nothing");
+    assert.deepEqual(traps(profile({keys: {...lockAt, "5:0": KC_B, "5:1": MO(6), "6:0": PD_MODE_LOCK(1)}, pdModes})), [], "a layer held from Extra 1 has its lock key");
+    // A behaviour branch or a combo that sends a pointing mode's key ends it too.
+    const row = {target: code(KC_ESC), allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: {kind: 4, flags: 0, operand: 1}}]};
+    assert.deepEqual(traps(profile({keys: {...lockAt, "5:0": KC_B, "5:1": KC_ESC}, rows: [row], pdModes})), [], "a tap that sends its hold key");
+    const combo = {inputs: [code(KC_A), code(KC_A)], output: {kind: 5, flags: 0, operand: 1}, allowedLayers: 0xffff};
+    assert.deepEqual(traps(profile({keys: {...lockAt, "5:0": KC_B}, combos: [combo], pdModes})), [], "a combo of Base's keys through Extra 1 sends its lock key");
+});
+
+test("a locked mode that keeps the pointer layer is a trap when the pointer layer covers every pointing mode's key", () => {
+    const mouse = {4: 1, 5: 4}, keeps = linked({pointerLayer: 0}), returns = linked({pointerLayer: 1});
+    const [trap] = modeTraps(profile({keys: {...lockAt, "4:0": KC_B}, settings: mouse, pdModes: [keeps]}));
+    assert.ok(trap, "with no link, the pointer layer it anchors covers its lock key");
+    assert.deepEqual(trap.layers, [4]);
+    assert.match(trap.detail, /keeps Pointer on/);
+    assert.match(trap.fix, /or choose Return to the typing layer for Volume/);
+    assert.equal(modeTraps(profile({keys: {...lockAt, "4:0": KC_B, "4:3": TO(0)}, settings: mouse, pdModes: [keeps]})).length, 1, "TO(0) leaves the pointer layer on");
+    assert.deepEqual(modeTraps(profile({keys: {...lockAt, "4:0": KC_B}, settings: mouse, pdModes: [returns]})), [], "a mode that returns to the typing layer keeps it off");
+    assert.deepEqual(modeTraps(profile({keys: {...lockAt, "4:0": KC_B}, settings: {5: 4}, pdModes: [keeps]})), [], "with auto-mouse off there is no pointer layer");
+    // Locked from Navigation, held: once Navigation is let go the pointer
+    // layer, above it, covers its lock key when Navigation is held again.
+    const fromNav = {"0:5": MO(3), "3:0": PD_MODE_LOCK(1)};
+    assert.equal(modeTraps(profile({keys: {...fromNav, "4:0": KC_B}, settings: mouse, pdModes: [keeps]})).length, 1);
+    assert.deepEqual(modeTraps(profile({keys: fromNav, settings: mouse, pdModes: [keeps]})), [], "the pointer layer is transparent there");
+    // A sniping layer other than the pointer layer strips it, anchored or not.
+    assert.deepEqual(modeTraps(profile({keys: {...lockAt, "4:0": KC_B, "0:5": MO(3)}, settings: {...mouse, 8: 1, 9: 1 << 3}, pdModes: [keeps]})), [], "holding a sniping layer uncovers the lock key");
+    // A mode that returns to the typing layer, when the pointer layer is a
+    // sniping layer itself: the trackball still wakes it, which uncovers
+    // nothing here, and it covers nothing below.
+    assert.deepEqual(modeTraps(profile({keys: {...lockAt, "4:0": KC_B}, settings: {...mouse, 8: 1, 9: 1 << 4}, pdModes: [returns]})), []);
+});
+
+test("a locked mode trapped only with layers locked names them", () => {
+    // The mode's key turns on Extra 3. Locked from rest, its lock key on Base
+    // still answers. Extra 2, locked from Base, covers that key and its own
+    // toggle, and its TO(0) is the way home; locked from Extra 2 (by a
+    // second lock key), Extra 3 covers that TO(0) and the second lock key.
+    const keys = {"0:0": PD_MODE_LOCK(1), "0:1": TG(6), "0:3": PD_MODE_LOCK(1), "6:0": KC_B, "6:1": KC_B, "6:2": TO(0), "7:2": KC_B, "7:3": KC_B};
+    const found = layerReach(profile({keys, pdModes: [turnsOn(7)]})).filter((finding) => finding.level === LEVELS.TRAP);
+    assert.deepEqual(found.map(({kind, layers, path}) => ({kind, layers, path})), [{kind: "modeTrap", layers: [6, 7],
+        path: ["Tap TG(6) on Base", "Tap PD_MODE_1_LOCK on Base (which runs Volume, whose key turns layers on)"]}]);
+    assert.match(found[0].detail, /^Once Volume is locked with Extra 2 locked, it keeps Extra 3 on/);
+    assert.deepEqual(modeTraps(profile({keys: {...keys, "7:2": TRNS}, pdModes: [turnsOn(7)]})), [], "with Extra 2's TO(0) showing through, TO(0) leaves Volume on Extra 3, where its lock key answers");
 });
 
 test("a layer that starts its mode keeps the pointer layer off, so a way back only there does not count", () => {

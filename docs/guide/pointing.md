@@ -176,6 +176,17 @@ keeps the pointer layer, the pointer layer covers it, and the step warns you.
 Have the key turn on a layer above it, or choose **Return to the typing
 layer** under **While it runs**.
 
+A locked mode ends only by a pointing mode's key: its lock key again, its hold
+key, or another mode's key. **Move to Base** and layer locks leave it running,
+and the layers its key turns on (and the pointer layer, if it keeps it) stay
+on. If those layers cover every pointing mode's key, the mode can lock with no
+way to turn it off, and the keyboard holds every edit while it runs, so only
+unplugging it gets you out. Review names it as a
+[trap](review-and-save.md#checks), and in Live edit and Live preview + save Ark
+asks before sending the edit that makes it. Leave the lock key showing
+through (transparent) on those layers, or put the mode's lock or hold key on
+them.
+
 **Duplicate** copies the layers a mode's key turns on, but not the layers
 that start it, since a layer starts only one mode; set those on the copy.
 
