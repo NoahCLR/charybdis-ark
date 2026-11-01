@@ -79,9 +79,10 @@ export function behaviourEditor(behaviour) {
     /** @param {import("../../../contracts/edits.js").TimingTerm} name */
     const timingControl = (name) => {
         const field = behaviourTimingField(behaviour, name);
+        const placeholder = field.fallback === "" ? "default unavailable" : field.placeholder;
         return `<label class="field bterm-field" data-tip="${esc(thresholdTips[name])}"><span>${esc(sentence(thresholdNames[name]))}</span>
-            <span class="affix unit"><input class="input mono num" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
-                placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
+            <span class="affix unit"><input class="input mono num" style="--digits: ${esc(Math.max(5, placeholder.length))}" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
+                placeholder="${esc(placeholder)}" ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 
     // An action as the grid names it: a layer, pointing mode or macro as that

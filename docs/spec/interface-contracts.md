@@ -167,8 +167,12 @@ The same kind of control looks and sits the same on every screen.
   1320 px together, a 340 px list and a 960 px editor, as a Settings screen
   stops at 980 px; a wider window leaves the room beside them
   (`browser-tests/consistency.spec.js`).
+- Every behaviour cell is one size, in any grid at any width: room for its
+  action and two lines of how it runs, longer words clamped to two lines
+  (`browser-tests/consistency.spec.js`).
 - A number field is as wide as the values it takes (`input.num`, five
-  digits unless `--digits` says otherwise) with room for its unit, never as
+  digits unless `--digits` says otherwise, a behaviour's timing as long as
+  its placeholder) with room for its unit, never as
   wide as its column, and a menu in the pointing editor is as wide as its
   words (`browser-tests/consistency.spec.js`).
 - A Settings card is named for what it holds, never for its screen (Where
