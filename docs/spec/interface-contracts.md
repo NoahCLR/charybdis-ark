@@ -163,6 +163,10 @@ The same kind of control looks and sits the same on every screen.
   its choices shows it as one more option, "as stored". A pair that are two
   independent switches (Reverse scrolling's two axes) is two switches, not
   four options naming their combinations.
+- A number field is as wide as the values it takes (`input.num`, five
+  digits unless `--digits` says otherwise) with room for its unit, never as
+  wide as its column, and a menu in the pointing editor is as wide as its
+  words (`browser-tests/consistency.spec.js`).
 - A Settings card is named for what it holds, never for its screen (Where
   behaviours run, How combos run; no test).
 - A macro, a custom key, a pointing mode and the keyboard are named by their
