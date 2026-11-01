@@ -21,9 +21,11 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         return node;
     };
 
-    const behaviour = el(`<div class="pd-grid3"></div>`);
-    behaviour.append(choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: words(model).pointerLayerTip}));
+    // How far the ball moves per key, for a mode that sends keys. (A key's
+    // behaviour is something else in Ark, so the section is named for what
+    // it sets.)
     if (!scrolling) {
+        const distances = el(`<div class="pd-grid3"></div>`);
         // An axis the mode does not read has no threshold to set. Sending
         // once per movement, the threshold is how far a movement has to go.
         const per = word(words(model).directionStep, slot.directionOutput);
@@ -37,10 +39,10 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             const shown = thresholdDistance(counts, dpi);
             return shown ? {unit: shown.short, wide: true, tip: `${does} ${shown.long}`} : {tip: `${does} In sensor counts at this mode's pointer speed.`};
         };
-        if (readsHorizontal(slot.axis)) behaviour.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
-        if (readsVertical(slot.axis)) behaviour.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
+        if (readsHorizontal(slot.axis)) distances.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
+        if (readsVertical(slot.axis)) distances.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
+        section("Distance").append(distances);
     }
-    section("Behaviour").append(behaviour);
 
     if (!scrolling) {
         // Each shortcut's own handling of modifiers held while it sends. A

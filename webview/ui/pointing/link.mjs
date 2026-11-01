@@ -53,7 +53,7 @@ export function startStep(model, slot, {form, disabled}, stage) {
     const covers = pointerLayerCovers(model, slot);
     if (covers) {
         const names = listed(covers.covered);
-        node.append(el(`<div class="callout warn" role="note">${esc(`${covers.pointer}, the pointer layer, sits above ${names}. This mode keeps the pointer layer on while its key runs it, so the pointer layer's keys cover ${names}'s wherever they are not transparent. Have its key turn on a layer above ${covers.pointer}, or choose Return to the typing layer under Advanced.`)}</div>`));
+        node.append(el(`<div class="callout warn" role="note">${esc(`${covers.pointer}, the pointer layer, sits above ${names}. This mode keeps the pointer layer on while its key runs it, so the pointer layer's keys cover ${names}'s wherever they are not transparent. Have its key turn on a layer above ${covers.pointer}, or choose Return to the typing layer under While it runs.`)}</div>`));
     }
     return node;
 }

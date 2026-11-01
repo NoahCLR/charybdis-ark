@@ -19,6 +19,7 @@ import {movement} from "./movement.mjs";
 import {lightRow, placeButton} from "./keys-and-light.mjs";
 import {startStep} from "./link.mjs";
 import {advancedControls} from "./advanced.mjs";
+import {words} from "./common.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
 export function editor(model, slot, canEdit, slots) {
@@ -83,6 +84,7 @@ export function editor(model, slot, canEdit, slots) {
     runs.append(select("Pointer speed", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: `Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
     lightRow(model, slot));
+    runs.append(controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: words(model).pointerLayerTip}));
     step(4, "While it runs").append(runs);
     wrap.append(card, advancedControls(model, slot, scrolling, controls));
 

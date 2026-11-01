@@ -1104,15 +1104,18 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    its fields as which way (Scrolls, a segmented choice; Reverse scrolling, a
    switch per axis, the record's two bits), Speed and Feel, under the
    vocabulary's names, and the held modifiers
-   (`webview/ui/pointing/movement.mjs`). Advanced's Pointer layer while it runs
-   and each direction's held-modifier handling are segmented choices too.
+   (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
+   under Advanced, is a segmented choice too.
    Every setting says what it does as its field's tip: a scroll field's from
    `vocabulary.pointing.scrollTips` (as the firmware's scrolling runs it), in
    the step and under Advanced alike (`browser-tests/pointing-controls.spec.js`).
 3. **What starts it**: the mode's hold and lock keys named by the mode, never
    by `PD_MODE_n`, and where they sit; then its link as layer chips
    ([Pointing links](#pointing-links)).
-4. **While it runs**: its pointer speed and its light, with Edit in Lighting.
+4. **While it runs**: its pointer speed, its light with Edit in Lighting,
+   and its pointer layer, a segmented choice. Advanced's sections are named
+   for what they set (Distance, Held modifiers, Scroll tuning), never
+   Behaviour, which is a key's in Ark.
 
 ## Focus across renders
 

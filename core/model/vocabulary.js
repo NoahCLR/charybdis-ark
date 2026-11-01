@@ -650,7 +650,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // What the pointer layer does while a mode its key started runs: on,
         // or off so the typing layer's keys stay under the hand. A mode its
         // layers started never keeps the pointer layer on.
-        pointerLayerLabel: "Pointer layer while it runs",
+        pointerLayerLabel: "Pointer layer",
         pointerLayerTip: "Keep the pointer layer active: the pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on. Return to the typing layer: starting the mode turns the pointer layer off, and it stays off while the mode runs. A mode its layers started never keeps the pointer layer on.",
     },
     modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],

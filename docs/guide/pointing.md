@@ -174,7 +174,7 @@ layers as before.
 When the mode's key turns on a layer below the pointer layer and the mode
 keeps the pointer layer, the pointer layer covers it, and the step warns you.
 Have the key turn on a layer above it, or choose **Return to the typing
-layer** under Advanced.
+layer** under **While it runs**.
 
 **Duplicate** copies the layers a mode's key turns on, but not the layers
 that start it, since a layer starts only one mode; set those on the copy.
@@ -184,18 +184,18 @@ that start it, since a layer starts only one mode; set those on the copy.
 - **Pointer speed**: the mode's own DPI, or **Normal pointer speed** to keep
   the one set on Pointer settings.
 - **Light**: its colour and where it paints, with **Edit in Lighting**.
+- **Pointer layer**: **Keep the pointer layer active** leaves
+  it on while the mode runs, and a locked mode keeps auto-mouse on. **Return
+  to the typing layer** turns it off as the mode starts, so your typing
+  layer's keys stay under your hand. A mode its layers started never keeps it
+  on.
 
 ### Advanced
 
 **Advanced** holds the finer settings and stays open as you move between
 slots:
 
-- **Pointer layer while it runs**: **Keep the pointer layer active** leaves
-  it on while the mode runs, and a locked mode keeps auto-mouse on. **Return
-  to the typing layer** turns it off as the mode starts, so your typing
-  layer's keys stay under your hand. A mode its layers started never keeps it
-  on.
-- How far the ball moves before a direction sends, shown in millimetres at
+- **Distance**: how far the ball moves before a direction sends, shown in millimetres at
   the mode's DPI. With **Every step**, one key per this distance; with **Once
   per movement**, how far it must go before the key is sent at all.
 - **Held modifiers**: what each direction does when you are already holding
