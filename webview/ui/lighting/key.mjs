@@ -21,7 +21,7 @@ function flashInterval(model) {
     const editable = editGate(model, "settings").editable && !field.readOnly;
     const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
     const node = el(`<label class="field" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}"><span>${esc(label)}</span>
-        <span class="affix unit"><input class="input mono" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span>
+        <span class="affix unit"><input class="input mono num" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span>
         <span class="hint">${esc(field.hint || "")}</span></label>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
