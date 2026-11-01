@@ -2,6 +2,8 @@
 /** @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model */
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
+import {segmented} from "../segmented.mjs";
+import {onScreenChoice} from "../../view/choices.mjs";
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {STEP_KINDS, addStepLabel, macroLocalState, macroShortName, protectionChoiceLabel, samePayload} from "../../view/macro.mjs";
@@ -38,8 +40,7 @@ export function editor(model, slot, canEdit) {
                 <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}
-            <label class="macro-protection"><span>${esc(uninterruptible.label)}</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
-                ${(model.macroProtectionChoices || []).map((choice) => `<option value="${esc(choice.value)}" ${slot.protection === choice.value ? "selected" : ""}>${esc(protectionChoiceLabel(model, choice, slot.uninterruptible))}</option>`).join("")}</select></label></div>
+            ${protectionField(model, slot, canEdit)}</div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
                 ${STEP_KINDS.map((value) => `<button class="btn" data-insert-kind="${esc(value)}" data-act="macro-insert:${esc(slot.keycode)}:${esc(value)}" ${editable ? "" : "disabled"}>${esc(addStepLabel(model, value))}</button>`).join("")}
@@ -71,7 +72,10 @@ export function editor(model, slot, canEdit) {
         Object.assign(state, {screen: "host", reveal: '.settings-group[data-section="host"]'});
         render();
     });
-    /** @type {HTMLSelectElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLSelectElement} */ (event.target).value), model.macroEditing.identity)));
+    /** @type {HTMLElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => {
+        event.stopPropagation();
+        post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLInputElement | HTMLSelectElement} */ (event.target).value), model.macroEditing.identity));
+    });
     if (model.macroNameSpace) attachTitleName(card, {stored: slot.name || "", perName: model.macroNameSpace.perName,
         rename: name => post(edits.macroNameMessage(slot.keycode, name, getModel()?.macroEditing?.identity))});
     showPlacements(card, "macros", slot.keycode);
@@ -132,6 +136,21 @@ export function editor(model, slot, canEdit) {
 }
 
 // Every slot can hold a full-length name. The core enforces the rule; the
+// Uninterruptible playback: its few choices on show, as view/choices.mjs's
+// rule has them, else a menu.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
+function protectionField(model, slot, canEdit) {
+    const label = vocabulary(model).macroUninterruptible.label;
+    /** @type {[string, string][]} */
+    const options = (model.macroProtectionChoices || []).map((choice) => [choice.value, protectionChoiceLabel(model, choice, slot.uninterruptible)]);
+    if (onScreenChoice(options.map(([, text]) => text))) {
+        return `<div class="macro-protection" data-protection><span aria-hidden="true">${esc(label)}</span>${segmented({label, f: `macro:${slot.keycode}:protection`,
+            choices: options, current: slot.protection, disabled: !canEdit, hideLabel: true})}</div>`;
+    }
+    return `<label class="macro-protection"><span>${esc(label)}</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
+        ${options.map(([value, text]) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
+}
+
 // counter says where the name stands in bytes, which is what the keyboard
 // counts.
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */

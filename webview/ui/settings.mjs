@@ -22,6 +22,8 @@ import {githubMark} from "../view/shell-panel.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
 import {keycodePlacements, reachLine} from "../view/placements.mjs";
 import {durationControl} from "./duration.mjs";
+import {segmented} from "./segmented.mjs";
+import {onScreenChoice} from "../view/choices.mjs";
 import {layerSwitchGrid} from "./layer-switches.mjs";
 import {fieldParts, isLayerSwitch, sectionsOn} from "../view/settings-layout.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
@@ -176,7 +178,9 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
         post(edits.settingsSection(section, (field) => {
             const duration = durations.get(field.macro);
             if (duration) return duration.read() ?? undefined;
-            const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
+            // A choice on show is its checked option; any other control is the one carrying its macro.
+            const macro = cssEscape(field.macro);
+            const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${macro}"]:not([type="radio"]), [data-macro="${macro}"]:checked`));
             if (!input) return undefined;
             return field.kind === "toggle" ? /** @type {HTMLInputElement} */ (input).checked : input.value;
         }, model?.settingsEditing?.identity));
@@ -272,6 +276,16 @@ function fieldRow(field, canEdit, submit, slot, durations) {
     if (field.choices?.length) {
         const choices = field.choices.map((choice) => typeof choice === "object" ? choice : {value: choice, label: String(choice)});
         const known = choices.some((choice) => String(choice.value) === String(field.value));
+        /** @type {[string, string][]} */
+        const options = [...(known ? [] : [/** @type {[string, string]} */ ([String(field.value), `${field.value} · as stored`])]),
+            ...choices.map((choice) => /** @type {[string, string]} */ ([String(choice.value), choice.label]))];
+        if (onScreenChoice(options.map(([, text]) => text))) {
+            const node = el(segmented({label: field.label, f: `setting:${field.macro}`, choices: options, current: String(field.value),
+                disabled: !editable, hideLabel: true, attributes: {"data-macro": field.macro}}));
+            node.addEventListener("change", submit);
+            control.appendChild(node);
+            return row;
+        }
         const node = el(`<select class="input" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${editable ? "" : "disabled"}>
             ${known ? "" : `<option value="${esc(field.value)}" selected>${esc(field.value)} · as stored</option>`}
             ${choices.map((choice) => `<option value="${esc(choice.value)}" ${String(choice.value) === String(field.value) ? "selected" : ""}>${esc(choice.label)}</option>`).join("")}</select>`);

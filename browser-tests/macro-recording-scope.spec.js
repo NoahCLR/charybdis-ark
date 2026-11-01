@@ -225,7 +225,7 @@ test('Discard during a take restores an existing macro and preserves its name/pr
     await page.locator('.macro-editor-card [data-act="discard"]').click();
     await expect(page.locator('[data-step-text]')).toHaveValue('original');
     await expect(page.locator('[data-name]')).toHaveValue('Keep me');
-    await expect(page.locator('[data-protection]')).toHaveValue('off');
+    await expect(page.locator('[data-protection] input[value="off"]')).toBeChecked();
     expect(await updates(page)).toEqual([]);
     await expect.poll(() => take(page).then(value => value.recording)).toBeNull();
     await page.locator('[data-sequence-tiles]').focus(); await page.keyboard.press('Control+z');

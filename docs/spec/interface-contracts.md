@@ -154,6 +154,15 @@ The same kind of control looks and sits the same on every screen.
 - A switch on a Settings screen's row sits at the row's right, with On or Off
   beside it; an editor's option reads switch, then its words, from the left
   edge (no test).
+- A choice of two to four options whose words fit one line together (60
+  characters) shows them on screen, as one segmented radio group
+  (`segmented`, `webview/ui/segmented.mjs`), so each is read without opening
+  anything and picked in one click; more options, or longer ones, stay a
+  menu (`onScreenChoice`, `webview/view/choices.mjs`;
+  `tests/view/choices.test.mjs`). A setting whose stored value is not among
+  its choices shows it as one more option, "as stored". A pair that are two
+  independent switches (Reverse scrolling's two axes) is two switches, not
+  four options naming their combinations.
 - A Settings card is named for what it holds, never for its screen (Where
   behaviours run, How combos run; no test).
 - A macro, a custom key, a pointing mode and the keyboard are named by their

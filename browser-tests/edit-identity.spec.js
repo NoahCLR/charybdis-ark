@@ -83,8 +83,8 @@ const forms = [
             store.setModel(model); store.render();
         }),
         commit: page => page.locator('[data-act="clear-shortcut"]').click(), type: "updateCustomKeyShortcut", names: "fingerprint"},
-    {name: "macro protection", screen: "macros", state: {macroSlot: "MACRO_17"}, shown: '[data-f="macro:MACRO_17:protection"]',
-        commit: page => page.locator('[data-f="macro:MACRO_17:protection"]').selectOption("off"), type: "updateMacro", names: "fingerprint"},
+    {name: "macro protection", screen: "macros", state: {macroSlot: "MACRO_17"}, shown: '[data-f="macro:MACRO_17:protection:off"]',
+        commit: page => page.locator('label:has([data-f="macro:MACRO_17:protection:off"])').click(), type: "updateMacro", names: "fingerprint"},
     {name: "macro steps, as raw text", screen: "macros", state: {macroSlot: "MACRO_17"}, shown: '[data-f="macro:MACRO_17:raw"]',
         open: page => page.locator("[data-raw-toggle]").click(),
         commit: page => change(page.locator("[data-raw-payload]"), "{KC_A}{KC_C}"), type: "updateMacro", names: "fingerprint"},
