@@ -156,11 +156,14 @@ The same kind of control looks and sits the same on every screen.
   edge (no test).
 - A choice of two to four options whose words fit one line together
   (`ON_SCREEN_MAX_OPTIONS`, `ON_SCREEN_MAX_CHARACTERS`: 60 characters) shows them on screen, as one segmented radio group
-  (`segmented`, `webview/ui/segmented.mjs`), so each is read without opening
-  anything and picked in one click; more options, or longer ones, stay a
-  menu (`onScreenChoice`, `webview/view/choices.mjs`;
-  `tests/view/choices.test.mjs`). A setting whose stored value is not among
-  its choices shows it as one more option, "as stored". A pair that are two
+  (`webview/ui/segmented.mjs`), so each is read without opening anything and
+  picked in one click; more options, or longer ones, stay a menu
+  (`onScreenChoice`, `webview/view/choices.mjs`). Every such choice is drawn
+  by `choiceField`, which applies the rule, and read by `choiceValue`,
+  whichever it became (`tests/view/choices.test.mjs`,
+  `browser-tests/consistency.spec.js`). A setting whose stored value is not
+  among its choices shows it as one more option, "as stored"
+  (`settingOptions`). A pair that are two
   independent switches (Reverse scrolling's two axes) is two switches, not
   four options naming their combinations.
 - A slot bank and its editor (Macros, Custom keys, Pointing modes) stop at

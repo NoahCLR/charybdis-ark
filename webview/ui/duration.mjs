@@ -2,7 +2,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {durationMilliseconds, durationUnit, durationValue} from "../view/duration.mjs";
 import {state} from "../store.mjs";
-import {pickSegment, segmented, segmentedValue} from "./segmented.mjs";
+import {choiceField, choiceValue, pickChoice} from "./segmented.mjs";
 
 /** @type {readonly (readonly [string, string])[]} */
 const UNITS = [["seconds", "seconds"], ["minutes", "minutes"]];
@@ -12,9 +12,9 @@ export function durationControl(field, editable, submit) {
     let unit = state.settingsDurationUnits[field.macro] || durationUnit(field.value);
     const node = el(`<div class="input-row duration-control">
         <input class="input mono num" inputmode="decimal" aria-label="${esc(field.label)}" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(durationValue(field.value, unit))}" ${editable ? "" : "disabled"}>
-        ${segmented({label: `${field.label} unit`, f: `setting:${field.macro}:unit`, choices: UNITS, current: unit, disabled: !editable, hideLabel: true})}</div>`);
+        ${choiceField({label: `${field.label} unit`, f: `setting:${field.macro}:unit`, choices: UNITS, current: unit, disabled: !editable, hideLabel: true})}</div>`);
     const input = /** @type {HTMLInputElement} */ (node.querySelector("input"));
-    const units = /** @type {HTMLElement} */ (node.querySelector(".segmented"));
+    const units = /** @type {HTMLElement} */ (node.querySelector(".field"));
     const read = () => {
         const milliseconds = durationMilliseconds(input.value, unit);
         const valid = milliseconds !== null && Number(milliseconds) >= (field.min ?? 0) && Number(milliseconds) <= (field.max ?? Infinity);
@@ -27,8 +27,8 @@ export function durationControl(field, editable, submit) {
     units.addEventListener("change", (event) => {
         event.stopPropagation();
         const milliseconds = read();
-        if (milliseconds === null) { pickSegment(units, unit); input.reportValidity(); return; }
-        unit = segmentedValue(units) === "minutes" ? "minutes" : "seconds";
+        if (milliseconds === null) { pickChoice(units, unit); input.reportValidity(); return; }
+        unit = choiceValue(units) === "minutes" ? "minutes" : "seconds";
         state.settingsDurationUnits[field.macro] = unit;
         input.value = durationValue(milliseconds, unit);
     });

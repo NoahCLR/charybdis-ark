@@ -1,5 +1,5 @@
 // @ts-check
-import {segmented} from "../segmented.mjs";
+import {choiceField} from "../segmented.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
 import {post, render, state} from "../../store.mjs";
@@ -71,7 +71,7 @@ export function stageKey(model) {
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
     const policy = section("When and where");
-    const commit = el(segmented({label: "Tap commit", f: "lighting:key:tap-commit", choices: vocabulary(model).tapCommit,
+    const commit = el(choiceField({label: "Tap commit", f: "lighting:key:tap-commit", choices: vocabulary(model).tapCommit,
         current: feedback.tapCommitMode, disabled: !canEdit}));
     commit.addEventListener("change", (event) =>
         post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));

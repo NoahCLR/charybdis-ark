@@ -2,8 +2,7 @@
 /** @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model */
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
-import {segmented} from "../segmented.mjs";
-import {onScreenChoice} from "../../view/choices.mjs";
+import {choiceField} from "../segmented.mjs";
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {STEP_KINDS, addStepLabel, macroLocalState, macroShortName, protectionChoiceLabel, samePayload} from "../../view/macro.mjs";
@@ -142,12 +141,8 @@ function protectionField(model, slot, canEdit) {
     const label = vocabulary(model).macroUninterruptible.label;
     /** @type {[string, string][]} */
     const options = (model.macroProtectionChoices || []).map((choice) => [choice.value, protectionChoiceLabel(model, choice, slot.uninterruptible)]);
-    if (onScreenChoice(options.map(([, text]) => text))) {
-        return `<div class="macro-protection" data-protection><span aria-hidden="true">${esc(label)}</span>${segmented({label, f: `macro:${slot.keycode}:protection`,
-            choices: options, current: slot.protection, disabled: !canEdit, hideLabel: true})}</div>`;
-    }
-    return `<label class="macro-protection"><span>${esc(label)}</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
-        ${options.map(([value, text]) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
+    return `<div class="macro-protection" data-protection><span aria-hidden="true">${esc(label)}</span>${choiceField({label, f: `macro:${slot.keycode}:protection`,
+        choices: options, current: slot.protection, disabled: !canEdit, hideLabel: true})}</div>`;
 }
 
 // Every slot can hold a full-length name. The core enforces the rule; the

@@ -14,7 +14,7 @@ import {emptyLayers} from "../../view/empty-layers.mjs";
 import {marked} from "../marks.mjs";
 import {tipFor, words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
-import {segmented, segmentedValue} from "../segmented.mjs";
+import {choiceField, choiceValue} from "../segmented.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @typedef {import("../../view/pointing-link.mjs").LinkRow} LinkRow */
@@ -41,10 +41,10 @@ export function startStep(model, slot, {form, disabled}, stage) {
 
     // What ends a mode its layers started, so only beside layers that start it.
     if (slot.linkedLayers) {
-        const ends = el(`<div class="pd-row"><span class="pd-row-l" aria-hidden="true">${esc(L.endsWhen)}</span>${segmented({label: L.linkEnds, f: `pointing:${slot.id}:linkEnds`,
+        const ends = el(`<div class="pd-row"><span class="pd-row-l" aria-hidden="true">${esc(L.endsWhen)}</span>${choiceField({label: L.linkEnds, f: `pointing:${slot.id}:linkEnds`,
             choices: P.linkEnds, current: slot.linkEnds, disabled: Boolean(disabled), hideLabel: true,
             tip: tipFor(model, "linkEnds")})}</div>`);
-        form.linkEnds = () => Number(segmentedValue(ends) || LINK_ENDS.NOTHING);
+        form.linkEnds = () => Number(choiceValue(ends) || LINK_ENDS.NOTHING);
         node.append(ends);
     }
 

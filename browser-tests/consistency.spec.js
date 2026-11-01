@@ -139,3 +139,12 @@ test("every behaviour cell is one size, on Custom keys and in the Keymap's Behav
         }))) expect(fits, `${screen} timing placeholder`).toBe(true);
     }
 });
+
+test("a choice shows a few short options on screen and keeps a longer list in a menu, by one rule", async ({page}) => {
+    await openControls(page, "host");
+    // Operating system: four short options, on show.
+    await expect(page.locator('.seg[aria-label="Operating system"] input[type="radio"]')).toHaveCount(4);
+    // Keyboard layout: seven, a menu.
+    await expect(page.locator('select[data-f="setting:hostLayout"]')).toHaveCount(1);
+    await expect(page.locator('.seg[aria-label="Keyboard layout"]')).toHaveCount(0);
+});
