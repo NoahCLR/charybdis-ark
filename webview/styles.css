@@ -9,7 +9,8 @@
  * (tests/scripts/conventions.test.js). A value the scale lacks is a new
  * token, not a literal. Exempt: 0, 50% (round), inherit, the board's and the
  * picker board's SVG text (sized in the drawing's own units), and the
- * alpha-only masks of a strip's faded edges. Spacing is not tokenised.
+ * alpha-only masks of a strip's faded edges and of the every-tap-count badge's
+ * ring (.bn.lit.all-counts). Spacing is not tokenised.
  *   --fs-*  font sizes, 2xs 9.5 · xs 10.5 · sm 11.5 · md 12.5 · base 13 · lg 15 · xl 20
  *   --fw-*  weights, regular 400 · strong 560 · label 600 · bold 700
  *   --r-*   radii, mark 2 · chip 4 · control 7 · card 10 · sheet 14 · pill
@@ -1085,6 +1086,9 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* A layer's or pointing mode's icon takes the whole slot, ending where the dots do: the board is wider than a badge. */
 .mk-slot > .kind-icon { grid-column: 1 / -1; }
 .mk-slot.title { display: inline-flex; width: 34px; justify-content: flex-start; }
+/* A Settings row never pairs a badge with a dot, so its one mark sits in the
+   middle of the slot rather than at the tier track's edge. */
+.setrow .mk-slot > :only-child { grid-column: 1 / -1; justify-self: center; }
 /* A branch that acts on a layer, or sends a pointing mode or a macro, reads as that thing: its kind's icon in its colour (its mark), its name and its tags (ui/marks.mjs sends). */
 .sends { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; font-family: var(--sans); font-size: var(--fs-sm); color: var(--text); font-weight: var(--fw-strong); vertical-align: middle; }
 .sends-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1313,8 +1317,19 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-branch { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 8px; align-items: start; }
 .hc-branch + .hc-branch { margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--line); }
 .hc-n { font-family: var(--mono); font-size: var(--fs-2xs); color: var(--text-3); border: 1px solid var(--line); border-radius: var(--r-chip); text-align: center; padding: 1px 0; }
-/* A tap-count badge in its branch colour (branchBadge in ui/marks.mjs). */
-.bn.lit { border-color: var(--tint); background: color-mix(in srgb, var(--tint) 28%, transparent); color: var(--text); }
+/* A tap-count badge in its branch colour (branchBadge in ui/marks.mjs). Its
+   fill is the colour at --lit-fill, which every lit badge shares. */
+.bn.lit { --lit-fill: 28%; border-color: var(--tint); background: color-mix(in srgb, var(--tint) var(--lit-fill), transparent); color: var(--text); }
+/* Every tap count's badge (branchesBadge): the lit badge's border and fill in
+   every tap-branch colour, an equal hard-edged share each, in tap order. The
+   border is the shares masked to a ring at the badge's edge; the fill is the
+   same shares at the lit badge's strength. */
+.bn.lit.all-counts { position: relative; border-color: transparent; background: none; isolation: isolate; }
+.bn.lit.all-counts::before, .bn.lit.all-counts::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; z-index: calc(-1 * var(--z-raised)); pointer-events: none;
+  background: linear-gradient(90deg, var(--tints)); }
+.bn.lit.all-counts::before { opacity: var(--lit-fill); }
+.bn.lit.all-counts::after { padding: 1px; mask-clip: content-box, border-box; mask-composite: exclude; }
+.bn.lit.all-counts::after { mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0); }
 .hc-act { display: grid; grid-template-columns: 70px minmax(0,1fr); gap: 7px; align-items: start; font-size: var(--fs-sm); line-height: 18px; }
 .hc-act + .hc-act { margin-top: 4px; }
 .hc-stage { color: var(--text-3); display: flex; align-items: center; gap: 5px; white-space: nowrap; }

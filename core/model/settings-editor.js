@@ -59,8 +59,9 @@ const COMBO_TIMING = Object.freeze([
 // Which screen draws a section is the interface's.
 //
 // `governs` names what a setting is about when that thing has a colour of its
-// own elsewhere — a behaviour tier, a tap-count branch, a pointing slot, a
-// layer — so every surface that shows the setting can mark it the same way.
+// own elsewhere — a behaviour tier, the tap counts past the first, a pointing
+// slot, a layer — so every surface that shows the setting can mark it the same
+// way.
 //
 // The defaults behaviours inherit, which the editor view also publishes as
 // `timing`.
@@ -71,7 +72,7 @@ const keyTiming = {id: "keyTiming", label: SECTION.keyTiming, fields: [
         {tooltip: "QMK's tapping term, used by LT(), MT(), OSM(), TT() and OSL() keys, and by their behaviours with an empty Tap / hold threshold."}),
     number("tapHoldTerm", SETTING.TAP_HOLD_TERM, `Behaviour ${THRESHOLD.tapHoldTerm}`, "Used when a behaviour on any other key leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
     number("longHoldTerm", SETTING.LONG_HOLD_TERM, capitalised(THRESHOLD.longHoldTerm), "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
-    number("multiTapTerm", SETTING.MULTI_TAP_TERM, capitalised(THRESHOLD.multiTapTerm), "How soon after a release the next press still counts as another tap, unless a behaviour sets its own.", {governs: {kind: "branch", count: 2}}),
+    number("multiTapTerm", SETTING.MULTI_TAP_TERM, capitalised(THRESHOLD.multiTapTerm), "How soon after a release the next press still counts as another tap, unless a behaviour sets its own.", {governs: {kind: "branches"}}),
 ]};
 /** @type {import("../../contracts/model.js").SettingsSection[]} */
 const sections = [

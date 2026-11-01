@@ -158,4 +158,9 @@ behaviour leaves its own empty:
 - **Long hold threshold**.
 - **Multi tap window**.
 
+Each behaviour timing wears the colour its key feedback flashes: the two
+behaviour thresholds their tier's dot, and the Multi tap window an "N×" badge
+split between the tap-branch colours, Key feedback's colour for each tap count
+from 2× up, since it decides all of them.
+
 Changing a default moves every behaviour that follows it.

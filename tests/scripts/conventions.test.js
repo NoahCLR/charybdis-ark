@@ -31,6 +31,8 @@ const STYLESHEET_ALLOWED = [
     {selector: /^\.(kc|pkb)-/, property: /^font-size$/},
     // A strip's faded edge is an alpha mask: its black is coverage, not a colour.
     {selector: /^\.more-/, property: /mask-image$/},
+    // Every tap count's badge masks its gradient to a ring the same way.
+    {selector: /^\.bn\.lit\.all-counts::after$/, property: /^mask-image$/},
 ];
 const stylesheetLiterals = (css) => {
     const found = [];

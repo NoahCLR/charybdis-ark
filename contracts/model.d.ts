@@ -276,7 +276,8 @@ export type ReviewMark =
     | {kind: 'layers'; layers: {layer: number; name: string}[]}
     | {kind: 'pointing'; slot: number}
     | {kind: 'tier'; tier: string; branch?: number}
-    | {kind: 'branch'; count: number}
+    /** Every tap count from 2× up, as the Multi tap window governs them. */
+    | {kind: 'branches'}
     | {kind: 'combo'; badge?: string}
     | {kind: 'stage'; on: boolean};
 export interface ReviewField {
@@ -324,7 +325,7 @@ export interface SettingFieldBase extends SettingBits {
     notBuilt?: boolean;
     /** QMK owns the live value, so keys on the keyboard (or VIA) change it too. */
     keyboardKeys?: boolean;
-    governs?: {kind: 'tier'; tier: string} | {kind: 'branch'; count: number} | {kind: 'layer'; layer: number};
+    governs?: {kind: 'tier'; tier: string} | {kind: 'branches'} | {kind: 'layer'; layer: number};
     /** The heading a field is listed under within its section. */
     part?: string;
 }
