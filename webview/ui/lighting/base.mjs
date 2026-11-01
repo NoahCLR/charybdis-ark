@@ -1,4 +1,6 @@
 // @ts-check
+import {segmented} from "../segmented.mjs";
+import {onScreenChoice} from "../../view/choices.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {post} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
@@ -44,6 +46,16 @@ export function stageBase(model) {
         if (!entry) return el(`<span></span>`);
         const choices = (entry.choices || []).map((item) => typeof item === "object" ? item : {value: item, label: String(item)});
         const known = choices.some((item) => String(item.value) === String(entry.value));
+        /** @type {[string, string][]} */
+        const options = [...(known ? [] : [/** @type {[string, string]} */ ([String(entry.value), `${entry.value} · as stored`])]),
+            ...choices.map((item) => /** @type {[string, string]} */ ([String(item.value), item.label]))];
+        if (onScreenChoice(options.map(([, text]) => text))) {
+            const control = el(`<div data-tip="${esc([entry.tooltip, entry.hint].filter(Boolean).join(" "))}">${segmented({label: entry.label, f: `setting:${entry.macro}`,
+                choices: options, current: String(entry.value), disabled: !(editable && !entry.readOnly), attributes: {"data-macro": entry.macro}})}
+                ${entry.hint ? `<span class="hint">${esc(entry.hint)}</span>` : ""}</div>`);
+            control.addEventListener("change", (event) => submit({[entry.macro]: /** @type {HTMLInputElement} */ (event.target).value}));
+            return control;
+        }
         const control = el(`<label class="field" data-tip="${esc([entry.tooltip, entry.hint].filter(Boolean).join(" "))}"><span>${esc(entry.label)}</span>
             <select class="input" data-macro="${esc(entry.macro)}" data-f="setting:${esc(entry.macro)}" ${editable && !entry.readOnly ? "" : "disabled"}>
             ${known ? "" : `<option value="${esc(entry.value)}" selected>${esc(entry.value)} · as stored</option>`}

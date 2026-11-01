@@ -377,14 +377,15 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
   font-style: normal; font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
 .affix.unit .input { padding-right: 30px; }
 .affix.unit.wide .input { padding-right: 78px; }
-.duration-control input { min-width: 0; }
-.duration-control select.input { flex: 0 0 auto; width: auto; }
+.duration-control > input { flex: 1 1 64px; min-width: 56px; }
+.duration-control > .segmented { flex: 0 0 auto; }
 /* All lighting and its idle timeout, in Lighting's title bar: they darken
    every stage, so they sit above all of them, and the board does not move. */
 .lighting-power { display: flex; align-items: center; gap: 18px; }
 .lighting-power .sw .txt { white-space: nowrap; }
 .lighting-timeout { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: var(--fs-md); }
-.lighting-timeout .duration-control { width: 170px; }
+.lighting-timeout .duration-control { width: auto; }
+.lighting-timeout .duration-control > input { flex: 0 0 64px; }
 
 /* The hidden input must stay beside its visible switch when the editor scrolls;
    focusing an absolutely positioned input elsewhere can move the viewport. */
@@ -1805,6 +1806,14 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .import-fits.warn { color: var(--warning); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
+/* A choice on show (ui/segmented.mjs) takes the width its options need, and
+   wraps under the name when the row cannot give it. */
+.setrow:has(> .control > .segmented) { grid-template-columns: minmax(0,1fr) auto; }
+.setrow > .control > .segmented { justify-items: end; }
+@container content (max-width: 788px) {
+  .setrow:has(> .control > .segmented) { grid-template-columns: minmax(0,1fr); }
+  .setrow > .control > .segmented { justify-items: start; }
+}
 .setrow.ro .nm { color: var(--text-2); }
 .setrow .nm { font-size: var(--fs-md); }
 .setrow .hint { font-size: var(--fs-sm); color: var(--text-3); margin-top: 2px; }
