@@ -24,7 +24,8 @@ The DPI keys on the keyboard change these too, and Ark shows the new value.
 
 - **Auto-sniping** uses the sniping speed while any of the **Auto-sniping
   layers** is on. Each layer has its own switch, as the other per-layer
-  settings do. Turning **Auto-sniping** off keeps the layers you chose.
+  settings do, the [empty layers](board-and-layers.md#empty-layers) folded at
+  the end. Turning **Auto-sniping** off keeps the layers you chose.
 - While one of those layers is on, moving the ball doesn't turn on a separate
   pointer layer, so the layer's own keys stay under your hand.
 
@@ -82,7 +83,8 @@ Then the layers. A layer the mode is linked to lends it its keys, whatever
 they are: clicks, modifiers, layer keys, behaviours. This is where a mode gets
 keys of its own: put what it needs on a layer, and have the layer start the
 mode, the mode's key turn the layer on, or both. The card lists every layer,
-in the order of the layer tabs, with two switches:
+in the order of the layer tabs, the [empty ones](board-and-layers.md#empty-layers)
+folded at its end, with two switches:
 
 - **Starts this pointing mode**: while this layer is on, held or locked, the
   mode runs. A layer starts one mode at most, so a layer that already starts

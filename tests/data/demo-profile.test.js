@@ -1,7 +1,8 @@
 "use strict";
 const {profileLayers, profileMacros} = require("../fixtures/profile-document");
 // The demo's profile is data the app ships (core/data/demo-profile.charybdis.json),
-// an export of a real keyboard, kept exactly as Ark exported it. These hold it
+// an export of a real keyboard, re-encoded by Ark's own codec when its data
+// changes (its colour once), so it stays as Ark exports it. These hold it
 // to what the demo promises: it is a complete profile for current firmware,
 // it decodes under the current schema without being upgraded, and it opens a
 // draft in which every area can be edited.

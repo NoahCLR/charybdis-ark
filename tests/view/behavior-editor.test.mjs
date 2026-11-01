@@ -80,7 +80,7 @@ test("each timing placeholder names where its default comes from, and storing is
     const model = onBase(["LT(3,KC_F)", "KC_A"]);
     const dual = behaviourEditorRow(model, "LT(3,KC_F)"), plain = behaviourEditorRow(model, "KC_A");
     assert.equal(behaviourTimingField(dual, "tapHoldTerm").placeholder, "200 · dual-role");
-    assert.equal(behaviourTimingField(plain, "tapHoldTerm").placeholder, "150 · behaviour default");
+    assert.equal(behaviourTimingField(plain, "tapHoldTerm").placeholder, "150 · default");
     assert.equal(behaviourTimingField(plain, "longHoldTerm").placeholder, "400 · default");
     assert.equal(behaviourTimingField(plain, "multiTapTerm").placeholder, "150 · default");
     assert.equal(behaviourTimingField({...plain, timingDefaults: {}}, "tapHoldTerm").placeholder, "ms", "no default reads ms");

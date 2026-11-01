@@ -192,11 +192,13 @@ function withFailure(error, applyProgress, connection) {
     // A device reason found after the step failed (AUTHORITY_FAILED read
     // back) outranks the step's own error.
     const cause = /** @type {Failure} */ (error.deviceError ? error : error.cause || error);
-    const failure = applyProgress.fail({reason: failureReason(cause, slaveOf(error)), saved});
+    const connected = !lost && /** @type {{connected?: boolean}} */ (connection).connected !== false;
+    // What to do next is the bar's to say too, after the verdict and why.
+    const advice = cutShort ? [connected && error.keepConnected ? "Keep both halves connected." : "", ...(error.advice || [])].filter(Boolean) : [];
+    const failure = applyProgress.fail({reason: failureReason(cause, slaveOf(error)), saved, advice});
     const fields = {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved};
     if (!cutShort) return Object.assign(error, fields);
-    const connected = !lost && /** @type {{connected?: boolean}} */ (connection).connected !== false;
-    const sentences = [failure.verdict, failure.reason, connected && error.keepConnected ? "Keep both halves connected." : "", ...(error.advice || [])];
+    const sentences = [failure.verdict, failure.reason, ...failure.advice];
     return Object.assign(fail(arkCode(error, "RESTORE_NOT_SAVED"), sentences.filter(Boolean).join(" ")),
         {cause: error.outcome ? error.cause : error, deviceError: error.deviceError}, fields, {verdict: failure.verdict});
 }
@@ -213,7 +215,7 @@ function slaveOf(error) {
 /** @param {boolean | undefined} incomplete @param {string} recovery @param {boolean} ifOld */
 function recoveryAdvice(incomplete, recovery, ifOld) {
     if (incomplete) return [ifOld ? "If it still shows the old profile then, import your original complete backup again." : "Import your original complete backup again.",
-        `Interrupted data was saved for diagnosis at ${recovery}.`];
+        `Interrupted data was saved for diagnosis on Backups (${recovery}).`];
     return [ifOld ? `If it still shows the old profile then, use the copy kept before the save (${recovery}) on Backups.` : `The copy kept before the save is on Backups (${recovery}).`];
 }
 

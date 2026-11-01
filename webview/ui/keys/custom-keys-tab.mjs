@@ -11,7 +11,7 @@ import {customKeyOf, hasShortcut} from "../../view/custom-key.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
-import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
+import {attachReachRows, reachAttrs, reachTable, rowPick} from "../groups.mjs";
 import {actionMarked, tierDot} from "../marks.mjs";
 import {reachLabel} from "./reach.mjs";
 
@@ -30,7 +30,7 @@ export function tabCustomKeys(body, right) {
         const key = customKeyOf(model, keycode);
         const behaviour = key?.hasBehavior ? keyIdentity(model, keycode).behaviour : undefined;
         return `<tr${reachAttrs("customKeys", group, keycode)}>
-            <td>${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedKeys.has(keycode) ? draftDot() : ""}</td>
+            <td>${rowPick("customKeys", group, keycode, `${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedKeys.has(keycode) ? draftDot() : ""}`)}</td>
             <td>${hasShortcut(key) ? `<span class="mono">${esc(key?.shortcutLabel)}</span>` : `<span class="muted">—</span>`}</td>
             <td class="beh-branches">${behaviour
                 ? `${behaviourTiers(behaviour).map((tier) => tierDot(model, tier.kind)).join("")} ${behaviour.steps.length}`

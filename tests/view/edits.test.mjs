@@ -1106,7 +1106,7 @@ test("the auto-mouse fade is posted as a share, and a new timeout rescales it in
     assert.equal(fade().whole, timeout);
     const last = draft.steps().at(-1).changes;
     assert.deepEqual(last.map((change) => [change.unit, change.area]).sort(),
-        [["settings:autoMouse", "Mouse"], ["settings:automouseFade", "Lighting"]], "the step says it moved the fade too");
+        [["settings:autoMouse", "Pointer"], ["settings:automouseFade", "Lighting"]], "the step says it moved the fade too");
     const place = last.find((change) => change.unit === "settings:automouseFade").place;
     assert.deepEqual(place, {kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"});
     const groups = draft.view({}).changes.filter((change) => ["settings:autoMouse", "settings:automouseFade"].includes(change.unit)).map((change) => change.group);

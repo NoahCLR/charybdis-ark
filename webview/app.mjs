@@ -11,6 +11,8 @@ import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
 import {activateOnKey, focusDialog, redrawKeepingFocus, trapTab} from "./lib/focus.mjs";
 import {mountNumberEntry} from "./lib/number-entry.mjs";
+import {announce, mountAnnouncer} from "./lib/announce.mjs";
+import {announcements} from "./view/announcements.mjs";
 import {getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
 import {chooseKeyboard, shellOf, otherTheme, setTheme} from "./view/shell-panel.mjs";
@@ -25,6 +27,7 @@ import {matchBehavioursHeight} from "./ui/keys/bench.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
 import {escapeKeyboardMenu} from "./ui/keyboard-menu.mjs";
+import {escapeBoardShortcuts} from "./ui/keys/board-card.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenBehaviours, screenCombos, screenHost, screenPointer} from "./ui/settings.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
@@ -39,7 +42,7 @@ import {screenDevice} from "./ui/device.mjs";
 import {reviewOverlay} from "./ui/review-overlay.mjs";
 import {leaveDemoOverlay} from "./ui/leave-demo.mjs";
 import {editModeOverlay, liveProposalOverlay} from "./ui/edit-mode.mjs";
-import {commitBar, rail, topbar} from "./ui/frame.mjs";
+import {commitBar, rail, reserveCommitRoom, topbar} from "./ui/frame.mjs";
 
 const root = /** @type {HTMLElement} */ (document.getElementById("root"));
 /** @type {import("./view/screens.mjs").ScreenId | null} */
@@ -60,6 +63,7 @@ function render({keepScreen = false} = {}) {
     redrawKeepingFocus(root, () => drawApp(keptScreen, scroll, benchHeight));
     focusDialog(root);
     reveal();
+    announce(announcements(getModel(), state));
 }
 
 /** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureKeysBenchHeight>} benchHeight */
@@ -82,6 +86,7 @@ function drawApp(keptScreen, scroll, benchHeight) {
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
     root.appendChild(app);
+    reserveCommitRoom(app);
     const theme = shellOf(model).theme;
     root.querySelector('[data-act="theme"]')?.addEventListener("click", () => post(setTheme(otherTheme(theme))));
     restoreKeysBenchHeight(root, benchHeight);
@@ -113,9 +118,10 @@ function readPlaceholder(read, model) {
     // Without a keyboard the demo is offered beside it; a shell that cannot
     // reach one at all still offers it, where the shell says so.
     const demoHere = demoOf(model).offered && (read.state !== "blocked" || Boolean(shellOf(model).blocked?.demo));
-    const screenTitle = screenDefinition(state.screen)?.title || "Keyboard";
+    // Titled as the rail item it sits under, which the rail highlights.
+    const screenTitle = screenDefinition(state.screen)?.label || "Ark";
     const secondary = secondaryScreen(model, state.screen);
-    const screen = el(`<div class="main">${topbar(screenTitle, "Ark changes what your Charybdis does — keys, layers, lighting, macros and the trackball — and saves nothing until you review it.")}
+    const screen = el(`<div class="main">${topbar(screenTitle, "Change what your Charybdis does. Nothing is saved until you review it.")}
         <div class="content"><div class="pad"><div class="read-placeholder" role="status" aria-live="polite">
             ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}
             <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>
@@ -165,6 +171,7 @@ function reveal() {
 }
 
 setRenderer(render);
+mountAnnouncer();
 mountHover(root);
 mountNumberEntry(root);
 
@@ -173,6 +180,8 @@ function refreshCommitBar() {
     if (previous && next) previous.replaceWith(next);
     else if (next && main) main.append(next);
     else previous?.remove();
+    reserveCommitRoom(root.querySelector(".app"));
+    announce(announcements(getModel(), state));
 }
 
 const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation});
@@ -227,9 +236,19 @@ addEventListener("keydown", (event) => {
         render();
         return;
     }
-    // Esc on a live edit's question is Go back: nothing is sent.
+    // Esc on a live edit's question is Go back: nothing is sent. The question
+    // sits over everything below, so it answers before any of them.
     const proposal = getModel()?.liveProposal;
-    if (proposal) post(controls.cancelLiveEdit(proposal.id));
+    if (proposal) { post(controls.cancelLiveEdit(proposal.id)); return; }
+    // Esc on the backup's comparison is its Cancel, unless it is busy.
+    const portable = getModel()?.portable;
+    if (portable?.review && state.screen === "profile") {
+        if (!portable.busy) post(controls.control("cancelPortableReview"));
+        return;
+    }
+    // Esc on a recovery copy's "Delete this copy?" is its Cancel.
+    if (state.recoveryAsk !== null && state.screen === "profile") { state.recoveryAsk = null; render(); return; }
+    escapeBoardShortcuts();
 });
 // A resize lets the workbench find its height again at the new width, the
 // Behaviours tab's included, once per frame however many events come.

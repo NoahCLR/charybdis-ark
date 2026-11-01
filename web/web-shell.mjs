@@ -5,7 +5,8 @@
 // chooser, downloads, and the page itself for progress and errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {FILE_MAX_BYTES, FILE_TOO_LARGE, openPanelLoop, WebHidDeviceAdapter} from "./core.mjs";
+import {FILE_MAX_BYTES, FILE_TOO_LARGE, openPanelLoop, VOCABULARY, WebHidDeviceAdapter} from "./core.mjs";
+import {copyTitle} from "../webview/view/shell-panel.mjs";
 import {connectPanel} from "./panel-channel.mjs";
 import {nativePopups} from "./native-popups.mjs";
 import {openRecoveries} from "./recoveries.mjs";
@@ -86,10 +87,13 @@ export function startWebShell(env) {
             try {return await work();}
             finally {progress = null;}
         },
+        // A copy is named as Backups lists it, never by the file it
+        // downloads as; core's sentences say it is on Backups.
         saveRecovery: async (copy, about) => {
-            const name = await recoveries.save(copy, about);
+            const savedAt = new Date();
+            await recoveries.save(copy, about, savedAt);
             recoveryList = await recoveries.list();
-            return `${name}, kept in this browser (Backups)`;
+            return copyTitle({vocabulary: VOCABULARY}, {...about, savedAt: savedAt.toISOString()});
         },
         chooseProfile: () => {
             const chosen = choosing || Promise.resolve(undefined);

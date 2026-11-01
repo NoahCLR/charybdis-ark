@@ -17,7 +17,7 @@ Click a row to see its keys ringed on the board and open it for editing, with
 
 ## Making a combo
 
-**New combo** opens the builder.
+**New combo** opens the builder for a new combo.
 
 1. **Sends**: what the combo sends, with **Pick…**. A combo can't send a
    layer's **Tap-hold**, which decides tap or hold on a key of its own, so
@@ -29,7 +29,8 @@ Click a row to see its keys ringed on the board and open it for editing, with
 Keep stays off until the combo has what it sends and at least two keys, and
 the note beside it says which is missing. At 16 keys the note says so and
 **Pick on board** takes no more. Until you keep it, the builder holds
-the combo on its own; **Cancel** drops it.
+the combo on its own; **Cancel**, or Escape, drops it and closes the
+builder.
 
 Each combo also has:
 
@@ -53,21 +54,24 @@ builder says which.
 ## Combo settings
 
 **Combo settings** (**Combos** under Settings in the rail) shows two cards,
-both open. **Combos**:
+both open. **How combos run**:
 
 - **Enabled**: every combo on or off. A key on the keyboard can change it
   too.
 - **Default combo window**: for every combo without its own. New combos start
   on it, and the combos that follow it change with it.
 - **Combo hold threshold**: how long a combo that must be held, or is tap
-  only, waits to tell a hold from a tap. Other combos ignore it.
+  only, waits to tell a hold from a tap: this, or its combo window if that is
+  longer, so 0 adds no wait beyond the window. Other combos ignore it.
 - **Combo outputs use behaviours**: off, combos still fire but send their
   plain output.
 - **On these layers**: a key joins combos only when the layer it comes from is
   on here.
 
 **Combo layer matching**: which layer's keys each layer's combos are matched
-against. Pick the layer itself to keep its combos independent.
+against. Pick the layer itself to keep its combos independent. Here and in
+**On these layers**, the [empty layers](board-and-layers.md#empty-layers) are
+folded at the end.
 
 ## Where combos run
 

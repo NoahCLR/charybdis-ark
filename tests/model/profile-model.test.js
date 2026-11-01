@@ -95,6 +95,18 @@ test("each published layer is always on as the profile's default layers say, and
     assert.deepEqual(unread.comboReferenceLayers, LAYER_IDENTITY, "with nothing read, each layer matches its own keys");
 });
 
+// An unnamed layer is published with core's words for it, which read like a
+// name ("Layer 9"), so whether the profile names it is said beside them.
+test("each published layer says whether the profile gives it a name of its own", () => {
+    const profile = opened((settings) => {settings.names[9] = "Gaming"; settings.names[10] = "";});
+    const layers = presented(profile).layers;
+    assert.deepEqual(layers.map((layer) => layer.named), profile.decoded.settings.names.map(Boolean));
+    assert.equal(layers[9].named, true);
+    assert.equal(layers[10].named, false);
+    const unread = profileModel({layers: [{layer: 0, keys: []}], domains: {}, comboRows: [], comboInfo: {state: "unread"}, baseEffect: baseRgbForView(undefined), identity: null}, null, EDITING);
+    assert.equal(unread.layers[0].named, false, "with no names read, none is named");
+});
+
 test("behaviour rows claim their keys' built-in first actions", () => {
     const rows = readback({committed: decodedDeviceProfile()}).keyBehaviors;
     const claims = rows.filter((row) => Object.keys(row.builtIn).length).map((row) => row.keycode);

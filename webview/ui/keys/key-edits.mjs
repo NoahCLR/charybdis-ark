@@ -17,8 +17,10 @@ export function pickKeycodeFor(layoutIndex) {
     const position = positionAt(layer, layoutIndex);
     state.selected = layoutIndex;
     openPicker({
-        title: `Keycode on ${layerCalled(layer)}`,
-        context: `index ${layoutIndex}`,
+        // Named as the board names the key, never by its layout index.
+        title: `Key on ${layerCalled(layer)}`,
+        contextKeycode: position ? keyMeaning(position) : undefined,
+        onLayer: layerCalled(layer),
         seed: position ? [keyMeaning(position)] : [],
         layoutKey: true,
         onPick: (expression) => {

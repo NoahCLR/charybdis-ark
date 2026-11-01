@@ -122,7 +122,8 @@ test("Keyboard: the title renames the keyboard, and memory and diagnostics live 
     await expect(page.locator(".card.usage")).toHaveCount(1);
     await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
     await clearPosts(page);
-    await page.locator('[data-section="diagnostics"] [data-act="read"]').click();
+    // Read keyboard sits over the fold's title, outside its summary.
+    await page.locator('.diagnostics [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh"})]);
     await expect(page.locator('[data-section="diagnostics"]')).not.toHaveAttribute("open", "");
     await page.locator('[data-screen="host"]').click();
@@ -138,13 +139,13 @@ test("Keyboard: opening Diagnostics reads the flash pauses once, and its Read ke
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "readFlashPauses"})]);
     await expect(fold.locator(".flash-pauses-section")).toContainText("Not read yet.");
     await clearPosts(page);
-    await fold.locator('[data-act="read"]').click();
+    await page.locator('.diagnostics [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "refresh", flashPauses: true})]);
     await expect(fold).toHaveAttribute("open", "");
     await clearPosts(page);
     await fold.locator("summary h3").click();
     await expect(fold).not.toHaveAttribute("open", "");
-    await fold.locator('[data-act="read"]').click();
+    await page.locator('.diagnostics [data-act="read"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([{type: "refresh", draftId: expect.any(String), draftRevision: expect.any(Number)}]);
 });
 
@@ -204,12 +205,16 @@ test("Backups: a recovery copy is named by what made it and its keyboard, can be
     await page.locator(".recovery-row [data-use]").first().click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "useRecovery", id: 4})]);
     await clearPosts(page);
+    // Delete asks first, in its row.
     await page.locator(".recovery-row [data-delete]").first().click();
+    expect(await page.evaluate(() => window.__posted)).toEqual([]);
+    await page.locator('.recovery-row [data-act="confirm-delete"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "deleteRecovery", id: 4})]);
     // A copy stored before causes were recorded works as any other.
     for (const [attribute, type] of [["data-use", "useRecovery"], ["data-recovery", "downloadRecovery"], ["data-delete", "deleteRecovery"]]) {
         await clearPosts(page);
         await page.locator(`.recovery-row [${attribute}]`).nth(3).click();
+        if (attribute === "data-delete") await page.locator('.recovery-row [data-act="confirm-delete"]').click();
         await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type, id: 1})]);
     }
     await page.evaluate(async () => {

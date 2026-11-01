@@ -35,15 +35,28 @@ const attachGroupToggles = (node) => /** @type {NodeListOf<HTMLElement>} */ (nod
     }));
 
 // Rows across the tabs pick themselves the same way, and picking the same row
-// again lets go of it.
+// again lets go of it. A click anywhere on the row picks it; its row-pick
+// button (rowPick) is how the keyboard does, by Enter or Space. Any other
+// button in the row is its own.
 /** @param {HTMLElement} node @param {keyof import("../state.js").PanelState["reachRow"]} tab */
 export const attachReachRows = (node, tab) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-reach]")).forEach((row) =>
     row.addEventListener("click", (event) => {
-        if (/** @type {Element} */ (event.target).closest("button")) return;
+        if (/** @type {Element} */ (event.target).closest("button:not(.row-pick)")) return;
         const picked = /** @type {string} */ (row.dataset.reach);
         state.reachRow[tab] = state.reachRow[tab] === picked ? null : picked;
         render();
     }));
+
+// A row's name, in its first cell, is a button that picks the row, as the
+// Behaviours tab's rows have: the list is walked with Tab and picked with
+// Enter or Space, and says whether it is picked. It keeps the focus across
+// the redraw a pick makes by its own identity (data-row-pick, lib/focus.mjs).
+// A row whose name is only a mark (a combo's badge) is named in words too.
+/** @param {keyof import("../state.js").PanelState["reachRow"]} tab @param {string} group @param {string | number} name @param {string} content markup @param {string} [label] */
+export const rowPick = (tab, group, name, content, label = "") => {
+    const picked = reachRowId(group, name);
+    return `<button class="row-pick" data-row-pick="${esc(`${tab}:${picked}`)}" aria-pressed="${state.reachRow[tab] === picked}"${label ? ` aria-label="${esc(label)}"` : ""}>${content}</button>`;
+};
 
 // A row names the route it was picked under (reachRowId).
 /** @param {keyof import("../state.js").PanelState["reachRow"]} tab @param {string} group @param {string | number} name */

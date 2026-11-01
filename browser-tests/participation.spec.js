@@ -30,12 +30,14 @@ test("participation controls post placements, shared definitions and master/sour
     await expect.poll(posted).toEqual([expect.objectContaining({type: "updatePlacementPolicy", useBehavior: false, joinCombos: false})]);
 
     await page.locator('[data-tab="behaviours"]').click();
+    await page.getByText("Layers it runs on", {exact: true}).click();
+    // Each layer by its name and mark, as Settings draws its layer switches;
+    // layer 15 is empty, so it shows once the empty layers do.
+    await expect(page.locator('.def-layers .layer-grid .sw .mk').first()).toBeVisible();
+    await page.locator('.def-layers [data-empty-layers]').click();
     await clear();
     await page.getByText('Use this behaviour', {exact: true}).click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: false, allowedLayers: 65535})})]);
-    await page.getByText("Layers it runs on", {exact: true}).click();
-    // Each layer by its name and mark, as Settings draws its layer switches.
-    await expect(page.locator('.def-layers .layer-grid .sw .mk').first()).toBeVisible();
     await clear();
     await page.locator('.def-layers label').filter({has: page.locator('[data-switch-layer="15"]')}).click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: false, allowedLayers: 32767})})]);
@@ -43,7 +45,9 @@ test("participation controls post placements, shared definitions and master/sour
     await page.locator('[data-tab="combos"]').click();
     await page.getByRole("button", {name: "New combo", exact: true}).click();
     await page.getByText('Use this combo', {exact: true}).click();
-    await page.getByText("Layers it runs on", {exact: true}).click();
+    // Layers it runs on stays open once opened, on a combo as on a behaviour.
+    await expect(page.locator(".def-layers")).toHaveAttribute("open", "");
+    await page.locator('.def-layers [data-empty-layers]').click();
     await page.locator('.def-layers label').filter({has: page.locator('[data-switch-layer="15"]')}).click();
     await page.locator('[data-output]').fill("KC_A");
     await page.locator('[data-act="pickboard"]').click();
@@ -58,6 +62,7 @@ test("participation controls post placements, shared definitions and master/sour
     for (const [macro, sectionId, screen] of [["behaviorsEnabled", "behaviorSettings", "behaviours"], ["behaviorsOnLayer15", "behaviorSettings", "behaviours"],
         ["combosEnabled", "comboSettings", "combos"], ["combosOnLayer15", "comboSettings", "combos"]]) {
         await page.locator(`[data-screen="${screen}"]`).click();
+        if (macro.endsWith("Layer15") && await page.locator(`[data-empty-layers="settings:${sectionId}"][aria-expanded="false"]`).count()) await page.locator(`[data-empty-layers="settings:${sectionId}"]`).click();
         await clear();
         await page.locator("label").filter({has: page.locator(`[data-macro="${macro}"]`)}).click();
         await expect.poll(posted).toEqual([expect.objectContaining({type: "updateConfigDefaults", sectionId, fields: expect.arrayContaining([{macro, enabled: false}])})]);
@@ -139,6 +144,6 @@ test("a key whose behaviour is switched off for it on this layer shows no dots t
     await expect(body.locator("h4").first()).toHaveText(`This key on this layer (${found.name})`);
     await expect(body.locator('.key-reaches [data-goto="behaviours"]')).toContainText(`not used: ${why}`);
     await expect(body.locator(".key-participation")).toContainText(`Behaviour and combos for this key on this layer (${found.name})`);
-    await expect(body.locator(".key-participation")).toContainText(`They switch only this key on this layer (${found.name}).`);
+    await expect(body.locator(".key-participation")).toContainText("For every key, use the behaviour's or combo's own switch; for a whole layer, Settings.");
     expect(errors).toEqual([]);
 });

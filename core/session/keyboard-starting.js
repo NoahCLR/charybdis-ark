@@ -60,7 +60,7 @@ const isStartingTimeout = error => codeOf(error) === STARTING_CODE;
 /** @param {Pick<import("./types.js").RunningPanelSession, "reconnect" | "kept">} session */
 function startingTimeout(session) {
     const recovery = session.reconnect?.restart ? undefined : keptForAny(session, "restart")?.recovery || keptForAny(session, "saveCutShort")?.recovery;
-    return `${STARTING_WORDS.timeout}${recovery ? ` Your unsaved edits are in the recovery copy: ${recovery}` : ""}`;
+    return `${STARTING_WORDS.timeout}${recovery ? ` Your unsaved edits are in the recovery copy on Backups: ${recovery}` : ""}`;
 }
 
 /**

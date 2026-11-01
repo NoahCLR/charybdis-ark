@@ -5,7 +5,7 @@
 // writes ⌘ where the person presses Ctrl.
 
 /** @param {string} [platform] */
-const onMac = (platform = globalThis.navigator?.platform || "") => /Mac|iPhone|iPad/.test(platform);
+export const onMac = (platform = globalThis.navigator?.platform || "") => /Mac|iPhone|iPad/.test(platform);
 
 // The modifier alone, for "⌘-click" or "Ctrl-click".
 /** @param {string} [platform] */

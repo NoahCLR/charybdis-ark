@@ -15,7 +15,7 @@ const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES, KEY_BEHAVIOR_TIER_FIELDS} = require("../schema/key-behavior-domain-v1");
 const {PD_AXIS, PD_KIND} = require("../schema/pd-mode-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
-const {VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
+const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {customKeyName} = require("../data/user-keycodes");
 const {UNIT, parseUnit} = require("./review-units");
@@ -378,7 +378,7 @@ function profileReview(before, after, capabilities) {
         // its old name on the keyboard and its new one in the draft.
         /** @param {number} code @param {Names} names */
         const values = (code, names) => ({text: keyLabel(names.keys, code), detail: keyLabelWithName(names.keys, code), key: code, mark: keyMark(code)});
-        item("Keys", UNIT.layout(l, p), `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.layers[l][p], namesB)]]),
+        item(AREA.keys, UNIT.layout(l, p), `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.layers[l][p], namesB)]]),
             {kind: "key", layer: l, layoutIndex: LAYOUT_INDEX.get(p)}, undefined, {kind: "layer", layer: l});
     }));
     a.settings.names.forEach((name, i) => {
@@ -387,7 +387,7 @@ function profileReview(before, after, capabilities) {
         /** @param {string[]} names @returns {Fields} */
         const fields = names => new Map([["Name", {text: layerCalled(names, i), key: names[i],
             detail: `${layerCalled(names, i)} · ${names[i] ? `stored name ${JSON.stringify(names[i])}` : "no stored name"}`}]]);
-        item("Layers", UNIT.layerName(i), `Layer ${i}`, fields(a.settings.names), fields(b.settings.names), {kind: "layers"}, undefined, {kind: "layer", layer: i});
+        item(AREA.layers, UNIT.layerName(i), `Layer ${i}`, fields(a.settings.names), fields(b.settings.names), {kind: "layers"}, undefined, {kind: "layer", layer: i});
     });
     a.settings.layers.forEach((record, layer) => {
         for (const layoutIndex of CHARYBDIS_4X6_LAYOUT_MATRIX.keys()) {
@@ -395,36 +395,36 @@ function profileReview(before, after, capabilities) {
             /** @param {import("../schema/types.js").LayerRecord} entry @returns {Fields} */
             const fields = entry => new Map([["Use behaviour", entry.bypass.includes(position) ? "off" : "on"], ["Join combos", entry.exclude.includes(position) ? "off" : "on"]]);
             // Named where the key sits, as its layout change is.
-            item("Keys", UNIT.placement(layer, position), `Participation · ${layerName(b, layer)} · ${positionName(position)}`, fields(record), fields(b.settings.layers[layer]),
+            item(AREA.keys, UNIT.placement(layer, position), `Participation · ${layerName(b, layer)} · ${positionName(position)}`, fields(record), fields(b.settings.layers[layer]),
                 {kind: "key", layer, layoutIndex: LAYOUT_INDEX.get(position)}, [true, true]);
         }
     });
     const targets = new Map([...a.behaviors.rows, ...b.behaviors.rows].map(row => [JSON.stringify(row.target), row.target]));
     for (const [id, target] of targets) {
         const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === id), next = b.behaviors.rows.find(row => JSON.stringify(row.target) === id);
-        item("Behaviours", UNIT.behavior(target), action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA, a.settings.customKeyShortcuts), behaviourFields(next, b.settings.values, namesB, b.settings.customKeyShortcuts),
+        item(AREA.behaviours, UNIT.behavior(target), action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA, a.settings.customKeyShortcuts), behaviourFields(next, b.settings.values, namesB, b.settings.customKeyShortcuts),
             {kind: "behaviour", target}, [Boolean(old), Boolean(next)]);
     }
     const combosA = a.combos.rows, combosB = b.combos.rows;
     const removedCombo = singleComboRemovalIndex(combosA, combosB);
     if (removedCombo !== null) {
         const i = removedCombo;
-        item("Combos", UNIT.combo(i), `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
+        item(AREA.combos, UNIT.combo(i), `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
             {kind: "combo", badge: `C${i}`});
         if (i < combosB.length) /** @type {Change} */ (items.at(-1)).note = "Later combos move up one number.";
     } else {
         for (let i = 0; i < Math.max(combosA.length, combosB.length); i++) {
-            item("Combos", UNIT.combo(i), `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
+            item(AREA.combos, UNIT.combo(i), `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
                 {kind: "combo", badge: `C${i}`});
         }
     }
-    item("Settings", UNIT.comboTiming, "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: "Settings"}, [true, true]);
+    item(AREA.settings, UNIT.comboTiming, "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: AREA.settings}, [true, true]);
     macrosA.macros.forEach((_, i) => {
         /** @param {Macros["macros"][number]} macro @returns {Fields} */
         const fields = (macro) => new Map(/** @type {[string, Field][]} */ ([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"],
             [VOCABULARY.macroUninterruptible.label, {key: macro.protection, text: protectionWords(macro.protection, macro.uninterruptible)}]]));
         const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
-        item("Macros", UNIT.macro(i), `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
+        item(AREA.macros, UNIT.macro(i), `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
     });
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
@@ -458,7 +458,7 @@ function profileReview(before, after, capabilities) {
             };
             // The effect belongs to Host, so discarding it restores Host and
             // preserves independently edited macro text and names.
-            item("Macros", UNIT.settings("host"), `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · ${VOCABULARY.settingsSections.host} settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index, keycode: macroName(index)}, [true, true]);
+            item(AREA.macros, UNIT.settings("host"), `${macroDefaultName(index)}${macro.name ? ` · ${macro.name}` : ""} · ${VOCABULARY.settingsSections.host} settings`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index, keycode: macroName(index)}, [true, true]);
             /** @type {Change} */ (items.at(-1)).note = `Playback changes because of ${settingsPath("host", "host")}. Discard it together with that change.`;
         });
     }
@@ -475,15 +475,15 @@ function profileReview(before, after, capabilities) {
         const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
         /** @param {string} name @param {import("../schema/types.js").CustomKeyShortcut} shortcut */
         const exists = (name, shortcut) => Boolean(name || shortcutPresent(shortcut));
-        item("Custom keys", UNIT.customKey(i), `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
+        item(AREA.customKeys, UNIT.customKey(i), `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i, keycode: customKeyName(i)},
             [exists(old, shortcutA), exists(next, shortcutB)]);
     });
     // The keyboard's own name, edited on Settings' Keyboard card. Empty is the
     // firmware's built-in name, which the keyboard then reports over USB.
     /** @param {string} name @returns {Fields} */
     const keyboardFields = name => new Map([["Name", name || "built-in name"]]);
-    item("Settings", UNIT.keyboardName, "Keyboard name", keyboardFields(a.settings.keyboardName), keyboardFields(b.settings.keyboardName),
-        {kind: "settings", section: "keyboard", area: "Settings"}, [true, true]);
+    item(AREA.settings, UNIT.keyboardName, "Keyboard name", keyboardFields(a.settings.keyboardName), keyboardFields(b.settings.keyboardName),
+        {kind: "settings", section: "keyboard", area: AREA.settings}, [true, true]);
     // Settings are saved a section at a time, so a section is one item.
     /** @param {Snapshot} snapshot @param {import("../schema/types.js").SettingsDomain} settings */
     const sections = (snapshot, settings) => /** @type {NonNullable<ReturnType<typeof settingsEditorView>>} */ (settingsEditorView(snapshot)).sections.map(section => ({id: section.id, label: section.label, area: section.area, stage: section.stage,
@@ -555,24 +555,24 @@ function profileReview(before, after, capabilities) {
         }
     }
     const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
-    item("Settings", UNIT.settings("otherKeyOptions"), "Other key options", new Map([["Stored bits", `0x${(a.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]),
+    item(AREA.settings, UNIT.settings("otherKeyOptions"), "Other key options", new Map([["Stored bits", `0x${(a.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]),
         new Map([["Stored bits", `0x${(b.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
     for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
-        item("Pointing modes", UNIT.pd(id), `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
+        item(AREA.pointing, UNIT.pd(id), `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
             pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind || old?.name), Boolean(next?.kind || next?.name)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);
     for (const [unit, record] of lightB) {
         const old = lightA.get(unit);
-        item("Lighting", unit, record.title, old?.fields || new Map(), record.fields, {kind: "lighting", stage: record.stage, ...record.where}, [Boolean(old), true], record.titleMark);
+        item(AREA.lighting, unit, record.title, old?.fields || new Map(), record.fields, {kind: "lighting", stage: record.stage, ...record.where}, [Boolean(old), true], record.titleMark);
     }
-    for (const [unit, record] of lightA) if (!lightB.has(unit)) item("Lighting", unit, record.title, record.fields, new Map(), {kind: "lighting", stage: record.stage, ...record.where});
+    for (const [unit, record] of lightA) if (!lightB.has(unit)) item(AREA.lighting, unit, record.title, record.fields, new Map(), {kind: "lighting", stage: record.stage, ...record.where});
     // The items above describe the profile in words. If the stored bytes
     // differ and none of them caught it, the review still must not read as
     // empty: an apply always shows that something will change.
     if (!items.length && before.fingerprint !== after.fingerprint) {
-        items.push({area: "Profile", unit: UNIT.profile, title: "Stored profile", status: "changed", fields: [{label: "", before: `fingerprint ${before.fingerprint}`,
+        items.push({area: AREA.profile, unit: UNIT.profile, title: "Stored profile", status: "changed", fields: [{label: "", before: `fingerprint ${before.fingerprint}`,
             after: `fingerprint ${after.fingerprint} · a change this review cannot describe`}], place: null});
     }
     return items;
@@ -594,7 +594,7 @@ function layerOrderReview(after, order) {
         ...(order[0] !== 0 ? [{label: "Base layer", status: /** @type {const} */ ("changed"), before: layerCalled(names, order.indexOf(0)), after: layerCalled(names, 0)}] : []),
         ...moved.map(/** @returns {import("../../contracts/model.js").ReviewField} */ slot => ({label: layerCalled(names, slot), labelMark: {kind: "layer", layer: slot}, status: "changed", before: String(order[slot]), after: where(slot)})),
     ];
-    return {area: "Layers", unit: UNIT.layerOrder, title: "Layer priority", note: "Higher layers win", status: "changed", fields,
+    return {area: AREA.layers, unit: UNIT.layerOrder, title: "Layer priority", note: "Higher layers win", status: "changed", fields,
         place: {kind: "layers", layers: moved}};
 }
 module.exports = {layerOrderReview, profileReview, singleComboRemovalIndex};

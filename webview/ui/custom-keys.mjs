@@ -29,6 +29,8 @@ import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourEditor} from "./keys/behaviour-editor.mjs";
 import {placementChipsMarkup, showPlacements} from "./keys/reach.mjs";
+import {slotBank} from "../view/slot-bank.mjs";
+import {allSlotsShown, slotBankControls} from "./slot-bank.mjs";
 
 
 export function screenCustomKeys() {
@@ -39,7 +41,7 @@ export function screenCustomKeys() {
 
     const main = el(`<div class="main">${topbar(
         "Custom keys",
-        "Keys you name yourself. Each can send a shortcut and have its own taps and holds, and goes on any key or combo.",
+        "Keys you name, each with its own shortcut, taps and holds.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad library"></div></div>`);
@@ -54,7 +56,7 @@ export function screenCustomKeys() {
 
     const named = keys.filter((row) => row.name).length;
     const grid = el(`<div class="card"><div class="card-h"><h3>Keys</h3>
-        <input class="input search card-search" id="customKeySearch" data-f="custom-keys:search" type="search" placeholder="Search by name" value="${esc(state.customKeySearch || "")}">
+        <input class="input search card-search" id="customKeySearch" data-f="custom-keys:search" type="search" aria-label="Search custom keys by name" placeholder="Search by name" value="${esc(state.customKeySearch || "")}">
         <span class="tag">${named} of ${keys.length} named</span></div>
         <div class="card-b"><div class="macro-grid"></div></div></div>`);
     /** @type {HTMLInputElement} */ (grid.querySelector("#customKeySearch")).addEventListener("input", (event) => { state.customKeySearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
@@ -64,14 +66,26 @@ export function screenCustomKeys() {
     const matches = (row) => !query || row.name.toLowerCase().includes(query) || String(row.slot) === query;
     if (!keys.some(matches)) cells.replaceWith(el(`<p class="note">No custom key is named “${esc(query)}”.</p>`));
     const changed = draftMarks(model?.draft?.changes).customKeys;
-    for (const row of keys) {
-        if (!matches(row)) continue;
+    // The keys in use first; New and the unused ones after them.
+    const shelf = slotBank(keys, {
+        inUse: customKeyInUse, free: (row) => !customKeyInUse(row),
+        keep: (row) => row.keycode === key?.keycode || changed.has(row.keycode),
+        matches, searching: Boolean(query), open: allSlotsShown("customKeys"),
+    });
+    // A tile says what its key is: its name, else what it sends, else that a
+    // behaviour holds it; a key with none of them is a dash.
+    /** @param {import("../../contracts/panel.js").CustomKey} row */
+    const tileWords = (row) => row.name || (hasShortcut(row) ? row.shortcutLabel : row.hasBehavior ? "behaviour" : "—");
+    /** @param {string} words */
+    const clip = (words) => words.length > 13 ? `${words.slice(0, 12)}…` : words;
+    /** @param {import("../../contracts/panel.js").CustomKey} row */
+    const tile = (row) => {
         const does = [hasShortcut(row) ? shortcutAct(row) : "", row.hasBehavior ? "has a behaviour" : ""].filter(Boolean).join(" · ");
         const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
         const cell = el(`<button class="mslot ${customKeyInUse(row) ? "filled" : ""}" data-custom-key="${esc(row.keycode)}"
             aria-current="${row.keycode === key?.keycode}" data-tip="${esc(tip)}">
             <span class="n">K${esc(row.slot)}</span>${changed.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
-            <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : "—"}</span></button>`);
+            <span class="v">${esc(clip(tileWords(row)))}</span></button>`);
         cell.addEventListener("click", () => {
             // Another key's behaviour opens with no cell open, as picking
             // another row does on the Keymap screen. Only this key's own cell
@@ -80,7 +94,18 @@ export function screenCustomKeys() {
             state.customKey = row.keycode;
             render();
         });
-        cells.append(cell);
+        return cell;
+    };
+    cells.append(...shelf.shown.map(tile));
+    if (!query) {
+        const {add, toggle} = slotBankControls("customKeys", {noun: "custom key", count: keys.length, free: Boolean(shelf.firstFree), canEdit,
+            pick: () => {
+                const next = shelf.firstFree;
+                if (!next) return;
+                if (next.keycode !== key?.keycode && state.cellRow === key?.keycode) Object.assign(state, {cell: null, cellRow: null, cellHow: null});
+                state.customKey = next.keycode;
+            }});
+        cells.append(add, toggle, ...shelf.revealed.map(tile));
     }
     pad.appendChild(grid);
     if (key) {

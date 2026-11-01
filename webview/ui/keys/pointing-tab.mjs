@@ -10,7 +10,7 @@ import {linkRows} from "../../view/pointing-link.mjs";
 import {pdColourRow} from "../../view/lighting.mjs";
 import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
-import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
+import {attachReachRows, reachAttrs, reachTable, rowPick} from "../groups.mjs";
 import {mark, slotNamedWithKeycodes} from "../marks.mjs";
 import {slotNamed, vocabulary, word} from "../../view/vocabulary.mjs";
 import {layersNamed, layersOfMask, pointingReachLines} from "./reach.mjs";
@@ -52,8 +52,8 @@ export function tabPointing(body, right) {
         if (started) keycodes.push([words.linkLabels.started, null]);
         const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs.` : "";
         return `<tr${reachAttrs("pointing", group, slot.id)}>
-            <td><span class="slot-named"><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${mark(model, {kind: "pointing", slot: slot.id})}</span>
-                ${slotNamedWithKeycodes(slotNamed(slot), keycodes)}${changedSlots.has(slot.id) ? draftDot() : ""}</span></td>
+            <td>${rowPick("pointing", group, slot.id, `<span class="slot-named"><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${mark(model, {kind: "pointing", slot: slot.id})}</span>
+                ${slotNamedWithKeycodes(slotNamed(slot), keycodes)}${changedSlots.has(slot.id) ? draftDot() : ""}</span>`)}</td>
             <td class="muted">${slot.kind
                 ? `${esc(word(words.kinds, slot.kind))}${slot.dpi ? ` · ${esc(slot.dpi)} DPI` : " · normal pointer speed"}`
                 : "Empty · these keys do nothing yet"}</td>

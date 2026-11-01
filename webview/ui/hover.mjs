@@ -1,13 +1,20 @@
 // @ts-check
 // Hovering: the hover card (webview/ui/hover-card.mjs) beside the key, with the
 // behaviours its combos run beside that, and any other control's data-tip
-// above it.
+// above it. A control reached by the keyboard shows its tip too, and a screen
+// reader hears it as the control's description: the focused control is
+// described by `describe`, which holds its tip's words while it has the focus.
+// Escape (app.mjs) or leaving the control hides it.
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, html} from "../lib/dom.mjs";
 import {behaviourCards, hoverCard} from "./hover-card.mjs";
 
-const tip = el(`<div class="tip" hidden></div>`);
+const tip = el(`<div class="tip" role="tooltip" hidden></div>`);
+const describe = el(`<div id="ark-focus-tip" hidden></div>`);
+// The control the focus tip describes, and the description it had before.
+/** @type {{control: Element, before: string | null} | null} */
+let described = null;
 const card = el(`<div class="hovercard" hidden></div>`);
 // The behaviours the key's combos run, each in its own card beside the key's.
 const side = el(`<div class="hovercard-side" hidden></div>`);
@@ -15,7 +22,7 @@ let timer = 0;
 
 /** @param {HTMLElement} root */
 export function mountHover(root) {
-    document.body.append(tip, card, side);
+    document.body.append(tip, card, side, describe);
     root.addEventListener("mouseover", (event) => {
         const key = /** @type {SVGElement | null} */ (/** @type {Element} */ (event.target).closest("[data-key]"));
         const hinted = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-tip]"));
@@ -35,18 +42,61 @@ export function mountHover(root) {
             return;
         }
         card.hidden = true; side.hidden = true;
-        if (hinted) {
+        // A tip that only names its control (data-tip-names) is for when the
+        // control shows no words of its own, as the rail's icons do in a
+        // narrow window.
+        if (hinted && !(hinted.hasAttribute("data-tip-names") && hinted.innerText.trim())) {
             const rect = hinted.getBoundingClientRect();
-            timer = setTimeout(() => { tip.textContent = hinted.dataset.tip ?? ""; place(tip, rect, 8); }, 260);
+            timer = setTimeout(() => { tip.textContent = hinted.dataset.tip ?? ""; delete tip.dataset.focus; place(tip, rect, 8); }, 260);
             return;
         }
         tip.hidden = true;
     }, true);
     root.addEventListener("mouseleave", hideHover, true);
+    root.addEventListener("focusin", (event) => focusTip(/** @type {Element} */ (event.target)));
+    root.addEventListener("focusout", (event) => {
+        if (described?.control === event.target) undescribe();
+        if (tip.dataset.focus) { clearTimeout(timer); tip.hidden = true; delete tip.dataset.focus; }
+    });
     addEventListener("scroll", hideHover, true);
 }
 
-export function hideHover() { clearTimeout(timer); tip.hidden = true; card.hidden = true; side.hidden = true; }
+export function hideHover() { clearTimeout(timer); tip.hidden = true; delete tip.dataset.focus; card.hidden = true; side.hidden = true; }
+
+// The tip of the control the focus is on, or of what holds it (a switch's
+// label): its words become the control's description at once, and the tip
+// shows above it a moment later when the focus came from the keyboard. A tip
+// that only names its control adds nothing to its name.
+/** @param {Element} control */
+function focusTip(control) {
+    if (described && described.control !== control) undescribe();
+    const hinted = /** @type {HTMLElement | null} */ (control.closest("[data-tip]"));
+    const words = hinted && !hinted.hasAttribute("data-tip-names") ? hinted.dataset.tip?.trim() ?? "" : "";
+    if (!words || !hinted || words === control.getAttribute("aria-label")) return;
+    describe.textContent = words;
+    if (described?.control !== control) {
+        const before = control.getAttribute("aria-describedby");
+        described = {control, before};
+        control.setAttribute("aria-describedby", [before, describe.id].filter(Boolean).join(" "));
+    }
+    if (!control.matches(":focus-visible")) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+        if (!control.isConnected || document.activeElement !== control) return;
+        card.hidden = true; side.hidden = true;
+        tip.textContent = words;
+        tip.dataset.focus = "true";
+        place(tip, hinted.getBoundingClientRect(), 8);
+    }, 260);
+}
+
+function undescribe() {
+    if (!described) return;
+    const {control, before} = described;
+    described = null;
+    if (before) control.setAttribute("aria-describedby", before);
+    else control.removeAttribute("aria-describedby");
+}
 
 // Beside the key's card, on its far side from the key, or across the key when
 // there is no room there.

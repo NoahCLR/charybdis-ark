@@ -80,12 +80,14 @@ class ApplyProgress {
         return this.index <= LAST_UNSAVED_STEP;
     }
 
-    /** @param {{reason?: string, saved?: string}} [failure] */
-    fail({reason = "", saved = "unknown"} = {}) {
+    // `advice` is what to do next, in whole sentences, for the bar to say
+    // after the verdict: an Apply cut short says it there, once.
+    /** @param {{reason?: string, saved?: string, advice?: string[]}} [failure] */
+    fail({reason = "", saved = "unknown", advice = []} = {}) {
         if (this.failure) return this.failure;
         const step = APPLY_STEPS[Math.max(this.index, 0)];
         const verdict = APPLY_VERDICTS[/** @type {keyof typeof APPLY_VERDICTS} */ (saved)] || APPLY_VERDICTS.unknown;
-        this.failure = {step: step.id, label: step.label, reason, saved, verdict};
+        this.failure = {step: step.id, label: step.label, reason, saved, verdict, advice: [...advice]};
         this.onChange(this.view());
         return this.failure;
     }

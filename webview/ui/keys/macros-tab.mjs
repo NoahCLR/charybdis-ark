@@ -7,7 +7,7 @@ import {el, esc} from "../../lib/dom.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {currentView, getModel, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
-import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
+import {attachReachRows, reachAttrs, reachTable, rowPick} from "../groups.mjs";
 import {reachLabel} from "./reach.mjs";
 import {actionMarked, macroSteps} from "../marks.mjs";
 
@@ -26,7 +26,7 @@ export function tabMacros(body, right) {
     const row = (group, keycode, reachedBy) => {
         const slot = slots.find((entry) => entry.keycode === keycode);
         return `<tr${reachAttrs("macros", group, keycode)}>
-            <td>${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot() : ""}</td>
+            <td>${rowPick("macros", group, keycode, `${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot() : ""}`)}</td>
             <td>${slot?.payload ? macroSteps(model, slot.payload) : `<span class="muted">${slot ? "empty" : "—"}</span>`}</td>
             <td class="muted">${reachedBy}</td>
             <td class="reach-edit">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;

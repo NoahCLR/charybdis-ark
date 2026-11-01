@@ -124,12 +124,12 @@ cable between the halves. If the halves ever stored different modes,
 Review lists every change in your draft, compared with the keyboard. Open it
 from the bar.
 
-**Checks** come first: what the draft lets the keyboard do, and what must be
-fixed first. Then the changes, grouped by the area they are edited in:
-Keys, Layers, Behaviours, Combos, Custom keys, Macros, Mouse (what Pointer
-settings edits), Pointing modes, Lighting, Settings (the other Settings
-screens) and so on. Each change shows the fields that differ, with
-the keyboard's value and the draft's side by side.
+The changes come first, grouped by the area they are edited in, each named
+as its screen is: Keys, Layers, Behaviours, Combos, Custom keys, Macros,
+Pointer, Pointing modes, Lighting, Settings (the other Settings screens) and
+so on. Each change shows the fields that differ, with the keyboard's value
+and the draft's side by side. **Checks** follow: what the draft lets the
+keyboard do, and what must be fixed first.
 
 - **Show** closes Review and opens the change where it is edited.
 - **Discard** puts that one change back.
@@ -154,9 +154,18 @@ the draft fixes it.
   your computer's settings can't play, and so on.
 - A **Notice** only informs, such as a behaviour that changes nothing.
 
+What your draft adds stays open. What the keyboard already has folds behind
+**Already on the keyboard** with its count, and what the draft fixes behind
+**Fixed by this draft**; open either to read it, and it stays open while
+Review is showing that draft. A blocker keeps its group open.
+
 When the draft has a trap or a warning, even one already on the keyboard,
 Save asks first: **Go back** or **Save anyway**. Notices and fixed checks need
 no answer.
+
+When **Save to keyboard** is off, the reason is written beside it: a blocker
+by its name, no keyboard connected, a keyboard that changed since the draft
+began, or a review still getting ready. **Restart** in the bar does the same.
 
 When a new trap or warning clearly comes from one change, the check links to
 it and the change is highlighted.
@@ -243,14 +252,15 @@ you dismiss it, with one of three outcomes:
 - Ark can't tell which profile was saved. Read the keyboard to see what it
   runs now.
 
-The message beside the rail starts with the same outcome, then says why in
-plain words and what to do. When the keyboard rejected the profile, it names
-the part as Review groups it, such as **in Behaviours, row 5**. If the
-keyboard was unplugged or restarted, that is the reason given: **The keyboard
-was disconnected or restarted.** Ark says **Keep both halves connected** only
+Under the outcome the bar says why in plain words and what to do; the rail
+doesn't say it again. When the keyboard rejected the profile, it names the
+part as Review groups it, such as **in Behaviours, row 5**. If the keyboard
+was unplugged or restarted, that is the reason given: **The keyboard was
+disconnected or restarted.** Ark says **Keep both halves connected** only
 while the keyboard is still connected.
-Either way the recovery copy is on the [Backups](backups.md) screen. The
-keyboard's own error, for whoever looks into it, is under **Diagnostics** on the
+Either way the recovery copy is on the [Backups](backups.md) screen, named
+as that screen lists it: what made it, the keyboard and when. The keyboard's
+own error, for whoever looks into it, is under **Diagnostics** on the
 Keyboard screen.
 
 ## When the keyboard stops saving

@@ -39,6 +39,72 @@ export const recordedKeycode = code => EVENT_CODES[code]
 const MODIFIERS = new Set(["ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"].map((code) => EVENT_CODES[code]));
 const modifier = (/** @type {string} */ key) => MODIFIERS.has(key);
 
+/** @param {readonly RecordedKey[]} events */
+function heldKeys(events) {
+    /** @type {Set<string>} */
+    const held = new Set();
+    for (const event of events) {
+        if (event.type === "keydown") held.add(event.keycode);
+        else held.delete(event.keycode);
+    }
+    return held;
+}
+
+// Releases for the keys still down other than modifiers, the ones a Mac does
+// not report under ⌘.
+/** @param {Set<string>} held @param {number} time @returns {RecordedKey[]} */
+const stuck = (held, time) => [...held].filter(key => !modifier(key)).map(key => ({keycode: key, type: "keyup", time}));
+
+// Windows sends AltGr as a Left Ctrl press and a Right Alt press at once.
+const ALT_GRAPH_MS = 20;
+
+// The take after one more key report. Browsers lose some presses and releases,
+// so the take is mended as it is captured:
+// - a key pressed again while still down lost its release, so it is released first;
+// - a Mac never reports the release of a key pressed with ⌘, so there each
+//   key pressed under ⌘ is a new shortcut (⌘C ⌘V with ⌘ held throughout), and
+//   letting go of ⌘ releases every other key still down;
+// - on a Mac, Caps Lock reports only turning on and turning off, so each
+//   report is one tap;
+// - Windows reports only Print Screen's release, so a release with no press is a tap;
+// - the Left Ctrl that Windows invents for AltGr is dropped.
+/** @param {readonly RecordedKey[]} events @param {RecordedKey & {altGraph?: boolean}} report @param {{mac?: boolean}} [platform] @returns {RecordedKey[]} */
+export function capturedKey(events, {keycode, type, time, altGraph = false}, {mac = false} = {}) {
+    const held = heldKeys(events);
+    /** @type {RecordedKey} */
+    const press = {keycode, type: "keydown", time};
+    /** @type {RecordedKey} */
+    const release = {keycode, type: "keyup", time};
+    if (mac && keycode === "KC_CAPS") return [...events, press, release];
+    if (keycode === "KC_PSCR" && type === "keyup" && !held.has(keycode)) return [...events, press, release];
+    if (type === "keydown") {
+        const last = events.at(-1);
+        if (altGraph && keycode === "KC_RALT" && last?.keycode === "KC_LCTL" && last.type === "keydown" && time - last.time <= ALT_GRAPH_MS) {
+            return [...events.slice(0, -1), press];
+        }
+        const underGui = mac && !modifier(keycode) && (held.has("KC_LGUI") || held.has("KC_RGUI"));
+        return [...events, ...(underGui ? stuck(held, time) : held.has(keycode) ? [release] : []), press];
+    }
+    if (mac && (keycode === "KC_LGUI" || keycode === "KC_RGUI")) return [...events, ...stuck(held, time), release];
+    return [...events, release];
+}
+
+// Leaving the page mid-chord (⌘Tab, Alt+Tab) loses that chord's releases,
+// and its presses alone would send a stray modifier tap. Only what finished
+// before the last moment no key was down stays in the take.
+/** @param {readonly RecordedKey[]} events */
+export function finishedPart(events) {
+    /** @type {Set<string>} */
+    const held = new Set();
+    let end = 0;
+    events.forEach((event, index) => {
+        if (event.type === "keydown") held.add(event.keycode);
+        else held.delete(event.keycode);
+        if (!held.size) end = index + 1;
+    });
+    return events.slice(0, end);
+}
+
 // A take may end before a physical release. Balance only keys this take
 // actually pressed; releases from before Record and repeated downs add nothing.
 /** @param {readonly RecordedKey[]} events @param {boolean} closeHeld @param {number | undefined} finishedAt */

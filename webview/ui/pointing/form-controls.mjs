@@ -36,7 +36,7 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         // that.
         const shown = options.name ?? keyDisplayName(model, Number(code ?? 0));
         const node = el(`<label class="field ${esc(options.klass)}"><span>${options.labelHtml || esc(label)}</span>
-            <div class="input-row"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input" value="${esc(shown)}" placeholder="nothing" ${disabled}
+            <div class="input-row"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input" value="${esc(shown)}" placeholder="None" ${disabled}
                 data-tip="${esc(name ? `Stored as ${name}. Type a QMK keycode name, or pick one.` : "Type a QMK keycode name, or pick one.")}">
             <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
         const macro = pointingMacro(model, code);

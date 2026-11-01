@@ -24,19 +24,21 @@ import {keycodePlacements, reachLine} from "../view/placements.mjs";
 import {durationControl} from "./duration.mjs";
 import {layerSwitchGrid} from "./layer-switches.mjs";
 import {fieldParts, isLayerSwitch, sectionsOn} from "../view/settings-layout.mjs";
+import {foldEmptyLayers} from "../view/empty-layers.mjs";
+import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {import("../../contracts/panel.js").PresentedSection} Section */
 /** @typedef {import("../../contracts/panel.js").PresentedField} Field */
 
 export const screenBehaviours = () => settingsScreen("behaviours", "Behaviours",
-    "How long a key waits to tell a tap from a hold, and the layers on which keys use their behaviours.");
+    "How a key tells a tap from a hold, and where behaviours run.");
 export const screenCombos = () => settingsScreen("combos", "Combos",
-    "Whether combos run and on which layers, the timing every combo shares, and the layer each layer matches its combos on.");
+    "Where combos run, how they are timed and how they match.");
 export const screenPointer = () => settingsScreen("pointer", "Pointer",
-    "How the trackball moves the pointer: its speed, sniping (a slower speed for precise work), and the layer moving the ball turns on.");
+    "Pointer speed, sniping and the pointer layer.");
 export const screenHost = () => settingsScreen("host", "Host",
-    "The computer the keyboard is plugged into, which macros type for, and the key swaps and typing options for every layer.");
+    "The computer you type on, and key swaps for every layer.");
 
 // One Settings screen: its sections as cards, all open, each saved whole.
 /** @param {string} screen @param {string} title @param {string} subtitle */
@@ -82,7 +84,9 @@ const combosCard = (model, section, canEdit) => sectionCard(model, section, canE
     {extra: {after: "combosEnabled", nodes: (section.comboTiming || []).map((entry) => comboTimingRow(model, entry))}});
 
 // Combo layer matching: one select per layer, four across, the sentence
-// said once. Saved whole, as every section is.
+// said once. Saved whole, as every section is. An empty layer matching on
+// its own keys folds behind the disclosure after the others (D-L76), drawn
+// hidden so the section still saves it.
 /** @param {Model | null} model @param {Section} section @param {boolean} canEdit */
 function referenceCard(model, section, canEdit) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
@@ -95,11 +99,16 @@ function referenceCard(model, section, canEdit) {
         const input = /** @type {HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
         return input ? input.value : undefined;
     }, model?.settingsEditing?.identity));
-    for (const field of section.fields) {
-        const at = field.governs?.kind === "layer" ? field.governs.layer : -1;
+    /** @param {Field} field */
+    const layerAt = (field) => field.governs?.kind === "layer" ? field.governs.layer : -1;
+    const {shown, folded} = foldEmptyLayers(model, section.fields, layerAt, (field) => field.value !== layers().find((entry) => entry.index === layerAt(field))?.name);
+    const open = emptyLayersShown("combo-matching");
+    for (const field of [...shown, ...folded]) {
+        const at = layerAt(field);
         const layer = layers().find((entry) => entry.index === at);
         const editable = canEdit && !field.readOnly;
-        const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}">
+        if (field === folded[0]) grid.appendChild(emptyLayersButton("combo-matching", folded.length, "grid-empties"));
+        const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${folded.includes(field) && !open ? "hidden" : ""}>
             <span class="txt">${layerCell(model, field, layer)}</span>
             <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
             ${layers().map((entry) => `<option value="${esc(entry.name)}" ${field.value === entry.name ? "selected" : ""}>${esc(layerCalled(entry))}</option>`).join("")}</select></label>`);
@@ -181,7 +190,7 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
         if (part) rows.appendChild(el(`<div class="setrow-part">${esc(part)}</div>`));
         for (const field of fields) {
             if (grouped.includes(field)) {
-                if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, canEdit, submit));
+                if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, canEdit, submit, `settings:${section.id}`));
                 continue;
             }
             rows.appendChild(fieldRow(field, canEdit, submit, slot, durations));
@@ -204,9 +213,10 @@ const layerCell = (model, field, layer) => layer
     : marked(model, field.governs, field.label);
 
 // A section's one-per-layer switches as one row of layers (layer-switches.mjs).
-// Each keeps its own field identity, so the section still saves whole.
-/** @param {{label: string, hint: string}} group @param {Field[]} fields @param {boolean} canEdit @param {() => void} submit */
-function layerGroupRow(group, fields, canEdit, submit) {
+// Each keeps its own field identity, so the section still saves whole, and
+// its empty layers fold behind the grid's disclosure (D-L76).
+/** @param {{label: string, hint: string}} group @param {Field[]} fields @param {boolean} canEdit @param {() => void} submit @param {string} place */
+function layerGroupRow(group, fields, canEdit, submit, place) {
     const row = el(`<div class="setrow layer-switches" data-tip="${esc(group.hint)}">
         <div><div class="nm">${esc(group.label)}${keyboardKeysMark(fields[0])}</div><div class="hint">${esc(group.hint)}</div></div>
     </div>`);
@@ -214,7 +224,7 @@ function layerGroupRow(group, fields, canEdit, submit) {
         layer: field.governs?.kind === "layer" ? field.governs.layer : -1, label: field.label, macro: field.macro, f: `setting:${field.macro}`,
         checked: Boolean(field.enabled), disabled: !canEdit || Boolean(field.readOnly),
         tip: [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" "),
-    })));
+    })), {place});
     /** @type {NodeListOf<HTMLInputElement>} */ (grid.querySelectorAll("input")).forEach((input) => input.addEventListener("change", submit));
     row.appendChild(grid);
     return row;
@@ -282,13 +292,13 @@ function fieldRow(field, canEdit, submit, slot, durations) {
 function snipingKeys(model, canEdit) {
     const node = el(`<div class="card-b sniping-keys">
         <div class="sect-h"><h4>Sniping keys</h4></div>
-        <p class="note">Sniping is on while one of these keys is held or toggled, and while one of the auto-sniping layers is on.</p></div>`);
+        <p class="note">Sniping is on while one of these keys is held or toggled.</p></div>`);
     for (const keycode of ["SNIPING", "SNP_TOG"]) {
         const words = keyIdentity(model, keycode).label;
         const row = el(`<div class="row gap-10 sniping-key">
             <span class="sniping-name">${esc(words)}</span>
             <span class="note">${esc(reachLine(keycodePlacements(model, [keycode])))}</span>
-            <button class="btn tiny right" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key…</button></div>`);
+            <button class="btn tiny ghost right" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key…</button></div>`);
         /** @type {HTMLButtonElement} */ (row.querySelector("[data-place]")).addEventListener("click", () => {
             state.placement = {keycode};
             state.screen = "keys";
@@ -297,7 +307,7 @@ function snipingKeys(model, canEdit) {
         });
         node.appendChild(row);
     }
-    node.appendChild(el(`<p class="note">Sniping also slows directional pointing modes; scrolling modes ignore it. Sniping DPI keys on the keyboard change its speed too.</p>`));
+    node.appendChild(el(`<p class="note">It slows directional pointing modes too, not scrolling ones.</p>`));
     return node;
 }
 

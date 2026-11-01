@@ -19,7 +19,8 @@ from; the base layer is always on, so one answers even with no layer preview.
 A behaviour is a grid. There is a row for each tap count (**Single tap**
 to **Quintuple tap**) and a column each for **Tap**, **Hold** and **Long
 hold**. Click a cell to set what it sends with **Sends** and **Pick…**. Click
-**Remove tier** to empty it.
+**Remove tier** to empty it. Every change goes into your draft as you make
+it; **Done**, or Escape, closes the cell and puts you back on it.
 
 A **Hold** or **Long hold** cell also sets **How it runs**:
 
@@ -73,11 +74,11 @@ Above the grid are the behaviour's timings:
 - **Long hold threshold**: how long before it counts as a long hold.
 
 A timing that follows the keyboard's default shows it greyed, with the
-setting it comes from, such as `200 · dual-role` on an `LT` or `MT` key,
-`150 · behaviour default` on any other key, and `400 · default` for the long
-hold threshold or multi tap window. Type a value to give this behaviour its own;
-clear the field to follow the default again. The defaults are under
-**Tap & hold timing** on Behaviour settings (below).
+setting it comes from: `200 · dual-role` for the tap / hold threshold of an
+`LT` or `MT` key, and otherwise `default`, such as `150 · default`. Type a
+value to give this behaviour its own; clear the field to follow the default
+again. The defaults are under **Tap & hold timing** on Behaviour settings
+(below).
 
 When Review's checks find a problem with the timing, a note above the grid
 says so, headed **Timing notice** or **Timing warning**.
@@ -124,10 +125,13 @@ on again. A behaviour runs only where every switch allows it:
 
 | Scope | Where | Switch |
 | --- | --- | --- |
-| The whole keyboard | **Behaviour settings**, the Behaviours card | **Enabled** |
-| Each layer | **Behaviour settings**, the Behaviours card | **On these layers** |
+| The whole keyboard | **Behaviour settings**, the Where behaviours run card | **Enabled** |
+| Each layer | **Behaviour settings**, the Where behaviours run card | **On these layers** |
 | This behaviour | the behaviour editor | **Use this behaviour** and **Layers it runs on** |
 | This key on this layer | the Key tab | **Use behaviour** |
+
+The switches per layer fold the [empty layers](board-and-layers.md#empty-layers)
+at their end; **Layers it runs on** shows any it is off on.
 
 The layer that counts is the one the key comes from: a transparent key takes
 the switches of the layer it falls through to. When a behaviour is off for a
@@ -142,8 +146,8 @@ isn't a change and isn't in Review: the key, or unplugging, turns it back on.
 ## Behaviour settings
 
 **Behaviour settings** (**Behaviours** under Settings in the rail) shows two
-cards, both open: **Tap & hold timing** and **Behaviours**, the switches in
-the table above.
+cards, both open: **Tap & hold timing** and **Where behaviours run**, the
+switches in the table above.
 
 **Tap & hold timing** holds the keyboard's default timings, used wherever a
 behaviour leaves its own empty:

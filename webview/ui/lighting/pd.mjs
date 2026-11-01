@@ -49,7 +49,7 @@ export function stagePointing(model) {
     where.append(stack(locality, previewSwitch));
     const note = section("What this stage does");
     note.className = "span";
-    note.append(el(`<p class="note stage-about">A pointing-mode colour is an overlay that exists only while the mode is held or locked. It replaces whatever the layer paints inside its locality for as long as the mode runs, the key that started it included when the locality holds it.</p>`));
+    note.append(el(`<p class="note stage-about">While the mode runs, its colour paints over the layer's colour in the area chosen above.</p>`));
     note.append(groupRowsTable(model.rgb.pdModeLedGroups, "pdMode"));
     main.append(colour, where, note);
     node.append(list, main);

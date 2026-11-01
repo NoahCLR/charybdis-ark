@@ -4,10 +4,11 @@
  */
 // The parts of the Keys board card around the board itself: the bar over it
 // while a keycode is placed or combo inputs are picked, the caption under it
-// in a layer preview, and the legend that reads under the card.
+// in a layer preview, and the legend that reads under the card with its
+// Shortcuts list.
 
 import {css, isOff} from "../../lib/colour.mjs";
-import {el, esc} from "../../lib/dom.mjs";
+import {el, esc, watchPressOutside} from "../../lib/dom.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {getModel, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
@@ -39,25 +40,82 @@ export function placementBar() {
     return node;
 }
 
+/** @type {(() => void) | null} */
+let stopWatching = null;   // stops the open shortcuts list's outside-press watch
+
+// What each mark on the board means, on one line, then a Shortcuts button
+// whose list says what the board takes from the mouse and the keys. Read
+// only (Live edit's held states, a keyboard not read yet), the list says
+// only what still works there: selecting a key and copying it.
 /** @param {Model} model */
 export function legend(model) {
     const colours = feedbackColours(model);
     const on = stageEnabled(model, "key");
     /** @param {import("../../../contracts/edits.js").Colour} colour */
     const dot = (colour) => on && !isOff(colour) ? `<i class="ldot" style="background:${css(colour)}"></i>` : `<i class="ldot off"></i>`;
-    return el(`<div class="board-legend">
-        <span class="legend-item">the board shows the light this layer paints</span>
-        <span class="legend-item"><i class="lkey sel"></i> selected key</span>
-        <span class="legend-item"><i class="lkey indicated"></i> keys for the picked row or the combo being built</span>
-        <span class="legend-item">${dot(colours.tap)} tap branch</span>
-        <span class="legend-item">${dot(colours.hold)} hold branch</span>
-        <span class="legend-item">${dot(colours.long)} long hold branch</span>
-        <span class="legend-item">${comboBadge(model, "C0")} combo input</span>
-        <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
-        ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}
-        <span class="legend-item dim">${editGate(model, "keys").editable ? "double-click to pick a keycode" : "select a key to read it"}${editGate(model, "keys").editable ? ` · drag one key onto another to swap · ${shortcut("C")} and ${shortcut("V")} copy between keys · delete makes a key transparent` : ` · ${shortcut("C")} copies a key`}</span>
-        ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
+    const open = Boolean(state.boardShortcuts);
+    const node = el(`<div class="board-legend">
+        <span class="legend-item"><i class="lkey sel"></i> Selected key</span>
+        <span class="legend-item"><i class="lkey indicated"></i> Keys of the picked row or new combo</span>
+        <span class="legend-item">${dot(colours.tap)}${dot(colours.hold)}${dot(colours.long)} Tap, hold and long hold branches</span>
+        <span class="legend-item">${comboBadge(model, "C0")} Combo input</span>
+        <span class="legend-item"><i class="lkey transparent"></i> Transparent</span>
+        ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} Changed in your draft</span>` : ""}
+        ${state.keyClipboard ? `<span class="legend-item">Copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
+        <span class="legend-shortcuts">
+            <button class="btn tiny ghost" id="board-shortcuts-button" data-act="board-shortcuts" aria-expanded="${open}"
+                ${open ? 'aria-controls="board-shortcuts"' : ""}>Shortcuts</button>
+            ${open ? shortcutList(editGate(model, "keys").editable) : ""}</span>
     </div>`);
+    const button = /** @type {HTMLButtonElement} */ (node.querySelector("#board-shortcuts-button"));
+    button.addEventListener("click", () => {
+        if (state.boardShortcuts) closeBoardShortcuts();
+        else state.boardShortcuts = true;
+        render();
+    });
+    const list = /** @type {HTMLElement | null} */ (node.querySelector("#board-shortcuts"));
+    if (list) {
+        stopWatching?.();
+        stopWatching = watchPressOutside([list, button], () => {
+            closeBoardShortcuts();
+            list.remove();
+            button.setAttribute("aria-expanded", "false");
+            button.removeAttribute("aria-controls");
+        });
+    } else closeBoardShortcuts();
+    return node;
+}
+
+/** @param {boolean} editable */
+function shortcutList(editable) {
+    /** @param {string} keys @param {string} does */
+    const row = (keys, does) => `<dt>${esc(keys)}</dt><dd>${esc(does)}</dd>`;
+    return `<div class="shortcuts-pop" id="board-shortcuts" role="group" aria-label="Board shortcuts"><dl>${editable
+        ? row("Double-click", "Pick a keycode")
+            + row("Drag onto a key", "Swap the two keys")
+            + row(`${shortcut("C")}, ${shortcut("V")}`, "Copy a key, paste it onto the selected one")
+            + row("Delete", "Make the selected key transparent")
+            + row(`${shortcut("Z")}, ${shortcut("Z", {shift: true})}`, "Undo, redo")
+            + row("Enter", "Open the picker for the selected key")
+        : row("Click", "Select a key to read it")
+            + row(shortcut("C"), "Copy the selected key")}</dl></div>`;
+}
+
+function closeBoardShortcuts() {
+    state.boardShortcuts = false;
+    stopWatching?.();
+    stopWatching = null;
+}
+
+// Esc anywhere closes the shortcuts list, focus back on its button.
+export function escapeBoardShortcuts() {
+    if (!state.boardShortcuts) return false;
+    closeBoardShortcuts();
+    // Left open on another screen, it was not on show: Esc is not its.
+    if (!document.querySelector("#board-shortcuts")) return false;
+    render();
+    /** @type {HTMLElement | null} */ (document.querySelector("#board-shortcuts-button"))?.focus();
+    return true;
 }
 
 export function pickBar() {

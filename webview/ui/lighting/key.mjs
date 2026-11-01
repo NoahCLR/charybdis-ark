@@ -89,7 +89,7 @@ export function stageKey(model) {
     // The chips name each colour as the list does.
     onBoard.append(el(`<div class="row gap-12 stage-chips">
         ${rows.map((row) => `<span class="chip">${dot(row.colour)} ${esc(row.label)}</span>`).join("")}</div>`));
-    onBoard.append(el(`<p class="note">These are the colours a key wears on the board: a behaviour's tap, hold and long-hold dots, and the branch numbers in the behaviour grid.${stageEnabled(model, "key") ? "" : " The stage is off, so every one of them is drawn hollow."}</p>`));
+    onBoard.append(el(`<p class="note">The board's behaviour dots and the behaviour grid's branch numbers wear these colours${stageEnabled(model, "key") ? "" : ", hollow while the stage is off"}.</p>`));
     onBoard.append(groupRowsTable(model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior"));
     main.append(colour, policy, onBoard);
     node.append(list, main);

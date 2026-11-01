@@ -32,7 +32,7 @@ export function screenPointing() {
 
     const main = el(`<div class="main">${topbar(
         "Pointing modes",
-        `Hold or toggle a key to make the trackball do something else: scroll, or press arrows and shortcuts as it moves. Up to ${slots.length || 32} modes.`
+        "Hold or lock a key to make the trackball scroll or press keys."
     )}</div>`);
     const content = el(`<div class="content"><div class="pad pd-page"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);

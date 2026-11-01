@@ -15,7 +15,7 @@ import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 import {bindKeyboardMenu, keyboardMenu} from "./keyboard-menu.mjs";
 import {restartOffer} from "../view/edit-mode.mjs";
-import {commitBarState} from "../view/commit-bar.mjs";
+import {barSaysNotice, commitBarState, restartOffReason} from "../view/commit-bar.mjs";
 import {ariaShortcut, shortcut} from "../view/shortcuts.mjs";
 
 // The review opens at once; the core marks it reviewed when it answers.
@@ -25,15 +25,19 @@ function openReview() {
     render();
 }
 
+// Draft history's mark, shown in its words' place when the rail is narrowed to
+// its icons: a clock turned back.
+const HISTORY_ICON = `<svg class="rail-history-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7M2.5 2.8v3.4h3.4M8 5v3.2l2.2 1.4"/></svg>`;
+
 export function rail() {
     const model = getModel();
     const draft = model?.draft;
     const shell = shellOf(model);
 
     const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
-        <button class="nav-item" data-screen="${esc(id)}" aria-current="${state.screen === id}"
+        <button class="nav-item" data-screen="${esc(id)}" aria-current="${state.screen === id}" aria-label="${esc(definition.label)}" data-tip="${esc(definition.label)}" data-tip-names
             ${screenAvailable(model, id) ? "" : "disabled"}>
-            ${definition.icon}<span>${esc(definition.label)}</span>
+            ${definition.icon}<span class="nav-label">${esc(definition.label)}</span>
         </button>`).join("")).join("");
 
     const node = el(`<aside class="rail">
@@ -43,11 +47,11 @@ export function rail() {
             ${keyboardMenu()}
         </div>
         <nav class="rail-nav">${nav}</nav>
-        ${shell.progress ? `<div class="rail-progress" role="status">${spinner()}<span>${esc(shell.progress)}</span></div>` : ""}
+        ${shell.progress ? `<div class="rail-progress">${spinner()}<span>${esc(shell.progress)}</span></div>` : ""}
         ${railMessage()}
         ${draft ? `<div class="rail-foot">
             <button class="btn tiny ghost rail-history" data-act="history"
-                data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
+                data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">${HISTORY_ICON}<span class="rail-history-label">Draft history</span>${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
             <button class="btn tiny ghost icon" data-act="undo" aria-label="Undo" aria-keyshortcuts="${ariaShortcut("Z")}" ${draft?.canUndo ? "" : "disabled"}
                 data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (${shortcut("Z")})${draft.live ? ". The keyboard takes it back at once." : ""}` : draft?.live ? `Undo the last edit (${shortcut("Z")}). The keyboard takes it back at once.` : `Undo the last edit in the draft (${shortcut("Z")}). The keyboard is not touched until you save.`)}">↺</button>
             <button class="btn tiny ghost icon" data-act="redo" aria-label="Redo" aria-keyshortcuts="${ariaShortcut("Z", {shift: true})}" ${draft?.canRedo ? "" : "disabled"}
@@ -103,12 +107,16 @@ function railBuild(build) {
         : `<div class="rail-build"><span>${esc(buildLine(build))}</span></div>`;
 }
 
+// What the rail and the bars say as it happens is heard through the page's
+// own live regions (view/announcements.mjs), not through these, which every
+// render draws anew.
 function railMessage() {
     const model = getModel();
     const error = state.error || model?.device?.health?.error;
     const message = error || state.notice;
-    if (!message) return "";
-    return `<div class="rail-message ${error ? "err" : ""}" role="status">
+    // A failed Apply is said once, by its bar, which stays until dismissed.
+    if (!message || barSaysNotice(commitBarState(model, state), message)) return "";
+    return `<div class="rail-message ${error ? "err" : ""}">
         <span>${esc(message)}</span>
         <button class="btn tiny ghost icon" data-act="dismiss" aria-label="Dismiss">✕</button></div>`;
 }
@@ -120,9 +128,10 @@ function applySteps(apply) {
     const rows = apply.steps.map((step) => {
         const current = step.state === "active";
         const counted = current && apply.bytes
-            ? `<span class="ap-bar"><i style="width:${Math.round((apply.bytes.completed / apply.bytes.total) * 100)}%"></i></span>
+            ? `<span class="ap-bar" role="progressbar" aria-label="${esc(step.label)}" aria-valuemin="0" aria-valuemax="${esc(apply.bytes.total)}" aria-valuenow="${esc(apply.bytes.completed)}"
+                aria-valuetext="${esc(apply.bytes.completed)} of ${esc(apply.bytes.total)} bytes"><i style="width:${Math.round((apply.bytes.completed / apply.bytes.total) * 100)}%"></i></span>
                <span class="ap-bytes" style="min-width:${`${apply.bytes.total} / ${apply.bytes.total} bytes`.length}ch">${esc(apply.bytes.completed)} / ${esc(apply.bytes.total)} bytes</span>` : "";
-        return `<li class="${esc(step.state)}"><span class="mark">${step.state === "active" ? spinner() : ""}</span>
+        return `<li class="${esc(step.state)}"${current ? ' aria-current="step"' : ""}><span class="mark">${step.state === "active" ? spinner() : ""}</span>
             <span class="lbl">${esc(step.label)}</span>
             ${current && (apply.detail || counted) ? `<span class="ap-detail"><span class="ap-text" title="${esc(apply.detail)}">${esc(apply.detail)}</span>${counted}</span>` : ""}</li>`;
     }).join("");
@@ -136,6 +145,20 @@ function spinner() {
     return `<span class="spin" aria-hidden="true" style="animation-delay:-${Math.round(time % 800)}ms"></span>`;
 }
 
+// The bar floats over the foot of the screen, so the screen's scrolling area
+// stops above it while it shows: nothing scrolls under it, at any scroll
+// position. The room is the bar's own height and its gap from the foot, read
+// each time it is drawn, since a running or failed Apply grows it into a
+// column; the toast the rail floats on a narrow window sits above it too.
+/** @param {Element | null} app */
+export function reserveCommitRoom(app) {
+    if (!(app instanceof HTMLElement)) return;
+    const main = app.querySelector(":scope > .main"), bar = main?.querySelector(":scope > .commit");
+    const room = main && bar ? Math.ceil(main.getBoundingClientRect().bottom - bar.getBoundingClientRect().top) + 10 : 0;
+    if (room > 0) app.style.setProperty("--commit-room", `${room}px`);
+    else app.style.removeProperty("--commit-room");
+}
+
 // The bar commitBarState names, drawn with what it does.
 export function commitBar() {
     const model = getModel();
@@ -144,29 +167,32 @@ export function commitBar() {
     if (!bar || !model || !draft) return null;
 
     if (bar.kind === "applying") {
-        return el(`<div class="commit applying ap">
-            <div class="ap-head"><strong>Saving to the keyboard</strong>
+        return el(`<div class="commit applying ap" role="group" aria-labelledby="apply-title">
+            <div class="ap-head"><strong id="apply-title">Saving to the keyboard</strong>
                 <span class="muted">step ${esc(bar.step)} of ${bar.apply.steps.length}</span></div>
             ${applySteps(bar.apply)}
             <div class="note">The keyboard keeps running its saved profile until both halves confirm.</div></div>`);
     }
     if (bar.kind === "readback") {
-        return el(`<div class="commit applying readback" role="status" aria-live="polite">
+        return el(`<div class="commit applying readback">
             ${spinner()}<strong>Saved — reading back the keyboard</strong>
             <span class="readback-detail">${esc(postApplyReadText(model, model.postApplyRead))}</span>
             <span class="readback-note">Editing resumes when this read finishes.</span></div>`);
     }
-    // What was saved is core's verdict, in the words the notice starts with too.
+    // What was saved is core's verdict, in the words the notice starts with
+    // too, then what to do next; the rail leaves that notice to the bar.
     if (bar.kind === "failed") {
-        const apply = bar.apply;
-        const node = el(`<div class="commit ap failed">
-            <div class="ap-head"><i class="dot err"></i><strong>Save stopped at: ${esc(apply.failure?.label)}</strong></div>
+        const apply = bar.apply, advice = apply.failure?.advice || [];
+        const node = el(`<div class="commit ap failed" role="group" aria-labelledby="apply-failed-title">
+            <div class="ap-head"><i class="dot err" aria-hidden="true"></i><strong id="apply-failed-title">Save stopped at: ${esc(apply.failure?.label)}</strong></div>
             <p class="ap-reason">${esc(apply.failure?.reason)}</p>
             <p class="ap-saved">${esc(apply.failure?.verdict)}</p>
+            ${advice.length ? `<p class="ap-advice">${esc(advice.join(" "))}</p>` : ""}
             ${applySteps(apply)}
             <div class="ap-actions"><button class="btn ghost tiny" data-act="dismiss">Dismiss</button>
                 <button class="btn tiny" data-act="read">Read keyboard</button></div></div>`);
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="dismiss"]')).addEventListener("click", () => {
+            if (barSaysNotice(bar, state.error)) state.error = "";
             state.applyDismissed = apply.id;
             render();
         });
@@ -177,7 +203,7 @@ export function commitBar() {
     // What to let go of, and Cancel edit for an edit.
     if (bar.kind === "held") {
         const wait = bar.wait;
-        const node = el(`<div class="commit applying held" role="status" aria-live="polite">
+        const node = el(`<div class="commit applying held">
             <span class="n">${spinner()} <strong>${esc(wait.title)}</strong>
             <span class="muted">${esc(wait.detail)}</span></span>
             ${wait.cancellable ? `<span class="sep"></span>
@@ -195,7 +221,7 @@ export function commitBar() {
     if (bar.kind === "otherKeyboard") {
         const node = el(`<div class="commit draft">
             <span class="n"><i class="dot draft"></i> <strong>Draft belongs to another keyboard</strong>
-            <span class="muted">${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} kept locally. Select that keyboard to continue${model.device?.connected ? ", or discard the draft here" : ""}.</span></span>
+            <span class="muted">${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} kept in Ark. Select that keyboard to continue${model.device?.connected ? ", or discard the draft here" : ""}.</span></span>
             <span class="sep"></span>
             ${model.device?.connected ? '<button class="btn ghost" data-act="discard">Discard draft</button>' : ""}</div>`);
         /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="discard"]'))?.addEventListener("click", () => post(controls.control("discardProfileDraft")));
@@ -236,7 +262,7 @@ export function commitBar() {
         <button class="btn ghost tiny" data-act="discard"
             data-tip="${demo ? "Put every change back to the demo profile." : "Put every change back to what the keyboard holds."} Undo (${shortcut("Z")}) brings them back.">Discard all</button>
         <button class="btn primary" data-act="review"
-            data-tip="${demo ? "See every change and what the checks find. Saving needs a keyboard; Export profile keeps it as a backup." : "See every change, then save the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and save"}</button></div>`);
+            data-tip="${demo ? "See every change and what the checks find. Saving needs a keyboard; Export profile keeps it as a backup." : "See every change, then save the draft to both halves at once."}">${demo ? "Review changes" : "Review and save"}</button></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="review"]')).addEventListener("click", openReview);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
     return node;
@@ -251,12 +277,15 @@ function restartBar(draft, offer) {
     const tip = draft.live ? "Restart both halves. A recovery copy of any unsaved edits is saved first; the keyboard comes back in a moment and Ark puts them back."
         : "Restart both halves. Your draft stays as it is in Ark; the keyboard comes back in a moment and Ark reads it again.";
     const count = !draft.live && draft.dirty ? draft.changes.length : 0;
+    // Off, it says why beside it, not only in its tip.
+    const why = restartOffReason(draft);
     const node = el(`<div class="commit${draft.live ? " live" : ""} ${offer.kind === "stopped" ? "stopped" : "restart-needed"}">
         <span class="n"><i class="dot err"></i> <strong>${esc(offer.title)}</strong>
         <span class="muted">${esc(offer.detail)}</span></span>
         ${count ? `<span class="peek"><span class="note">${count} change${count === 1 ? "" : "s"} in your draft</span></span>` : ""}
         <span class="sep"></span>
-        <button class="btn primary" data-act="restart" ${draft.connected ? "" : "disabled"} data-tip="${esc(tip)}">Restart</button></div>`);
+        ${why ? `<span class="note restart-why" id="restart-why">${esc(why)}</span>` : ""}
+        <button class="btn primary" data-act="restart" ${why ? 'disabled aria-describedby="restart-why"' : ""} data-tip="${esc(tip)}">Restart</button></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restart"]')).addEventListener("click", () => post(controls.restartKeyboard()));
     return node;
 }

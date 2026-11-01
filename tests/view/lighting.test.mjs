@@ -67,7 +67,7 @@ test("stages report what the device said, and the base effect is its own read", 
 // in the draft the stage paints nothing, whatever its stored switch says.
 test("the auto-mouse fade is in effect only while auto-mouse is on", () => {
     const withAutoMouse = (enabled) => ({...model(), configDefaults: [
-        {id: "autoMouse", area: "Mouse", fields: [{macro: "autoMouse", kind: "toggle", value: enabled ? "1" : "0", enabled}]}]});
+        {id: "autoMouse", area: "Pointer", fields: [{macro: "autoMouse", kind: "toggle", value: enabled ? "1" : "0", enabled}]}]});
     assert.equal(stageInEffect(withAutoMouse(true), "auto"), true);
     assert.equal(stageIdle(withAutoMouse(true), "auto"), null);
     const off = withAutoMouse(false);

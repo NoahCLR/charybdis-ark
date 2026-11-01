@@ -311,7 +311,7 @@ const LIVE_ACTIONS = Object.freeze({
         try {
             const status = await service.saveWorkingCopy({session: live.session, revision: live.revision});
             draft.confirmSaved(status);
-            session.notice = `Saved on both halves. Recovery copy of what was saved before: ${recovery}`;
+            session.notice = `Saved on both halves. Recovery copy of what was saved before, on Backups: ${recovery}`;
         } catch (error) {
             if (codeOf(error) === "LIVE_HALVES_APART") markApart(draft);
             else if (interruption(error)) throw await saveCutShort(session, draft, error, saveRecovery);

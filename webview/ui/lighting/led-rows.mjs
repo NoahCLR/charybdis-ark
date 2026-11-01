@@ -41,7 +41,7 @@ export function groupRowsTable(rows, target) {
             <td>${target === "combo" ? "All combos" : ownerCell(model, target, row.owner)}</td>
             <td class="mono">${esc(row.ledGroup)} · ${row.ledIndices.length} LED${row.ledIndices.length === 1 ? "" : "s"}</td>
             <td><span class="led-swatch ${inheritsStageColour(row.color) ? "swatch-off" : ""}" style="${inheritsStageColour(row.color) ? "" : `background:${css(row.color)}`}"></span>
-                <code class="dim">${esc(hsvLabel(row.color))}</code>${inheritsStageColour(row.color) ? ` <span class="note">inherits the stage colour</span>` : ""}</td>
+                ${inheritsStageColour(row.color) ? `<span class="note">inherits the stage colour</span>` : `<code class="dim">${esc(hsvLabel(row.color))}</code>`}</td>
             <td class="t-act"><button class="btn tiny ghost" data-remove="${index}" ${editGate(model, "lighting").editable ? "" : "disabled"}>Remove</button></td></tr>`).join("")}</tbody></table>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () =>
         post(edits.deleteLedRow(target, Number(button.dataset.remove)))));

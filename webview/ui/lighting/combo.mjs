@@ -32,7 +32,7 @@ export function stageCombo(model) {
     onBoard.append(el(`<div class="row gap-8 stage-chips">${(model.combos || []).slice(0, 8).map((row) =>
         `<span class="chip">${comboBadge(model, row.badge || "C")}
         ${comboInputsMarked(model, row)}</span>`).join("") || `<span class="note">No combos are stored.</span>`}</div>`));
-    onBoard.append(el(`<p class="note">While a combo's inputs are held, its keys wear this colour. The badges on the key faces take their outline from it, so an off stage shows plain badges.</p>`));
+    onBoard.append(el(`<p class="note">While a combo's inputs are held, its keys wear this colour; its badges take their outline from it.</p>`));
     node.append(colour, where, onBoard);
     return node;
 }

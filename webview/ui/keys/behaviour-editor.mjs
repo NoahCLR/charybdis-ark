@@ -41,8 +41,8 @@ function timingDefaultsNote(model, behaviour) {
         .filter(([, value]) => String(value ?? "").trim() !== "")
         .map(([name, value]) => `${name} ${value} ms`);
     return values.length
-        ? `Keyboard defaults from ${where}: ${values.join(", ")}. Clear an override to follow its default.`
-        : `Clear a timing override to follow the keyboard default from ${where}.`;
+        ? `Empty fields follow ${where}: ${values.join(", ")}.`
+        : `Empty fields follow ${where}.`;
 }
 
 // The cell open in this behaviour's grid: one opened in another behaviour's
@@ -57,8 +57,8 @@ const openCell = (behaviour) => state.cellRow === behaviour.keycode ? state.cell
 function storageNotes(behaviour) {
     const timingIdle = !behaviour.steps.length && behaviour.timingAlone === false;
     if (!behaviour.stored) return [timingIdle
-        ? "Using the key’s defaults. A behaviour is added to the draft when you set a grid action or Keeps the pointer layer on. On this key a timing does nothing until it has a branch."
-        : "Using the key’s defaults. A behaviour is added to the draft when you set a grid action, a timing or Keeps the pointer layer on."];
+        ? "Using the key’s defaults until you set an action or Keeps the pointer layer on. A timing alone does nothing here."
+        : "Using the key’s defaults until you set an action, a timing or Keeps the pointer layer on."];
     if (behaviourChangesNothing(behaviour)) return [`This behaviour changes nothing: ${behaviourHasTiming(behaviour)
         ? "on this key a timing does nothing without a branch" : "it has no branches or timing of its own"}, so the key runs as if it had none. Set a grid action, or remove it.`];
     return timingIdle ? ["On this key a timing does nothing until the behaviour has a branch."] : [];
@@ -171,7 +171,7 @@ export function behaviourEditor(behaviour) {
                 ${TIERS.map((kind) => cellFor(step, kind)).join("")}`).join("")}
         </div>
         <div id="cellEditor"></div>
-        <p class="note beh-foot">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are left out of the profile.${dashed ? " A dashed cell is what the keyboard does there with nothing set: the key's own action, or the other hold tier carrying on. It is not stored, and setting an action there replaces it." : ""}</p>
+        <p class="note beh-foot">Each cell is one action and how it runs. Empty cells are not stored.${dashed ? " A dashed cell is what the key does with nothing set; an action there replaces it." : ""}</p>
     </div>`);
 
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-cell]")).forEach((button) => button.addEventListener("click", () => {

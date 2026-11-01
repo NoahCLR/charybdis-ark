@@ -1,0 +1,9 @@
+# Empty layers fold away
+
+Cited as D-L76.
+
+The keyboard compiles 16 layers and a keymap uses a few, so every list of layers shows the layers in use and folds the empty ones behind one disclosure at its end, and the person shows them when they want one. A layer is empty when nothing would be lost by not seeing it: it is not the base or a default layer, has no name of its own, maps no key, and nothing uses it (a key turning it on, a pointing mode it starts or the pointer layer, Combo layer matching, a colour or LED override, a key's Use behaviour or Join combos off, a Settings switch). The picked layer always shows, and so does one whose setting on that screen differs from how it came. Folding is presentation only: every layer is still drawn into the form it belongs to, stored and posted as before, and Rename & reorder still reaches every one, which is how a new layer gets its name. Core publishes whether a layer has a name of its own (`named`), since its words for an unnamed layer read like a name; the rest is the interface's, `emptyLayers` in `webview/view/empty-layers.mjs`. The contract is in [Shared controls](../spec/interface-contracts.md#shared-controls).
+
+## Considered options
+
+Hiding the layers past the last one in use: rejected, because an empty layer can sit between used ones and a used one past an empty run. Judging a Settings switch against the firmware's compiled default: Ark does not know it (D-L11), so a switch counts as set where it differs from most empty layers', and on every one of them where they split evenly. A popover listing the empty layers from the strip: rejected for one disclosure that reads the same in every list.

@@ -174,9 +174,10 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     if (await anyway.count()) await anyway.click();
     await expect(page.locator(".commit.failed")).toBeVisible({timeout: 20000});
     await expect(page.locator(".commit.failed .ap-saved")).toHaveText("Nothing was saved: the keyboard kept the profile it had.");
-    // The notice starts with the same verdict and is shown as a failure.
-    await expect(page.locator(".rail-message.err > span")).toHaveText(/^Nothing was saved: the keyboard kept the profile it had\. [A-Z]/);
-    await expect(page.locator(".rail-message")).not.toContainText(/Failed|Candidate|mutation|ambiguous|wait window/);
+    // The notice starts with the same verdict, and the bar says it once, what
+    // to do included, naming no file; the rail does not say it again.
+    await expect(page.locator(".commit.failed")).not.toContainText(/Failed|Candidate|mutation|ambiguous|wait window|recovery-|\.json/);
+    await expect(page.locator(".rail-message", {hasText: "Nothing was saved"})).toHaveCount(0);
     expect(keyboard.mutations.length).toBeGreaterThan(0);
     expect(keyboard.mutations.every((report) => keyboard.unhandled.includes(report))).toBe(true);
     await page.locator('.commit.failed [data-act="dismiss"]').click();
@@ -321,7 +322,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await page.locator('.commit [data-act="review"]').click();
     const sheet = page.locator(".sheet");
     await expect(sheet.locator("h2")).toHaveText("Review 3 changes");
-    for (const area of ["Mouse", "Custom keys", "Macros"]) await expect(sheet.locator(".rv-sect h4", {hasText: area})).toHaveCount(1);
+    for (const area of ["Pointer", "Custom keys", "Macros"]) await expect(sheet.locator(".rv-sect h4", {hasText: area})).toHaveCount(1);
     await expect(sheet).toContainText("Saving needs a keyboard");
     await expect(sheet.locator('[data-act="apply"], [data-act="apply-anyway"]')).toHaveCount(0);
     const [exported] = await Promise.all([page.waitForEvent("download"), sheet.locator('[data-act="export"]').click()]);
@@ -454,6 +455,8 @@ test("literal macro steps stage through the real web shell, export exactly, undo
     await page.locator('.read-placeholder [data-act="explore-demo"]').click();
     await ready(page);
     await page.locator('[data-screen="macros"]').click();
+    // An unused slot, under the bank's Show all.
+    await page.locator('[data-all-slots="macros"]').click();
     await page.locator('[data-slot="MACRO_17"]').click();
     await page.locator('[data-insert-kind="text"]').click();
     const text = ' {"key": "{KC_A}"}\nhello ';

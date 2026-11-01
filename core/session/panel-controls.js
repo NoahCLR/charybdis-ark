@@ -12,7 +12,8 @@
 //   shell.progress(title, run)     runs `run` behind a progress indicator
 //   shell.saveRecovery(document, about)
 //                                  writes a recovery copy with what made it and
-//                                  the keyboard's name, resolves to where it went
+//                                  the keyboard's name, resolves to its name as
+//                                  Backups lists it (the sentences say where)
 //   shell.chooseProfile()          resolves to a chosen file's text, or undefined
 //
 // and `shell.words.noneFound`, when a shell says "no keyboard found" its own
@@ -242,7 +243,7 @@ const DRAFT_ACTIONS = Object.freeze({
             // What the keyboard held before, for "Put back what it had".
             if (saved) remember(session, "beforeApply", {document: saved, savedAt: new Date().toISOString()}, service.snapshot(), draft.deviceId);
             else forget(session, "beforeApply");
-            session.notice = await storedProfile(session, {before, result, copy: `Recovery copy: ${recovery}`, onStep: (step) => {
+            session.notice = await storedProfile(session, {before, result, copy: `Recovery copy on Backups: ${recovery}`, onStep: (step) => {
                 readStep(step);
                 service.emitChange?.();
             }});
@@ -341,7 +342,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
             saveRecovery: async (copy) => (recovery = await recoveryFor(shell, session, "restore")(copy))});
         closeEditors(session);
-        session.notice = await storedProfile(session, {before, result, copy: (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery});
+        session.notice = await storedProfile(session, {before, result, copy: (before.incomplete ? "Interrupted data retained for diagnosis on Backups: " : "Recovery copy on Backups: ") + recovery});
         return;
     },
 });

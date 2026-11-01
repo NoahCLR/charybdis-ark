@@ -237,6 +237,8 @@ test("the layer and pointing-mode lists scroll on their own and keep their place
     await openStage(page, "layers");
     const list = page.locator('[data-scroll-list="layers"]');
     const content = page.locator(".content");
+    // Every layer listed, the empty ones shown too, is too many for the card.
+    await list.locator('[data-empty-layers="lighting-layers"]').click();
     await expect(list).toHaveClass(/\bmany\b/);
     const layer = list.locator('[data-layer="12"]');
     await layer.scrollIntoViewIfNeeded();

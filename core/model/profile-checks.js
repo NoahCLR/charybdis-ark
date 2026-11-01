@@ -16,7 +16,7 @@ const {pointingMacros} = require("./pointing-taps");
 const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {actionName} = require("../schema/actions");
-const {VOCABULARY, macroDefaultName, settingsPath, slotName} = require("./vocabulary");
+const {REVIEW_AREAS, VOCABULARY, macroDefaultName, settingsPath, slotName} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 
 // A behaviour step that sends a custom key sends only its shortcut (firmware
@@ -51,7 +51,7 @@ function profileFindings(decoded, destination = {}) {
     for (const [slot, count] of Object.entries(decoded.danglingPointingKeys || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,
-            title: `${count} action${count === 1 ? "" : "s"} reach empty pointing slot ${Number(slot) + 1}`,
+            title: `${count} action${count === 1 ? " reaches" : "s reach"} ${slotName(undefined, Number(slot))}, an empty pointing slot`,
             detail: "Keys, behaviours or combo outputs still name this empty slot. The keyboard accepts them but does nothing when they run.",
             fix: "Configure the slot or replace the actions that reach it.", place: {kind: "pointing", slot: Number(slot)}});
     }
@@ -97,13 +97,13 @@ function profileFindings(decoded, destination = {}) {
         findings.push({kind: "brightnessBlocker", level: "blocker", layers: [], identity: String(lighting.brightness),
             title: `Background effect brightness exceeds this keyboard's limit of ${max}`,
             detail: `This profile stores brightness ${lighting.brightness}; the keyboard accepts at most ${max}, so it refuses the profile.`,
-            fix: `Set the background effect brightness to ${max} or lower.`, place: {kind: "settings", area: "Lighting", section: "rgbAppearance", stage: "base"}});
+            fix: `Set the background effect brightness to ${max} or lower.`, place: {kind: "settings", area: REVIEW_AREAS.lighting, section: "rgbAppearance", stage: "base"}});
     }
     if (Array.isArray(destination.effects) && !destination.effects.some(effect => effect.id === lighting.effect)) {
         findings.push({kind: "effectBlocker", level: "blocker", layers: [], identity: String(lighting.effect),
             title: `Background effect ${lighting.effect} is unavailable on this keyboard`,
             detail: "The connected firmware does not advertise this effect, so the keyboard refuses the profile.",
-            fix: "Choose a background effect this keyboard reports.", place: {kind: "settings", area: "Lighting", section: "rgbAppearance", stage: "base"}});
+            fix: "Choose a background effect this keyboard reports.", place: {kind: "settings", area: REVIEW_AREAS.lighting, section: "rgbAppearance", stage: "base"}});
     }
     return findings;
 }

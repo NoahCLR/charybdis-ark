@@ -19,11 +19,11 @@ import {ALL_LAYERS, LAYERS} from "../../webview/view/layout.mjs";
 import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE} from "../../webview/view/backups.mjs";
 import {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS as LOCK_SLOTS} from "../../webview/view/keycode-expression.mjs";
 import {macroUnit} from "../../webview/view/macro.mjs";
-import {LAYER_ORDER_UNIT, OTHER_KEY_OPTIONS_UNIT} from "../../webview/view/review.mjs";
+import {AREAS, LAYER_ORDER_UNIT, OTHER_KEY_OPTIONS_UNIT} from "../../webview/view/review.mjs";
 
 const require = createRequire(import.meta.url);
 const pd = require("../../core/schema/pd-mode-domain-v1");
-const {VOCABULARY} = require("../../core/model/vocabulary");
+const {REVIEW_AREAS, VOCABULARY} = require("../../core/model/vocabulary");
 const {RGB_POINTING_MODE_IDS} = require("../../core/schema/rgb-domain-v1");
 const {POINTING_SLOT_COUNT} = require("../../core/data/pd-mode-keys");
 
@@ -100,4 +100,8 @@ test("the review units the webview reads are core's", () => {
     const {UNIT} = require("../../core/model/review-units");
     for (const index of [0, 7, 31]) assert.equal(macroUnit(index), UNIT.macro(index));
     assert.deepEqual([LAYER_ORDER_UNIT, OTHER_KEY_OPTIONS_UNIT], [UNIT.layerOrder, UNIT.settings("otherKeyOptions")]);
+});
+
+test("the review's areas, in their order, are core's, each named as its screen is", () => {
+    assert.deepEqual([...AREAS], Object.values(REVIEW_AREAS));
 });

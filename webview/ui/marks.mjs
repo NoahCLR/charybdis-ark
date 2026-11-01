@@ -184,6 +184,11 @@ export function valueMarked(model, marker, text) {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} [text] */
 export const actionMarked = (model, keycode, text = keyIdentity(model, keycode).label) => keyNameMarked(model, text, keycode);
 
+// A key named where no mark can ride, in an accessible name (aria-label): the
+// words actionMarked shows, as text.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode */
+export const keyNameText = (model, keycode) => keyIdentity(model, keycode).label || keycode;
+
 // What a combo sends and the keys that press it, named the same way.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
 export const comboOutputMarked = (model, combo) =>

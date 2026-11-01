@@ -30,7 +30,9 @@ On a key face:
 - A frosted key is transparent: it falls through to the layer below.
 - A small dot in the corner marks a key changed in your draft.
 
-The legend under the board explains each mark.
+The legend under the board explains each mark. Its **Shortcuts** button
+lists what the board takes from the mouse and the keys (below); Escape or a
+click elsewhere closes the list.
 
 ## The hover card
 
@@ -63,6 +65,10 @@ so and what the key sends instead.
 From the keyboard: Space or Enter selects a key, and Enter on the selected key
 opens its picker.
 
+While the keyboard can't take an edit, such as while keys are held in a live
+mode, the board is read only: clicking selects a key to read it, and ⌘C still
+copies it.
+
 Off a Mac, use Ctrl where this guide says ⌘; Ark's own tips say Ctrl there.
 
 ## Layers
@@ -70,7 +76,36 @@ Off a Mac, use Ctrl where this guide says ⌘; Ark's own tips say Ctrl there.
 The keyboard has 16 layers. The tabs under the board pick which one the board
 shows and which one you edit. Each tab shows the layer's colour, name and
 number. The highest layer that is on wins; a transparent key takes what the
-next layer down does; the base layer is always on.
+next layer down does; the base layer is always on. When the tabs don't fit,
+they scroll sideways: the arrows at each end or scrolling move along them,
+and an end with more tabs past it fades out. From the keyboard, Tab reaches
+the picked tab and ← → pick the layer beside it (Home and End the first and
+last); the workbench's and Lighting's tabs work the same way.
+
+### Empty layers
+
+Most keymaps use a few of the 16 layers. A layer with nothing in it is
+**empty**: it isn't the base or a default layer, it has no name of your own,
+every key on it is transparent or KC_NO, and nothing uses it. Nothing uses it
+when no key, behaviour, combo, pointing mode or custom key turns it on, no
+pointing mode starts from it and it isn't the pointer layer, no layer matches
+its combos on it, it has no colour or LED override of its own, no key on it
+has **Use behaviour** or **Join combos** off, and its switches on the
+Settings screens read as the other empty layers' do.
+
+Every list of layers shows the layers in use and folds the empty ones behind
+one line at its end, such as **› 8 empty layers**. Click it, or press Enter
+or Space on it, to show them; again to fold them. In the tabs it sits after
+the last one, and the layers it shows come after the others; a list in stack
+order, such as [This key on every layer](keys.md#the-key-tab) and Rename &
+reorder, shows them in their places. The layer you picked always shows, and so
+does one whose setting on that screen is on where the others' are off, or the
+other way round. To start using a new layer, show the empty ones and pick it,
+or name it in Rename & reorder. Folding only draws less: Ark stores and sends
+every layer as before.
+
+A key's name that doesn't fit its cap on one line takes two, such as
+**Slot 6** over **hold (empty)**, rather than shrinking out of reading.
 
 Where Ark names a layer in passing (a key's name, a combo, the review), a
 small drawing of the board in the layer's colour sits before its name. A
@@ -84,17 +119,19 @@ key keeps its name ("/ / Navigation"), with the icon before the layer.
 ### Rename & reorder
 
 **Rename & reorder**, after the last tab, opens the layer list over the
-board, highest first, with the base at the bottom.
+board, highest first, with the base at the bottom. Its empty layers are
+folded under the list; show them to name one.
 
 - Type in a name to rename a layer. Names are up to 32 bytes: a letter takes
   one, an accented letter two. The count under the name says where it
   stands, and warns past the limit.
 - Drag a row by its grip to move it, or focus the grip and press ↑ or ↓.
-- **Make base** swaps a layer with the base. The base row itself can't be
+- **Make base**, on the row under the pointer or the one you have tabbed
+  into, swaps that layer with the base. The base row itself can't be
   dragged.
-- **Keys follow their layers**, on by default, renumbers every layer key
-  (MO, LT, TG, TO, TT, OSL and the rest) so each still reaches the same layer
-  after a move. Turned off, layer keys keep their numbers and reach whatever
+- **Keys follow their layers**, on by default, renumbers every layer key,
+  of every kind (Hold, Lock, Move to, Tap-toggle, One-shot, tap-holds and the
+  rest), so each still reaches the same layer after a move. Turned off, layer keys keep their numbers and reach whatever
   layer now sits there. A pointing mode's layers, those that start it and
   those its key turns on, move as the layer keys do, so the keys that started
   a mode still start it, and so do the layers a custom key's shortcut turns
@@ -188,4 +225,5 @@ layer, through a transparent key and so on) that folds, and a row per thing.
 The table scrolls inside the workbench, so a long list never makes the
 workbench taller. Every tab is as tall as Behaviours, so switching tabs never
 moves what is under the workbench. Pick a key on the board and its row
-scrolls into view.
+scrolls into view. Click a row to pick it, and its keys ring on the board;
+from the keyboard, Tab to the row's name and press Enter or Space.

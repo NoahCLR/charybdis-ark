@@ -32,9 +32,10 @@ behaviour runs here and the key can join combos, and if not, which switch
 keeps it off. A key transparent on this layer takes its switches from the
 layer it falls through to; **Open this key on** that layer goes there.
 
-**This key on every layer** lists this position on all 16 layers, highest
-first. Three or more transparent layers in a row fold into one line; click it
-to see each. Click a row to switch to that layer.
+**This key on every layer** lists this position on every layer in use,
+highest first, with the [empty layers](board-and-layers.md#empty-layers)
+folded at its end. Three or more transparent layers in a row fold into one
+line; click it to see each. Click a row to switch to that layer.
 
 **What this key reaches** links to its behaviour, its combos (or **New** to
 start one with this key) and any pointing mode it runs. A behaviour or combo
@@ -74,9 +75,9 @@ built with are left out.
 
 ### Modifiers
 
-The row of modifiers above the board wraps the key you pick: Command + C
-stores `G(KC_C)`. The footer shows the keycode you'll get, and **Use keycode**
-stores it.
+A modifier picked in the row above the board is held down with the key you
+pick: Command and C make one key that sends Command+C (stored as `G(KC_C)`).
+The footer shows the keycode you'll get, and **Use keycode** stores it.
 
 Modifiers picked with no other key are stored with one of them as the key,
 wrapped in the rest: Left Ctrl + Left Shift stores `S(KC_LEFT_CTRL)`, and
@@ -104,9 +105,11 @@ The **Custom keys** screen holds 128 keys you name yourself. Each can send a
 shortcut, have its own taps and holds, and go on any key or combo. The picker
 lists them under **Custom keys**.
 
-Pick one from the list (**Search by name** finds it by name or number). Its
-name is the editor's title: click it to rename, Enter to keep, Escape to put
-it back.
+The list opens on the keys in use, each by its name or what it sends.
+**+ New custom key** opens the first free one with its name ready to type,
+and **Show all 128 slots** lists the rest. Pick one from the list (**Search
+by name** finds it by name or number, through every key). Its name is the
+editor's title: click it to rename, Enter to keep, Escape to put it back.
 
 **Shortcut** is what the key sends: up to six keys held together, any
 modifiers and any layers. The keys and modifiers are held while you hold the

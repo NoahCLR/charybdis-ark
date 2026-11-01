@@ -20,13 +20,15 @@ function checkItem(model, check, show, source, demo) {
 
 // The section, or nothing when the walk found nothing. Saving is what makes
 // the edits permanent, in every edit mode (D-L72).
-/** @param {import("../view/vocabulary.mjs").VocabularyModel | null | undefined} model @param {readonly import("../../contracts/model.js").Check[]} checks @param {(check: import("../../contracts/model.js").Check) => string} show @param {(check: import("../../contracts/model.js").Check) => string} [source] @param {boolean} [demo] in the demo, what the draft started from is the demo profile */
-export function checksSection(model, checks, show, source = () => "", demo = false) {
+// `opened` is a group's open state a person chose, by its id, which a render
+// keeps over the group's own default.
+/** @param {import("../view/vocabulary.mjs").VocabularyModel | null | undefined} model @param {readonly import("../../contracts/model.js").Check[]} checks @param {(check: import("../../contracts/model.js").Check) => string} show @param {(check: import("../../contracts/model.js").Check) => string} [source] @param {boolean} [demo] in the demo, what the draft started from is the demo profile @param {Readonly<Record<string, boolean>>} [opened] */
+export function checksSection(model, checks, show, source = () => "", demo = false, opened = {}) {
     const groups = checkGroups(checks, {demo});
     if (!groups.length) return "";
     return `<section class="rv-sect ck">
         <div class="sect-h"><h4>Checks</h4><span class="note">what can run, what layers you can reach, and what must be fixed before saving</span></div>
-        ${groups.map((group) => `<details class="ck-group" ${group.open ? "open" : ""}>
+        ${groups.map((group) => `<details class="ck-group" data-check-group="${esc(group.id)}" ${(opened[group.id] ?? group.open) ? "open" : ""}>
             <summary>${DISCLOSURE}${esc(group.title)} <span class="tag">${group.items.length}</span></summary>
             ${group.items.map((check) => checkItem(model, check, show, source, demo)).join("")}</details>`).join("")}
     </section>`;

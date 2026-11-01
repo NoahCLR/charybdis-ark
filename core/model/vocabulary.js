@@ -315,7 +315,7 @@ const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 const SETTINGS_SECTIONS = Object.freeze({
     keyTiming: "Tap & hold timing", normalPointerSpeed: "Pointer speed", sniping: "Auto-sniping", autoMouse: "Auto-mouse",
     automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Key feedback flash",
-    startupLayers: "Default layers", behaviorSettings: "Behaviours", comboSettings: "Combos", comboReferences: "Combo layer matching",
+    startupLayers: "Default layers", behaviorSettings: "Where behaviours run", comboSettings: "How combos run", comboReferences: "Combo layer matching",
     keyboardOptions: "Key swaps & typing", host: "Your computer",
 });
 
@@ -438,8 +438,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // A built-in hold that starts as the key goes down (MO, LM, pointing modes).
     holdFromPress: "held from the press",
     // The setting a timing default comes from, as a behaviour's timing
-    // placeholders name it ("200 · dual-role").
-    timingSources: {tappingTerm: "dual-role", tapHoldTerm: "behaviour default", longHoldTerm: "default", multiTapTerm: "default"},
+    // placeholders name it ("200 · dual-role"). Every other default is
+    // Behaviour settings' own, so it is only "default": a placeholder fits
+    // its field at every width with its unit beside it.
+    timingSources: {tappingTerm: "dual-role", tapHoldTerm: "default", longHoldTerm: "default", multiTapTerm: "default"},
     thresholds: THRESHOLDS,
     thresholdNames: {tapHoldTerm: `${THRESHOLDS.tapHoldTerm} threshold`, longHoldTerm: `${THRESHOLDS.longHoldTerm} threshold`, multiTapTerm: THRESHOLDS.multiTapTerm},
     // What each threshold means, said where a behaviour sets its own.
@@ -669,11 +671,19 @@ const protectionWords = (protection, uninterruptible) => (protection === "auto"
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
+// The areas Review groups its changes under, in the order the rail lists
+// where they are edited. An area edited on a screen of its own is named as
+// that screen is (the pointer's settings are Pointer's); Settings is the
+// other Settings screens'. The interface keeps a copy of the order
+// (webview/view/review.mjs AREAS, pinned by tests/view/enum-drift.test.mjs).
+const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros",
+    pointer: "Pointer", pointing: "Pointing modes", lighting: "Lighting", settings: "Settings", profile: "Profile", recovery: "Recovery"});
 // Each part of the profile as the area Review groups its changes under, by
 // the area core/schema/profile-domains.js gives it: where a refusal says the
 // keyboard found a problem.
 /** @type {Readonly<Record<import("../schema/profile-domains.js").ProfileDomain["area"], string>>} */
-const PROFILE_AREAS = Object.freeze({lighting: "Lighting", behaviours: "Behaviours", combos: "Combos", settings: "Settings", pointing: "Pointing modes", keys: "Keys", macros: "Macros"});
+const PROFILE_AREAS = Object.freeze({lighting: REVIEW_AREAS.lighting, behaviours: REVIEW_AREAS.behaviours, combos: REVIEW_AREAS.combos, settings: REVIEW_AREAS.settings,
+    pointing: REVIEW_AREAS.pointing, keys: REVIEW_AREAS.keys, macros: REVIEW_AREAS.macros});
 
 // What a failure says to a person (interface contracts: no code or developer
 // word reaches one). Ark's own failures are sentences written for a person: a
@@ -723,4 +733,4 @@ function failureSentence(error) {
     return INCOMPATIBLE_ANSWERS.has(String(code)) ? FAILURE_WORDS.incompatible : FAILURE_WORDS.unreadable;
 }
 
-module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};
+module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};

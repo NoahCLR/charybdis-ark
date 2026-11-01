@@ -116,6 +116,15 @@ test("an edit that would add a trap asks first; Go back and Send anyway post the
     await expectPost(page, {type: "confirmLiveEdit", proposal: 7});
 });
 
+test("Escape on a live edit's question is its Go back, even with the board's Shortcuts list open under it", async ({page}) => {
+    await openLive(page, "keys", {boardShortcuts: true});
+    await expect(page.locator("#board-shortcuts")).toBeVisible();
+    await withModel(page, model => {model.liveProposal = {id: 8, label: "Set Base · Q to TG(2)", checks: [{kind: "trap", level: "trap", status: "new", key: "trap:2", layers: [2], title: "Layer 2 has no way back", detail: "", fix: ""}]};});
+    await expect(page.locator(".sheet.live-ask")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expectPost(page, {type: "cancelLiveEdit", proposal: 8});
+});
+
 test("combos turned off by a key show beside the switch, not as a change", async ({page}) => {
     await openLive(page, "combos");
     const mark = page.locator('.off-by-key');
@@ -215,6 +224,8 @@ test("macros: a macro's name posts", async ({page}) => {
 });
 test("behaviours: a custom key's behaviour posts", async ({page}) => {
     await openLive(page, "customKeys");
+    // An unused key, under the bank's Show all.
+    await page.locator('[data-all-slots="customKeys"]').click();
     await page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_5"]').click();
     await page.locator('.custom-key-behaviour [data-cell="0-long"]').click();
     await clearPosts(page);
@@ -431,4 +442,48 @@ test("a keyboard that stopped saving and needs a restart shows one bar, the stop
     await expect(page.locator(".commit.stopped")).toContainText("The keyboard stopped saving");
     await expect(page.locator(".commit.stopped")).toContainText("1 change in your draft");
     await expect(page.locator(".commit.restart-needed")).toHaveCount(0);
+});
+
+// The review leads with the changes: checks the keyboard already has fold
+// behind one line with their count, and stay as a person sets them while the
+// review redraws; a Save that is off says why beside it, a blocker by its
+// title, and still takes the pointer so its tip can show.
+test("the review lists the changes first, folds what the keyboard already has, and says why Save is off", async ({page}) => {
+    await openLive(page, "keys");
+    await page.locator('.commit [data-act="review"]').click();
+    const sheet = page.locator(".sheet.rv, .sheet:has(.rv)");
+    await expect(sheet.locator(".rv > section").first().locator("h4")).toHaveText("Keys");
+    await expect(sheet.locator(".rv > section").last().locator("h4")).toHaveText("Checks");
+    const existing = sheet.locator('details[data-check-group="existing"]');
+    await expect(existing.locator("summary")).toContainText("Already on the keyboard");
+    await expect(existing.locator("summary .tag")).toHaveText("7");
+    await expect(existing).not.toHaveAttribute("open", "");
+    await existing.locator("summary").click();
+    await expect(existing).toHaveAttribute("open", "");
+    await withModel(page, () => {});
+    await expect(page.locator('details[data-check-group="existing"]')).toHaveAttribute("open", "", {timeout: 2000});
+
+    const save = page.locator('.sheet-f [data-act="apply"]');
+    await withModel(page, model => {model.draft.reviewed = true; model.draft.checks.push({kind: "effectBlocker", level: "blocker", status: "existing",
+        layers: [], key: "effectBlocker:9", title: "Background effect 9 is unavailable on this keyboard", detail: "", fix: ""});});
+    await expect(save).toBeDisabled();
+    await expect(page.locator("#review-save-why")).toHaveText("Fix the blocker first: Background effect 9 is unavailable on this keyboard.");
+    await expect(save).toHaveAttribute("aria-describedby", "review-save-why");
+    await expect(page.locator('details[data-check-group="existing"]')).toHaveAttribute("open", "", {timeout: 2000});
+    expect(await save.evaluate((button) => getComputedStyle(button).pointerEvents)).not.toBe("none");
+
+    await withModel(page, model => {model.draft.reviewed = true; model.draft.checks = model.draft.checks.filter((check) => check.level !== "blocker");});
+    await expect(save).toBeEnabled();
+    await expect(page.locator("#review-save-why")).toHaveCount(0);
+    await withModel(page, model => {model.draft.connected = false;});
+    await expect(page.locator("#review-save-why")).toHaveText("Connect the keyboard to save.");
+});
+
+test("a Restart that is off says why beside it", async ({page}) => {
+    await page.goto("/preview/index.html?shell=live-stopped");
+    await withModel(page, model => {model.draft.connected = false;});
+    const restart = page.locator('.commit [data-act="restart"]');
+    await expect(restart).toBeDisabled();
+    await expect(page.locator("#restart-why")).toHaveText("Connect the keyboard to restart it.");
+    await expect(restart).toHaveAttribute("aria-describedby", "restart-why");
 });

@@ -42,7 +42,7 @@ const RESTART_LABEL = "Put back the unsaved edits from before the restart";
 /** @param {string} message @param {string} code */
 const refusal = (message, code) => Object.assign(new Error(message), {code});
 /** @param {string | undefined} recovery */
-const inRecovery = recovery => recovery ? ` Your unsaved edits are in the recovery copy: ${recovery}` : "";
+const inRecovery = recovery => recovery ? ` Your unsaved edits are in the recovery copy on Backups: ${recovery}` : "";
 const UNANSWERED = " The slave half did not answer the restart: if the halves do not agree now, unplug the keyboard and plug it back in.";
 
 // What a restart would lose: the keyboard's working copy, as a document. A

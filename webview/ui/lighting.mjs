@@ -13,6 +13,7 @@ import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
+import {linkTabPanel, rovingTabs} from "../lib/tabs.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
@@ -36,7 +37,7 @@ export function screenLighting() {
     const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
         "Lighting",
-        "What the keyboard lights, and when. Each stage paints over the one before it, and the board shows the result of your draft."
+        "What the keyboard lights, and when."
     )}</div>`);
     const power = powerControls(model);
     if (power) main.querySelector(".topbar-actions")?.prepend(power);
@@ -48,7 +49,7 @@ export function screenLighting() {
     const card = el(`<div class="board-card"></div>`);
     const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
         ? pdColourRow(model, state.pointingSlot) : null;
-    card.appendChild(board(onGroups ? view.alone : view, {
+    const drawn = card.appendChild(board(onGroups ? view.alone : view, {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
         picks: state.ledPicks,
@@ -64,7 +65,7 @@ export function screenLighting() {
     card.appendChild(el(`<div class="board-foot">
         <b>${onGroups ? "LED selector" : "Preview"}</b>
         <span class="board-foot-text">${onGroups
-            ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
+            ? `Click LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
             : `${esc(layerCalled(layer))}${view.held.some((at) => at > 0) && !onGroups
                 ? ` with ${esc(listed(view.held.filter((at) => at > 0).reverse().map((at) => layerCalled(view.stack[at]))))} on`
                 : ""} over the background effect${preview
@@ -83,6 +84,7 @@ export function screenLighting() {
     const bar = layerBar();
     attachLayersControl(bar);
     card.append(bar);
+    linkTabPanel(/** @type {HTMLElement | null} */ (bar.querySelector(".layer-tabs")), drawn);
     pad.appendChild(card);
 
     const marks = draftMarks(model?.draft?.changes);
@@ -94,7 +96,7 @@ export function screenLighting() {
     const stageTab = (stage, index) => {
         const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
         const idle = stageIdle(model, stage.id);
-        return `<button role="tab" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}"
+        return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}"
             data-tip="Painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
             <span class="n">${esc(index + 1)}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
             <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
@@ -103,7 +105,7 @@ export function screenLighting() {
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
             ${stages.map(stageTab).join(`<span class="tab-step" aria-hidden="true">›</span>`)}
             <span class="tab-sep" aria-hidden="true"></span>
-            <button role="tab" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
+            <button role="tab" id="stage-tab-groups" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -117,6 +119,7 @@ export function screenLighting() {
     if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
     stageBody(/** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
     keepInView(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
+    rovingTabs(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")), /** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
     pad.appendChild(bench);
 
     main.appendChild(content);

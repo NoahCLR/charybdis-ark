@@ -78,8 +78,8 @@ test("the header reports the keyboard, not a profile directory", () => {
     assert.equal(connected.label, "bastardkb Charybdis 4x6");
     assert.match(connected.summary, /generation 7/);
     assert.match(connected.summary, /0xABCD1234/);
-    assert.equal(connected.savedProfile, "saved profile generation 7 · both halves connected", "the review's footer: words, no digest");
-    assert.doesNotMatch(connected.savedProfile, /0x/i);
+    assert.equal(connected.savedProfile, "saved profile · both halves connected", "the review's footer: words, no generation or digest");
+    assert.doesNotMatch(connected.savedProfile, /0x|generation/i);
     const state = {capabilities: {}, device: {manufacturer: "bastardkb", product: "Charybdis 4x6"}};
     assert.equal(buildDeviceModel({...state, storedKeyboardName: ""}).device.label, "bastardkb Charybdis 4x6", "the built-in name keeps its maker");
     assert.equal(buildDeviceModel({...state, storedKeyboardName: "Noah’s board"}).device.label, "Noah’s board", "a name the person gave stands alone");

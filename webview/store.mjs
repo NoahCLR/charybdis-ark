@@ -51,6 +51,10 @@ export const STATE_FIELDS = {
     flashPausesAsked: kept(null), // the connection whose flash pauses an open Diagnostics last asked for
     keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
     stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
+    emptyLayersShown: kept([]), // the places showing their empty layers (ui/empty-layers.mjs)
+    allSlotsShown: kept([]),   // the slot banks showing their unused slots (ui/slot-bank.mjs)
+    definitionLayersOpen: kept(false), // a behaviour's or combo's Layers it runs on, open on every one once opened, so a render keeps it
+    checkGroupsOpen: kept(null), // {revision, open}: the review's check groups opened or folded by hand, for that revision of the draft
     settingsDurationUnits: kept({}), // display preferences; stored settings remain milliseconds
     // {cell, keycode, style, repeatHz}: how the open empty cell runs, chosen
     // before it sends anything. Historically kept across draft replacement;
@@ -76,6 +80,7 @@ export const STATE_FIELDS = {
     keyClipboard: kept(null),  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
     stage: kept("layers"),
     railMenu: kept(false),    // the keyboard menu under the rail's mark
+    boardShortcuts: kept(false), // the Shortcuts list in the board's legend
     layersOpen: kept(false),  // the layer-stack panel on the layer row
     layersAsked: kept(false), // its stack is requested once per opening
     pointingSlot: kept(0),
@@ -83,6 +88,7 @@ export const STATE_FIELDS = {
     pdTaps: resets(null),      // {slot, rows: {"dir:up": tap}}: direction shortcuts set to ignore modifiers before any is chosen
     pdAdvanced: kept(false),  // Advanced open on the pointing editor, whichever slot is shown
     applyDismissed: kept(0),  // the failed Apply (by id) the person closed, so it stays closed
+    recoveryAsk: kept(null),  // the recovery copy (by id) whose Delete is asking "Delete this copy?"
     pdPreview: kept(false),
     feedbackRow: kept("hold"),
     macroSlot: kept(null),

@@ -27,8 +27,7 @@ export function hoverCard(index) {
     if (!reach) return "";
     const {position} = reach;
     const own = reachSections(reach.own, position);
-    return `<div class="hc-head"><div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span>
-        <span class="hc-pill">index ${esc(index)}</span></div>
+    return `<div class="hc-head"><div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span></div>
         <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code>${headline(model, keyMeaning(position))}</div>${own.join("")}${seenThrough(view, reach)}`;
 }
 

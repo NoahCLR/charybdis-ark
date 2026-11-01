@@ -24,7 +24,8 @@ const ACTION_NAMES = [
     "id", "data-key", "data-custom-key", "data-trackball", "data-cell", "data-term", "data-macro", "data-channel", "data-row",
     "data-edit", "data-editmacro", "data-editpd", "data-pick", "data-lt", "data-mod", "data-screen", "data-tab",
     "data-ltab", "data-slot", "data-b", "data-style", "data-repeat", "data-output", "data-target", "data-owner",
-    "data-source", "data-mode", "data-anchor", "data-act", "data-step-text", "data-step-delay", "data-raw-payload",
+    "data-source", "data-mode", "data-anchor", "data-act", "data-step-text", "data-step-delay", "data-raw-payload", "data-empty-layers",
+    "data-all-slots", "data-row-pick",
 ];
 
 // While a redraw draws, a field it throws away is not being left.
@@ -47,10 +48,11 @@ export function redrawKeepingFocus(root, draw) {
     }
 }
 
-/** @param {Element} root @returns {CapturedFocus | null} */
-function captureFocus(root) {
-    const active = /** @type {FocusControl | null} */ (root.ownerDocument?.activeElement);
-    if (!active || active === root.ownerDocument.body || !root.contains(active)) return null;
+// Where a control is found again once a redraw has thrown it away: by its
+// data-f identity, unique, or by its authored hook and its place among the
+// controls sharing it.
+/** @param {Element} root @param {Element} active @returns {{selector: string, index: number, unique: boolean} | null} */
+function identityOf(root, active) {
     const name = active.matches("input, select, textarea") ? "data-f"
         : ACTION_NAMES.find((attribute) => active.hasAttribute(attribute));
     if (!name || !active.hasAttribute(name)) return null;
@@ -59,7 +61,16 @@ function captureFocus(root) {
     const matches = [...root.querySelectorAll(selector)];
     const unique = name === "data-f";
     if (unique && matches.length !== 1) return null;
-    const index = matches.indexOf(active);
+    return {selector, index: matches.indexOf(active), unique};
+}
+
+/** @param {Element} root @returns {CapturedFocus | null} */
+function captureFocus(root) {
+    const active = /** @type {FocusControl | null} */ (root.ownerDocument?.activeElement);
+    if (!active || active === root.ownerDocument.body || !root.contains(active)) return null;
+    const identity = identityOf(root, active);
+    if (!identity) return null;
+    const {selector, index, unique} = identity;
     /** @type {CapturedFocus["caret"]} */
     const caret = typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd ?? null] : null;
     const text = caret && unique && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) ? active : null;
@@ -130,10 +141,32 @@ function restoreFocus(root, captured) {
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]';
 
+// What a sheet or a dialog is, for giving the focus back when it closes: one
+// over the screen (.scrim) or one opened on it (Rename & reorder's panel).
+const DIALOGS = ".scrim, .layerpanel";
+// The control that opened the dialog on screen, found again by its identity.
+/** @type {{selector: string, index: number} | null} */
+let opener = null;
+
 // A dialog that opens takes focus: whatever was focused behind it is not
-// something the keyboard should keep acting on.
+// something the keyboard should keep acting on. The control that had the
+// focus as it opened is remembered, and when the last dialog closes with the
+// focus gone with it, the focus goes back to that control, or to the one
+// drawn in its place.
 /** @param {Element} root */
 export function focusDialog(root) {
+    const active = root.ownerDocument.activeElement;
+    const lost = !active || active === root.ownerDocument.body || !root.contains(active);
+    const open = [...root.querySelectorAll(DIALOGS)];
+    if (!open.length) {
+        const back = opener;
+        opener = null;
+        if (!back || !lost) return;
+        const target = /** @type {HTMLElement | SVGElement | undefined} */ (root.querySelectorAll(back.selector)[back.index]);
+        target?.focus({preventScroll: true});
+        return;
+    }
+    if (!opener && !lost && active && !open.some((dialog) => dialog.contains(active))) opener = identityOf(root, active);
     const dialogs = root.querySelectorAll(".scrim");
     const dialog = dialogs[dialogs.length - 1];
     if (!dialog || dialog.contains(root.ownerDocument.activeElement)) return;

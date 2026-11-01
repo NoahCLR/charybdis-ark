@@ -236,7 +236,8 @@ async function cutShortApply() {
     /** @type {import("../contracts/model.js").ApplyView | undefined} */
     let view;
     f.options.onApplyProgress = (/** @type {import("../contracts/model.js").ApplyView} */ applied) => {view = applied;};
-    f.options.saveRecovery = async () => "recovery-2026-10-24T09-12-00-000Z-before-apply-charybdis.charybdis.json";
+    // The shell names a copy as Backups lists it (web/web-shell.mjs).
+    f.options.saveRecovery = async () => "Before saving a draft · Charybdis 4x6 · 24 Oct 2026, 09:12";
     const failure = await f.restore().then(() => {throw new Error("the preview's Apply was meant to be cut short");}, (/** @type {Error} */ error) => error);
     return {view: /** @type {import("../contracts/model.js").ApplyView} */ (view), notice: failure.message};
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {GEO, boardOutlineMarkup, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../../webview/view/geometry.mjs";
+import {GEO, LEGEND_MIN, boardOutlineMarkup, fitLegend, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../../webview/view/geometry.mjs";
 
 test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(0), false, "left home column");
@@ -93,6 +93,28 @@ test("a legend is sized to its row rather than bucketed by length", () => {
     assert.ok(fitText("MMMMMMMM", row).size < fitText("iiiiiiii", row).size);
     assert.equal(fitText("", row).size, 12, "an empty legend has nothing to fit");
     assert.equal(fitText("Left Control", {max: 12, min: 11, width: 48}).size, 11, "the floor holds");
+});
+
+test("a legend alone on its cap never shrinks past the legible floor: a long one takes two lines", () => {
+    const row = {max: 12, width: GEO.keyW - 10};
+    assert.deepEqual(fitLegend("Esc", row), {size: 12, lines: [{text: "Esc", squeeze: 0}]}, "a short legend is one line at full size");
+    const shift = fitLegend("Left Shift", row);
+    assert.equal(shift.lines.length, 1, "one that fits at the floor stays on one line");
+    assert.ok(shift.size >= LEGEND_MIN && shift.size < 12);
+
+    const slot = fitLegend("Slot 6 · hold (empty)", row);
+    assert.deepEqual(slot.lines.map((line) => line.text), ["Slot 6", "hold (empty)"], "broken where the separator was, which the break replaces");
+    assert.ok(slot.size >= LEGEND_MIN, "and drawn no smaller than the floor");
+    assert.deepEqual(fitLegend("Custom key 0", row).lines.map((line) => line.text), ["Custom", "key 0"], "the longer line comes out shortest");
+    for (const name of ["Slot 20 · lock (empty)", "Dragscroll · hold", "Left Command", "Custom key 127"]) {
+        const fit = fitLegend(name, row);
+        assert.ok(fit.size >= LEGEND_MIN, `${name}: at least the floor`);
+        assert.equal(fit.lines.map((line) => line.text).join(" ").replace(/ /g, ""), name.replace(/ · /g, " ").replace(/ /g, ""), `${name}: every word kept`);
+    }
+    const word = fitLegend("Supercalifragilistic", row);
+    assert.equal(word.lines.length, 1, "a single word has nowhere to break");
+    assert.equal(word.size, LEGEND_MIN);
+    assert.equal(word.lines[0].squeeze, row.width, "so it is compressed into the row at the floor");
 });
 
 test("the board outline draws every key and the trackball", () => {

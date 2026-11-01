@@ -72,7 +72,7 @@ export function tabBehaviours(body, right) {
     const item = (group, row, note) => {
         const picked = row.keycode === state.behaviourRow && (!route || route === group);
         return `<tr class="beh-row${note ? " quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${esc(group)}"${picked ? ' data-picked="true"' : ""}${picked && selectionMoved ? " data-reveal-selected" : ""}>
-            <td><button class="row-pick">${actionMarked(model, row.keycode)}${keyIdentity(model, row.keycode).label === row.keycode ? ""
+            <td><button class="row-pick" data-row-pick="${esc(`behaviours:${group}:${row.keycode}`)}">${actionMarked(model, row.keycode)}${keyIdentity(model, row.keycode).label === row.keycode ? ""
                 : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</button>${note ? `<span class="sub">${note}</span>` : ""}</td>
             <td class="beh-branches">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length}</td></tr>`;
     };

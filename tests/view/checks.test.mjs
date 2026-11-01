@@ -17,9 +17,10 @@ test("checks are grouped by where they come from, most serious first, and empty 
     assert.deepEqual(checkGroups(), []);
 });
 
-test("what is already on the keyboard stays folded unless it holds a trap", () => {
+test("what is already on the keyboard stays folded, traps too, unless it holds a blocker that keeps Save off", () => {
     assert.equal(checkGroups([check("warning", "existing")])[0].open, false);
-    assert.equal(checkGroups([check("warning", "existing"), check("trap", "existing")])[0].open, true);
+    assert.equal(checkGroups([check("warning", "existing"), check("trap", "existing")])[0].open, false,
+        "a trap the keyboard already has folds, so the changes stay in view; Save still asks about it");
     assert.equal(checkGroups([check("blocker", "existing")])[0].open, true);
 });
 

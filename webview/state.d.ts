@@ -14,19 +14,19 @@ export interface MacroForm {
     moveNotice?: string;
     selectionAnchor?: string | null; selectedSteps?: string[]; stepHistory?: MacroHistory;
 }
-export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; own?: string[]; symbols?: Record<string, string[]>; layerTap: string | null; onPick?: (expression: string) => void; layers?: number; layerKind?: number; onShortcut?: (shortcut: import('../contracts/panel.js').CustomKeyShortcut) => void; onCustomKey?: (keycode: string, shortcut: import('../contracts/panel.js').CustomKeyShortcut, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'; layoutKey?: boolean; comboOutput?: boolean}
+export interface PickerState {title: string; context?: string; contextKeycode?: string; onLayer?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; own?: string[]; symbols?: Record<string, string[]>; layerTap: string | null; onPick?: (expression: string) => void; layers?: number; layerKind?: number; onShortcut?: (shortcut: import('../contracts/panel.js').CustomKeyShortcut) => void; onCustomKey?: (keycode: string, shortcut: import('../contracts/panel.js').CustomKeyShortcut, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'; layoutKey?: boolean; comboOutput?: boolean}
 export interface PanelState {
     screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;
     reachGroups: Record<string, boolean>; resetBenchHeight: boolean; reachRow: {macros: string | null; customKeys: string | null; combos: string | null; pointing: string | null};
-    cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; flashPausesAsked: number | string | null; keyDetailsOpen: boolean; stackOpen: boolean;
+    cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; flashPausesAsked: number | string | null; keyDetailsOpen: boolean; stackOpen: boolean; emptyLayersShown: string[]; allSlotsShown: string[]; definitionLayersOpen: boolean; checkGroupsOpen: {revision: number; open: Record<string, boolean>} | null;
     cellHow: {cell: string; keycode: string; style?: BranchStyle; repeatHz?: Scalar} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null;
         madeKey: {keycode: string; shortcut: import('../contracts/panel.js').CustomKeyShortcut; name: string} | null};
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
-    railMenu: boolean; stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pointingSlot: number; pdKind: {slot: number; kind: number} | null;
+    railMenu: boolean; boardShortcuts: boolean; stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pointingSlot: number; pdKind: {slot: number; kind: number} | null;
     pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
-    pdAdvanced: boolean; applyDismissed: number; pdPreview: boolean; feedbackRow: string | undefined;
+    pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; pdPreview: boolean; feedbackRow: string | undefined;
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
     macroClipboard: MacroStep[] | null;
     recording: {slot: string; before: string} | null; lastTake: {slot: string; before: string; after: string} | null;

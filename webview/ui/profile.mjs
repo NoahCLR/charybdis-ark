@@ -11,7 +11,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post} from "../store.mjs";
+import {getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {topbar} from "./frame.mjs";
 import {categorySummary, statusBesideCount} from "../view/review.mjs";
@@ -20,6 +20,7 @@ import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {reviewPortableProfile} from "../view/edits.mjs";
 import {PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE, fitsLine} from "../view/backups.mjs";
 import {importCallout, importNote} from "../view/edit-mode.mjs";
+import {dialogFoot} from "./dialog-foot.mjs";
 
 export function screenProfile() {
     const model = getModel();
@@ -34,7 +35,7 @@ export function screenProfile() {
 
     const main = el(`<div class="main">${topbar(
         "Backups",
-        "Everything the keyboard stores, as one file: keys, layers, behaviours, combos, macros, custom keys, pointing modes, lighting and settings.",
+        "Everything the keyboard stores, as one file.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad stack profile-pad"></div></div>`);
@@ -51,7 +52,7 @@ export function screenProfile() {
             <div class="card-b">
                 <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg></span>
                 <h3>Import profile</h3>
-                <p class="note">${esc(demo ? "Choose or drop a complete backup here and review its differences from the demo profile first. Import replaces the demo's draft; Undo brings it back."
+                <p class="note">${esc(demo ? "Choose or drop a backup to compare it with the demo first. It replaces the demo's draft; Undo brings it back."
                     : importNote(model?.draft))}</p>
                 <p class="note profile-drop-status" role="status" hidden></p>
                 <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Import profile…</button>
@@ -62,7 +63,7 @@ export function screenProfile() {
                 <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 21V9M7.5 13.5 12 9l4.5 4.5M4 5h16"/></svg></span>
                 <h3>Export profile</h3>
                 <p class="note">${demo ? esc(DEMO_WORDS.exportNote)
-                    : `Save a complete backup of the profile currently running on the keyboard. Keep it somewhere safe before experimenting. ${esc(FIRMWARE_LINE)}`}</p>
+                    : `The profile the keyboard runs, as one file. Keep one safe before experimenting. ${esc(FIRMWARE_LINE)}`}</p>
                 <button class="btn primary" data-act="export" ${canExport ? "" : "disabled"}>Export profile…</button>
             </div>
         </div>
@@ -145,6 +146,9 @@ function wireProfileDrop(card) {
 // its keyboard.
 // The browser keeps them in its storage, each usable as a draft (through the
 // same comparison as a backup file), downloadable as a file, or deletable.
+// A copy is the safety net, and a deleted one is gone, so Delete asks first,
+// in its row: Cancel, then Delete. The question's Cancel takes the Delete
+// button's place, focus included, and gives it back; Escape is Cancel too.
 /** @param {import("../../contracts/model.js").RecoveryCopy[]} recoveries */
 function recoveriesCard(recoveries) {
     const model = getModel();
@@ -153,10 +157,14 @@ function recoveriesCard(recoveries) {
         <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
         ${recoveries.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
             <span class="recovery-name" title="${esc(copy.name)}">${esc(copyTitle(model, copy))}</span>
-            <span class="right row gap-4">
-                <button class="btn compact" data-use="${esc(copy.id)}" ${canImport ? "" : "disabled"}>Use as draft</button>
-                <button class="btn text" data-recovery="${esc(copy.id)}">Download</button>
-                <button class="btn text destructive" data-delete="${esc(copy.id)}">Delete</button></span></div>`).join("")}</div>` : ""}
+            ${String(state.recoveryAsk) === String(copy.id)
+                ? `<span class="recovery-ask" role="group" aria-label="Delete this copy?">${dialogFoot(
+                    `<button class="btn tiny destructive" data-act="confirm-delete">Delete</button>`,
+                    {tiny: true, id: `recovery-delete-${copy.id}`}, "", "", `<span class="note">Delete this copy?</span>`)}</span>`
+                : `<span class="right row gap-4">
+                <button class="btn tiny" data-use="${esc(copy.id)}" ${canImport ? "" : "disabled"}>Use as draft</button>
+                <button class="btn tiny ghost" data-recovery="${esc(copy.id)}">Download</button>
+                <button class="btn tiny ghost destructive" id="recovery-delete-${esc(copy.id)}" data-delete="${esc(copy.id)}">Delete</button></span>`}</div>`).join("")}</div>` : ""}
         <div class="card-b"><p class="note">${recoveries.length ? "" : "None yet. "}${RECOVERY_NOTE} here. They stay in this browser until you delete them or clear the site's data, so download any you want to keep.</p></div>
     </div>`);
     /** @param {string} attribute @param {(id: string | number) => Parameters<typeof post>[0]} message */
@@ -166,7 +174,18 @@ function recoveriesCard(recoveries) {
     }));
     wire("data-use", useRecovery);
     wire("data-recovery", downloadRecovery);
-    wire("data-delete", deleteRecovery);
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-delete]")).forEach((button) => button.addEventListener("click", () => {
+        state.recoveryAsk = button.dataset.delete ?? null;
+        render();
+    }));
+    const ask = node.querySelector(".recovery-ask");
+    ask?.querySelector('[data-act="cancel"]')?.addEventListener("click", () => {state.recoveryAsk = null; render();});
+    ask?.querySelector('[data-act="confirm-delete"]')?.addEventListener("click", () => {
+        const copy = recoveries.find((entry) => String(entry.id) === String(state.recoveryAsk));
+        state.recoveryAsk = null;
+        if (copy) post(deleteRecovery(copy.id));
+        render();
+    });
     return node;
 }
 
@@ -206,9 +225,7 @@ function reviewSheet(model, portable, busy) {
                     ${group.rows.map((row) => `<tr class="sub"><td>${esc(row.label)}</td><td class="mono">${esc(row.count)}</td><td></td></tr>`).join("")}`).join("")}</tbody></table>` : ""}
             ${same ? "" : `<div class="callout">${esc(callout)}</div>`}
         </div>
-        <div class="sheet-f"><span class="right row gap-8">
-            <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Cancel</button>
-            <button class="btn primary" data-act="restore" ${busy || changesNothing ? "disabled" : ""}>${draft ? "Use as draft" : "Save to keyboard"}</button></span></div>
+        <div class="sheet-f">${dialogFoot(`<button class="btn primary" data-act="restore" ${busy || changesNothing ? "disabled" : ""}>${draft ? "Use as draft" : "Save to keyboard"}</button>`, {disabled: busy})}</div>
     </div></div>`);
     node.addEventListener("click", (event) => { if (event.target === node && !busy) post(controls.control("cancelPortableReview")); });
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restore"]')).addEventListener("click", () => post(controls.control("restorePortableProfile")));

@@ -14,7 +14,7 @@ test("the registry owns every rail screen and renderer in the existing order", (
         .map(name => [`screen${name}`, () => name[0].toLowerCase() + name.slice(1)]));
     for (const [id, definition] of Object.entries(SCREENS)) {
         assert.equal(definition.render(renderers), id, `${id} selects its own screen`);
-        assert.ok(definition.label && definition.title && definition.icon.startsWith("<svg"), id);
+        assert.ok(definition.label && definition.icon.startsWith("<svg"), id);
         assert.equal(isScreenId(id), true);
         assert.equal(screenDefinition(id), definition);
         assert.ok(Object.isFrozen(definition), id);

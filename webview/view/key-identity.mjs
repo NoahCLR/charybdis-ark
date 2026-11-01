@@ -174,6 +174,13 @@ function canonicalOf(model, expression) {
 /** @param {string} spelling */
 const hexValue = (spelling) => /^0x[0-9a-f]+$/i.test(spelling) ? Number(spelling) : NaN;
 
+// The layers some key the profile holds turns on, every pointing mode's and
+// custom key's included, as a mask (qmkKeyTurnsOn, which core publishes for
+// exactly those keys).
+/** @param {ViewModel} model */
+export const layersAnyKeyTurnsOn = (model) => Object.values(model?.qmkKeyTurnsOn || {})
+    .reduce((mask, on) => (Number.isInteger(on) ? mask | on : mask), 0) >>> 0;
+
 // The two values a pointing slot answers to: hold and lock, as the core's key
 // table (data/pd-mode-keys.js) gives them. Matching on the numbers rather than
 // on names matters for an empty slot, whose record carries no name for the
