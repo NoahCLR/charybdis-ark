@@ -1,4 +1,5 @@
 // @ts-check
+import {segmented} from "../segmented.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
 import {currentLayer, layers, post, render, showLayer, state} from "../../store.mjs";
@@ -47,12 +48,10 @@ export function stageLayers(model) {
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));
     const where = section("Where it paints");
-    const mode = el(`<label class="field"><span>Which keys light up</span>
-        <select data-f="lighting:layer:${esc(layer?.index)}:mode" class="input" ${canEdit ? "" : "disabled"}>
-            ${vocabulary(model).paintModes.map(([id, text]) => `<option value="${esc(id)}" ${(row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY") === id ? "selected" : ""}>${esc(text)}</option>`).join("")}
-        </select></label>`);
-    /** @type {HTMLSelectElement} */ (mode.querySelector("select")).addEventListener("change", (event) =>
-        { if (row) post(edits.layerColour(row.layer, /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
+    const mode = el(segmented({label: "Which keys light up", f: `lighting:layer:${layer?.index}:mode`, choices: vocabulary(model).paintModes,
+        current: row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY", disabled: !canEdit}));
+    mode.addEventListener("change", (event) =>
+        { if (row) post(edits.layerColour(row.layer, /** @type {HTMLInputElement} */ (event.target).value, row.color)); });
     where.append(stack(mode, el(`<p class="note">Keys mapped on this layer only leaves its transparent and empty keys unpainted, so what is beneath shows. All keys paints every key.</p>`)));
     const overrides = section("LED overrides on this layer", `<span class="right"><button class="btn tiny ghost" data-act="groups">Edit groups</button></span>`);
     overrides.className = "span";

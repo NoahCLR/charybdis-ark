@@ -1,4 +1,5 @@
 // @ts-check
+import {segmented} from "../segmented.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
 import {post, render, state} from "../../store.mjs";
@@ -70,10 +71,10 @@ export function stageKey(model) {
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
     const policy = section("When and where");
-    const commit = el(`<label class="field"><span>Tap commit</span><select data-f="lighting:key:tap-commit" class="input" ${canEdit ? "" : "disabled"}>
-        ${vocabulary(model).tapCommit.map(([id, text]) => `<option value="${esc(id)}" ${feedback.tapCommitMode === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
-    /** @type {HTMLSelectElement} */ (commit.querySelector("select")).addEventListener("change", (event) =>
-        post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLSelectElement} */ (event.target).value})));
+    const commit = el(segmented({label: "Tap commit", f: "lighting:key:tap-commit", choices: vocabulary(model).tapCommit,
+        current: feedback.tapCommitMode, disabled: !canEdit}));
+    commit.addEventListener("change", (event) =>
+        post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));
     const locality = el(`<label class="field"><span>Locality</span><select data-f="lighting:key:locality" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${feedback.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
