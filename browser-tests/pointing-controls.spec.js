@@ -80,7 +80,8 @@ for (const [label, value, expected] of [
 test("reverse scrolling is a switch per axis, posted as the record's two bits", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 0});
     const sideways = page.locator('[data-f="pointing:0:invert:1"]'), upDown = page.locator('[data-f="pointing:0:invert:2"]');
-    // Dragscroll reverses up and down only.
+    // Each switch is named as Review names its axis, and Dragscroll reverses up and down only.
+    await expect(page.locator(".pd-switches .sw .txt")).toHaveText(["Horizontal", "Vertical"]);
     await expect(sideways).not.toBeChecked();
     await expect(upDown).toBeChecked();
     await page.locator("label.sw").filter({has: sideways}).click();
@@ -388,7 +389,7 @@ test("every setting in a mode says what it does, under Advanced too", async ({pa
         // Every number field, and every few-option choice outside the
         // per-direction table, carries a tip on the field itself.
         const untipped = await editor(page).locator(".field").evaluateAll(fields => fields
-            .filter(field => field.querySelector("input.input, .seg") && !field.closest(".pd-taps"))
+            .filter(field => field.querySelector("input.input, .seg, .pd-switches, .pd-mods") && !field.closest(".pd-taps"))
             .filter(field => !(field.getAttribute("data-tip") || field.querySelector(".seg[data-tip]")?.getAttribute("data-tip")))
             .map(field => field.querySelector("span")?.textContent));
         expect(untipped, `slot ${slot}`).toEqual([]);

@@ -10,6 +10,7 @@ import {keycodeName} from "../../view/key-identity.mjs";
 import {render} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
 import {ARROWS, scrollLabel, words} from "./common.mjs";
+import {word} from "../../view/vocabulary.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
@@ -43,7 +44,7 @@ function directions(model, slot, {choice, form, disabled}, stage) {
     fields.append(choice("When a direction has no key", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
         {tip: "Moving toward a direction with no key: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing."}));
     fields.append(choice("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
-        {tip: "Every step sends the key again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; it sends again when the ball moves back the other way, or after a 150 ms pause. Turning toward another direction sends nothing more."}));
+        {tip: "Every step sends the key again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; a movement starts again after a 150 ms pause, and only turning more than 90 degrees from the direction that sent sends again before then."}));
     fields.append(el(`<p class="note">A direction can also click mouse buttons 1–8 or play a macro; both are in the picker.</p>`));
     return node;
 }
@@ -104,18 +105,22 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
         field(scrollLabel(model, "divisorV"), slot.scroll?.divisorV, "scroll:divisorV", {tip: tip("divisorV")}));
     group("feel").append(field(scrollLabel(model, "intervalMs", "ms"), slot.scroll?.intervalMs, "scroll:intervalMs", {unit: "ms", tip: tip("intervalMs")}),
     field(scrollLabel(model, "lockMs", "ms"), slot.scroll?.lockMs, "scroll:lockMs", {unit: "ms", tip: tip("lockMs")}));
-    node.append(modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers"));
+    const held = modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers");
+    held.setAttribute("data-tip", words(model).scrollTips?.heldModifiers || "");
+    node.append(held);
     return node;
 }
 
-// Reverse scrolling is one switch per axis: the record keeps it as two bits,
+// Reverse scrolling is one switch per axis, named as the vocabulary names
+// each bit alone (the same words Review reads): the record keeps it as two bits,
 // sideways (1) and up and down (2), which the vocabulary names together.
 /** @param {Model} model @param {PresentedSlot} slot @param {FormControls["form"]} form @param {string} disabled */
 function reverse(model, slot, form, disabled) {
     const invert = Number(slot.scroll?.invert ?? 0);
-    const node = el(`<div class="field"><span>Reverse scrolling</span><div class="pd-switches">
-        <label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:invert:1" data-bit="1" ${invert & 1 ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">Sideways</span></label>
-        <label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:invert:2" data-bit="2" ${invert & 2 ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">Up and down</span></label></div></div>`);
+    const P = words(model);
+    /** @param {number} bit */
+    const axis = (bit) => `<label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:invert:${bit}" data-bit="${bit}" ${invert & bit ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">${esc(word(P.invert, bit))}</span></label>`;
+    const node = el(`<div class="field" data-tip="${esc(P.scrollTips?.invert || "")}"><span>Reverse scrolling</span><div class="pd-switches">${axis(1)}${axis(2)}</div></div>`);
     form.invert = () => [...node.querySelectorAll("input:checked")].reduce((mask, input) => mask | Number(/** @type {HTMLInputElement} */ (input).dataset.bit), 0);
     return node;
 }

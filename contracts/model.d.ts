@@ -176,6 +176,8 @@ export interface Vocabulary {
         directionOutput: WordList<number>;
         directionStep: WordList<number>;
         modifierPolicy: WordList<number>;
+        kindsDo: WordList<number>;
+        movementLabel: string;
         scrollFields: WordList<string>;
         heldModifiers: string;
         scrollTips: Readonly<Record<string, string>>;

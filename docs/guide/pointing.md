@@ -61,7 +61,7 @@ The editor runs in four steps, top to bottom.
 ### Starting a mode
 
 An empty slot asks what the trackball should do: **Scroll** or **Send keys**.
-Pick one and the slot holds a new mode of that kind. **Or copy a mode** copies
+Pick one and the slot holds a new mode that moves that way. **Or copy a mode** copies
 one you already have into the slot instead.
 
 A key can point at an empty slot. It just does nothing until the slot holds a
@@ -72,7 +72,7 @@ and clearing a slot doesn't break the keys that use it.
 ### 1. What the ball does
 
 **Scroll** or **Send keys**. Switching redraws the steps below for the other
-kind; nothing is saved to your draft until you change one of its settings.
+movement; nothing is saved to your draft until you change one of its settings.
 
 ### 2. What each direction sends
 
@@ -106,8 +106,8 @@ For a scrolling mode:
 
 - **Scrolls**: **Both axes**, **Horizontal only** or **Vertical only**. With
   one axis, drift the other way doesn't scroll.
-- **Reverse scrolling**: a switch for each axis, **Sideways** and **Up and
-  down**.
+- **Reverse scrolling**: a switch for each axis, **Horizontal** and
+  **Vertical**.
 - **Speed**: how far the ball moves for one scroll step, **sideways** and
   **up and down**. Lower scrolls faster.
 - **Feel**: **Fastest repeat** is the shortest time between two scroll steps,

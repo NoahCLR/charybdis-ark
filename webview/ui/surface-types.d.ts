@@ -22,6 +22,6 @@ export interface KeyDrag {x: number; y: number; moved: boolean; target: SVGGElem
 export interface TrackballOptions {mode: string; trackball: boolean; clickable: boolean}
 export type PresentedSlot = PublishedModel['pdModes'][number];
 export interface FieldOptions {unit?: string; wide?: boolean; tip?: string}
-export interface SelectOptions {inline?: boolean; tip?: string; onChange?: (event: Event) => void}
+export interface SelectOptions {tip?: string}
 export type FormReaders = PdForm & Record<string, () => Scalar>;
 export type LayerStack = NonNullable<PublishedModel['portable']['layers']>;

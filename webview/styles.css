@@ -1465,7 +1465,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-pair > .field.segmented { grid-column: 1 / -1; }
 .pd-sub { margin: 6px 0 0; }
 .pd-sub h5 { font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: var(--fw-label); }
-.pd-sub .note { margin-left: 4px; }
 /* Step 1: the two movements as large radio choices. */
 .pd-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .pd-kind { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line-2);
@@ -1486,7 +1485,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-directions { display: grid; gap: 18px; }
 .pd-direction-fields { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: start; }
 .pd-direction-fields > .note { flex-basis: 100%; }
-.pd-grid3 > .field:has(> .seg) { grid-column: 1 / -1; }
 .pd-editor .seg { flex-wrap: wrap; max-width: 100%; }
 .pd-switches { display: flex; gap: 8px 20px; flex-wrap: wrap; min-height: var(--h-control); align-items: center; }
 .pd-compass { display: grid; gap: 10px 14px; align-items: center; justify-items: center; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

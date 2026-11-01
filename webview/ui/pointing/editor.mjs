@@ -14,7 +14,7 @@ import * as edits from "../../view/edits.mjs";
 import {mark} from "../marks.mjs";
 import {attachTitleName, titleName} from "../title-name.mjs";
 import {formControls} from "./form-controls.mjs";
-import {kindChoice} from "./kind-choice.mjs";
+import {movementChoice} from "./movement-choice.mjs";
 import {movement} from "./movement.mjs";
 import {lightRow, placeButton} from "./keys-and-light.mjs";
 import {startStep} from "./link.mjs";
@@ -48,7 +48,7 @@ export function editor(model, slot, canEdit, slots) {
     const empties = slots.some((candidate) => !candidate.kind);
     const card = el(`<div class="card">
         <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>
-            ${titleName({f: `pointing:${slot.id}:name`, value: slot.name || "", placeholder: `Pointing mode ${slot.id}`,
+            ${titleName({f: `pointing:${slot.id}:name`, value: slot.name || "", placeholder: slot.displayName,
                 label: "Pointing mode name", perName: NAME_MAX_BYTES, canEdit})}
             <span class="tag">Slot ${esc(slot.id)}</span>
             <span class="right row actions">
@@ -72,7 +72,7 @@ export function editor(model, slot, canEdit, slots) {
         steps.append(node);
         return /** @type {HTMLElement} */ (node.querySelector(".pd-step-b"));
     };
-    step(1, "What the ball does").append(kindChoice(model, slot.id, kind, {disabled: !canEdit,
+    step(1, "What the ball does").append(movementChoice(model, slot.id, kind, {disabled: !canEdit,
         // Switching movement only redraws the form for the other kind: its
         // fields start empty, so staging now would post an invalid record.
         // The slot is staged once a field of the new form is changed.

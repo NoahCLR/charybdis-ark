@@ -75,7 +75,7 @@ function layerChips(model, rows, which, {disabled, empties, labelledBy, id, chan
         ${on.map((row) => `<span class="pd-chip ${row.unusable ? "warn" : ""}" ${row.tip ? `data-tip="${esc(row.tip)}"` : ""}>${marked(model, {kind: "layer", layer: row.layer}, row.name)}
             <button type="button" data-remove="${esc(row.layer)}" aria-label="${esc(`Remove ${row.name}`)}" ${esc(disabled)}>×</button></span>`).join("")}
         ${on.length ? "" : `<span class="note">None</span>`}
-        ${off.some((row) => !locked(row)) ? `<select class="input pd-add" data-f="${esc(id)}:add" aria-label="Add a layer" ${esc(disabled)}>
+        ${off.length ? `<select class="input pd-add" data-f="${esc(id)}:add" aria-label="Add a layer" ${esc(disabled)}>
             <option value="">+ Add layer</option>${shown.map(option).join("")}
             ${folded.length ? `<optgroup label="Empty layers">${folded.map(option).join("")}</optgroup>` : ""}</select>` : ""}
     </div>`);

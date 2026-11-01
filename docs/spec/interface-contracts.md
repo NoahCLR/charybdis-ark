@@ -1092,9 +1092,10 @@ beside it, and four numbered steps read top to bottom; Advanced follows as its
 own folded card (`browser-tests/pointing-controls.spec.js`).
 
 1. **What the ball does**: Scroll or Send keys, a radio group of two large
-   choices (`webview/ui/pointing/kind-choice.mjs`). Picking the other kind
+   choices in the vocabulary's words (`kinds`, `kindsDo`;
+   `webview/ui/pointing/movement-choice.mjs`). Picking the other movement
    redraws the form for it and posts nothing; its first edit posts the new
-   kind. An empty slot starts a mode by the same choice, or copies one.
+   movement. An empty slot starts a mode by the same choice, or copies one.
 2. **What each direction sends** draws each direction the mode reads as a key
    placed where the ball sends it, around the ball (four, or eight with the
    diagonals); a click opens the picker on the keys a pointing mode sends, ×
@@ -1102,11 +1103,11 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    When a direction has no key and How often it sends below, each a
    segmented choice (`webview/ui/segmented.mjs`). **How it scrolls** groups
    its fields as which way (Scrolls, a segmented choice; Reverse scrolling, a
-   switch per axis, the record's two bits), Speed and Feel, under the
+   switch per axis named as the vocabulary names each bit, the record's two bits), Speed and Feel, under the
    vocabulary's names, and the held modifiers
    (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
    under Advanced, is a segmented choice too.
-   Every setting says what it does as its field's tip: a scroll field's from
+   Every setting, Reverse scrolling and the held modifiers included, says what it does as its field's tip: a scroll field's from
    `vocabulary.pointing.scrollTips` (as the firmware's scrolling runs it), in
    the step and under Advanced alike (`browser-tests/pointing-controls.spec.js`).
 3. **What starts it**: the mode's hold and lock keys named by the mode, never

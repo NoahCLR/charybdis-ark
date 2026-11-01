@@ -23,5 +23,3 @@ export const SCROLL_LEAD = [["divisorH"], ["divisorV"], ["intervalMs", "ms"], ["
 // the two axis ratios, each as one numerator : denominator pair.
 export const SCROLL_SINGLES = [["thresholdH"], ["thresholdV"], ["expireMs", "ms"], ["decayDivisor"]];
 export const SCROLL_RATIOS = [["startNumerator", "startDenominator"], ["sustainNumerator", "sustainDenominator"]];
-/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {number} axis */
-export const axisLabel = (model, axis) => word(words(model).axes, axis);

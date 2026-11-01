@@ -585,6 +585,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     },
     pointing: {
         kinds: [[0, "Empty"], [1, "Send keys"], [2, "Scroll"]],
+        // What each movement does, said beside it where a mode picks it, and
+        // what that choice is called.
+        kindsDo: [[1, "Each direction sends a key or shortcut."], [2, "The ball scrolls the page."]],
+        movementLabel: "What the ball does",
         // A directional mode's shortcuts, by where the record keeps each: the
         // straight directions, and the diagonals eight directions add.
         directions: [["left", "Left"], ["right", "Right"], ["up", "Up"], ["down", "Down"]],
@@ -640,10 +644,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             thresholdV: "How far the ball must move up or down, in sensor counts, before a scroll can go up or down. When both axes are below their thresholds, the scroll lets go of its axis.",
             divisorH: "Sensor counts of sideways movement for one scroll step. Lower scrolls faster.",
             divisorV: "Sensor counts of up-and-down movement for one scroll step. Lower scrolls faster.",
-            intervalMs: "The shortest time between two scroll steps. 0 sends a step with every movement the sensor reports.",
+            intervalMs: "The shortest time between two scrolls sent. 0 leaves no wait: a scroll is sent as soon as the ball has moved a whole step.",
             lockMs: "How long a scroll keeps its axis once the ball stops. Move again within it and it carries on the same way; after it, the next movement picks its axis afresh.",
             expireMs: "Movement that has not yet made a whole scroll step is kept this long after the ball stops, so a slow movement still adds up; then it is forgotten. At least the axis time.",
-            decayDivisor: "Each scroll step divides the other axis's leftover movement by this, and drops it once it is below that axis's threshold, so drift across a scroll fades instead of building up. Higher fades faster; at least 2.",
+            decayDivisor: "Each scroll sent divides the other axis's leftover movement by this, and drops it once it is below that axis's threshold, so drift across a scroll fades instead of building up. Higher fades faster; at least 2.",
+            invert: "Reverses which way the page scrolls for that axis: sideways, up and down, or both.",
+            heldModifiers: "Modifiers held down while the mode scrolls, for apps that scroll differently with them: Shift to scroll sideways in some, Command or Ctrl to zoom in others.",
             startNumerator: "To pick an axis, its movement must be at least this many times the other axis's: 7 : 4 is 1.75 times. Higher needs a straighter movement before a scroll starts; when neither axis wins, it waits.",
             sustainNumerator: "A scroll keeps its axis while that axis moves at least this many times the other (5 : 4 is 1.25 times, never more than the selection ratio). Below it, the other axis takes over only if it reaches the selection ratio; otherwise the scroll stays on its axis through the wobble.",
         },

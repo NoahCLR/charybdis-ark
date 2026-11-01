@@ -11,7 +11,7 @@ import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} 
 export function advancedControls(model, slot, scrolling, {form, disabled, field, choice, modifiers}) {
     // ── advanced ──────────────────────────────────────────────────────────
     const advanced = /** @type {HTMLDetailsElement} */ (el(`<details class="card pd-advanced" ${state.pdAdvanced ? "open" : ""}><summary class="card-h">
-        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">thresholds, ratios, held modifiers</span></summary>
+        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">${scrolling ? "thresholds, ratios, decay, expiry" : "distance, held modifiers"}</span></summary>
         <div class="card-b stack"></div></details>`));
     const advancedBody = /** @type {HTMLElement} */ (advanced.querySelector(".card-b"));
     /** @param {string} title */

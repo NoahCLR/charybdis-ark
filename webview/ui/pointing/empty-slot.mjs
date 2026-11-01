@@ -9,7 +9,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {actionMarked, mark} from "../marks.mjs";
 import {listed} from "../../view/vocabulary.mjs";
-import {kindChoice} from "./kind-choice.mjs";
+import {movementChoice} from "./movement-choice.mjs";
 import {placeButton} from "./keys-and-light.mjs";
 
 // A key for an empty slot is allowed by the keyboard, so the card explains
@@ -43,7 +43,7 @@ export function emptySlot(model, slot, slots) {
         ${canEdit || gate.quiet ? "" : `<div class="unavailable">${esc(gate.why || "This slot cannot be edited right now.")}</div>`}
     </div></div></div>`);
     /** @type {HTMLElement} */ (node.querySelector(".right")).append(placeButton(slot, editGate(model, "keys").editable));
-    /** @type {HTMLElement} */ (node.querySelector("[data-kinds]")).replaceWith(kindChoice(model, slot.id, null, {disabled: !canEdit,
+    /** @type {HTMLElement} */ (node.querySelector("[data-kinds]")).replaceWith(movementChoice(model, slot.id, null, {disabled: !canEdit,
         pick: (kind) => post(edits.pdMode(slot.id, newMode(slot, kind, scrollStarter(slots)), model.profileIdentity))}));
     /** @type {HTMLSelectElement | null} */ (node.querySelector("[data-source]"))?.addEventListener("change", (event) => {
         const value = /** @type {HTMLSelectElement} */ (event.target).value;
