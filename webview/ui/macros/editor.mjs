@@ -135,7 +135,6 @@ export function editor(model, slot, canEdit) {
     return wrap;
 }
 
-// Every slot can hold a full-length name. The core enforces the rule; the
 // Uninterruptible playback: its few choices on show, as view/choices.mjs's
 // rule has them, else a menu.
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
@@ -151,6 +150,7 @@ function protectionField(model, slot, canEdit) {
         ${options.map(([value, text]) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
 }
 
+// Every slot can hold a full-length name. The core enforces the rule; the
 // counter says where the name stands in bytes, which is what the keyboard
 // counts.
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */

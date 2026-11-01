@@ -154,8 +154,8 @@ The same kind of control looks and sits the same on every screen.
 - A switch on a Settings screen's row sits at the row's right, with On or Off
   beside it; an editor's option reads switch, then its words, from the left
   edge (no test).
-- A choice of two to four options whose words fit one line together (60
-  characters) shows them on screen, as one segmented radio group
+- A choice of two to four options whose words fit one line together
+  (`ON_SCREEN_MAX_OPTIONS`, `ON_SCREEN_MAX_CHARACTERS`: 60 characters) shows them on screen, as one segmented radio group
   (`segmented`, `webview/ui/segmented.mjs`), so each is read without opening
   anything and picked in one click; more options, or longer ones, stay a
   menu (`onScreenChoice`, `webview/view/choices.mjs`;
