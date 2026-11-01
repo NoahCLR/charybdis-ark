@@ -21,7 +21,9 @@ reads as a grid (D-L32).
   marked + added, − removed, nothing for changed; an empty side shows a dash
   (no test).
 - Where marked and unmarked labels share a column, every label gets the same
-  mark slot, `marked(…, {slot: true})` (no test).
+  mark slot, `marked(…, {slot: true})` (no test). A Settings row has one mark
+  at most, so it sits in the middle of the slot
+  (`browser-tests/marks.spec.js`).
 - A removed thing keeps its mark and Show only where it is still on screen,
   such as a cleared pointing slot (`tests/view/review.test.mjs`).
 
@@ -349,6 +351,7 @@ Each thing with a colour of its own has exactly one mark, drawn by
 | --- | --- |
 | A behaviour tier (tap, hold, long hold) | the dot the keyboard flashes when it resolves (`tierDot`); a key feedback state's LED rows carry its tier's (`vocabulary.feedbackTiers`) |
 | A tap count (2× and up) | its branch badge in its tap-branch colour (`branchBadge`) |
+| Every tap count at once (what the Multi tap window governs) | a branch badge counting "N×", its border and fill split into an equal, hard-edged share per tap-branch colour, in tap order (`branchesBadge`) |
 | A layer | the board's icon in its layer colour (`kindIcon`); in a set of layers, before each layer's name (`valueMarked`) |
 | A pointing mode | the Pointing modes screen's icon in the light its slot paints (`kindIcon`, `slotLight`) |
 | A combo | its badge in the combo feedback colour (`comboBadge`) |

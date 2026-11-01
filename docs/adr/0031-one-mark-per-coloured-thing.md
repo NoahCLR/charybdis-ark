@@ -6,4 +6,8 @@ Each thing with a colour of its own on the keyboard (a behaviour tier, a tap cou
 
 A layer's and a pointing mode's mark is its kind's icon in its colour (the board for a layer, the Pointing modes screen's icon for a pointing mode), so one mark says both what the thing is and its colour, and a layer and a pointing mode that share a colour still read apart. A swatch shows the colour itself, and is not a mark: it is used only where the colour is the subject (a colour field or value, a pointing slot's Light value) or where every item is a layer and only the colour tells them apart (the layer bar, a list of layer chips); a pointing slot is always named by its mark. A per-layer setting shows its layer's mark in its Settings grid and in the review alike.
 
+A setting that governs every tap count at once, the Multi tap window, shows one mark for the set rather than a mark for each: the branch badge counting "N×", its border and fill split into an equal, hard-edged share of each tap-branch colour in tap order. A share whose colour is off is left empty, so every tap count keeps its place.
+
 Amended 2026-10-24: a layer's and a pointing mode's mark was its swatch, and Settings' per-layer grids showed each layer's swatch.
+
+Amended 2026-11-01: the Multi tap window was marked as the 2× tap count, by its badge in the 2× tap-branch colour alone.

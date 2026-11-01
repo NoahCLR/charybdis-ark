@@ -2,8 +2,9 @@
 // One mark per thing that has a colour of its own, drawn the same everywhere.
 //
 // A behaviour tier is the dot the keyboard flashes when it resolves, a tap
-// count is its branch badge, a layer is the board's icon in its layer colour,
-// a pointing mode is the Pointing modes icon in the light its slot paints, a
+// count is its branch badge (every tap count at once is "N×" in every
+// tap-branch colour), a layer is the board's icon in its layer colour, a
+// pointing mode is the Pointing modes icon in the light its slot paints, a
 // combo is its badge in the combo colour, a lighting stage is its on/off dot.
 // The grid, the hover card, Settings and the draft review all draw these from
 // here, so a colour means one thing on every surface — and a stage that is off
@@ -33,6 +34,22 @@ export function branchBadge(model, count, className = "") {
     const colour = feedbackColours(model).branches[count - 2];
     const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
     return `<span class="bn${lit ? " lit" : ""}${className ? ` ${esc(className)}` : ""}"${lit ? ` style="--tint:${css(colour)}"` : ""}>${esc(count)}×</span>`;
+}
+
+// Every tap count at once, as the Multi tap window governs them: the branch
+// badge, counting "N×", tinted with every tap-branch colour rather than one
+// (D-L31). Each tap count takes an equal share of the badge, left to right in
+// tap order, with a hard edge between colours. A colour that is off leaves its
+// share empty; with key feedback off, or every colour off, the badge is
+// drawn unlit.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model */
+export function branchesBadge(model) {
+    const colours = feedbackColours(model).branches;
+    if (!stageEnabled(model, "key") || colours.every(isOff)) return `<span class="bn">N×</span>`;
+    const share = 100 / colours.length;
+    const stops = colours.map((colour, i) =>
+        `${isOff(colour) ? "transparent" : css(colour)} ${+(i * share).toFixed(2)}% ${+((i + 1) * share).toFixed(2)}%`).join(", ");
+    return `<span class="bn lit all-counts" style="--tints:${esc(stops)}">N×</span>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind */
@@ -121,14 +138,14 @@ export const slotNamedWithKeycodes = (name, keycodes) => `<span class="sends inl
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
 // A mark as the core describes it: {kind: "tier", tier, branch?} · {kind:
-// "branch", count} · {kind: "layer", layer} · {kind: "pointing", slot} ·
+// "branches"} · {kind: "layer", layer} · {kind: "pointing", slot} ·
 // {kind: "combo", badge?} · {kind: "stage", on}. Anything else draws nothing;
 // a set of layers marks each name instead (valueMarked).
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value */
 export function mark(model, value) {
     switch (value?.kind) {
         case "tier": return `${value.branch ? branchBadge(model, value.branch) : ""}${tierDot(model, value.tier)}`;
-        case "branch": return branchBadge(model, value.count);
+        case "branches": return branchesBadge(model);
         case "layer": return kindIcon("layer", layerSwatch(model, {index: value.layer}).colour);
         case "pointing": return kindIcon("pointing", slotLight(model, {id: value.slot}).colour);
         case "combo": return comboBadge(model, value.badge);

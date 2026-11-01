@@ -177,7 +177,7 @@ function behaviourFields(row, defaults, names, shortcuts) {
     const inherited = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, defaults, shortcuts);
     /** @type {Fields} */
     const fields = new Map([
-        ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
+        ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branches"})],
         ["Tap / hold threshold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
         ["Long hold threshold", timing(row.longHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
         ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
