@@ -129,8 +129,10 @@ test("ending an explicit take releases captured held keys and Clear take restore
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("before");
 });
 
+// Record delays is switched on mid-take, so the threshold sits above any gap
+// between two keys, however slow the machine.
 test("recorder options and ordinary rerenders keep a take running; a tapped Escape records, a held one stops it", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false});
+    await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false, recordDelayThreshold: 1000});
     await page.locator('[data-act="record"]').click();
     await page.locator('label:has([data-delays])').click();
     expect((await take(page)).recording).toBe("MACRO_17");
