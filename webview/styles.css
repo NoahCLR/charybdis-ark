@@ -1473,6 +1473,10 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 /* A menu in the editor is as wide as its words, as its number fields are. */
 .pd-editor select.input { width: auto; min-width: 140px; max-width: 100%; }
 .pd-sub { margin: 6px 0 0; }
+/* Speed and Feel side by side, each its heading, its fields and its note. */
+.pd-groups { display: flex; flex-wrap: wrap; gap: 14px 56px; align-items: start; }
+.pd-group { display: grid; gap: 10px; align-content: start; }
+.pd-group > .note { max-width: 36ch; }
 .pd-sub h5 { margin: 0; font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: var(--fw-label); }
 /* Step 1: the two movements as large radio choices. */
 .pd-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -1586,6 +1590,9 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
    own card, which stays in view beside the editor, so picking a slot far down
    never scrolls the editor away (lib/scroll.mjs keeps the bank's place). */
 .pad.library { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+/* A slot editor reads as a page, not a banner: past a list and an editor
+   of 960 px, a wider window leaves the room to the right, as Settings does. */
+.pad.library { max-width: 1320px; }
 .pad.library > *, .pad.library .card-b.stack > * { min-width: 0; }
 .pad.library > .card:first-child { position: sticky; top: 14px; }
 .pad.library .macro-grid { max-height: 540px; overflow-y: auto; scrollbar-width: thin; padding: 2px; }
