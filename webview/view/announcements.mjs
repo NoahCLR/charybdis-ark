@@ -33,11 +33,11 @@ export function announcements(model, {notice = "", error = "", applyDismissed = 
     if (model?.portable?.progress) polite.push(model.portable.progress);
     if (bar?.kind === "applying") {
         const step = bar.apply.steps[bar.step - 1];
-        polite.push(`Saving to the keyboard, step ${bar.step} of ${bar.apply.steps.length}${step ? `: ${step.label}` : ""}`);
+        polite.push(`${bar.title}, step ${bar.step} of ${bar.apply.steps.length}${step ? `: ${step.label}` : ""}`);
     }
-    if (bar?.kind === "readback") polite.push("Saved. Reading back the keyboard");
+    if (bar?.kind === "readback") polite.push(bar.title);
     if (bar?.kind === "held") polite.push(bar.wait.title);
-    if (bar?.kind === "busy") polite.push("Working with the keyboard");
+    if (bar?.kind === "busy") polite.push(bar.title);
     if (bar?.kind === "restart") polite.push(bar.offer.title);
     if (bar?.kind === "failed") {
         const failure = bar.apply.failure;

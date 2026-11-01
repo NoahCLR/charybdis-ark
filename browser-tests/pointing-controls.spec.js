@@ -46,7 +46,7 @@ test("every scrolling tuning field posts the visible value once, retaining the r
     await openControls(page, "pointing", {pointingSlot: 0});
     await advanced(page);
     const fields = [
-        ["Sideways: ball movement per step", "divisorH"], ["Up and down: ball movement per step", "divisorV"],
+        ["Horizontal: ball movement per step", "divisorH"], ["Vertical: ball movement per step", "divisorV"],
         ["Fastest repeat ms", "intervalMs"], ["Axis kept after the ball stops ms", "lockMs"],
         ["Horizontal activation threshold", "thresholdH"], ["Vertical activation threshold", "thresholdV"],
         ["Leftover movement kept for ms", "expireMs"], ["Cross-axis decay divisor", "decayDivisor"],

@@ -26,7 +26,7 @@ test("work under way is said politely, a save by its step and never by its bytes
     assert.deepEqual(announcements(model({draft: {busy: true}, apply})).polite, ["Saving to the keyboard, step 2 of 3: Send the profile"]);
     const further = {...apply, bytes: {completed: 1024, total: 4096}};
     assert.deepEqual(announcements(model({draft: {busy: true}, apply: further})).polite, ["Saving to the keyboard, step 2 of 3: Send the profile"]);
-    assert.deepEqual(announcements(model({draft: {busy: true}, apply: {...apply, state: "done"}})).polite, ["Saved. Reading back the keyboard"]);
+    assert.deepEqual(announcements(model({draft: {busy: true}, apply: {...apply, state: "done"}})).polite, ["Saved — reading back the keyboard"]);
     assert.deepEqual(announcements(model({shell: {progress: "Saving a recovery copy"}, portable: {progress: "Reading profile…"}})).polite,
         ["Saving a recovery copy", "Reading profile…"]);
 });

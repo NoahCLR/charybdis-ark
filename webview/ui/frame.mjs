@@ -168,14 +168,14 @@ export function commitBar() {
 
     if (bar.kind === "applying") {
         return el(`<div class="commit applying ap" role="group" aria-labelledby="apply-title">
-            <div class="ap-head"><strong id="apply-title">Saving to the keyboard</strong>
+            <div class="ap-head"><strong id="apply-title">${esc(bar.title)}</strong>
                 <span class="muted">step ${esc(bar.step)} of ${bar.apply.steps.length}</span></div>
             ${applySteps(bar.apply)}
             <div class="note">The keyboard keeps running its saved profile until both halves confirm.</div></div>`);
     }
     if (bar.kind === "readback") {
         return el(`<div class="commit applying readback">
-            ${spinner()}<strong>Saved — reading back the keyboard</strong>
+            ${spinner()}<strong>${esc(bar.title)}</strong>
             <span class="readback-detail">${esc(postApplyReadText(model, model.postApplyRead))}</span>
             <span class="readback-note">Editing resumes when this read finishes.</span></div>`);
     }
@@ -213,7 +213,7 @@ export function commitBar() {
     }
     if (bar.kind === "busy") {
         return el(`<div class="commit applying">
-            <span class="n">${spinner()} <strong>Working with the keyboard</strong>
+            <span class="n">${spinner()} <strong>${esc(bar.title)}</strong>
             <span class="muted">${esc(bar.busy.detail)}</span></span>
             ${bar.busy.writes ? `<span class="sep"></span>
             <span class="note">the keyboard keeps running its saved profile until both halves confirm</span>` : ""}</div>`);

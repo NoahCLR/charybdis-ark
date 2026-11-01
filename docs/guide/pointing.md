@@ -108,8 +108,8 @@ For a scrolling mode:
   one axis, drift the other way doesn't scroll.
 - **Reverse scrolling**: a switch for each axis, **Horizontal** and
   **Vertical**.
-- **Speed**: how far the ball moves for one scroll step, **sideways** and
-  **up and down**. Lower scrolls faster.
+- **Speed**: how far the ball moves for one scroll step, **Horizontal** and
+  **Vertical**. Lower scrolls faster.
 - **Feel**: **Fastest repeat** is the shortest time between two scroll steps,
   and **Axis kept after the ball stops** is how long a scroll keeps its axis
   once the ball stops: move again within it and it carries on the same way.

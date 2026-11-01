@@ -1,7 +1,7 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 import {macroNamed, vocabulary} from "./vocabulary.mjs";
-import {keyIdentity, keycodeName, macroIndex} from "./key-identity.mjs";
+import {catalogEntry, keyIdentity, keycodeName, macroIndex} from "./key-identity.mjs";
 import {MODIFIER_KEYS, MODIFIER_KEY_SIDES, MOD_BITS, MOD_RIGHT, QK, inBlock, keyOf, macroName, modsOf} from "../../rules/qmk-keycodes.mjs";
 
 // Keycodes as values: a stored shortcut named for a person, the modifiers a
@@ -40,7 +40,7 @@ export function keycodeModifiers(model, code) {
     if (inBlock(code, MODIFIER_KEYS)) return {key: "", mods: 1 << (code - MODIFIER_KEYS.first)};
     const mods = compactModifierMask(code);
     if (!mods) return null;
-    const base = (model?.qmkKeycodes || []).find((row) => row.keycode === keyOf(code));
+    const base = catalogEntry(model, keyOf(code));
     return base ? {key: base.value, mods} : null;
 }
 
@@ -78,7 +78,7 @@ export function modifierPick(model, {keys = [], mods = []}) {
         : single(mask & LEFT) ? mask & LEFT
         : single(mask & RIGHT) ? mask & RIGHT : 0;
     if (!inner) return {shortcut: {mods: mask, keys: [], layers: 0, layerKind: 0}};
-    const name = (model?.qmkKeycodes || []).find((entry) => entry.keycode === MODIFIER_KEYS.first + Math.log2(inner))?.value;
+    const name = catalogEntry(model, MODIFIER_KEYS.first + Math.log2(inner))?.value;
     if (!name) return null;
     return {keys: [name], mods: controls.filter((entry) => mask & ~inner & entry.bit).map((entry) => entry.value)};
 }

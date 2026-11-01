@@ -629,7 +629,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         modifierPolicy: [[0, "Inherit modifiers"], [1, "Ignore"], [2, "Exact shortcut"]],
         scrollFields: [
             ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
-            ["divisorH", "Sideways: ball movement per step"], ["divisorV", "Up and down: ball movement per step"],
+            ["divisorH", "Horizontal: ball movement per step"], ["divisorV", "Vertical: ball movement per step"],
             ["intervalMs", "Fastest repeat (ms)"], ["expireMs", "Leftover movement kept for (ms)"], ["lockMs", "Axis kept after the ball stops (ms)"],
             ["startNumerator", "Axis selection ratio · numerator"], ["startDenominator", "Axis selection ratio · denominator"],
             ["sustainNumerator", "Axis retention ratio · numerator"], ["sustainDenominator", "Axis retention ratio · denominator"],

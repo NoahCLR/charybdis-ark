@@ -9,7 +9,7 @@
 // included.
 import {layerCalledAt, sentence, vocabulary} from "./vocabulary.mjs";
 import {placementsOf} from "./reach.mjs";
-import {keyIdentity} from "./key-identity.mjs";
+import {catalogEntry, keyIdentity} from "./key-identity.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
 import {keycodeModifiers} from "./keyvalues.mjs";
 import {LAYERS} from "./layout.mjs";
@@ -324,7 +324,7 @@ export function shortcutPickKey(model, pick, name) {
 /** @param {Model} model @param {{mods: number, keys: readonly number[], layers?: number, layerKind?: number}} shortcut */
 export function shortcutPickLabel(model, shortcut) {
     const mods = (vocabulary(model).modifiers || []).filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
-    const keys = shortcut.keys.map((code) => (model?.qmkKeycodes || []).find((row) => row.keycode === code)).map((entry) => entry ? entry.label || entry.value : "");
+    const keys = shortcut.keys.map((code) => catalogEntry(model, code)).map((entry) => entry ? entry.label || entry.value : "");
     const layers = (model?.layers || []).map((layer) => layer.index).filter((index) => (shortcut.layers ?? 0) & 2 ** index).sort((a, b) => a - b).map((index) => layerCalledAt(model, index));
     const verb = shortcut.layerKind ? (vocabulary(model).customKeys?.layerKinds || []).find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
     if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;

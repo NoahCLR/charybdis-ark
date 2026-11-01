@@ -10,13 +10,23 @@ export const ON_SCREEN_MAX_CHARACTERS = 60;
 export const onScreenChoice = (labels) => labels.length >= 2 && labels.length <= ON_SCREEN_MAX_OPTIONS
     && labels.reduce((total, label) => total + label.length, 0) <= ON_SCREEN_MAX_CHARACTERS;
 
-// A setting's choices as options to draw, [value, words], with its stored
-// value first as one more, "… · as stored", when it is none of them, so the
-// choice still shows what the keyboard holds.
+// Options to draw, [value, words], with the stored value first as one more,
+// "… · as stored", when it is none of them, so the choice still shows what the
+// keyboard holds, and a form that reads every field back sends it unchanged
+// rather than the first option. No stored value adds none.
+/**
+ * @template {string | number} V
+ * @param {readonly (readonly [V, string])[]} choices @param {V | null | undefined} current
+ * @returns {(readonly [V, string])[]}
+ */
+export function storedChoices(choices, current) {
+    if (current === null || current === undefined || choices.some(([value]) => String(value) === String(current))) return [...choices];
+    return [[current, `${current} · as stored`], ...choices];
+}
+
+// A setting's choices as options to draw (storedChoices).
 /** @param {{value: unknown, choices?: readonly (string | number | {value: string | number, label?: string})[]}} field @returns {[string, string][]} */
 export function settingOptions(field) {
-    const choices = (field.choices || []).map((choice) => typeof choice === "object" ? {value: choice.value, label: choice.label ?? String(choice.value)} : {value: choice, label: String(choice)});
-    const known = choices.some((choice) => String(choice.value) === String(field.value));
-    return [...(known ? [] : [/** @type {[string, string]} */ ([String(field.value), `${field.value} · as stored`])]),
-        ...choices.map((choice) => /** @type {[string, string]} */ ([String(choice.value), choice.label]))];
+    const choices = (field.choices || []).map((choice) => /** @type {[string, string]} */ (typeof choice === "object" ? [String(choice.value), choice.label ?? String(choice.value)] : [String(choice), String(choice)]));
+    return /** @type {[string, string][]} */ (storedChoices(choices, String(field.value)));
 }
