@@ -310,6 +310,9 @@ function layersForView(layout, labels, aliases = {}, names = {}, alwaysOn = 1) {
         index: entry.layer,
         // Base, and every default layer the keyboard keeps, is always on.
         alwaysOn: Boolean(alwaysOn & (1 << entry.layer)),
+        // Whether the profile names it; unnamed, it is called by core's words
+        // for it, which the interface cannot tell from a name.
+        named: Boolean(layerNames[entry.layer]),
         answers: answers[at],
         positions: entry.keys.map((key) => {
             /** @type {import("../data/types.js").ResolvedKeycode & {tapLabel?: string, layerLabel?: string}} */

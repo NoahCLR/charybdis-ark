@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SECTION_ROWS, categorySummary, changesKept, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
+import {SECTION_ROWS, activeBlockers, categorySummary, changesKept, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, saveOffReason, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
 
 const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
 const words = {vocabulary: VOCABULARY};
@@ -90,7 +90,7 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(lands("host").screen, "host");
     assert.equal(lands("keyboardOptions").screen, "host");
     for (const section of ["normalPointerSpeed", "sniping", "autoMouse"]) {
-        assert.deepEqual(lands(section, "Mouse"), {screen: "pointer", reveal: `.settings-group[data-section="${section}"]`}, `${section} is a pointer setting`);
+        assert.deepEqual(lands(section, "Pointer"), {screen: "pointer", reveal: `.settings-group[data-section="${section}"]`}, `${section} is a pointer setting`);
     }
     assert.deepEqual(lands("keyboard"), {screen: "device"}, "the keyboard's name is the Keyboard screen's title");
     assert.equal(lands("startupLayers"), null, "Default layers has no editor, so its row has no Show");
@@ -137,13 +137,13 @@ test("a profile file's differences are counted by what they configure, split as 
         at({kind: "settings"}, {unit: "settings:otherKeyOptions"}), at({kind: "macro", index: 4, keycode: "MACRO_4"}), at(null, {unit: "profile", title: "Stored profile"}),
     ], {names: ["Base", "Numbers", "Symbols", "Navigation"]});
     assert.deepEqual(groups.map((group) => [group.category, group.count]),
-        [["Keys", 8], ["Lighting", 7], ["Macros", 1], ["Mouse", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");
+        [["Keys", 8], ["Lighting", 7], ["Macros", 1], ["Pointer", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");
     const rows = (category) => groups.find((group) => group.category === category).rows.map((row) => `${row.label} ${row.count}`);
     assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Key swaps & typing 1"],
         "the board's keys by layer first, then the rest of the Keys screen");
     assert.deepEqual(rows("Lighting"), ["All lighting 1", "Stages on or off 1", "Background effect 1", "Layer colours 1", "Auto-mouse fade 1", "Key feedback 2"],
         "all lighting first, then stages in paint order; a setting edited on a stage counts with it");
-    assert.deepEqual(rows("Mouse"), ["Auto-sniping 1", "Auto-mouse 1"], "the pointer's settings are filed with Mouse");
+    assert.deepEqual(rows("Pointer"), ["Auto-sniping 1", "Auto-mouse 1"], "the pointer's settings are filed with Pointer, the screen that edits them");
     assert.deepEqual(rows("Pointing modes"), [], "the slots are the whole category");
     assert.deepEqual(rows("Other"), ["Stored profile 1"]);
     assert.deepEqual(rows("Macros"), [], "a category that is its one row shows no rows");
@@ -160,11 +160,25 @@ test("a profile file's settings sections are counted under the vocabulary's word
     assert.deepEqual(labels, {
         "Tap & hold timing": "Keys", "Default layers": "Keys", "Behaviour settings": "Keys", "Combo settings": "Keys", "Combo layer matching": "Keys",
         "Key swaps & typing": "Keys", "All lighting": "Lighting", "Background effect": "Lighting", "Key feedback": "Lighting",
-        "Pointer speed": "Mouse", "Auto-sniping": "Mouse", "Auto-mouse": "Mouse",
+        "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer",
     });
 });
 
 test("a stale draft says how many changes it keeps, in agreement", () => {
     assert.equal(changesKept(1), "your 1 change is kept");
     assert.equal(changesKept(2), "your 2 changes are kept");
+});
+
+test("a Save that is off says why beside it, a blocker by its own title", () => {
+    const ready = {connected: true, stale: false, reviewed: true, checks: []};
+    const blocker = (title, status = "existing") => ({level: "blocker", status, title, key: title});
+    assert.equal(saveOffReason(words, ready), "", "nothing to say while it can save");
+    assert.equal(saveOffReason(words, {...ready, connected: false}), "Connect the keyboard to save.");
+    assert.match(saveOffReason(words, {...ready, stale: true}), /^The keyboard changed since this draft began\. Close Review and review against the keyboard\.$/);
+    assert.equal(saveOffReason(words, {...ready, checks: [blocker("Background effect 9 is unavailable on this keyboard")]}),
+        "Fix the blocker first: Background effect 9 is unavailable on this keyboard.");
+    assert.equal(saveOffReason(words, {...ready, checks: [blocker("A"), blocker("B", "new"), blocker("C", "fixed")]}), "Fix the 2 blockers in Checks first.",
+        "a blocker the draft fixes keeps nothing off");
+    assert.deepEqual(activeBlockers([blocker("A"), blocker("C", "fixed")]).map((check) => check.title), ["A"]);
+    assert.equal(saveOffReason(words, {...ready, reviewed: false}), "Getting the review ready…");
 });

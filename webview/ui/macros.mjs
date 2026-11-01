@@ -24,6 +24,8 @@ import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
 import {topbar} from "./frame.mjs";
 import {editor} from "./macros/editor.mjs";
+import {slotBank} from "../view/slot-bank.mjs";
+import {allSlotsShown, slotBankControls} from "./slot-bank.mjs";
 
 export function screenMacros() {
     const model = getModel();
@@ -34,14 +36,14 @@ export function screenMacros() {
 
     const main = el(`<div class="main">${topbar(
         "Macros",
-        "Text and key sequences one key can type. A macro you name shows by that name on the board and in the picker.",
+        "Text and key sequences that one key types.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad library macros-library"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!bank.length) {
         pad.classList.remove("library");
-        pad.appendChild(el(`<div class="screen-stub"><h3>No macro banks read</h3>
+        pad.appendChild(el(`<div class="screen-stub"><h3>No macros read</h3>
             <p class="note">${esc(gate.why || "Choose Read keyboard to read this keyboard's macros.")}</p></div>`));
         main.appendChild(content);
         return main;
@@ -52,7 +54,7 @@ export function screenMacros() {
     const filled = bank.filter((row) => !row.empty).length;
     const available = memory?.available ?? bank.length;
     const grid = el(`<div class="card"><div class="card-h"><h3>Slots</h3>
-        <input class="input search card-search" id="macroSearch" data-f="macros:search" type="search" placeholder="Search by name" value="${esc(state.macroSearch || "")}">
+        <input class="input search card-search" id="macroSearch" data-f="macros:search" type="search" aria-label="Search macros by name" placeholder="Search by name" value="${esc(state.macroSearch || "")}">
         <span class="tag" data-tip="${esc(available)} of ${bank.length} slots have room in macro memory">${filled} of ${bank.length} used${available < bank.length ? ` · ${bank.length - available} without room` : ""}</span></div>
         <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);
     /** @type {HTMLInputElement} */ (grid.querySelector("#macroSearch")).addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
@@ -62,8 +64,16 @@ export function screenMacros() {
         cells.replaceWith(el(`<p class="note">No macro is named “${esc(query.trim())}”.</p>`));
     }
     const changedMacros = draftMarks(model?.draft?.changes).macros;
-    bank.forEach((row, index) => {
-        if (!macroMatches(row, query)) return;
+    // The slots in use first; New and the unused ones after them.
+    const shelf = slotBank(bank, {
+        inUse: (row) => !row.empty || Boolean(row.name),
+        free: (row) => row.empty && !row.name && row.available !== false,
+        keep: (row) => row.keycode === slot?.keycode || changedMacros.has(row.keycode),
+        matches: (row) => macroMatches(row, query), searching: Boolean(query.trim()), open: allSlotsShown("macros"),
+    });
+    /** @param {MacroSlot} row */
+    const tile = (row) => {
+        const index = bank.indexOf(row);
         const {steps} = readMacro(model, row.keycode, row.payload, "grid");
         const peek = macroPeekSteps(readMacro(model, row.keycode, row.payload, "peek").steps, (name) => keyIdentity(model, name).label);
         const out = row.available === false;
@@ -74,8 +84,14 @@ export function screenMacros() {
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
             <span class="v">${row.needsUnicodeSetup ? esc(vocabulary(model).macroPlayback?.setup) : row.playable === false ? esc(vocabulary(model).macroPlayback?.blocked) : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? esc(vocabulary(model).macroPlayback?.unavailable) : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
-        cells.append(cell);
-    });
+        return cell;
+    };
+    cells.append(...shelf.shown.map(tile));
+    if (!query.trim()) {
+        const {add, toggle} = slotBankControls("macros", {noun: "macro", count: bank.length, free: Boolean(shelf.firstFree), canEdit: gate.editable,
+            pick: () => { state.macroSlot = shelf.firstFree?.keycode ?? state.macroSlot; }});
+        cells.append(add, toggle, ...shelf.revealed.map(tile));
+    }
     pad.appendChild(grid);
     pad.appendChild(slot ? editor(/** @type {import("../../contracts/panel.js").PublishedModel} */ (model), slot, canEdit) : el(`<div class="empty-card"><p class="note">Pick a slot.</p></div>`));
     main.appendChild(content);

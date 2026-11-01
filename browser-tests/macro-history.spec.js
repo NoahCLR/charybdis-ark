@@ -16,7 +16,7 @@ async function command(page, action) {
 
 
 async function openMacro(page, payload = '{KC_A}{KC_C}') {
-    await openControls(page, 'macros', {macroSlot: 'MACRO_17'});
+    await openControls(page, 'macros', {macroSlot: 'MACRO_17', allSlotsShown: ['macros']});
     await page.evaluate(async payload => {
         const store = await import('/webview/store.mjs'), model = structuredClone(store.getModel());
         Object.assign(model.macros[17], {payload, bytes: 6, empty: false});

@@ -266,8 +266,8 @@ test("a settings section is listed under the screen it is edited on", () => {
     const timing=items.find(entry=>entry.unit==="settings:keyTiming"), mouse=items.find(entry=>entry.unit==="settings:autoMouse");
     assert.equal(timing.area,"Settings");
     assert.deepEqual(timing.place,{kind:"settings",section:"keyTiming",area:"Settings"});
-    assert.equal(mouse.area,"Mouse","auto-mouse is listed under Mouse");
-    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Mouse"});
+    assert.equal(mouse.area,"Pointer","auto-mouse is listed under Pointer, the screen that edits it");
+    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Pointer"});
 });
 test("clearing a pointing mode is a change to the slot, not to every behaviour that reaches it", () => {
     const base=pdDocument(), slots=validateSnapshot(base).pdModes;

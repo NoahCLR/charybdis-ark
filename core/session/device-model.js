@@ -99,15 +99,16 @@ function deviceHeader(state) {
     const status = state.status;
     // Say plainly when nothing is committed. "generation 0" reads like a real
     // generation and it is not one.
-    // `savedProfile` says the same in words alone, for the review's footer:
-    // the digest is for the Keyboard screen's Diagnostics.
+    // `savedProfile` says it in words a person reads, for the review's footer:
+    // whether a profile is saved and how the halves stand. Its generation and
+    // digest are for the Keyboard screen's Diagnostics.
     const unsaved = status && (state.committed?.source === "compiled" || status.committedGeneration === 0);
     const summary = !status ? ""
         : unsaved ? `no committed profile · running compiled defaults · ${convergence(status)}`
             : `generation ${status.committedGeneration} · ${hex(status.committedDigest)} · ${convergence(status)}`;
     const savedProfile = !status ? ""
         : unsaved ? `no saved profile · running the compiled defaults · ${convergence(status)}`
-            : `saved profile generation ${status.committedGeneration} · ${convergence(status)}`;
+            : `saved profile · ${convergence(status)}`;
     const layers = state.layout?.state === "read" ? state.layout.layers.length : 0;
     const parts = [];
     if (layers) {

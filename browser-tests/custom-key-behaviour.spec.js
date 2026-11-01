@@ -10,7 +10,7 @@ const editor = (page) => page.locator(".custom-key-behaviour");
 const pick = (page, slot) => page.locator(`.macro-grid [data-custom-key="CUSTOM_KEY_${slot}"]`).click();
 
 test("the custom key bank scrolls on its own and keeps its place, so the editor stays beside it", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
     const bank = page.locator(".pad.library .macro-grid");
     const content = page.locator(".content");
     const tile = page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_100"]');
@@ -39,7 +39,7 @@ test("the custom key bank scrolls on its own and keeps its place, so the editor 
 });
 
 test("a custom key tile hovers its tip, not the board's hover card", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
     const tile = page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_5"]');
     await tile.hover();
     await expect(page.locator(".tip")).toBeVisible();
@@ -50,7 +50,7 @@ test("a custom key tile hovers its tip, not the board's hover card", async ({pag
 test("an unplaced custom key gets its behaviour on the Custom keys screen, with its built-in defaults", async ({page}) => {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
     await pick(page, 5);
     await expect(editor(page).locator(".card-h .tag")).toHaveText("No behaviour yet");
     await expect(editor(page).locator('[data-act="show-behaviour"]'), "a key on no layer has nothing to show on the board").toHaveCount(0);
@@ -104,7 +104,7 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
 });
 
 test("once stored, the behaviour shows its dashed cells and can be removed from Custom keys", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
     await pick(page, 5);
     // What the core publishes once it accepts a tap and a Long hold.
     await page.evaluate(async () => {
@@ -271,7 +271,7 @@ test("Change key… on Custom keys to an ordinary key opens the behaviour on the
 });
 
 test("Delete on Custom keys clears the open cell of the selected key's behaviour, and only that", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
     await pick(page, 5);
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");

@@ -8,6 +8,7 @@ import {mappedKeyCount} from "../../view/lighting.mjs";
 import {currentLayer, currentView, getModel, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {keepInView} from "../layerbar.mjs";
+import {rovingTabs} from "../../lib/tabs.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {behaviourEditor} from "./behaviour-editor.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
@@ -40,8 +41,8 @@ export function bench() {
     const drafted = {key: Boolean(marks.keys.get(currentLayer()?.index)?.has(state.selected)), behaviours: marks.behaviours.size > 0,
         combos: marks.combos.size > 0, macros: marks.macros.size > 0, customKeys: marks.customKeys.size > 0, pointing: marks.pointing.size > 0};
     const node = el(`<div class="card bench keys-bench">
-        <div class="bench-tabs"><div class="bench-tablist" role="tablist">
-            ${TABS.map((tab) => `<button role="tab" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
+        <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Workbench">
+            ${TABS.map((tab) => `<button role="tab" id="bench-tab-${tab.id}" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
                 <span class="tab-label">${tab.label}</span><span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}</div>
             <span class="bench-right" id="benchRight"></span>
         </div>
@@ -55,6 +56,7 @@ export function bench() {
     }));
     keepInView(/** @type {HTMLElement} */ (node.querySelector(".bench-tablist")));
     const body = /** @type {HTMLElement} */ (node.querySelector("#benchBody")), right = /** @type {HTMLElement} */ (node.querySelector("#benchRight"));
+    rovingTabs(/** @type {HTMLElement} */ (node.querySelector(".bench-tablist")), body);
     const tabs = /** @type {Record<string, (body: HTMLElement, right: HTMLElement) => void>} */ ({key: tabKey, behaviours: tabBehaviours, combos: tabCombos, macros: tabMacros, customKeys: tabCustomKeys, pointing: tabPointing});
     (tabs[state.tab] || tabKey)(body, right);
     return node;

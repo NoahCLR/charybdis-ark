@@ -12,6 +12,7 @@ import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
 import {branchName, holdStyles, tierName} from "../../view/vocabulary.mjs";
 import {behaviourMessage, saveBehaviour} from "./save-behaviour.mjs";
+import {DONE, closesInPlace} from "../inline-editor.mjs";
 
 const {TIER_FIELDS, DEFAULT_REPEAT_HZ} = edits;
 
@@ -31,21 +32,18 @@ export function cellEditor(behaviour, step, kind) {
     const node = el(`<div class="cell-editor">
         <div class="ce-head"><span class="tag">${esc(branchName(getModel(), step.tapCount + 1))}</span><h4>${esc(tierName(getModel(), kind))}</h4>
             <span class="note">${kind === "tap" ? "A tap tier fires on release, so it has no hold style." : "Runs once this tier's threshold passes."}</span>
-            <span class="right"><button class="btn tiny ghost" data-act="close">Done</button></span></div>
+            <span class="right">${DONE}${branch ? `<button class="btn tiny ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}</span></div>
         <div class="ce-body">
             <label class="field"><span>Sends</span>
-                <div class="input-row"><input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:action" data-action value="${esc(branch?.action || "")}" placeholder="nothing" ${canEdit ? "" : "disabled"}>
+                <div class="input-row"><input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:action" data-action value="${esc(branch?.action || "")}" placeholder="None" ${canEdit ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${canEdit ? "" : "disabled"}>Pick…</button></div></label>
             ${kind === "tap" ? "<span></span>" : `<label class="field"><span>How it runs</span>
                 <select class="input" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:style" data-style ${canEdit ? "" : "disabled"}>
                     ${holdStyles(getModel(), kind).map(([value, text]) => `<option value="${esc(value)}" ${shown?.style === value ? "selected" : ""}>${esc(text)}</option>`).join("")}
                 </select></label>`}
-            ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.style === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate · Hz</span>
-                <input class="input mono" type="number" min="1" max="100" step="1" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:repeat" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown?.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
-            <div class="row ce-actions">
-                ${branch ? `<button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}
-                <span class="note">Changes are kept in the draft automatically.</span>
-            </div>
+            ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.style === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate</span>
+                <span class="affix unit"><input class="input mono" inputmode="numeric" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:repeat" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown?.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}><i>Hz</i></span></label>`}
+            <p class="note ce-actions">Changes are kept in the draft automatically.</p>
         </div>
     </div>`);
     const stage = (action = /** @type {HTMLInputElement} */ (node.querySelector("[data-action]")).value.trim()) => {
@@ -54,7 +52,12 @@ export function cellEditor(behaviour, step, kind) {
         state.cellHow = edit.pending ? {cell, keycode: behaviour.keycode, ...edit.pending} : null;
         if (!edit.pending) saveBehaviour(document, behaviour, identity, {tapCount: step.tapCount, kind, branch: edit.branch || null});
     };
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="close"]')).addEventListener("click", () => { state.cell = null; render(); });
+    // Done or Escape closes it, and the focus goes back to its cell.
+    closesInPlace(node, () => {
+        state.cell = null;
+        render();
+        /** @type {HTMLElement | null} */ (document.querySelector(`.bcell[data-cell="${CSS.escape(cell)}"]`))?.focus();
+    });
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="pick"]'))?.addEventListener("click", () => openPicker({
         title: `${tierName(getModel(), kind)} action`,
         contextKeycode: behaviour.keycode,

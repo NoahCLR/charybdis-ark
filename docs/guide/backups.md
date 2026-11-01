@@ -33,7 +33,7 @@ changes. The sheet says:
   behaviours, lighting, macros and so on.
 
 **Use as draft** makes the file your draft. Undo brings back the draft you
-had. In Review and save, the keyboard changes only once you review and save
+had. **Cancel**, or Escape, closes the sheet and changes nothing. In Review and save, the keyboard changes only once you review and save
 it; in Live preview + save the file is sent to the keyboard as unsaved edits,
 for you to review and save.
 
@@ -65,7 +65,10 @@ The copies are kept in the browser and listed under **Recovery copies**,
 newest first, each with **Use as draft**, **Download** and **Delete**. Use as
 draft opens the same comparison as a backup file. A downloaded copy is named
 the same way (`recovery-<when>-before-save-noah-s-charybdis.charybdis.json`).
-Clearing the site's data deletes them, so download any you want to keep.
+A deleted copy is gone for good, so **Delete** asks first, in the copy's row:
+"Delete this copy?" with **Cancel** and **Delete**. Cancel, or Escape, leaves
+the copy as it was. Clearing the site's data deletes them, so download any
+you want to keep.
 
 ## Firmware updates
 

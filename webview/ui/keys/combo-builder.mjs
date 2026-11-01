@@ -16,9 +16,10 @@ import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
-import {keyNameMarked} from "../marks.mjs";
+import {keyNameMarked, keyNameText} from "../marks.mjs";
 import {sentence, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {comboFull, comboMissing} from "../../view/combo-form.mjs";
+import {closesInPlace} from "../inline-editor.mjs";
 
 // A builder input by the name the core gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
@@ -61,7 +62,7 @@ export function comboBuilder(canEdit, holdTerm) {
                     ${state.combo.inputs.length ? state.combo.inputs.map((input) => `<span class="chip"${shown(input) ? ""
                         : ` data-tip="No key on the board presses this from here, so nothing rings for it. It stays an input unless you remove it."`}>
                         <span class="mono">${keyNameMarked(model, comboInputLabel(model, input), input)}</span>
-                        <button data-remove="${esc(input)}">✕</button></span>`).join("")
+                        <button data-remove="${esc(input)}" aria-label="${esc(`Remove the input ${keyNameText(model, input)}`)}">✕</button></span>`).join("")
                         : `<span class="note">no inputs yet</span>`}
                 </div>
                 <div class="row combo-pick">
@@ -167,7 +168,16 @@ export function comboBuilder(canEdit, holdTerm) {
             }
         });
     }
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { closeComboBuilder(); render(); });
+    // Cancel or Escape drops the form, which is not in the draft until Keep,
+    // and the focus goes back to the combo's row, or to New combo.
+    const editedId = state.combo.editId;
+    closesInPlace(node, () => {
+        closeComboBuilder();
+        render();
+        const row = editedId === null ? null : /** @type {HTMLElement | null} */ (document.querySelector(`tr[data-combo="${editedId}"]`));
+        row?.focus();
+        if (!row || document.activeElement !== row) /** @type {HTMLElement | null} */ (document.querySelector('[data-act="new-combo"]'))?.focus();
+    }, '[data-act="cancel"]');
     // Keep and Delete close the builder once the core accepts them, so a
     // second press cannot add the combo twice, and a refused combo keeps its
     // fields for fixing.

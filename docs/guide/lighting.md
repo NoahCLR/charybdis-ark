@@ -35,7 +35,8 @@ Every stage uses the same colour editor: drag in the square and along the
 **Hue** strip, or type **H**, **S** and **V**. Brightness stops at the limit
 the keyboard reports.
 
-**Turn off** stores HSV(0, 0, 0), and what that does depends on the stage. A
+**Turn off** stores HSV(0, 0, 0), and the colour then reads **Off**; what
+that does depends on the stage. A
 layer with no colour paints nothing, so what is underneath shows through, and
 an LED row with none takes its stage's colour. Everywhere else black is
 black: a pointing mode, combo feedback or a key feedback colour turned off
@@ -58,7 +59,9 @@ shows it.
 
 ### Layer colours
 
-Pick a layer in the list to give it a colour. **Which keys light up**: **Keys
+Pick a layer in the list to give it a colour; the
+[empty layers](board-and-layers.md#empty-layers) are folded at its end, and
+one with a colour is not empty. **Which keys light up**: **Keys
 mapped on this layer only** leaves the keys that are transparent or empty on
 the layer unpainted, so what is beneath shows there; **All keys** paints
 every key. Transparent keys keep their ▽ on the board either way. A layer with

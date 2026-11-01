@@ -18,15 +18,17 @@ const LEVEL_RANK = {blocker: 0, trap: 1, warning: 2, notice: 3};
 const byLevel = (a, b) => (LEVEL_RANK[a.level] ?? 3) - (LEVEL_RANK[b.level] ?? 3);
 
 // The groups the review lists, in reading order, leaving out empty ones. A
-// group opens by default when it has something to act on: what the draft adds,
-// and anything on the keyboard that is a trap.
+// group opens by default when it has something to act on in this draft: what
+// the draft adds, and a blocker that keeps Save off (D-L36). What is already
+// on the keyboard folds, so it never pushes the changes out of view; Save still
+// asks about its traps and warnings.
 /** @param {readonly import("../../contracts/model.js").Check[]} [checks] @param {{demo?: boolean}} [options] */
 export function checkGroups(checks = [], {demo = false} = {}) {
     /** @param {import("../../contracts/model.js").Check["status"]} status */
     const of = (status) => checks.filter((check) => check.status === status).sort(byLevel);
     return [
         {id: "new", title: "New in this draft", items: of("new"), open: true},
-        {id: "existing", title: demo ? DEMO_WORDS.existingChecks : "Already on the keyboard", items: of("existing"), open: of("existing").some((check) => ["trap", "blocker"].includes(check.level))},
+        {id: "existing", title: demo ? DEMO_WORDS.existingChecks : "Already on the keyboard", items: of("existing"), open: of("existing").some((check) => check.level === "blocker")},
         {id: "fixed", title: "Fixed by this draft", items: of("fixed"), open: false},
     ].filter((group) => group.items.length);
 }

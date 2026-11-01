@@ -17,6 +17,7 @@ import {draftMarks} from "../view/review.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
+import {linkTabPanel} from "../lib/tabs.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {topbar} from "./frame.mjs";
 import {bench} from "./keys/bench.mjs";
@@ -32,7 +33,7 @@ export function screenKeys() {
     const layer = view.layer;
     const main = el(`<div class="main">${topbar(
         "Keymap",
-        "Click a key to change what it does. The tabs under the board edit its behaviour, its combos and what this layer reaches.",
+        "Click a key to change what it does.",
     )}</div>`);
 
     const gate = editGate(model, "keys");
@@ -60,7 +61,7 @@ export function screenKeys() {
     // One indication at a time: while a combo is being built its inputs are
     // the keys in question, otherwise the keys that reach the picked row.
     const building = state.combo.picking || (state.combo.open && state.tab === "combos");
-    card.appendChild(board(view, {
+    const drawn = card.appendChild(board(view, {
         selected: state.selected,
         drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
         reach: building ? view.combos.inputKeys(state.combo.inputs) : reachHighlight(view),
@@ -89,9 +90,10 @@ export function screenKeys() {
         onSwap: gate.editable ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
     }));
     card.appendChild(view.previewing ? previewFoot(view) : el(`<div class="board-foot"><span class="board-foot-text">${lit
-        ? `lit ${esc(hsvLabel(row.color))} · ${esc(word(vocabulary(model).paintModes, row.mode).toLowerCase())}`
-        : "no layer colour · the background effect shows through"}</span></div>`));
+        ? `Lit ${esc(hsvLabel(row.color))} · ${esc(word(vocabulary(model).paintModes, row.mode).toLowerCase())}`
+        : "No layer colour · the background effect shows through"}</span></div>`));
     card.append(bar);
+    linkTabPanel(/** @type {HTMLElement | null} */ (bar.querySelector(".layer-tabs")), drawn);
     stage.append(card, legend(model));
     pad.append(stage, bench());
     main.appendChild(content);

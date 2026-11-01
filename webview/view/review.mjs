@@ -9,15 +9,18 @@
 // item knows how to go to its editor.
 
 import {screenOfSection} from "./settings-layout.mjs";
-import {listed, stageOrder, vocabulary} from "./vocabulary.mjs";
+import {draftBlockWords, listed, stageOrder, vocabulary} from "./vocabulary.mjs";
 
 // The review units read here by name: core's (core/model/review-units.js),
 // copied since the interface may not import core and pinned by
 // tests/view/enum-drift.test.mjs.
 export const LAYER_ORDER_UNIT = "layerOrder", OTHER_KEY_OPTIONS_UNIT = "settings:otherKeyOptions";
 
-// The order areas are read in, as the rail lists the screens they live on.
-const AREAS = ["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
+// The order areas are read in, as the rail lists the screens they live on,
+// each named as its screen is: core's REVIEW_AREAS (core/model/vocabulary.js),
+// copied since the interface may not import core and pinned by
+// tests/view/enum-drift.test.mjs.
+export const AREAS = Object.freeze(["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Pointer", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"]);
 // An area's place in that order; one the rail does not list comes last.
 /** @param {string} area */
 export const areaRank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
@@ -76,7 +79,7 @@ export const statusBesideCount = (changes) => changes.every((change) => change.s
 // the lighting stages, in paint order, and the settings sections are named as
 // the vocabulary words them (`stages`, `fileSections`). Core words an
 // unnamed layer's name (ProfileSummary.names).
-const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
+const CATEGORIES = ["Keys", "Lighting", "Macros", "Pointer", "Pointing modes", "Other"];
 // A custom key's name is counted with the keys, where its behaviour is too.
 // Each settings section's category and its row's place there; its words are
 // the vocabulary's (tests/view/review.test.mjs holds the two to one set).
@@ -84,7 +87,7 @@ const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Ot
 export const SECTION_ROWS = {
     keyTiming: ["Keys", 31], startupLayers: ["Keys", 22], behaviorSettings: ["Keys", 32], comboSettings: ["Keys", 40], comboReferences: ["Keys", 41],
     keyboardOptions: ["Keys", 50], lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15],
-    normalPointerSpeed: ["Mouse", 1], sniping: ["Mouse", 2], autoMouse: ["Mouse", 3],
+    normalPointerSpeed: ["Pointer", 1], sniping: ["Pointer", 2], autoMouse: ["Pointer", 3],
 };
 /** @param {string} id @param {Readonly<Record<string, string>>} sections @returns {[string, string, number] | undefined} */
 function sectionRow(id, sections) {
@@ -257,3 +260,23 @@ export const draftDot = (tip = "Changed in your draft", place = "") => `<i class
 // What a stale draft's bar says it keeps: "your 1 change is kept".
 /** @param {number} count */
 export const changesKept = (count) => `your ${count} change${count === 1 ? " is" : "s are"} kept`;
+
+// The blockers the draft keeps: values the keyboard would refuse, which keep
+// Save off until they are fixed (D-L36).
+/** @param {readonly import("../../contracts/model.js").Check[]} [checks] */
+export const activeBlockers = (checks = []) => checks.filter((check) => check.level === "blocker" && check.status !== "fixed");
+
+// Why the review's Save is off, said beside it, or "" while it can save. A
+// blocker names itself, so the reason is readable without finding it among
+// the checks; core refuses the same saves on its own. Until core has the
+// review for this revision (`reviewed`) the wait is said too.
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {Pick<import("../../contracts/panel.js").DraftView, "connected" | "stale" | "reviewed" | "checks">} draft */
+export function saveOffReason(model, draft) {
+    if (!draft.connected) return "Connect the keyboard to save.";
+    if (draft.stale) return `${draftBlockWords(model, "stale")?.title || "The keyboard changed since this draft began"}. Close Review and review against the keyboard.`;
+    const blockers = activeBlockers(draft.checks);
+    if (blockers.length === 1) return `Fix the blocker first: ${blockers[0].title}.`;
+    if (blockers.length) return `Fix the ${blockers.length} blockers in Checks first.`;
+    if (!draft.reviewed) return "Getting the review ready…";
+    return "";
+}

@@ -12,7 +12,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText} from "../lib/colour.mjs";
-import {GEO, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
+import {GEO, fitLegend, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
 import {boardKeys, boardTrackball} from "../view/board-keys.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
 import {el, esc} from "../lib/dom.mjs";
@@ -88,25 +88,37 @@ export function board(view, options = {}) {
         const above = (tiers.length ? 1 : 0) + (badges.length ? 1 : 0);
         // A legend is sized to the room its row leaves, so one typeface at one
         // weight carries every cap instead of stepping between faces by length.
-        const mainFit = fitText(main, sub
-            ? (above ? {max: 9.1, min: 6.4, width: GEO.keyW - 12} : {max: 12, min: 7, width: GEO.keyW - 12})
-            : {max: 12, min: 7, width: GEO.keyW - 10});
+        // Alone on its cap it never shrinks past LEGEND_MIN: a long name takes
+        // two lines instead, either side of the row's middle (fitLegend).
+        const tap = sub
+            ? fitText(main, above ? {max: 9.1, min: 6.4, width: GEO.keyW - 12} : {max: 12, min: 7, width: GEO.keyW - 12})
+            : null;
+        const legend = tap ? {size: tap.size, lines: [{text: main, squeeze: tap.squeeze}]} : fitLegend(main, {max: 12, width: GEO.keyW - 10});
         const subFit = sub ? fitText(sub, above
             ? {max: 6.4, min: 5.2, width: GEO.keyW - 12}
             : {max: 8, min: 6.2, width: GEO.keyW - 12}) : null;
-        /** @param {ReturnType<typeof fitText>} fit */
+        /** @param {{squeeze: number}} fit */
         const squeeze = (fit) => fit.squeeze ? ` textLength="${esc(fit.squeeze)}" lengthAdjust="spacingAndGlyphs"` : "";
+        const fillText = text ? ` style="fill:${text}"` : "";
+        /** @param {number} order */
+        const lineY = (order) => rows.mainY + (order - (legend.lines.length - 1) / 2) * legend.size * 1.1;
+        const label = `<text class="kc-label" font-size="${esc(legend.size)}"${fillText}>${legend.lines.map((line, order) =>
+            `<tspan x="${cx}" y="${esc(lineY(order))}"${squeeze(line)}>${esc(line.text)}</tspan>`).join("")}</text>`;
 
-        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"
-            aria-label="${esc(key.meaning)} at index ${esc(index)}${from ? `, from ${esc(layerCalled(from))}` : ""}"${transform}>
+        // What the rings and dots say, said to a screen reader too: the
+        // selected key is the current one, a picked LED is pressed, and a
+        // key the draft changed says so after its name.
+        const said = mode === "leds" ? ` aria-pressed="${Boolean(picked)}"` : selected === index ? ' aria-current="true"' : "";
+        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"${said}
+            aria-label="${esc(key.name)}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.has(index) ? ", changed in your draft" : ""}"${transform}>
             <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${esc(rows.separatorY)}" x2="${visual.x + GEO.keyW - 8}" y2="${esc(rows.separatorY)}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
-            <text class="kc-label" x="${cx}" y="${esc(rows.mainY)}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
-            ${subFit ? `<text class="kc-sub" x="${cx}" y="${esc(rows.subY)}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
+            ${label}
+            ${subFit ? `<text class="kc-sub" x="${cx}" y="${esc(rows.subY)}" font-size="${subFit.size}"${squeeze(subFit)}${fillText}>${esc(sub)}</text>` : ""}
         </g>`;
     }
 

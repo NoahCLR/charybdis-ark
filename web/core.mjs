@@ -10,6 +10,7 @@
 
 export {openPanelLoop} from "../core/session/panel-loop.js";
 export {recoveryFileName} from "../core/session/recovery-copy.js";
+export {VOCABULARY} from "../core/model/vocabulary.js";
 export {WebHidDeviceAdapter} from "../core/transport/webhid-adapter.js";
 export {FILE_MAX_BYTES, FILE_TOO_LARGE} from "../core/model/portable-profile.js";
 

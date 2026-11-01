@@ -11,7 +11,7 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, render, state} from "../store.mjs";
-import {actionMarked} from "./marks.mjs";
+import {actionMarked, keyNameText} from "./marks.mjs";
 import {PICKER_BOARD, legendFits, pickerBoardKey} from "../view/picker-board.mjs";
 import {comboOutputProblem, keyProblem} from "../view/keycode-expression.mjs";
 import {foldedPick, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, pickAllowed, pickProblem, pickValue, pickedExpression, pickerMatches, shownSection} from "../view/picker.mjs";
@@ -38,10 +38,10 @@ const modifierControls = model => vocabulary(model).pickerModifiers || [];
 // field does with a custom key: runs its behaviour too (a layout key, a combo
 // output), or sends only its shortcut (a behaviour step). `comboOutput` holds
 // the pick to what a combo can send: no Tap-hold, which needs a key of its own.
-export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false, comboOutput = false}) {
+export function openPicker({title, context, contextKeycode, onLayer, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false, comboOutput = false}) {
     const keys = allowedKeys ? seed.map(key => keyIdentity(getModel(), key).name) : seed.slice();
     const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : [];
-    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), own: mods.slice(), symbols: {}, layers: shortcut?.layers || 0, layerKind: shortcut?.layers ? shortcut.layerKind || 0 : 0, maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
+    state.picker = {title, context, contextKeycode, onLayer, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), own: mods.slice(), symbols: {}, layers: shortcut?.layers || 0, layerKind: shortcut?.layers ? shortcut.layerKind || 0 : 0, maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
     render();
 }
 
@@ -114,9 +114,11 @@ function sectionBody(model) {
                     : `<text class="pkb-main ${legendFits(key.labels[0], key.w) ? "" : "sm"}" x="${key.x + key.w / 2}" y="${key.y + key.h / 2 + 5}">${esc(key.labels[0])}</text>`}
             </g>`;
         }).join("");
+        // The host's name for GUI (Command on a Mac), as the modifier row says it.
+        const gui = modifierControls(model).find(({value}) => value === "G")?.label || "GUI";
         return `<div class="pk-body"><div class="pkb"><svg viewBox="0 0 ${PICKER_BOARD.width} ${PICKER_BOARD.height}" xmlns="http://www.w3.org/2000/svg">${keys}</svg></div>
             ${model?.hostLayoutLegends ? `<p class="note pk-note">Shift above; ${esc(vocabulary(model).thirdLevel)} on the right. ◌ marks a dead key: press it, then a letter.</p>` : ""}
-            <p class="note pk-note">${picker.shortcut ? `Click the keys to hold together, in the order they go down, and the modifiers held with them, left and right mixed; click a key again to take it out. A symbol's modifiers are held for the whole shortcut. ${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}. ` : ""}Layers adds the layers it turns on, and how. Modifiers alone, a key alone or layers alone are a shortcut too.` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.`}</p></div>`;
+            <p class="note pk-note">${picker.shortcut ? `Click the keys to hold together, in the order they go down, and the modifiers held with them, left and right mixed; click a key again to take it out. A symbol's modifiers are held for the whole shortcut. ${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}. ` : ""}Layers adds the layers it turns on, and how. Modifiers alone, a key alone or layers alone are a shortcut too.` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. A modifier picked above is held down with it: <code>${esc(gui)}</code> and <code>C</code> make one key that sends ${esc(gui)}+C.`}</p></div>`;
     }
     // A shortcut's layers are switches (shortcutLayerTable), placed once the
     // sheet is built.
@@ -128,7 +130,7 @@ function sectionBody(model) {
             <div class="seg" role="radiogroup" aria-label="How the shortcut turns its layers on" data-tip="${none ? "Switch a layer on first." : ""}">
                 ${shortcutLayerKinds(model).map(({kind, label, tip}) => `<label data-tip="${esc(tip)}"><input type="radio" name="picker:shortcut-layer-kind" value="${esc(kind)}" data-f="picker:shortcut-layer-kind:${esc(kind)}" ${kind === (picker.layerKind || 0) ? "checked" : ""} ${none ? "disabled" : ""}><span>${esc(label)}</span></label>`).join("")}
             </div></div><div data-shortcut-layers></div>
-        <p class="note pk-note">Each layer switched on is turned on as the choice above says, as that layer key would turn it on: held while the shortcut is, locked, locked alone, tap-toggled or one-shot. Held, it goes off when the shortcut lets go unless something else keeps it on, and a tap turns it on only for the tap. The base layer and the default layers are always on.</p></div>`;
+        <p class="note pk-note">Each layer switched on turns on as the choice above says, as that layer key would. The base and default layers are always on.</p></div>`;
     }
     if (section.kind === "layers") {
         // A key storing another form of the same act lights its button
@@ -172,7 +174,7 @@ function sectionBody(model) {
                 ${button(slot.keys.hold, "Hold", "On while the key is down.")}
                 ${button(slot.keys.lock, "Lock", "Turns the mode on until pressed again.")}
             </div>`).join("")}</div>
-            <p class="note pk-note">Hold re-reads the trackball while the key is down. Lock keeps the mode on until the key is pressed again. A key for an empty slot does nothing until the slot is configured.</p></div>`;
+            <p class="note pk-note">Hold runs the mode while the key is down; Lock keeps the mode on until it is pressed again. An empty slot's key does nothing.</p></div>`;
     }
     if (section.kind === "macros") {
         const slots = offeredMacros(model, picker);
@@ -226,13 +228,14 @@ export function pickerOverlay() {
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
-                <p class="note">${picker.shortcut ? `For <b>${esc(picker.title)}</b> · ${esc(picker.context || "")}${shortcutLimitWords(model) ? ` · ${esc(shortcutLimitWords(model))}` : ""}` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${esc(picker.maxKeys)} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
-            <input class="input pk-search" id="pickerSearch" data-f="picker:search" placeholder="Search every section" value="${esc(picker.search)}">
+                <p class="note">${picker.shortcut ? `For <b>${esc(picker.title)}</b> · ${esc(picker.context || "")}${shortcutLimitWords(model) ? ` · ${esc(shortcutLimitWords(model))}` : ""}` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${esc(picker.maxKeys)} keys to send together.` : "Choose one or more keys." : picker.onLayer ? `For ${picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "a key"} on <b>${esc(picker.onLayer)}</b>`
+                : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
+            <input class="input pk-search" id="pickerSearch" data-f="picker:search" aria-label="Search keycodes" placeholder="Search every section" value="${esc(picker.search)}">
             <span class="right"><button class="btn ghost" data-act="cancel">Close</button></span>
         </div>
         ${picker.mode === "list" ? "" : `<div class="pk-mods"><span class="label">Modifiers</span>
-            ${modifierControls(model).map(({value: wrap, label}) => `<button class="pk-mod ${picker.mods.includes(wrap) ? "on" : ""}" data-mod="${esc(wrap)}"
-                data-tip="${picker.shortcut ? "Held with the key." : `Wraps the picked key as ${esc(wrap)}(key).`}">${esc(label)}</button>`).join("")}
+            ${modifierControls(model).map(({value: wrap, label}) => `<button class="pk-mod ${picker.mods.includes(wrap) ? "on" : ""}" data-mod="${esc(wrap)}" aria-pressed="${picker.mods.includes(wrap)}"
+                data-tip="Held down with the key.">${esc(label)}</button>`).join("")}
             <span class="note">held together with the key</span></div>`}
         <div class="sheet-b">
             <div class="picker-side">${offeredSections(model, picker).map((section) =>
@@ -241,13 +244,13 @@ export function pickerOverlay() {
         </div>
         <div class="sheet-f">
             <span class="label">Selected</span>
-            ${picker.layerTap ? `<button class="chip" data-act="clearlt">LT ${esc(layerTapName(picker.layerTap))} ✕</button>` : ""}
-            ${picker.keys.length ? picker.keys.map((key, index) => `<button class="chip" data-remove="${esc(index)}">${esc(key)} ✕</button>`).join("")
+            ${picker.layerTap ? `<button class="chip" data-act="clearlt" aria-label="${esc(`Remove the tap-hold on ${layerTapName(picker.layerTap)}`)}">LT ${esc(layerTapName(picker.layerTap))} ✕</button>` : ""}
+            ${picker.keys.length ? picker.keys.map((key, index) => `<button class="chip" data-remove="${esc(index)}" aria-label="${esc(`Remove ${keyNameText(model, key)}`)}">${esc(key)} ✕</button>`).join("")
                 : picker.mods.length ? modifierControls(model).filter(({value: wrap}) => picker.mods.includes(wrap)).map(({value: wrap, label}) =>
-                    `<button class="chip" data-unmod="${esc(wrap)}">${esc(label)} ✕</button>`).join("")
+                    `<button class="chip" data-unmod="${esc(wrap)}" aria-label="${esc(`Remove ${label}`)}">${esc(label)} ✕</button>`).join("")
                 : picker.layers ? "" : `<span class="note">nothing picked yet</span>`}
             ${picker.shortcut ? layers().filter((layer) => (picker.layers || 0) & 2 ** layer.index).map((layer) =>
-                `<button class="chip" data-unlayer="${esc(layer.index)}">${esc(layerCalled(layer))} ✕</button>`).join("") : ""}
+                `<button class="chip" data-unlayer="${esc(layer.index)}" aria-label="${esc(`Remove ${layerCalled(layer)}`)}">${esc(layerCalled(layer))} ✕</button>`).join("") : ""}
             <code class="mono pk-value">${esc(storable || "—")}</code>
             <span class="right"><button class="btn ghost" data-act="clear">Clear</button>
                 <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>${picker.shortcut ? "Use shortcut" : "Use keycode"}</button></span>

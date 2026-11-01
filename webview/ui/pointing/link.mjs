@@ -39,7 +39,7 @@ export function startCard(model, slot, canEdit, {form, disabled}) {
             {f: `pointing:${slot.id}:linkTurnsOn:${row.layer}`, label: `${row.name}: ${L.keyTurnsOn}`, checked: row.key, disabled: locked || row.keyLocked,
                 tip: row.keyLocked ? row.tip : "While this pointing mode's key runs it, held or locked, this layer stays on; it goes off when the mode ends unless something else keeps it."},
         ],
-    })));
+    })), {place: "pointing-link"});
     body.append(table);
     form.linkedLayers = () => switchedLayers(table, 0);
     form.linkTurnsOn = () => switchedLayers(table, 1);

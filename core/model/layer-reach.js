@@ -40,7 +40,8 @@
 
 const {LAYERS, layersOfMask} = require("../data/charybdis-layout");
 const {actionName} = require("../schema/actions");
-const {VOCABULARY, layerName, listed, settingsPath} = require("./vocabulary");
+const {LAYER_KEY_VERBS, REVIEW_AREAS, layerName, listed, settingsPath} = require("./vocabulary");
+const {layerKeyLabel} = require("./key-names");
 const {maskOf: layersOf} = require("./layer-state-graph");
 const {actionEffects, bit, codeName, layerEffects} = require("./layer-effects");
 const {MAX_TRAPS, NOTHING, TRANSPARENT, highest, profileFacts, walkLayers} = require("./layer-walk");
@@ -55,6 +56,10 @@ const {MAX_TRAPS, NOTHING, TRANSPARENT, highest, profileFacts, walkLayers} = req
  */
 const LEVELS = Object.freeze(/** @type {const} */ ({TRAP: "trap", WARNING: "warning", NOTICE: "notice"}));
 
+// A layer key as the picker and the board name it ("Lock Numbers"), by
+// QMK's function (MO, TG, TO…) and the layer it acts on.
+/** @param {Facts} facts @param {string} form @param {number} layer */
+const layerKey = (facts, form, layer) => layerKeyLabel(form, layer, facts.names);
 /** @param {Facts} facts @param {number} mask */
 const namesOf = (facts, mask) => layersOfMask(mask).map((layer) => layerName(facts.names, layer));
 // Where a finding is edited, in the review's place shapes (profile-review.js):
@@ -75,7 +80,7 @@ function traps(facts, walked) {
             title: `${listed(names)} can lock with no way back to ${layerName(facts.names, 0)}`,
             detail: `Once ${listed(names)} ${names.length === 1 ? "is" : "are"} locked, no key, behaviour or combo left on the board turns ${names.length === 1 ? "it" : "them"} off or moves back to ${layerName(facts.names, 0)}. Unplugging the keyboard clears it.`,
             path: path.map((effect) => effect.kind === "release" ? `Release the hold on ${listed(namesOf(facts, layersOf(effect)))}` : effect.how),
-            fix: `Put TO(0) or TG(${top}) on ${layerName(facts.names, top)}, where it answers, or take away the lock.`,
+            fix: `Put a ${layerKey(facts, "TO", 0)} or ${layerKey(facts, "TG", top)} key on ${layerName(facts.names, top)}, where it answers, or take away the lock.`,
             place: placeOf(effect.from)};
     });
     const omitted = walked.trapCount - named.length;
@@ -99,7 +104,7 @@ function findings(facts, walked) {
         detail: `${names.length ? `The controls involving ${listed(names)} have complex interactions. ` : ""}${reachabilityComplete
             ? "Ark checked which layers and combos can be reached, but could not establish whether every combination of locks has a way back to Base."
             : "Ark could not establish which layer and combo combinations can be reached or whether every combination of locks has a way back to Base."}`,
-        fix: "Check these layers together, including keys that cover another layer's exit. Keep a TO(0) escape accessible through every overlay.",
+        fix: `Check these layers together, including keys that cover another layer's exit. Keep a ${layerKey(facts, "TO", 0)} key within reach through every overlay.`,
         place: involved.length ? keyPlace(involved[0]) : undefined}];
     const reached = walked.reachedLayers;
     // A layer of transparent keys and KC_NO has nothing of its own to use.
@@ -111,7 +116,7 @@ function findings(facts, walked) {
         results.push({kind: "unreachable", level: LEVELS.WARNING, layers: [layer],
             title: `Nothing reaches ${layerName(facts.names, layer)}`,
             detail: `${layerName(facts.names, layer)} has keys, but no key, behaviour, combo, pointing mode or the trackball turns it on, so none of them can be used.`,
-            fix: `Put a layer key for ${layerName(facts.names, layer)} (MO(${layer}), TG(${layer}), TO(${layer})…) on a layer you can reach.`,
+            fix: `Put a layer key for ${layerName(facts.names, layer)}, such as ${layerKey(facts, "MO", layer)}, ${layerKey(facts, "TG", layer)} or ${layerKey(facts, "TO", layer)}, on a layer you can reach.`,
             place: keyPlace(layer)});
     }
 
@@ -145,26 +150,29 @@ function findings(facts, walked) {
     // counted, reachable or not.
     /** @param {LayerEffect[]} effects */
     const idle = (effects) => effects.some((effect) => effect.kind !== "move" && effect.kind !== "unowned" && (layersOf(effect) & ~facts.always) === 0);
-    /** @type {{name: string, place: import("../../contracts/model.js").FindingPlace}[]} */
+    // Each by its stored name, which tells one finding from another, and as
+    // the screens name it (`said`), which the check reads.
+    /** @type {{name: string, said: string, place: import("../../contracts/model.js").FindingPlace}[]} */
     const idlePlaces = [];
     facts.layers.forEach((codes, layer) => codes.forEach((code, position) => {
-        if (idle(layerEffects(code))) idlePlaces.push({name: codeName(code), place: keyPlace(layer, position)});
+        if (idle(layerEffects(code))) idlePlaces.push({name: codeName(code), said: facts.label(code), place: keyPlace(layer, position)});
     }));
     for (const [code, row] of facts.rows) for (const step of row.steps) {
         for (const action of [step.tap, step.hold?.action, step.longHold?.action]) {
-            if (idle(actionEffects(action))) idlePlaces.push({name: `${actionName(/** @type {Action} */ (action))} in the behaviour on ${codeName(code)}`, place: {kind: "behaviour", keycode: codeName(code)}});
+            if (idle(actionEffects(action))) idlePlaces.push({name: `${actionName(/** @type {Action} */ (action))} in the behaviour on ${codeName(code)}`,
+                said: `${facts.said(/** @type {Action} */ (action))} in the behaviour on ${codeName(code)}`, place: {kind: "behaviour", keycode: codeName(code)}});
         }
     }
     for (const combo of facts.allCombos) {
-        if (idle(actionEffects(combo.output))) idlePlaces.push({name: `${actionName(combo.output)} on combo ${combo.index}`, place: {kind: "combo", index: combo.index}});
+        if (idle(actionEffects(combo.output))) idlePlaces.push({name: `${actionName(combo.output)} on combo ${combo.index}`, said: `${facts.said(combo.output)} on combo ${combo.index}`, place: {kind: "combo", index: combo.index}});
     }
     if (idlePlaces.length) {
         const count = idlePlaces.length;
         results.push({kind: "idleLayerKey", level: LEVELS.NOTICE, layers: [0], count,
             identity: idlePlaces.map(({name, place}) => `${name}:${JSON.stringify(place)}`).join("|"),
             title: `${count} layer key${count === 1 ? "" : "s"} hold${count === 1 ? "s" : ""} or toggle${count === 1 ? "s" : ""} ${layerName(facts.names, 0)}, which is always on`,
-            detail: `${count > 3 ? `${idlePlaces.slice(0, 3).map((entry) => entry.name).join(", ")} and ${count - 3} more` : listed(idlePlaces.map((entry) => entry.name))}: ${layerName(facts.names, 0)} is always on, so holding, toggling or locking it does nothing. TO(0) is the one that means something there: it goes home.`,
-            fix: "Point them at another layer, use TO(0) to go home, or give the keys something else to do.",
+            detail: `${count > 3 ? `${idlePlaces.slice(0, 3).map((entry) => entry.said).join(", ")} and ${count - 3} more` : listed(idlePlaces.map((entry) => entry.said))}: ${layerName(facts.names, 0)} is always on, so holding, toggling or locking it does nothing. ${layerKey(facts, "TO", 0)} is the one that means something there: it goes home.`,
+            fix: `Point them at another layer, use ${layerKey(facts, "TO", 0)} to go home, or give the keys something else to do.`,
             place: idlePlaces[0].place});
     }
 
@@ -192,7 +200,7 @@ function findings(facts, walked) {
             results.push({kind: "pointerLayer", level: LEVELS.WARNING, layers: [facts.pointer],
                 title: `The trackball turns on ${layerName(facts.names, facts.pointer)}, which is always on`,
                 detail: "Moving the trackball changes nothing on the board, so the pointer layer's keys are never there when you mouse.",
-                fix: `Choose the pointer layer under ${settingsPath("pointer", "autoMouse")}.`, place: {kind: "settings", area: "Mouse", section: "autoMouse"}});
+                fix: `Choose the pointer layer under ${settingsPath("pointer", "autoMouse")}.`, place: {kind: "settings", area: REVIEW_AREAS.pointer, section: "autoMouse"}});
         } else if (!hasKeys(facts.pointer)) {
             results.push({kind: "pointerLayer", level: LEVELS.NOTICE, layers: [facts.pointer],
                 title: `The trackball turns on ${layerName(facts.names, facts.pointer)}, which has no keys of its own`,
@@ -204,9 +212,9 @@ function findings(facts, walked) {
     facts.layers.forEach((codes, layer) => codes.forEach((code, position) => {
         if (!layerEffects(code).some((effect) => effect.kind === "unowned")) return;
         results.push({kind: "unowned", level: LEVELS.WARNING, layers: [layer], identity: `${position}:${code}`,
-            title: `${codeName(code)} on ${layerName(facts.names, layer)} bypasses layer tracking`,
-            detail: `The keyboard leaves ${codeName(code)} to QMK's own layer code, so it can change the default layer or turn on a layer no key releases.`,
-            fix: "Replace it with TO(), TG() or MO().", place: keyPlace(layer, position)});
+            title: `${facts.label(code)} (${codeName(code)}) on ${layerName(facts.names, layer)} bypasses layer tracking`,
+            detail: `The keyboard leaves ${facts.label(code)} to QMK's own layer code, so it can change the default layer or turn on a layer no key releases.`,
+            fix: `Replace it with a ${LAYER_KEY_VERBS.TO}, ${LAYER_KEY_VERBS.TG} or ${LAYER_KEY_VERBS.MO} layer key.`, place: keyPlace(layer, position)});
     }));
     return results;
 }

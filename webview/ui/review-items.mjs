@@ -3,7 +3,7 @@
 // review (the draft against the keyboard) and the draft history (each step
 // against the step before it).
 
-import {esc} from "../lib/dom.mjs";
+import {DISCLOSURE, esc} from "../lib/dom.mjs";
 import {css, isOff} from "../lib/colour.mjs";
 import {FIELDS_SHOWN} from "../view/review.mjs";
 import {keyNameMarked, mark, marked, valueMarked} from "./marks.mjs";
@@ -59,7 +59,7 @@ const fields = (model, item) => {
     const head = item.fields.slice(0, FIELDS_SHOWN), rest = item.fields.slice(FIELDS_SHOWN);
     const row = field(model, item.fields.some((entry) => entry.labelMark));
     return `<div class="rv-fields">${head.map(row).join("")}${rest.length
-        ? `<details class="rv-more"><summary>Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
+        ? `<details class="rv-more"><summary>${DISCLOSURE}Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
 };
 
 // A behaviour is titled by its key's name, named as every surface names that

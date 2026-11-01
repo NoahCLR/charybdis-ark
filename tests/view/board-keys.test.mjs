@@ -59,6 +59,13 @@ test("a key in a combo wears its badge, lit in the combo feedback colour while t
     assert.deepEqual(keyOf(model, 0, [], 1).badges, []);
 });
 
+test("a key is named as the board names it, never by its layout index", () => {
+    assert.equal(keyOf(model, 0, [], 0).name, "C");
+    assert.equal(keyOf(model, 2, [], 0).name, "Transparent", "a transparent key says so");
+    assert.equal(keyOf(model, 2, [0], 0).name, "C", "and seen through to Base, names the key that answers");
+    assert.equal(keyOf(model, 0, [], 1, {mode: "leds"}).name, `LED ${keyLed(model, 1)}`, "the LED selector names its LED");
+});
+
 test("the LED selector names each key's LED, and shows no light, marks or second line", () => {
     const led = keyOf(model, 0, [], 1, {mode: "leds"});
     assert.deepEqual([led.main, led.sub, led.light, led.tiers, led.badges], [String(keyLed(model, 1)), "", null, [], []]);

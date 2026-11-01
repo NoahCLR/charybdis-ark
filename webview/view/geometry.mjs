@@ -125,7 +125,50 @@ const charWidth = (char) => {
  */
 /** @param {unknown} text @param {{max: number, min: number, width: number}} bounds */
 export function fitText(text, {max, min, width}) {
-    const unit = [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
+    const unit = units(text);
     const preferred = unit > 0 ? Math.min(max, width / unit) : max;
     return {size: Math.round(Math.max(min, preferred) * 100) / 100, squeeze: unit * max > width ? width : 0};
+}
+
+/** @param {unknown} text */
+const units = (text) => [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
+
+// The smallest a legend with a cap to itself is drawn: past it a name stops
+// reading at a laptop's width, so it takes two lines instead.
+export const LEGEND_MIN = 8;
+// Two lines share the cap, so neither is drawn larger than this.
+const TWO_LINE_MAX = 9.5;
+
+/**
+ * A legend alone on its cap (no hold under a line): one line while it fits at
+ * LEGEND_MIN or more, as `fitText` sizes it; otherwise two, broken between
+ * words where the longer line comes out shortest, and a " · " the break falls
+ * on dropped, since the break already parts them ("Slot 6" over "hold
+ * (empty)"). Each line has its own `squeeze`, set only when a single word
+ * overruns the row even at LEGEND_MIN. The words are never cut, so the hover
+ * card and the key's label still read the whole name.
+ */
+/** @param {unknown} text @param {{max: number, width: number}} bounds @returns {{size: number, lines: {text: string, squeeze: number}[]}} */
+export function fitLegend(text, {max, width}) {
+    const whole = String(text ?? "");
+    const one = () => {
+        const fit = fitText(whole, {max, min: LEGEND_MIN, width});
+        return {size: fit.size, lines: [{text: whole, squeeze: fit.squeeze}]};
+    };
+    if (units(whole) * LEGEND_MIN <= width) return one();
+    const words = whole.split(" ").filter(Boolean);
+    /** @param {string[]} part */
+    const line = (part) => part.join(" ");
+    let best = {first: "", second: "", longest: Infinity};
+    for (let at = 1; at < words.length; at++) {
+        const first = words.slice(0, at), second = words.slice(at);
+        if (first.at(-1) === "·") first.pop();
+        if (second[0] === "·") second.shift();
+        if (!first.length || !second.length) continue;
+        const longest = Math.max(units(line(first)), units(line(second)));
+        if (longest < best.longest) best = {first: line(first), second: line(second), longest};
+    }
+    if (best.longest === Infinity) return one();
+    const size = Math.round(Math.max(LEGEND_MIN, Math.min(TWO_LINE_MAX, max, width / best.longest)) * 100) / 100;
+    return {size, lines: [best.first, best.second].map((part) => ({text: part, squeeze: units(part) * size > width ? width : 0}))};
 }

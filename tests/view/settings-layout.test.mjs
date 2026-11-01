@@ -17,15 +17,15 @@ test("each Settings screen draws its sections in the order a person reads them",
     assert.deepEqual(Object.keys(SETTINGS_SCREENS), ["behaviours", "combos", "pointer", "host"]);
     assert.deepEqual(ids("behaviours"), ["keyTiming", "behaviorSettings"], "Tap & hold timing, then where behaviours run");
     assert.deepEqual(ids("combos"), ["comboSettings", "comboReferences"], "Combos, then Combo layer matching");
-    assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything Mouse had");
+    assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything filed under Pointer");
     assert.deepEqual(ids("host"), ["host", "keyboardOptions"], "Your computer, then Key swaps & typing");
     assert.deepEqual(sectionsOn(sections, "keys"), [], "a screen that is not a Settings one draws none");
 });
 
-test("every section the keyboard's model files under Settings or Mouse is on one Settings screen, except Default layers", () => {
+test("every section the keyboard's model files under Settings or Pointer is on one Settings screen, except Default layers", () => {
     const drawn = Object.keys(SETTINGS_SCREENS).flatMap(ids);
     assert.equal(new Set(drawn).size, drawn.length, "no section is drawn twice");
-    const filed = sections.filter((section) => section.area === "Settings" || section.area === "Mouse").map((section) => section.id);
+    const filed = sections.filter((section) => section.area === "Settings" || section.area === "Pointer").map((section) => section.id);
     assert.deepEqual(filed.filter((id) => !drawn.includes(id)), ["startupLayers"], "moving the base layer stands in for a Default layers editor");
     assert.ok(byId("startupLayers"), "the stored value is still published, for the review and checks");
     assert.ok(!drawn.some((id) => byId(id).area === "Lighting"), "lighting is set on Lighting");

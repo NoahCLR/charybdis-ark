@@ -71,15 +71,15 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     assert.deepEqual(buildDeviceModel().configDefaults, []);
 });
 
-test("every section names the screen it is edited on, and the pointer's own settings are Mouse", () => {
+test("every section names the screen it is edited on, and the pointer's own settings are Pointer's", () => {
     const areas = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.area]));
-    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Mouse"), ["normalPointerSpeed", "sniping", "autoMouse"]);
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Pointer"), ["normalPointerSpeed", "sniping", "autoMouse"]);
     assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade", "lightingPower", "rgbAppearance", "lightingFeedback"],
         "lighting is set where it is coloured: the fade's timing, all lighting, the background effect and the feedback flash");
     const stages = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.stage]));
     assert.deepEqual([stages.automouseFade, stages.rgbAppearance, stages.lightingFeedback, stages.lightingPower], ["auto", "base", "key", undefined],
         "a section is edited on its stage; All lighting darkens every stage, so it has none");
-    assert.ok(Object.values(areas).every(area => ["Mouse", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
+    assert.ok(Object.values(areas).every(area => ["Pointer", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
 });
 
 test("every field edits a stored value the schema names, within what the keyboard accepts", () => {
@@ -290,6 +290,20 @@ test("the Host section offers the effective OS's layouts", () => {
     assert.ok(windows.fields.every(field => !field.readOnly), "every Host field is editable");
 });
 
+// What the keyboard detected is said in Auto's own choice, not in a line over
+// the section; an unknown OS asks to be chosen.
+test("the Host section says what Auto detected in its choice", () => {
+    const current = {document: document(), fingerprint: fingerprint(document())};
+    const host = detected => settingsEditorView({...current, hostOs: {detected}}).sections.find(s => s.id === "host");
+    const os = section => section.fields.find(field => field.macro === "hostOs");
+    assert.deepEqual(os(host(1)).choices.map(choice => choice.label), ["Auto (macOS detected)", "macOS", "Windows", "Linux"]);
+    assert.equal(os(host(2)).choices[0].label, "Auto (Windows detected)");
+    assert.equal(os(host(0)).choices[0].label, "Auto", "nothing detected, nothing said");
+    assert.match(os(host(0)).hint, /could not tell/);
+    for (const detected of [0, 1, 2, 3]) assert.equal(host(detected).description, undefined, "no line over the section");
+    assert.match(host(1).fields.find(field => field.macro === "hostLayout").hint, /Unicode Hex Input/, "on macOS the layout row says where emoji come from");
+});
+
 test("choosing a Host OS carries the layout to that OS, and a mismatch left by Auto warns", () => {
     const {hostMacros} = require("../fixtures/host-macros");
     const host = current => settingsEditorView(current).sections.find(section => section.id === "host");
@@ -345,7 +359,7 @@ test("settings presentation owns combo timing words and explicit duration units"
 test("auto-sniping is its switch and one switch per layer, saved as one layer mask", () => {
     const current = snapshot();
     const section = settingsEditorView(current).sections.find(entry => entry.id === "sniping");
-    assert.equal(section.area, "Mouse");
+    assert.equal(section.area, "Pointer");
     assert.deepEqual(section.layerGroup, {label: "Auto-sniping layers", hint: section.layerGroup.hint});
     assert.deepEqual(section.fields.map(field => field.macro), ["autoSniping", ...Array.from({length: 16}, (_, i) => `snipingOnLayer${i}`)]);
     assert.deepEqual(section.fields.filter(field => field.enabled).map(field => field.macro), ["autoSniping", "snipingOnLayer3"], "Navigation alone, as the test profile has it");

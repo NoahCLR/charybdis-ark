@@ -17,6 +17,9 @@ const {participation} = require("./participation");
 const {linkStartHolds} = require("../../rules/pointing-link-starts.mjs");
 const {actionEffects, bit, codeName, keyEffects, linkFacts} = require("./layer-effects");
 const {comboReferenceLayers} = require("./combo-reach");
+const {keyLabel, profileKeyNames} = require("./key-names");
+const {hostSettings} = require("../schema/host-settings");
+const {macroName} = require("../../rules/qmk-keycodes.mjs");
 
 /**
  * @typedef {import("./types.js").OfferedLayerEffect} OfferedEffect
@@ -63,7 +66,24 @@ function profileFacts(decoded) {
     const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? (values[SETTING.AUTO_SNIPING_LAYERS] & ALL_LAYERS) >>> 0 : 0;
     const {modeLinks, layerStarted, endedStarts} = linkFacts(decoded);
     const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
-    return {names, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, modeLinks, layerStarted, endedStarts, values, behaviorUsed, comboPress, generatedLayers,
+    // Keys and actions as the screens name them (model/key-names.js): a layer
+    // key by what it does and its layer's name ("Lock Numbers"), a custom
+    // key, macro or pointing key by its own, and a character key as the
+    // profile's host layout types it. Worked out on first use.
+    const host = hostSettings(values);
+    /** @type {import("../../contracts/model.js").ProfileKeyNames | undefined} */
+    let keyNames;
+    /** @param {number} code */
+    const label = (code) => keyLabel(keyNames ??= profileKeyNames({hostOs: host.effective, hostLayout: host.layout, macosIso: host.macosIso, actionsKnown: true, layers: names,
+        macros: (decoded.settings.macroNames || []).map((name, index) => ({keycode: macroName(index), name})),
+        customKeys: (decoded.settings.customKeyNames || []).map((name, slot) => ({slot, name})),
+        behaviors: decoded.behaviors?.rows || [], pdModes: decoded.pdModes || []}), code);
+    /** @param {import("../schema/types.js").SemanticAction} action */
+    const said = (action) => {
+        const code = nativeCode(action);
+        return code === undefined ? actionName(action) : label(code);
+    };
+    return {names, label, said, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, modeLinks, layerStarted, endedStarts, values, behaviorUsed, comboPress, generatedLayers,
         // Base is always on, and so are the default layers the keyboard keeps.
         always: alwaysOnLayers(values),
         // Which layer's keys combos match while `layer` is on top (combo-reach.js).
@@ -125,7 +145,7 @@ function offers(facts, active, cache) {
         const at = resolve(facts, active, position);
         if (!at || at.code === NOTHING) return;
         const row = facts.rows.get(at.code);
-        for (const effect of keyEffects(at.code, facts.behaviorUsed(row, at.layer, position) ? row : undefined, facts.values, facts.modeLinks)) {
+        for (const effect of keyEffects(at.code, facts.behaviorUsed(row, at.layer, position) ? row : undefined, facts.values, facts.modeLinks, facts.said)) {
             found.push({...effect, from: {layer: at.layer, layoutIndex: position, code: at.code},
                 how: `${effect.how} on ${layerName(facts.names, at.layer)}${effect.note ? ` (${effect.note})` : ""}`});
         }
@@ -141,12 +161,12 @@ function offers(facts, active, cache) {
             const row = facts.rows.get(outputCode), allowed = facts.generatedLayers(row, combo);
             const origins = (present.get(combo.inputs.at(-1)) || []).filter(layer => combo.allowedLayers & bit(layer));
             const effects = [
-                ...(origins.some(layer => allowed & bit(layer)) ? keyEffects(outputCode, row, facts.values, facts.modeLinks) : []),
+                ...(origins.some(layer => allowed & bit(layer)) ? keyEffects(outputCode, row, facts.values, facts.modeLinks, facts.said) : []),
                 ...(origins.some(layer => !(allowed & bit(layer))) ? actionEffects(combo.output, facts.modeLinks) : []),
             ];
             for (const effect of effects) {
                 if (effect.kind === "unowned") continue;
-                found.push({...effect, from: {combo: combo.index}, how: `Press combo ${combo.index} (${combo.inputs.map(codeName).join(" + ")}), which sends ${actionName(combo.output)}`});
+                found.push({...effect, from: {combo: combo.index}, how: `Press combo ${combo.index} (${combo.inputs.map(codeName).join(" + ")}), which sends ${facts.said(combo.output)}`});
             }
         }
     }
@@ -182,7 +202,7 @@ function compactWalk(facts, limits) {
             const when = {on: bit(layer), off: covered}; covered |= bit(layer);
             const source = {position, layer, code, when}; sources.push(source);
             const row = facts.rows.get(code);
-            for (const effect of keyEffects(code, facts.behaviorUsed(row, layer, position) ? row : undefined, facts.values, facts.modeLinks)) {
+            for (const effect of keyEffects(code, facts.behaviorUsed(row, layer, position) ? row : undefined, facts.values, facts.modeLinks, facts.said)) {
                 transitions.push({...effect, when, from: {layer, layoutIndex: position, code},
                     how: `${effect.how} on ${layerName(facts.names, layer)}${effect.note ? ` (${effect.note})` : ""}`});
             }
@@ -222,11 +242,11 @@ function compactWalk(facts, limits) {
         // Bind each to its own source-resolution/participation conditions;
         // absence of an eligible owner is not the condition for a bypassed one.
         const variants = allowed ? [
-            {when: {all: [when, presence(owner, combo.allowedLayers & allowed)]}, effects: keyEffects(outputCode, row, facts.values, facts.modeLinks)},
+            {when: {all: [when, presence(owner, combo.allowedLayers & allowed)]}, effects: keyEffects(outputCode, row, facts.values, facts.modeLinks, facts.said)},
             {when: {all: [when, presence(owner, combo.allowedLayers & ~allowed)]}, effects: actionEffects(combo.output, facts.modeLinks)},
         ] : [{when, effects: actionEffects(combo.output, facts.modeLinks)}];
         for (const variant of variants) for (const effect of variant.effects) transitions.push({...effect, when: variant.when,
-            from: {combo: combo.index}, how: `Press combo ${combo.index} (${combo.inputs.map(codeName).join(" + ")}), which sends ${actionName(combo.output)}`});
+            from: {combo: combo.index}, how: `Press combo ${combo.index} (${combo.inputs.map(codeName).join(" + ")}), which sends ${facts.said(combo.output)}`});
     }
     if (facts.pointer !== undefined && facts.pointer < LAYERS) transitions.push({kind: "hold", layer: facts.pointer,
         when: {all: [{off: pointerStrip(facts)}, ...facts.endedStarts.map(({layer, ends}) => ({not: {on: bit(layer), off: ends}}))]},

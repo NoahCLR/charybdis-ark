@@ -15,7 +15,7 @@ export interface Position {
 }
 /** One possible answer, while its layer is active and higher answering layers are absent. */
 export interface LayerAnswer {layer: number; active: number; blocked: number}
-export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]; /** Base, and each default layer the keyboard keeps, is always on. */ alwaysOn?: boolean}
+export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]; /** Base, and each default layer the keyboard keeps, is always on. */ alwaysOn?: boolean; /** The profile gives it a name of its own; without one, `displayName` is core's words for it. */ named?: boolean}
 // What a key with no behaviour of its own runs on: its built-in actions, the
 // timing defaults it follows, with or without a row, which setting each comes
 // from, and whether a behaviour's timing alone does something on it (firmware
@@ -203,7 +203,7 @@ export interface PublishedModel {
     /** QMK spellings the encoder accepts beyond the catalogue: mod-tap shorthands (name → MT modifiers), deprecated wrappers (name → wrapper) and names (name → expression). */
     qmkSpellings: {modTaps: Record<string, string>; wrappers: Record<string, string>; names: Record<string, string>};
     diagnostics: string[];
-    /** `summary` names the saved profile's generation and digest (Diagnostics); `savedProfile` the same in words, without the digest. */
+    /** `summary` names the saved profile's generation and digest (Diagnostics); `savedProfile` says in words whether a profile is saved and how the halves stand, without either. */
     device: {connected: boolean; label: string; summary: string; savedProfile: string; subtitle: string; /** Each half's flash pauses as last read (GET 0x0D); null until read; the demo's are samples. */ flashPauses: import('./model.js').FlashPausesView | null; health: {profile: string; converged: boolean; halves: import('./model.js').HalvesId; recoveryPending: boolean; restartNeeded: boolean; earlierFormat: boolean; busy: boolean; phase: PhaseId; error: string}};
     devices: {id: string; label: string}[];
     selectedDeviceId: string;

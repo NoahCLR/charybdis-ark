@@ -58,3 +58,22 @@ export function commitBarState(model, {applyDismissed = null} = {}) {
     }
     return draft.dirty ? {kind: "review"} : null;
 }
+
+// Whether `text`, a failure's notice or the keyboard's own error, is what a
+// failed Apply's bar already says, so the rail leaves it to the bar: an Apply
+// cut short's notice is its verdict, why and what to do
+// (core/session/portable-profile-session.js withFailure), one refused before
+// anything was sent says "Failed:" and why, and the keyboard's error is the
+// why alone. Any other text, or one saying more, is the rail's to show.
+/** @param {CommitBar | null} bar @param {string | null | undefined} text */
+export function barSaysNotice(bar, text) {
+    const failure = bar?.kind === "failed" ? bar.apply.failure : null;
+    if (!failure || !text) return false;
+    return text === [failure.verdict, failure.reason, ...(failure.advice || [])].filter(Boolean).join(" ")
+        || text === `Failed: ${failure.reason}` || text === failure.reason;
+}
+
+// Why the bar's Restart is off, said beside it, or "" while it can restart:
+// a restart needs the keyboard there to take it.
+/** @param {Pick<import("../../contracts/panel.js").DraftView, "connected">} draft */
+export const restartOffReason = (draft) => (draft.connected ? "" : "Connect the keyboard to restart it.");

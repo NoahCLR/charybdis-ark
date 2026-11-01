@@ -143,9 +143,9 @@ since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
 
 **Area**:
-The part of the profile Review groups its changes under, mostly one screen's.
-Two keep older names: Mouse is what Pointer settings edits, and Settings what
-the rest of the Settings group edits.
+The part of the profile Review groups its changes under, mostly one screen's,
+and named as that screen is: Pointer is what Pointer settings edits. Settings
+is what the rest of the Settings group edits.
 _Avoid_: section, domain (for this), category
 
 **Frame**:
@@ -198,6 +198,12 @@ _Avoid_: tag, chip (for a mark), dot (for a layer's mark)
 Showing several layers stacked on the board the way the keyboard would
 resolve them.
 _Avoid_: layer stack, overlay view
+
+**Empty layer**:
+A layer with nothing in it: not the base or a default layer, no name of its
+own, no key mapped, and nothing that uses it (D-L76). Lists of layers fold
+them behind one disclosure at their end.
+_Avoid_: unused layer, spare layer, blank layer
 
 ## Where Ark runs
 

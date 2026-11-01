@@ -40,7 +40,7 @@ export function screenDevice() {
         label: "Keyboard name", perName: keyboard.perName || NAME_MAX_BYTES, canEdit: editGate(model, "settings").editable})
         : `<h1>${esc(device?.label || "Keyboard")}</h1>`;
     const dirty = draftMarks(model?.draft?.changes).settings.has("keyboard");
-    const sub = demo ? "The demo stands in for a keyboard running current firmware. Nothing here reaches a keyboard."
+    const sub = demo ? "A stand-in keyboard on current firmware. Nothing here reaches a keyboard."
         : "Your Charybdis: its firmware, its two halves and how full it is.";
     const firmware = firmwareLine(model);
     const build = shellOf(model).build;
@@ -54,7 +54,7 @@ export function screenDevice() {
     const identity = kv([
         ...(product ? /** @type {const} */ ([["Product", esc(product)]]) : []),
         ["Firmware", demo ? "Current firmware (demo)" : `${esc(firmware.version)} · ${firmware.works ? `<span class="ok-words">${esc(firmware.words)}</span>`
-            : `<span class="warn-words">${esc(firmware.words)}</span> <a class="btn text compact" href="${esc(FIRMWARE_RELEASES)}" target="_blank" rel="noopener">How to install →</a>`}`],
+            : `<span class="warn-words">${esc(firmware.words)}</span> <a class="btn tiny ghost" href="${esc(FIRMWARE_RELEASES)}" target="_blank" rel="noopener">How to install ↗</a>`}`],
         ...(build?.version ? /** @type {const} */ ([["Ark", esc(`Ark ${build.version}`)]]) : []),
         ["Halves", demo ? "Demo · no keyboard" : `<span class="halves">${halves}</span>`],
     ]);
@@ -68,7 +68,7 @@ export function screenDevice() {
     const unread = diagnosticsOpen && !demo && device?.connected && !device.flashPauses && !health?.busy && connection !== null && state.flashPausesAsked !== connection;
     const facts = firmwareFacts(model);
     const main = el(`<div class="main">
-        <header class="topbar keyboard-topbar"><div class="keyboard-title">${title}${dirty ? draftDot() : ""}
+        <header class="topbar keyboard-topbar"><div class="keyboard-title"><div class="keyboard-name">${title}${dirty ? draftDot() : ""}</div>
             <p class="sub">${esc(sub)}</p><p class="note rename-note">${esc(renameNote(model?.draft))}</p></div>
             <div class="topbar-actions">${themeToggle()}</div></header>
         <div class="content"><div class="pad stack device-pad">
@@ -76,9 +76,8 @@ export function screenDevice() {
                 <div class="card-b stack gap-12">${identity}${restart}${earlier}${saving}</div></section>
             ${usage ? usageCard(usage) : ""}
             ${facts.length ? builtInCard(facts) : ""}
-            <details class="card settings-group" data-section="diagnostics" ${diagnosticsOpen ? "open" : ""}>
-                <summary class="card-h">${DISCLOSURE}<h3>Diagnostics</h3>
-                    <span class="right"><button class="btn compact" data-act="read" ${health?.busy ? "disabled" : ""}>Read keyboard</button></span></summary>
+            <div class="diagnostics"><details class="card settings-group" data-section="diagnostics" ${diagnosticsOpen ? "open" : ""}>
+                <summary class="card-h">${DISCLOSURE}<h3>Diagnostics</h3></summary>
                 <div class="card-b stack gap-12">${kv([
                     ["Saved profile", esc(device?.summary || "")],
                     ["Halves", esc(halvesWords(model, health?.halves).label)],
@@ -90,6 +89,7 @@ export function screenDevice() {
                     `<div class="list-row note-row"><span class="note">${esc(note)}</span></div>`).join("")
                     || `<div class="list-row"><span class="note">Nothing has been read yet.</span></div>`}</div>
             </details>
+            <button class="btn tiny diagnostics-read" data-act="read" ${health?.busy ? "disabled" : ""}>Read keyboard</button></div>
         </div></div></div>`);
     /** @type {NodeListOf<HTMLDetailsElement>} */ (main.querySelectorAll("details[data-section]")).forEach((fold) => fold.addEventListener("toggle", () => {
         const id = /** @type {string} */ (fold.dataset.section);
@@ -101,10 +101,10 @@ export function screenDevice() {
     }));
     if (unread) askFlashPauses();
     const read = /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]'));
-    // The button sits in the fold's title; pressing it does not fold.
-    read.addEventListener("click", (event) => {
-        event.preventDefault();
-        const message = controls.readKeyboard(/** @type {HTMLDetailsElement} */ (read.closest("details")).open);
+    // The button sits over the fold's title, outside its summary, so it is a
+    // control of its own and pressing it does not fold.
+    read.addEventListener("click", () => {
+        const message = controls.readKeyboard(/** @type {HTMLDetailsElement} */ (read.parentElement?.querySelector("details")).open);
         if (demo) postLeavingDemo(message);
         else post(message);
     });
@@ -134,7 +134,7 @@ function builtInCard(facts) {
     return `<details class="card settings-group" data-section="builtIn" ${open ? "open" : ""}>
         <summary class="card-h">${DISCLOSURE}<h3>Built into this firmware</h3>
             <span class="right fold-summary">${facts.length} facts</span></summary>
-        <div class="card-b settings-intro"><p class="note">Set when the firmware was built, not stored in the profile: changing any of these needs a new firmware build on both halves.</p></div>
+        <div class="card-b settings-intro"><p class="note">Changing any of these needs a new firmware build on both halves.</p></div>
         <div class="rows">${facts.map((fact) => `<div class="setrow ro" data-tip="${esc(fact.hint)}">
             <div><div class="nm">${esc(fact.label)}</div><div class="hint">${esc(fact.hint)}</div></div>
             <div class="control"><span class="fact-value">${esc(fact.value)}</span></div></div>`).join("")}</div>

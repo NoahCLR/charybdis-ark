@@ -43,7 +43,7 @@ for (const theme of ["dark", "light"]) {
         await expect(page.locator('[data-step-tile="0"] .macro-token-label')).toHaveText("L Cmd");
         await expect(page.locator('[data-step-tile="0"]')).toHaveAccessibleName(/Left Command/);
         await page.locator('[data-raw-toggle]').click();
-        await page.locator('[data-close-step]').filter({visible: true}).click();
+        await page.locator('.macro-step [data-act="done"]').filter({visible: true}).click();
         await page.setViewportSize({width: 1600, height: 1400});
         await page.locator('[data-macro-editor]').screenshot({path: `/tmp/ark-macro-sequence-${theme}.png`});
     });

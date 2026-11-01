@@ -64,7 +64,7 @@ export function stageBase(model) {
     how.append(stack(choice(field("effectMode")), choice(field("effectLeds")), speedControl));
 
     const under = section("Under every stage");
-    under.append(el(`<p class="note">QMK's own effect, drawn first. Every stage paints over it; a layer with no colour shows it on the LEDs it lights. Layer colours and feedback keep their own brightness.</p>`));
+    under.append(el(`<p class="note">QMK's own effect, drawn first. Every stage paints over it.</p>`));
     if (lightingOff(model)) under.append(el(`<div class="callout">All lighting is off, so nothing is lit. Its switch is at the top of this screen.</div>`));
     node.append(colour, how, under);
     return node;

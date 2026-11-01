@@ -8,7 +8,12 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render as rerender, state} from "../store.mjs";
 import {questionWords, switchQuestion} from "../view/edit-mode.mjs";
 import {editModeWords} from "../view/vocabulary.mjs";
-import {checksToConfirm, confirmText} from "../view/checks.mjs";
+import {checkLevelWord, checksToConfirm, confirmText} from "../view/checks.mjs";
+import {dialogFoot} from "./dialog-foot.mjs";
+
+// An answer to the switch's question, as a button its foot holds.
+/** @param {{pending: string, label: string, primary?: boolean}} answer */
+const answerButton = (answer) => `<button class="btn${answer.primary ? " primary" : ""}" data-pending="${esc(answer.pending)}">${esc(answer.label)}</button>`;
 
 // Choosing a mode in the rail's keyboard menu: what switching has to ask
 // first opens as a question; otherwise the mode is posted at once. Choosing
@@ -25,6 +30,12 @@ export function chooseMode(mode) {
     post(controls.setEditMode(/** @type {0 | 1 | 2} */ (mode)));
 }
 
+// A check a question asks about: its dot, and its level in words, so a trap
+// and a warning differ in more than colour.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Pick<import("../../contracts/model.js").Check, "level" | "title">} check */
+const askedCheck = (model, check) => `<li><i class="dot ${check.level === "trap" ? "err" : "warn"}" aria-hidden="true"></i>
+    <b class="ck-level">${esc(checkLevelWord(model, check.level))}</b> ${esc(check.title)}</li>`;
+
 export function editModeOverlay() {
     const ask = state.modeAsk, model = getModel();
     if (state.overlay !== "editMode" || !ask || !model?.draft) return null;
@@ -33,9 +44,9 @@ export function editModeOverlay() {
     const node = el(`<div class="scrim"><div class="sheet edit-mode-ask" role="alertdialog" aria-modal="true" aria-label="${esc(words.title)}">
         <div class="sheet-h"><h2>${esc(words.title)}</h2></div>
         <div class="sheet-b"><p>${esc(words.detail)}</p>${words.checks.length
-            ? `<ul class="live-ask-checks">${words.checks.map((check) => `<li><i class="dot ${check.level === "trap" ? "err" : "warn"}"></i> ${esc(check.title)}</li>`).join("")}</ul>` : ""}</div>
-        <div class="sheet-f"><button class="btn ghost" data-act="cancel">Cancel</button>
-            <span class="right">${words.answers.map((answer) => `<button class="btn${answer.primary ? " primary" : ""}" data-pending="${esc(answer.pending)}">${esc(answer.label)}</button>`).join("")}</span></div>
+            ? `<ul class="live-ask-checks">${words.checks.map((check) => askedCheck(model, check)).join("")}</ul>` : ""}</div>
+        <div class="sheet-f">${dialogFoot(words.answers.filter((answer) => answer.primary).map(answerButton).join(""), {},
+            "", words.answers.filter((answer) => !answer.primary).map(answerButton).join(""))}</div>
     </div></div>`);
     const close = () => {state.overlay = null; state.modeAsk = null; rerender();};
     node.addEventListener("click", (event) => {
@@ -60,10 +71,9 @@ export function liveProposalOverlay() {
     const node = el(`<div class="scrim"><div class="sheet live-ask ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-modal="true" aria-label="Confirm this edit">
         <div class="sheet-h"><h2>${hasTrap ? "This edit adds a trap" : "This edit adds a warning"}</h2></div>
         <div class="sheet-b"><p>${esc(proposal.label ? `${proposal.label}. ` : "")}${esc(confirmText(proposal.checks, "send"))}</p>
-            <ul class="live-ask-checks">${proposal.checks.map((check) => `<li><i class="dot ${check.level === "trap" ? "err" : "warn"}"></i> ${esc(check.title)}</li>`).join("")}</ul>
+            <ul class="live-ask-checks">${proposal.checks.map((check) => askedCheck(model, check)).join("")}</ul>
             <p class="note">Nothing has been sent. Sent, it takes effect on the keyboard at once; Revert or a replug puts back what is saved.</p></div>
-        <div class="sheet-f"><button class="btn ghost" data-act="back">Go back</button>
-            <span class="right"><button class="btn primary" data-act="send">Send anyway</button></span></div>
+        <div class="sheet-f">${dialogFoot('<button class="btn primary" data-act="send">Send anyway</button>', {back: "Go back", act: "back"})}</div>
     </div></div>`);
     node.addEventListener("click", (event) => {
         const target = event.target;

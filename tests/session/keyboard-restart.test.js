@@ -125,7 +125,7 @@ test("a keyboard that does not finish starting says so and names the recovery co
     assert.ok(clock.now() - since >= STARTING.WAIT_MS, "it waited the bound");
     const said = notices(shell).at(-1);
     assert.ok(said.startsWith(STARTING_WORDS.timeout), said);
-    assert.equal(said.match(/recovery copy: \/recovery\/1\.json/g)?.length, 1, "the recovery copy, named once");
+    assert.equal(said.match(/recovery copy on Backups: \/recovery\/1\.json/g)?.length, 1, "the recovery copy, named once");
     assert.equal(keyboard.working, null, "nothing was put back on a keyboard still starting");
     // It finishes; reading it then puts the edits back.
     keyboard.boot([]);
@@ -218,7 +218,7 @@ test("firmware without restart answers unhandled: nothing happens, and the recov
     assert.equal(keptForAny(loop.session, "restart"), undefined);
     const said = notices(shell).at(-1);
     assert.match(said, /firmware cannot restart from Ark, so nothing happened\. Unplug the keyboard/);
-    assert.match(said, /recovery copy: \/recovery\/1\.json/);
+    assert.match(said, /recovery copy on Backups: \/recovery\/1\.json/);
     assert.equal(lastModel(shell).device.connected, true, "the keyboard is still there");
 });
 
@@ -249,7 +249,7 @@ test("a keyboard that stops again at once is told apart: the edits stay in the r
     assert.equal(keyboard.working, null, "nothing was sent to a stopped keyboard");
     const said = notices(shell).at(-1);
     assert.match(said, /stopped saving again at once, so the fault is in its flash or its firmware/);
-    assert.match(said, /not put back\. Your unsaved edits are in the recovery copy: \/recovery\/1\.json/);
+    assert.match(said, /not put back\. Your unsaved edits are in the recovery copy on Backups: \/recovery\/1\.json/);
 });
 
 // Under a Review and save draft the edits are Ark's own, not the keyboard's:
@@ -364,7 +364,7 @@ test("a keyboard that does not come back says so and names the recovery copy", a
     assert.equal(keyboard.restarting.restarts, 1);
     const said = notices(shell).at(-1);
     assert.ok(said.startsWith(RESTART_WORDS.timeout), said);
-    assert.match(said, /recovery copy: \/recovery\/1\.json/);
+    assert.match(said, /recovery copy on Backups: \/recovery\/1\.json/);
 });
 
 test("a restart the keyboard's answer cut short is said in words, the answer's text kept for the diagnostics", async t => {
@@ -374,7 +374,7 @@ test("a restart the keyboard's answer cut short is said in words, the answer's t
     const said = notices(shell).at(-1);
     assert.match(said, new RegExp(`The keyboard did not restart\\. ${FAILURE_WORDS.unreadable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
     assert.doesNotMatch(said, /3 bytes short/);
-    assert.match(said, /recovery copy: \/recovery\/1\.json/);
+    assert.match(said, /recovery copy on Backups: \/recovery\/1\.json/);
     assert.ok(lastModel(shell).diagnostics.some(line => line.includes("3 bytes short")), "the diagnostics keep the answer's text");
 });
 
@@ -387,5 +387,5 @@ test("a fault in Ark under a restart still says the restart's own words and name
     const said = notices(shell).at(-1);
     assert.ok(said.startsWith("Failed: The keyboard did not restart. "), said);
     assert.ok(said.includes(FAILURE_WORDS.unexpected), said);
-    assert.match(said, /recovery copy: \/recovery\/1\.json/);
+    assert.match(said, /recovery copy on Backups: \/recovery\/1\.json/);
 });

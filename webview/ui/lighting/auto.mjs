@@ -88,7 +88,7 @@ export function stageAuto(model) {
             <div><div class="colour-title">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
         : colourControl(model, {colour: fade.end_color, canEdit: editFade, title: "Fade destination", ...offWording(model, "auto"),
             onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
-    if (unused) endColour.append(el(`<p class="note">Follow-the-real-destination lands on whatever the board would show once auto-mouse turns the pointer layer off, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
+    if (unused) endColour.append(el(`<p class="note">This mode lands on what the board would show without the pointer layer, so it uses no end colour.</p>`));
     node.append(policy, endColour, fadeTiming(model, idle));
     return node;
 }

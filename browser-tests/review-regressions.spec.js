@@ -3,9 +3,10 @@
 const {test, expect} = require("@playwright/test");
 const {openControls, clearPosts, expectPost, change, publishAccepted} = require("./control-preview");
 
+// Layer 15 is empty, so its row shows once the empty layers do.
 for (const [index, destination] of [[1, 14], [9, 6]]) {
     test(`dragging Layer 15 into visual row ${index} posts slot ${destination}`, async ({page}) => {
-        await openControls(page, "keys", {layersOpen: true});
+        await openControls(page, "keys", {layersOpen: true, emptyLayersShown: ["layer-reorder"]});
         await expect(page.locator('.layerpanel [data-grip="15"]')).toBeVisible();
         await page.evaluate(index => {
             const list = document.querySelector(".layerpanel .list");
@@ -31,7 +32,7 @@ for (const [how, dismiss] of [
     ["Discard", page => page.locator('.layerpanel [data-act="cancel"]').click()],
 ]) {
     test(`closing Rename & Reorder by ${how} discards its pending moves`, async ({page}) => {
-        await openControls(page, "keys", {layersOpen: true});
+        await openControls(page, "keys", {layersOpen: true, emptyLayersShown: ["layer-reorder"]});
         await page.locator('.layerpanel [data-base="15"]').click();
         await expectPost(page, {type: "editPortableLayer", id: 15, makeBase: true});
         await clearPosts(page);

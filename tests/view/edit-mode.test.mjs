@@ -225,7 +225,7 @@ test("history, rename and import words follow the edit mode", async () => {
 
     assert.equal(historyFooter(apply), "Going to a step changes only the draft. The keyboard is not touched until you save.");
     assert.equal(renameNote(apply), "Your computer and Chrome show this name once you save; the keyboard reconnects for a moment to take it.");
-    assert.equal(importNote(apply), "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing reaches the keyboard until you review and save it.");
+    assert.equal(importNote(apply), "Choose or drop a backup to compare it first. It replaces your draft; nothing reaches the keyboard until you review and save it.");
     assert.equal(importCallout(apply), "Nothing reaches the keyboard until you review and save; the review shows every change field by field.");
     assert.equal(historyFooter(null), historyFooter(apply), "no draft reads as Review and save");
 

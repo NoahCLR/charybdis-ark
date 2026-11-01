@@ -36,7 +36,7 @@ test("a failure is pinned to the running step, and nothing moves after it", () =
     assert.equal(progress.beforeDecision, true, "the copy to the slave half comes before the commit decision");
     const failure = progress.fail({reason: "The slave half kept answering that it was busy.", saved: "none"});
     assert.deepEqual(failure, {step: "slave", label: "Copy the profile to the slave half", reason: "The slave half kept answering that it was busy.", saved: "none",
-        verdict: "Nothing was saved: the keyboard kept the profile it had."});
+        verdict: "Nothing was saved: the keyboard kept the profile it had.", advice: []});
     progress.report("commit");
     const view = progress.view();
     assert.equal(view.state, "failed");
@@ -90,6 +90,14 @@ test("a fault in Ark under a save reads as a plain sentence, never its own text"
     const {FAILURE_WORDS} = require("../../core/model/vocabulary");
     assert.equal(failureReason(new TypeError("Cannot read properties of undefined (reading 'id')")), FAILURE_WORDS.unexpected);
     assert.equal(failureReason(Object.assign(new Error("x is not a function"), {code: "TypeError"})), FAILURE_WORDS.unexpected, "as the device service passes it on");
+});
+
+test("what to do next rides with the failure, for the bar to say after the verdict", () => {
+    const progress = new ApplyProgress();
+    progress.report("upload");
+    const advice = ["Keep both halves connected.", "The copy kept before the save is on Backups (Before saving a draft · 24 Oct 2026, 09:12)."];
+    assert.deepEqual(progress.fail({reason: "It stopped.", saved: "none", advice}).advice, advice);
+    assert.deepEqual(progress.view().failure?.advice, advice, "the view carries it");
 });
 
 test("each verdict is the bar's sentence, and an unknown one says Ark can't tell", () => {

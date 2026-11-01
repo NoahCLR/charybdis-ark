@@ -14,7 +14,10 @@
 // A layer is moved by dragging its row by the grip on its left (or, focused
 // there, with the arrow keys). The bottom row is the base: always on, and what
 // every transparent key falls through to. It is not dragged; Make base on
-// another row swaps that layer into it.
+// another row swaps that layer into it, and shows on the row under the pointer
+// or holding the focus. Empty layers (D-L76) fold behind the disclosure at the
+// list's end, and show in their places once it is open: this is where a new
+// layer gets its name.
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as controls from "../view/controls.mjs";
@@ -24,6 +27,8 @@ import {NAME_TIP} from "../view/names.mjs";
 import {countNameBytes} from "./title-name.mjs";
 import {getModel, layers, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
+import {emptyLayers} from "../view/empty-layers.mjs";
+import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
 
 /** @type {(() => void) | null} */
 let stopWatching = null;   // stops the open panel's outside-press watch
@@ -39,7 +44,7 @@ export function attachLayersControl(bar) {
     const busy = Boolean(portable.busy);
     const canEdit = editGate(model, "layers").editable;
 
-    const trigger = el(`<button class="layer-edit" aria-haspopup="dialog" aria-expanded="${Boolean(state.layersOpen)}"
+    const trigger = el(`<button class="layer-edit" data-act="rename-layers" aria-haspopup="dialog" aria-expanded="${Boolean(state.layersOpen)}"
         data-tip="Rename layers and change their order: a higher layer wins over the ones under it.">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 13V3M2.5 5.5 5 3l2.5 2.5M11 3v10M8.5 10.5 11 13l2.5-2.5"/></svg>
         <span>Rename &amp; reorder</span></button>`);
@@ -111,8 +116,8 @@ function editor(model, portable, busy) {
                 <label class="sw"><input type="checkbox" id="layerKeysFollow" data-f="layers:keys-follow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Keys follow their layers</span></label>
                 <span class="note">${follow
-                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer, and pointing modes' layers and custom keys' shortcut layers move with them. Make base swaps the two roles: a key that reached the new base reaches the old one."
-                    : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Pointing modes' layers and custom keys' shortcut layers keep their numbers too, and a move that would land one on a default layer, or two of one link's or shortcut's layers on one, is refused. Names, colours and the pointer and sniping settings still move with their layer, and Make base still swaps the keys that reach the two layers."}</span>
+                    ? "Layer keys of every kind are renumbered with the move, so each still reaches the same layer, and pointing modes' layers and custom keys' shortcut layers move with them. Make base swaps the two roles: a key that reached the new base reaches the old one."
+                    : "Layer keys keep their numbers: a key that held layer 1 holds whatever layer is now 1. Pointing modes' layers and custom keys' shortcut layers keep their numbers too, and a move that would land one on a default layer, or two of one link's or shortcut's layers on one, is refused. Names, colours and the pointer and sniping settings still move with their layer, and Make base still swaps the keys that reach the two layers."}</span>
             </div>
             <div class="row">
                 <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
@@ -121,13 +126,17 @@ function editor(model, portable, busy) {
         </div></div>`);
 
     const list = /** @type {HTMLElement} */ (node.querySelector(".list"));
+    // A row stays in its place in the stack, hidden, so a drag still counts it.
+    const empty = emptyLayers(model);
+    const folded = order.filter((layerId) => empty.has(layerId) && portable.layers.order.indexOf(layerId) !== 0);
+    const hidden = emptyLayersShown("layer-reorder") ? [] : folded;
     order.forEach((layerId) => {
         const position = portable.layers.order.indexOf(layerId);
         const layer = layers().find((entry) => entry.index === layerId);
         const mapped = mappedKeyCount(model, layer);
         const base = position === 0;
         const label = portable.layers?.titles[layerId] ?? "";
-        const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${esc(layerId)}">
+        const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${esc(layerId)}" ${hidden.includes(layerId) ? "hidden" : ""}>
             ${base ? `<span class="lp-grip-slot" aria-hidden="true"></span>`
                 : `<button class="lp-grip" data-grip="${esc(layerId)}" ${busy ? "disabled" : ""} aria-label="Move ${esc(label)}: drag, or press the up and down arrows"
                     data-tip="Drag to move this layer, or focus it and press ↑ ↓.">${GRIP}</button>`}
@@ -136,11 +145,13 @@ function editor(model, portable, busy) {
                 aria-label="${layerId ? `Name for layer ${esc(layerId)}` : "Base layer name"}"><span class="note name-bytes-count" data-name-count></span></span>
             <span class="note ${mapped ? "" : "dim"}">${mapped ? `${mapped} key${mapped === 1 ? "" : "s"}` : "nothing mapped"}</span>
             ${base ? `<span class="tag lp-base" data-tip="Always on, and what every transparent key falls through to.">base</span>`
-                : `<button class="btn tiny ghost" data-base="${esc(layerId)}" ${busy ? "disabled" : ""}
+                : `<button class="btn tiny ghost lp-make-base" data-base="${esc(layerId)}" ${busy ? "disabled" : ""}
                     data-tip="Put this layer at the bottom. Its transparent keys become KC_NO; KC_NO on the former base becomes transparent. An uncoloured former base gets the saved base colour.">Make base</button>`}</div>`);
         countNameBytes(/** @type {HTMLInputElement} */ (row.querySelector("[data-name]")), /** @type {HTMLElement} */ (row.querySelector("[data-name-count]")));
         list.append(row);
     });
+    // Under the list rather than in it, so it stays in view as the list scrolls.
+    if (folded.length) list.after(emptyLayersButton("layer-reorder", folded.length, "list-empties"));
 
     const currentNames = () => {
         /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-name]")).forEach((input) => { names[Number(input.dataset.name)] = input.value.trim(); });

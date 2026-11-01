@@ -6,7 +6,7 @@ const updates = page => page.evaluate(() => window.__posted.filter(m => m.type =
 
 for (const theme of ["dark", "light"]) {
     test(`macro bank keeps its scroll when selecting, editing and recording a later slot (${theme})`, async ({page}) => {
-        await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false}, theme);
+        await openControls(page, "macros", {macroSlot: "MACRO_17", recordDelays: false, allSlotsShown: ["macros"]}, theme);
         const bank = page.locator(".macros-library .macro-grid");
         const slot = page.locator('[data-slot="MACRO_100"]');
         await slot.scrollIntoViewIfNeeded();
@@ -51,7 +51,8 @@ test("dropping in the space before the first tile inserts the dragged step first
 });
 
 test("the first step can move to trailing whitespace after wrapped rows", async ({page}) => {
-    await page.setViewportSize({width: 800, height: 900});
+    // Narrow enough, beside the rail's icons, that five tiles take two rows.
+    await page.setViewportSize({width: 640, height: 900});
     await openControls(page, "macros", {macroSlot: "MACRO_17"});
     await page.locator('[data-raw-toggle]').click();
     await page.locator('[data-raw-payload]').fill('{KC_A}{KC_B}{KC_C}{KC_D}{KC_ENT}');
@@ -137,15 +138,19 @@ for (const theme of ["dark", "light"]) {
         await page.locator('.pkb-key[data-pick="KC_LGUI"]').click();
         await page.locator('.pkb-key[data-pick="KC_ENT"]').click();
         await page.locator('.picker [data-act="use"]').click();
-        await page.locator('[data-close-step]:visible').click();
-        await expect(page.locator('[data-guidance]')).not.toHaveAttribute("open");
+        await page.locator('.macro-step [data-act="done"]:visible').click();
+        await expect(page.locator('[data-guidance]')).toBeHidden();
+        await expect(page.locator('[data-show-help]')).toHaveAttribute("aria-expanded", "false");
+        await expect(page.locator('[data-show-help] .chev')).toHaveCount(1);
         await expect(page.locator('[data-protection]')).toBeVisible();
         await expect(page.locator('[data-preserve-hold-timing]')).toBeVisible();
         await expect(page.locator('[data-host-settings]')).toBeVisible();
         await page.locator('[data-show-help]').click();
         await expect(page.locator('[data-guidance]')).toBeVisible();
         await expect(page.locator('[data-guidance]')).toContainText("Only the macro types");
+        await expect(page.locator('[data-show-help]')).toHaveAttribute("aria-expanded", "true");
         await page.locator('[data-show-help]').click();
+        await expect(page.locator('[data-guidance]')).toBeHidden();
         await page.getByRole('textbox', {name: 'Macro name', exact: true}).fill('Quick reply');
         await page.getByRole('textbox', {name: 'Macro name', exact: true}).press('Enter');
         await publishAccepted(page, ['macros', 17, 'name'], 'Quick reply');
@@ -242,10 +247,10 @@ test('read-only macro tiles cannot be deleted', async ({page}) => {
 });
 
 for (const theme of ["dark", "light"]) {
-    test(`Raw payload is a persistent toggle on the right of the add row; tile focus has no extra outline (${theme})`, async ({page}) => {
+    test(`Edit as text is a persistent toggle on the right of the add row; tile focus has no extra outline (${theme})`, async ({page}) => {
         await page.setViewportSize({width: 1400, height: 1000});
         await openControls(page, 'macros', {macroSlot: 'MACRO_17'}, theme);
-        const toggle = page.getByRole('checkbox', {name: 'Raw payload', exact: true});
+        const toggle = page.getByRole('checkbox', {name: 'Edit as text', exact: true});
         const positions = await page.locator('.macro-insert-tools').evaluate(row => {
             const add = row.querySelector('[data-insert-kind="text"]').getBoundingClientRect();
             const raw = row.querySelector('.macro-raw-toggle').getBoundingClientRect();
@@ -266,7 +271,7 @@ for (const theme of ["dark", "light"]) {
         await expect(tile).toHaveAttribute('aria-pressed', 'true');
         await toggle.uncheck();
         await expect(page.locator('[data-raw-payload]')).toBeHidden();
-        await page.locator('[data-step="1"] [data-close-step]').click();
+        await page.locator('[data-step="1"] [data-act="done"]').click();
         await expect(toggle).not.toBeChecked();
         await expect(page.locator('[data-raw-payload]')).toBeHidden();
     });

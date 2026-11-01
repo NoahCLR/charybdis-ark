@@ -174,7 +174,7 @@ test("a lock whose layer covers its own key, with nothing else to release it, is
     assert.equal(trap.title, "Numbers can lock with no way back to Base");
     assert.deepEqual(trap.path, ["Tap TG(1) on Base"]);
     assert.deepEqual(trap.place, {kind: "key", layer: 0, layoutIndex: 0});
-    assert.match(trap.fix, /TO\(0\) or TG\(1\) on Numbers/);
+    assert.equal(trap.fix, "Put a Move to Base or Lock Numbers key on Numbers, where it answers, or take away the lock.", "the way out named as the picker names it");
 });
 
 test("a lock is no trap when its key falls through, or the layer has TO(0), TG or LOCK_LAYER of itself", () => {
@@ -218,7 +218,7 @@ test("TT locks on its fifth tap, unless a behaviour row with steps on it replace
 test("behaviour branches lock and release like keys, told by the taps that reach them", () => {
     const lock = {target: code(KC_ESC), steps: [{tapIndex: 1, tap: {kind: 3, flags: 0, operand: 2}}]};
     const [trap] = traps(profile({keys: {"0:0": KC_ESC, "2:0": KC_B}, rows: [lock]}));
-    assert.deepEqual(trap.path, ["Double-tap KC_ESCAPE on Base (its behaviour sends LOCK_LAYER(2))"]);
+    assert.deepEqual(trap.path, ["Double-tap KC_ESCAPE on Base (its behaviour sends Lock Symbols)"], "what the behaviour sends, in Ark's words");
     const release = {target: code(KC_B), steps: [{tapIndex: 0, hold: {style: 2, repeatHz: 0, action: code(TO(0))}}]};
     assert.deepEqual(traps(profile({keys: {"0:0": KC_ESC, "2:0": KC_B}, rows: [lock, release]})), []);
     // A layer hold only holds from a "Press and hold until release" branch.
@@ -289,6 +289,8 @@ test("a layer with keys that nothing reaches is a warning, an empty one is not",
     const findings = layerReach(profile({keys: {"5:0": KC_B}}));
     assert.deepEqual(findings.map((finding) => [finding.kind, finding.level, finding.layers]), [["unreachable", "warning", [5]]]);
     assert.equal(findings[0].title, "Nothing reaches Extra 1");
+    assert.equal(findings[0].fix, "Put a layer key for Extra 1, such as Hold Extra 1, Lock Extra 1 or Move to Extra 1, on a layer you can reach.",
+        "the layer keys it suggests are named as the picker names them");
     assert.deepEqual(kinds(profile({keys: {"0:0": MO(5), "5:0": KC_B}})), []);
     assert.deepEqual(kinds(profile({keys: {"0:0": TG(5), "5:3": KC_B}})), [], "reached through a lock");
 });
@@ -320,7 +322,7 @@ test("transparent and KC_NO base keys have separate notices and counts", () => {
 test("a pointer layer that is always on, or empty, cannot work", () => {
     assert.deepEqual(layerReach(profile({settings: {4: 1, 5: 0}})).map((finding) => [finding.kind, finding.level]), [["pointerLayer", "warning"]]);
     const [always] = layerReach(profile({settings: {4: 1, 5: 0}}));
-    assert.deepEqual(always.place, {kind: "settings", area: "Mouse", section: "autoMouse"}, "it is fixed in Auto-mouse");
+    assert.deepEqual(always.place, {kind: "settings", area: "Pointer", section: "autoMouse"}, "it is fixed in Auto-mouse");
     assert.match(always.fix, /Pointer settings → Auto-mouse/);
     assert.deepEqual(layerReach(profile({settings: {4: 1, 5: 4}})).map((finding) => [finding.kind, finding.level]), [["pointerLayer", "notice"]]);
     assert.deepEqual(kinds(profile({keys: {"4:0": KC_B}, settings: {4: 1, 5: 4}})), []);
@@ -329,7 +331,8 @@ test("a pointer layer that is always on, or empty, cannot work", () => {
 test("layer keys the keyboard leaves to QMK are named where they sit", () => {
     const [finding] = layerReach(profile({keys: {"0:7": DF(1)}}));
     assert.equal(finding.kind, "unowned");
-    assert.equal(finding.title, "DF(1) on Base bypasses layer tracking");
+    assert.equal(finding.title, "Default Numbers (DF(1)) on Base bypasses layer tracking");
+    assert.equal(finding.fix, "Replace it with a Move to, Lock or Hold layer key.");
     assert.deepEqual(finding.place, {kind: "key", layer: 0, layoutIndex: 7});
 });
 
@@ -383,7 +386,7 @@ test("layer keys that hold or toggle Base do nothing, and are counted wherever t
     assert.equal(finding.level, "notice");
     assert.equal(finding.count, 4);
     assert.equal(finding.title, "4 layer keys hold or toggle Base, which is always on");
-    assert.match(finding.detail, /^MO\(0\), TG\(0\), LOCK_LAYER\(0\) in the behaviour on KC_ESCAPE and 1 more: Base is always on/);
+    assert.match(finding.detail, /^Hold Base, Lock Base, Lock Base in the behaviour on KC_ESCAPE and 1 more: Base is always on.* Move to Base is the one/);
     assert.deepEqual(finding.place, {kind: "key", layer: 0, layoutIndex: 0});
     assert.deepEqual(kinds(profile({keys: {"0:0": TO(0)}})), []);
 });

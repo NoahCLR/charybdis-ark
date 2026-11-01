@@ -23,6 +23,47 @@ test("screen colours use the model or CSS ink tokens", () => {
     assert.deepEqual(sources("webview/ui").filter(file => literal.test(read(file))), []);
 });
 
+// The stylesheet draws its sizes, weights, radii, layers and colours from the
+// tokens in :root and the light theme's block (webview/styles.css's header).
+// What a rule may write instead: 0, 50%, inherit, a token, or a calc() on one.
+const STYLESHEET_ALLOWED = [
+    // SVG text on the board and the picker's board is sized in the drawing's own units.
+    {selector: /^\.(kc|pkb)-/, property: /^font-size$/},
+    // A strip's faded edge is an alpha mask: its black is coverage, not a colour.
+    {selector: /^\.more-/, property: /mask-image$/},
+];
+const stylesheetLiterals = (css) => {
+    const found = [];
+    const derived = (part) => /^(0|50%|inherit|var\(--[\w-]+\))$/.test(part) || /^calc\(.*var\(--[\w-]+\)/.test(part);
+    for (const [, selectorText, body] of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selector = selectorText.trim().replace(/\s+/g, " ");
+        if (selector.startsWith(":root")) continue;
+        for (const [, property, raw] of body.matchAll(/(?:^|;)\s*([\w-]+)\s*:\s*([^;]+)/g)) {
+            const value = raw.trim();
+            if (STYLESHEET_ALLOWED.some(allowed => allowed.selector.test(selector) && allowed.property.test(property))) continue;
+            const parts = value.match(/calc\([^()]*(?:\([^()]*\)[^()]*)*\)|var\([^()]*\)|[^\s]+/g) || [];
+            const literal = property === "font"
+                ? value !== "inherit" && /\d/.test(value.replace(/var\([^()]*\)/g, "").replace(/\/\S+/, ""))
+                : /^(font-size|font-weight|z-index|border(-[a-z]+)*-radius)$/.test(property) ? !parts.every(derived)
+                : /#[\da-f]{3,8}\b|\b(rgb|hsl)a?\(/i.test(value);
+            if (literal) found.push(`${selector} { ${property}: ${value} }`);
+        }
+    }
+    return found;
+};
+
+test("the stylesheet writes no raw size, weight, radius, layer or colour outside its tokens", () => {
+    assert.deepEqual(stylesheetLiterals(read("webview/styles.css")), []);
+    // The check sees what it is meant to.
+    assert.deepEqual(stylesheetLiterals(`:root { --fs-md: 12.5px; --x: #fff; }
+        .a { font-size: 12px; border-radius: 0 6px; z-index: 3; font: 600 11px/1 var(--sans); color: rgba(0,0,0,.5); }
+        .b { font-size: var(--fs-md); border-radius: calc(var(--r-sheet) - 1px) 0; z-index: calc(var(--z-popover) + 1); font: var(--fs-md)/22px var(--mono); }
+        .kc-badge { font-size: 9px; }`), [
+        ".a { font-size: 12px }", ".a { border-radius: 0 6px }", ".a { z-index: 3 }",
+        ".a { font: 600 11px/1 var(--sans) }", ".a { color: rgba(0,0,0,.5) }",
+    ]);
+});
+
 // The page requires Trusted Types (scripts/build-web.js): markup reaches an
 // HTML sink only through webview/lib/dom.mjs `html`, and the one script the
 // page starts by URL is web/page.mjs's worker, so a sink that does neither

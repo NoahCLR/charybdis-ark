@@ -8,6 +8,11 @@
 // its own key so one list's place never carries into another's. Moving to
 // another screen still starts at its top.
 
+// A scroll Ark makes on its own glides, unless the person asked their system
+// for less motion: then it jumps.
+/** @returns {ScrollBehavior} */
+export const scrollMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+
 /** @typedef {{top: number, left: number}} ScrollOffset */
 /** @typedef {ScrollOffset & {bank?: ScrollOffset, list?: {key: string, top: number}}} ContentScroll */
 
@@ -98,5 +103,5 @@ export function scrollContentTo(root, selector, margin = 20) {
     const target = content?.querySelector(selector);
     if (!content || !target) return;
     const top = content.scrollTop + target.getBoundingClientRect().top - content.getBoundingClientRect().top - margin;
-    content.scrollTo({top, left: content.scrollLeft, behavior: "smooth"});
+    content.scrollTo({top, left: content.scrollLeft, behavior: scrollMotion()});
 }

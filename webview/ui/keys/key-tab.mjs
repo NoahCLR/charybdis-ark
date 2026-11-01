@@ -18,6 +18,8 @@ import {actionMarked, comboBadge, comboOutputMarked, keyNameMarked, layerIconOff
 import {customKeyBypassText, customKeyOf} from "../../view/custom-key.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {pickKeycodeFor} from "./key-edits.mjs";
+import {foldEmptyLayers} from "../../view/empty-layers.mjs";
+import {emptyLayersShown, emptyLayersToggle, wireEmptyLayers} from "../empty-layers.mjs";
 
 /** @param {HTMLElement} body */
 export function tabKey(body) {
@@ -62,7 +64,7 @@ export function tabKey(body) {
         <section>
             <div class="sect-h"><h4>This key on every layer</h4></div>
             <div class="stacklist">${stackRows(model, layer, position)}</div>
-            <p class="note stack-note">The highest layer you hold wins. A transparent key takes what the next layer down that you hold does; ${esc(layerCalled(layers()[0]))} is always on.</p>
+            <p class="note stack-note">The highest layer on wins; a transparent key takes the next one down. ${esc(layerCalled(layers()[0]))} is always on.</p>
         </section>
         <section>
             <div class="sect-h"><h4>What this key reaches</h4></div>
@@ -85,17 +87,20 @@ export function tabKey(body) {
         const field = /** @type {HTMLInputElement} */ (event.target);
         const written = field.value.trim();
         const note = /** @type {HTMLElement | null} */ (node.querySelector(".keycode-problem"));
-        if (!written || written === keyMeaning(position)) { note?.remove(); field.removeAttribute("aria-invalid"); return; }
+        // The reason is the field's description while it stands.
+        const valid = () => {note?.remove(); field.removeAttribute("aria-invalid"); field.removeAttribute("aria-describedby");};
+        if (!written || written === keyMeaning(position)) { valid(); return; }
         // A key the draft would refuse stays in the field with the reason
         // under it, and posts nothing; the rail is not where you are typing.
         const problem = keyProblem(getModel(), written);
         if (problem) {
             field.setAttribute("aria-invalid", "true");
+            field.setAttribute("aria-describedby", "keycode-problem");
             if (note) note.textContent = problem;
-            else field.closest(".field")?.append(el(`<p class="note keycode-problem" role="status">${esc(problem)}</p>`));
+            else field.closest(".field")?.append(el(`<p class="note keycode-problem" id="keycode-problem" role="status">${esc(problem)}</p>`));
             return;
         }
-        note?.remove(); field.removeAttribute("aria-invalid");
+        valid();
         post(edits.setKey(layer.name, position.layoutIndex, written));
     });
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-golayer]")).forEach((button) => button.addEventListener("click", () => {
@@ -103,6 +108,7 @@ export function tabKey(body) {
         render();
     }));
     /** @type {HTMLElement | null} */ (node.querySelector("[data-stack-open]"))?.addEventListener("click", () => { state.stackOpen = !state.stackOpen; render(); });
+    wireEmptyLayers(node);
     /** @type {HTMLDetailsElement | null} */ (node.querySelector(".key-more"))?.addEventListener("toggle", (event) => {
         state.keyDetailsOpen = /** @type {HTMLDetailsElement} */ (event.target).open;
     });
@@ -124,8 +130,8 @@ export function tabKey(body) {
             ${inherited ? `<p class="note">This key is transparent on this layer (${esc(layerCalled(layer))}), so its switches on ${esc(layerCalled(source))} decide.</p><button class="btn tiny" data-source-layer>Open this key on ${esc(layerCalled(source))}</button>` : `
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${gate.editable ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${gate.editable ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
-            ${inherited ? "" : `<p class="note">They switch only ${esc(thisKeyOnThisLayer(model, layerCalled(source)))}. To switch a behaviour or combo off on every key, use its own Use this behaviour or Use this combo; for a whole layer, Settings.</p>`}
-            <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behaviour ? "runs here" : "this key has none")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "this key can take part; each combo has its own switches too")}.</p>
+            ${inherited ? "" : `<p class="note">For every key, use the behaviour's or combo's own switch; for a whole layer, Settings.</p>`}
+            <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behaviour ? "runs here" : "none on this key")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "can take part")}.</p>
             ${customKeyBypassText(customKeyOf(model, keyIdentity(model, keyMeaning(key)).canonical)) ? `<p class="note">${esc(customKeyBypassText(customKeyOf(model, keyIdentity(model, keyMeaning(key)).canonical)))}</p>` : ""}
         </div>`);
         /** @type {HTMLElement | null} */ (controls.querySelector("[data-source-layer]"))?.addEventListener("click", () => {showLayer(layers().indexOf(source)); render();});
@@ -139,9 +145,13 @@ export function tabKey(body) {
 // The selected position on every layer, highest first. Three or more
 // transparent layers in a row fold into one line, since each only says the
 // key falls through; the picked layer always shows, and a click unfolds them.
+// Empty layers fold behind the disclosure at the list's end (D-L76), and
+// show in their places in the stack once it is open.
 /** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {import("../../../contracts/panel.js").Layer} layer @param {import("../../../contracts/panel.js").Position | undefined} position */
 function stackRows(model, layer, position) {
-    const rows = [...layers()].reverse().map((other) => {
+    const {folded} = foldEmptyLayers(model, layers(), (other) => other.index, (other) => other.index === layer.index);
+    const hidden = new Set(emptyLayersShown("key-stack") ? [] : folded);
+    const rows = [...layers()].reverse().filter((other) => !hidden.has(other)).map((other) => {
         const there = positionAt(other, position?.layoutIndex);
         const face = keyFace(there, model);
         return {other, there, face, through: face.kind === "transparent" && other.index !== layer.index};
@@ -170,6 +180,7 @@ function stackRows(model, layer, position) {
     flush();
     if (state.stackOpen && rows.filter((entry) => entry.through).length >= 3)
         html += `<button class="stackrow folded" data-stack-open><span></span><span class="nm dim">Fold transparent layers</span><span></span><code></code></button>`;
+    if (folded.length) html += emptyLayersToggle("key-stack", folded.length, "stack-empties");
     return html;
 }
 

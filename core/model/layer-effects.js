@@ -137,9 +137,10 @@ const holdPhrase = (index, name, longer) => `${index === 0 ? `Hold ${name}` : `T
 // from an empty first tap, held from the fallback hold, which belongs to the
 // first press alone and only while it authors neither a hold nor a long hold
 // (built-in-behavior.js). A shortcut that locks or moves does so from either,
-// and one that holds from the fallback hold.
-/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @param {LayerOwners} [links] @returns {(LayerEffect & {how: string, note?: string})[]} */
-function keyEffects(code, row, values, links) {
+// and one that holds from the fallback hold. `said` names what a branch
+// sends, as the screens name it (layer-walk.js), or as its action by default.
+/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @param {LayerOwners} [links] @param {(action: Action) => string} [said] @returns {(LayerEffect & {how: string, note?: string})[]} */
+function keyEffects(code, row, values, links, said = actionName) {
     /** @type {(LayerEffect & {how: string, note?: string})[]} */
     const effects = [];
     const first = row?.steps.find((step) => step.tapIndex === 0);
@@ -166,7 +167,7 @@ function keyEffects(code, row, values, links) {
     }
     for (const step of row?.steps || []) {
         /** @param {Action | undefined} action */
-        const sends = (action) => `its behaviour sends ${actionName(/** @type {Action} */ (action))}`;
+        const sends = (action) => `its behaviour sends ${said(/** @type {Action} */ (action))}`;
         for (const effect of actionEffects(step.tap, links)) {
             if (effect.kind !== "hold" || effect.oneShot) effects.push({...effect, how: tapPhrase(step.tapIndex, codeName(code)), note: sends(step.tap)});
         }

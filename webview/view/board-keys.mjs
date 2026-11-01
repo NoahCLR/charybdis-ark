@@ -18,7 +18,7 @@
 // marks or second line; `faces: false` leaves the marks off in any mode.
 
 import {isOff} from "../lib/colour.mjs";
-import {behaviourTiers, keyFace, keyMeaning} from "./keyface.mjs";
+import {behaviourTiers, keyFace, keyMeaning, keyName} from "./keyface.mjs";
 import {keyIdentity} from "./key-identity.mjs";
 import {behaviourRuns} from "./participation.mjs";
 import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trackballLight} from "./lighting.mjs";
@@ -33,6 +33,8 @@ import {keyLed, keyLight, ownLight, stageEnabled, tierColour, trackballLed, trac
  * @property {import("../../contracts/panel.js").Layer | null} from the layer below that answers, through a transparent key
  * @property {import("./keyface-types.js").KeyFace["kind"]} kind
  * @property {string} meaning what the shown key means
+ * @property {string} name what a screen reader calls the key: as the board
+ *     names it (its LED in the LED selector), never by its layout index
  * @property {boolean} glass
  * @property {Colour | null} light the colour it shows, none in the LED selector
  * @property {{kind: import("./keyface-types.js").Tier, count: number, colour: Colour | null}[]} tiers one dot per tier, with the colour it flashes, none when key feedback leaves it dark
@@ -64,6 +66,7 @@ export function boardKeys(view, {mode = "light", faces = true, pdActive = null} 
             index, shown, from,
             kind: face.kind,
             meaning: keyMeaning(shown),
+            name: leds ? `LED ${keyLed(model, index) ?? index}` : keyName(shown, model),
             glass: face.kind === "transparent" || Boolean(from),
             light: leds ? null : keyLight(model, layer, position, {pdActive, held}).colour,
             tiers: runs ? behaviourTiers(behaviour).map((tier) => {

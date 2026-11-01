@@ -7,9 +7,9 @@ import {closeComboBuilder, currentView, getModel, openComboBuilder, render, stat
 import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {draftMarks, draftDot} from "../../view/review.mjs";
-import {reachAttrs, reachTable} from "../groups.mjs";
+import {reachAttrs, reachTable, rowPick} from "../groups.mjs";
 import {reachRowId, setReachGroupOpen} from "../../view/reach-groups.mjs";
-import {comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
+import {comboBadge, comboOutputMarked, keyNameMarked, keyNameText} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {keyMeaning, keyName} from "../../view/keyface.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
@@ -23,9 +23,12 @@ export function tabCombos(body, right) {
     const canEdit = editGate(model, "combos").editable;
 
     right.replaceChildren();
-    const toggle = el(`<button class="btn tiny" ${canEdit ? "" : "disabled"}>${state.combo.open ? "Close builder" : "New combo"}</button>`);
+    // New combo opens the builder on a new combo; the builder closes itself
+    // (Cancel, Escape), so this never doubles as its close.
+    const building = state.combo.open && state.combo.editId === null;
+    const toggle = el(`<button class="btn tiny" data-act="new-combo" ${canEdit && !building ? "" : "disabled"}>New combo</button>`);
     toggle.addEventListener("click", () => {
-        if (state.combo.open) closeComboBuilder(); else openComboBuilder(null, edits.comboDefaultWindowValue(model));
+        openComboBuilder(null, edits.comboDefaultWindowValue(model));
         render();
     });
     right.appendChild(toggle);
@@ -51,7 +54,8 @@ export function tabCombos(body, right) {
     const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
         const requires = /** @type {("mustHold" | "mustTap" | "ordered")[]} */ (["mustHold", "mustTap", "ordered"]).filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
-        return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
+        return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${rowPick("combos", group, combo.id, `${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}`,
+            `Combo ${combo.badge}: ${(combo.inputs || []).map((input) => keyNameText(model, input)).join(" + ")} sends ${keyNameText(model, combo.output)}`)}</td>
             <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
             <td class="mono">${comboOutputMarked(model, combo)}</td>
             <td class="mono">${esc(combo.termMs ?? "")} ms${combo.followsDefault ? ` <span class="tag" data-tip="${esc(`Follows the default combo window (${vocabulary(model).settingsScreens.combos}), so it changes with it.`)}">default</span>` : ""}</td>

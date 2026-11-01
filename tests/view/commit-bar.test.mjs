@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {commitBarState} from "../../webview/view/commit-bar.mjs";
+import {barSaysNotice, commitBarState, restartOffReason} from "../../webview/view/commit-bar.mjs";
 import {LIVE, LIVE_REVIEW, STOPPED_WORDS} from "../../webview/view/edit-mode.mjs";
 import {RESTART_NEEDED} from "../../webview/view/keyboard-view.mjs";
 import {macroMessage} from "../../webview/view/edits.mjs";
@@ -47,6 +47,21 @@ test("a failed Apply stays until it is dismissed", () => {
     assert.equal(kind(model({draft: {busy: true}, apply})), "busy", "the keyboard working again comes first");
 });
 
+test("a failed Apply's bar says its notice once, so the rail does not say it again", () => {
+    const failure = {label: "Send the profile", reason: "The keyboard was disconnected or restarted.", verdict: "Nothing was saved.",
+        advice: ["The copy kept before the save is on Backups (Before saving a draft · 24 Oct 2026, 09:12)."]};
+    const bar = commitBarState(model({apply: {id: 4, state: "failed", steps, failure}}));
+    const cutShort = "Nothing was saved. The keyboard was disconnected or restarted. The copy kept before the save is on Backups (Before saving a draft · 24 Oct 2026, 09:12).";
+    assert.equal(barSaysNotice(bar, cutShort), true, "a cut-short notice: verdict, why, what to do");
+    assert.equal(barSaysNotice(bar, "Failed: The keyboard was disconnected or restarted."), true, "a refusal: Failed and why");
+    assert.equal(barSaysNotice(bar, "The keyboard was disconnected or restarted."), true, "the keyboard's own error: why");
+    assert.equal(barSaysNotice(bar, `${cutShort} The keyboard restarted over unsaved edits.`), false, "a notice saying more is the rail's");
+    assert.equal(barSaysNotice(bar, "Failed: Something else."), false, "another failure is the rail's");
+    assert.equal(barSaysNotice(commitBarState(model({apply: {id: 4, state: "failed", steps, failure}}), {applyDismissed: 4}), cutShort), false,
+        "a dismissed bar says nothing");
+    assert.equal(barSaysNotice(bar, ""), false);
+});
+
 test("a live edit the keyboard holds says what to let go of", () => {
     const wait = {title: "Let go of the keys", detail: "Shift is held", cancellable: true};
     assert.deepEqual(commitBarState(model({draft: {busy: true}, liveWait: wait})), {kind: "held", wait});
@@ -86,4 +101,9 @@ test("the live modes: the keyboard's failed save, Live edit's own saving, and Li
     assert.equal(kind(model({draft: {...liveDraft({unsaved: false}), dirty: true}})), "livePreview", "edits undone back to what is saved still run");
     assert.equal(kind(model({draft: {...liveDraft({unsaved: true}), dirty: false}})), "livePreview");
     assert.equal(kind(model({draft: {...liveDraft({unsaved: false}), dirty: false}})), null, "nothing unsaved, no bar");
+});
+
+test("a Restart that is off says why beside it", () => {
+    assert.equal(restartOffReason({connected: true}), "");
+    assert.equal(restartOffReason({connected: false}), "Connect the keyboard to restart it.");
 });

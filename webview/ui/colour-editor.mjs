@@ -12,7 +12,8 @@ import {el, esc} from "../lib/dom.mjs";
 
 // `offTip` offers Turn off, storing HSV(0, 0, 0), and says what that does in
 // this stage (`offWording` in view/lighting.mjs); without it there is no Turn
-// off, as for the background effect.
+// off, as for the background effect. A colour turned off reads "Off", never
+// its stored numbers; the callout says what off means here.
 /** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, maximumBrightness?: number}} options */
 export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, maximumBrightness}) {
     const [h, s, v] = hsv(colour);
@@ -23,7 +24,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
 
     if (inheritsStageColour(colour)) {
         node.append(el(`<div class="row colour-head"><span class="swatch-lg swatch-off"></span>
-            <div><div class="colour-title">${esc(title)}</div><div class="note mono">${esc(hsvLabel(colour))}</div></div></div>`));
+            <div><div class="colour-title">${esc(title)}</div><div class="note">Off</div></div></div>`));
         node.append(el(`<div class="callout">${esc(offNote || "This colour has zero brightness.")}</div>`));
         if (canEdit) {
             const give = el(`<button class="btn self-start">Give it a colour</button>`);

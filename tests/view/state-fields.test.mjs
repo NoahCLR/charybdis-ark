@@ -45,8 +45,8 @@ const RESETS = ["retarget", "pdKind", "pdTaps", "lastTake"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
-    "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "flashPausesAsked", "keyDetailsOpen", "stackOpen", "cellHow", "placement",
-    "macroClipboard", "keyClipboard", "stage", "railMenu", "layersOpen", "layersAsked", "pointingSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
+    "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "flashPausesAsked", "keyDetailsOpen", "stackOpen", "emptyLayersShown", "allSlotsShown", "definitionLayersOpen", "checkGroupsOpen", "cellHow", "placement",
+    "macroClipboard", "keyClipboard", "stage", "railMenu", "boardShortcuts", "layersOpen", "layersAsked", "pointingSlot", "pdAdvanced", "applyDismissed", "recoveryAsk", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "overlay", "leaveDemo", "modeAsk", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",

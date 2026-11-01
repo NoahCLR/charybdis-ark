@@ -3,7 +3,7 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {MAX_DELAY, MAX_KEYS, describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
+import {MAX_KEYS, describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
 import {withStepFocus} from "../../view/macro-focus.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {appendSequenceStep, moveSequenceStep, sequenceFace, sequenceInsertionAt, sequenceIssues} from "../../view/macro-sequence.mjs";
@@ -12,6 +12,7 @@ import {openPicker} from "../picker.mjs";
 import {stepMark, stepWord} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {inspectEdit} from "./validation.mjs";
+import {DONE, closesInPlace} from "../inline-editor.mjs";
 import {finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
 
 // Like the board's deletion shortcut, consume Backspace before the shell turns
@@ -206,10 +207,10 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
         <div class="row macro-step-head"><span class="kind">Step ${esc(index + 1)} · ${esc(label)}</span><span class="right row">
             <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step earlier">← Earlier</button>
             <button class="btn tiny ghost" data-move="1" ${canEdit && index < steps.length - 1 ? "" : "disabled"} aria-label="Move step later">Later →</button>
-            <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button>
-            <button class="btn tiny ghost" data-close-step aria-label="Close step editor">×</button></span></div>
+            ${DONE}
+            <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button></span></div>
         ${step.kind === "text" ? `<label class="field"><textarea data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:text" aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${esc(index)}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
-            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${esc(index)}" type="number" min="0" max="${esc(MAX_DELAY)}" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
+            : step.kind === "delay" ? `<label class="field delay-field"><span>Delay</span><span class="affix unit"><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${esc(index)}" inputmode="numeric" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}><i>ms</i></span></label>`
             : `<div class="row"><span class="tok">${esc(describeStep(step, key => keyIdentity(model, key).label)) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
     </div>`);
     const input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (node.querySelector("textarea, input"));
@@ -218,7 +219,8 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
         saveSteps(slot, next.map((item, at) => at === index ? {...item, ...(step.kind === "text" ? {text: input.value} : {delay: input.value})} : item), false, input.dataset.f || null);
     });
     input?.addEventListener("change", () => {finishMacroHistoryGroup(slot); inspectEdit(slot, true);});
-    /** @type {HTMLButtonElement} */ (node.querySelector("[data-close-step]")).addEventListener("click", () => {
+    // Done or Escape closes it, and the focus goes back to its step.
+    closesInPlace(node, () => {
         setMacroForm(slot.keycode, {selectedStep: null, selectionAnchor: null, selectedSteps: []}); render();
         /** @type {HTMLElement | null} */ (document.querySelector(`[data-step-id="${CSS.escape(step.focusId || "")}"]`))?.focus();
     });

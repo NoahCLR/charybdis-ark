@@ -15,7 +15,7 @@ const {actionName, knownActionAbi} = require("../schema/actions");
 const {LAYERS, LAYER_IDENTITY} = require("../data/charybdis-layout");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {liveKeyboardStatus} = require("./live-profile-session");
-const {LIVE_RESULT_WORDS, quietWords} = require("../model/vocabulary");
+const {LIVE_RESULT_WORDS, REVIEW_AREAS, quietWords} = require("../model/vocabulary");
 
 // What the panel shows of the keyboard's own saving and its halves.
 /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
@@ -473,7 +473,7 @@ class ProfileDraftSession {
     changes() {
         if (!this.dirty) return [];
         const current = this.current;
-        if (this.base.incomplete) return [{area: "Recovery", unit: null, title: "Complete profile", status: "changed", group: null, place: null,
+        if (this.base.incomplete) return [{area: REVIEW_AREAS.recovery, unit: null, title: "Complete profile", status: "changed", group: null, place: null,
             fields: [{label: "", before: "Interrupted profile; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
         const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => unitByLayer(row.unit, this.order)));
         const parent = new Map([...shown].map(unit => [unit, unit]));

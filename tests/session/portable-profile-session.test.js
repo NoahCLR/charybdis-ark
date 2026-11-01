@@ -240,9 +240,12 @@ test("an Apply cut short by a lost connection says its verdict first and the dis
         f.keyboard.faults.stallCommit = true;
         f.keyboard.faults.beforeRequest = (r, keyboard) => {if (trigger(r, keyboard)) unplug(keyboard);};
         const views = []; f.options.onApplyProgress = view => views.push(view);
-        await assert.rejects(f.restore(), error => saysVerdict(error, saved) && lostSaid(error) && error.cause?.code !== undefined, point);
-        assert.equal(views.at(-1).failure.reason, "The keyboard was disconnected or restarted.", `${point}: the bar gives the same reason`);
-        assert.equal(views.at(-1).failure.verdict, APPLY_VERDICTS[saved]);
+        let said = "";
+        await assert.rejects(f.restore(), error => {said = error.message; return saysVerdict(error, saved) && lostSaid(error) && error.cause?.code !== undefined;}, point);
+        const failure = views.at(-1).failure;
+        assert.equal(failure.reason, "The keyboard was disconnected or restarted.", `${point}: the bar gives the same reason`);
+        assert.equal(failure.verdict, APPLY_VERDICTS[saved]);
+        assert.equal(said, [failure.verdict, failure.reason, ...failure.advice].join(" "), `${point}: the bar says the whole notice, what to do included`);
         assert.equal(f.keyboard.durable, false, `${point}: nothing was saved`);
     }
 });

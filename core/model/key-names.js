@@ -235,7 +235,8 @@ function keyKind(value) {
     return customKeyOfCode(value) !== undefined ? "customKey" : undefined;
 }
 
-// A layer key by what it does and the name of its layer.
+// A layer key by what it does and the name of its layer: "Lock Numbers",
+// "Move to Base". Review's checks name the layer keys they advise this way.
 /** @param {string} form @param {number} layer @param {readonly string[]} [layers] */
 function layerKeyLabel(form, layer, layers) {
     return `${LAYER_VERBS[form]} ${layerName(layers, layer)}`;
@@ -404,4 +405,4 @@ function unnamedKeyCount(layers, capabilities) {
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 
-module.exports = {compactKeyLabels, heldModifierWords, hostKeyVocabulary, hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames, unnamedKeyCount};
+module.exports = {compactKeyLabels, heldModifierWords, hostKeyVocabulary, hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, keyLayerForm, layerKeyLabel, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames, unnamedKeyCount};

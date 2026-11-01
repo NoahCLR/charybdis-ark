@@ -9,6 +9,8 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 import {groupRowsTable} from "./led-rows.mjs";
+import {foldEmptyLayers} from "../../view/empty-layers.mjs";
+import {emptyLayersButton, emptyLayersShown} from "../empty-layers.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageLayers(model) {
@@ -18,17 +20,23 @@ export function stageLayers(model) {
 
     node.className = "tab-split";
     // Past eight layers the list scrolls on its own beside the editor, as the
-    // pointing modes' list does.
-    const list = el(`<aside class="rowlist ${layers().length > 8 ? "many" : ""}" data-scroll-list="layers"><div class="rowlist-h">Layers</div></aside>`);
-    layers().forEach((layer, index) => {
+    // pointing modes' list does. Empty layers fold behind the disclosure at
+    // its end (D-L76), the picked one apart.
+    const {shown, folded} = foldEmptyLayers(model, layers(), (layer) => layer.index, (layer) => layer.index === state.layer);
+    const listed = emptyLayersShown("lighting-layers") ? [...shown, ...folded] : shown;
+    const list = el(`<aside class="rowlist ${listed.length > 8 ? "many" : ""}" data-scroll-list="layers"><div class="rowlist-h">Layers</div></aside>`);
+    listed.forEach((layer) => {
+        const index = layer.index;
+        if (layer === folded[0]) list.append(emptyLayersButton("lighting-layers", folded.length, "rowlist-empties"));
         const row = layerColourRow(model, layer.index);
         const lit = row && !isOff(row.color);
-        const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${index}">
+        const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${esc(index)}">
             <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
             <span class="m">${esc(!row ? "not reported" : !layerPaints(row.color) ? "no colour" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModes, row.mode).toLowerCase()}`)}</span></button>`);
         item.addEventListener("click", () => { showLayer(index); render(); });
         list.append(item);
     });
+    if (folded.length && listed === shown) list.append(emptyLayersButton("lighting-layers", folded.length, "rowlist-empties"));
     const layer = currentLayer();
     const row = layerColourRow(model, layer?.index);
     const main = el(`<div class="tab-grid two stage-detail"></div>`);
@@ -45,7 +53,7 @@ export function stageLayers(model) {
         </select></label>`);
     /** @type {HTMLSelectElement} */ (mode.querySelector("select")).addEventListener("change", (event) =>
         { if (row) post(edits.layerColour(row.layer, /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
-    where.append(stack(mode, el(`<p class="note">Keys mapped on this layer only leaves the keys that are transparent or empty on this layer unpainted, so what is beneath shows there; All keys paints every key. Transparent keys keep their ▽ on the board either way, and the board above already shows the choice.</p>`)));
+    where.append(stack(mode, el(`<p class="note">Keys mapped on this layer only leaves its transparent and empty keys unpainted, so what is beneath shows. All keys paints every key.</p>`)));
     const overrides = section("LED overrides on this layer", `<span class="right"><button class="btn tiny ghost" data-act="groups">Edit groups</button></span>`);
     overrides.className = "span";
     overrides.append(groupRowsTable(model.rgb.layerLedGroups, "layer"));

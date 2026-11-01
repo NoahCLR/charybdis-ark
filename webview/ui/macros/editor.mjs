@@ -2,7 +2,7 @@
 /** @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model */
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
-import {el, esc} from "../../lib/dom.mjs";
+import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {STEP_KINDS, addStepLabel, macroLocalState, macroShortName, protectionChoiceLabel, samePayload} from "../../view/macro.mjs";
 import {titleName, attachTitleName} from "../title-name.mjs";
@@ -34,7 +34,7 @@ export function editor(model, slot, canEdit) {
             <span class="tag">${esc(macroShortName(slot))}</span>
             <span class="right row actions"><span class="chip" data-local-state><i class="dot ${chip.dot}"></i>${chip.text}</span>
                 <button class="btn tiny ghost" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key…</button>
-                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"}>Discard local edits</button>
+                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"} data-tip="Put this macro back to what your draft holds, dropping the edit made here that is not in the draft yet.">Back to draft</button>
                 <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}
@@ -43,23 +43,22 @@ export function editor(model, slot, canEdit) {
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
                 ${STEP_KINDS.map((value) => `<button class="btn" data-insert-kind="${esc(value)}" data-act="macro-insert:${esc(slot.keycode)}:${esc(value)}" ${editable ? "" : "disabled"}>${esc(addStepLabel(model, value))}</button>`).join("")}
-                <label class="sw macro-raw-toggle"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:raw-toggle" data-raw-toggle aria-controls="macro-raw-${esc(slot.keycode)}" ${rawOpen ? "checked" : ""}><span class="track"></span><span>Raw payload</span></label>
+                <label class="sw macro-raw-toggle"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:raw-toggle" data-raw-toggle aria-controls="macro-raw-${esc(slot.keycode)}" ${rawOpen ? "checked" : ""}><span class="track"></span><span>Edit as text</span></label>
             </div>
             <details class="macro-raw" id="macro-raw-${esc(slot.keycode)}" data-raw ${rawOpen ? "open" : ""}>
-                <summary hidden>Raw payload</summary>
-                <label class="field"><span>Raw payload</span><textarea class="input mono" rows="3" data-f="macro:${esc(slot.keycode)}:raw" data-raw-payload="${esc(slot.keycode)}" ${canEdit && !state.recording ? "" : "disabled"}>${esc(payload)}</textarea></label>
-                <p class="note">Commands use {KC_A}, {+KC_A}, {-KC_A} and {120}. Literal braces use {{ and }}. Text steps escape them automatically.</p>
+                <summary hidden>Macro as text</summary>
+                <label class="field"><span>Macro as text</span><textarea class="input mono" rows="3" data-f="macro:${esc(slot.keycode)}:raw" data-raw-payload="${esc(slot.keycode)}" ${canEdit && !state.recording ? "" : "disabled"}>${esc(payload)}</textarea></label>
+                <p class="note">{KC_A} taps, {+KC_A} presses, {-KC_A} releases, {120} waits 120 ms; {{ and }} type braces.</p>
             </details>
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}${esc(vocabulary(model).settingsSections.host)} ↗</button>
-                <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">Typing & playback help</button>
+            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}${esc(vocabulary(model).settingsSections.host)} →</button>
+                <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">${DISCLOSURE}Typing & playback help</button>
             </div>
-            <details class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "open" : ""}>
-                <summary>Typing & playback help</summary>${unicodeSetup(model, slot)}
+            <div class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "" : "hidden"}>${unicodeSetup(model, slot)}
                 <p class="note">${esc(word(vocabulary(model).macroProtection, "auto"))} turns ${esc(uninterruptible.label)} on when this layout needs Unicode entry. A macro that plays uninterruptibly starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.</p>
-            </details>
+            </div>
             </div>
         </div></div>`);
     // Pointer actions that discard/clear this input take precedence over the
@@ -81,10 +80,14 @@ export function editor(model, slot, canEdit) {
     });
     /** @type {HTMLElement} */ (card.querySelector("[data-macro-steps]")).append(sequenceEditor(model, slot, steps, editable));
     card.querySelectorAll("[data-insert-kind]").forEach(button => button.addEventListener("click", () => insertStep(model, slot, steps, /** @type {MacroStep['kind']} */ (/** @type {HTMLElement} */ (button).dataset.insertKind))));
-    const guidance = /** @type {HTMLDetailsElement} */ (card.querySelector("[data-guidance]"));
+    // One button opens and closes the help, and says which it is.
+    const guidance = /** @type {HTMLElement} */ (card.querySelector("[data-guidance]"));
     const helpButton = /** @type {HTMLButtonElement} */ (card.querySelector("[data-show-help]"));
-    helpButton.addEventListener("click", () => {guidance.open = !guidance.open; setMacroForm(slot.keycode, {guidanceOpen: guidance.open}); helpButton.setAttribute("aria-expanded", String(guidance.open));});
-    guidance.addEventListener("toggle", () => {if (guidance.isConnected) {setMacroForm(slot.keycode, {guidanceOpen: guidance.open}); helpButton.setAttribute("aria-expanded", String(guidance.open));}});
+    helpButton.addEventListener("click", () => {
+        guidance.hidden = !guidance.hidden;
+        setMacroForm(slot.keycode, {guidanceOpen: !guidance.hidden});
+        helpButton.setAttribute("aria-expanded", String(!guidance.hidden));
+    });
     const raw = /** @type {HTMLTextAreaElement} */ (card.querySelector("[data-raw-payload]"));
     raw.addEventListener("input", () => {
         rememberMacroEdit(slot, raw.value, undefined, raw.dataset.f || null);

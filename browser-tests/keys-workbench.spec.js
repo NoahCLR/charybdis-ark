@@ -115,7 +115,7 @@ test("a behaviour row opens its behaviour, by click or from the keyboard", async
 test("a key picked on the board scrolls its row into the list, and unfolding a group keeps the list's place", async ({page}) => {
     await openPreview(page);
     await tab(page, "behaviours").click();
-    await page.locator('.board [aria-label^="KC_ENTER at"]').click();
+    await page.locator('.board [aria-label="Enter"]').click();
     const row = page.locator('.bench-pane tr[data-row="KC_ENTER"][data-picked]');
     await expect(row).toHaveCount(1);
     const inView = () => row.evaluate((node) => {
