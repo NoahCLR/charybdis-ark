@@ -1,7 +1,7 @@
 {
   "name": "charybdis-ark",
   "description": "Live firmware editor for the Charybdis, as a web page: edits the connected keyboard over WebHID.",
-  "version": "2026.10.27",
+  "version": "2026.11.1",
   "private": true,
   "engines": {
     "node": ">=26.10.0"
