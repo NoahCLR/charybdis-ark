@@ -456,7 +456,7 @@ test("the review lists the changes first, folds what the keyboard already has, a
     await expect(sheet.locator(".rv > section").last().locator("h4")).toHaveText("Checks");
     const existing = sheet.locator('details[data-check-group="existing"]');
     await expect(existing.locator("summary")).toContainText("Already on the keyboard");
-    await expect(existing.locator("summary .tag")).toHaveText("7");
+    await expect(existing.locator("summary .tag")).toHaveText("8");
     await expect(existing).not.toHaveAttribute("open", "");
     await existing.locator("summary").click();
     await expect(existing).toHaveAttribute("open", "");
