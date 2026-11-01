@@ -16,7 +16,7 @@ import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
 import {behaviourChangesNothing, behaviourHasTiming, behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
 import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, sentence, styleWord, tierName, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
-import {cellEditor} from "./cell-editor.mjs";
+import {cellEditor, cellEditorOf, pickCellAction} from "./cell-editor.mjs";
 import {sectionPath} from "../../view/settings-layout.mjs";
 import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
 import {saveBehaviour} from "./save-behaviour.mjs";
@@ -62,6 +62,16 @@ function storageNotes(behaviour) {
     if (behaviourChangesNothing(behaviour)) return [`This behaviour changes nothing: ${behaviourHasTiming(behaviour)
         ? "on this key a timing does nothing without a branch" : "it has no branches or timing of its own"}, so the key runs as if it had none. Set a grid action, or remove it.`];
     return timingIdle ? ["On this key a timing does nothing until the behaviour has a branch."] : [];
+}
+
+// A cell by its id in the grid ("1-hold"): its tap count's step and its tier,
+// or null for none.
+/** @param {import("../../../contracts/panel.js").BehaviorView["steps"]} steps @param {string | null} cell */
+function cellAt(steps, cell) {
+    if (!cell) return null;
+    const [tapCount, tier] = cell.split("-");
+    const step = steps.find((row) => String(row.tapCount) === tapCount);
+    return step ? {step, kind: /** @type {import("../../../contracts/edits.js").Tier} */ (tier)} : null;
 }
 
 /** @param {EditorBehavior} behaviour */
@@ -175,19 +185,29 @@ export function behaviourEditor(behaviour) {
         <p class="note beh-foot">Each cell is one action and how it runs. Empty cells are not stored.${dashed ? " A dashed cell is what the key does with nothing set; an action there replaces it." : ""}</p>
     </div>`);
 
-    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-cell]")).forEach((button) => button.addEventListener("click", () => {
-        state.cell = openCell(behaviour) === button.dataset.cell ? null : button.dataset.cell || null;
+    // A click opens a cell's editor, or closes it again. A double-click opens
+    // it with the keycode picker already open, as a double-click on the board
+    // opens a key's: the second click of the pair leaves the cell open for it.
+    /** @param {string | null} cell */
+    const showCell = (cell) => {
+        state.cell = cell;
         state.cellRow = behaviour.keycode;
         state.cellHow = null;
         render();
-    }));
-    const cell = openCell(behaviour);
-    if (cell) {
-        const [tapCount, tier] = cell.split("-");
-        const kind = /** @type {import("../../../contracts/edits.js").Tier} */ (tier);
-        const step = steps.find((row) => String(row.tapCount) === tapCount);
-        if (step) /** @type {HTMLElement} */ (node.querySelector("#cellEditor")).appendChild(cellEditor(behaviour, step, kind));
-    }
+    };
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-cell]")).forEach((button) => {
+        const cell = button.dataset.cell || "";
+        button.addEventListener("click", (event) => {
+            if (event.detail <= 1) showCell(openCell(behaviour) === cell ? null : cell);
+        });
+        button.addEventListener("dblclick", () => {
+            showCell(cell);
+            const editor = cellEditorOf(behaviour.keycode, cell), at = cellAt(steps, cell);
+            if (canEdit && editor && at) pickCellAction(editor, behaviour, at.step, at.kind, model?.profileIdentity);
+        });
+    });
+    const open = cellAt(steps, openCell(behaviour));
+    if (open) /** @type {HTMLElement} */ (node.querySelector("#cellEditor")).appendChild(cellEditor(behaviour, open.step, open.kind));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="rekey"]'))?.addEventListener("click", () => pickBehaviourKey(behaviour));
     if (state.retarget?.from === behaviour.keycode) node.append(retargetPrompt(behaviour));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="remove"]'))?.addEventListener("click", () =>

@@ -18,7 +18,8 @@ from; the base layer is always on, so one answers even with no layer preview.
 
 A behaviour is a grid. There is a row for each tap count (**Single tap**
 to **Quintuple tap**) and a column each for **Tap**, **Hold** and **Long
-hold**. Click a cell to set what it sends with **Sends** and **Pick…**. Click
+hold**. Click a cell to set what it sends with **Sends** and **Pick…**, or
+double-click it to open the keycode picker straight away. Click
 **Remove tier** to empty it. Every change goes into your draft as you make
 it; **Done**, or Escape, closes the cell and puts you back on it.
 

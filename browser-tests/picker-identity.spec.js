@@ -95,3 +95,30 @@ test("a custom key made for a behaviour cell across another edit carries the row
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", expectedFingerprint: current.fingerprint,
         then: expect.objectContaining({type: "saveBehavior", expectedBase: drawn.base})})]);
 });
+
+// Double-clicking a behaviour cell opens its editor with the picker already
+// open, wherever the grid is drawn: the Custom keys screen and the Keys
+// screen's Behaviours tab share it. What the picker hands back lands in the
+// cell, as Pick… does.
+test("double-clicking a behaviour cell opens the keycode picker for it", async ({page}) => {
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_5"});
+    await page.locator('.custom-key-behaviour [data-cell="0-hold"]').dblclick();
+    await expect(page.locator(".picker")).toBeVisible();
+    await expect(page.locator('.custom-key-behaviour [data-cell="0-hold"]')).toHaveClass(/\bon\b/);
+    await page.locator("#pickerSearch").fill("KC_B");
+    await page.locator('.picker [data-pick="KC_B"]').first().click();
+    await clearPosts(page);
+    await page.locator('.picker [data-act="use"]').click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior",
+        behavior: expect.objectContaining({keycode: "CUSTOM_KEY_5", steps: [expect.objectContaining({tapCount: 0, hold: expect.objectContaining({action: "KC_B"})})]})})]);
+    await expect(page.locator(".picker")).toHaveCount(0);
+
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        Object.assign(store.state, {screen: "keys", tab: "behaviours", behaviourRow: "CUSTOM_KEY_5", cell: null});
+        store.render();
+    });
+    await page.locator('.beh-main [data-cell="0-long"]').dblclick();
+    await expect(page.locator(".picker")).toBeVisible();
+    await expect(page.locator('.beh-main [data-cell="0-long"]')).toHaveClass(/\bon\b/);
+});

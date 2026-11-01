@@ -46,7 +46,8 @@ the Key tab says so. A keycode you set here goes on the top layer and wins.
 
 ## The keycode picker
 
-**Pick…**, or double-clicking a key, opens the keycode picker. It starts with
+**Pick…**, or double-clicking a key or a behaviour cell, opens the keycode
+picker. It starts with
 a board labelled for your computer's keyboard layout (set in
 [Host settings](macros.md#your-computer)), with Shift above each legend and
 Option or AltGr on the right. Below it are sections by task:
