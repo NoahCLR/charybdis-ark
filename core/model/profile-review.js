@@ -3,7 +3,7 @@
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {layerOfRef, nativeCode, pointingSlotOfCode} = require("../schema/actions");
-const {hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, profileKeyNames, shortcutLabel} = require("./key-names");
+const {hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, profileKeyNames, shortcutLabel} = require("./key-names");
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
 const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings-domain-v1");
 const {decodedOf} = require("./portable-profile");
@@ -70,16 +70,19 @@ const layerSet = (mask, names, none) => {
 /** @param {number} mask @param {Names} names */
 const allowedLayers = (mask, names) => layerSet(mask, names, "none");
 // The mark a stored keycode carries: the layer it acts on (model/key-names.js
-// keyLayer, as the screens mark it), or the pointing mode it runs.
+// keyLayer, as the screens mark it), the pointing mode it runs, or the macro
+// or custom key it is (keyKind), which have a mark but no colour (D-L31).
 /** @param {number} code @returns {Mark | undefined} */
 const keyMark = code => {
     const slot = pointingSlotOfCode(code);
     if (slot !== undefined) return {kind: "pointing", slot};
     const layer = keyLayer(code);
-    return layer === undefined ? undefined : {kind: "layer", layer};
+    if (layer !== undefined) return {kind: "layer", layer};
+    const kind = keyKind(code);
+    return kind === "macro" || kind === "customKey" ? {kind} : undefined;
 };
-// The mark an action carries: what it reaches, when that has a colour of its
-// own — a pointing mode's light, a layer's colour.
+// The mark an action carries: what it reaches — a pointing mode's light, a
+// layer's colour, a macro or a custom key.
 /** @param {Action | undefined} value @returns {Mark | undefined} */
 const actionMark = value => {
     if (!value) return undefined;

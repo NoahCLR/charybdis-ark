@@ -275,6 +275,9 @@ export type ReviewMark =
     /** A set of layers, each named as the value names it, in order. */
     | {kind: 'layers'; layers: {layer: number; name: string}[]}
     | {kind: 'pointing'; slot: number}
+    /** A macro or a custom key, which has a mark but no colour (D-L31). */
+    | {kind: 'macro'}
+    | {kind: 'customKey'}
     | {kind: 'tier'; tier: string; branch?: number}
     /** Every tap count from 2× up, as the Multi tap window governs them. */
     | {kind: 'branches'}

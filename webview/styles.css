@@ -662,6 +662,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc-ball circle { transition: fill .12s ease, stroke .12s ease; }
 .kc-ball[data-trackball] { cursor: crosshair; }
 .kc-ball[data-trackball]:hover circle { stroke: var(--text); }
+.kc-icon { fill: none; stroke-width: 1.7; stroke-linejoin: round; overflow: visible; pointer-events: none; }
 .kc-dotn { font-family: var(--mono); font-size: 5.8px; font-weight: var(--fw-bold); text-anchor: middle; dominant-baseline: central; }
 .kc-badgetext { fill: var(--badge-text); font-family: var(--mono); font-weight: var(--fw-bold); text-anchor: middle; dominant-baseline: central; }
 /* Every legend mark sits in the same 12px-high slot with the same stroke, so
@@ -677,6 +678,8 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .legend-item .lkey.indicated { border-style: dotted; }
 .legend-item .lkey.transparent { border: 0; background: var(--text-3); opacity: .5; filter: blur(.8px); }
 .legend-item .ldot + .ldot { margin-left: -3.5px; }
+.legend-item .licons { display: inline-flex; gap: 3px; }
+.legend-item .licons svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linejoin: round; }
 /* The Shortcuts button ends the legend's row, its list opening under it over
    the workbench. */
 .legend-shortcuts { position: relative; margin-left: auto; }
@@ -1104,6 +1107,7 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .kind-icon.layer svg, .kind-icon.layer:not(.off) svg { width: 32px; height: 14px; stroke: none; fill: currentColor; fill-opacity: 1; filter: none; }
 /* A thing whose colour or stage is off: its icon has no colour, in the quiet text colour. */
 .kind-icon.off { color: var(--text-3); }
+.kind-icon.plain svg, .kind-icon.plain:not(.off) svg { fill: none; fill-opacity: 1; filter: none; }
 /* A built-in cell keeps its dim words when they name a thing. */
 .bcell.inherited .sends { color: var(--text-2); font-weight: var(--fw-regular); }
 /* Named inline, in a sentence, a table or the review (ui/marks.mjs keyNameMarked), an action keeps

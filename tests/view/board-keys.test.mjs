@@ -81,3 +81,33 @@ test("the trackball shows its light, solid on base, and in the LED selector only
     assert.ok(ball.light);
     assert.deepEqual(boardTrackball(layerView(model, 2), {mode: "leds"}), {led: model.leds.trackball, light: null, glass: false});
 });
+
+test("a key wears one icon for each kind of thing it plays, sends or runs, its own first", () => {
+    // D taps macro 1 and holds Volume locked on; F taps Dragscroll and holds
+    // Zoom; E's row runs only on Numbers. Symbols is transparent at the
+    // pointing key.
+    const model = published({
+        keys: {0: {5: "MACRO_0", 6: "CUSTOM_KEY_0", 7: "PD_MODE_0", 8: "KC_D", 9: "KC_E", 10: "MACRO_2", 11: "KC_F"}, 2: {7: "KC_TRANSPARENT"}},
+        behaviours: [
+            {keycode: "KC_D", steps: [{tapCount: 0, tap: {action: "MACRO_1"}, hold: {action: "PD_MODE_1_LOCK", style: "TAP_AT_HOLD_THRESHOLD"}}]},
+            {keycode: "KC_E", allowedLayers: NUMBERS, steps: [{tapCount: 0, tap: {action: "CUSTOM_KEY_1"}}]},
+            {keycode: "MACRO_2", steps: [{tapCount: 0, hold: {action: "MACRO_3", style: "TAP_AT_HOLD_THRESHOLD"}, longHold: {action: "CUSTOM_KEY_1", style: "TAP_AT_HOLD_THRESHOLD"}}]},
+            {keycode: "KC_F", steps: [{tapCount: 0, tap: {action: "PD_MODE_0"}, hold: {action: "PD_MODE_3", style: "TAP_AT_HOLD_THRESHOLD"}}]},
+        ]});
+    /** @param {number} at @param {number} index @param {number[]} [held] @param {Parameters<typeof boardKeys>[1]} [shows] */
+    const icons = (at, index, held = [], shows) => keyOf(model, at, held, index, shows).icons;
+
+    assert.deepEqual(icons(0, 5), ["macro"], "a macro's key");
+    assert.deepEqual(icons(0, 6), ["customKey"], "a custom key");
+    assert.deepEqual(icons(0, 7), ["pointing"], "a pointing key");
+    assert.deepEqual(icons(0, 8), ["macro", "pointing"], "a plain key whose behaviour plays a macro and runs a pointing mode, in tier order");
+    assert.deepEqual(icons(0, 10), ["macro", "customKey"], "its own macro once, then what its behaviour sends");
+    assert.deepEqual(icons(0, 11), ["pointing"], "two pointing modes, one icon");
+    assert.deepEqual(icons(0, 9), [], "a behaviour a switch keeps off marks nothing, as its dots don't");
+    assert.deepEqual(icons(1, 9), [], "Numbers holds no E");
+    assert.deepEqual(icons(0, 0), [], "a plain key has none");
+
+    assert.deepEqual(icons(2, 7), [], "a transparent key shows none of its own");
+    assert.deepEqual(icons(2, 7, [0]), ["pointing"], "seen through to Base, the answering key's");
+    assert.deepEqual([icons(0, 8, [], {faces: false}), icons(0, 8, [], {mode: "leds"})], [[], []], "no marks, no icons");
+});

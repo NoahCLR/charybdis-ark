@@ -84,6 +84,61 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
     expect(drawn.layerSet, "a set of layers marks each layer before its name").toEqual({icons: 2, names: ["Base", "Navigation"], text: "Base, Navigation"});
 });
 
+// The demo's Base holds Macro 0, Custom key 0 and Dragscroll's hold side by
+// side on the left thumb.
+test("a key wears the icon of each kind of thing it reaches, in its legend's colour", async ({page}) => {
+    await openControls(page, "keys");
+    const drawn = await page.evaluate(() => {
+        const at = (index) => [...document.querySelectorAll(`.board [data-key="${index}"] .kc-icon`)].map((icon) => {
+            const legend = document.querySelector(`.board [data-key="${index}"] .kc-label`);
+            return `${icon.dataset.kind}${getComputedStyle(icon).stroke === getComputedStyle(legend).fill ? "" : " coloured"}`;
+        });
+        return {macro: at(48), customKey: at(49), dragscroll: at(50), plain: at(0)};
+    });
+    expect(drawn).toEqual({macro: ["macro"], customKey: ["customKey"], dragscroll: ["pointing"], plain: []});
+
+    // The icons sit in a row under the legend, and the dots stay centred.
+    const placed = await page.evaluate(() => {
+        const at = (index) => {
+            const key = document.querySelector(`.board [data-key="${index}"]`);
+            const rect = key.querySelector(".kc-rect");
+            const centre = Number(rect.getAttribute("x")) + Number(rect.getAttribute("width")) / 2;
+            const xs = [...key.querySelectorAll('circle[r="3.9"]')].map((dot) => Number(dot.getAttribute("cx")));
+            const label = key.querySelector(".kc-label").getBBox();
+            const icon = key.querySelector(".kc-icon");
+            return {dots: xs.length, dotsOffCentre: Math.round(((xs[0] + xs.at(-1)) / 2 - centre) * 100) / 100,
+                iconsBelowLegend: Number(icon.getAttribute("y")) >= label.y + label.height - 1};
+        };
+        return {dragscroll: at(50), customKey: at(49)};
+    });
+    expect(placed).toEqual({dragscroll: {dots: 2, dotsOffCentre: 0, iconsBelowLegend: true}, customKey: {dots: 3, dotsOffCentre: 0, iconsBelowLegend: true}});
+});
+
+// A macro and a custom key have no colour, so their mark is their screen's
+// icon in the words' colour, wherever a key names one (D-L31).
+test("the hover card names a macro and a custom key after their screen's icon", async ({page}) => {
+    await openControls(page, "keys");
+    const card = page.locator(".hovercard").first();
+    await page.locator('.board [data-key="48"]').first().hover();
+    await expect(card.locator(".hc-title .kind-icon[data-kind=macro]")).toHaveCount(1);
+    await expect(card.locator(".hc-sect .kind-icon[data-kind=macro]")).toHaveCount(1);
+    await expect(card.locator(".hc-sect .sends")).toContainText("Macro 0");
+    await page.mouse.move(0, 0);
+    await page.locator('.board [data-key="49"]').first().hover();
+    await expect(card.locator(".hc-title .kind-icon[data-kind=customKey]")).toHaveCount(1);
+    await expect(card.locator(".kind-icon[data-kind=macro]")).toHaveCount(0);
+
+    // The review's values carry the mark core gives them, as every other surface does.
+    const review = await page.evaluate(async () => {
+        const {getModel} = await import("/webview/store.mjs");
+        const {mark} = await import("/webview/ui/marks.mjs");
+        const {html} = await import("/webview/lib/dom.mjs");
+        const box = (markup) => Object.assign(document.createElement("div"), {innerHTML: html(markup)});
+        return ["macro", "customKey"].map((kind) => box(mark(getModel(), {kind})).querySelector(".kind-icon")?.dataset.kind);
+    });
+    expect(review).toEqual(["macro", "customKey"]);
+});
+
 test("the hover card's title and the Combos table mark a layer by its icon", async ({page}) => {
     await openControls(page, "keys");
     await withLayerTapAndCombo(page);

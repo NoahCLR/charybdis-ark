@@ -17,6 +17,7 @@ import {draftDot} from "../../view/review.mjs";
 import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
 import {comboInputLabel} from "./combo-builder.mjs";
 import {modifierKey, shortcut} from "../../view/shortcuts.mjs";
+import {REACH_ICONS} from "../../view/screens.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
 // order they win. Clicking any tab goes back to one layer.
@@ -59,6 +60,7 @@ export function legend(model) {
         <span class="legend-item"><i class="lkey indicated"></i> Keys of the picked row or new combo</span>
         <span class="legend-item">${dot(colours.tap)}${dot(colours.hold)}${dot(colours.long)} Tap, hold and long hold branches</span>
         <span class="legend-item">${comboBadge(model, "C0")} Combo input</span>
+        <span class="legend-item"><i class="licons" aria-hidden="true">${Object.values(REACH_ICONS).join("")}</i> Macro, custom key, pointing mode</span>
         <span class="legend-item"><i class="lkey transparent"></i> Transparent</span>
         ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} Changed in your draft</span>` : ""}
         ${state.keyClipboard ? `<span class="legend-item">Copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}

@@ -89,6 +89,13 @@ test("a key changed to a layer key carries that layer's mark, and one changed to
     assert.deepEqual(marks,[{kind:"layer",layer:5},{kind:"layer",layer:3},{kind:"pointing",slot:0},undefined]);
 });
 
+test("a key changed to a macro or a custom key carries that kind's mark, which has no colour to name", () => {
+    const before=snapshot(document()), after=structuredClone(before.document);
+    editLayers(after, layers => layers[0][7]=0x7700); editLayers(after, layers => layers[0][8]=0x7f00); // MACRO_0, CUSTOM_KEY_0
+    const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Keys").map(row=>row.fields[0].afterMark);
+    assert.deepEqual(marks,[{kind:"macro"},{kind:"customKey"}]);
+});
+
 test("a key's participation is named where the key sits, as its layout change is", () => {
     const {applyDraftEdit}=require("../../core/model/draft-editor");
     const {matrixPosition}=require("../../core/data/charybdis-layout");

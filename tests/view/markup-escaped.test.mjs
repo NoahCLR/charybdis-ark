@@ -52,8 +52,10 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/layerbar.mjs", ["tint"], "a style attribute holding layerSwatch()'s css() colour"],
     ["webview/ui/pointing/empty-slot.mjs", ["listed(parts)"], "the ways still reaching an empty slot, joined in prose (view/vocabulary.mjs listed): each a template of counts, escaped layer names and marked actions"],
     ["webview/ui/review-items.mjs", ['head.map(row).join("")', 'rest.map(row).join("")', "show", "discard"], "field rows from field(), and the Show and Discard buttons the review overlay builds"],
-    ["webview/ui/marks.mjs", ["SCREENS.pointing.icon", "look"], "the Pointing modes screen's authored SVG icon (view/screens.mjs), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],
+    ["webview/ui/marks.mjs", ["REACH_ICONS.pointing", "REACH_ICONS[kind]", "look"], "the Pointing modes, Macros and Custom keys screens' authored SVG icons (view/screens.mjs REACH_ICONS), and a style attribute holding a css() colour: a layer swatch's or a pointing slot's light"],
     ["webview/ui/frame.mjs", ["definition.icon"], "a screen's authored SVG icon (view/screens.mjs)"],
+    ["webview/ui/keys/board-card.mjs", ['Object.values(REACH_ICONS).join("")'], "the Macros, Custom keys and Pointing modes screens' authored SVG icons (view/screens.mjs REACH_ICONS), in the board's legend"],
+    ["webview/ui/board.mjs", ["REACH_ICONS[kind]"], "the Macros, Custom keys or Pointing modes screen's authored SVG icon (view/screens.mjs REACH_ICONS), on a key that reaches one"],
     ["webview/view/geometry.mjs", ['keys.join("")'], "the outline's key rectangles, templates of GEO numbers"],
 ];
 

@@ -79,6 +79,22 @@ test("the key face drops its legend by how many rows sit above it", () => {
     assert.ok(dual.subY < GEO.keyH, "and the hold legend stays on the cap");
 });
 
+test("a row of icons sits under the legend, above the line on a key with one, and the legend rises to make room", () => {
+    for (const tiers of [false, true]) for (const combos of [false, true]) for (const sub of [false, true]) {
+        const plain = keyFaceRows(0, {tiers, combos, sub});
+        const rows = keyFaceRows(0, {tiers, combos, sub, icons: true});
+        const what = JSON.stringify({tiers, combos, sub});
+        assert.equal(plain.iconY, undefined, `${what}: no icons, no row for them`);
+        assert.ok(rows.iconY !== undefined && rows.iconY + rows.iconSize < GEO.keyH, `${what}: the icons stay on the cap`);
+        assert.deepEqual([rows.tierY, rows.comboY], [plain.tierY, plain.comboY], `${what}: the rows above stay where they were`);
+        assert.ok(rows.mainY < plain.mainY && rows.mainY < rows.iconY, `${what}: the legend rises, and the icons sit under it`);
+        if (sub) {
+            assert.ok(rows.iconY + rows.iconSize < rows.separatorY && rows.separatorY < rows.subY, `${what}: tap, icons, rule, hold, in that order`);
+            assert.deepEqual([rows.separatorY, rows.subY], [plain.separatorY, plain.subY], `${what}: the rule and the hold stay where they were`);
+        }
+    }
+});
+
 test("a legend is sized to its row rather than bucketed by length", () => {
     const row = {max: 12, min: 7, width: 48};
     assert.deepEqual(fitText("Esc", row), {size: 12, squeeze: 0}, "a short legend takes the full size");
