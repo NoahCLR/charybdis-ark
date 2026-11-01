@@ -38,6 +38,9 @@ test("the board's Shortcuts list names the shortcuts this computer uses", async 
     await expect(list).toContainText("Ctrl+C, Ctrl+V");
     await expect(list).toContainText("Copy a key, paste it onto the selected one");
     await expect(list).toContainText("Ctrl+Z, Ctrl+Shift+Z");
+    // Previewing layers together is listed too, with this computer's key.
+    await expect(list).toContainText("Ctrl-click a layer");
+    await expect(list).toContainText("Preview it on with the others");
     expect(await shownWords(page)).not.toContain("⌘");
 });
 
