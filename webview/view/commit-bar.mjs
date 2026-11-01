@@ -8,11 +8,11 @@ import {LIVE, liveSaveState, restartOffer} from "./edit-mode.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel} Model
- * @typedef {{kind: "applying", apply: import("../../contracts/model.js").ApplyView, step: number}
- *     | {kind: "readback"}
+ * @typedef {{kind: "applying", title: string, apply: import("../../contracts/model.js").ApplyView, step: number}
+ *     | {kind: "readback", title: string}
  *     | {kind: "failed", apply: import("../../contracts/model.js").ApplyView}
  *     | {kind: "held", wait: NonNullable<Model["liveWait"]>}
- *     | {kind: "busy", busy: ReturnType<typeof busyText>}
+ *     | {kind: "busy", title: string, busy: ReturnType<typeof busyText>}
  *     | {kind: "otherKeyboard"}
  *     | {kind: "reread"}
  *     | {kind: "stale"}
@@ -32,17 +32,18 @@ import {LIVE, liveSaveState, restartOffer} from "./edit-mode.mjs";
 // needs a restart, in any edit mode. Last the edit modes' own ways on: in the
 // live modes the keyboard already runs the edits, and in Live edit it saves by
 // itself; in Review and save the review. Null for no bar: no draft, or nothing
-// in it to save.
+// in it to save. A bar for work under way carries its title, which the frame
+// draws and a screen reader is told (announcements.mjs).
 /** @param {Model | null | undefined} model @param {{applyDismissed?: number | null}} [state] @returns {CommitBar | null} */
 export function commitBarState(model, {applyDismissed = null} = {}) {
     const draft = model?.draft;
     const apply = model?.apply;
     if (!model || !draft) return null;
-    if (draft.busy && apply?.state === "applying") return {kind: "applying", apply, step: apply.steps.findIndex((step) => step.state === "active") + 1};
-    if (draft.busy && apply?.state === "done") return {kind: "readback"};
+    if (draft.busy && apply?.state === "applying") return {kind: "applying", title: "Saving to the keyboard", apply, step: apply.steps.findIndex((step) => step.state === "active") + 1};
+    if (draft.busy && apply?.state === "done") return {kind: "readback", title: "Saved — reading back the keyboard"};
     if (!draft.busy && apply?.state === "failed" && applyDismissed !== apply.id) return {kind: "failed", apply};
     if (draft.busy && model.liveWait) return {kind: "held", wait: model.liveWait};
-    if (draft.busy) return {kind: "busy", busy: busyText(model.device?.health?.phase, model)};
+    if (draft.busy) return {kind: "busy", title: "Working with the keyboard", busy: busyText(model.device?.health?.phase, model)};
     if (!draft.matching) return {kind: "otherKeyboard"};
     if (draft.stale) return {kind: draft.live ? "reread" : "stale"};
     const offer = restartOffer(model);

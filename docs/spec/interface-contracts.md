@@ -165,9 +165,10 @@ The same kind of control looks and sits the same on every screen.
   (`onScreenChoice`, `webview/view/choices.mjs`). Every such choice is drawn
   by `choiceField`, which applies the rule, and read by `choiceValue`,
   whichever it became (`tests/view/choices.test.mjs`,
-  `browser-tests/consistency.spec.js`). A setting whose stored value is not
-  among its choices shows it as one more option, "as stored"
-  (`settingOptions`). A pair that are two
+  `browser-tests/consistency.spec.js`). A stored value that is none of a
+  choice's options, a setting's or a pointing mode's, shows as one more option,
+  "as stored", so a form read back whole sends it unchanged
+  (`storedChoices`, `webview/view/choices.mjs`). A pair that are two
   independent switches (Reverse scrolling's two axes) is two switches, not
   four options naming their combinations.
 - A slot bank and its editor (Macros, Custom keys, Pointing modes) stop at

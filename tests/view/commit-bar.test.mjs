@@ -35,7 +35,7 @@ test("the published draft holding an edit leads to the review", () => {
 
 test("an Apply running names its step; once done, the read back", () => {
     const apply = {id: 4, state: "applying", steps};
-    assert.deepEqual(commitBarState(model({draft: {busy: true}, apply})), {kind: "applying", apply, step: 2});
+    assert.deepEqual(commitBarState(model({draft: {busy: true}, apply})), {kind: "applying", title: "Saving to the keyboard", apply, step: 2});
     assert.equal(kind(model({draft: {busy: true}, apply: {id: 4, state: "done", steps}})), "readback");
 });
 

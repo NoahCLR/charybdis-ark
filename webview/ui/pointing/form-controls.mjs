@@ -2,6 +2,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {modifierGrid} from "../modifier-grid.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
+import {storedChoices} from "../../view/choices.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit */
 export function formControls(model, slot, canEdit) {
@@ -16,18 +17,11 @@ export function formControls(model, slot, canEdit) {
         form[key] = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).value;
         return node;
     };
-    /** @param {string} label @param {readonly (readonly [number, string])[]} choices @param {import("../../../contracts/edits.js").Scalar | undefined} current @param {string} key @param {import("../surface-types.js").SelectOptions} [options] */
-    const select = (label, choices, current, key, options = {}) => {
-        const node = el(`<label class="field"><span>${esc(label)}</span>
-            <select data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input" ${disabled} ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>
-            ${choices.map(([value, text]) => `<option value="${esc(value)}" ${String(value) === String(current) ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
-        form[key] = () => Number(/** @type {HTMLSelectElement} */ (node.querySelector("select")).value);
-        return node;
-    };
-    // A choice of a few short options, all on show (ui/segmented.mjs).
+    // A choice, on show or in a menu as ui/segmented.mjs draws it, holding the
+    // stored value even when it is none of the options (storedChoices).
     /** @param {string} label @param {readonly (readonly [number, string])[]} choices @param {import("../../../contracts/edits.js").Scalar | undefined} current @param {string} key @param {{tip?: string, hideLabel?: boolean}} [options] */
     const choice = (label, choices, current, key, options = {}) => {
-        const node = el(choiceField({label, f: `pointing:${slot.id}:${key}`, choices, current: current ?? undefined, disabled: !canEdit, ...options}));
+        const node = el(choiceField({label, f: `pointing:${slot.id}:${key}`, choices: storedChoices(choices, current), current: current ?? undefined, disabled: !canEdit, ...options}));
         form[key] = () => Number(choiceValue(node) || (choices[0]?.[0] ?? 0));
         return node;
     };
@@ -39,5 +33,5 @@ export function formControls(model, slot, canEdit) {
         return grid.node;
     };
 
-    return {form, disabled, field, select, choice, modifiers};
+    return {form, disabled, field, choice, modifiers};
 }

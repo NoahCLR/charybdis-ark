@@ -40,22 +40,22 @@ export function emptyLayers(model) {
         const matched = new Set(references.flatMap((reference, layer) => reference === layer ? [] : [layer, reference]));
         const overridden = new Set((model.rgb?.layerLedGroups || []).map((row) => row.ownerLayer));
         const placements = model.participation?.layers || [];
-        const unused = new Set(model.layers.filter((layer) => {
+        const empty = new Set(model.layers.filter((layer) => {
             const bit = 2 ** layer.index;
             return layer.index !== 0 && !layer.alwaysOn && !layer.named && !mappedKeyCount(model, layer)
                 && !(turnedOn & bit) && !(starts & bit) && layer.index !== model.pdModeEditing?.pointerLayer
                 && !matched.has(layer.index) && !layerPaints(layerColourRow(model, layer.index)?.color) && !overridden.has(layer.index)
                 && !placements[layer.index]?.bypass?.length && !placements[layer.index]?.exclude?.length;
         }).map((layer) => layer.index));
-        // Each per-layer setting, judged among the layers nothing else uses.
+        // Each per-layer setting, judged among the empty layers.
         const set = (model.configDefaults || []).flatMap((section) => {
             if (!section.layerGroup) return [];
-            const switches = section.fields.filter((field) => isLayerSwitch(field) && unused.has(layerOf(field)));
+            const switches = section.fields.filter((field) => isLayerSwitch(field) && empty.has(layerOf(field)));
             const on = switches.filter((field) => field.enabled).length, off = switches.length - on;
             return switches.filter((field) => on === off || Boolean(field.enabled) !== on > off).map(layerOf);
         });
-        for (const layer of set) unused.delete(layer);
-        return unused;
+        for (const layer of set) empty.delete(layer);
+        return empty;
     });
 }
 

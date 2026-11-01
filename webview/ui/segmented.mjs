@@ -12,11 +12,14 @@ import {onScreenChoice} from "../view/choices.mjs";
 /** @typedef {{label: string, f: string, choices: readonly (readonly [string | number, string])[], current: string | number | null | undefined,
  *   disabled?: boolean, tip?: string, hideLabel?: boolean, attributes?: Readonly<Record<string, string>>}} ChoiceOptions */
 
+/** @param {Readonly<Record<string, string>>} attributes */
+const attributesOf = (attributes) => Object.entries(attributes).map(([name, value]) => `${esc(name)}="${esc(value)}"`).join(" ");
+
 /** @param {ChoiceOptions} options */
 export function choiceField(options) {
     if (onScreenChoice(options.choices.map(([, text]) => text))) return segmented(options);
     const {label, f, choices, current, disabled = false, tip = "", hideLabel = false, attributes = {}} = options;
-    const extra = Object.entries(attributes).map(([name, value]) => `${esc(name)}="${esc(value)}"`).join(" ");
+    const extra = attributesOf(attributes);
     return `<label class="field"><span${hideLabel ? ` class="sr"` : ""}>${esc(label)}</span>
         <select class="input" data-f="${esc(f)}" ${extra} ${disabled ? "disabled" : ""} ${tip ? `data-tip="${esc(tip)}"` : ""}>
         ${choices.map(([value, text]) => `<option value="${esc(value)}" ${String(value) === String(current) ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
@@ -26,7 +29,7 @@ export function choiceField(options) {
 // radio's form identity.
 /** @param {ChoiceOptions} options */
 function segmented({label, f, choices, current, disabled = false, tip = "", hideLabel = false, attributes = {}}) {
-    const extra = Object.entries(attributes).map(([name, value]) => `${esc(name)}="${esc(value)}"`).join(" ");
+    const extra = attributesOf(attributes);
     const picked = choices.some(([value]) => String(value) === String(current)) ? String(current) : String(choices[0]?.[0] ?? "");
     return `<div class="field segmented"><span${hideLabel ? ` class="sr"` : ""}>${esc(label)}</span>
         <div class="seg" role="radiogroup" aria-label="${esc(label)}" ${tip ? `data-tip="${esc(tip)}"` : ""}>

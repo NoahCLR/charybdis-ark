@@ -114,7 +114,7 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
 
 // Reverse scrolling is one switch per axis, named as the vocabulary names
 // each bit alone (the same words Review reads): the record keeps it as two bits,
-// sideways (1) and up and down (2), which the vocabulary names together.
+// horizontal (1) and vertical (2), which the vocabulary names together.
 /** @param {Model} model @param {PresentedSlot} slot @param {FormControls["form"]} form @param {string} disabled */
 function reverse(model, slot, form, disabled) {
     const invert = Number(slot.scroll?.invert ?? 0);

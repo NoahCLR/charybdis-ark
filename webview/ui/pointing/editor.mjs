@@ -32,7 +32,7 @@ export function editor(model, slot, canEdit, slots) {
     if (kind !== slot.kind) slot = /** @type {import("../surface-types.js").PresentedSlot} */ (startingRecord(slot, kind, scrollStarter(slots)));
     const scrolling = kind === KIND.SCROLLING;
     const controls = formControls(model, slot, canEdit);
-    const {form, select} = controls;
+    const {form} = controls;
     form.kind = () => kind;
     const stage = () => {
         const {config, pending} = settleTaps(slot, readConfig(slot, form, model), model);
@@ -82,7 +82,7 @@ export function editor(model, slot, canEdit, slots) {
         .append(movement(model, slot, scrolling, controls, stage));
     step(3, "What starts it").append(startStep(model, slot, controls, stage));
     const runs = el(`<div class="pd-pair"></div>`);
-    runs.append(select("Pointer speed", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
+    runs.append(controls.choice("Pointer speed", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: `${tipFor(model, "dpi")} Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
     lightRow(model, slot));
     runs.append(controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: tipFor(model, "pointerLayer")}));

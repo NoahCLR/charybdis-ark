@@ -1,5 +1,5 @@
 // @ts-check
-// A bank of slots (Macros, Custom keys) opens on what is in it: the slots in
+// A bank of slots (Macros, Custom keys, Pointing modes) opens on what is in it: the slots in
 // use, in slot order, and New, which picks the first free slot. The unused
 // slots fold behind one disclosure after them, which draws them after it, in
 // slot order, so nothing already shown moves. The slot open in the editor, and

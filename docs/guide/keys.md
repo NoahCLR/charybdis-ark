@@ -71,7 +71,7 @@ built with are left out.
 | **Move to** | `TO` | switches to the layer |
 
 **Pointing modes** offers each mode as **Hold** (on while the key is down) or
-**Toggle** (on until pressed again).
+**Lock** (on until pressed again).
 
 ### Modifiers
 

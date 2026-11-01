@@ -220,13 +220,18 @@ function pointingVariantOf(spelling, known, slot) {
 // wrapped in modifiers by the wrappers it carries, and otherwise its hex
 // rather than a name it cannot prove. Pointing slots store their shortcuts
 // as bare numbers, and the profile writer takes them back as these names.
+// The catalog's entry for a keycode number, if it has one: the one lookup by
+// number, beside keyIdentity's by spelling.
+/** @param {ViewModel} model @param {number} code */
+export const catalogEntry = (model, code) => (model?.qmkKeycodes || []).find((entry) => entry.keycode === code);
+
 const LEFT_MODS = [MODS.LCTL, MODS.LSFT, MODS.LALT, MODS.LGUI], RIGHT_MODS = [MODS.RCTL, MODS.RSFT, MODS.RALT, MODS.RGUI];
 /** @param {ViewModel} model @param {number} code */
 export function keycodeName(model, code) {
     if (!code) return "";
     const macro = macroIndex(code);
     if (macro !== null) return macroName(macro);
-    const direct = (/** @type {number} */ value) => (model?.qmkKeycodes || []).find((entry) => entry.keycode === value)?.value;
+    const direct = (/** @type {number} */ value) => catalogEntry(model, value)?.value;
     const exact = direct(code);
     if (exact) return exact;
 

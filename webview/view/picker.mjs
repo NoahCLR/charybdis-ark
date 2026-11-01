@@ -10,7 +10,7 @@ import {keycodeValue} from "./keycode-expression.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "./picker-sections.mjs";
 import {macroMatches} from "./macro.mjs";
 import {shortcutModifiers, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickLabel, shortcutPickModifier, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
-import {keyIdentity, sameKey} from "./key-identity.mjs";
+import {catalogEntry, keyIdentity, sameKey} from "./key-identity.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 
 /**
@@ -58,7 +58,7 @@ export function openingPick(model, picker, keys) {
     if (!oneKey(picker) || keys.length !== 1) return {keys: [...keys], mods: []};
     const code = keyIdentity(model, keys[0]).entry?.keycode ?? keycodeValue(model, keys[0]);
     const held = code === undefined ? null : keycodeModifiers(model, code);
-    const named = Boolean(held?.key) && (model?.qmkKeycodes || []).some((entry) => entry.keycode === code);
+    const named = Boolean(held?.key) && code !== undefined && Boolean(catalogEntry(model, code));
     if (!held || named) return {keys: [...keys], mods: []};
     return {keys: held.key ? [held.key] : [], mods: shortcutPickMods(model, held.mods)};
 }
