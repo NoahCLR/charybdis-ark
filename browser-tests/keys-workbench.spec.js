@@ -87,11 +87,13 @@ test("every tab is as tall as the Behaviours tab, before it is ever opened", asy
     }
     for (const name of ["key", "combos", "macros", "customKeys", "pointing"]) expect(heights[name], name).toBe(heights.behaviours);
 
-    // Narrowed, the editor wraps taller, and the open tab follows it.
+    // Narrowed, the editor wraps taller, and the open tab follows it. Its
+    // cells keep one size (two lines of how each runs), so it takes a window
+    // narrow enough for the rest of the editor to wrap.
     const page = await context.newPage();
     await openPreview(page);
     await tab(page, "combos").click();
-    await page.setViewportSize({width: 1000, height: 900});
+    await page.setViewportSize({width: 900, height: 900});
     const height = () => page.locator(".keys-bench").evaluate((node) => /** @type {HTMLElement} */ (node).offsetHeight);
     await expect.poll(height, "the narrow editor is taller than the wide one").toBeGreaterThan(heights.behaviours);
     const narrowed = await height();

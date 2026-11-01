@@ -891,14 +891,17 @@ button.tier:hover { background: var(--surface-3); }
 .fbdot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); flex: none; display: inline-block; }
 .rowitem .fbdot, .reach .fbdot { margin-right: 3px; }
 .bcell {
-  display: grid; align-content: center; justify-items: center; gap: 3px; min-height: 52px; padding: 8px 10px;
+  display: grid; align-content: center; justify-items: center; gap: 3px; min-height: 68px; padding: 8px 10px;
   border: 1px solid var(--line); border-radius: var(--r-control); background: var(--surface-2); text-align: center; width: 100%;
 }
 .bcell:hover { border-color: var(--line-3); background: var(--surface-3); }
 .bcell.on { border-color: var(--text); background: var(--surface-3); }
 .bcell .bk { max-width: 100%; font-family: var(--mono); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bcell .bk.named { font-family: inherit; font-size: var(--fs-md); }
-.bcell .bl { font-size: var(--fs-xs); color: var(--text-3); }
+/* Every cell is one size: room for its action and two lines of how it runs,
+   whatever the grid's width, so a row never grows past the others. */
+.bcell .bl { font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-3);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .bcell.empty { border-style: dashed; background: none; }
 .bcell.empty .plus { color: var(--text-3); font-size: var(--fs-base); }
 /* The key's own action where the row leaves a first-press tier empty: present,
