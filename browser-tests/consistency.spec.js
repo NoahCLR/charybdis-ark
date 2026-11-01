@@ -111,3 +111,12 @@ test("a number field is as wide as the values it takes, never as wide as its col
     // Every number field on a screen carries the class that sizes it.
     expect(await page.locator('input[inputmode="numeric"]:not(.num), input[inputmode="decimal"]:not(.num)').count()).toBe(0);
 });
+
+test("a slot bank and its editor stop at 1320 px on a wide window, as Settings stops at 980 px", async ({page}) => {
+    await page.setViewportSize({width: 2200, height: 1000});
+    for (const screen of ["macros", "customKeys", "pointing"]) {
+        await openControls(page, screen);
+        const width = await page.locator(".pad.library").evaluate(node => node.getBoundingClientRect().width);
+        expect(width, screen).toBeLessThanOrEqual(1320);
+    }
+});
