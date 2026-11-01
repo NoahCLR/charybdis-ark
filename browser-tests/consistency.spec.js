@@ -98,3 +98,16 @@ test("a slot bank opens on the slots in use, makes a new one in the first free s
     await expect(macros.locator('[data-act="new-slot"]')).toHaveText("+ New macro");
     await expect(macros.locator('[data-all-slots="macros"]')).toHaveText("Show all 128 slots");
 });
+
+test("a number field is as wide as the values it takes, never as wide as its column", async ({page}) => {
+    await page.setViewportSize({width: 1920, height: 1000});
+    for (const [screen, state] of [["pointing", {pointingSlot: 0, pdAdvanced: true}], ["pointing", {pointingSlot: 4, pdAdvanced: true}], ["behaviours", {}], ["lighting", {stage: "key"}]]) {
+        await openControls(page, screen, state);
+        const widths = await page.locator("input.num:visible").evaluateAll(nodes => nodes.map(node => [node.getAttribute("data-f"), Math.round(node.getBoundingClientRect().width)]));
+        expect(widths.length, `${screen} has number fields`).toBeGreaterThan(0);
+        // Five digits and a unit, or a unit and its distance (≈ 2.5 mm), at most.
+        for (const [f, width] of widths) expect(width, f).toBeLessThanOrEqual(160);
+    }
+    // Every number field on a screen carries the class that sizes it.
+    expect(await page.locator('input[inputmode="numeric"]:not(.num), input[inputmode="decimal"]:not(.num)').count()).toBe(0);
+});

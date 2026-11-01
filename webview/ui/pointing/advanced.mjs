@@ -93,7 +93,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             const pair = el(`<div class="field" data-tip="${esc(words(model).scrollTips?.[top] || "")}"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
-                const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
+                const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono num" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
                     aria-label="${esc(`${label} ${index ? "denominator" : "numerator"}`)}" ${esc(disabled)}>`));
                 form[`scroll:${key}`] = () => input.value;
                 if (index) inputs.append(el(`<i>:</i>`));

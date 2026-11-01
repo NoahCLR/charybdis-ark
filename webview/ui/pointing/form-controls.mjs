@@ -12,7 +12,7 @@ export function formControls(model, slot, canEdit) {
     const field = (label, value, key, options = {}) => {
         // The tip is the whole field's, its label's as much as its box's.
         const node = el(`<label class="field" ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}><span>${esc(label)}</span>
-            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
+            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input mono num" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
         form[key] = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).value;
         return node;
     };
