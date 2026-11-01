@@ -112,6 +112,27 @@ test("an edit that adds a trap waits for the person; cancelling sends nothing, c
     assert.equal(session.draft.history.length, 2);
 });
 
+// A locked pointing mode ends only by a pointing mode's key, and the keyboard
+// holds every edit while it runs, so Ark could not mend it once sent
+// (firmware D-F62).
+test("a pointing mode edit that leaves a locked mode no way off waits for the person", async t => {
+    const {keyboard, shell, session, key, send} = await open(t);
+    // Arrow returns to the typing layer, so its lock key on Base still answers.
+    await key(0, 10, "PD_MODE_4_LOCK");
+    assert.equal(lastModel(shell).liveProposal, null);
+    const published = keyboard.events.filter(event => event === "published").length;
+    // Extra 2, all KC_NO, covers it once Arrow's key turns it on.
+    const arrow = validateSnapshot(session.draft.document).pdModes[4];
+    await send({type: "savePdMode", slot: 4, config: {...arrow, linkTurnsOn: 1 << 6}});
+    const proposal = lastModel(shell).liveProposal;
+    assert.ok(proposal, "asked before anything is sent");
+    const trap = proposal.checks.find(check => check.kind === "modeTrap");
+    assert.equal(trap?.title, "Arrow can lock with no way to turn it off");
+    assert.equal(keyboard.events.filter(event => event === "published").length, published);
+    await send({type: "cancelLiveEdit", proposal: proposal.id});
+    assert.equal(validateSnapshot(session.draft.document).pdModes[4].linkTurnsOn, 0, "nothing was staged");
+});
+
 // Shift held through a rename once made Ark say "Failed" after 5 s and throw
 // the history away, though the keyboard took the edit on release (keyboard
 // session, 2026-10-24).

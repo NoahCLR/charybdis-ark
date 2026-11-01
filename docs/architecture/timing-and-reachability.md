@@ -95,9 +95,9 @@ active layer that is not transparent answers. A key moves the state by:
   holds until release);
 - the combos its presses complete;
 - a pointing mode's key, held or locked, for the layers its link has the
-  key turn on (firmware D-F62): the hold key holds them and the lock key
-  toggles them as a layer lock, as for a key, a behaviour branch or a combo
-  output that runs the mode;
+  key turn on (firmware D-F62): both hold them, the lock key as long as the
+  mode runs, as for a key, a behaviour branch or a combo output that runs the
+  mode ([locked modes](#locked-pointing-modes) below);
 - a custom key's shortcut (firmware D-F26), which turns its layers on as its
   kind's layer key does: held as `MO()`, locked as a lock of several, moved to
   as `TO()` of several, held with a fifth-tap lock as `TT()`, or held as a
@@ -133,10 +133,7 @@ together, and a hold of them is released together, so the walk never reaches a
 state where only some of one key's layers are on. A lock of several turns them
 all on, or all off once all of them are on. A shortcut's Lock shares each
 layer's lock with `TG()` (firmware layer ownership), so this is exact: turning
-them all off releases a layer a `TG()` locked too, as the keyboard does. A
-pointing mode's lock key is walked the same way, though the keyboard's mode
-owns its layers apart from the locks, so there the walk may let go of a layer
-a `TG()` still keeps on. A move to several locks them alone and lets every
+them all off releases a layer a `TG()` locked too, as the keyboard does. A move to several locks them alone and lets every
 other lock go; `TO(0)`'s is the base alone, which lets them all go. A hold's
 release joins the walk once a state reached can make that hold. Layers are not
 tracked by the key that holds or locks them, though: where two holds share a
@@ -171,6 +168,35 @@ were established, the layers left unsettled, the layers and combos reached,
 what reachable states offer, and the smallest traps with their count.
 `layerReach` only words it as findings.
 
+### Locked pointing modes
+
+A locked pointing mode is an owner of its own, apart from the layer locks and
+holds (firmware D-F62, "Activation and locks"). Only a pointing mode's key
+ends it: its lock key, its hold key, or any key of another slot that holds a
+mode. While it runs it keeps on the layers its key turns on, and `TO()`,
+`TG()` and a shortcut's Lock leave them on. A mode that keeps the pointer
+layer anchors it on, unless an auto-sniping layer other than it is on; one
+that returns to the typing layer keeps it off, unless it is an auto-sniping
+layer itself, when the trackball still wakes it while no other is on. While a
+key runs a mode the links wait, so no linked layer keeps the pointer layer
+off. The keyboard holds every edit while a mode is locked, so Ark cannot mend
+it from the page either.
+
+So a **mode trap** is a pointing mode whose lock key answers in some state,
+reachable from rest, from whose locks, once every key is let go, no state the
+locked mode allows has a pointing mode's key answering. For reachability the
+walk lets the lock key hold the mode's layers, which reaches what the hold key
+does. Each mode that can lock is then an **anchor** of `analyzeLayerStates`:
+the conditions are compiled again with its layers kept on and off as above,
+and a backward pass from the states where a pointing mode's key answers
+(a key, a behaviour branch or a combo output that sends one) finds whether
+every lock set its lock key answers in gets there. Any held layer can be let
+go there, and a pointing key behind a row counts unless the row replaces
+both its tap and its hold, so a mode trap is never invented. Review names
+each mode once, with the smallest lock set it is trapped with, the steps to
+its lock key and a fix. The bounded walk does the same over explicit states
+(`boundedModeTraps`); past its bound, escape stays unproved.
+
 Besides traps, the walk reports unreachable layers and combos, layer keys left
 to QMK, and layer keys that do nothing (`findings` in `layer-reach.js`).
 
@@ -185,9 +211,11 @@ escape.
 Held by `tests/model/layer-reach.test.js` ("compiled source and declared-owner
 conditions agree with an exhaustive profile oracle"),
 `tests/model/layer-walk.test.js` ("both walks find the same smallest traps, the
-lock that gets into each and the steps from rest") and
+lock that gets into each and the steps from rest", "both walks find the same
+locked modes with no way to turn them off") and
 `tests/model/layer-state-graph.test.js` ("compact analysis agrees with
-exhaustive enumeration on seeded interacting graphs").
+exhaustive enumeration on seeded interacting graphs", "an anchor is trapped
+exactly when some lock set it is entered with cannot reach its end").
 
 ## Built-in branches
 

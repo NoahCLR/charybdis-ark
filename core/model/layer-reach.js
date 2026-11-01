@@ -22,6 +22,12 @@
 // From that it names:
 //
 // - traps: a set of locks you can get into and cannot get back to Base from;
+// - mode traps: a pointing mode you can lock and then not turn off. Only a
+//   pointing mode's key ends a locked mode (its lock key, its hold key, or
+//   another mode's key), and while it runs it keeps on the layers its key
+//   turns on, and the pointer layer if it keeps it, whatever TO() or TG()
+//   do. The keyboard holds every edit while a mode is locked, so Ark cannot
+//   mend it either;
 // - layers nothing reaches, layer keys that reach a layer with no keys of its
 //   own, layer keys that hold or toggle Base (which is always on, so they do
 //   nothing), transparent and KC_NO keys on Base, a pointer layer that cannot work, and
@@ -40,7 +46,7 @@
 
 const {LAYERS, layersOfMask} = require("../data/charybdis-layout");
 const {actionName} = require("../schema/actions");
-const {LAYER_KEY_VERBS, REVIEW_AREAS, layerName, listed, settingsPath} = require("./vocabulary");
+const {LAYER_KEY_VERBS, REVIEW_AREAS, VOCABULARY, layerName, listed, settingsPath, word} = require("./vocabulary");
 const {layerKeyLabel} = require("./key-names");
 const {maskOf: layersOf} = require("./layer-state-graph");
 const {actionEffects, bit, codeName, layerEffects} = require("./layer-effects");
@@ -91,6 +97,26 @@ function traps(facts, walked) {
     return named;
 }
 
+// Names each pointing mode that can lock with no way to turn it off.
+/** @param {Facts} facts @param {LayerWalk} walked @returns {Finding[]} */
+function modeTraps(facts, walked) {
+    return walked.modeTraps.map(/** @returns {Finding} */ ({slot, locks, effect, path}) => {
+        const mode = /** @type {{layers: number, name: string, keepsPointer: boolean}} */ (facts.modeLinks.modes.get(slot));
+        const pointer = mode.keepsPointer && facts.pointer !== undefined && facts.pointer < LAYERS ? facts.pointer : undefined;
+        const kept = namesOf(facts, mode.layers | (pointer === undefined ? 0 : bit(pointer)));
+        const locked = namesOf(facts, locks);
+        const keeps = kept.length ? `it keeps ${listed(kept)} on, and ` : "";
+        const pointerFix = pointer === undefined ? "" : `, or choose ${word(VOCABULARY.pointing.pointerLayer, 1)} for ${mode.name}`;
+        return {kind: "modeTrap", level: LEVELS.TRAP, layers: layersOfMask((mode.layers | locks | (pointer === undefined ? 0 : bit(pointer))) >>> 0), identity: String(slot),
+            title: `${mode.name} can lock with no way to turn it off`,
+            detail: `Once ${mode.name} is locked${locked.length ? ` with ${listed(locked)} locked` : ""}, ${keeps}no key, behaviour or combo left on the board turns it off: only its lock key, its hold key or another pointing mode's key does, and ${layerKey(facts, "TO", 0)} or a layer lock leaves it running. The keyboard holds every edit while it runs, so Ark can't fix it either. Unplugging the keyboard clears it.`,
+            path: path.map((step) => step.kind === "release" ? `Release the hold on ${listed(namesOf(facts, layersOf(step)))}` : step.how),
+            fix: kept.length ? `Make ${listed(kept)} transparent where ${mode.name}'s lock key is, so it shows through, or put ${mode.name}'s lock or hold key on ${listed(kept)}${pointerFix}.`
+                : `Put ${mode.name}'s lock or hold key where it answers while ${mode.name} runs.`,
+            place: {kind: "pointing", slot}};
+    });
+}
+
 /** @param {Facts} facts @param {LayerWalk} walked @returns {Finding[]} */
 function findings(facts, walked) {
     const {reachabilityComplete} = walked;
@@ -98,7 +124,7 @@ function findings(facts, walked) {
     const names = involved.map(layer => layerName(facts.names, layer));
     const shortNames = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} other layers` : listed(names);
     /** @type {Finding[]} */
-    const results = walked.escapeComplete ? traps(facts, walked) : [{kind: "reachabilityIncomplete", level: LEVELS.WARNING, layers: involved,
+    const results = walked.escapeComplete ? [...traps(facts, walked), ...modeTraps(facts, walked)] : [{kind: "reachabilityIncomplete", level: LEVELS.WARNING, layers: involved,
         scope: reachabilityComplete ? "escapes" : "reachability",
         title: names.length ? `Check ${reachabilityComplete ? "a way home when" : "how"} ${shortNames} combine` : "Check the layer controls together",
         detail: `${names.length ? `The controls involving ${listed(names)} have complex interactions. ` : ""}${reachabilityComplete
@@ -149,7 +175,7 @@ function findings(facts, walked) {
     // only TO() means something there. Every key, branch and combo output is
     // counted, reachable or not.
     /** @param {LayerEffect[]} effects */
-    const idle = (effects) => effects.some((effect) => effect.kind !== "move" && effect.kind !== "unowned" && (layersOf(effect) & ~facts.always) === 0);
+    const idle = (effects) => effects.some((effect) => effect.kind !== "move" && effect.kind !== "unowned" && effect.kind !== "modeLock" && (layersOf(effect) & ~facts.always) === 0);
     // Each by its stored name, which tells one finding from another, and as
     // the screens name it (`said`), which the check reads.
     /** @type {{name: string, said: string, place: import("../../contracts/model.js").FindingPlace}[]} */

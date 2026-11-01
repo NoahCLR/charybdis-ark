@@ -78,7 +78,8 @@ test("a profile's links: the layers a mode's key turns on, the layers that start
         // A slot with no mode links nothing.
         {id: 6, kind: 0, name: "", linkedLayers: 1 << 6, linkTurnsOn: 1 << 6, linkEnds: PD_LINK_ENDS.NOTHING},
     ]});
-    assert.deepEqual([...facts.modeLinks.modes], [[2, {layers: 1 << 5, name: "Scroll"}]]);
+    assert.deepEqual([...facts.modeLinks.modes], [[2, {layers: 1 << 5, name: "Scroll", keepsPointer: false}], [3, {layers: 0, name: "Arrow", keepsPointer: false}]],
+        "every slot that holds a mode, with the layers its key turns on, none for Arrow");
     assert.equal(facts.layerStarted, 1 << 3, "Scroll's start from layer 3 never ends");
     assert.equal(facts.endedStarts.length, 1);
     const [{layer, ends}] = facts.endedStarts;

@@ -92,3 +92,27 @@ test("a walk neither finishes names the layers involved, and claims no reach or 
     assert.deepEqual([walked.traps, walked.trapCount, walked.reachableCombos.size], [[], 0, 0]);
     assert.equal(walkLayers(profileFacts(decoded(keys))).escapeComplete, true, "the compact walk, given its budget, finishes");
 });
+
+test("both walks find the same locked modes with no way to turn them off, and the lock key that gets there", () => {
+    const PD_MODE = (n) => 0x7e80 + n, PD_MODE_LOCK = (n) => 0x7ea0 + n;
+    const slot = (extra) => ({id: 1, kind: 1, name: "Volume", linkedLayers: 0, linkTurnsOn: 0, linkEnds: 0, pointerLayer: 1, ...extra});
+    /** @param {Record<string, number>} keys @param {object[]} pdModes @param {boolean} [mouse] */
+    const walks = (keys, pdModes, mouse = false) => {
+        const profile = {...decoded(keys), pdModes};
+        if (mouse) {profile.settings.values[SETTING.AUTO_MOUSE_ENABLED] = 1; profile.settings.values[SETTING.AUTO_MOUSE_LAYER] = 4;}
+        const facts = profileFacts(profile), compact = walkLayers(facts), bounded = walkLayers(facts, BOUNDED);
+        const traps = (walked) => walked.modeTraps.map(({slot, locks, effect, path}) => ({slot, locks, from: effect.from, steps: path.length}));
+        assert.equal(bounded.escapeComplete, true);
+        assert.deepEqual(traps(bounded), traps(compact));
+        return traps(compact);
+    };
+    const lock = {"0:0": PD_MODE_LOCK(1)}, extra = [slot({linkTurnsOn: 1 << 5})];
+    assert.deepEqual(walks({...lock, "5:0": KC_B, "5:1": TO(0)}, extra), [{slot: 1, locks: 0, from: {layer: 0, layoutIndex: 0, code: PD_MODE_LOCK(1)}, steps: 1}]);
+    assert.deepEqual(walks({...lock, "5:0": KC_B, "5:1": PD_MODE(1)}, extra), [], "its hold key ends it");
+    assert.deepEqual(walks({...lock, "5:3": KC_B}, extra), [], "its lock key still answers");
+    assert.equal(walks({...lock, "4:0": KC_B}, [slot({pointerLayer: 0})], true).length, 1, "the pointer layer it keeps covers its lock key");
+    assert.deepEqual(walks({...lock, "4:0": KC_B}, [slot({pointerLayer: 1})], true), [], "one that returns to the typing layer keeps it off");
+    // Locked with Extra 2 locked only: Extra 3 covers Extra 2's way home.
+    const keys = {...lock, "0:1": TG(6), "0:3": PD_MODE_LOCK(1), "6:0": KC_B, "6:1": KC_B, "6:2": TO(0), "7:2": KC_B, "7:3": KC_B};
+    assert.deepEqual(walks(keys, [slot({linkTurnsOn: 1 << 7})]), [{slot: 1, locks: 1 << 6, from: {layer: 0, layoutIndex: 3, code: PD_MODE_LOCK(1)}, steps: 2}]);
+});

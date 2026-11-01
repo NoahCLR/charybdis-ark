@@ -9,7 +9,7 @@ const {LAYER_IDENTITY} = require("../data/charybdis-layout");
 
 /** @typedef {import("../../contracts/model.js").Finding} Finding */
 
-const GRAPH_FINDINGS = new Set(["trap", "trapOverflow", "unreachable", "unreachableCombo"]);
+const GRAPH_FINDINGS = new Set(["trap", "trapOverflow", "modeTrap", "unreachable", "unreachableCombo"]);
 
 // A finding's identity across two profiles: what kind it is and which layers it
 // is about, named by the keyboard layer each slot holds (`order[slot]`, as
@@ -28,7 +28,7 @@ const findingKey = (finding, order = LAYER_IDENTITY) => `${finding.kind}:${findi
 function compareFindings(before, after, order = LAYER_IDENTITY) {
     const known = new Set(before.map((finding) => findingKey(finding))), still = new Set(after.map((finding) => findingKey(finding, order)));
     const incomplete = after.find(finding => finding.kind === "reachabilityIncomplete");
-    const uncertainKinds = incomplete?.scope === "escapes" ? new Set(["trap", "trapOverflow"]) : GRAPH_FINDINGS;
+    const uncertainKinds = incomplete?.scope === "escapes" ? new Set(["trap", "trapOverflow", "modeTrap"]) : GRAPH_FINDINGS;
     return [
         ...after.map(/** @returns {import("../../contracts/model.js").Check} */ (finding) => ({...finding, key: findingKey(finding, order), status: known.has(findingKey(finding, order)) ? "existing" : "new"})),
         ...before.filter((finding) => !still.has(findingKey(finding)) && !(incomplete && uncertainKinds.has(finding.kind)))
