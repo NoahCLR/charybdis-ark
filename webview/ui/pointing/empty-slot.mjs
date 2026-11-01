@@ -36,18 +36,19 @@ export function emptySlot(model, slot, slots) {
         <p class="note">Nothing is stored here yet. What should the trackball do while this mode runs?</p>
         ${inertNote(model, slot)}
         <div data-kinds></div>
-        ${sources.length ? `<label class="field pd-copy"><span>Or copy a mode</span><select class="input" data-f="pointing:${esc(slot.id)}:copy" data-source ${canEdit ? "" : "disabled"}>
-            <option value="">Pick a mode…</option>
-            ${sources.map((row) => `<option value="${esc(row.id)}">${esc(row.name)} · slot ${esc(row.id)}</option>`).join("")}</select></label>`
+        ${sources.length ? `<div class="pd-copy"><label class="field"><span>Or copy a mode</span><select class="input" data-f="pointing:${esc(slot.id)}:copy" data-source ${canEdit ? "" : "disabled"}>
+            ${sources.map((row) => `<option value="${esc(row.id)}">${esc(row.name)} · slot ${esc(row.id)}</option>`).join("")}</select></label>
+            <button class="btn" data-act="copy" ${canEdit ? "" : "disabled"}>Copy into this slot</button></div>`
             : ""}
         ${canEdit || gate.quiet ? "" : `<div class="unavailable">${esc(gate.why || "This slot cannot be edited right now.")}</div>`}
     </div></div></div>`);
     /** @type {HTMLElement} */ (node.querySelector(".right")).append(placeButton(slot, editGate(model, "keys").editable));
     /** @type {HTMLElement} */ (node.querySelector("[data-kinds]")).replaceWith(movementChoice(model, slot.id, null, {disabled: !canEdit,
         pick: (kind) => post(edits.pdMode(slot.id, newMode(slot, kind, scrollStarter(slots)), model.profileIdentity))}));
-    /** @type {HTMLSelectElement | null} */ (node.querySelector("[data-source]"))?.addEventListener("change", (event) => {
-        const value = /** @type {HTMLSelectElement} */ (event.target).value;
-        if (value !== "") post(edits.duplicatePdMode(slot.id, Number(value), model.profileIdentity));
+    // Copying fills the slot, so it waits for its button, as making a mode does.
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="copy"]'))?.addEventListener("click", () => {
+        const source = /** @type {HTMLSelectElement} */ (node.querySelector("[data-source]")).value;
+        post(edits.duplicatePdMode(slot.id, Number(source), model.profileIdentity));
     });
     return node;
 }

@@ -159,7 +159,7 @@ const forms = [
     {name: "new pointing mode", screen: "pointing", state: {pointingSlot: 20}, shown: '[data-f="pointing:20:copy"]',
         commit: page => page.locator(".pd-kind").first().click(), type: "savePdMode", names: "base"},
     {name: "pointing mode copied into an empty slot", screen: "pointing", state: {pointingSlot: 20}, shown: '[data-f="pointing:20:copy"]',
-        commit: page => page.locator('[data-f="pointing:20:copy"]').selectOption({index: 1}), type: "duplicatePdMode", names: "base"},
+        commit: page => page.locator('[data-act="copy"]').click(), type: "duplicatePdMode", names: "base"},
 ];
 
 for (const [cause, publish, carried] of changes) {

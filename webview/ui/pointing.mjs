@@ -9,7 +9,6 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
-import {KIND} from "../view/pointing-config.mjs";
 import {whatReachesSlot} from "../view/pointing-reach.mjs";
 import {getModel, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
@@ -59,7 +58,7 @@ export function screenPointing() {
     const tile = (row) => {
         const reaching = !row.kind ? whatReachesSlot(model, row) : null;
         const inert = reaching ? reaching.keys.length + reaching.behaviours.length + reaching.combos.length : 0;
-        const kind = row.kind === KIND.SCROLLING ? word(words(model).kinds, KIND.SCROLLING) : row.kind === KIND.DIRECTIONAL ? word(words(model).kinds, KIND.DIRECTIONAL) : "";
+        const kind = row.kind ? word(words(model).kinds, row.kind) : "";
         const tip = row.kind ? `Slot ${row.id} · ${row.name} · ${kind}` : `Slot ${row.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} still reach it` : ""}`;
         const cell = el(`<button class="mslot pd-tile ${row.kind ? "filled" : ""} ${inert ? "warn" : ""}" data-slot="${esc(row.id)}" role="listitem"
             aria-current="${row.id === slot.id}" aria-label="${esc(tip)}" data-tip="${esc(tip)}">

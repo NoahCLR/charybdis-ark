@@ -19,7 +19,7 @@ import {movement} from "./movement.mjs";
 import {lightRow, placeButton} from "./keys-and-light.mjs";
 import {startStep} from "./link.mjs";
 import {advancedControls} from "./advanced.mjs";
-import {words} from "./common.mjs";
+import {tipFor, words} from "./common.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
 export function editor(model, slot, canEdit, slots) {
@@ -61,7 +61,8 @@ export function editor(model, slot, canEdit, slots) {
     /** @type {HTMLElement} */ (card.querySelector(".right")).prepend(placeButton(slot, editGate(model, "keys").editable));
     const nameInput = /** @type {HTMLInputElement} */ (card.querySelector("[data-name]"));
     form.name = () => nameInput.value.trim();
-    attachTitleName(card, {stored: slot.name || "", perName: NAME_MAX_BYTES, rename: () => {}});
+    // A rename stages the whole record, as every field of the mode does.
+    attachTitleName(card, {stored: slot.name || "", perName: NAME_MAX_BYTES, rename: () => stage()});
 
     const steps = /** @type {HTMLElement} */ (card.querySelector(".pd-steps"));
     /** @param {number} n @param {string} title @param {string} [hint] */
@@ -82,14 +83,15 @@ export function editor(model, slot, canEdit, slots) {
     step(3, "What starts it").append(startStep(model, slot, controls, stage));
     const runs = el(`<div class="pd-pair"></div>`);
     runs.append(select("Pointer speed", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
-        {tip: `Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
+        {tip: `${tipFor(model, "dpi")} Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
     lightRow(model, slot));
-    runs.append(controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: words(model).pointerLayerTip}));
+    runs.append(controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: tipFor(model, "pointerLayer")}));
     step(4, "While it runs").append(runs);
     wrap.append(card, advancedControls(model, slot, scrolling, controls));
 
     wrap.addEventListener("change", (event) => {
-        if (!/** @type {Element} */ (event.target).matches("input, select")) return;
+        const target = /** @type {Element} */ (event.target);
+        if (!target.matches("input, select") || target.matches("[data-name]")) return;
         stage();
     });
     /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="clear"]')).addEventListener("click", () => {

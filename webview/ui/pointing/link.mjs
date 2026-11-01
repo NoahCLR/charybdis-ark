@@ -9,10 +9,10 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {LINK_ENDS} from "../../view/pointing-config.mjs";
 import {listed} from "../../view/vocabulary.mjs";
-import {linkIgnored, linkRows, pointerLayerCovers} from "../../view/pointing-link.mjs";
+import {linkIgnored, linkRows, pointerLayerCovers, withLayer} from "../../view/pointing-link.mjs";
 import {emptyLayers} from "../../view/empty-layers.mjs";
 import {marked} from "../marks.mjs";
-import {words} from "./common.mjs";
+import {tipFor, words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
 import {segmented, segmentedValue} from "../segmented.mjs";
 
@@ -26,8 +26,8 @@ export function startStep(model, slot, {form, disabled}, stage) {
     const rows = linkRows(model, slot);
     const node = el(`<div class="pd-starts stack">
         <div class="pd-row"><span class="pd-row-l">Its keys</span></div>
-        <div class="pd-row" data-tip="While one of these layers is on, held or locked, it starts this pointing mode. A mode started by its key wins over one its layers started."><span class="pd-row-l" id="pd-starts-${esc(slot.id)}">Layers</span></div>
-        <div class="pd-row" data-tip="While this pointing mode's key runs it, held or locked, these layers stay on; each goes off when the mode ends unless something else keeps it."><span class="pd-row-l" id="pd-turns-${esc(slot.id)}">${esc(L.keyTurnsOnShort)}</span></div></div>`);
+        <div class="pd-row" data-tip="${esc(tipFor(model, "linkedLayers"))}"><span class="pd-row-l" id="pd-starts-${esc(slot.id)}">Layers</span></div>
+        <div class="pd-row" data-tip="${esc(tipFor(model, "linkTurnsOn"))}"><span class="pd-row-l" id="pd-turns-${esc(slot.id)}">${esc(L.keyTurnsOnShort)}</span></div></div>`);
     const [keys, starts, turns] = /** @type {HTMLElement[]} */ ([...node.querySelectorAll(".pd-row")]);
     keys.append(keysRow(model, slot));
     let linked = slot.linkedLayers, turnsOn = slot.linkTurnsOn;
@@ -35,15 +35,15 @@ export function startStep(model, slot, {form, disabled}, stage) {
     form.linkTurnsOn = () => turnsOn;
     const empties = emptyLayers(model);
     starts.append(layerChips(model, rows, "starts", {disabled, empties, labelledBy: `pd-starts-${slot.id}`, id: `pointing:${slot.id}:linkedLayers`,
-        change: (layer, on) => { linked = on ? linked | 2 ** layer : linked & ~(2 ** layer); stage(); }}));
+        change: (layer, on) => { linked = withLayer(linked, layer, on); stage(); }}));
     turns.append(layerChips(model, rows, "key", {disabled, empties, labelledBy: `pd-turns-${slot.id}`, id: `pointing:${slot.id}:linkTurnsOn`,
-        change: (layer, on) => { turnsOn = on ? turnsOn | 2 ** layer : turnsOn & ~(2 ** layer); stage(); }}));
+        change: (layer, on) => { turnsOn = withLayer(turnsOn, layer, on); stage(); }}));
 
     // What ends a mode its layers started, so only beside layers that start it.
     if (slot.linkedLayers) {
         const ends = el(`<div class="pd-row"><span class="pd-row-l" aria-hidden="true">${esc(L.endsWhen)}</span>${segmented({label: L.linkEnds, f: `pointing:${slot.id}:linkEnds`,
             choices: P.linkEnds, current: slot.linkEnds, disabled: Boolean(disabled), hideLabel: true,
-            tip: "A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and starts or is turned on by neither. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended."})}</div>`);
+            tip: tipFor(model, "linkEnds")})}</div>`);
         form.linkEnds = () => Number(segmentedValue(ends) || LINK_ENDS.NOTHING);
         node.append(ends);
     }

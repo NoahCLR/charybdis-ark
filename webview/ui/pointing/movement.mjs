@@ -9,7 +9,7 @@ import {keyDisplayName, pointingMacro} from "../../view/keyvalues.mjs";
 import {keycodeName} from "../../view/key-identity.mjs";
 import {render} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
-import {ARROWS, scrollLabel, words} from "./common.mjs";
+import {ARROWS, SCROLL_LEAD, scrollLabel, tipFor, words} from "./common.mjs";
 import {word} from "../../view/vocabulary.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
@@ -39,12 +39,12 @@ function directions(model, slot, {choice, form, disabled}, stage) {
         compass.append(directionKey(model, slot, group, name, {form, disabled, stage}));
     }
     /** @type {HTMLElement} */ (node.querySelector(".pd-direction-reads")).append(choice("Reads", words(model).axes, slot.axis, "axis",
-        {tip: "Which movement this mode turns into keys. Switching to one axis empties the other axis's keys."}));
+        {tip: tipFor(model, "axis")}));
     const fields = /** @type {HTMLElement} */ (node.querySelector(".pd-direction-fields"));
     fields.append(choice("When a direction has no key", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
-        {tip: "Moving toward a direction with no key: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing."}));
+        {tip: tipFor(model, "emptyDirection")}));
     fields.append(choice("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
-        {tip: "Every step sends the key again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; a movement starts again after a 150 ms pause, and only turning more than 90 degrees from the direction that sent sends again before then."}));
+        {tip: tipFor(model, "directionOutput")}));
     fields.append(el(`<p class="note">A direction can also click mouse buttons 1–8 or play a macro; both are in the picker.</p>`));
     return node;
 }
@@ -98,15 +98,15 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
         <div class="pd-pair" data-group="feel"></div></div>`);
     const group = (/** @type {string} */ name) => /** @type {HTMLElement} */ (node.querySelector(`[data-group="${name}"]`));
     group("which").append(choice("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
-        {tip: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis."}),
+        {tip: tipFor(model, "scrollAxes")}),
     reverse(model, slot, form, disabled));
-    const tip = (/** @type {string} */ key) => words(model).scrollTips?.[key] || "";
-    group("speed").append(field(scrollLabel(model, "divisorH"), slot.scroll?.divisorH, "scroll:divisorH", {tip: tip("divisorH")}),
-        field(scrollLabel(model, "divisorV"), slot.scroll?.divisorV, "scroll:divisorV", {tip: tip("divisorV")}));
-    group("feel").append(field(scrollLabel(model, "intervalMs", "ms"), slot.scroll?.intervalMs, "scroll:intervalMs", {unit: "ms", tip: tip("intervalMs")}),
-    field(scrollLabel(model, "lockMs", "ms"), slot.scroll?.lockMs, "scroll:lockMs", {unit: "ms", tip: tip("lockMs")}));
+    // The fields this step draws are SCROLL_LEAD's, the divisors as Speed
+    // and the rest as Feel; Advanced draws the others.
+    for (const [key, unit] of SCROLL_LEAD) {
+        group(key.startsWith("divisor") ? "speed" : "feel").append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: tipFor(model, key)}));
+    }
     const held = modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers");
-    held.setAttribute("data-tip", words(model).scrollTips?.heldModifiers || "");
+    held.setAttribute("data-tip", tipFor(model, "heldModifiers"));
     node.append(held);
     return node;
 }
@@ -120,7 +120,7 @@ function reverse(model, slot, form, disabled) {
     const P = words(model);
     /** @param {number} bit */
     const axis = (bit) => `<label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:invert:${bit}" data-bit="${bit}" ${invert & bit ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">${esc(word(P.invert, bit))}</span></label>`;
-    const node = el(`<div class="field" data-tip="${esc(P.scrollTips?.invert || "")}"><span>Reverse scrolling</span><div class="pd-switches">${axis(1)}${axis(2)}</div></div>`);
+    const node = el(`<div class="field" data-tip="${esc(tipFor(model, "invert"))}"><span>Reverse scrolling</span><div class="pd-switches">${axis(1)}${axis(2)}</div></div>`);
     form.invert = () => [...node.querySelectorAll("input:checked")].reduce((mask, input) => mask | Number(/** @type {HTMLInputElement} */ (input).dataset.bit), 0);
     return node;
 }

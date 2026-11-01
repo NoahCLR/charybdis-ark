@@ -180,9 +180,8 @@ export interface Vocabulary {
         movementLabel: string;
         scrollFields: WordList<string>;
         heldModifiers: string;
-        scrollTips: Readonly<Record<string, string>>;
+        tips: Readonly<Record<string, string>>;
         pointerLayerLabel: string;
-        pointerLayerTip: string;
     };
     modifiers: WordList<number>;
     comboOptions: Readonly<Record<string, string>>;

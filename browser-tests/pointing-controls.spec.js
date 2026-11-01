@@ -238,7 +238,10 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
         await configPost(page, 8, {kind, name: "Mode 8"});
     }
     await clearPosts(page);
+    // Copying waits for its button: picking a mode alone posts nothing.
     await editor(page).locator("[data-source]").selectOption("5");
+    expect(await posted(page)).toEqual([]);
+    await editor(page).getByRole("button", {name: "Copy into this slot"}).click();
     await expectPost(page, {type: "duplicatePdMode", slot: 8, source: 5});
 });
 

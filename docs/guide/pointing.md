@@ -61,8 +61,8 @@ The editor runs in four steps, top to bottom.
 ### Starting a mode
 
 An empty slot asks what the trackball should do: **Scroll** or **Send keys**.
-Pick one and the slot holds a new mode that moves that way. **Or copy a mode** copies
-one you already have into the slot instead.
+Pick one and the slot holds a new mode that moves that way. Or pick a mode
+you already have under **Or copy a mode** and choose **Copy into this slot**.
 
 A key can point at an empty slot. It just does nothing until the slot holds a
 mode, and its key on the board reads by the slot's number, such as **Slot 6 ·

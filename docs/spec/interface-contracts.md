@@ -1108,7 +1108,7 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
    under Advanced, is a segmented choice too.
    Every setting, Reverse scrolling and the held modifiers included, says what it does as its field's tip: a scroll field's from
-   `vocabulary.pointing.scrollTips` (as the firmware's scrolling runs it), in
+   `vocabulary.pointing.tips`, keyed by the field it sets (as the firmware runs it), in
    the step and under Advanced alike (`browser-tests/pointing-controls.spec.js`).
 3. **What starts it**: the mode's hold and lock keys named by the mode, never
    by `PD_MODE_n`, and where they sit; then its link as layer chips

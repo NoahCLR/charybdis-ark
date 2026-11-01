@@ -636,10 +636,23 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             ["decayDivisor", "Cross-axis decay divisor"],
         ],
         heldModifiers: "Hold modifiers while scrolling",
-        // What each scroll field does, as the firmware's scrolling runs it
-        // (firmware pointing_mode_dragscroll.c): said as each field's tip, in
-        // the step and under Advanced alike. A ratio's tip is its numerator's.
-        scrollTips: {
+        // What each setting of a mode does, by the field it sets, as the
+        // firmware runs it (its pointing spec; pointing_mode_dragscroll.c for
+        // the scroll fields): said as the field's tip wherever it is drawn. A
+        // ratio's tip is its numerator's; a directional threshold's is by how
+        // often the mode sends (thresholdEvery, thresholdOnce).
+        tips: {
+            axis: "Which movement this mode turns into keys. Switching to one axis empties the other axis's keys.",
+            emptyDirection: "Moving toward a direction with no key: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing.",
+            directionOutput: "Every step sends the key again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; a movement starts again after a 150 ms pause, and only turning more than 90 degrees from the direction that sent sends again before then.",
+            thresholdEvery: "How far the ball must move for each key a direction sends: one key per this distance. Lower sends more often.",
+            thresholdOnce: "How far the ball must move before a direction sends its key; it sends once however far the ball goes.",
+            scrollAxes: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis.",
+            dpi: "Sensor DPI while this mode runs.",
+            pointerLayer: "Keep the pointer layer active: the pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on. Return to the typing layer: starting the mode turns the pointer layer off, and it stays off while the mode runs. A mode its layers started never keeps the pointer layer on.",
+            linkedLayers: "While one of these layers is on, held or locked, it starts this pointing mode. A mode started by its key wins over one its layers started.",
+            linkTurnsOn: "While this pointing mode's key runs it, held or locked, these layers stay on; each goes off when the mode ends unless something else keeps it.",
+            linkEnds: "A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and starts or is turned on by neither. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended.",
             thresholdH: "How far the ball must move sideways, in sensor counts, before a scroll can go sideways. When both axes are below their thresholds, the scroll lets go of its axis.",
             thresholdV: "How far the ball must move up or down, in sensor counts, before a scroll can go up or down. When both axes are below their thresholds, the scroll lets go of its axis.",
             divisorH: "Sensor counts of sideways movement for one scroll step. Lower scrolls faster.",
@@ -654,10 +667,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             sustainNumerator: "A scroll keeps its axis while that axis moves at least this many times the other (5 : 4 is 1.25 times, never more than the selection ratio). Below it, the other axis takes over only if it reaches the selection ratio; otherwise the scroll stays on its axis through the wobble.",
         },
         // What the pointer layer does while a mode its key started runs: on,
-        // or off so the typing layer's keys stay under the hand. A mode its
-        // layers started never keeps the pointer layer on.
+        // or off so the typing layer's keys stay under the hand.
         pointerLayerLabel: "Pointer layer",
-        pointerLayerTip: "Keep the pointer layer active: the pointer layer stays on while the mode runs, and a locked mode keeps auto-mouse on. Return to the typing layer: starting the mode turns the pointer layer off, and it stays off while the mode runs. A mode its layers started never keeps the pointer layer on.",
     },
     modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
         [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"]],

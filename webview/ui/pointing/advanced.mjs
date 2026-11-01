@@ -4,7 +4,7 @@ import {AXIS, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, modi
 import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
 import {word} from "../../view/vocabulary.mjs";
 import {state} from "../../store.mjs";
-import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} from "./common.mjs";
+import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, tipFor, words} from "./common.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} scrolling @param {FormControls} controls */
@@ -31,9 +31,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         const per = word(words(model).directionStep, slot.directionOutput);
         const dpi = modeDpi(slot, model.configDefaults);
         // What the threshold does, by how often the mode sends, then how far it is.
-        const does = slot.directionOutput === 1
-            ? "How far the ball must move before a direction sends its key; it sends once however far the ball goes."
-            : "How far the ball must move for each key a direction sends: one key per this distance. Lower sends more often.";
+        const does = tipFor(model, slot.directionOutput === 1 ? "thresholdOnce" : "thresholdEvery");
         /** @param {number} counts */
         const distance = (counts) => {
             const shown = thresholdDistance(counts, dpi);
@@ -85,12 +83,12 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         const tuning = el(`<div class="pd-grid3"></div>`);
         const drawn = new Set(SCROLL_LEAD.map(([key]) => key));
         for (const [key, unit] of SCROLL_SINGLES) {
-            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: words(model).scrollTips?.[key]}));
+            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: tipFor(model, key)}));
             drawn.add(key);
         }
         for (const [top, bottom] of SCROLL_RATIOS) {
             const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
-            const pair = el(`<div class="field" data-tip="${esc(words(model).scrollTips?.[top] || "")}"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
+            const pair = el(`<div class="field" data-tip="${esc(tipFor(model, top))}"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
                 const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${esc(slot.id)}:scroll:${esc(key)}" class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
