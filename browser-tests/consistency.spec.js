@@ -98,3 +98,53 @@ test("a slot bank opens on the slots in use, makes a new one in the first free s
     await expect(macros.locator('[data-act="new-slot"]')).toHaveText("+ New macro");
     await expect(macros.locator('[data-all-slots="macros"]')).toHaveText("Show all 128 slots");
 });
+
+test("a number field is as wide as the values it takes, never as wide as its column", async ({page}) => {
+    await page.setViewportSize({width: 1920, height: 1000});
+    for (const [screen, state] of [["pointing", {pointingSlot: 0, pdAdvanced: true}], ["pointing", {pointingSlot: 4, pdAdvanced: true}], ["behaviours", {}], ["lighting", {stage: "key"}]]) {
+        await openControls(page, screen, state);
+        const widths = await page.locator("input.num:visible").evaluateAll(nodes => nodes.map(node => [node.getAttribute("data-f"), Math.round(node.getBoundingClientRect().width)]));
+        expect(widths.length, `${screen} has number fields`).toBeGreaterThan(0);
+        // Five digits and a unit, or a unit and its distance (≈ 2.5 mm), at most.
+        for (const [f, width] of widths) expect(width, f).toBeLessThanOrEqual(160);
+    }
+    // Every number field on a screen carries the class that sizes it.
+    expect(await page.locator('input[inputmode="numeric"]:not(.num), input[inputmode="decimal"]:not(.num)').count()).toBe(0);
+});
+
+test("a slot bank and its editor stop at 1320 px on a wide window, as Settings stops at 980 px", async ({page}) => {
+    await page.setViewportSize({width: 2200, height: 1000});
+    for (const screen of ["macros", "customKeys", "pointing"]) {
+        await openControls(page, screen);
+        const width = await page.locator(".pad.library").evaluate(node => node.getBoundingClientRect().width);
+        expect(width, screen).toBeLessThanOrEqual(1320);
+    }
+});
+
+test("every behaviour cell is one size, on Custom keys and in the Keymap's Behaviours tab, whatever its words", async ({page}) => {
+    for (const [width, screen, state] of [[1920, "customKeys", {}], [1440, "customKeys", {}], [1920, "keys", {tab: "behaviours"}]]) {
+        await page.setViewportSize({width, height: 1100});
+        await openControls(page, screen, state);
+        const heights = await page.locator(".bgrid .bcell").evaluateAll(cells => [...new Set(cells.map(cell => Math.round(cell.getBoundingClientRect().height)))]);
+        expect(heights, `${screen} at ${width}`).toHaveLength(1);
+        // A timing field shows its whole placeholder ("150 · default").
+        for (const fits of await page.locator(".bgrid input.num").evaluateAll(inputs => inputs.map(input => {
+            const probe = document.createElement("span");
+            probe.style.font = getComputedStyle(input).font;
+            probe.textContent = input.placeholder;
+            document.body.append(probe);
+            const fits = probe.getBoundingClientRect().width <= input.clientWidth;
+            probe.remove();
+            return fits;
+        }))) expect(fits, `${screen} timing placeholder`).toBe(true);
+    }
+});
+
+test("a choice shows a few short options on screen and keeps a longer list in a menu, by one rule", async ({page}) => {
+    await openControls(page, "host");
+    // Operating system: four short options, on show.
+    await expect(page.locator('.seg[aria-label="Operating system"] input[type="radio"]')).toHaveCount(4);
+    // Keyboard layout: seven, a menu.
+    await expect(page.locator('select[data-f="setting:hostLayout"]')).toHaveCount(1);
+    await expect(page.locator('.seg[aria-label="Keyboard layout"]')).toHaveCount(0);
+});

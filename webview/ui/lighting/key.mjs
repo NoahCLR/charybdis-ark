@@ -1,4 +1,5 @@
 // @ts-check
+import {choiceField} from "../segmented.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
 import {post, render, state} from "../../store.mjs";
@@ -20,7 +21,7 @@ function flashInterval(model) {
     const editable = editGate(model, "settings").editable && !field.readOnly;
     const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
     const node = el(`<label class="field" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}"><span>${esc(label)}</span>
-        <span class="affix unit"><input class="input mono" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span>
+        <span class="affix unit"><input class="input mono num" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span>
         <span class="hint">${esc(field.hint || "")}</span></label>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
@@ -70,10 +71,10 @@ export function stageKey(model) {
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
     const policy = section("When and where");
-    const commit = el(`<label class="field"><span>Tap commit</span><select data-f="lighting:key:tap-commit" class="input" ${canEdit ? "" : "disabled"}>
-        ${vocabulary(model).tapCommit.map(([id, text]) => `<option value="${esc(id)}" ${feedback.tapCommitMode === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
-    /** @type {HTMLSelectElement} */ (commit.querySelector("select")).addEventListener("change", (event) =>
-        post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLSelectElement} */ (event.target).value})));
+    const commit = el(choiceField({label: "Tap commit", f: "lighting:key:tap-commit", choices: vocabulary(model).tapCommit,
+        current: feedback.tapCommitMode, disabled: !canEdit}));
+    commit.addEventListener("change", (event) =>
+        post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));
     const locality = el(`<label class="field"><span>Locality</span><select data-f="lighting:key:locality" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${feedback.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>

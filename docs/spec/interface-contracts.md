@@ -154,6 +154,30 @@ The same kind of control looks and sits the same on every screen.
 - A switch on a Settings screen's row sits at the row's right, with On or Off
   beside it; an editor's option reads switch, then its words, from the left
   edge (no test).
+- A choice of two to four options whose words fit one line together
+  (`ON_SCREEN_MAX_OPTIONS`, `ON_SCREEN_MAX_CHARACTERS`: 60 characters) shows them on screen, as one segmented radio group
+  (`webview/ui/segmented.mjs`), so each is read without opening anything and
+  picked in one click; more options, or longer ones, stay a menu
+  (`onScreenChoice`, `webview/view/choices.mjs`). Every such choice is drawn
+  by `choiceField`, which applies the rule, and read by `choiceValue`,
+  whichever it became (`tests/view/choices.test.mjs`,
+  `browser-tests/consistency.spec.js`). A setting whose stored value is not
+  among its choices shows it as one more option, "as stored"
+  (`settingOptions`). A pair that are two
+  independent switches (Reverse scrolling's two axes) is two switches, not
+  four options naming their combinations.
+- A slot bank and its editor (Macros, Custom keys, Pointing modes) stop at
+  1320 px together, a 340 px list and a 960 px editor, as a Settings screen
+  stops at 980 px; a wider window leaves the room beside them
+  (`browser-tests/consistency.spec.js`).
+- Every behaviour cell is one size, in any grid at any width: room for its
+  action and two lines of how it runs, longer words clamped to two lines
+  (`browser-tests/consistency.spec.js`).
+- A number field is as wide as the values it takes (`input.num`, five
+  digits unless `--digits` says otherwise, a behaviour's timing as long as
+  its placeholder) with room for its unit, never as
+  wide as its column, and a menu in the pointing editor is as wide as its
+  words (`browser-tests/consistency.spec.js`).
 - A Settings card is named for what it holds, never for its screen (Where
   behaviours run, How combos run; no test).
 - A macro, a custom key, a pointing mode and the keyboard are named by their

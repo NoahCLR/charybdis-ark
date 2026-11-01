@@ -1,4 +1,6 @@
 // @ts-check
+import {choiceField} from "../segmented.mjs";
+import {settingOptions} from "../../view/choices.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {post} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
@@ -42,20 +44,15 @@ export function stageBase(model) {
     /** @param {import("../../../contracts/panel.js").PresentedField | undefined} entry */
     const choice = (entry) => {
         if (!entry) return el(`<span></span>`);
-        const choices = (entry.choices || []).map((item) => typeof item === "object" ? item : {value: item, label: String(item)});
-        const known = choices.some((item) => String(item.value) === String(entry.value));
-        const control = el(`<label class="field" data-tip="${esc([entry.tooltip, entry.hint].filter(Boolean).join(" "))}"><span>${esc(entry.label)}</span>
-            <select class="input" data-macro="${esc(entry.macro)}" data-f="setting:${esc(entry.macro)}" ${editable && !entry.readOnly ? "" : "disabled"}>
-            ${known ? "" : `<option value="${esc(entry.value)}" selected>${esc(entry.value)} · as stored</option>`}
-            ${choices.map((item) => `<option value="${esc(item.value)}" ${String(item.value) === String(entry.value) ? "selected" : ""}>${esc(item.label)}</option>`).join("")}</select>
-            ${entry.hint ? `<span class="hint">${esc(entry.hint)}</span>` : ""}</label>`);
-        /** @type {HTMLSelectElement} */ (control.querySelector("select")).addEventListener("change", (event) =>
-            submit({[entry.macro]: /** @type {HTMLSelectElement} */ (event.target).value}));
+        const control = el(`<div data-tip="${esc([entry.tooltip, entry.hint].filter(Boolean).join(" "))}">${choiceField({label: entry.label, f: `setting:${entry.macro}`,
+            choices: settingOptions(entry), current: String(entry.value), disabled: !(editable && !entry.readOnly), attributes: {"data-macro": entry.macro}})}
+            ${entry.hint ? `<span class="hint">${esc(entry.hint)}</span>` : ""}</div>`);
+        control.addEventListener("change", (event) => submit({[entry.macro]: /** @type {HTMLInputElement | HTMLSelectElement} */ (event.target).value}));
         return control;
     };
     const speed = field("effectSpeed");
     const speedControl = speed ? el(`<label class="field" data-tip="${esc([speed.tooltip, speed.hint].filter(Boolean).join(" "))}"><span>${esc(speed.label)}</span>
-        <input class="input mono" inputmode="numeric" data-macro="${esc(speed.macro)}" data-f="setting:${esc(speed.macro)}" value="${esc(speed.value)}" ${editable && !speed.readOnly ? "" : "disabled"}>
+        <input class="input mono num" inputmode="numeric" data-macro="${esc(speed.macro)}" data-f="setting:${esc(speed.macro)}" value="${esc(speed.value)}" ${editable && !speed.readOnly ? "" : "disabled"}>
         <span class="hint">${esc(speed.hint || "")}. Effects without animation ignore it.</span></label>`) : el(`<span></span>`);
     speedControl.querySelector("input")?.addEventListener("change", (event) => {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();

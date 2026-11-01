@@ -210,7 +210,7 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
             ${DONE}
             <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button></span></div>
         ${step.kind === "text" ? `<label class="field"><textarea data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:text" aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${esc(index)}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
-            : step.kind === "delay" ? `<label class="field delay-field"><span>Delay</span><span class="affix unit"><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${esc(index)}" inputmode="numeric" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}><i>ms</i></span></label>`
+            : step.kind === "delay" ? `<label class="field delay-field"><span>Delay</span><span class="affix unit"><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono num" data-step-delay="${esc(index)}" inputmode="numeric" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}><i>ms</i></span></label>`
             : `<div class="row"><span class="tok">${esc(describeStep(step, key => keyIdentity(model, key).label)) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
     </div>`);
     const input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (node.querySelector("textarea, input"));
