@@ -85,7 +85,7 @@ for (const [screen, state] of surfaces) {
 
 test("Pointing name preserves focus and caret across an accepted edit", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 0});
-    const input = page.locator(".pd-identity label").filter({has: page.getByText("Name", {exact: true})}).locator("input");
+    const input = page.locator('[data-f="pointing:0:name"]');
     await input.focus();
     await input.evaluate(node => node.setSelectionRange(2, 5));
     const previous = await input.elementHandle();
@@ -202,7 +202,7 @@ test("a field drawn closed keeps no typed text", async ({page}) => {
 
 test("picker search has a unique identity beside its underlying editor", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
-    await page.locator(".pd-cross .arm.up [data-pick]").click();
+    await page.locator(".pd-arm.up .pd-key").click();
     expect(await identityProblems(page)).toEqual([]);
     const search = page.locator("#pickerSearch");
     await search.fill("key");

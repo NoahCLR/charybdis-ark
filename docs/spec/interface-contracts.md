@@ -156,36 +156,38 @@ The same kind of control looks and sits the same on every screen.
   edge (no test).
 - A Settings card is named for what it holds, never for its screen (Where
   behaviours run, How combos run; no test).
-- A macro, a custom key and the keyboard are named by their editor's title,
-  `titleName`: Enter commits, Escape restores the stored name, and the byte
-  count shows on focus or when over the limit
+- A macro, a custom key, a pointing mode and the keyboard are named by their
+  editor's title, `titleName`: Enter commits, Escape restores the stored
+  name, and the byte count shows on focus or when over the limit
   (`browser-tests/macro-ux.spec.js`,
-  `browser-tests/custom-key-behaviour.spec.js`).
+  `browser-tests/custom-key-behaviour.spec.js`,
+  `browser-tests/pointing-controls.spec.js`).
 - A Settings screen (Behaviours, Combos, Pointer, Host) draws its
   sections as open cards, none folding, and offers no search
   (`tests/view/settings-layout.test.mjs`,
   `browser-tests/settings-screens.spec.js`).
-- A slot bank (Macros, Custom keys) and a list beside its editor (Lighting's
+- A slot bank (Macros, Custom keys, Pointing modes) and a list beside its editor (Lighting's
   layers and pointing modes) scroll on their own and keep their place across
   renders of the same screen, each list apart (`data-scroll-list`)
   (`tests/view/scroll.test.mjs`, `browser-tests/macro-ux.spec.js`,
   `browser-tests/lighting-controls.spec.js`).
 - A slot bank opens on the slots in use, in slot order, each tile saying what
-  its slot is (a name, else what it holds), then **+ New macro** or **+ New
-  custom key**, which opens the first free slot with its name ready to type,
-  then one disclosure, "Show all 128 slots", which draws the unused slots
+  its slot is (a name, else what it holds), then **+ New macro**, **+ New
+  custom key** or **+ New mode**, which opens the first free slot (its name
+  ready to type, where the slot has one before it holds anything), then one
+  disclosure, "Show all 128 slots" (32 for pointing modes), which draws the unused slots
   after it, in slot order, so nothing shown moves, its open state kept per
   bank. The slot open in the editor and one the draft changed always show; a
   search looks through every slot (`slotBank`, `webview/view/slot-bank.mjs`,
   drawn by `webview/ui/slot-bank.mjs`; `tests/view/slot-bank.test.mjs`,
-  `browser-tests/consistency.spec.js`).
+  `browser-tests/consistency.spec.js`, `browser-tests/pointing-controls.spec.js`).
 - Keys and Lighting draw the same layer strip on the board
   (`tests/view/navigation-profile-ui.test.mjs`), Rename & reorder included
   (no test).
 - Every list of layers (the layer strip, This key on every layer, a Settings
   screen's per-layer switches, Combo layer matching, a behaviour's or combo's
-  Layers it runs on, a pointing mode's How it starts, Lighting's layer list,
-  Rename & reorder) shows the layers in use and folds the empty ones
+  Layers it runs on, Lighting's layer list, Rename & reorder) shows the
+  layers in use and folds the empty ones
   (`emptyLayers`, `webview/view/empty-layers.mjs`; D-L76) behind one
   disclosure at its end, `emptyLayersToggle` (`webview/ui/empty-layers.mjs`):
   `DISCLOSURE`, then "8 empty layers", a button with `aria-expanded`, its open
@@ -570,15 +572,16 @@ file did not load leaves a plain message in the page, never a blank one.
 Firmware D-F62. Which layers may start a slot's mode or be turned on by its
 key, and why not, are published as `pdModeEditing.linkTargets`.
 
-The How it starts card (the mode's keys, then its layers, then what ends it;
-the slot's light sits in its identity card) draws the layers with the shared
-per-layer switches (`webview/ui/layer-switches.mjs`, whose grid Settings'
-layer groups use), as a table: a row per layer, a "Starts this pointing mode"
-and a "Turned on by this pointing mode's key" switch, each titled for the
-layer in its row. A default layer or the pointer layer is a dimmed row saying
-why in it, both switches disabled; a layer that starts another mode has its
-"Starts" switch disabled and says "already starts" that mode in the row, its
-key switch usable.
+A mode's What starts it step (its keys, then its layers, then what ends it)
+draws each half of the link as layer chips, the layers that start the mode
+and the layers its key turns on, each chip removed by its ×, then an
+**+ Add layer** menu of every other layer, in the tab order, the empty ones
+(D-L76) in an "Empty layers" group at its end. A layer that cannot be added
+is in the menu, disabled, saying why: a default layer or the pointer layer
+gives the reason the keyboard ignores it, and a layer that starts another
+mode says "already starts" that mode in the Layers menu, while the Its key
+turns on menu still offers it (`webview/ui/pointing/link.mjs`;
+`browser-tests/pointing-controls.spec.js`).
 
 A changed link naming one is refused when staged, and so is a settings change
 that makes a layer a link names the pointer layer or a default layer
@@ -588,7 +591,7 @@ follow their layers included) and refuses, in words, a move that would still
 leave a link ignored, have one layer start two modes, or put two of a link's
 layers on one (`reorderLinkRefusal`, `core/model/portable-profile.js`); a
 stored layer the keyboard ignores (in an imported profile, say) stays
-switchable off, said beside it and as a Review warning.
+removable, said beside it and as a Review warning.
 
 Review names each layer of a link, and of a behaviour's or combo's allowed
 layers, after its mark (a `layers` review mark). What ends the mode is a
@@ -1080,6 +1083,29 @@ escaped payload (D-L26), in `webview/ui/macros/`.
   each key arrives (`capturedKey`): a Mac's releases under ⌘ and its Caps Lock
   reports, Windows's lone Print Screen release and the Left Ctrl it sends with
   AltGr.
+
+## Pointing mode editor
+
+A configured mode's editor (`webview/ui/pointing/editor.mjs`) is one card
+titled by the mode's name, with Place on a key…, Duplicate and Clear mode
+beside it, and four numbered steps read top to bottom; Advanced follows as its
+own folded card (`browser-tests/pointing-controls.spec.js`).
+
+1. **What the ball does**: Scroll or Send keys, a radio group of two large
+   choices (`webview/ui/pointing/kind-choice.mjs`). Picking the other kind
+   redraws the form for it and posts nothing; its first edit posts the new
+   kind. An empty slot starts a mode by the same choice, or copies one.
+2. **What each direction sends** draws each direction the mode reads as a key
+   placed where the ball sends it, around the ball (four, or eight with the
+   diagonals); a click opens the picker on the keys a pointing mode sends, ×
+   clears it, and a macro's notes sit under its key. Beside them, Reads, When
+   a direction has no key and How often it sends. **How it scrolls** groups
+   its fields as which way, Speed and Feel, under the vocabulary's names, and
+   the held modifiers (`webview/ui/pointing/movement.mjs`).
+3. **What starts it**: the mode's hold and lock keys named by the mode, never
+   by `PD_MODE_n`, and where they sit; then its link as layer chips
+   ([Pointing links](#pointing-links)).
+4. **While it runs**: its pointer speed and its light, with Edit in Lighting.
 
 ## Focus across renders
 

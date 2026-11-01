@@ -1,13 +1,19 @@
 // @ts-check
+// An empty slot's card: it starts a mode by the same choice step 1 of a mode
+// offers, Scroll or Send keys, or copies a mode already made.
 import {el, esc} from "../../lib/dom.mjs";
-import {KIND, newMode, scrollStarter} from "../../view/pointing-config.mjs";
-import {holdKeyName, whatReachesSlot} from "../../view/pointing-reach.mjs";
+import {newMode, scrollStarter} from "../../view/pointing-config.mjs";
+import {whatReachesSlot} from "../../view/pointing-reach.mjs";
 import {post} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {actionMarked, mark} from "../marks.mjs";
 import {listed} from "../../view/vocabulary.mjs";
+import {kindChoice} from "./kind-choice.mjs";
+import {placeButton} from "./keys-and-light.mjs";
 
+// A key for an empty slot is allowed by the keyboard, so the card explains
+// the consequence instead of the app refusing the edit.
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot */
 function inertNote(model, slot) {
     const {keys, behaviours, combos, layers} = whatReachesSlot(model, slot);
@@ -16,34 +22,32 @@ function inertNote(model, slot) {
     if (keys.length) parts.push(`${keys.length} key${keys.length === 1 ? "" : "s"} on ${esc(layers.join(", "))}`);
     if (behaviours.length) parts.push(`${behaviours.length} behaviour${behaviours.length === 1 ? "" : "s"} (${behaviours.map((row) => actionMarked(model, row.keycode)).join(", ")})`);
     if (combos.length) parts.push(`${combos.length} combo output${combos.length === 1 ? "" : "s"} (${esc(combos.map((row) => row.badge).join(", "))})`);
-    return `<div class="unavailable">${listed(parts)} still reach this slot. The keyboard refuses to activate an empty slot, so they do nothing until it is configured — they do not need to be removed first.</div>`;
+    return `<div class="unavailable">${listed(parts)} still reach this slot. The keyboard refuses to activate an empty slot, so they do nothing until it holds a mode — they do not need to be removed first.</div>`;
 }
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {import("../surface-types.js").PresentedSlot[]} slots */
 export function emptySlot(model, slot, slots) {
     const gate = editGate(model, "pointing"), canEdit = gate.editable;
     const sources = slots.filter((row) => row.kind);
-    const node = el(`<div class="pd-editor stack"><div class="card">
-        <div class="card-h"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span><h3>Slot ${esc(slot.id)} is empty</h3>
-            <span class="tag">${esc(holdKeyName(slot))}</span></div>
+    const node = el(`<div class="pd-editor stack" data-pd-editor="${esc(slot.id)}"><div class="card">
+        <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span><h3>New pointing mode</h3>
+            <span class="tag">Slot ${esc(slot.id)}</span><span class="right row actions"></span></div>
         <div class="card-b stack">
-        <p class="note pd-empty-note">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its hold key is <code>${esc(holdKeyName(slot))}</code>, and <code>${esc(slot.keys?.lock || "")}</code> locks it on.</p>
+        <p class="note">Nothing is stored here yet. What should the trackball do while this mode runs?</p>
         ${inertNote(model, slot)}
-        <div class="row gap-8">
-            <button class="btn primary" data-new="${KIND.DIRECTIONAL}" ${canEdit ? "" : "disabled"}
-                data-tip="Arrow-style keys or shortcuts, starting on the dominant axis with no shortcuts set.">New directional mode</button>
-            <button class="btn" data-new="${KIND.SCROLLING}" ${canEdit ? "" : "disabled"}
-                data-tip="Scrolling, starting from Dragscroll's tuning.">New scrolling mode</button></div>
-        ${sources.length ? `<div class="pd-copy">
-            <label class="field"><span>Copy from</span><select class="input" data-f="pointing:${esc(slot.id)}:copy" data-source ${canEdit ? "" : "disabled"}>
-                ${sources.map((row) => `<option value="${esc(row.id)}">Slot ${esc(row.id)} · ${esc(row.name)}</option>`).join("")}</select></label>
-            <button class="btn" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
+        <div data-kinds></div>
+        ${sources.length ? `<label class="field pd-copy"><span>Or copy a mode</span><select class="input" data-f="pointing:${esc(slot.id)}:copy" data-source ${canEdit ? "" : "disabled"}>
+            <option value="">Pick a mode…</option>
+            ${sources.map((row) => `<option value="${esc(row.id)}">${esc(row.name)} · slot ${esc(row.id)}</option>`).join("")}</select></label>`
             : ""}
         ${canEdit || gate.quiet ? "" : `<div class="unavailable">${esc(gate.why || "This slot cannot be edited right now.")}</div>`}
     </div></div></div>`);
-    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-new]")).forEach((button) => button.addEventListener("click", () =>
-        post(edits.pdMode(slot.id, newMode(slot, Number(button.dataset.new), scrollStarter(slots)), model.profileIdentity))));
-    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="duplicate"]'))?.addEventListener("click", () =>
-        post(edits.duplicatePdMode(slot.id, Number(/** @type {HTMLSelectElement} */ (node.querySelector("[data-source]")).value), model.profileIdentity)));
+    /** @type {HTMLElement} */ (node.querySelector(".right")).append(placeButton(slot, editGate(model, "keys").editable));
+    /** @type {HTMLElement} */ (node.querySelector("[data-kinds]")).replaceWith(kindChoice(model, slot.id, null, {disabled: !canEdit,
+        pick: (kind) => post(edits.pdMode(slot.id, newMode(slot, kind, scrollStarter(slots)), model.profileIdentity))}));
+    /** @type {HTMLSelectElement | null} */ (node.querySelector("[data-source]"))?.addEventListener("change", (event) => {
+        const value = /** @type {HTMLSelectElement} */ (event.target).value;
+        if (value !== "") post(edits.duplicatePdMode(slot.id, Number(value), model.profileIdentity));
+    });
     return node;
 }

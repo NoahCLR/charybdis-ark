@@ -1,13 +1,9 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {keyDisplayName, pointingMacro} from "../../view/keyvalues.mjs";
-import {keycodeName} from "../../view/key-identity.mjs";
 import {modifierGrid} from "../modifier-grid.mjs";
-import {render} from "../../store.mjs";
-import {openPicker} from "../picker.mjs";
 
-/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {() => void} stageCurrent */
-export function formControls(model, slot, canEdit, stageCurrent) {
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit */
+export function formControls(model, slot, canEdit) {
     /** @type {import("../surface-types.js").FormReaders} */
     const form = {name: () => slot.name, kind: () => slot.kind, dpi: () => slot.dpi};
     const disabled = canEdit ? "" : "disabled";
@@ -28,43 +24,6 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         if (options.onChange) /** @type {HTMLSelectElement} */ (node.querySelector("select")).addEventListener("change", options.onChange);
         return node;
     };
-    /** @param {string} label @param {import("../../../contracts/edits.js").Scalar | undefined} code @param {string} key @param {import("../surface-types.js").ShortcutOptions} [options] */
-    const shortcut = (label, code, key, options = {}) => {
-        const name = options.name ?? keycodeName(model, Number(code ?? 0));
-        // The field shows the key as the picker names it. Left as shown it
-        // stages the stored keycode; a QMK name or alias typed over it stages
-        // that.
-        const shown = options.name ?? keyDisplayName(model, Number(code ?? 0));
-        const node = el(`<label class="field ${esc(options.klass)}"><span>${options.labelHtml || esc(label)}</span>
-            <div class="input-row"><input data-f="pointing:${esc(slot.id)}:${esc(key)}" class="input" value="${esc(shown)}" placeholder="None" ${disabled}
-                data-tip="${esc(name ? `Stored as ${name}. Type a QMK keycode name, or pick one.` : "Type a QMK keycode name, or pick one.")}">
-            <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
-        const macro = pointingMacro(model, code);
-        if (macro) {
-            if (macro.empty) node.append(el(`<span class="note">Empty macro: does nothing yet</span>`));
-            if (slot.directionOutput === 0) node.append(el(`<span class="note" data-tip="Triggers while a macro is playing are dropped. Choose Once per movement under How often it sends for a longer macro.">Busy triggers are dropped · try Once per movement</span>`));
-        }
-        const input = /** @type {HTMLInputElement} */ (node.querySelector("input"));
-        form[key] = () => input.value.trim() === shown ? name : input.value.trim();
-        /** @type {HTMLButtonElement} */ (node.querySelector("[data-pick]")).addEventListener("click", (event) => {
-            event.preventDefault();   // inside a <label>, a click would also focus the input
-            // Only what the keyboard sends from a pointing mode is offered
-            // (model.pdModeEditing.tapKeys); a key typed instead is checked
-            // when it is staged.
-            openPicker({
-                title: label, context: `${slot.name} · slot ${slot.id}`,
-                seed: name ? [name] : [],
-                allowedKeys: model.pdModeEditing?.tapKeys?.plain ?? null,
-                modifiable: model.pdModeEditing?.tapKeys?.modified ?? null,
-                onPick: (expression) => {
-                    input.value = expression;
-                    stageCurrent();
-                    render();
-                },
-            });
-        });
-        return node;
-    };
     // The shared Left / Right by Ctrl / Shift / Alt / GUI grid.
     /** @param {string} label @param {number} mask @param {string} key */
     const modifiers = (label, mask, key) => {
@@ -73,5 +32,5 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         return grid.node;
     };
 
-    return {form, disabled, field, select, shortcut, modifiers};
+    return {form, disabled, field, select, modifiers};
 }

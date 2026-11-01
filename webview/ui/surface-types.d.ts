@@ -23,6 +23,5 @@ export interface TrackballOptions {mode: string; trackball: boolean; clickable: 
 export type PresentedSlot = PublishedModel['pdModes'][number];
 export interface FieldOptions {unit?: string; wide?: boolean; tip?: string}
 export interface SelectOptions {inline?: boolean; tip?: string; onChange?: (event: Event) => void}
-export interface ShortcutOptions {name?: string; klass?: string; labelHtml?: string}
 export type FormReaders = PdForm & Record<string, () => Scalar>;
 export type LayerStack = NonNullable<PublishedModel['portable']['layers']>;

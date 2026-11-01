@@ -9,18 +9,43 @@ const field = (page, name) => editor(page).getByLabel(name, {exact: true})
 const configPost = (page, slot, config) => expectPost(page, {
     type: "savePdMode", slot, expectedBase: expect.any(Object), config: expect.objectContaining({id: slot, ...config}),
 });
+// A direction's key, picked as a person picks it: the key, then Use.
+async function pickDirection(page, direction, keycode) {
+    await editor(page).locator(`.pd-arm.${direction} .pd-key`).click();
+    await page.locator(`.pkb-key[data-pick="${keycode}"]`).click();
+    await page.locator('.picker [data-act="use"]').click();
+}
 async function advanced(page) {
     await editor(page).locator("details summary").click();
     await expect(editor(page).locator("details")).toHaveAttribute("open");
     await expect.poll(() => page.evaluate(async () => (await import("/webview/store.mjs")).state.pdAdvanced)).toBe(true);
 }
 
+test("the slot list opens on the modes in use; New opens the first free slot, and Show all the rest", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 0});
+    const list = page.getByRole("list", {name: "Pointing slots"});
+    const used = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().pdModes.filter(slot => slot.kind));
+    await expect(list.locator(".pd-tile")).toHaveCount(used.length);
+    await expect(list.locator(".pd-tile .v")).toHaveText(used.map(slot => slot.name));
+    await expect(page.locator(".pointing-library .card-h .tag").first()).toHaveText(`${used.length} of 32 used`);
+    await list.locator('[data-act="new-slot"]').click();
+    const free = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().pdModes.find(slot => !slot.kind).id);
+    await expect(editor(page).locator(".card-h h3")).toHaveText("New pointing mode");
+    await expect(editor(page).locator(".card-h .tag")).toHaveText(`Slot ${free}`);
+    expect(await posted(page)).toEqual([]);
+    await list.locator('[data-all-slots="pointing"]').click();
+    await expect(list.locator(".pd-tile")).toHaveCount(32);
+    // An empty slot that keys still reach is marked, and says so.
+    await expect(list.locator(`.pd-tile[data-slot="${free}"]`)).toHaveClass(/warn/);
+    await expect(list.locator(`.pd-tile[data-slot="${free}"]`)).toHaveAttribute("data-tip", /still reach it/);
+});
+
 test("every scrolling tuning field posts the visible value once, retaining the rest of the record", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 0});
     await advanced(page);
     const fields = [
-        ["Movement per wheel step ↔", "divisorH"], ["Movement per wheel step ↕", "divisorV"],
-        ["Minimum interval ms", "intervalMs"], ["Axis lock timeout ms", "lockMs"],
+        ["Sideways: ball movement per step", "divisorH"], ["Up and down: ball movement per step", "divisorV"],
+        ["Fastest repeat ms", "intervalMs"], ["Stay on one axis for ms", "lockMs"],
         ["Horizontal activation threshold", "thresholdH"], ["Vertical activation threshold", "thresholdV"],
         ["Gesture expiry ms", "expireMs"], ["Cross-axis decay divisor", "decayDivisor"],
         ["Axis selection ratio numerator", "startNumerator"], ["Axis selection ratio denominator", "startDenominator"],
@@ -36,8 +61,8 @@ test("every scrolling tuning field posts the visible value once, retaining the r
 });
 
 for (const [label, value, expected] of [
-    ["Name", "Scroll sentinel", {name: "Scroll sentinel"}],
-    ["Pointer speed while active", "1400", {dpi: 1400}],
+    ["Pointing mode name", "Scroll sentinel", {name: "Scroll sentinel"}],
+    ["Pointer speed", "1400", {dpi: 1400}],
     ["Scrolls", "1", {axis: 1}],
     ["Reverse scrolling", "3", {scroll: expect.objectContaining({invert: 3})}],
     ["After this mode ends", "1", {pointerLayer: 1}],
@@ -45,7 +70,7 @@ for (const [label, value, expected] of [
     test(`scrolling ${label} posts its record`, async ({page}) => {
         await openControls(page, "pointing", {pointingSlot: 0});
         if (label === "After this mode ends") await advanced(page);
-        if (label === "Name") await change(field(page, label), value);
+        if (label === "Pointing mode name") await change(field(page, label), value);
         else await field(page, label).selectOption(value);
         await configPost(page, 0, {kind: 2, ...expected});
     });
@@ -68,15 +93,14 @@ test("each modifier checkbox in scrolling contributes its own bit", async ({page
 
 test("directional shortcuts, axes, empty directions, output and thresholds all post", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
-    const directions = {};
+    // The preview never applies what is posted, so each pick posts only its own direction changed.
     for (const direction of ["up", "left", "right", "down"]) {
         await clearPosts(page);
-        await change(editor(page).locator(`.pd-cross .arm.${direction} input`), "KC_A");
-        directions[direction] = expect.objectContaining({keycode: "KC_A"});
-        await configPost(page, 4, {directions: expect.objectContaining({...directions})});
+        await pickDirection(page, direction, "KC_A");
+        await configPost(page, 4, {directions: expect.objectContaining({[direction]: expect.objectContaining({keycode: "KC_A"})})});
     }
     for (const [label, value, expected] of [
-        ["When a direction is empty", "2", {emptyDirection: 2}],
+        ["When a direction has no key", "2", {emptyDirection: 2}],
         ["How often it sends", "1", {directionOutput: 1}],
     ]) {
         await clearPosts(page);
@@ -110,12 +134,11 @@ test("eight directions draw and post every diagonal shortcut and modifier policy
         for (const key of Object.keys(model.pdModes[4].diagonals)) model.pdModes[4].diagonals[key].keycode = 4;
         store.setModel(model); store.render();
     });
-    const diagonals = {};
+    await expect(editor(page).locator(".pd-compass.eight .pd-arm")).toHaveCount(8);
     for (const direction of ["upLeft", "upRight", "downLeft", "downRight"]) {
         await clearPosts(page);
-        await change(editor(page).locator(`.pd-cross .arm.${direction} input`), "KC_B");
-        diagonals[direction] = expect.objectContaining({keycode: "KC_B"});
-        await configPost(page, 4, {diagonals: expect.objectContaining({...diagonals})});
+        await pickDirection(page, direction, "KC_B");
+        await configPost(page, 4, {diagonals: expect.objectContaining({[direction]: expect.objectContaining({keycode: "KC_B"})})});
     }
     await advanced(page);
     for (const label of ["Up", "Left", "Right", "Down", "Up-left", "Up-right", "Down-left", "Down-right"]) {
@@ -157,26 +180,32 @@ test("Advanced has no mouse button overrides, and a saved mode posts no button f
     await expect(editor(page).locator(".pd-buttons")).toHaveCount(0);
     await expect(editor(page)).not.toContainText("Mouse button overrides");
     await expect(editor(page).locator('[data-f^="pointing:4:button:"]')).toHaveCount(0);
-    await change(field(page, "Name"), "Arrow sentinel");
+    await change(field(page, "Pointing mode name"), "Arrow sentinel");
     await configPost(page, 4, {name: "Arrow sentinel"});
     expect((await posted(page))[0].config).not.toHaveProperty("buttons");
 });
 
 test("movement changes its form locally, and the first edit posts the new kind", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 0});
-    await field(page, "Movement").selectOption("1");
+    const kinds = editor(page).getByRole("radiogroup", {name: "What the ball does"});
+    await expect(kinds.getByRole("radio", {name: /Scroll/})).toBeChecked();
+    await kinds.locator("label").filter({hasText: "Send keys"}).click();
     expect(await posted(page)).toEqual([]);
-    await expect(editor(page).locator(".pd-cross")).toBeVisible();
-    await change(field(page, "Name"), "Directional sentinel");
+    await expect(kinds.getByRole("radio", {name: /Send keys/})).toBeChecked();
+    await expect(editor(page).locator(".pd-compass")).toBeVisible();
+    await expect(editor(page).locator(".pd-step h4").nth(1)).toHaveText("What each direction sends");
+    await change(field(page, "Pointing mode name"), "Directional sentinel");
     await configPost(page, 0, {kind: 1, name: "Directional sentinel", thresholdY: 60});
 });
 
 test("shortcut picker, duplicate, clear and empty-slot creation post their commands", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
-    await editor(page).locator(".pd-cross .arm.up [data-pick]").click();
-    await page.locator('.pkb-key[data-pick="KC_A"]').click();
-    await page.locator('.picker [data-act="use"]').click();
+    await pickDirection(page, "up", "KC_A");
     await configPost(page, 4, {directions: expect.objectContaining({up: expect.objectContaining({keycode: expect.stringContaining("KC_A")})})});
+    // × clears a direction's key.
+    await clearPosts(page);
+    await editor(page).locator(".pd-arm.down .pd-key-clear").click();
+    await configPost(page, 4, {directions: expect.objectContaining({down: {keycode: "0", modifierPolicy: 0, mask: 0}})});
     await clearPosts(page);
     await editor(page).locator('[data-act="duplicate"]').click();
     await expectPost(page, {type: "duplicatePdMode", slot: 6, source: 4});
@@ -184,15 +213,17 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
     await clearPosts(page);
     await editor(page).locator('[data-act="clear"]').click();
     await expectPost(page, {type: "clearPdMode", slot: 4});
+    await page.locator('[data-all-slots="pointing"]').click();
     await page.locator('[data-slot="8"]').click();
-    for (const [label, kind] of [["New directional mode", 1], ["New scrolling mode", 2]]) {
+    // An empty slot starts a mode by the same choice step 1 offers.
+    await expect(editor(page).locator(".card-h h3")).toHaveText("New pointing mode");
+    for (const [label, kind] of [["Send keys", 1], ["Scroll", 2]]) {
         await clearPosts(page);
-        await editor(page).getByRole("button", {name: label, exact: true}).click();
+        await editor(page).locator(".pd-kind").filter({hasText: label}).click();
         await configPost(page, 8, {kind, name: "Mode 8"});
     }
     await clearPosts(page);
     await editor(page).locator("[data-source]").selectOption("5");
-    await editor(page).getByRole("button", {name: "Duplicate into this slot", exact: true}).click();
     await expectPost(page, {type: "duplicatePdMode", slot: 8, source: 5});
 });
 
@@ -230,7 +261,7 @@ test("the reach row places the hold key on a key, and an empty slot names what s
 
 test("a pointing mode name counts bytes and flags one past the limit instead of cutting it off", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
-    const name = field(page, "Name");
+    const name = field(page, "Pointing mode name");
     const count = editor(page).locator("[data-name-count]");
     await name.fill("é".repeat(17));
     await expect(name).toHaveValue("é".repeat(17));
@@ -255,66 +286,59 @@ async function publishSlot(page, id, link) {
     }, {id, link});
 }
 
-test("the How it starts card posts the layers that start the mode, the layers its key turns on and what ends it", async ({page}) => {
+test("What starts it posts the layers that start the mode, the layers its key turns on and what ends it", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 1});
     const card = editor(page).locator(".pd-starts");
-    // One card for how the mode starts: its keys, then the layers, then what ends it.
-    await expect(card.locator(".card-h h3")).toHaveText("How it starts");
-    await expect(card.locator(".card-h .note")).toHaveCount(0);
-    expect(await card.locator(".card-b > *").evaluateAll(nodes => nodes.map(node => node.className.split(" ")[0]))).toEqual(["note", "pd-lines", "layer-table"]);
-    await expect(card.locator('[data-act="place"]')).toBeVisible();
-    await expect(card.locator('[data-act="lighting"]')).toHaveCount(0);
-    await expect(editor(page).locator('.pd-identity [data-act="lighting"]')).toBeVisible();
-    const starts = n => page.locator(`[data-f="pointing:1:linkedLayers:${n}"]`);
-    const key = n => page.locator(`[data-f="pointing:1:linkTurnsOn:${n}"]`);
-    const sw = locator => page.locator("label.sw").filter({has: locator});
-    const rowOf = n => card.locator(".layer-table-row").filter({has: starts(n)});
+    // Step 3: its keys, then the layers that start it, then the layers its key turns on.
+    await expect(editor(page).locator(".pd-step h4").nth(2)).toHaveText("What starts it");
+    await expect(card.locator(".pd-row-l")).toHaveText(["Its keys", "Layers", "Its key turns on"]);
+    await expect(card.locator(".pd-cap")).toHaveText(["Volume hold", "Volume lock"]);
+    await expect(card).not.toContainText("PD_MODE_1");
+    const add = page.locator('[data-f="pointing:1:linkedLayers:add"]'), addKey = page.locator('[data-f="pointing:1:linkTurnsOn:add"]');
+    const starts = card.locator('[aria-labelledby="pd-starts-1"]'), turns = card.locator('[aria-labelledby="pd-turns-1"]');
     const link = (fields) => ({linkedLayers: 0, linkTurnsOn: 0, linkEnds: 0, ...fields});
-    // One row per layer, in the tab order, with a switch in each of two columns.
+    // Every layer not in a list is in its Add menu; the default and pointer
+    // layers are there disabled, saying why.
     const layers = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().layers.length);
-    await expect(card.locator(".layer-table-row:not(.layer-table-head)")).toHaveCount(layers);
-    await expect(card.locator(".layer-table-head")).toContainText("Starts this pointing mode");
-    await expect(card.locator(".layer-table-head")).toContainText("Turned on by this pointing mode's key");
-    // The default and pointer layers are dimmed rows that say why, both switches off limits.
-    await expect(rowOf(0)).toHaveClass(/unusable/);
-    await expect(rowOf(0)).toContainText("default layer, always on");
-    await expect(rowOf(4)).toContainText("pointer layer, follows the trackball");
-    for (const n of [0, 4]) { await expect(starts(n)).toBeDisabled(); await expect(key(n)).toBeDisabled(); }
-    await expect(card).not.toContainText("Not offered");
-    // A disabled switch looks disabled.
-    expect(await sw(starts(4)).locator(".track").evaluate(node => getComputedStyle(node).borderStyle)).toBe("dashed");
+    await expect(add.locator("option:not([value=''])")).toHaveCount(layers);
+    await expect(add.locator('option[value="0"]')).toBeDisabled();
+    await expect(add.locator('option[value="0"]')).toContainText("default layer, always on");
+    await expect(add.locator('option[value="4"]')).toContainText("pointer layer, follows the trackball");
+    for (const menu of [add, addKey]) for (const n of ["0", "4"]) await expect(menu.locator(`option[value="${n}"]`)).toBeDisabled();
     const ends = card.locator('[role="radiogroup"]');
     await expect(ends).toHaveCount(0);
 
-    await sw(starts(3)).click();
+    await add.selectOption("3");
     await configPost(page, 1, link({linkedLayers: 1 << 3}));
     await publishSlot(page, 1, link({linkedLayers: 1 << 3}));
+    await expect(starts.locator(".pd-chip")).toHaveText([/^Navigation\s*×$/]);
     await expect(ends).toHaveCount(1);
-    await expect(card.locator(".pd-link-ends")).toContainText("Ends when another layer turns on");
+    await expect(card.locator(".pd-row:has([role=radiogroup]) .pd-row-l")).toHaveText("Ends when");
     await expect(ends.locator('input[value="0"]')).toBeChecked();
     await ends.locator("label").filter({hasText: "Any layer"}).click();
     await configPost(page, 1, link({linkedLayers: 1 << 3, linkEnds: 2}));
     await publishSlot(page, 1, {linkEnds: 2});
-    await sw(key(3)).click();
+    await addKey.selectOption("3");
     await configPost(page, 1, link({linkedLayers: 1 << 3, linkTurnsOn: 1 << 3, linkEnds: 2}));
     // Navigation sits below the pointer layer, which this mode keeps: the
-    // core publishes that the pointer layer covers it, and the card says so.
+    // core publishes that the pointer layer covers it, and the step says so.
     await publishSlot(page, 1, {linkTurnsOn: 1 << 3, pointerCovers: 1 << 3});
     await expect(card.locator(".callout.warn")).toContainText("Pointer, the pointer layer, sits above Navigation");
-    await sw(key(6)).click();
+    await addKey.selectOption("6");
     await configPost(page, 1, link({linkedLayers: 1 << 3, linkTurnsOn: (1 << 3) | (1 << 6), linkEnds: 2}));
     await publishSlot(page, 1, {linkTurnsOn: (1 << 3) | (1 << 6)});
-    await expect(card.locator(".card-h .note")).toHaveText("also started by Navigation; its key turns on Navigation and Extra 2");
-    // Switching off the last starting layer resets what ends it to Never.
-    await sw(starts(3)).click();
+    await expect(turns.locator(".pd-chip")).toHaveText([/^Navigation\s*×$/, /^Extra 2\s*×$/]);
+    // Removing the last starting layer resets what ends it to Never.
+    await starts.getByRole("button", {name: "Remove Navigation"}).click();
     await configPost(page, 1, link({linkTurnsOn: (1 << 3) | (1 << 6)}));
     await publishSlot(page, 1, link({linkTurnsOn: (1 << 3) | (1 << 6)}));
     await expect(ends).toHaveCount(0);
-    await sw(key(3)).click();
+    await expect(starts).toContainText("None");
+    await turns.getByRole("button", {name: "Remove Navigation"}).click();
     await configPost(page, 1, link({linkTurnsOn: 1 << 6}));
 });
 
-test("a layer that starts another mode cannot start this one and says so in its row, while its key switch stays usable", async ({page}) => {
+test("a layer that starts another mode cannot start this one and says so in the menu, while its key may still turn it on", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 2});
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
@@ -322,12 +346,12 @@ test("a layer that starts another mode cannot start this one and says so in its 
         Object.assign(model.pdModeEditing.linkTargets[5], {linkedBy: 1, linkedByName: "Volume"});
         store.setModel(model); store.render();
     });
-    const starts = page.locator('[data-f="pointing:2:linkedLayers:5"]'), key = page.locator('[data-f="pointing:2:linkTurnsOn:5"]');
+    const starts = page.locator('[data-f="pointing:2:linkedLayers:add"] option[value="5"]');
+    const key = page.locator('[data-f="pointing:2:linkTurnsOn:add"] option[value="5"]');
     await expect(starts).toBeDisabled();
-    await expect(page.locator("label.sw").filter({has: starts})).toContainText("already starts Volume");
-    await expect(page.locator(".layer-table-row").filter({has: starts})).not.toHaveClass(/unusable/);
+    await expect(starts).toContainText("already starts Volume");
     await expect(key).toBeEnabled();
-    await page.locator("label.sw").filter({has: key}).click();
+    await page.locator('[data-f="pointing:2:linkTurnsOn:add"]').selectOption("5");
     await configPost(page, 2, {linkTurnsOn: 1 << 5});
 });
 

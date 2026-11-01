@@ -1,5 +1,5 @@
 // @ts-check
-// A pointing slot's link, as the How it starts card offers it: a row per layer with
+// A pointing slot's link, as the What starts it step offers it: a row per layer with
 // whether it starts this pointing mode and whether this pointing mode's key
 // turns it on, and why
 // a switch cannot be used. The core publishes the rule

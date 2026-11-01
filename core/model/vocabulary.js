@@ -584,7 +584,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
     },
     pointing: {
-        kinds: [[0, "Empty"], [1, "Directional keys / shortcuts"], [2, "Scrolling"]],
+        kinds: [[0, "Empty"], [1, "Send keys"], [2, "Scroll"]],
         // A directional mode's shortcuts, by where the record keeps each: the
         // straight directions, and the diagonals eight directions add.
         directions: [["left", "Left"], ["right", "Right"], ["up", "Up"], ["down", "Down"]],
@@ -598,13 +598,13 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // layers its key turns on while it runs the mode, and what ends a mode
         // its layers started: a layer above the highest of them that is on, or
         // any layer outside both sets, neither the pointer layer nor a default
-        // layer. The editor's two columns of switches, and Review's fields.
-        // Each column title describes the layer in its row; "already starts"
+        // layer. Review's fields; the editor's What starts it step heads its
+        // lists with `keyTurnsOnShort` and `endsWhen`, and "already starts"
         // names the other mode a layer starts. The Keys workbench's Pointing
         // modes tab heads a column for each part of the link (`startedBy`,
         // `endsWhen`, `keyTurnsOnShort`), marks a layer the keyboard ignores in
         // it (`ignored`), and tags a mode its link starts (`started`).
-        linkLabels: {starts: "Starts this pointing mode", keyTurnsOn: "Turned on by this pointing mode's key", startsOther: "already starts",
+        linkLabels: {startsOther: "already starts",
             linkedLayers: "Layers that start this pointing mode", linkTurnsOn: "Layers turned on by this pointing mode's key", linkEnds: "Ends when another layer turns on",
             startedBy: "Started by", endsWhen: "Ends when", keyTurnsOnShort: "Its key turns on", ignored: "ignored", started: "started"},
         linkEnds: [[0, "Never"], [1, "A higher layer"], [2, "Any layer"]],
@@ -625,8 +625,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         modifierPolicy: [[0, "Inherit modifiers"], [1, "Ignore"], [2, "Exact shortcut"]],
         scrollFields: [
             ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
-            ["divisorH", "Movement per wheel step ↔"], ["divisorV", "Movement per wheel step ↕"],
-            ["intervalMs", "Minimum interval (ms)"], ["expireMs", "Gesture expiry (ms)"], ["lockMs", "Axis lock timeout (ms)"],
+            ["divisorH", "Sideways: ball movement per step"], ["divisorV", "Up and down: ball movement per step"],
+            ["intervalMs", "Fastest repeat (ms)"], ["expireMs", "Gesture expiry (ms)"], ["lockMs", "Stay on one axis for (ms)"],
             ["startNumerator", "Axis selection ratio · numerator"], ["startDenominator", "Axis selection ratio · denominator"],
             ["sustainNumerator", "Axis retention ratio · numerator"], ["sustainDenominator", "Axis retention ratio · denominator"],
             ["decayDivisor", "Cross-axis decay divisor"],

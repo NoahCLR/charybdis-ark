@@ -1,66 +1,93 @@
 // @ts-check
-// The How it starts card: the mode's keys, then its link (firmware D-F62),
-// one row per layer, in the tab order, with two switches: whether the layer
-// starts this pointing mode, and whether it is turned on by this pointing
-// mode's key. Then what ends a mode its layers started, as three buttons.
-// Every link field is read into the slot's one record by readConfig
+// Step 3 of a mode, What starts it: its keys, then its link (firmware D-F62)
+// as two lists of layer chips, the layers that start it and the layers its
+// key turns on, each with an Add menu. A layer that cannot go in a list is in
+// the menu, disabled, saying why; the empty layers sit in the menu's own
+// group at its end. Then what ends a mode its layers started, and the
+// warnings. Every link field is read into the slot's one record by readConfig
 // (view/pointing-config.mjs linkRecord) and posted with the rest of it.
 import {el, esc} from "../../lib/dom.mjs";
 import {LINK_ENDS} from "../../view/pointing-config.mjs";
 import {listed} from "../../view/vocabulary.mjs";
 import {linkIgnored, linkRows, pointerLayerCovers} from "../../view/pointing-link.mjs";
-import {layerSwitchTable, switchedLayers} from "../layer-switches.mjs";
+import {emptyLayers} from "../../view/empty-layers.mjs";
+import {marked} from "../marks.mjs";
 import {words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
+/** @typedef {import("../../view/pointing-link.mjs").LinkRow} LinkRow */
+/** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
 
-/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {FormControls} controls */
-export function startCard(model, slot, canEdit, {form, disabled}) {
+/** @param {Model} model @param {import("../surface-types.js").PresentedSlot} slot @param {FormControls} controls @param {() => void} stage */
+export function startStep(model, slot, {form, disabled}, stage) {
     const P = words(model), L = P.linkLabels;
     const rows = linkRows(model, slot);
-    const started = rows.filter((row) => row.starts).map((row) => row.name), keyLayers = rows.filter((row) => row.key).map((row) => row.name);
-    // The header sums up only the link; the keys are always there.
-    const summary = [started.length ? `also started by ${listed(started)}` : "", keyLayers.length ? `its key turns on ${listed(keyLayers)}` : ""].filter(Boolean).join("; ");
-    const card = el(`<div class="card pd-starts">
-        <div class="card-h"><h3>How it starts</h3>${summary ? `<span class="right note">${esc(summary)}</span>` : ""}</div>
-        <div class="card-b stack">
-            <p class="note">Its keys start it. Layers can start it too, and its key can turn layers on.</p>
-        </div></div>`);
-    const body = /** @type {HTMLElement} */ (card.querySelector(".card-b"));
-    body.append(keysRow(model, slot, canEdit));
-    const locked = Boolean(disabled);
-
-    const table = layerSwitchTable(model, "Layers", [L.starts, L.keyTurnsOn], rows.map((row) => ({
-        layer: row.layer, label: row.name, why: row.why, tip: row.tip, unusable: row.unusable,
-        switches: [
-            {f: `pointing:${slot.id}:linkedLayers:${row.layer}`, label: `${row.name}: ${L.starts}`, checked: row.starts, disabled: locked || row.startLocked,
-                tip: row.startTip || (row.startLocked ? row.tip : "While this layer is on, held or locked, it starts this pointing mode. A mode started by its key wins over one its layers started."), text: row.startsOther},
-            {f: `pointing:${slot.id}:linkTurnsOn:${row.layer}`, label: `${row.name}: ${L.keyTurnsOn}`, checked: row.key, disabled: locked || row.keyLocked,
-                tip: row.keyLocked ? row.tip : "While this pointing mode's key runs it, held or locked, this layer stays on; it goes off when the mode ends unless something else keeps it."},
-        ],
-    })), {place: "pointing-link"});
-    body.append(table);
-    form.linkedLayers = () => switchedLayers(table, 0);
-    form.linkTurnsOn = () => switchedLayers(table, 1);
+    const node = el(`<div class="pd-starts stack">
+        <div class="pd-row"><span class="pd-row-l">Its keys</span></div>
+        <div class="pd-row" data-tip="While one of these layers is on, held or locked, it starts this pointing mode. A mode started by its key wins over one its layers started."><span class="pd-row-l" id="pd-starts-${esc(slot.id)}">Layers</span></div>
+        <div class="pd-row" data-tip="While this pointing mode's key runs it, held or locked, these layers stay on; each goes off when the mode ends unless something else keeps it."><span class="pd-row-l" id="pd-turns-${esc(slot.id)}">${esc(L.keyTurnsOnShort)}</span></div></div>`);
+    const [keys, starts, turns] = /** @type {HTMLElement[]} */ ([...node.querySelectorAll(".pd-row")]);
+    keys.append(keysRow(model, slot));
+    let linked = slot.linkedLayers, turnsOn = slot.linkTurnsOn;
+    form.linkedLayers = () => linked;
+    form.linkTurnsOn = () => turnsOn;
+    const empties = emptyLayers(model);
+    starts.append(layerChips(model, rows, "starts", {disabled, empties, labelledBy: `pd-starts-${slot.id}`, id: `pointing:${slot.id}:linkedLayers`,
+        change: (layer, on) => { linked = on ? linked | 2 ** layer : linked & ~(2 ** layer); stage(); }}));
+    turns.append(layerChips(model, rows, "key", {disabled, empties, labelledBy: `pd-turns-${slot.id}`, id: `pointing:${slot.id}:linkTurnsOn`,
+        change: (layer, on) => { turnsOn = on ? turnsOn | 2 ** layer : turnsOn & ~(2 ** layer); stage(); }}));
 
     // What ends a mode its layers started, so only beside layers that start it.
     if (slot.linkedLayers) {
-        const ends = el(`<div class="field pd-link-ends"><span>${esc(L.linkEnds)}</span>
+        const ends = el(`<div class="pd-row"><span class="pd-row-l">${esc(L.endsWhen)}</span>
             <div class="seg" role="radiogroup" aria-label="${esc(L.linkEnds)}"
-                data-tip="A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and is in neither column. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended.">
+                data-tip="A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and starts or is turned on by neither. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended.">
                 ${P.linkEnds.map(([value, text]) => `<label><input type="radio" name="pointing:${esc(slot.id)}:linkEnds" value="${esc(value)}" data-f="pointing:${esc(slot.id)}:linkEnds:${esc(value)}" ${value === slot.linkEnds ? "checked" : ""} ${esc(disabled)}><span>${esc(text)}</span></label>`).join("")}
             </div></div>`);
         form.linkEnds = () => Number(/** @type {HTMLInputElement | null} */ (ends.querySelector("input:checked"))?.value ?? LINK_ENDS.NOTHING);
-        body.append(ends);
+        node.append(ends);
     }
 
     const ignored = linkIgnored(model, slot);
-    if (ignored) body.append(el(`<div class="callout warn" role="note">${esc(ignored)} Switch it off.</div>`));
+    if (ignored) node.append(el(`<div class="callout warn" role="note">${esc(ignored)} Remove it.</div>`));
     const covers = pointerLayerCovers(model, slot);
     if (covers) {
         const names = listed(covers.covered);
-        body.append(el(`<div class="callout warn" role="note">${esc(`${covers.pointer}, the pointer layer, sits above ${names}. This mode keeps the pointer layer on while its key runs it, so the pointer layer's keys cover ${names}'s wherever they are not transparent. Have its key turn on a layer above ${covers.pointer}, or choose Return to the typing layer under Advanced.`)}</div>`));
+        node.append(el(`<div class="callout warn" role="note">${esc(`${covers.pointer}, the pointer layer, sits above ${names}. This mode keeps the pointer layer on while its key runs it, so the pointer layer's keys cover ${names}'s wherever they are not transparent. Have its key turn on a layer above ${covers.pointer}, or choose Return to the typing layer under Advanced.`)}</div>`));
     }
-    return card;
+    return node;
+}
+
+// One half of the link as chips: a chip per layer in it, each with ×, then
+// an Add menu of the layers that are not. `which` is the row field: "starts"
+// or "key".
+/** @param {Model} model @param {LinkRow[]} rows @param {"starts" | "key"} which @param {{disabled: string, empties: ReadonlySet<number>, labelledBy: string, id: string, change: (layer: number, on: boolean) => void}} options */
+function layerChips(model, rows, which, {disabled, empties, labelledBy, id, change}) {
+    const locked = (/** @type {LinkRow} */ row) => which === "starts" ? row.startLocked : row.keyLocked;
+    const on = rows.filter((row) => row[which]);
+    const off = rows.filter((row) => !row[which]);
+    // Why a layer cannot be added, said in its menu entry.
+    const why = (/** @type {LinkRow} */ row) => row.why || (which === "starts" && row.startsOther ? row.startsOther : row.tip);
+    /** @param {LinkRow} row */
+    const option = (row) => `<option value="${esc(row.layer)}" ${locked(row) ? "disabled" : ""}>${esc(row.name)}${locked(row) && why(row) ? ` · ${esc(why(row))}` : ""}</option>`;
+    const shown = off.filter((row) => !empties.has(row.layer)), folded = off.filter((row) => empties.has(row.layer));
+    const node = el(`<div class="pd-chips" role="group" aria-labelledby="${esc(labelledBy)}">
+        ${on.map((row) => `<span class="pd-chip ${row.unusable ? "warn" : ""}" ${row.tip ? `data-tip="${esc(row.tip)}"` : ""}>${marked(model, {kind: "layer", layer: row.layer}, row.name)}
+            <button type="button" data-remove="${esc(row.layer)}" aria-label="${esc(`Remove ${row.name}`)}" ${esc(disabled)}>×</button></span>`).join("")}
+        ${on.length ? "" : `<span class="note">None</span>`}
+        ${off.some((row) => !locked(row)) ? `<select class="input pd-add" data-f="${esc(id)}:add" aria-label="Add a layer" ${esc(disabled)}>
+            <option value="">+ Add layer</option>${shown.map(option).join("")}
+            ${folded.length ? `<optgroup label="Empty layers">${folded.map(option).join("")}</optgroup>` : ""}</select>` : ""}
+    </div>`);
+    node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () =>
+        change(Number(/** @type {HTMLElement} */ (button).dataset.remove), false)));
+    // The add menu stages by itself, never through the editor's change
+    // listener, which would stage the record before the chip was added.
+    node.querySelector("select")?.addEventListener("change", (event) => {
+        event.stopPropagation();
+        const value = /** @type {HTMLSelectElement} */ (event.target).value;
+        if (value !== "") change(Number(value), true);
+    });
+    return node;
 }
