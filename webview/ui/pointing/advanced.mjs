@@ -8,7 +8,7 @@ import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} 
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} scrolling @param {FormControls} controls */
-export function advancedControls(model, slot, scrolling, {form, disabled, field, select, modifiers}) {
+export function advancedControls(model, slot, scrolling, {form, disabled, field, choice, modifiers}) {
     // ── advanced ──────────────────────────────────────────────────────────
     const advanced = /** @type {HTMLDetailsElement} */ (el(`<details class="card pd-advanced" ${state.pdAdvanced ? "open" : ""}><summary class="card-h">
         ${DISCLOSURE}<h3>Advanced</h3><span class="right note">thresholds, ratios, held modifiers</span></summary>
@@ -22,7 +22,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     };
 
     const behaviour = el(`<div class="pd-grid3"></div>`);
-    behaviour.append(select("After this mode ends", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
+    behaviour.append(choice("After this mode ends", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
     if (!scrolling) {
         // An axis the mode does not read has no threshold to set. Sending
         // once per movement, the threshold is how far a movement has to go.
@@ -58,9 +58,8 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
                         el(`<span class="note">${esc(word(words(model).modifierPolicy, MODIFIER_POLICY.INHERIT))}</span>`), el(`<span class="note">The macro continues after its trigger.</span>`));
                     continue;
                 }
-                const policy = select(`${label} with held modifiers`, words(model).modifierPolicy, tap.modifierPolicy ?? 0, `${prefix}Policy:${name}`,
-                    {tip: modifierPolicyTip(model)});
-                /** @type {HTMLElement} */ (policy.querySelector("span")).classList.add("sr");
+                const policy = choice(`${label} with held modifiers`, words(model).modifierPolicy, tap.modifierPolicy ?? 0, `${prefix}Policy:${name}`,
+                    {tip: modifierPolicyTip(model), hideLabel: true});
                 const masking = tap.modifierPolicy === MODIFIER_POLICY.MASK;
                 const left = masking ? modifierNames(model, tap.mask).join(", ") || "choose at least one below" : "—";
                 table.append(el(`<span class="n">${ARROWS[name]} ${esc(label)}</span>`), policy, el(`<span class="note">${esc(left)}</span>`));

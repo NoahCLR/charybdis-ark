@@ -1098,10 +1098,14 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
 2. **What each direction sends** draws each direction the mode reads as a key
    placed where the ball sends it, around the ball (four, or eight with the
    diagonals); a click opens the picker on the keys a pointing mode sends, ×
-   clears it, and a macro's notes sit under its key. Beside them, Reads, When
-   a direction has no key and How often it sends. **How it scrolls** groups
-   its fields as which way, Speed and Feel, under the vocabulary's names, and
-   the held modifiers (`webview/ui/pointing/movement.mjs`).
+   clears it, and a macro's notes sit under its key. Reads sits above them,
+   When a direction has no key and How often it sends below, each a
+   segmented choice (`webview/ui/segmented.mjs`). **How it scrolls** groups
+   its fields as which way (Scrolls, a segmented choice; Reverse scrolling, a
+   switch per axis, the record's two bits), Speed and Feel, under the
+   vocabulary's names, and the held modifiers
+   (`webview/ui/pointing/movement.mjs`). Advanced's After this mode ends and
+   each direction's held-modifier handling are segmented choices too.
 3. **What starts it**: the mode's hold and lock keys named by the mode, never
    by `PD_MODE_n`, and where they sit; then its link as layer chips
    ([Pointing links](#pointing-links)).

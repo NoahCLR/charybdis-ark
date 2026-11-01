@@ -21,14 +21,15 @@ export function movement(model, slot, scrolling, controls, stage) {
 }
 
 /** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls @param {() => void} stage */
-function directions(model, slot, {select, form, disabled}, stage) {
+function directions(model, slot, {choice, form, disabled}, stage) {
     const reads = axisReads(slot.axis);
     const eight = slot.axis === AXIS.EIGHT;
     const shape = eight ? "eight" : reads.length === 4 ? "four" : reads.includes("up") ? "vertical" : "horizontal";
     const node = el(`<div class="pd-directions">
+        <div class="pd-direction-reads"></div>
         <div class="pd-compass ${shape}" role="group" aria-label="What each direction sends">
             <div class="pd-ball" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="30"/><circle cx="40" cy="40" r="4"/></svg></div></div>
-        <div class="pd-direction-fields stack"></div></div>`);
+        <div class="pd-direction-fields"></div></div>`);
     const compass = /** @type {HTMLElement} */ (node.querySelector(".pd-compass"));
     /** @type {[("directions" | "diagonals"), string][]} */
     const places = [...DIRECTIONS.filter((name) => reads.includes(name)).map((name) => /** @type {["directions", string]} */ (["directions", name])),
@@ -36,12 +37,12 @@ function directions(model, slot, {select, form, disabled}, stage) {
     for (const [group, name] of places) {
         compass.append(directionKey(model, slot, group, name, {form, disabled, stage}));
     }
-    const fields = /** @type {HTMLElement} */ (node.querySelector(".pd-direction-fields"));
-    fields.append(select("Reads", words(model).axes, slot.axis, "axis",
+    /** @type {HTMLElement} */ (node.querySelector(".pd-direction-reads")).append(choice("Reads", words(model).axes, slot.axis, "axis",
         {tip: "Which movement this mode turns into keys. Switching to one axis empties the other axis's keys."}));
-    fields.append(select("When a direction has no key", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
+    const fields = /** @type {HTMLElement} */ (node.querySelector(".pd-direction-fields"));
+    fields.append(choice("When a direction has no key", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
         {tip: "Moving toward a direction with no key: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing."}));
-    fields.append(select("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
+    fields.append(choice("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
         {tip: "Every step sends the key again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; it sends again when the ball moves back the other way, or after a 150 ms pause. Turning toward another direction sends nothing more."}));
     fields.append(el(`<p class="note">A direction can also click mouse buttons 1–8 or play a macro; both are in the picker.</p>`));
     return node;
@@ -87,7 +88,7 @@ function directionKey(model, slot, group, name, {form, disabled, stage}) {
 // record. A field drawn twice registers its reader twice, and the second
 // input silently wins, so the two never overlap (common.mjs SCROLL_LEAD).
 /** @param {Model} model @param {PresentedSlot} slot @param {FormControls} controls */
-function scrollingFields(model, slot, {field, select, modifiers}) {
+function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}) {
     const node = el(`<div class="pd-scrolling stack">
         <div class="pd-pair" data-group="which"></div>
         <div class="sect-h pd-sub"><h5>Speed</h5><span class="note">How far the ball moves for one scroll step. Lower scrolls faster.</span></div>
@@ -95,9 +96,9 @@ function scrollingFields(model, slot, {field, select, modifiers}) {
         <div class="sect-h pd-sub"><h5>Feel</h5></div>
         <div class="pd-pair" data-group="feel"></div></div>`);
     const group = (/** @type {string} */ name) => /** @type {HTMLElement} */ (node.querySelector(`[data-group="${name}"]`));
-    group("which").append(select("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
+    group("which").append(choice("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
         {tip: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis."}),
-    select("Reverse scrolling", words(model).invert, slot.scroll?.invert, "invert"));
+    reverse(model, slot, form, disabled));
     group("speed").append(field(scrollLabel(model, "divisorH"), slot.scroll?.divisorH, "scroll:divisorH"),
         field(scrollLabel(model, "divisorV"), slot.scroll?.divisorV, "scroll:divisorV"));
     group("feel").append(field(scrollLabel(model, "intervalMs", "ms"), slot.scroll?.intervalMs, "scroll:intervalMs", {unit: "ms",
@@ -105,5 +106,17 @@ function scrollingFields(model, slot, {field, select, modifiers}) {
     field(scrollLabel(model, "lockMs", "ms"), slot.scroll?.lockMs, "scroll:lockMs", {unit: "ms",
         tip: "How long a scroll stays on the axis it started on before it may switch."}));
     node.append(modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers"));
+    return node;
+}
+
+// Reverse scrolling is one switch per axis: the record keeps it as two bits,
+// sideways (1) and up and down (2), which the vocabulary names together.
+/** @param {Model} model @param {PresentedSlot} slot @param {FormControls["form"]} form @param {string} disabled */
+function reverse(model, slot, form, disabled) {
+    const invert = Number(slot.scroll?.invert ?? 0);
+    const node = el(`<div class="field"><span>Reverse scrolling</span><div class="pd-switches">
+        <label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:invert:1" data-bit="1" ${invert & 1 ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">Sideways</span></label>
+        <label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:invert:2" data-bit="2" ${invert & 2 ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">Up and down</span></label></div></div>`);
+    form.invert = () => [...node.querySelectorAll("input:checked")].reduce((mask, input) => mask | Number(/** @type {HTMLInputElement} */ (input).dataset.bit), 0);
     return node;
 }

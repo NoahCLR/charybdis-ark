@@ -25,7 +25,7 @@ for (const theme of ["dark", "light"]) {
         await openControls(page, "pointing", {pointingSlot: 4, pdAdvanced: true}, theme);
         await publish();
         await clearPosts(page);
-        await page.locator('[data-f="pointing:4:axis"]').selectOption("3");
+        await page.locator('label:has([data-f="pointing:4:axis:3"])').click();
         await stagePosts();
 
         for (const [field, macro] of [["dir:left", 0], ["diag:upLeft", 127]]) {
@@ -53,7 +53,7 @@ for (const theme of ["dark", "light"]) {
         await expect(page.locator(".pd-taps")).toContainText("The macro continues after its trigger");
 
         await clearPosts(page);
-        await page.locator('[data-f="pointing:4:directionOutput"]').selectOption("1");
+        await page.locator('label:has([data-f="pointing:4:directionOutput:1"])').click();
         await stagePosts();
         await expect(page.locator(".pd-compass")).not.toContainText("Busy triggers are dropped");
         expect(validateSnapshot(draft.document).pdModes[4].directions.left.keycode).toBe(0x7700);

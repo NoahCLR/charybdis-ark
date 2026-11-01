@@ -1481,8 +1481,14 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-kind-art path { fill: var(--text-2); }
 .pd-kind-art rect { fill: var(--text-3); }
 /* Step 2: each direction a key placed where the ball sends it. */
-.pd-directions { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr); gap: 28px; align-items: center; }
+.pd-directions { display: grid; gap: 18px; }
+.pd-direction-fields { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: start; }
+.pd-direction-fields > .note { flex-basis: 100%; }
+.pd-grid3 > .field:has(> .seg) { grid-column: 1 / -1; }
+.pd-editor .seg { flex-wrap: wrap; max-width: 100%; }
+.pd-switches { display: flex; gap: 8px 20px; flex-wrap: wrap; min-height: var(--h-control); align-items: center; }
 .pd-compass { display: grid; gap: 10px 14px; align-items: center; justify-items: center; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  max-width: 560px; width: 100%; justify-self: center;
   grid-template-areas: ". up ." "left ball right" ". down ."; }
 .pd-compass.vertical { grid-template-columns: auto; grid-template-areas: "up" "ball" "down"; justify-content: center; }
 .pd-compass.horizontal { grid-template-areas: "left ball right"; }
@@ -1512,7 +1518,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-row { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 0; }
 .pd-row + .pd-row { border-top: 1px solid var(--line); }
 .pd-row-l { font-size: var(--fs-md); color: var(--text-2); }
-.pd-row > .seg { justify-self: start; }
+.pd-row > .segmented { justify-self: start; }
 .pd-starts > .callout { margin-top: 10px; }
 .pd-keys { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pd-cap { display: inline-flex; align-items: center; gap: 6px; height: var(--h-chip); padding: 0 8px; border: 1px solid var(--line-2);

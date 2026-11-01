@@ -14,6 +14,7 @@ import {emptyLayers} from "../../view/empty-layers.mjs";
 import {marked} from "../marks.mjs";
 import {words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
+import {segmented, segmentedValue} from "../segmented.mjs";
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @typedef {import("../../view/pointing-link.mjs").LinkRow} LinkRow */
@@ -40,12 +41,10 @@ export function startStep(model, slot, {form, disabled}, stage) {
 
     // What ends a mode its layers started, so only beside layers that start it.
     if (slot.linkedLayers) {
-        const ends = el(`<div class="pd-row"><span class="pd-row-l">${esc(L.endsWhen)}</span>
-            <div class="seg" role="radiogroup" aria-label="${esc(L.linkEnds)}"
-                data-tip="A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and starts or is turned on by neither. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended.">
-                ${P.linkEnds.map(([value, text]) => `<label><input type="radio" name="pointing:${esc(slot.id)}:linkEnds" value="${esc(value)}" data-f="pointing:${esc(slot.id)}:linkEnds:${esc(value)}" ${value === slot.linkEnds ? "checked" : ""} ${esc(disabled)}><span>${esc(text)}</span></label>`).join("")}
-            </div></div>`);
-        form.linkEnds = () => Number(/** @type {HTMLInputElement | null} */ (ends.querySelector("input:checked"))?.value ?? LINK_ENDS.NOTHING);
+        const ends = el(`<div class="pd-row"><span class="pd-row-l" aria-hidden="true">${esc(L.endsWhen)}</span>${segmented({label: L.linkEnds, f: `pointing:${slot.id}:linkEnds`,
+            choices: P.linkEnds, current: slot.linkEnds, disabled: Boolean(disabled), hideLabel: true,
+            tip: "A higher layer: one above the highest layer that starts this pointing mode and is on. Any layer: any layer that is on and starts or is turned on by neither. Either ends the mode until that layer goes off; the pointer layer and the default layers never do, and a mode its key runs is never ended."})}</div>`);
+        form.linkEnds = () => Number(segmentedValue(ends) || LINK_ENDS.NOTHING);
         node.append(ends);
     }
 

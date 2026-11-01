@@ -9,6 +9,8 @@ const field = (page, name) => editor(page).getByLabel(name, {exact: true})
 const configPost = (page, slot, config) => expectPost(page, {
     type: "savePdMode", slot, expectedBase: expect.any(Object), config: expect.objectContaining({id: slot, ...config}),
 });
+// A few short options are on show as one segmented group: pick one by its value.
+const choose = (page, label, value) => editor(page).locator(`.seg[aria-label="${label}"] label`).filter({has: page.locator(`input[value="${value}"]`)}).click();
 // A direction's key, picked as a person picks it: the key, then Use.
 async function pickDirection(page, direction, keycode) {
     await editor(page).locator(`.pd-arm.${direction} .pd-key`).click();
@@ -64,17 +66,30 @@ for (const [label, value, expected] of [
     ["Pointing mode name", "Scroll sentinel", {name: "Scroll sentinel"}],
     ["Pointer speed", "1400", {dpi: 1400}],
     ["Scrolls", "1", {axis: 1}],
-    ["Reverse scrolling", "3", {scroll: expect.objectContaining({invert: 3})}],
     ["After this mode ends", "1", {pointerLayer: 1}],
 ]) {
     test(`scrolling ${label} posts its record`, async ({page}) => {
         await openControls(page, "pointing", {pointingSlot: 0});
         if (label === "After this mode ends") await advanced(page);
         if (label === "Pointing mode name") await change(field(page, label), value);
-        else await field(page, label).selectOption(value);
+        else if (label === "Pointer speed") await field(page, label).selectOption(value);
+        else await choose(page, label, value);
         await configPost(page, 0, {kind: 2, ...expected});
     });
 }
+
+test("reverse scrolling is a switch per axis, posted as the record's two bits", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 0});
+    const sideways = page.locator('[data-f="pointing:0:invert:1"]'), upDown = page.locator('[data-f="pointing:0:invert:2"]');
+    // Dragscroll reverses up and down only.
+    await expect(sideways).not.toBeChecked();
+    await expect(upDown).toBeChecked();
+    await page.locator("label.sw").filter({has: sideways}).click();
+    await configPost(page, 0, {scroll: expect.objectContaining({invert: 3})});
+    await page.evaluate(() => { window.__posted.length = 0; });
+    await page.locator("label.sw").filter({has: upDown}).click();
+    await configPost(page, 0, {scroll: expect.objectContaining({invert: 1})});
+});
 
 test("each modifier checkbox in scrolling contributes its own bit", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 0});
@@ -104,7 +119,7 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
         ["How often it sends", "1", {directionOutput: 1}],
     ]) {
         await clearPosts(page);
-        await field(page, label).selectOption(value);
+        await choose(page, label, value);
         await configPost(page, 4, expected);
     }
     await advanced(page);
@@ -114,17 +129,17 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
         await configPost(page, 4, {[key]: 777});
     }
     await clearPosts(page);
-    await field(page, "After this mode ends").selectOption("0");
+    await choose(page, "After this mode ends", "0");
     await configPost(page, 4, {pointerLayer: 0});
     await clearPosts(page);
-    await field(page, "Reads").selectOption("0");
+    await choose(page, "Reads", "0");
     await configPost(page, 4, {axis: 0, thresholdX: 0,
         directions: expect.objectContaining({left: {keycode: "0", modifierPolicy: 0, mask: 0}, right: {keycode: "0", modifierPolicy: 0, mask: 0}})});
 });
 
 test("eight directions draw and post every diagonal shortcut and modifier policy", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
-    await field(page, "Reads").selectOption("3");
+    await choose(page, "Reads", "3");
     await configPost(page, 4, {axis: 3});
     // The core accepts the axis change before the four new fields are drawn.
     await page.evaluate(async () => {
@@ -143,7 +158,7 @@ test("eight directions draw and post every diagonal shortcut and modifier policy
     await advanced(page);
     for (const label of ["Up", "Left", "Right", "Down", "Up-left", "Up-right", "Down-left", "Down-right"]) {
         await clearPosts(page);
-        await field(page, `${label} with held modifiers`).selectOption("2");
+        await choose(page, `${label} with held modifiers`, "2");
         const key = label.replace(/-(\w)/g, (_, letter) => letter.toUpperCase()).replace(/^\w/, letter => letter.toLowerCase());
         const group = label.includes("-") ? "diagonals" : "directions";
         await configPost(page, 4, {[group]: expect.objectContaining({[key]: expect.objectContaining({modifierPolicy: 2, mask: 0})})});

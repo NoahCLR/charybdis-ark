@@ -1,6 +1,7 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {modifierGrid} from "../modifier-grid.mjs";
+import {segmented, segmentedValue} from "../segmented.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit */
 export function formControls(model, slot, canEdit) {
@@ -24,6 +25,13 @@ export function formControls(model, slot, canEdit) {
         if (options.onChange) /** @type {HTMLSelectElement} */ (node.querySelector("select")).addEventListener("change", options.onChange);
         return node;
     };
+    // A choice of a few short options, all on show (ui/segmented.mjs).
+    /** @param {string} label @param {readonly (readonly [number, string])[]} choices @param {import("../../../contracts/edits.js").Scalar | undefined} current @param {string} key @param {{tip?: string, hideLabel?: boolean}} [options] */
+    const choice = (label, choices, current, key, options = {}) => {
+        const node = el(segmented({label, f: `pointing:${slot.id}:${key}`, choices, current: current ?? undefined, disabled: !canEdit, ...options}));
+        form[key] = () => Number(segmentedValue(node) || (choices[0]?.[0] ?? 0));
+        return node;
+    };
     // The shared Left / Right by Ctrl / Shift / Alt / GUI grid.
     /** @param {string} label @param {number} mask @param {string} key */
     const modifiers = (label, mask, key) => {
@@ -32,5 +40,5 @@ export function formControls(model, slot, canEdit) {
         return grid.node;
     };
 
-    return {form, disabled, field, select, modifiers};
+    return {form, disabled, field, select, choice, modifiers};
 }
