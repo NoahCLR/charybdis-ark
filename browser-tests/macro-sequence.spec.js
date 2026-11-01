@@ -31,7 +31,7 @@ for (const theme of ["dark", "light"]) {
         await page.locator('[data-name]').fill("Sequence test");
         await page.locator('[data-name]').press("Tab");
         await expect.poll(() => updates(page).then(rows => rows.find(m => m.name)?.name)).toBe("Sequence test");
-        await page.locator('[data-protection]').selectOption("on");
+        await page.locator('[data-protection] label:has(input[value="on"])').click();
         await expect.poll(() => updates(page).then(rows => rows.find(m => m.protection)?.protection)).toBe("on");
         await expect(page.locator('[data-act="place"]')).toBeVisible();
         await expect(page.locator('[data-preserve-hold-timing]')).toBeVisible();

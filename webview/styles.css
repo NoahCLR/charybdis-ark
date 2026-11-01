@@ -377,14 +377,23 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
   font-style: normal; font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
 .affix.unit .input { padding-right: 30px; }
 .affix.unit.wide .input { padding-right: 78px; }
-.duration-control input { min-width: 0; }
-.duration-control select.input { flex: 0 0 auto; width: auto; }
+/* A number field is as wide as the values it takes (five digits unless
+   --digits says otherwise) with room for its unit, never as wide as its
+   column: the field says how big the number is. */
+.input.num { width: calc(var(--digits, 5) * 1ch + 24px); max-width: 100%; }
+.affix.unit > .input.num { width: calc(var(--digits, 5) * 1ch + 52px); }
+.affix.unit.wide > .input.num { width: calc(var(--digits, 5) * 1ch + 100px); }
+.affix:has(> .input.num) { display: inline-block; justify-self: start; max-width: 100%; }
+.field:has(> .input.num), .field:has(> .affix > .input.num) { justify-items: start; }
+.input-row > .input.num, .input-row > .affix:has(> .input.num) { flex: 0 0 auto; }
+.duration-control > .input.num { --digits: 6; }
+.duration-control > .segmented { flex: 0 0 auto; }
 /* All lighting and its idle timeout, in Lighting's title bar: they darken
    every stage, so they sit above all of them, and the board does not move. */
 .lighting-power { display: flex; align-items: center; gap: 18px; }
 .lighting-power .sw .txt { white-space: nowrap; }
 .lighting-timeout { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: var(--fs-md); }
-.lighting-timeout .duration-control { width: 170px; }
+.lighting-timeout .duration-control { width: auto; }
 
 /* The hidden input must stay beside its visible switch when the editor scrolls;
    focusing an absolutely positioned input elsewhere can move the viewport. */
@@ -882,14 +891,17 @@ button.tier:hover { background: var(--surface-3); }
 .fbdot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); flex: none; display: inline-block; }
 .rowitem .fbdot, .reach .fbdot { margin-right: 3px; }
 .bcell {
-  display: grid; align-content: center; justify-items: center; gap: 3px; min-height: 52px; padding: 8px 10px;
+  display: grid; align-content: center; justify-items: center; gap: 3px; min-height: 68px; padding: 8px 10px;
   border: 1px solid var(--line); border-radius: var(--r-control); background: var(--surface-2); text-align: center; width: 100%;
 }
 .bcell:hover { border-color: var(--line-3); background: var(--surface-3); }
 .bcell.on { border-color: var(--text); background: var(--surface-3); }
 .bcell .bk { max-width: 100%; font-family: var(--mono); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bcell .bk.named { font-family: inherit; font-size: var(--fs-md); }
-.bcell .bl { font-size: var(--fs-xs); color: var(--text-3); }
+/* Every cell is one size: room for its action and two lines of how it runs,
+   whatever the grid's width, so a row never grows past the others. */
+.bcell .bl { font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-3);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .bcell.empty { border-style: dashed; background: none; }
 .bcell.empty .plus { color: var(--text-3); font-size: var(--fs-base); }
 /* The key's own action where the row leaves a first-press tier empty: present,
@@ -1460,11 +1472,15 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-n { display: inline-grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: var(--r-pill);
   background: var(--inv-bg); color: var(--inv-text); font-size: var(--fs-xs); font-weight: var(--fw-bold); }
 .pd-step-b { display: grid; gap: 12px; padding-left: 32px; min-width: 0; }
-.pd-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; align-items: start; }
-/* A choice on show takes its row, so its options stay on one line. */
-.pd-pair > .field.segmented { grid-column: 1 / -1; }
+.pd-pair { display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: start; }
+/* A menu in the editor is as wide as its words, as its number fields are. */
+.pd-editor select.input { width: auto; min-width: 140px; max-width: 100%; }
 .pd-sub { margin: 6px 0 0; }
-.pd-sub h5 { font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: var(--fw-label); }
+/* Speed and Feel side by side, each its heading, its fields and its note. */
+.pd-groups { display: flex; flex-wrap: wrap; gap: 14px 56px; align-items: start; }
+.pd-group { display: grid; gap: 10px; align-content: start; }
+.pd-group > .note { max-width: 36ch; }
+.pd-sub h5 { margin: 0; font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: var(--fw-label); }
 /* Step 1: the two movements as large radio choices. */
 .pd-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .pd-kind { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line-2);
@@ -1539,7 +1555,7 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .pd-light-row .btn { margin-left: auto; }
 .pd-copy { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
 .pd-copy > .field { min-width: 0; max-width: 300px; }
-.pd-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.pd-grid3 { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: end; }
 .field.inline { display: flex; align-items: center; gap: 8px; }
 .field.inline > span { white-space: nowrap; }
 .field.inline select.input { height: var(--h-compact); width: auto; min-width: 150px; background-position: calc(100% - 15px) 12px, calc(100% - 10px) 12px; }
@@ -1549,19 +1565,19 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .pd-advanced > summary { cursor: pointer; border-bottom-color: transparent; }
 .pd-advanced[open] > summary { border-bottom-color: var(--line); }
 .pd-sect + .pd-sect { padding-top: 14px; border-top: 1px solid var(--line); }
-.pd-ratio { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; }
+.pd-ratio { display: grid; grid-template-columns: auto auto auto; justify-content: start; gap: 6px; align-items: center; }
+.pd-ratio .input.num { --digits: 3; }
 .pd-ratio i { font-style: normal; color: var(--text-3); font-family: var(--mono); }
 .pd-taps { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; align-items: center; }
 .pd-taps > .h { font-size: var(--fs-xs); color: var(--text-3); }
 .pd-taps .n { font-size: var(--fs-md); color: var(--text-2); }
 .pd-taps .mods { grid-column: 2 / -1; padding-bottom: 6px; }
 @container pd (max-width: 720px) {
-  .pd-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pd-directions { grid-template-columns: minmax(0, 1fr); }
   .pd-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
 @container pd (max-width: 560px) {
-  .pd-kinds, .pd-pair { grid-template-columns: minmax(0, 1fr); }
+  .pd-kinds { grid-template-columns: minmax(0, 1fr); }
   .pd-step-b { padding-left: 0; }
   .pd-compass.pd-compass { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
   .pd-arm.pd-arm { grid-area: auto; justify-self: center; }
@@ -1578,6 +1594,9 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
    own card, which stays in view beside the editor, so picking a slot far down
    never scrolls the editor away (lib/scroll.mjs keeps the bank's place). */
 .pad.library { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+/* A slot editor reads as a page, not a banner: past a list and an editor
+   of 960 px, a wider window leaves the room to the right, as Settings does. */
+.pad.library { max-width: 1320px; }
 .pad.library > *, .pad.library .card-b.stack > * { min-width: 0; }
 .pad.library > .card:first-child { position: sticky; top: 14px; }
 .pad.library .macro-grid { max-height: 540px; overflow-y: auto; scrollbar-width: thin; padding: 2px; }
@@ -1804,6 +1823,14 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .import-fits.warn { color: var(--warning); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
+/* A choice on show (ui/segmented.mjs) takes the width its options need, and
+   wraps under the name when the row cannot give it. */
+.setrow:has(> .control > .segmented) { grid-template-columns: minmax(0,1fr) auto; }
+.setrow > .control > .segmented { justify-items: end; }
+@container content (max-width: 788px) {
+  .setrow:has(> .control > .segmented) { grid-template-columns: minmax(0,1fr); }
+  .setrow > .control > .segmented { justify-items: start; }
+}
 .setrow.ro .nm { color: var(--text-2); }
 .setrow .nm { font-size: var(--fs-md); }
 .setrow .hint { font-size: var(--fs-sm); color: var(--text-3); margin-top: 2px; }

@@ -22,6 +22,8 @@ import {githubMark} from "../view/shell-panel.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
 import {keycodePlacements, reachLine} from "../view/placements.mjs";
 import {durationControl} from "./duration.mjs";
+import {choiceField} from "./segmented.mjs";
+import {settingOptions} from "../view/choices.mjs";
 import {layerSwitchGrid} from "./layer-switches.mjs";
 import {fieldParts, isLayerSwitch, sectionsOn} from "../view/settings-layout.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
@@ -137,7 +139,7 @@ function comboTimingRow(model, entry) {
     const row = el(`<div class="setrow" data-tip="${esc(hint)}" data-timing="${esc(entry.id)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
-        <div class="control"><span class="affix unit"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultWindow"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}><i>ms</i></span></div>
+        <div class="control"><span class="affix unit"><input class="input mono num" id="${hold ? "comboHoldTerm" : "comboDefaultWindow"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}><i>ms</i></span></div>
     </div>`);
     // Posted on its own rather than riding along with whichever combo is saved
     // next. The keyboard always stores a number, so an emptied field is put
@@ -176,7 +178,9 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
         post(edits.settingsSection(section, (field) => {
             const duration = durations.get(field.macro);
             if (duration) return duration.read() ?? undefined;
-            const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
+            // A choice on show is its checked option; any other control is the one carrying its macro.
+            const macro = cssEscape(field.macro);
+            const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${macro}"]:not([type="radio"]), [data-macro="${macro}"]:checked`));
             if (!input) return undefined;
             return field.kind === "toggle" ? /** @type {HTMLInputElement} */ (input).checked : input.value;
         }, model?.settingsEditing?.identity));
@@ -270,16 +274,13 @@ function fieldRow(field, canEdit, submit, slot, durations) {
         return row;
     }
     if (field.choices?.length) {
-        const choices = field.choices.map((choice) => typeof choice === "object" ? choice : {value: choice, label: String(choice)});
-        const known = choices.some((choice) => String(choice.value) === String(field.value));
-        const node = el(`<select class="input" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${editable ? "" : "disabled"}>
-            ${known ? "" : `<option value="${esc(field.value)}" selected>${esc(field.value)} · as stored</option>`}
-            ${choices.map((choice) => `<option value="${esc(choice.value)}" ${String(choice.value) === String(field.value) ? "selected" : ""}>${esc(choice.label)}</option>`).join("")}</select>`);
+        const node = el(choiceField({label: field.label, f: `setting:${field.macro}`, choices: settingOptions(field), current: String(field.value),
+            disabled: !editable, hideLabel: true, attributes: {"data-macro": field.macro}}));
         node.addEventListener("change", submit);
         control.appendChild(node);
         return row;
     }
-    const node = el(`<span class="affix${affixed ? " unit" : ""}"><input class="input mono" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" inputmode="numeric" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${affixed ? `<i>${esc(field.unit)}</i>` : ""}</span>`);
+    const node = el(`<span class="affix${affixed ? " unit" : ""}"><input class="input mono num" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" inputmode="numeric" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${affixed ? `<i>${esc(field.unit)}</i>` : ""}</span>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
     control.appendChild(node);
     return row;

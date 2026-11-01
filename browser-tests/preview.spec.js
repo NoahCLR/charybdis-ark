@@ -122,14 +122,15 @@ for (const theme of ["dark", "light"]) {
             window.__posted.length = 0;
         });
         const input = page.getByRole("textbox", {name: "Idle timeout", exact: true});
-        const unit = page.getByRole("combobox", {name: "Idle timeout unit"});
+        const unit = page.getByRole("radiogroup", {name: "Idle timeout unit"});
+        const pickUnit = (name) => unit.locator("label").filter({hasText: name}).click();
         await expect(input).toHaveValue("1");
-        await expect(unit).toHaveValue("minutes");
-        await unit.selectOption("seconds");
+        await expect(unit.getByRole("radio", {name: "minutes"})).toBeChecked();
+        await pickUnit("seconds");
         await expect(input).toHaveValue("60");
         expect(await page.evaluate(() => window.__posted)).toEqual([]);
         for (const [units, value, ms] of [["seconds", "777", "777000"], ["minutes", "1.5", "90000"], ["seconds", "0.777", "777"], ["minutes", "0", "0"], ["minutes", "1440", "86400000"]]) {
-            await unit.selectOption(units);
+            await pickUnit(units);
             await page.evaluate(() => {window.__posted.length = 0;});
             await input.fill(value);
             await input.blur();
@@ -156,7 +157,7 @@ for (const theme of ["dark", "light"]) {
         await input.focus();
         await input.evaluate(node => node.setSelectionRange(0, 1));
         await page.evaluate(async () => (await import("/webview/store.mjs")).render());
-        await expect(unit).toHaveValue("minutes");
+        await expect(unit.getByRole("radio", {name: "minutes"})).toBeChecked();
         await expect(input).toBeFocused();
         expect(await input.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([0, 1]);
     });
