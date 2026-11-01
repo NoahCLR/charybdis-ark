@@ -91,10 +91,11 @@ function directionKey(model, slot, group, name, {form, disabled, stage}) {
 function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}) {
     const node = el(`<div class="pd-scrolling stack">
         <div class="pd-pair" data-group="which"></div>
-        <div class="sect-h pd-sub"><h5>Speed</h5><span class="note">How far the ball moves for one scroll step. Lower scrolls faster.</span></div>
-        <div class="pd-pair" data-group="speed"></div>
-        <div class="sect-h pd-sub"><h5>Feel</h5></div>
-        <div class="pd-pair" data-group="feel"></div></div>`);
+        <div class="pd-groups">
+            <section class="pd-group"><div class="sect-h pd-sub"><h5>Speed</h5></div><div class="pd-pair" data-group="speed"></div>
+                <p class="note">How far the ball moves for one scroll step. Lower scrolls faster.</p></section>
+            <section class="pd-group"><div class="sect-h pd-sub"><h5>Feel</h5></div><div class="pd-pair" data-group="feel"></div></section>
+        </div></div>`);
     const group = (/** @type {string} */ name) => /** @type {HTMLElement} */ (node.querySelector(`[data-group="${name}"]`));
     group("which").append(choice("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
         {tip: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis."}),

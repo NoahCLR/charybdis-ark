@@ -163,6 +163,10 @@ The same kind of control looks and sits the same on every screen.
   its choices shows it as one more option, "as stored". A pair that are two
   independent switches (Reverse scrolling's two axes) is two switches, not
   four options naming their combinations.
+- A slot bank and its editor (Macros, Custom keys, Pointing modes) stop at
+  1320 px together, a 340 px list and a 960 px editor, as a Settings screen
+  stops at 980 px; a wider window leaves the room beside them
+  (`browser-tests/consistency.spec.js`).
 - A number field is as wide as the values it takes (`input.num`, five
   digits unless `--digits` says otherwise) with room for its unit, never as
   wide as its column, and a menu in the pointing editor is as wide as its
