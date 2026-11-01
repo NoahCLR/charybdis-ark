@@ -120,3 +120,22 @@ test("a slot bank and its editor stop at 1320 px on a wide window, as Settings s
         expect(width, screen).toBeLessThanOrEqual(1320);
     }
 });
+
+test("every behaviour cell is one size, on Custom keys and in the Keymap's Behaviours tab, whatever its words", async ({page}) => {
+    for (const [width, screen, state] of [[1920, "customKeys", {}], [1440, "customKeys", {}], [1920, "keys", {tab: "behaviours"}]]) {
+        await page.setViewportSize({width, height: 1100});
+        await openControls(page, screen, state);
+        const heights = await page.locator(".bgrid .bcell").evaluateAll(cells => [...new Set(cells.map(cell => Math.round(cell.getBoundingClientRect().height)))]);
+        expect(heights, `${screen} at ${width}`).toHaveLength(1);
+        // A timing field shows its whole placeholder ("150 · default").
+        for (const fits of await page.locator(".bgrid input.num").evaluateAll(inputs => inputs.map(input => {
+            const probe = document.createElement("span");
+            probe.style.font = getComputedStyle(input).font;
+            probe.textContent = input.placeholder;
+            document.body.append(probe);
+            const fits = probe.getBoundingClientRect().width <= input.clientWidth;
+            probe.remove();
+            return fits;
+        }))) expect(fits, `${screen} timing placeholder`).toBe(true);
+    }
+});
