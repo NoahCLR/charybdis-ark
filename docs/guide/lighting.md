@@ -88,7 +88,9 @@ A mode linked to layers paints beneath the lowest of them that is on instead
 (a layer that starts it or one its key turns on),
 however the mode started: those layers' own colours show over it, and higher
 layers cover both (see [Pointing](pointing.md#3-what-starts-it)). Pick a mode,
-give it a colour, and choose where it paints:
+give it a colour, and choose where it paints. The empty slots are folded at
+the list's end, as the empty layers are in Layer colours: click
+**› 24 empty slots** to show them.
 
 - **Both halves**, **Left half** or **Right half**: that area, whichever key
   started the mode.

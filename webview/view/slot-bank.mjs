@@ -26,3 +26,8 @@ export function slotBank(slots, {inUse, free, keep, matches, searching, open}) {
 // The disclosure's words, for a bank of `count` slots.
 /** @param {number} count */
 export const allSlotsLabel = (count) => `Show all ${count} slots`;
+
+// The words of a list's disclosure that holds `count` empty slots, as a list of
+// layers says how many empty layers it holds (Lighting's pointing modes).
+/** @param {number} count */
+export const emptySlotsLabel = (count) => `${count} empty slot${count === 1 ? "" : "s"}`;

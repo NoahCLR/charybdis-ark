@@ -236,6 +236,34 @@ test("Lighting preview switches and screen links navigate without posting edits"
     await expectPost(page, {type: "refresh"});
 });
 
+test("the pointing-mode list folds its empty slots at its end, as the layer list folds its empty layers", async ({page}) => {
+    await openStage(page, "pd");
+    const list = page.locator('[data-scroll-list="pd"]');
+    const slots = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel()?.pdModes?.map((slot) => ({id: slot.id, empty: !slot.kind})) || []);
+    const empty = slots.filter((slot) => slot.empty && slot.id !== 0).map((slot) => slot.id);
+    expect(empty.length, "the preview has empty slots to fold").toBeGreaterThan(0);
+    const toggle = list.locator('[data-all-slots="lighting-pointing"]');
+    await expect(toggle).toHaveText(`${empty.length} empty slot${empty.length === 1 ? "" : "s"}`);
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(list.locator(".rowitem")).toHaveCount(slots.length - empty.length);
+    await expect(list.locator(":scope > :last-child"), "the disclosure ends the list").toHaveAttribute("data-all-slots", "lighting-pointing");
+
+    // Opened, the empty slots follow it in slot order, so nothing shown moves;
+    // one picked stays shown once they fold again. Folding posts nothing.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const after = await list.evaluate((node) => [...node.querySelectorAll('[data-all-slots] ~ .rowitem')].map((row) => Number(/** @type {HTMLElement} */ (row).dataset.slot)));
+    expect(after).toEqual(empty);
+    const picked = list.locator(`[data-slot="${empty[0]}"]`);
+    await picked.click();
+    await expect(picked).toHaveClass(/\bon\b/);
+    await toggle.click();
+    await expect(list.locator(".rowitem")).toHaveCount(slots.length - empty.length + 1);
+    await expect(list.locator(`[data-slot="${empty[0]}"]`)).toHaveClass(/\bon\b/);
+    await expect(toggle).toHaveText(`${empty.length - 1} empty slot${empty.length === 2 ? "" : "s"}`);
+    expect(await posted(page)).toEqual([]);
+});
+
 test("the layer and pointing-mode lists scroll on their own and keep their place", async ({page}) => {
     await openStage(page, "layers");
     const list = page.locator('[data-scroll-list="layers"]');
