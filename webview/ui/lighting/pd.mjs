@@ -49,7 +49,7 @@ export function stagePointing(model) {
         onChange: (next) => { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], row.locality, next)); },
     }));
     const where = section("Where it paints");
-    const locality = el(`<label class="field"><span>Locality</span>
+    const locality = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.locality)}</span>
         <select data-f="lighting:pointing:${esc(state.pointingSlot)}:locality" class="input" ${canEdit ? "" : "disabled"}
             data-tip="Where the colour paints while the mode runs. The trigger key choices follow the key that started it, and paint every key when no key did.">
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${row?.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);

@@ -122,9 +122,9 @@ behaviour grid has a column per tier and a row per tap count:
 **On the board** shows the same colours under the same names and groups.
 Under **When and where**:
 
-- **Tap commit**: **Double taps and more** flashes when a double tap or more
-  fires, unless it sends a layer or pointing key, whose own stage shows it;
-  **Off** doesn't flash for taps.
+- **Tap branch commit**: **Double taps and more** flashes when a double tap
+  or more fires, unless it sends a layer or pointing key, whose own stage
+  shows it; **Off** doesn't flash for taps.
 - **Locality**: where the flash paints, with the same choices as a pointing
   mode.
 - **Flash interval**: how long each on or off phase lasts.

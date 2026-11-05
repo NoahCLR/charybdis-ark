@@ -81,11 +81,11 @@ export function stageKey(model) {
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
     const policy = section("When and where");
-    const commit = el(choiceField({label: "Tap commit", f: "lighting:key:tap-commit", choices: vocabulary(model).tapCommit,
+    const commit = el(choiceField({label: vocabulary(model).lightingFields.tapBranchCommit, f: "lighting:key:tap-commit", choices: vocabulary(model).tapCommit,
         current: feedback.tapCommitMode, disabled: !canEdit}));
     commit.addEventListener("change", (event) =>
         post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLInputElement} */ (event.target).value})));
-    const locality = el(`<label class="field"><span>Locality</span><select data-f="lighting:key:locality" class="input" ${canEdit ? "" : "disabled"}>
+    const locality = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.locality)}</span><select data-f="lighting:key:locality" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${feedback.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: /** @type {HTMLSelectElement} */ (event.target).value})));

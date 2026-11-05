@@ -232,6 +232,28 @@ test("a colour travels as a colour, and an off one says what off means there", (
     assert.match(override.after,/Group \d+ · 3 LEDs · inherits the stage colour/);
     assert.deepEqual(override.afterColour,{h:0,s:0,v:0},"drawn as off, as Lighting draws it");
 });
+test("every Lighting field reads in the review as its Lighting tab labels it", () => {
+    const {VOCABULARY: V} = require("../../core/model/vocabulary");
+    const {RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES} = require("../../core/schema/rgb-domain-v1");
+    const other = (values, value) => Object.values(values).find(id => id !== value);
+    const hue = colour => ({...colour, h: (colour.h + 1) % 256, v: colour.v || 100});
+    const base=pdDocument(), before=snapshot(base);
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        layerColors:rgb.layerColors.map(row=>({...row,color:hue(row.color),mode:other(RGB_LAYER_MODES,row.mode)})),
+        pdModeColors:rgb.pdModeColors.map(row=>({...row,color:hue(row.color),locality:other(RGB_LOCALITIES,row.locality)})),
+        automouseFade:{...rgb.automouseFade,mode:other(RGB_AUTOMOUSE_MODES,rgb.automouseFade.mode),endColor:hue(rgb.automouseFade.endColor)},
+        comboFeedback:{...rgb.comboFeedback,color:hue(rgb.comboFeedback.color),locality:other(RGB_LOCALITIES,rgb.comboFeedback.locality)},
+        keyFeedback:{...rgb.keyFeedback,tapCommittedColor:hue(rgb.keyFeedback.tapCommittedColor),holdActiveColor:hue(rgb.keyFeedback.holdActiveColor),
+            longHoldActiveColor:hue(rgb.keyFeedback.longHoldActiveColor),tapBranchColors:rgb.keyFeedback.tapBranchColors.map(hue),
+            tapCommitMode:other(RGB_TAP_COMMIT_MODES,rgb.keyFeedback.tapCommitMode),locality:other(RGB_LOCALITIES,rgb.keyFeedback.locality)}})));
+    const items=profileReview(before,after).filter(entry=>/^rgb:(layer|pd|automouse|combo|key)/.test(entry.unit));
+    const words=new Set([...Object.values(V.lightingFields),...V.branches,...V.feedbackOwners.map(([,text])=>text)]);
+    for (const entry of items) for (const field of entry.fields) assert.ok(words.has(field.label),`${entry.title}: "${field.label}" is not a Lighting word`);
+    const key=items.find(entry=>entry.unit==="rgb:key");
+    assert.deepEqual(key.fields.map(field=>field.label),["Tap committed","Hold active","Long hold active",...V.branches.slice(1,1+key.fields.length-5),
+        V.lightingFields.tapBranchCommit,V.lightingFields.locality],"listed as the Key feedback tab lists them");
+    for (const unit of ["rgb:layer","rgb:pd","rgb:automouse","rgb:combo"]) assert.ok(items.some(entry=>entry.unit.startsWith(unit)),`${unit} changed`);
+});
 test("switching one lighting stage off names that stage, in the Lighting screen's words", () => {
     const base=pdDocument(), before=snapshot(base);
     const [item]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask & ~4}))));

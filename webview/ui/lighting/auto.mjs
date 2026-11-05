@@ -76,12 +76,12 @@ export function stageAuto(model) {
         node.append(notice);
     }
     const policy = section("Fade");
-    const select = el(`<label class="field"><span>Fade mode</span><select data-f="lighting:auto:fade-mode" class="input" ${editFade ? "" : "disabled"}>
+    const select = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.fadeMode)}</span><select data-f="lighting:auto:fade-mode" class="input" ${editFade ? "" : "disabled"}>
         ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${esc(id)}" ${fade.mode === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
         { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
     policy.append(stack(select, el(`<p class="note">Where the fade lands once auto-mouse turns the pointer layer off. The board shows the destination, not the animation.</p>`)));
-    const endColour = section("End colour");
+    const endColour = section(vocabulary(model).lightingFields.endColour);
     const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
     endColour.append(unused
         ? el(`<div class="row colour-head unused"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
