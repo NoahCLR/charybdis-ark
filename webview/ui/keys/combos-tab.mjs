@@ -82,9 +82,10 @@ export function tabCombos(body, right) {
         ...reach.groups.map(({id, empty, entries}) => ({id, empty, drafted: entries.some((entry) => changedCombos.has(entry.combo.id)),
             rows: entries.map((entry) => row(id, entry, reachedBy(id, entry)))})),
     ];
+    const columns = vocabulary(model).comboFields;
     const comboTable = reachTable("combos", comboGroupRows, [
-        ["", "7%"], ["Inputs", "25%"], ["Sends", "21%"], ["Window", "10%"],
-        ["Conditions", "13%"], ["Reached by", "24%"]]);
+        ["", "7%"], [columns.inputs, "25%"], [columns.sends, "21%"], [columns.window, "10%"],
+        [columns.conditions, "13%"], ["Reached by", "24%"]]);
     /** @type {HTMLElement} */ (node.querySelector("#comboTable")).replaceWith(comboTable);
 
     // A combo row is picked like any reach row — its keys ring on the board —

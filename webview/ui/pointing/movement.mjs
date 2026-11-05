@@ -38,12 +38,12 @@ function directions(model, slot, {choice, form, disabled}, stage) {
     for (const [group, name] of places) {
         compass.append(directionKey(model, slot, group, name, {form, disabled, stage}));
     }
-    /** @type {HTMLElement} */ (node.querySelector(".pd-direction-reads")).append(choice("Reads", words(model).axes, slot.axis, "axis",
+    /** @type {HTMLElement} */ (node.querySelector(".pd-direction-reads")).append(choice(words(model).fieldLabels.axis, words(model).axes, slot.axis, "axis",
         {tip: tipFor(model, "axis")}));
     const fields = /** @type {HTMLElement} */ (node.querySelector(".pd-direction-fields"));
-    fields.append(choice("When a direction has no key", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
+    fields.append(choice(words(model).fieldLabels.emptyDirection, words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
         {tip: tipFor(model, "emptyDirection")}));
-    fields.append(choice("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
+    fields.append(choice(words(model).fieldLabels.directionOutput, words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
         {tip: tipFor(model, "directionOutput")}));
     fields.append(el(`<p class="note">A direction can also click mouse buttons 1–8 or play a macro; both are in the picker.</p>`));
     return node;
@@ -98,7 +98,7 @@ function scrollingFields(model, slot, {field, choice, form, disabled, modifiers}
             <section class="pd-group"><div class="sect-h pd-sub"><h5>Feel</h5></div><div class="pd-pair" data-group="feel"></div></section>
         </div></div>`);
     const group = (/** @type {string} */ name) => /** @type {HTMLElement} */ (node.querySelector(`[data-group="${name}"]`));
-    group("which").append(choice("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
+    group("which").append(choice(words(model).fieldLabels.scrollAxes, words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
         {tip: tipFor(model, "scrollAxes")}),
     reverse(model, slot, form, disabled));
     // The fields this step draws are SCROLL_LEAD's, the divisors as Speed
@@ -121,7 +121,7 @@ function reverse(model, slot, form, disabled) {
     const P = words(model);
     /** @param {number} bit */
     const axis = (bit) => `<label class="sw"><input type="checkbox" data-f="pointing:${esc(slot.id)}:invert:${bit}" data-bit="${bit}" ${invert & bit ? "checked" : ""} ${esc(disabled)}><span class="track"></span><span class="txt">${esc(word(P.invert, bit))}</span></label>`;
-    const node = el(`<div class="field" data-tip="${esc(tipFor(model, "invert"))}"><span>Reverse scrolling</span><div class="pd-switches">${axis(1)}${axis(2)}</div></div>`);
+    const node = el(`<div class="field" data-tip="${esc(tipFor(model, "invert"))}"><span>${esc(words(model).fieldLabels.invert)}</span><div class="pd-switches">${axis(1)}${axis(2)}</div></div>`);
     form.invert = () => [...node.querySelectorAll("input:checked")].reduce((mask, input) => mask | Number(/** @type {HTMLInputElement} */ (input).dataset.bit), 0);
     return node;
 }

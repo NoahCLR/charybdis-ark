@@ -4,6 +4,7 @@ import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 import {getModel, state} from "../store.mjs";
 import {layerSwitchGrid, switchedLayers} from "./layer-switches.mjs";
 import {ALL_LAYERS} from "../view/layout.mjs";
+import {vocabulary} from "../view/vocabulary.mjs";
 
 // Definition switches preserve all actions and timing while disabled. A
 // behaviour or a combo is named as itself, and the layers it may run on are
@@ -11,14 +12,15 @@ import {ALL_LAYERS} from "../view/layout.mjs";
 // each layer by its name and mark (layer-switches.mjs).
 /** @param {{index: number, label?: string, name: string}[]} layers @param {{enabled?: boolean, allowedLayers?: number}} definition @param {boolean} editable @param {(patch: {enabled: boolean, allowedLayers: number}) => void} changed @param {string} identity @param {"behaviour" | "combo"} noun */
 export function definitionControls(layers, definition, editable, changed, identity, noun) {
+    const words = vocabulary(getModel()).definitionFields;
     const node = el(`<div class="stack gap-10">
         <label class="sw" data-tip="Off, this ${noun} keeps its actions and timing but does nothing until it is on again."><input type="checkbox" data-f="${esc(identity)}:enabled" data-definition-enabled ${definition.enabled !== false ? "checked" : ""} ${editable ? "" : "disabled"}>
-            <span class="track"></span><span class="txt">Use this ${noun}</span></label>
-        <details class="def-layers" ${state.definitionLayersOpen ? "open" : ""}><summary class="note" data-tip="The layers a key can come from for this ${noun} to run.">${DISCLOSURE}Layers it runs on</summary></details>
+            <span class="track"></span><span class="txt">${esc(words.use[noun])}</span></label>
+        <details class="def-layers" ${state.definitionLayersOpen ? "open" : ""}><summary class="note" data-tip="The layers a key can come from for this ${noun} to run.">${DISCLOSURE}${esc(words.allowedLayers)}</summary></details>
         <p class="note">It runs only where Settings and the key's own switch allow it too.</p>
     </div>`);
     const allowed = definition.allowedLayers ?? ALL_LAYERS;
-    const grid = layerSwitchGrid(getModel(), "Layers it runs on", layers.map(layer => ({layer: layer.index, label: layer.label || layer.name,
+    const grid = layerSwitchGrid(getModel(), words.allowedLayers, layers.map(layer => ({layer: layer.index, label: layer.label || layer.name,
         f: `${identity}:allowed-layer:${layer.index}`, checked: Boolean(allowed & 2 ** layer.index), disabled: !editable})),
     // An empty layer it does not run on differs from how it came, so shows.
     {place: `runs-on:${noun}`, keep: (layer) => !(allowed & 2 ** layer)});

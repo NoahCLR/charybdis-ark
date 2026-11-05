@@ -15,7 +15,10 @@ const NONE = {phases: /** @type {Vocabulary["phases"]} */ ({}), readSteps: /** @
     colourOff: {}, feedbackOwners: [], feedbackTiers: {}, ledTables: [], stages: [], customKeys: {alwaysOn: {base: "", default: ""}, layerKinds: []},
     keyCapLayerVerbs: {}, layerKeyVerbs: {}, checkLevels: /** @type {Vocabulary["checkLevels"]} */ ({}), checkStatuses: /** @type {Vocabulary["checkStatuses"]} */ ({}), recoveryCauses: /** @type {Vocabulary["recoveryCauses"]} */ ({}), settingsSections: {}, fileSections: {}, usageCounts: /** @type {Vocabulary["usageCounts"]} */ ({}), participationReasons: /** @type {Vocabulary["participationReasons"]} */ ({}), participationPlaces: {key: "", layer: "", keyOn: ""}, settingsScreens: {behaviours: "", combos: "", pointer: "", host: ""},
     pointing: {kinds: [], directions: [], diagonals: [], axes: [], invert: [], pointerLayer: [], linkLabels: {startsOther: "", linkedLayers: "", linkTurnsOn: "", linkEnds: "", startedBy: "", endsWhen: "", keyTurnsOnShort: "", ignored: "", started: ""}, linkEnds: [], linkInert: {default: "", pointer: ""},
-        emptyDirection: [], directionOutput: [], directionStep: [], scrollAxes: [], modifierPolicy: [], kindsDo: [], movementLabel: "", scrollFields: [], heldModifiers: "", tips: {}, pointerLayerLabel: ""}, modifiers: [], comboOptions: {}};
+        emptyDirection: [], directionOutput: [], directionStep: [], scrollAxes: [], modifierPolicy: [], kindsDo: [], movementLabel: "", scrollFields: [], heldModifiers: "", tips: {}, pointerLayerLabel: "",
+        fieldLabels: {name: "", dpi: "", axis: "", emptyDirection: "", directionOutput: "", scrollAxes: "", invert: "", horizontal: "", vertical: ""}},
+    modifiers: [], comboOptions: {}, definitionFields: {use: {behaviour: "", combo: ""}, allowedLayers: ""}, behaviourFields: {anchor: ""},
+    comboFields: {inputs: "", sends: "", window: "", conditions: ""}};
 
 /** @param {VocabularyModel | null | undefined} model */
 export const vocabulary = (model) => model?.vocabulary || NONE;

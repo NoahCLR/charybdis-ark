@@ -37,8 +37,8 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             const shown = thresholdDistance(counts, dpi);
             return shown ? {unit: shown.short, wide: true, tip: `${does} ${shown.long}`} : {tip: `${does} In sensor counts at this mode's pointer speed.`};
         };
-        if (readsHorizontal(slot.axis)) distances.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
-        if (readsVertical(slot.axis)) distances.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
+        if (readsHorizontal(slot.axis)) distances.append(field(`${words(model).fieldLabels.horizontal} ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
+        if (readsVertical(slot.axis)) distances.append(field(`${words(model).fieldLabels.vertical} ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
         section("Distance").append(distances);
     }
 

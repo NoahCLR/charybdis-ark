@@ -672,10 +672,22 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         // What the pointer layer does while a mode its key started runs: on,
         // or off so the typing layer's keys stay under the hand.
         pointerLayerLabel: "Pointer layer",
+        // The editor's other field labels, which the review names its fields
+        // by. A directional threshold is its axis's word and then its
+        // directionStep ("Horizontal movement per tap").
+        fieldLabels: {name: "Pointing mode name", dpi: "Pointer speed", axis: "Reads", emptyDirection: "When a direction has no key",
+            directionOutput: "How often it sends", scrollAxes: "Scrolls", invert: "Reverse scrolling", horizontal: "Horizontal", vertical: "Vertical"},
     },
     modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
         [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"]],
     comboOptions: {useOutputBehavior: "use output behaviour", mustHold: "must be held", mustTap: "tap only", ordered: "keys in order"},
+    // What a behaviour and a combo share, as both editors label it and the
+    // review names it: whether it runs, and on which layers.
+    definitionFields: {use: {behaviour: "Use this behaviour", combo: "Use this combo"}, allowedLayers: "Layers it runs on"},
+    // A behaviour's own switch, as its editor labels it and the review names it.
+    behaviourFields: {anchor: "Keeps the pointer layer on"},
+    // A combo's fields, as the Combos table heads them and the review names them.
+    comboFields: {inputs: "Inputs", sends: "Sends", window: "Window", conditions: "Conditions"},
 }));
 
 // The names a person reads for a layer and a pointing slot that have none of

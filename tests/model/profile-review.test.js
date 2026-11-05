@@ -67,7 +67,7 @@ test("a combo's keys read as the screens read them, with no stored name where no
     const base=combos(pdDocument(),()=>comboRows()), before=snapshot(base);
     // LT(3,KC_SLASH) and a pointing-mode key: once "/ / layer 3 (LT(3,KC_SLASH))" and "User 16".
     const after=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,inputs:[{kind:1,flags:0,operand:0x4338},{kind:1,flags:0,operand:0x7e80}]}:row)));
-    const keys=profileReview(before,after).find(row=>row.unit==="combo:0").fields.find(field=>field.label==="Keys");
+    const keys=profileReview(before,after).find(row=>row.unit==="combo:0").fields.find(field=>field.label==="Inputs");
     assert.equal(keys.after,`/ / ${settings.names[3]} + ${slots[0].name} · hold`,"a layer by its name");
 });
 test("a key changed for another with the same label is still a visible change", () => {
@@ -133,7 +133,7 @@ test("a changed default window is one Combo timing change, and the combos that f
     const after=snapshot(combos(base,rows=>rows,{defaultTermMs:70,holdTermMs:250}));
     const items=profileReview(before,after);
     assert.deepEqual(items.map(row=>row.unit),["comboTiming"]);
-    assert.deepEqual(items[0].fields.map(field=>[field.label,field.before,field.after]),[["Default window","50 ms","70 ms"],["Hold threshold","200 ms","250 ms"]]);
+    assert.deepEqual(items[0].fields.map(field=>[field.label,field.before,field.after]),[["Default combo window","50 ms","70 ms"],["Combo hold threshold","200 ms","250 ms"]]);
     assert.deepEqual(items[0].place,{kind:"settings",section:"comboSettings",area:"Settings"});
     // A combo moving between its own window and the default is its change.
     const own=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,termMs:50}:row)));
@@ -171,7 +171,7 @@ test("a behaviour's allowed layers are named as every screen names them, never b
     const target=validateSnapshot(base).behaviors.rows[0].target, names=validateSnapshot(base).settings.names;
     const after=snapshot(behaviours(base,rows=>rows.map(row=>JSON.stringify(row.target)===JSON.stringify(target)?{...row,allowedLayers:0b1000000000010011}:row)));
     const [item]=profileReview(before,after);
-    const field=item.fields.find(entry=>entry.label==="Allowed layers");
+    const field=item.fields.find(entry=>entry.label==="Layers it runs on");
     const called=index=>names[index]||(index?`Layer ${index}`:"Base");
     assert.equal(field.after,[0,1,4,15].map(called).join(", "));
     assert.ok(field.after.split(", ").every(Boolean),"no layer is a blank name");
@@ -254,6 +254,29 @@ test("every Lighting field reads in the review as its Lighting tab labels it", (
         V.lightingFields.tapBranchCommit,V.lightingFields.locality],"listed as the Key feedback tab lists them");
     for (const unit of ["rgb:layer","rgb:pd","rgb:automouse","rgb:combo"]) assert.ok(items.some(entry=>entry.unit.startsWith(unit)),`${unit} changed`);
 });
+test("every behaviour, combo and pointing mode field reads in the review as its editor labels it", () => {
+    const {VOCABULARY: V} = require("../../core/model/vocabulary");
+    const {COMBO_TIMING} = require("../../core/model/settings-editor");
+    const P = V.pointing, sentence = text => text.charAt(0).toUpperCase() + text.slice(1);
+    const words = new Set([
+        ...Object.values(V.definitionFields.use), V.definitionFields.allowedLayers, ...Object.values(V.behaviourFields),
+        ...Object.values(V.thresholdNames).map(sentence), ...Object.values(V.comboFields), sentence(V.comboOptions.useOutputBehavior),
+        ...COMBO_TIMING.map(field => field.label),
+        P.movementLabel, P.pointerLayerLabel, P.heldModifiers, ...Object.values(P.fieldLabels), ...Object.values(P.linkLabels),
+        ...[...P.directions, ...P.diagonals, ...P.scrollFields].map(([, text]) => text),
+        ...[P.fieldLabels.horizontal, P.fieldLabels.vertical].flatMap(axis => P.directionStep.map(([, step]) => `${axis} ${step}`)),
+    ]);
+    // A tier reads as the grid heads it: "2× long hold".
+    const tier = new RegExp(`^\\d× (${Object.values(V.tiers).map(name => name.toLowerCase()).join("|")})$`);
+    const full = combos(pdDocument(), () => comboRows().map((row, id) => ({...row, termMs: id ? row.termMs : null, mustHold: id === 1, ordered: id === 2})));
+    const empty = combos(behaviours(withDomain(full,80,decodePdDomain,encodePdDomain,modes=>modes.map(mode=>({...mode,kind:0,name:""}))),()=>[]),()=>[],{defaultTermMs:70,holdTermMs:250});
+    const items = [...profileReview(snapshot(empty), snapshot(full)), ...profileReview(snapshot(full), snapshot(empty))]
+        .filter(entry => /^(pd|behavior|combo)/.test(entry.unit));
+    const labels = new Set(items.flatMap(entry => entry.fields.map(field => field.label)));
+    for (const label of labels) assert.ok(words.has(label) || tier.test(label), `"${label}" is not a word its editor uses`);
+    for (const label of [V.behaviourFields.anchor, V.definitionFields.use.behaviour, V.definitionFields.use.combo, V.comboFields.inputs,
+        COMBO_TIMING[0].label, P.fieldLabels.dpi, P.fieldLabels.name, P.movementLabel]) assert.ok(labels.has(label), `"${label}" is reviewed`);
+});
 test("switching one lighting stage off names that stage, in the Lighting screen's words", () => {
     const base=pdDocument(), before=snapshot(base);
     const [item]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask & ~4}))));
@@ -323,7 +346,7 @@ test("an eight-direction mode reads as eight directions, and lists its diagonals
     const directional=slots.findIndex(slot=>slot.kind===1);
     const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===directional?{...mode,axis:3,thresholdX:mode.thresholdX||60,thresholdY:mode.thresholdY||60}:mode)));
     const [item]=profileReview(before,after);
-    const axis=item.fields.find(field=>field.label==="Axes");
+    const axis=item.fields.find(field=>field.label==="Reads");
     assert.equal(axis.after,"Eight directions","not undefined");
     assert.ok(item.fields.some(field=>field.label==="Up-left"),"the diagonals it now reads are listed");
 });
