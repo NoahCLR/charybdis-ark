@@ -46,22 +46,32 @@ export function stageKey(model) {
 
     /** @type {Partial<import("../../../contracts/edits.js").KeyFeedback<import("../../../contracts/edits.js").Colour>>} */
     const feedback = model.rgb.keyBehaviorFeedback || {};
-    /** @type {{id: import("../../../contracts/edits.js").FeedbackRow, label: string, colour: import("../../../contracts/edits.js").Colour | undefined}[]} */
-    const rows = [
-        ...SEMANTIC_ROWS.map((row) => ({...row, label: word(vocabulary(model).feedbackOwners, row.owner), colour: feedback[row.id]})),
-        ...(feedback.tapBranchColors || []).map((colour, index) => ({id: /** @type {const} */ (`branch:${index}`), label: branchName(model, index + 2), colour})),
-    ];
+    /** @typedef {{id: import("../../../contracts/edits.js").FeedbackRow, label: string, colour: import("../../../contracts/edits.js").Colour | undefined}} Row */
+    // The colours fall in two groups, as the behaviour grid's columns and
+    // rows do: a tier's colour flashes as it fires, a tap branch's while a
+    // run of taps waits on its count.
+    /** @type {{title: string, tip: string, rows: Row[]}[]} */
+    const groups = [
+        {title: "Tiers", tip: "Flash as a key's tap, hold or long hold fires.",
+            rows: SEMANTIC_ROWS.map((row) => ({id: row.id, label: word(vocabulary(model).feedbackOwners, row.owner), colour: feedback[row.id]}))},
+        {title: "Tap branches", tip: "Flash while a run of taps waits on that tap count, until it resolves.",
+            rows: (feedback.tapBranchColors || []).map((colour, index) => ({id: /** @type {const} */ (`branch:${index}`), label: branchName(model, index + 2), colour}))},
+    ].filter((group) => group.rows.length);
+    const rows = groups.flatMap((group) => group.rows);
     if (!rows.some((row) => row.id === state.feedbackRow)) state.feedbackRow = rows[0]?.id;
     const current = rows.find((row) => row.id === state.feedbackRow) || rows[0];
     node.className = "tab-split";
     const list = el(`<aside class="rowlist"><div class="rowlist-h">Feedback colours</div></aside>`);
-    rows.forEach((row) => {
-        const lit = !isOff(row.colour);
-        const item = el(`<button class="rowitem ${row.id === current?.id ? "on" : ""}" data-row="${esc(row.id)}">
-            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}</span>
-            ${lit ? "" : `<span class="m">off</span>`}</button>`);
-        item.addEventListener("click", () => { state.feedbackRow = row.id; render(); });
-        list.append(item);
+    groups.forEach((group) => {
+        list.append(el(`<div class="rowlist-sub" data-tip="${esc(group.tip)}">${esc(group.title)}</div>`));
+        group.rows.forEach((row) => {
+            const lit = !isOff(row.colour);
+            const item = el(`<button class="rowitem ${row.id === current?.id ? "on" : ""}" data-row="${esc(row.id)}">
+                <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}</span>
+                ${lit ? "" : `<span class="m">off</span>`}</button>`);
+            item.addEventListener("click", () => { state.feedbackRow = row.id; render(); });
+            list.append(item);
+        });
     });
     const main = el(`<div class="tab-grid two stage-detail"></div>`);
     const colour = section(current?.label || "Feedback");
@@ -87,9 +97,10 @@ export function stageKey(model) {
         const lit = stageEnabled(model, "key") && !isOff(colour);
         return `<i class="fbdot${lit ? "" : " off"}"${lit ? ` style="background:${css(colour)}"` : ""}></i>`;
     };
-    // The chips name each colour as the list does.
-    onBoard.append(el(`<div class="row gap-12 stage-chips">
-        ${rows.map((row) => `<span class="chip">${dot(row.colour)} ${esc(row.label)}</span>`).join("")}</div>`));
+    // The chips name and group each colour as the list does.
+    groups.forEach((group) => onBoard.append(el(`<div class="row gap-12 stage-chips grouped">
+        <span class="stage-chips-k">${esc(group.title)}</span>
+        ${group.rows.map((row) => `<span class="chip">${dot(row.colour)} ${esc(row.label)}</span>`).join("")}</div>`)));
     onBoard.append(el(`<p class="note">The board's behaviour dots and the behaviour grid's branch numbers wear these colours${stageEnabled(model, "key") ? "" : ", hollow while the stage is off"}.</p>`));
     onBoard.append(groupRowsTable(model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior"));
     main.append(colour, policy, onBoard);
