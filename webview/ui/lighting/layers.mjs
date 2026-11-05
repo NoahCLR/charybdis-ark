@@ -48,7 +48,7 @@ export function stageLayers(model) {
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));
     const where = section("Where it paints");
-    const mode = el(choiceField({label: "Which keys light up", f: `lighting:layer:${layer?.index}:mode`, choices: vocabulary(model).paintModes,
+    const mode = el(choiceField({label: vocabulary(model).lightingFields.paintMode, f: `lighting:layer:${layer?.index}:mode`, choices: vocabulary(model).paintModes,
         current: row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY", disabled: !canEdit}));
     mode.addEventListener("change", (event) =>
         { if (row) post(edits.layerColour(row.layer, /** @type {HTMLInputElement} */ (event.target).value, row.color)); });

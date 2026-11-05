@@ -16,14 +16,14 @@ export function stageCombo(model) {
     /** @type {Partial<import("../../../contracts/panel.js").RgbView["comboFeedback"]>} */
     const combo = model.rgb.comboFeedback || {};
     node.className = "tab-grid three";
-    const colour = section("Colour");
+    const colour = section(vocabulary(model).lightingFields.colour);
     colour.append(colourControl(model, {
         colour: combo.color, canEdit, title: "Combo feedback",
         ...offWording(model, "combo"),
         onChange: (next) => { if (combo.locality !== undefined) post(edits.comboFeedback(combo.locality, next)); },
     }));
     const where = section("Where it paints");
-    const locality = el(`<label class="field"><span>Locality</span><select data-f="lighting:combo:locality" class="input" ${canEdit ? "" : "disabled"}>
+    const locality = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.locality)}</span><select data-f="lighting:combo:locality" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${esc(id)}" ${combo.locality === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         { if (combo.color) post(edits.comboFeedback(/** @type {HTMLSelectElement} */ (event.target).value, combo.color)); });

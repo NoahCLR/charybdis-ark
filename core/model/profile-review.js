@@ -271,6 +271,7 @@ function singleComboRemovalIndex(before, after) {
 /** @param {import("../../contracts/model.js").WordList} list @param {Record<string, number>} values @param {number} value */
 const nameIn = (list, values, value) => word(list, Object.entries(values).find(([, id]) => id === value)?.[0] ?? value);
 const V = VOCABULARY;
+const F = V.lightingFields;
 /** @param {import("../schema/types.js").Hsv} value @param {string} [off] */
 const colour = (value, off = "off") => ({text: value.v ? hsv(value) : off, key: hsv(value), colour: {h: value.h, s: value.s, v: value.v}});
 
@@ -292,15 +293,19 @@ function lightingRecords(value) {
         return [stage.label, {text: on ? "on" : "off", key: on, mark: {kind: "stage", on}}];
     }));
     for (const row of r.layerColors) record(UNIT.rgbLayer(row.layerId), `${layerName(row.layerId)} colour`, "layers",
-        [["Colour", colour(row.color, row.layerId === 0 ? "off · the background effect shows" : "off")], ["Paints", nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
+        [[F.colour, colour(row.color, row.layerId === 0 ? "off · the background effect shows" : "off")], [F.paintMode, nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
     for (const row of r.pdModeColors) record(UNIT.rgbPd(row.pdModeId), `Pointing mode colour · ${slotCalled(row.pdModeId)}`, "pd",
-        [["Colour", colour(row.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
-    record(UNIT.rgb("automouse"), "Auto-mouse fade", "auto", [["Fade", nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
-    record(UNIT.rgb("combo"), "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
+        [[F.colour, colour(row.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
+    record(UNIT.rgb("automouse"), "Auto-mouse fade", "auto", [[F.fadeMode, nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], [F.endColour, colour(r.automouseFade.endColor)]]);
+    record(UNIT.rgb("combo"), "Combo feedback", "combo", [[F.colour, colour(r.comboFeedback.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
     const k = r.keyFeedback;
-    record(UNIT.rgb("key"), "Key feedback", "key", [...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [`${i + 2}× branch`, colour(value)]),
-        ["Tap committed", colour(k.tapCommittedColor)], ["Hold active", colour(k.holdActiveColor)], ["Long hold active", colour(k.longHoldActiveColor)],
-        ["Tap commit", nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
+    // Named and ordered as the Key feedback tab lists them: the tiers, then
+    // the tap branches, then when and where.
+    record(UNIT.rgb("key"), "Key feedback", "key", [
+        [word(V.feedbackOwners, "KEY_FEEDBACK_GROUP_TAP_COMMITTED"), colour(k.tapCommittedColor)], [word(V.feedbackOwners, "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), colour(k.holdActiveColor)],
+        [word(V.feedbackOwners, "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"), colour(k.longHoldActiveColor)],
+        ...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [V.branches[i + 1] || `${i + 2} taps`, colour(value)]),
+        [F.tapBranchCommit, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
     // LED groups are one record with every row that paints them: rows name
     // groups by id, so a row put back without its group could point at a
     // group that no longer exists. Groups read as the Lighting screen shows

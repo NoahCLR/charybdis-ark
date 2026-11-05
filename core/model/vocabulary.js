@@ -465,6 +465,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["END_COLOR_ON_ALL_KEYS", "End colour on all keys"],
     ],
     tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Double taps and more"]],
+    // Lighting's fields, as its tabs label them and the review names them.
+    lightingFields: {colour: "Colour", locality: "Locality", paintMode: "Which keys light up", fadeMode: "Fade mode", endColour: "End colour",
+        tapBranchCommit: "Tap branch commit"},
     // What the colour editor says about HSV(0, 0, 0) in each stage: the tip on
     // Turn off and the note shown once it is stored. Outside a layer colour
     // and a group row black is literal black (firmware RGB domain spec,

@@ -94,7 +94,7 @@ test("all Lighting policy selects post the chosen policy and retained colour", a
         ["auto", "Fade mode", "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", {type: "updateAutomouseFade", mode: "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", h: 167, s: 255, v: 199}],
         ["pd", "Locality", "RGB_LEFT_HALF", {type: "updatePdModeColor", pointingMode: "POINTING_MODE_DRAGSCROLL", locality: "RGB_LEFT_HALF", h: 21, s: 255, v: 200}],
         ["combo", "Locality", "RGB_BOTH_HALVES", {type: "updateComboFeedback", locality: "RGB_BOTH_HALVES", h: 191, s: 255, v: 200}],
-        ["key", "Tap commit", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
+        ["key", "Tap branch commit", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
         ["key", "Locality", "RGB_LEFT_HALF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({locality: "RGB_LEFT_HALF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
     ]) {
         await openStage(page, stage);
@@ -118,7 +118,7 @@ test("key feedback names each colour once, in the list and on the board, grouped
     const listed = await body(page).locator(".rowlist [data-row]").allInnerTexts();
     const chips = await body(page).locator(".stage-chips .chip").allInnerTexts();
     expect(chips.map(text => text.trim())).toEqual(listed.map(text => text.replace(/\s*off$/, "").trim()));
-    const commit = body(page).locator('.seg[aria-label="Tap commit"] label');
+    const commit = body(page).locator('.seg[aria-label="Tap branch commit"] label');
     await expect(commit).toHaveText(["Off", "Double taps and more"]);
 });
 

@@ -92,6 +92,9 @@ export interface ApplyView {
 
 export type WordList<T = Scalar> = readonly (readonly [T, string])[];
 export type HalvesId = 'agree' | 'alone' | 'apart' | 'unread';
+/** A Lighting field the tabs and the review both name. */
+export type LightingField = 'colour' | 'locality' | 'paintMode' | 'fadeMode' | 'endColour' | 'tapBranchCommit';
+
 export interface Vocabulary {
     phases: Readonly<Record<PhaseId, Readonly<PhaseWords>>>;
     readSteps: Readonly<Record<import('./messages.js').ReadStep, string>>;
@@ -135,6 +138,8 @@ export interface Vocabulary {
     paintModes: WordList<string>;
     fadeModes: WordList<string>;
     tapCommit: WordList<string>;
+    /** Lighting's fields, as its tabs label them and the review names them. */
+    lightingFields: Readonly<Record<LightingField, string>>;
     /** What storing HSV(0, 0, 0) does, by lighting stage (or `groups`, a group row): Turn off's tip and the note once stored. */
     colourOff: Readonly<Record<string, {offTip: string; offNote?: string}>>;
     feedbackOwners: WordList<string>;
