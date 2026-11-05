@@ -492,14 +492,15 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layerbar-wrap > .layer-edit { flex: none; margin: 0 10px 0 10px; }
 /* Empty layers (D-L76) fold behind one disclosure at the end of every list
    of layers: its chevron, then how many, turned down while they show. In the
-   layer bar it hangs from the strip's foot like a tab, outside what scrolls. */
-.empty-layers {
+   layer bar it hangs from the strip's foot like a tab, outside what scrolls.
+   Lighting's list of pointing modes folds its empty slots the same way. */
+:is(.empty-layers, .empty-slots) {
   display: inline-flex; align-items: center; gap: 7px; height: var(--h-compact); padding: 0 10px 0 8px; border-radius: var(--r-control);
   color: var(--text-2); font-size: var(--fs-md); white-space: nowrap; text-align: left;
 }
-.empty-layers:hover { color: var(--text); background: var(--surface-3); }
-.empty-layers .chev { width: 10px; height: 10px; flex: none; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
-.empty-layers[aria-expanded="true"] .chev { transform: rotate(90deg); }
+:is(.empty-layers, .empty-slots):hover { color: var(--text); background: var(--surface-3); }
+:is(.empty-layers, .empty-slots) .chev { width: 10px; height: 10px; flex: none; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
+:is(.empty-layers, .empty-slots)[aria-expanded="true"] .chev { transform: rotate(90deg); }
 .layerbar-wrap > .layer-empties { position: relative; flex: none; height: var(--h-tab); margin-left: 10px; border-radius: 0 0 var(--r-control) var(--r-control); }
 .layerbar-wrap > .layer-empties::before { content: ""; position: absolute; left: -5px; top: 9px; bottom: 9px; width: 1px; background: var(--line); }
 .grid-empties { grid-column: 1 / -1; justify-self: start; margin-left: -8px; }

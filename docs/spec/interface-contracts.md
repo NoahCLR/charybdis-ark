@@ -210,6 +210,10 @@ The same kind of control looks and sits the same on every screen.
   search looks through every slot (`slotBank`, `webview/view/slot-bank.mjs`,
   drawn by `webview/ui/slot-bank.mjs`; `tests/view/slot-bank.test.mjs`,
   `browser-tests/consistency.spec.js`, `browser-tests/pointing-controls.spec.js`).
+  Lighting's list of pointing modes folds its empty slots by the same rule,
+  behind one disclosure at its end worded as the empty layers' is, "24 empty
+  slots" (`emptySlotsButton`), which draws them after it; the picked slot and
+  one the draft changed always show (`browser-tests/lighting-controls.spec.js`).
 - Keys and Lighting draw the same layer strip on the board
   (`tests/view/navigation-profile-ui.test.mjs`), Rename & reorder included
   (no test).

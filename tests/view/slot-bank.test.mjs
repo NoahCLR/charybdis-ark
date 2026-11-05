@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {allSlotsLabel, slotBank} from "../../webview/view/slot-bank.mjs";
+import {allSlotsLabel, emptySlotsLabel, slotBank} from "../../webview/view/slot-bank.mjs";
 
 // Eight slots: 2 and 5 in use, 4 the one open in the editor, 6 out of room.
 const slots = Array.from({length: 8}, (_, slot) => ({slot, used: slot === 2 || slot === 5, out: slot === 6}));
@@ -38,4 +38,9 @@ test("a search looks through every slot, used or not, and folds nothing", () => 
 
 test("the disclosure counts the whole bank", () => {
     assert.equal(allSlotsLabel(128), "Show all 128 slots");
+});
+
+test("a list of slots says how many empty slots its disclosure holds, as a list of layers does", () => {
+    assert.equal(emptySlotsLabel(24), "24 empty slots");
+    assert.equal(emptySlotsLabel(1), "1 empty slot");
 });

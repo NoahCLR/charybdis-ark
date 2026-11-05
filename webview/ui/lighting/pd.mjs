@@ -9,6 +9,8 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourControl, localityLabel, section, stack} from "./common.mjs";
 import {groupRowsTable} from "./led-rows.mjs";
+import {slotBank} from "../../view/slot-bank.mjs";
+import {allSlotsShown, emptySlotsButton} from "../slot-bank.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stagePointing(model) {
@@ -17,9 +19,18 @@ export function stagePointing(model) {
     const marks = draftMarks(model?.draft?.changes);
 
     node.className = "tab-split";
-    // Past eight slots the list scrolls on its own beside the editor.
-    const list = el(`<aside class="rowlist ${(model.pdModes || []).length > 8 ? "many" : ""}" data-scroll-list="pd"><div class="rowlist-h">Pointing modes</div></aside>`);
-    (model.pdModes || []).forEach((slot) => {
+    // Past eight slots the list scrolls on its own beside the editor. Empty
+    // slots fold behind the disclosure at its end, as the layers' list folds
+    // its empty layers; the picked slot, and one the draft changed, apart.
+    const slots = model.pdModes || [];
+    const bank = slotBank(slots, {inUse: (slot) => Boolean(slot.kind), free: (slot) => !slot.kind,
+        keep: (slot) => slot.id === state.pointingSlot || marks.lightingSlots.has(slot.id),
+        matches: () => true, searching: false, open: allSlotsShown("lighting-pointing")});
+    const listed = [...bank.shown, ...bank.revealed];
+    const list = el(`<aside class="rowlist ${listed.length > 8 ? "many" : ""}" data-scroll-list="pd"><div class="rowlist-h">Pointing modes</div></aside>`);
+    const disclosure = bank.folded ? emptySlotsButton("lighting-pointing", bank.folded, "mode", "rowlist-empties") : null;
+    listed.forEach((slot) => {
+        if (disclosure && slot === bank.revealed[0]) list.append(disclosure);
         const row = pdColourRow(model, slot.id);
         const lit = row && !isOff(row.color);
         const item = el(`<button class="rowitem ${slot.id === state.pointingSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${esc(slot.id)}">
@@ -28,6 +39,7 @@ export function stagePointing(model) {
         item.addEventListener("click", () => { state.pointingSlot = slot.id; render(); });
         list.append(item);
     });
+    if (disclosure && !bank.revealed.length) list.append(disclosure);
     const row = pdColourRow(model, state.pointingSlot);
     const main = el(`<div class="tab-grid two stage-detail"></div>`);
     const colour = section(`${slotName(model, state.pointingSlot)} colour`);
