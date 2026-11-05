@@ -59,6 +59,11 @@ beside it says where the macro stands: **edited here** while an edit is not in
 the draft yet, **changed in draft** once the draft changes the macro, and
 **as read** when it matches the keyboard (in the demo, the demo profile).
 
+In the live modes an edit reaches the keyboard once Ark has checked it, so
+the button is **Back to keyboard**, which drops an edit that hasn't reached the
+keyboard yet. The chip says **unsaved** while the keyboard runs a change it
+hasn't saved, and **saved** when the macro matches what it saved.
+
 **Clear macro** empties the slot. **Place on a key…** takes you to the Keymap
 screen to put the macro on a key. Beside the title, chips name the layers
 that use the macro; click one to see it there.

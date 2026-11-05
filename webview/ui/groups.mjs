@@ -14,11 +14,11 @@ import {GROUP_TITLES, inGroupOrder, reachRowId, setReachGroupOpen} from "../view
 // open, its rows carry their own marks.
 // A group whose rows depend on a choice elsewhere names it after the title,
 // as markup: a key is named as every surface names it (ui/marks.mjs).
-/** @param {string} tab @param {string} id @param {number} count @param {boolean} [drafted] @param {string} [detail] */
-function groupHeader(tab, id, count, drafted = false, detail = "") {
+/** @param {Parameters<typeof draftDot>[0]} draft @param {string} tab @param {string} id @param {number} count @param {boolean} [drafted] @param {string} [detail] */
+function groupHeader(draft, tab, id, count, drafted = false, detail = "") {
     const open = state.reachGroups[id];
     return `<button class="group-h" data-group-tab="${esc(tab)}" data-group="${esc(id)}" aria-expanded="${esc(open)}">
-        ${DISCLOSURE}<span class="ttl">${esc(GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (id)])}${detail ? ` <span class="mono dim">· ${detail}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
+        ${DISCLOSURE}<span class="ttl">${esc(GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (id)])}${detail ? ` <span class="mono dim">· ${detail}</span>` : ""}${drafted && !open ? draftDot(draft, "", {holds: true}) : ""}</span>
         <span class="n">${count}</span></button>`;
 }
 
@@ -72,11 +72,11 @@ export const reachAttrs = (tab, group, name) => {
 // The table scrolls inside its pane, under its column header and the band of
 // the group in view, so a long list never stretches the workbench; it keeps
 // its own place under the tab's key ([data-scroll-list], lib/scroll.mjs).
-/** @param {string} tab @param {{id: string, rows: string[], drafted?: boolean, detail?: string, empty?: string}[]} groups @param {string[][]} columns */
-export function reachTable(tab, groups, columns) {
+/** @param {string} tab @param {{id: string, rows: string[], drafted?: boolean, detail?: string, empty?: string}[]} groups @param {string[][]} columns @param {Parameters<typeof draftDot>[0]} draft whose edit mode words a folded group's mark */
+export function reachTable(tab, groups, columns, draft) {
     /** @param {{id: string, rows: string[], drafted?: boolean, detail?: string, empty?: string}} group */
     const section = (group) => `<tbody class="rowgroup">
-        <tr><td colspan="${columns.length}" class="t-group">${groupHeader(tab, group.id, group.rows.length, group.drafted, group.detail)}</td></tr>
+        <tr><td colspan="${columns.length}" class="t-group">${groupHeader(draft, tab, group.id, group.rows.length, group.drafted, group.detail)}</td></tr>
         ${groupOpen(tab, group.id)
             ? (group.rows.length ? group.rows.join("")
                 : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)

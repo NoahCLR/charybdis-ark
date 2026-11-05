@@ -62,7 +62,7 @@ export function screenPointing() {
         const tip = row.kind ? `Slot ${row.id} · ${row.name} · ${kind}` : `Slot ${row.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} still reach it` : ""}`;
         const cell = el(`<button class="mslot pd-tile ${row.kind ? "filled" : ""} ${inert ? "warn" : ""}" data-slot="${esc(row.id)}" role="listitem"
             aria-current="${row.id === slot.id}" aria-label="${esc(tip)}" data-tip="${esc(tip)}">
-            ${changed.has(row.id) ? draftDot("Changed in your draft", "corner") : ""}
+            ${changed.has(row.id) ? draftDot(model?.draft, "corner") : ""}
             <span class="pd-tile-top">${row.kind ? slotLight(model, row).swatch() : ""}<span class="n">${esc(row.id)}</span></span>
             <span class="v">${row.kind ? esc(row.name) : "—"}</span></button>`);
         cell.addEventListener("click", () => { state.pointingSlot = row.id; state.pdKind = null; state.pdTaps = null; render(); });

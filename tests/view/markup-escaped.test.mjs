@@ -57,6 +57,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/keys/board-card.mjs", ['Object.values(REACH_ICONS).join("")'], "the Macros, Custom keys and Pointing modes screens' authored SVG icons (view/screens.mjs REACH_ICONS), in the board's legend"],
     ["webview/ui/board.mjs", ["REACH_ICONS[kind]"], "the Macros, Custom keys or Pointing modes screen's authored SVG icon (view/screens.mjs REACH_ICONS), on a key that reaches one"],
     ["webview/view/geometry.mjs", ['keys.join("")'], "the outline's key rectangles, templates of GEO numbers"],
+    ["webview/view/review.mjs", ["tip"], "a change mark's tip, an authored literal from the frozen word tables editWords returns (view/edit-mode.mjs)"],
 ];
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));

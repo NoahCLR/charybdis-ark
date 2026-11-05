@@ -34,7 +34,7 @@ export function stagePointing(model) {
         const row = pdColourRow(model, slot.id);
         const lit = row && !isOff(row.color);
         const item = el(`<button class="rowitem ${slot.id === state.pointingSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${esc(slot.id)}">
-            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slotNamed(slot))}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
+            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slotNamed(slot))}${marks.lightingSlots.has(slot.id) ? draftDot(model?.draft) : ""}</span>
             <span class="m">${esc(!row ? "not reported" : lit ? localityLabel(row.locality).toLowerCase() : "no colour")}</span></button>`);
         item.addEventListener("click", () => { state.pointingSlot = slot.id; render(); });
         list.append(item);

@@ -12,6 +12,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {sectionPath} from "../../view/settings-layout.mjs";
 import {macroNamed, vocabulary, word} from "../../view/vocabulary.mjs";
+import {editWords} from "../../view/edit-mode.mjs";
 import {insertStep, sequenceEditor, saveSteps, focusSteps} from "./steps.mjs";
 import {inspectEdit, paintFeedback, matchingValidation, requestInspection} from "./validation.mjs";
 import {ensureMacroHistory, finishMacroHistoryGroup, rememberMacroEdit} from "./history.mjs";
@@ -27,15 +28,15 @@ export function editor(model, slot, canEdit) {
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
     const dirty = form.draft !== undefined && !samePayload(payload, slot.payload, model);
-    const chip = macroLocalState(model.draft?.changes, slot.keycode, dirty);
+    const chip = macroLocalState(model.draft, slot.keycode, dirty);
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
     const wrap = el(`<div class="stack"></div>`), uninterruptible = vocabulary(model).macroUninterruptible;
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
         <div class="card-h name-titlebar macro-titlebar">${nameField(model, slot, canEdit)}
             <span class="tag">${esc(macroShortName(slot))}</span>
-            <span class="right row actions"><span class="chip" data-local-state><i class="dot ${chip.dot}"></i>${chip.text}</span>
+            <span class="right row actions"><span class="chip" data-local-state><i class="dot ${chip.dot}"></i>${esc(chip.text)}</span>
                 <button class="btn tiny ghost" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key…</button>
-                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"} data-tip="Put this macro back to what your draft holds, dropping the edit made here that is not in the draft yet.">Back to draft</button>
+                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"} data-tip="${esc(editWords(model.draft).macroBackTip)}">${esc(editWords(model.draft).macroBack)}</button>
                 <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}

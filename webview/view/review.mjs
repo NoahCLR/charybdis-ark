@@ -10,6 +10,7 @@
 
 import {screenOfSection} from "./settings-layout.mjs";
 import {draftBlockWords, listed, stageOrder, vocabulary} from "./vocabulary.mjs";
+import {editWords} from "./edit-mode.mjs";
 
 // The review units read here by name: core's (core/model/review-units.js),
 // copied since the interface may not import core and pinned by
@@ -252,10 +253,16 @@ function computeMarks(changes) {
 }
 
 // The mark itself, one look everywhere: the draft's dot, and a tip that says
-// it. In a row it follows the label; on a tile (a key, a macro slot, a
-// pointing slot card) it sits in the tile's top-right corner, as on the board.
-/** @param {string} [tip] @param {string} [place] */
-export const draftDot = (tip = "Changed in your draft", place = "") => `<i class="draft-dot ${place}" data-tip="${tip}" aria-label="${tip}"></i>`;
+// it in the edit mode's words (edit-mode.mjs editWords). In a row it follows
+// the label; on a tile (a key, a macro slot, a pointing slot card) it sits in
+// the tile's top-right corner, as on the board. On a folded group's header
+// the tip says the group holds one.
+/** @param {Parameters<typeof editWords>[0]} draft @param {string} [place] @param {{holds?: boolean}} [options] */
+export const draftDot = (draft, place = "", {holds = false} = {}) => {
+    const words = editWords(draft);
+    const tip = holds ? words.holds : words.mark;
+    return `<i class="draft-dot ${place}" data-tip="${tip}" aria-label="${tip}"></i>`;
+};
 
 // What a stale draft's bar says it keeps: "your 1 change is kept".
 /** @param {number} count */

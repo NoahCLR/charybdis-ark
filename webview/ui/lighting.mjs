@@ -99,13 +99,13 @@ export function screenLighting() {
         return `<button role="tab" id="stage-tab-${esc(stage.id)}" class="${on ? "" : "off"}" data-ltab="${esc(stage.id)}" aria-selected="${state.stage === stage.id}"
             data-tip="Painted ${esc(index + 1)} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
             <span class="n">${esc(index + 1)}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
-            <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
+            <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot(model?.draft) : ""}</button>`;
     };
     const bench = el(`<div class="card bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
             ${stages.map(stageTab).join(`<span class="tab-step" aria-hidden="true">›</span>`)}
             <span class="tab-sep" aria-hidden="true"></span>
-            <button role="tab" id="stage-tab-groups" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
+            <button role="tab" id="stage-tab-groups" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot(model?.draft) : ""}</button></div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -141,7 +141,7 @@ function powerControls(model) {
     const editable = editGate(model, "settings").editable;
     const node = el(`<div class="settings-group lighting-power" data-section="${esc(section.id)}">
         <label class="sw" data-tip="${esc([toggle.hint, toggle.tooltip].filter(Boolean).join(" "))}"><input type="checkbox" data-macro="${esc(toggle.macro)}" data-f="setting:${esc(toggle.macro)}" ${toggle.enabled ? "checked" : ""} ${editable && !toggle.readOnly ? "" : "disabled"}>
-            <span class="track"></span><span class="txt">${esc(toggle.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</span></label>
+            <span class="track"></span><span class="txt">${esc(toggle.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</span></label>
         <span class="lighting-timeout" data-tip="${esc(timeout.hint || "")}"><span class="muted">${esc(timeout.label)}</span></span></div>`);
     const submit = () => {
         if (duration.read() === null) { duration.reportValidity(); return; }

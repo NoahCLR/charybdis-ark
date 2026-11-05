@@ -140,7 +140,8 @@ The **LED groups** tab paints single LEDs, over a stage's own colour.
 2. Under **New row from the selection**, choose which stage's table it goes
    in, what it belongs to (a layer, a pointing mode or a feedback state, or
    all of them), and its colour.
-3. **Keep row in draft**.
+3. **Keep row in draft** (**Send row to keyboard** in the live modes,
+   where the row takes effect at once).
 
 **Make a group from the selection** keeps the selected LEDs as a reusable
 group for other rows; with nothing selected there is nothing to group.

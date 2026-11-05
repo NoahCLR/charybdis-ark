@@ -54,7 +54,7 @@ export function tabCombos(body, right) {
     const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
         const requires = /** @type {("mustHold" | "mustTap" | "ordered")[]} */ (["mustHold", "mustTap", "ordered"]).filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
-        return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${rowPick("combos", group, combo.id, `${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}`,
+        return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${rowPick("combos", group, combo.id, `${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot(model?.draft) : ""}`,
             `Combo ${combo.badge}: ${(combo.inputs || []).map((input) => keyNameText(model, input)).join(" + ")} sends ${keyNameText(model, combo.output)}`)}</td>
             <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
             <td class="mono">${comboOutputMarked(model, combo)}</td>
@@ -85,7 +85,7 @@ export function tabCombos(body, right) {
     const columns = vocabulary(model).comboFields;
     const comboTable = reachTable("combos", comboGroupRows, [
         ["", "7%"], [columns.inputs, "25%"], [columns.sends, "21%"], [columns.window, "10%"],
-        [columns.conditions, "13%"], ["Reached by", "24%"]]);
+        [columns.conditions, "13%"], ["Reached by", "24%"]], model?.draft);
     /** @type {HTMLElement} */ (node.querySelector("#comboTable")).replaceWith(comboTable);
 
     // A combo row is picked like any reach row — its keys ring on the board —

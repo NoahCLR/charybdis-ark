@@ -91,7 +91,7 @@ test('field edits coalesce, invalid delay redo stays local, and a valid correcti
     await expect(page.locator('[data-macro-feedback]')).toBeHidden();
     await command(page, 'redo');
     await expect(delay).toHaveValue('65536');
-    await expect(page.locator('[data-macro-feedback]')).toContainText('not staged');
+    await expect(page.locator('[data-macro-feedback]')).toContainText('not in your draft');
     expect(await updates(page)).toEqual([]);
     await delay.fill('250'); await delay.press('Tab');
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{250}{KC_C}');
@@ -254,7 +254,7 @@ test('pasting an unsupported key stays local, and a finished take followed by Cl
         store.render(); window.__posted.length = 0;
     });
     await command(page, 'paste');
-    await expect(page.locator('[data-macro-feedback]')).toContainText('not staged');
+    await expect(page.locator('[data-macro-feedback]')).toContainText('not in your draft');
     expect(await updates(page)).toEqual([]);
     await page.keyboard.press('Control+z');
     await page.locator('[data-act="record"]').click(); await page.keyboard.press('b'); await page.locator('[data-act="record"]').click();

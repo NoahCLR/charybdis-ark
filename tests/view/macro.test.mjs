@@ -3,6 +3,7 @@ import test from "node:test";
 import {sequenceFace} from "../../webview/view/macro-sequence.mjs";
 import {TEXT_CHIP, TEXT_TIP, describeStep, macroChips, macroMatches, macroNumber, macroShortName, macroPeekSteps, parseMacro as parseMacroWith, protectionChoiceLabel, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
 import {createRequire as requireFrom} from "node:module";
+import {LIVE} from "../../webview/view/edit-mode.mjs";
 // The step editor reads a macro with the vocabulary's words for what is wrong.
 const {VOCABULARY: WORDS} = requireFrom(import.meta.url)("../../core/model/vocabulary");
 /** @param {unknown} payload @param {object} [options] */
@@ -225,19 +226,25 @@ test("a macro's chip tells an unkept edit, a change kept in the draft and the ma
     const value = document();
     const {DEMO_CAPABILITIES} = require("../../core/session/demo-session");
     const draft = new ProfileDraftSession({document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)}, "test-device", DEMO_CAPABILITIES);
-    const changes = () => draft.view({selectedDeviceId: "test-device", connected: true}).changes;
+    // As the panel has it in Review and save, and in a live mode.
+    const changes = () => ({changes: draft.view({selectedDeviceId: "test-device", connected: true}).changes, live: null});
+    const live = () => /** @type {any} */ ({...changes(), live: {mode: LIVE}});
     assert.equal(macroLocalState(changes(), "MACRO_0", false).text, "as read");
     assert.deepEqual(macroLocalState(changes(), "MACRO_0", true), {state: "local", dot: "draft", text: "edited here"});
     draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateMacro", keycode: "MACRO_0", payload: "Hi"});
     assert.deepEqual(macroLocalState(changes(), "MACRO_0", false), {state: "draft", dot: "draft", text: "changed in draft"});
     assert.equal(macroLocalState(changes(), "MACRO_1", false).text, "as read", "another macro is as read");
-    assert.equal(macroLocalState([{unit: "macro:null"}], "KC_A", false).text, "as read", "a keycode that names no slot names no unit");
+    assert.equal(macroLocalState({changes: [{unit: "macro:null"}], live: null}, "KC_A", false).text, "as read", "a keycode that names no slot names no unit");
     assert.equal(macroLocalState(changes(), "MACRO_0", true).text, "edited here", "an unkept edit over it still says so");
+    // In the live modes the draft's base is what the keyboard saved.
+    assert.deepEqual(macroLocalState(live(), "MACRO_0", false), {state: "draft", dot: "draft", text: "unsaved"});
+    assert.deepEqual(macroLocalState(live(), "MACRO_1", false), {state: "read", dot: "on", text: "saved"});
+    assert.equal(macroLocalState(live(), "MACRO_0", true).text, "edited here");
     draft.jump(draft.revision, 0);
     assert.equal(macroLocalState(changes(), "MACRO_0", false).text, "as read", "undone, it is as read again");
     // A playback change Your computer caused is listed under the macro, but it
     // is not a change to the macro.
-    assert.equal(macroLocalState([{unit: "settings:host"}], "MACRO_0", false).text, "as read");
+    assert.equal(macroLocalState({changes: [{unit: "settings:host"}], live: null}, "MACRO_0", false).text, "as read");
 });
 
 // The dropdown says Automatic as core does, with whether the macro plays

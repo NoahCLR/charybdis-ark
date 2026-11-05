@@ -16,6 +16,7 @@ import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
 import {behaviourChangesNothing, behaviourHasTiming, behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
 import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, sentence, styleWord, tierName, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
+import {editWords} from "../../view/edit-mode.mjs";
 import {cellEditor, cellEditorOf, pickCellAction} from "./cell-editor.mjs";
 import {sectionPath} from "../../view/settings-layout.mjs";
 import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
@@ -160,7 +161,7 @@ export function behaviourEditor(behaviour) {
                 <button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
                     data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
                 <button class="btn tiny ghost" data-act="remove" ${canEdit ? "" : "disabled"}
-                    data-tip="Remove this behaviour from the draft. Its keys then send their plain keycode.">Remove behaviour</button>
+                    data-tip="${esc(editWords(model?.draft).removeBehaviour)}. Its keys then send their plain keycode.">Remove behaviour</button>
             </div>` : ""}
         </div>
         <div class="beh-intro">

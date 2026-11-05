@@ -14,6 +14,7 @@ import {getModel, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import {layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot} from "../../view/review.mjs";
+import {editWords} from "../../view/edit-mode.mjs";
 import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
 import {comboInputLabel} from "./combo-builder.mjs";
 import {modifierKey, shortcut} from "../../view/shortcuts.mjs";
@@ -62,7 +63,7 @@ export function legend(model) {
         <span class="legend-item">${comboBadge(model, "C0")} Combo input</span>
         <span class="legend-item"><i class="licons" aria-hidden="true">${Object.values(REACH_ICONS).join("")}</i> Macro, custom key, pointing mode</span>
         <span class="legend-item"><i class="lkey transparent"></i> Transparent</span>
-        ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} Changed in your draft</span>` : ""}
+        ${model?.draft?.dirty ? `<span class="legend-item">${draftDot(model?.draft)} ${esc(editWords(model?.draft).mark)}</span>` : ""}
         ${state.keyClipboard ? `<span class="legend-item">Copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
         <span class="legend-shortcuts">
             <button class="btn tiny ghost" id="board-shortcuts-button" data-act="board-shortcuts" aria-expanded="${open}"

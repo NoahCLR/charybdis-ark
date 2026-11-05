@@ -149,7 +149,7 @@ export function restartOffer(model) {
 // the live modes the draft is the keyboard's working copy, so each reaches
 // the keyboard at once (D-L65; a new name by one USB restart, firmware
 // D-F25). No draft reads as Apply.
-/** @param {Draft | null | undefined} draft */
+/** @param {Pick<Draft, "live"> | null | undefined} draft */
 const liveMode = (draft) => draft?.live ? draft.live.mode : null;
 // How unsaved edits on the keyboard are kept or undone, by mode.
 /** @param {number} mode */
@@ -168,6 +168,48 @@ export function historyFooter(draft) {
 export const renameNote = (draft) => liveMode(draft) === null
     ? "Your computer and Chrome show this name once you save; the keyboard reconnects for a moment to take it."
     : "The keyboard reconnects for a moment to take it right after the edit; your computer and Chrome then show this name.";
+
+// Where an edit goes, as the editors say it. In Review and save it waits in
+// the draft until a save. In the live modes Ark opens its draft on the
+// keyboard's working copy (D-L65): an edit runs on the keyboard at once, and
+// the draft's base is what the keyboard saved, so a change it marks is one
+// not saved yet (in Live edit, until the keyboard saves by itself).
+//   keep, keepVerb    a builder's Keep (a combo, a lighting row, the layer
+//                     order) and its form's note
+//   cellNote          a behaviour cell editor's note
+//   removeBehaviour   Remove behaviour's tip, before what its keys then send
+//   macroFixFirst     a failed macro edit's note
+//   macroNotIn        a failed macro edit, after its error
+//   macroBack         the macro editor's way back from its own edit, and tip
+//   macroChanged, macroUnchanged   the macro editor's chip
+//   mark, holds, after   a change's mark: its tip, a folded group's, and what
+//                     follows a thing's name (view/review.mjs draftDot)
+const REVIEW_AND_SAVE_WORDS = Object.freeze({
+    /** @param {string} thing */
+    keep: (thing) => `Keep ${thing} in draft`, keepVerb: "keep",
+    cellNote: "Changes are kept in the draft automatically.",
+    removeBehaviour: "Remove this behaviour from the draft",
+    macroFixFirst: "Fix this edit before it can be kept in your draft.",
+    macroNotIn: "This edit is not in your draft.",
+    macroBack: "Back to draft",
+    macroBackTip: "Put this macro back to what your draft holds, dropping the edit made here that is not in the draft yet.",
+    macroChanged: "changed in draft", macroUnchanged: "as read",
+    mark: "Changed in your draft", holds: "Holds a change in your draft", after: "changed in your draft",
+});
+const LIVE_WORDS = Object.freeze({
+    /** @param {string} thing */
+    keep: (thing) => `Send ${thing} to keyboard`, keepVerb: "send",
+    cellNote: "Changes reach the keyboard as you make them.",
+    removeBehaviour: "Remove this behaviour from the keyboard at once",
+    macroFixFirst: "Fix this edit before it can be sent to the keyboard.",
+    macroNotIn: "This edit has not reached the keyboard.",
+    macroBack: "Back to keyboard",
+    macroBackTip: "Put this macro back to what the keyboard runs, dropping the edit made here that has not reached it yet.",
+    macroChanged: "unsaved", macroUnchanged: "saved",
+    mark: "Unsaved change", holds: "Holds an unsaved change", after: "unsaved change",
+});
+/** @param {Pick<Draft, "live"> | null | undefined} draft */
+export const editWords = (draft) => liveMode(draft) === null ? REVIEW_AND_SAVE_WORDS : LIVE_WORDS;
 
 // The Import card's note, outside the demo (which says its own).
 /** @param {Draft | null | undefined} draft */

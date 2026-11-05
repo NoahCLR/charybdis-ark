@@ -8,6 +8,7 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {getModel, post, render, state} from "../../store.mjs";
+import {editWords} from "../../view/edit-mode.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
@@ -44,7 +45,7 @@ export function cellEditor(behaviour, step, kind) {
                 </select></label>`}
             ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.style === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate</span>
                 <span class="affix unit"><input class="input mono num" inputmode="numeric" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:repeat" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown?.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}><i>Hz</i></span></label>`}
-            <p class="note ce-actions">Changes are kept in the draft automatically.</p>
+            <p class="note ce-actions">${esc(editWords(getModel()?.draft).cellNote)}</p>
         </div>
     </div>`);
     /** @param {string} [action] */

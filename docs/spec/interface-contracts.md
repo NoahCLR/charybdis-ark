@@ -330,7 +330,8 @@ hold what they name.
   `aria-pressed` (tested for the picker).
 - A board key says what its rings and dots show: the selected key is
   `aria-current`, a key the draft changed ends its label "changed in your
-  draft", and an LED on LED groups is `aria-pressed` while picked (tested).
+  draft" ("unsaved change" in the live modes), and an LED on LED groups is
+  `aria-pressed` while picked (tested).
 - A trap and a warning a question asks about differ in words, not only in
   their dot's colour (no test). A field whose entry is refused
   (`aria-invalid`) is described by the reason under it (the Key tab's
@@ -939,6 +940,15 @@ standalone export reads its own snapshot and leaves the editor's alone
   to the header of a folded group holding a change. The marks come from the
   review's own changes (`draftMarks`), so the two never disagree
   (`tests/view/review.test.mjs`).
+- What the editors say of an edit and a change follows the edit mode, from
+  one table (`editWords` in `webview/view/edit-mode.mjs`, D-L65). In Review
+  and save a mark says "Changed in your draft" and a builder's Keep **Keep …
+  in draft**. In the live modes, where an edit runs on the keyboard at once
+  and the draft's base is what it saved, a mark says "Unsaved change", a
+  builder's Keep **Send … to keyboard**, and a macro's chip "unsaved" or
+  "saved" with **Back to keyboard** (`tests/view/edit-mode.test.mjs`,
+  `tests/view/review.test.mjs`, `tests/view/macro.test.mjs`,
+  `browser-tests/live-edits.spec.js`).
 - **Discard all** is one more step that undo takes back; the keyboard is read
   again only for a stale draft, one bound to another keyboard, or a recovery
   (`tests/session/panel-controls.test.js`).

@@ -32,7 +32,7 @@ export function stageLayers(model) {
         const row = layerColourRow(model, layer.index);
         const lit = row && !isOff(row.color);
         const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${esc(index)}">
-            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
+            <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(layer.index) ? draftDot(model?.draft) : ""}</span>
             <span class="m">${esc(!row ? "not reported" : !layerPaints(row.color) ? "no colour" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModes, row.mode).toLowerCase()}`)}</span></button>`);
         item.addEventListener("click", () => { showLayer(index); render(); });
         list.append(item);

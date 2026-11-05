@@ -29,6 +29,7 @@ import {getModel, layers, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {emptyLayers} from "../view/empty-layers.mjs";
 import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
+import {editWords} from "../view/edit-mode.mjs";
 
 /** @type {(() => void) | null} */
 let stopWatching = null;   // stops the open panel's outside-press watch
@@ -120,7 +121,7 @@ function editor(model, portable, busy) {
                     : "Layer keys keep their numbers: a key that held layer 1 holds whatever layer is now 1. Pointing modes' layers and custom keys' shortcut layers keep their numbers too, and a move that would land one on a default layer, or two of one link's or shortcut's layers on one, is refused. Names, colours and the pointer and sniping settings still move with their layer, and Make base still swaps the keys that reach the two layers."}</span>
             </div>
             <div class="row">
-                <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
+                <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>${esc(editWords(model?.draft).keep("layers"))}</button>
                 <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Discard</button>
             </div>
         </div></div>`);
@@ -250,9 +251,10 @@ function closeLayers() {
     state.layersAsked = false;
 }
 
-// Moves and Make base stay pending in the core until Keep layers in draft, so
-// every other way of closing the panel (Discard, Escape, a click outside it or
-// on its trigger) drops them, and it opens again on the draft's order.
+// Moves and Make base stay pending in the core until Keep layers in draft (in
+// the live modes, Send layers to keyboard), so every other way of closing the
+// panel (Discard, Escape, a click outside it or on its trigger) drops them,
+// and it opens again on the draft's order.
 export function discardLayers() {
     post(controls.control("cancelPortableReview"));
     closeLayers();
