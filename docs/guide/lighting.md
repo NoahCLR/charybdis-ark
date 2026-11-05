@@ -111,10 +111,16 @@ combo badges on the board take their outline from it.
 
 ### Key feedback
 
-The colours a key flashes as a behaviour fires: **Tap committed**, **Hold
-active**, **Long hold active**, and one for each tap count from the double tap
-on. **On the board** shows the same colours under the same names. Under
-**When and where**:
+The colours a key flashes as a behaviour fires, in two groups, as the
+behaviour grid has a column per tier and a row per tap count:
+
+- **Tiers**: **Tap committed**, **Hold active** and **Long hold active**
+  flash as that tier fires.
+- **Tap branches**: one for each tap count from the double tap on, flashed
+  while a run of taps waits on that count.
+
+**On the board** shows the same colours under the same names and groups.
+Under **When and where**:
 
 - **Tap commit**: **Double taps and more** flashes when a double tap or more
   fires, unless it sends a layer or pointing key, whose own stage shows it;

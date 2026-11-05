@@ -851,6 +851,8 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist-h { padding: 9px 12px; font-size: var(--fs-xs); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); font-weight: var(--fw-label); border-bottom: 1px solid var(--line); }
 .rowitem { display: grid; gap: 2px; width: 100%; text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); }
 .rowitem:last-child { border-bottom: 0; }
+/* A group inside one list, under the list's own heading. */
+.rowlist-sub { padding: 10px 12px 6px; font-size: var(--fs-xs); color: var(--text-3); font-weight: var(--fw-label); border-bottom: 1px solid var(--line); background: var(--surface); }
 .rowitem:hover { background: var(--surface-3); }
 .rowitem.on { background: var(--surface-3); box-shadow: inset 2px 0 0 var(--text); }
 .rowitem .t { font-size: var(--fs-md); }
@@ -1897,6 +1899,8 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .tab-grid.stage-detail { gap: 22px; }
 .stage-about { max-width: 96ch; }
 .stage-chips { flex-wrap: wrap; margin-bottom: 10px; }
+.stage-chips.grouped { margin-bottom: 8px; }
+.stage-chips-k { flex: none; width: 96px; font-size: var(--fs-sm); color: var(--text-3); }
 .led-rows { margin-top: 8px; }
 .led-swatch { width: 13px; height: 13px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; display: inline-block; vertical-align: -2px; }
 .led-swatch + code { margin-left: 6px; }

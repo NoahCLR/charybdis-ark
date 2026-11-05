@@ -106,8 +106,15 @@ test("all Lighting policy selects post the chosen policy and retained colour", a
     }
 });
 
-test("key feedback names each colour once, in the list and on the board", async ({page}) => {
+test("key feedback names each colour once, in the list and on the board, grouped the same way", async ({page}) => {
     await openStage(page, "key");
+    // Tiers, then the tap branches, in the list and on the board alike.
+    await expect(body(page).locator(".rowlist .rowlist-sub")).toHaveText(["Tiers", "Tap branches"]);
+    await expect(body(page).locator(".stage-chips-k")).toHaveText(["Tiers", "Tap branches"]);
+    const grouped = await body(page).locator(".rowlist").evaluate(list => [...list.querySelectorAll(".rowlist-sub, [data-row]")]
+        .map(node => node.classList.contains("rowlist-sub") ? `# ${node.textContent}` : node.getAttribute("data-row")));
+    expect(grouped).toEqual(["# Tiers", "tapCommittedColor", "holdActiveColor", "longHoldActiveColor",
+        "# Tap branches", "branch:0", "branch:1", "branch:2", "branch:3"]);
     const listed = await body(page).locator(".rowlist [data-row]").allInnerTexts();
     const chips = await body(page).locator(".stage-chips .chip").allInnerTexts();
     expect(chips.map(text => text.trim())).toEqual(listed.map(text => text.replace(/\s*off$/, "").trim()));
