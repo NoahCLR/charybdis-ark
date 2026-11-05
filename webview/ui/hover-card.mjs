@@ -114,7 +114,7 @@ function reachSections(reach, position, {foot = true} = {}) {
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
             <div class="hc-sub">${[count ? `${count} branch${count === 1 ? "" : "es"}` : "No branches yet",
                 ...terms.used.map((name) => `${vocabulary(model).thresholds[name]} ${threshold(terms[name])}`),
-                ...(behaviour.keepsAutoMouseAnchored ? ["keeps auto-mouse anchored"] : [])].map(esc).join(" · ")}</div>
+                ...(behaviour.keepsAutoMouseAnchored ? [vocabulary(model).behaviourFields.anchor.toLowerCase()] : [])].map(esc).join(" · ")}</div>
             ${branches}
             ${count && foot ? `<div class="hc-sub hc-foot">${lit
                 ? "Each dot is the colour this key flashes when that tier resolves."

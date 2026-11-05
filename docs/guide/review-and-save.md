@@ -127,8 +127,9 @@ from the bar.
 The changes come first, grouped by the area they are edited in, each named
 as its screen is: Keys, Layers, Behaviours, Combos, Custom keys, Macros,
 Pointer, Pointing modes, Lighting, Settings (the other Settings screens) and
-so on. Each change shows the fields that differ, with the keyboard's value
-and the draft's side by side. **Checks** follow: what the draft lets the
+so on. Each change shows the fields that differ, named as the screen that
+edits them labels them, with the keyboard's value and the draft's side by
+side. **Checks** follow: what the draft lets the
 keyboard do, and what must be fixed first.
 
 - **Show** closes Review and opens the change where it is edited.

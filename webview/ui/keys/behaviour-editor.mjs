@@ -166,7 +166,7 @@ export function behaviourEditor(behaviour) {
         <div class="beh-intro">
             <label class="sw" data-tip="Treat this key as part of using the trackball, so pressing it keeps the pointer layer on instead of letting auto-mouse turn it off.">
                 <input type="checkbox" data-f="behaviour:${esc(behaviour.keycode)}:anchor" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
-                <span class="track"></span><span class="txt">Keeps the pointer layer on</span></label>
+                <span class="track"></span><span class="txt">${esc(vocabulary(model).behaviourFields.anchor)}</span></label>
         </div>
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>Timing ${esc(checkLevelWord(model, check.level).toLowerCase())}.</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="bgrid">

@@ -49,7 +49,7 @@ export function editor(model, slot, canEdit, slots) {
     const card = el(`<div class="card">
         <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>
             ${titleName({f: `pointing:${slot.id}:name`, value: slot.name || "", placeholder: slot.displayName,
-                label: "Pointing mode name", perName: NAME_MAX_BYTES, canEdit})}
+                label: words(model).fieldLabels.name, perName: NAME_MAX_BYTES, canEdit})}
             <span class="tag">Slot ${esc(slot.id)}</span>
             <span class="right row actions">
                 ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${canEdit ? "" : "disabled"}
@@ -82,7 +82,7 @@ export function editor(model, slot, canEdit, slots) {
         .append(movement(model, slot, scrolling, controls, stage));
     step(3, "What starts it").append(startStep(model, slot, controls, stage));
     const runs = el(`<div class="pd-pair"></div>`);
-    runs.append(controls.choice("Pointer speed", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
+    runs.append(controls.choice(words(model).fieldLabels.dpi, dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: `${tipFor(model, "dpi")} Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
     lightRow(model, slot));
     runs.append(controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: tipFor(model, "pointerLayer")}));

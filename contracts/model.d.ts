@@ -187,9 +187,15 @@ export interface Vocabulary {
         heldModifiers: string;
         tips: Readonly<Record<string, string>>;
         pointerLayerLabel: string;
+        /** The editor's other field labels, which the review names its fields by. */
+        fieldLabels: Readonly<Record<'name' | 'dpi' | 'axis' | 'emptyDirection' | 'directionOutput' | 'scrollAxes' | 'invert' | 'horizontal' | 'vertical', string>>;
     };
     modifiers: WordList<number>;
     comboOptions: Readonly<Record<string, string>>;
+    /** What a behaviour and a combo share: whether it runs, and on which layers. */
+    definitionFields: {use: Readonly<Record<'behaviour' | 'combo', string>>; allowedLayers: string};
+    behaviourFields: Readonly<Record<'anchor', string>>;
+    comboFields: Readonly<Record<'inputs' | 'sends' | 'window' | 'conditions', string>>;
 }
 
 export type MacroTypingRoute =

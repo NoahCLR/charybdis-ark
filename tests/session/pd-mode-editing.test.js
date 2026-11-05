@@ -44,7 +44,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     const slot = view.changes.find(change => change.area === "Pointing modes" && change.unit === "pd:7");
     const field = label => slot.fields.find(entry => entry.label === label)?.after;
     assert.equal(slot.status, "added"); assert.equal(slot.title, "Slot 7 · History");
-    assert.equal(field("Name"), "History");
+    assert.equal(field("Pointing mode name"), "History");
     assert.equal(field("Horizontal movement per tap"), 30);
     assert.match(field("Left"), /Inherit modifiers/);
     const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});

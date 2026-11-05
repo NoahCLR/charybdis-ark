@@ -141,7 +141,7 @@ test("a disabled pointing slot's retained name is reviewed", () => {
     const after = rewrite(base, PROFILE_DOMAINS.find(row => row.key === "pdModes"), modes, decoded.codecOptions);
     const [item] = profileReview(snapshot(base), snapshot(after));
     assert.equal(item.unit, `pd:${slot.id}`);
-    assert.deepEqual(item.fields, [{label: "Name", status: "added", before: null, after: "Reserved mode"}]);
+    assert.deepEqual(item.fields, [{label: "Pointing mode name", status: "added", before: null, after: "Reserved mode"}]);
 });
 
 test("clearing a stored name identical to its fallback explains both sides", () => {

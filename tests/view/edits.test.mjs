@@ -1187,7 +1187,7 @@ test("participation controls preserve definitions, review their scopes, and undo
     assert.equal(stored.enabled, false); assert.equal(stored.allowedLayers, 32768);
     assert.deepEqual(stored.steps, original.steps);
     change = draft.view({selectedDeviceId: "test-device", connected: true}).changes.find(row => row.unit.startsWith("behavior:"));
-    assert.deepEqual(change.fields.map(field => field.label), ["Enabled", "Allowed layers"]);
+    assert.deepEqual(change.fields.map(field => field.label), ["Use this behaviour", "Layers it runs on"]);
     // Another edit from a form that omits the fields must keep both permissions.
     stage(draft, {type: "saveBehavior", behavior: {...edits.saveBehaviour(behavior).behavior, enabled: undefined, allowedLayers: undefined}});
     stored = decoded(draft).behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(original.target));
@@ -1198,7 +1198,7 @@ test("participation controls preserve definitions, review their scopes, and undo
     assert.equal(decoded(draft).combos.rows[0].enabled, false);
     assert.equal(decoded(draft).combos.rows[0].allowedLayers, 32768);
     change = draft.view({selectedDeviceId: "test-device", connected: true}).changes.find(row => row.unit === "combo:0");
-    assert.deepEqual(change.fields.map(field => field.label), ["Enabled", "Allowed layers"]);
+    assert.deepEqual(change.fields.map(field => field.label), ["Use this combo", "Layers it runs on"]);
     draft.discard(draft.revision, change.group); assert.deepEqual(draft.document, base);
 });
 

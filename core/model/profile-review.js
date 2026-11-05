@@ -7,7 +7,7 @@ const {hostKeyLabel, keyKind, keyLabel, keyLabelWithName, keyLayer, profileKeyNa
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
 const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings-domain-v1");
 const {decodedOf} = require("./portable-profile");
-const {settingsEditorView} = require("./settings-editor");
+const {settingsEditorView, COMBO_TIMING} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
@@ -19,6 +19,12 @@ const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaul
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {customKeyName} = require("../data/user-keycodes");
 const {UNIT, parseUnit} = require("./review-units");
+
+// Field labels are the editors' own words, from the vocabulary (D: what a
+// behaviour and a combo share; T: the behaviour thresholds).
+const D = VOCABULARY.definitionFields, T = VOCABULARY.thresholdNames;
+/** @param {string} text */
+const sentence = text => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
  * @typedef {import("../schema/types.js").SemanticAction} Action
@@ -94,17 +100,17 @@ const actionMark = value => {
 // A pointing slot as fields, in the Pointing modes editor's words.
 /** @param {import("../schema/types.js").PointingSlot | undefined} slot @param {Names} names @returns {Fields} */
 function pointingFields(slot, names) {
-    const P = VOCABULARY.pointing;
+    const P = VOCABULARY.pointing, labels = P.fieldLabels;
     /** @type {Fields} */
-    const result = new Map([["Movement", word(P.kinds, slot?.kind || 0)], ["Name", slot?.name || "Empty"]]);
+    const result = new Map([[P.movementLabel, word(P.kinds, slot?.kind || 0)], [labels.name, slot?.name || "Empty"]]);
     if (!slot?.kind) return result;
     /** @param {number} mask */
     const mods = mask => modifierNames(mask).map(label => hostKeyLabel(label, names.keys?.hostOs)).join(" + ") || "None";
     /** @param {import("../schema/types.js").PdTap | undefined} output */
     const tap = output => !output?.keycode ? "None"
         : `${keyLabel(names.keys, output.keycode)} · ${output.modifierPolicy === 1 ? `${word(P.modifierPolicy, 1)} ${mods(output.mask)}` : word(P.modifierPolicy, output.modifierPolicy)}`;
-    result.set("DPI", slot.dpi || "Normal pointer speed");
-    result.set("Pointer layer", word(P.pointerLayer, slot.pointerLayer));
+    result.set(labels.dpi, slot.dpi || "Normal pointer speed");
+    result.set(P.pointerLayerLabel, word(P.pointerLayer, slot.pointerLayer));
     // The link: each set of layers by name with its marks, compared by what
     // is stored; what ends it only beside layers that start it.
     const L = P.linkLabels;
@@ -112,20 +118,22 @@ function pointingFields(slot, names) {
     result.set(L.linkTurnsOn, layerSet(slot.linkTurnsOn, names, "None"));
     if (slot.linkedLayers) result.set(L.linkEnds, word(P.linkEnds, slot.linkEnds));
     if (slot.kind === PD_KIND.DIRECTIONAL) {
-        result.set("Axes", word(P.axes, slot.axis));
-        result.set("Horizontal movement per tap", slot.thresholdX);
-        result.set("Vertical movement per tap", slot.thresholdY);
+        result.set(labels.axis, word(P.axes, slot.axis));
+        // Named by what the threshold measures, as the editor names it.
+        const per = word(P.directionStep, slot.directionOutput ?? 0);
+        result.set(`${labels.horizontal} ${per}`, slot.thresholdX);
+        result.set(`${labels.vertical} ${per}`, slot.thresholdY);
         for (const [direction, name] of P.directions) result.set(name, tap(slot.directions[direction]));
         if (slot.axis === PD_AXIS.EIGHT) for (const [diagonal, name] of P.diagonals) {
             result.set(name, tap(slot.diagonals?.[diagonal]));
         }
-        result.set("When a direction is empty", word(P.emptyDirection, slot.emptyDirection ?? 0));
-        result.set("How often it sends", word(P.directionOutput, slot.directionOutput ?? 0));
+        result.set(labels.emptyDirection, word(P.emptyDirection, slot.emptyDirection ?? 0));
+        result.set(labels.directionOutput, word(P.directionOutput, slot.directionOutput ?? 0));
     } else {
-        result.set("Scrolls", word(P.scrollAxes, slot.axis ?? 0));
+        result.set(labels.scrollAxes, word(P.scrollAxes, slot.axis ?? 0));
         result.set(P.heldModifiers, mods(slot.heldModifiers));
         for (const [field, label] of P.scrollFields) result.set(label, slot.scroll[field]);
-        result.set("Reverse scrolling", word(P.invert, slot.scroll.invert));
+        result.set(labels.invert, word(P.invert, slot.scroll.invert));
     }
     return result;
 }
@@ -180,12 +188,12 @@ function behaviourFields(row, defaults, names, shortcuts) {
     const inherited = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, defaults, shortcuts);
     /** @type {Fields} */
     const fields = new Map([
-        ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branches"})],
-        ["Tap / hold threshold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
-        ["Long hold threshold", timing(row.longHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
-        ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
-        ["Enabled", row.enabled ? "on" : "off"],
-        ["Allowed layers", allowedLayers(row.allowedLayers, names)],
+        [sentence(T.multiTapTerm), timing(row.multiTapTerm, defaults[3], {kind: "branches"})],
+        [sentence(T.tapHoldTerm), timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
+        [sentence(T.longHoldTerm), timing(row.longHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
+        [VOCABULARY.behaviourFields.anchor, row.keepsAutoMouseAnchored ? "yes" : "no"],
+        [D.use.behaviour, row.enabled ? "on" : "off"],
+        [D.allowedLayers, allowedLayers(row.allowedLayers, names)],
     ]);
     for (const step of row.steps) for (const [name, tier] of TIERS) {
         const branch = step[tier];
@@ -209,7 +217,7 @@ function behaviourFields(row, defaults, names, shortcuts) {
 /** @type {Set<Scalar>} */
 const EMPTY = new Set(["no", "none", "no name", "empty"]);
 /** @param {string} label @param {Scalar | undefined} value */
-const holds = (label, value) => value !== undefined && !EMPTY.has(value) && !/^default · /.test(String(value)) && !(label === "Movement" && value === "Empty");
+const holds = (label, value) => value !== undefined && !EMPTY.has(value) && !/^default · /.test(String(value)) && !(label === VOCABULARY.pointing.movementLabel && value === "Empty");
 
 // A field is shown by its text and compared by its key; most fields are plain
 // text and are both. A field may also carry its own label, when the map key is
@@ -233,17 +241,21 @@ function comboFields(row, table, names) {
     if (!row) return new Map();
     const options = (/** @type {const} */ (["mustHold", "mustTap", "ordered"])).filter(flag => row[flag]).map(flag => VOCABULARY.comboOptions[flag]).join(", ");
     const window = row.termMs === null ? {text: `default · ${table.defaultTermMs} ms`, key: "default"} : {text: `${row.termMs} ms`, key: row.termMs};
-    return new Map(/** @type {[string, Field][]} */ ([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "),
+    const C = VOCABULARY.comboFields;
+    return new Map(/** @type {[string, Field][]} */ ([[C.inputs, {text: row.inputs.map(input => action(input, names)).join(" + "),
         detail: row.inputs.map(input => action(input, names, true)).join(" + "), key: JSON.stringify(row.inputs)}],
-        ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", window], ["Conditions", options || "none"],
-        ["Enabled", row.enabled ? "on" : "off"], ["Use output behaviour", row.useOutputBehavior ? "on" : "off"],
-        ["Allowed layers", allowedLayers(row.allowedLayers, names)]]));
+        [C.sends, actionField(row.output, names, {mark: actionMark(row.output)})], [C.window, window], [C.conditions, options || "none"],
+        [D.use.combo, row.enabled ? "on" : "off"], [sentence(VOCABULARY.comboOptions.useOutputBehavior), row.useOutputBehavior ? "on" : "off"],
+        [D.allowedLayers, allowedLayers(row.allowedLayers, names)]]));
 }
 // The two values every combo shares. A version 1 table has no default window,
 // and without combos no hold threshold either.
 /** @param {Combos} table @returns {Fields} */
-const comboTimingFields = table => new Map([["Default window", table.defaultTermMs === null ? "none" : `${table.defaultTermMs} ms`],
-    ["Hold threshold", table.holdTermMs === null ? "none" : `${table.holdTermMs} ms`]]);
+const comboTimingFields = table => new Map([[comboTimingLabel("default"), table.defaultTermMs === null ? "none" : `${table.defaultTermMs} ms`],
+    [comboTimingLabel("hold"), table.holdTermMs === null ? "none" : `${table.holdTermMs} ms`]]);
+// Combo timing's fields as How combos run labels them.
+/** @param {string} id */
+function comboTimingLabel(id) { return COMBO_TIMING.find(field => field.id === id)?.label || id; }
 
 // Combo IDs are packed positions, not stable identities. Recognize a single
 // removed row by its stored contents so the shifted suffix is not presented as

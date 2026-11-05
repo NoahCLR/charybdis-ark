@@ -53,11 +53,11 @@ export function comboBuilder(canEdit, holdTerm) {
         <div class="card-h"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
         <div class="card-b">
-            <div class="field"><span>Sends</span>
+            <div class="field"><span>${esc(vocabulary(model).comboFields.sends)}</span>
                 <div class="input-row"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:output" data-output value="${esc(visibleKeycode(model, form.output))}" ${canEdit ? "" : "disabled"}>
                 <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div>
                 ${sendsNote ? `<span class="note">${esc(sendsNote)}</span>` : ""}</div>
-            <div class="field"><span>Inputs</span>
+            <div class="field"><span>${esc(vocabulary(model).comboFields.inputs)}</span>
                 <div class="row combo-inputs">
                     ${state.combo.inputs.length ? state.combo.inputs.map((input) => `<span class="chip"${shown(input) ? ""
                         : ` data-tip="No key on the board presses this from here, so nothing rings for it. It stays an input unless you remove it."`}>

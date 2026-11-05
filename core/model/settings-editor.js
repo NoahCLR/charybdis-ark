@@ -390,4 +390,4 @@ function editSettings(document, message, draft) {
     });
 }
 
-module.exports = {settingsEditorView, editSettings, fieldMask, baseLighting};
+module.exports = {settingsEditorView, editSettings, fieldMask, baseLighting, COMBO_TIMING};
