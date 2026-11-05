@@ -14,6 +14,7 @@ import {vocabulary, word} from "./vocabulary.mjs";
 import {MACRO_LIMITS, macroProblemWords, readMacroPayload} from "../../rules/macro-payload.mjs";
 import {macroOfName} from "../../rules/qmk-keycodes.mjs";
 import {keyIdentity} from "./key-identity.mjs";
+import {editWords} from "./edit-mode.mjs";
 
 /** @typedef {import("./types.js").MacroStep} MacroStep */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
@@ -193,12 +194,15 @@ export function samePayload(a, b, model) {
 // What a macro card's chip says its editor holds, against the draft and the
 // keyboard: an edit not kept in the draft yet, a macro the draft changed
 // (Review lists it), or the macro as read (in the demo, as the demo profile has
-// it). A playback change the host section caused is not a change to the macro.
-/** @param {readonly Pick<import("../../contracts/model.js").ReviewChange, "unit">[] | undefined} changes @param {string} keycode @param {boolean} local @returns {{state: "local" | "draft" | "read", dot: string, text: string}} */
-export function macroLocalState(changes, keycode, local) {
+// it), in the edit mode's words (edit-mode.mjs editWords: in the live modes
+// unsaved and saved). A playback change the host section caused is not a
+// change to the macro.
+/** @param {(Pick<NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>, "live"> & {changes?: readonly Pick<import("../../contracts/model.js").ReviewChange, "unit">[]}) | null | undefined} draft @param {string} keycode @param {boolean} local @returns {{state: "local" | "draft" | "read", dot: string, text: string}} */
+export function macroLocalState(draft, keycode, local) {
     if (local) return {state: "local", dot: "draft", text: "edited here"};
+    const words = editWords(draft);
     const index = macroNumber(keycode);
-    return index !== null && (changes || []).some((change) => change.unit === macroUnit(index))
-        ? {state: "draft", dot: "draft", text: "changed in draft"}
-        : {state: "read", dot: "on", text: "as read"};
+    return index !== null && (draft?.changes || []).some((change) => change.unit === macroUnit(index))
+        ? {state: "draft", dot: "draft", text: words.macroChanged}
+        : {state: "read", dot: "on", text: words.macroUnchanged};
 }

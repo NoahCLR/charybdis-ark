@@ -19,7 +19,7 @@ import {colourControl, section, stack} from "./common.mjs";
 function fadeTiming(model, idle) {
     const section = sectionsIn(model, "Lighting").find((entry) => entry.stage === "auto");
     const gate = editGate(model, "settings");
-    const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h4></div></section>`);
+    const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h4></div></section>`);
     if (!section) {
         node.append(el(`<p class="note">${esc(gate.why || "Choose Read keyboard to read the auto-mouse timing.")}</p>`));
         return node;

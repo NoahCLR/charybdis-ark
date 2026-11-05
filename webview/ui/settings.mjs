@@ -92,7 +92,7 @@ const combosCard = (model, section, canEdit) => sectionCard(model, section, canE
 /** @param {Model | null} model @param {Section} section @param {boolean} canEdit */
 function referenceCard(model, section, canEdit) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
-        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3></div>
+        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3></div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"><div class="setrow layer-switches" data-tip="${esc(section.description || "")}"><div class="layer-grid reference-grid" role="group" aria-label="${esc(section.label)}"></div></div></div>
     </section>`);
@@ -161,7 +161,7 @@ function comboTimingRow(model, entry) {
  */
 function sectionCard(model, section, canEdit, {extra} = {}) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
-        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3></div>
+        <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3></div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
         ${section.warning ? `<div class="card-b"><div class="callout warn" role="note">${esc(section.warning)}</div></div>` : ""}

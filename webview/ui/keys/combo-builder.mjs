@@ -4,7 +4,8 @@
  */
 // The combo builder beside the Combos table: what a new or open combo sends,
 // its inputs picked on the board, its window and conditions. The form keeps
-// its own state until the combo is kept in the draft.
+// its own state until the combo is kept in the draft (in the live modes, sent
+// to the keyboard).
 
 import {el, esc} from "../../lib/dom.mjs";
 import {scrollContentTo} from "../../lib/scroll.mjs";
@@ -20,6 +21,7 @@ import {keyNameMarked, keyNameText} from "../marks.mjs";
 import {sentence, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {comboFull, comboMissing} from "../../view/combo-form.mjs";
 import {closesInPlace} from "../inline-editor.mjs";
+import {editWords} from "../../view/edit-mode.mjs";
 
 // A builder input by the name the core gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
@@ -86,11 +88,11 @@ export function comboBuilder(canEdit, holdTerm) {
                     `<label class="sw" data-tip="${esc(tip)}"><input type="checkbox" data-f="combo:${esc(state.combo.editId ?? 'new')}:${esc(flag)}" data-${esc(flag.toLowerCase())} ${form[/** @type {"mustHold" | "mustTap" | "ordered"} */ (flag)] ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions[flag]))}</span></label>`).join("")}
             </div>
             <div class="row combo-actions">
-                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting && !missing ? "" : "disabled"}>Keep combo in draft</button>
+                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting && !missing ? "" : "disabled"}>${esc(editWords(model?.draft).keep("combo"))}</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
                 <span class="note" data-combo-missing ${note ? "" : "hidden"}>${esc(note)}</span>
             </div>
-            <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
+            <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you ${esc(editWords(model?.draft).keepVerb)} it.</p>
         </div></div>`);
 
     /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerCalled(layer)})), form, canEdit,

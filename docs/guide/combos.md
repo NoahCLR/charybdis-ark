@@ -24,11 +24,12 @@ Click a row to see its keys ringed on the board and open it for editing, with
    the picker doesn't offer it.
 2. **Inputs**: **Pick on board** and click the keys on the board, then
    **Done**. Click a picked key again to drop it.
-3. **Keep combo in draft**.
+3. **Keep combo in draft**. In the live modes the button is **Send combo
+   to keyboard**, and the combo takes effect at once.
 
-Keep stays off until the combo has what it sends and at least two keys, and
-the note beside it says which is missing. At 16 keys the note says so and
-**Pick on board** takes no more. Until you keep it, the builder holds
+The button stays off until the combo has what it sends and at least two
+keys, and the note beside it says which is missing. At 16 keys the note says
+so and **Pick on board** takes no more. Until you press it, the builder holds
 the combo on its own; **Cancel**, or Escape, drops it and closes the
 builder.
 

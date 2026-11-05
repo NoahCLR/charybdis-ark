@@ -7,6 +7,7 @@ import {macroLocalState, samePayload, unreleased} from "../../view/macro.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {listed, vocabulary} from "../../view/vocabulary.mjs";
+import {editWords} from "../../view/edit-mode.mjs";
 import {getModel, macroForm, post, setMacroForm, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -91,14 +92,14 @@ export function paintFeedback(card, model, slot) {
     /** @type {import("../../../contracts/messages.js").MacroValidation | null | undefined} */
     const inspection = matchingValidation(form, model, slot) ? form.validation?.validation : null;
     const error = form.stepError || parsed.error || (held.length ? `Release ${listed(held.map(key => keyIdentity(model, key).label))} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
-    const note = error ? (local ? "Fix this edit before it can be kept in your draft." : `Change ${sectionPath(model, "host")} or fix the macro before playing it.`) : local && !inspection ? "Checking this edit…" : "";
+    const note = error ? (local ? editWords(model?.draft).macroFixFirst : `Change ${sectionPath(model, "host")} or fix the macro before playing it.`) : local && !inspection ? "Checking this edit…" : "";
     const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
     feedback.hidden = !error && !note;
     feedback.replaceChildren(el(`<div class="stack">
-        ${error ? `<div class="unavailable">${esc(error)} ${local ? "This edit is not staged." : `This stored macro cannot play with the current settings in ${esc(vocabulary(model).settingsSections.host)}.`}</div>` : ""}
+        ${error ? `<div class="unavailable">${esc(error)} ${local ? esc(editWords(model?.draft).macroNotIn) : `This stored macro cannot play with the current settings in ${esc(vocabulary(model).settingsSections.host)}.`}</div>` : ""}
         ${note ? `<p class="note">${esc(note)}</p>` : ""}
     </div>`));
-    const chip = macroLocalState(model?.draft?.changes, slot.keycode, local);
+    const chip = macroLocalState(model?.draft, slot.keycode, local);
     /** @type {HTMLElement} */ (card.querySelector("[data-local-state]")).replaceChildren(el(`<i class="dot ${chip.dot}"></i>`), document.createTextNode(chip.text));
     /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="discard"]')).disabled = !local;
 }

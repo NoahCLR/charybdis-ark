@@ -26,7 +26,7 @@ export function tabMacros(body, right) {
     const row = (group, keycode, reachedBy) => {
         const slot = slots.find((entry) => entry.keycode === keycode);
         return `<tr${reachAttrs("macros", group, keycode)}>
-            <td>${rowPick("macros", group, keycode, `${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot() : ""}`)}</td>
+            <td>${rowPick("macros", group, keycode, `${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot(model?.draft) : ""}`)}</td>
             <td>${slot?.payload ? macroSteps(model, slot.payload) : `<span class="muted">${slot ? "empty" : "—"}</span>`}</td>
             <td class="muted">${reachedBy}</td>
             <td class="reach-edit">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;
@@ -35,7 +35,7 @@ export function tabMacros(body, right) {
     const groups = reach.groups.map(({id, empty, entries}) => ({id, empty,
         rows: entries.map((entry) => row(id, entry.name, id === "elsewhere" ? "not reached from this layer" : reachLabel(model, entry))),
         drafted: entries.some((entry) => changedMacros.has(entry.name))}));
-    const node = reachTable("macros", groups, [["Slot", "24%"], ["Steps", "44%"], ["Reached by", "24%"], ["", "8%"]]);
+    const node = reachTable("macros", groups, [["Slot", "24%"], ["Steps", "44%"], ["Reached by", "24%"], ["", "8%"]], model?.draft);
     attachReachRows(node, "macros");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editmacro]")).forEach((button) => button.addEventListener("click", () => {
         const keycode = button.dataset.editmacro;

@@ -196,12 +196,13 @@ test("what happens is said through live regions outside what renders, once", asy
 });
 
 test("a board key says it is selected, and a key the draft changed says so", async ({page}) => {
-    // The live preview's draft changed Base's key 25.
+    // The live preview's draft changed Base's key 25; in a live mode that is
+    // an unsaved change running on the keyboard.
     await page.goto("/preview/index.html?shell=live");
     await expect(page.locator(".board [data-key][aria-current=true]")).toHaveCount(1);
     await expect(page.locator(".board [data-key].sel")).toHaveAttribute("aria-current", "true");
-    await expect(page.locator('.board [data-key="25"]')).toHaveAttribute("aria-label", /, changed in your draft$/);
-    await expect(page.locator(".board [aria-label$=', changed in your draft']")).toHaveCount(1);
+    await expect(page.locator('.board [data-key="25"]')).toHaveAttribute("aria-label", /, unsaved change$/);
+    await expect(page.locator(".board [aria-label$=', unsaved change']")).toHaveCount(1);
     // On LED groups a key is an LED, pressed while it is picked.
     await page.locator('[data-screen="lighting"]').click();
     await page.locator("#stage-tab-groups").click();

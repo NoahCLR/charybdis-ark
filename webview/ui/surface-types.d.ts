@@ -8,7 +8,8 @@ export interface BoardOptions {
     picks?: number[];
     reach?: number[];
     pdActive?: LightOptions['pdActive'] | null;
-    drafted?: ReadonlySet<number | undefined> | null;
+    /** The keys the draft changed, and what a screen reader hears after such a key's name (view/edit-mode.mjs editWords `after`). */
+    drafted?: {keys: ReadonlySet<number | undefined> | undefined; after: string} | null;
     faces?: boolean;
     trackball?: boolean;
     picking?: boolean;

@@ -9,6 +9,7 @@ import {currentView, getModel, render, showLayer, state, toggleLayerOn} from "..
 import {layerCalled} from "../view/vocabulary.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
+import {editWords} from "../view/edit-mode.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
 import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
@@ -63,7 +64,7 @@ export function layerBar(trailing = "") {
         // set reads at a glance without being mistaken for the picked tab.
         const tint = on && swatch.colour ? ` style="--tab-tint:${swatch.colour}"` : "";
         return `<button class="layer-tab${on ? " on" : ""}"${tint} role="tab" id="layer-tab-${esc(index)}" data-layer="${esc(index)}" aria-selected="${state.layer === index}"
-            data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? " · changed in your draft" : ""}${esc(how)}">${swatch.html}
+            data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? ` · ${esc(editWords(model?.draft).after)}` : ""}${esc(how)}">${swatch.html}
             <span>${esc(layerCalled(layer))}</span>${layerCalled(layer) === layer.name ? "" : `<span class="idx">${esc(layer.index)}</span>`}${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
     const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" id="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div></div>`);

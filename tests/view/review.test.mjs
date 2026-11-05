@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SECTION_ROWS, activeBlockers, categorySummary, changesKept, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, saveOffReason, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
+import {SECTION_ROWS, activeBlockers, categorySummary, changesKept, discardLabel, draftDot, draftMarks, groupNote, placeState, reviewBlocks, saveOffReason, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
+import {LIVE, LIVE_REVIEW} from "../../webview/view/edit-mode.mjs";
 
 const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
 const words = {vocabulary: VOCABULARY};
@@ -181,4 +182,13 @@ test("a Save that is off says why beside it, a blocker by its own title", () => 
         "a blocker the draft fixes keeps nothing off");
     assert.deepEqual(activeBlockers([blocker("A"), blocker("C", "fixed")]).map((check) => check.title), ["A"]);
     assert.equal(saveOffReason(words, {...ready, reviewed: false}), "Getting the review ready…");
+});
+
+// The mark says a change in the edit mode's words (edit-mode.mjs editWords):
+// in the draft in Review and save, unsaved in the live modes.
+test("a change's mark says it is in the draft, or in the live modes unsaved", () => {
+    assert.equal(draftDot(null), '<i class="draft-dot " data-tip="Changed in your draft" aria-label="Changed in your draft"></i>');
+    assert.equal(draftDot(/** @type {any} */ ({live: {mode: LIVE_REVIEW}}), "corner"), '<i class="draft-dot corner" data-tip="Unsaved change" aria-label="Unsaved change"></i>');
+    assert.match(draftDot(/** @type {any} */ ({live: {mode: LIVE}}), "", {holds: true}), /data-tip="Holds an unsaved change"/);
+    assert.match(draftDot({live: null}, "", {holds: true}), /data-tip="Holds a change in your draft"/);
 });

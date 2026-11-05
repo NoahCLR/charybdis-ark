@@ -58,7 +58,7 @@ test("dragging a release before its press stays local, flags tiles and can be co
     await expect(page.locator('[data-step-tile="0"]')).toHaveAttribute("data-step-id", id);
     await expect(page.locator('[data-step-tile="0"]')).toHaveAttribute("aria-invalid", "true");
     await expect(page.locator('[data-macro-feedback]')).toContainText("released before it is pressed");
-    await expect(page.locator('[data-macro-feedback]')).toContainText("not staged");
+    await expect(page.locator('[data-macro-feedback]')).toContainText("not in your draft");
     expect(await updates(page)).toEqual([]);
     await page.locator('[data-step-tile="0"]').dragTo(page.locator('[data-step-tile="1"]'), {targetPosition: {x: 60, y: 40}});
     await expect(page.locator('[data-step-tile="1"]')).toHaveAttribute("data-step-id", id);

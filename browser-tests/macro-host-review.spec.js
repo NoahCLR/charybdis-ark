@@ -38,7 +38,7 @@ for (const theme of ["dark", "light"]) {
         await expect(page.locator('[data-slot="MACRO_1"]')).toContainText("blocked");
         await expect(page.locator('[data-macro-feedback]')).toContainText("Release ordinary keys");
         await expect(page.locator('[data-macro-feedback]')).toContainText("stored macro cannot play");
-        await expect(page.locator('[data-macro-feedback]')).not.toContainText("This edit is not staged");
+        await expect(page.locator('[data-macro-feedback]')).not.toContainText("This edit is not in your draft");
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             store.state.overlay = "review"; store.render();

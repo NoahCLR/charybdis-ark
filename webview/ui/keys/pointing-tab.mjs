@@ -53,7 +53,7 @@ export function tabPointing(body, right) {
         const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs.` : "";
         return `<tr${reachAttrs("pointing", group, slot.id)}>
             <td>${rowPick("pointing", group, slot.id, `<span class="slot-named"><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${mark(model, {kind: "pointing", slot: slot.id})}</span>
-                ${slotNamedWithKeycodes(slotNamed(slot), keycodes)}${changedSlots.has(slot.id) ? draftDot() : ""}</span>`)}</td>
+                ${slotNamedWithKeycodes(slotNamed(slot), keycodes)}${changedSlots.has(slot.id) ? draftDot(model?.draft) : ""}</span>`)}</td>
             <td class="muted">${slot.kind
                 ? `${esc(word(words.kinds, slot.kind))}${slot.dpi ? ` · ${esc(slot.dpi)} DPI` : " · normal pointer speed"}`
                 : "Empty · these keys do nothing yet"}</td>
@@ -81,7 +81,7 @@ export function tabPointing(body, right) {
     const groups = reach.groups.map(({id, empty, entries}) => ({id, empty,
         rows: entries.map((entry) => id === "elsewhere" ? card(id, entry.name, "not reached from this layer") : reachCard(id)(entry)),
         drafted: entries.some((entry) => changedSlots.has(Number(entry.name)))}));
-    const node = reachTable("pointing", groups, [["Slot", "24%"], ["Mode", "14%"], [words.linkLabels.startedBy, "10%"], [words.linkLabels.endsWhen, "8%"], [words.linkLabels.keyTurnsOnShort, "9%"], ["Reached by", "29%"], ["", "6%"]]);
+    const node = reachTable("pointing", groups, [["Slot", "24%"], ["Mode", "14%"], [words.linkLabels.startedBy, "10%"], [words.linkLabels.endsWhen, "8%"], [words.linkLabels.keyTurnsOnShort, "9%"], ["Reached by", "29%"], ["", "6%"]], model?.draft);
     attachReachRows(node, "pointing");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editpd]")).forEach((button) => button.addEventListener("click", () => {
         state.pointingSlot = Number(button.dataset.editpd);

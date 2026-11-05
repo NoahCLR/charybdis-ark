@@ -68,7 +68,7 @@ export function screenDevice() {
     const unread = diagnosticsOpen && !demo && device?.connected && !device.flashPauses && !health?.busy && connection !== null && state.flashPausesAsked !== connection;
     const facts = firmwareFacts(model);
     const main = el(`<div class="main">
-        <header class="topbar keyboard-topbar"><div class="keyboard-title"><div class="keyboard-name">${title}${dirty ? draftDot() : ""}</div>
+        <header class="topbar keyboard-topbar"><div class="keyboard-title"><div class="keyboard-name">${title}${dirty ? draftDot(model?.draft) : ""}</div>
             <p class="sub">${esc(sub)}</p><p class="note rename-note">${esc(renameNote(model?.draft))}</p></div>
             <div class="topbar-actions">${themeToggle()}</div></header>
         <div class="content"><div class="pad stack device-pad">

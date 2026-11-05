@@ -12,6 +12,7 @@ import {currentView, getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftMarks} from "../view/review.mjs";
+import {editWords} from "../view/edit-mode.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {linkTabPanel} from "../lib/tabs.mjs";
@@ -58,7 +59,7 @@ export function screenKeys() {
     const building = state.combo.picking || (state.combo.open && state.tab === "combos");
     const drawn = card.appendChild(board(view, {
         selected: state.selected,
-        drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
+        drafted: {keys: draftMarks(model?.draft?.changes).keys.get(layer.index), after: editWords(model?.draft).after},
         reach: building ? view.combos.inputKeys(state.combo.inputs) : reachHighlight(view),
         picking: state.combo.picking || Boolean(state.placement),
         onKey: (/** @type {number} */ index) => {

@@ -73,7 +73,7 @@ export function tabBehaviours(body, right) {
         const picked = row.keycode === state.behaviourRow && (!route || route === group);
         return `<tr class="beh-row${note ? " quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${esc(group)}"${picked ? ' data-picked="true"' : ""}${picked && selectionMoved ? " data-reveal-selected" : ""}>
             <td><button class="row-pick" data-row-pick="${esc(`behaviours:${group}:${row.keycode}`)}">${actionMarked(model, row.keycode)}${keyIdentity(model, row.keycode).label === row.keycode ? ""
-                : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</button>${note ? `<span class="sub">${note}</span>` : ""}</td>
+                : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot(model?.draft) : ""}</button>${note ? `<span class="sub">${note}</span>` : ""}</td>
             <td class="beh-branches">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length}</td></tr>`;
     };
 
@@ -97,7 +97,7 @@ export function tabBehaviours(body, right) {
 
     const list = reachTable("behaviours", reach.groups.map(({id, empty, entries}) => ({id, empty,
         rows: entries.map((entry) => item(id, entry.row, note(id, entry))),
-        drafted: entries.some((entry) => changed.has(entry.name))})), [["Behaviour", "70%"], ["Branches", "30%"]]);
+        drafted: entries.some((entry) => changed.has(entry.name))})), [["Behaviour", "70%"], ["Branches", "30%"]], model?.draft);
     const node = el(`<div class="tab-split reach-split"><div class="beh-main"></div></div>`);
     node.prepend(list);
     /** @type {NodeListOf<HTMLElement>} */ (list.querySelectorAll("tr[data-row]")).forEach((tr) => tr.addEventListener("click", () => {

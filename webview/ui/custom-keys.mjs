@@ -84,7 +84,7 @@ export function screenCustomKeys() {
         const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
         const cell = el(`<button class="mslot ${customKeyInUse(row) ? "filled" : ""}" data-custom-key="${esc(row.keycode)}"
             aria-current="${row.keycode === key?.keycode}" data-tip="${esc(tip)}">
-            <span class="n">K${esc(row.slot)}</span>${changed.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
+            <span class="n">K${esc(row.slot)}</span>${changed.has(row.keycode) ? draftDot(model?.draft, "corner") : ""}
             <span class="v">${esc(clip(tileWords(row)))}</span></button>`);
         cell.addEventListener("click", () => {
             // Another key's behaviour opens with no cell open, as picking

@@ -133,6 +133,36 @@ test("combos turned off by a key show beside the switch, not as a change", async
     await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });
 
+// In the live modes a builder's Keep sends its edit to the keyboard at once,
+// and posts as in Review and save.
+test("the combo builder's Keep says it sends the combo to the keyboard, and posts", async ({page}) => {
+    await openLive(page, "keys");
+    await page.locator('[data-tab="combos"]').click();
+    await page.locator('[data-act="new-combo"]').click();
+    const builder = page.locator(".combo-builder");
+    await builder.locator("[data-output]").fill("KC_A");
+    await builder.locator('[data-act="pickboard"]').click();
+    await page.locator('.board-card [data-key="1"]').click();
+    await page.locator('.board-card [data-key="2"]').click();
+    const keep = builder.locator('[data-act="keep"]');
+    await expect(keep).toHaveText("Send combo to keyboard");
+    await expect(builder).toContainText("until you send it.");
+    await keep.click();
+    await expectPost(page, {type: "addCombo", output: "KC_A"});
+});
+
+// In the live modes a change runs on the keyboard and the draft's base is what
+// it saved, so the marks say unsaved, not in your draft.
+test("change marks say unsaved, and the macro editor goes back to the keyboard", async ({page}) => {
+    await openLive(page, "keys");
+    await expect(page.locator(".legend-item").filter({has: page.locator(".draft-dot")})).toHaveText("Unsaved change");
+    await expect(page.locator(".board [aria-label$=', unsaved change']")).toHaveCount(1);
+    await expect(page.locator(".board [aria-label$=', changed in your draft']")).toHaveCount(0);
+    await openLive(page, "macros", {macroSlot: "MACRO_0"});
+    await expect(page.locator(".macro-titlebar [data-local-state]")).toHaveText("saved");
+    await expect(page.locator('.macro-titlebar [data-act="discard"]')).toHaveText("Back to keyboard");
+});
+
 // The change goes in as the expression Playwright evaluates: the page runs
 // under Trusted Types, which refuses `new Function` on a string.
 /** @param {import("@playwright/test").Page} page @param {(model: any) => void} change */
@@ -228,6 +258,7 @@ test("behaviours: a custom key's behaviour posts", async ({page}) => {
     await page.locator('[data-all-slots="customKeys"]').click();
     await page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_5"]').click();
     await page.locator('.custom-key-behaviour [data-cell="0-long"]').click();
+    await expect(page.locator(".ce-actions")).toHaveText("Changes reach the keyboard as you make them.");
     await clearPosts(page);
     await change(page.locator('[data-f="behaviour:CUSTOM_KEY_5:0-long:action"]'), "KC_B");
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior"})]);

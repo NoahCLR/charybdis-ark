@@ -35,7 +35,9 @@ On a key face:
   behaviour a switch keeps off on this layer adds no icon, as it adds no
   dots.
 - A frosted key is transparent: it falls through to the layer below.
-- A small dot in the corner marks a key changed in your draft.
+- A small dot in the corner marks a key changed in your draft. In the live
+  modes the change already runs on the keyboard, so the dot marks an
+  **unsaved change**; in Live edit it goes once the keyboard saves.
 
 The legend under the board explains each mark. Its **Shortcuts** button
 lists what the board takes from the mouse and the keys (below), ⌘-clicking a
@@ -151,9 +153,10 @@ folded under the list; show them to name one.
   or put two layers of one link or shortcut on the same layer (with layer keys
   keeping their numbers, Make base can bring two of them together).
 
-Nothing changes until you press **Keep layers in draft**. **Discard** drops
-the moves, and so does closing the list any other way: Escape, or a click
-outside it.
+Nothing changes until you press **Keep layers in draft** (**Send layers to
+keyboard** in the live modes, where the new order takes effect at once).
+**Discard** drops the moves, and so does closing the list any other way:
+Escape, or a click outside it.
 
 Make base swaps the two layers' roles: a key that reached the new base now
 reaches the old one, and so do a pointing mode's link and a custom key's
@@ -226,7 +229,8 @@ Under the board, the workbench works on the selected key. Its tabs are:
   **Hold** or **Lock** for routes that send its own keys.
   **Edit** opens one on its own screen.
 
-Each tab counts what it holds for this layer, and a dot marks a draft change.
+Each tab counts what it holds for this layer, and a dot marks a draft change
+(an unsaved change in the live modes).
 
 Behaviours, Combos, Macros, Custom keys and Pointing modes list what they
 hold in one kind of table: a header row per group (on this view, on this

@@ -126,12 +126,12 @@ export function board(view, options = {}) {
         // key the draft changed says so after its name.
         const said = mode === "leds" ? ` aria-pressed="${Boolean(picked)}"` : selected === index ? ' aria-current="true"' : "";
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"${said}
-            aria-label="${esc(key.name)}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.has(index) ? ", changed in your draft" : ""}"${transform}>
+            aria-label="${esc(key.name)}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.keys?.has(index) ? `, ${esc(drafted.after)}` : ""}"${transform}>
             <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
-            ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
+            ${drafted?.keys?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${esc(rows.separatorY)}" x2="${visual.x + GEO.keyW - 8}" y2="${esc(rows.separatorY)}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
             ${label}
             ${subFit ? `<text class="kc-sub" x="${cx}" y="${esc(rows.subY)}" font-size="${subFit.size}"${squeeze(subFit)}${fillText}>${esc(sub)}</text>` : ""}

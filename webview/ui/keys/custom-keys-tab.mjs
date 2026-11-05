@@ -30,7 +30,7 @@ export function tabCustomKeys(body, right) {
         const key = customKeyOf(model, keycode);
         const behaviour = key?.hasBehavior ? keyIdentity(model, keycode).behaviour : undefined;
         return `<tr${reachAttrs("customKeys", group, keycode)}>
-            <td>${rowPick("customKeys", group, keycode, `${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedKeys.has(keycode) ? draftDot() : ""}`)}</td>
+            <td>${rowPick("customKeys", group, keycode, `${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedKeys.has(keycode) ? draftDot(model?.draft) : ""}`)}</td>
             <td>${hasShortcut(key) ? `<span class="mono">${esc(key?.shortcutLabel)}</span>` : `<span class="muted">—</span>`}</td>
             <td class="beh-branches">${behaviour
                 ? `${behaviourTiers(behaviour).map((tier) => tierDot(model, tier.kind)).join("")} ${behaviour.steps.length}`
@@ -42,7 +42,7 @@ export function tabCustomKeys(body, right) {
     const groups = reach.groups.map(({id, empty, entries}) => ({id, empty,
         rows: entries.map((entry) => row(id, entry.name, id === "elsewhere" ? "not reached from this layer" : reachLabel(model, entry))),
         drafted: entries.some((entry) => changedKeys.has(entry.name))}));
-    const node = reachTable("customKeys", groups, [["Key", "26%"], ["Shortcut", "20%"], ["Behaviour", "12%"], ["Reached by", "34%"], ["", "8%"]]);
+    const node = reachTable("customKeys", groups, [["Key", "26%"], ["Shortcut", "20%"], ["Behaviour", "12%"], ["Reached by", "34%"], ["", "8%"]], model?.draft);
     attachReachRows(node, "customKeys");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editcustom]")).forEach((button) => button.addEventListener("click", () => {
         state.customKey = button.dataset.editcustom || null;

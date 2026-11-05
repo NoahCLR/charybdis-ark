@@ -7,6 +7,7 @@ import {keyLed, offWording, trackballLed} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {groupRowsTable, rowOwners, usageName} from "./led-rows.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
+import {editWords} from "../../view/edit-mode.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageGroups(model) {
@@ -47,7 +48,7 @@ function groupBuilder(model, canEdit) {
     }));
     const actions = el(`<div class="row gap-8">
         <button class="btn primary" data-act="keep" ${canEdit && (draft.source || picked) ? "" : "disabled"}
-            data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Keep row in draft</button>
+            data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">${esc(editWords(model.draft).keep("row"))}</button>
         <button class="btn ghost" data-act="save" ${canEdit && picked ? "" : "disabled"}
             data-tip="${picked ? "Store the picked LEDs as a group other rows can point at. Groups are numbered by the LEDs they hold, so the others may renumber." : "Pick LEDs on the board first, then make them a group."}">Make a group from the selection</button></div>`);
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => {
