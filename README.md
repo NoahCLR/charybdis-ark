@@ -10,7 +10,7 @@ and can be tried in real typing before it is saved.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/live-edit-dark.gif">
-    <img src="docs/images/readme/live-edit-light.gif" width="800"
+    <img src="docs/images/readme/live-edit-light.gif" width="880"
          alt="In Ark, Esc is double-clicked and changed to Mute from the Media keys; a bar says one unsaved change is running on the keyboard, Review shows Esc saved and Mute running now, and Revert puts Esc back">
   </picture>
   <br>
@@ -43,7 +43,7 @@ key that has a behaviour of its own, a second card shows that behaviour.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/hover-dark.gif">
-    <img src="docs/images/readme/hover-light.gif" width="768"
+    <img src="docs/images/readme/hover-light.gif" width="880"
          alt="Hovering keys in Ark: Esc shows a double tap for a tilde and a long hold for Option+Command+Esc (Force Quit); V shows the combo of eight bottom-row keys that sends Esc, with a second card for the Esc behaviour the combo runs; Right Option shows a tap that locks the Arrow pointing mode and a double tap held for Undo / Redo">
   </picture>
   <br>
@@ -58,7 +58,7 @@ them stacked the way the keyboard resolves them:
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/layers-dark.gif">
-    <img src="docs/images/readme/layers-light.gif" width="800"
+    <img src="docs/images/readme/layers-light.gif" width="880"
          alt="Ark showing layers stacked: Symbol, then Navigation on top of it, then Pointing on top of both, with keys from lower layers frosted">
   </picture>
   <br>
@@ -109,7 +109,7 @@ or run on some layers only.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/combo-dark.gif">
-    <img src="docs/images/readme/combo-light.gif" width="800"
+    <img src="docs/images/readme/combo-light.gif" width="880"
          alt="Making a combo in Ark: New combo, Command+W picked as what it sends, E and R clicked on the board, Keep combo in draft, then E's hover card lists the new combo">
   </picture>
   <br>
@@ -215,7 +215,7 @@ a trap or a warning.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/trap-dark.gif">
-    <img src="docs/images/readme/trap-light.gif" width="800"
+    <img src="docs/images/readme/trap-light.gif" width="880"
          alt="Review showing a trap: Extra can lock with no way back to Base. Then Discard all puts Esc back, and the change is made again in the keycode picker">
   </picture>
   <br>
