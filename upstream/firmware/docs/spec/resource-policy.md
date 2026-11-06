@@ -36,9 +36,9 @@ The fixed linked prefix runs from the bank's start to `__heap_base__`: all of
 `.data` and `.bss`. The largest static claims in it are the working copy,
 `runtime_working_bytes`, one slot payload (130,048 bytes,
 `NOAH_PROFILE_PAYLOAD_MAX`) of `.bss` (D-F32,
-[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0032-live-edits-working-copy-and-save.md)); QMK's RAM mirror
+[`0032`](https://github.com/NoahCLR/charybdis-4x6/blob/67d87d2c4fba52e58839eaed39b2363c35e60974/docs/adr/0032-live-edits-working-copy-and-save.md)); QMK's RAM mirror
 of the 4 KiB logical EEPROM (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0031-via-is-not-supported.md)); and the split slave thread's
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/67d87d2c4fba52e58839eaed39b2363c35e60974/docs/adr/0031-via-is-not-supported.md)); and the split slave thread's
 1,200-byte working area. The working copy is static, never allocated, so the
 core-memory span says exactly what is left. No RAM copy of a profile slot
 exists: slots are read in place through XIP.
@@ -76,7 +76,7 @@ on any of these:
 
 | Policy | Value | What it is |
 | --- | ---: | --- |
-| SRAM0–3 `.data + .bss` | at most 203,776 bytes | a regression tripwire just above the largest build; crossing it means justify the growth and raise the line deliberately, not that the chip is full |
+| SRAM0–3 `.data + .bss` | at most 204,176 bytes | a regression tripwire just above the largest build; crossing it means justify the growth and raise the line deliberately, not that the chip is full |
 | Core-memory span at boot | at least 4,096 bytes | the safety floor for the newlib arena, about two orders of magnitude above its observed use; raise it only with evidence of a new allocator |
 | Named macro storage | at most 8,192 bytes | the playback symbols `profile_macro_slots` and `macro_slot_active_ir` (both required) plus the provider's bookkeeping symbols |
 | Reclaimed macro storage | at least 32,768 bytes below a 41,440-byte baseline | the VIA-era bank's footprint; the 8,192-byte line above always fails first |
@@ -85,7 +85,7 @@ Only the sum of `.data` and `.bss` is gated. The split between them is an
 initialisation artifact: one nonzero member moves a whole object to `.data`,
 where it also costs flash. `.bss` alone is gated only when
 `--max-static-bss` is passed, and nothing passes it; the report prints both
-sections. The script states how the 203,776 bytes are composed: a 56 KiB base
+sections. The script states how the 204,176 bytes are composed: a 56 KiB base
 plus each reviewed increment and decrement since, each named by its decision.
 A change that moves the tripwire edits that sum and its comment and says why
 in its commit.
@@ -124,6 +124,7 @@ engineering regression policies, not SRAM limits:
 | Split authority | 128 | `NOAH_PROFILE_SPLIT_AUTHORITY_STATE_BUDGET_32BIT` |
 | Key-behaviour domain handle / its validation | 128 / 128 | `key_behavior_domain_v1.c`, `NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Lighting domain view / its validation | 40 / 72 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |
+| Lighting row selectors, one byte per group row (D-F63) | 656 | `rgb_active_profile_config.c` |
 | Lighting render snapshot | 96 | `rgb_runtime.c` |
 | Compiled-profile handle | 76 | `profile_compiled_defaults_v1.c` |
 | Durable-I/O grant | 28 | `NOAH_QMK_DURABLE_IO_STATE_BUDGET_32BIT` |
@@ -177,7 +178,7 @@ the budgets against the real ELF only in a resource build.
 `tests/host/run_firmware_stack_budget_checks.sh` and
 `tests/host/run_live_profile_owner_stack_budget_checks.sh` check a plain
 `qmk compile` image, which leaves out the live-profile owner (D-F35,
-[`0035`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0035-live-profile-owner-on-by-default.md)) and is not the
+[`0035`](https://github.com/NoahCLR/charybdis-4x6/blob/67d87d2c4fba52e58839eaed39b2363c35e60974/docs/adr/0035-live-profile-owner-on-by-default.md)) and is not the
 firmware anyone flashes.
 
 ## Flash
@@ -187,7 +188,7 @@ The firmware image must end below 1 MiB: the link fails if it reaches
 (`users/noah/lib/compat/qmk_profile_flash.ld`). The two 128 KiB slots, QMK's
 8 KiB wear-leveling backing at the top of the assumed 2 MiB, the slot record,
 the flash pauses and every profile ceiling (D-F14,
-[`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/44d66892f37bf14d9f6b7c25bcc4a2f20c4aa72e/docs/adr/0014-bigger-profiles.md)) are in
+[`0014`](https://github.com/NoahCLR/charybdis-4x6/blob/67d87d2c4fba52e58839eaed39b2363c35e60974/docs/adr/0014-bigger-profiles.md)) are in
 [the device-resident profile](device-resident-profile.md#where-the-profile-is-stored).
 
 Held by: `tests/host/run_profile_storage_layout_tests.sh` (the linker guard

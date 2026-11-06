@@ -180,7 +180,10 @@ function validateSnapshot(value, capabilities) {
     const macros = decoded("macros");
     macros.forEach(slot => validateMacro(slot));
     const pdModes = decoded("pdModes");
-    const codecOptions = profileDepthOptions(capabilities, payload("rgb"));
+    const depthOptions = profileDepthOptions(capabilities, payload("rgb"));
+    // A backup past the keyboard's LED sets or accents is refused here, in
+    // words, rather than by the keyboard.
+    const codecOptions = {...depthOptions, rgb: {...depthOptions.rgb, ...lightingCeilings(capabilities)}};
     const rgb = decoded("rgb", codecOptions), behaviors = decoded("behaviors", codecOptions),
         combos = decoded("combos"), settings = decoded("settings");
     // With Unicode playback on, a held ordinary key cannot span text the
@@ -239,9 +242,19 @@ function tooFull(error, full) {
 // codec's whole range when none was read.
 /** @param {DomainsContext["limits"]} limits */
 const brightnessCeiling = (limits) => limits?.brightnessMax ?? 255;
+// The LED sets and accents the keyboard reports it holds; the format's own
+// ceilings where none was read.
+/** @param {DomainsContext["capabilities"]} capabilities */
+function lightingCeilings(capabilities) {
+    return {
+        ...(Number.isInteger(capabilities?.maxReusableRgbGroups) ? {maxGroups: capabilities?.maxReusableRgbGroups} : {}),
+        ...(Number.isInteger(capabilities?.maxRgbTableGroupRows) ? {maxTableGroupRows: capabilities?.maxRgbTableGroupRows} : {}),
+        ...(Number.isInteger(capabilities?.maxRgbStageGroupRows) ? {maxGroupRows: capabilities?.maxRgbStageGroupRows} : {}),
+    };
+}
 // The codec options a document's domains are read and written with: the tap
 // depth the keyboard reports, or the one the document's RGB palette counts;
-// and the brightness the keyboard allows. A behaviour edit also checks every
+// the brightness the keyboard allows; and the LED sets and accents it holds. A behaviour edit also checks every
 // row's actions against the keyboard's action slots (`checkActions`), since
 // the keyboard refuses a profile whose actions sit where it cannot run them;
 // any other edit keeps the rows it does not touch as they are.
@@ -250,7 +263,7 @@ function domainOptions(rgbPayload, {capabilities, limits, checkActions}) {
     const depth = profileDepthOptions(capabilities, rgbPayload);
     const actionLimits = {maxPdModes: POINTING_SLOT_COUNT, maxLogicalLayers: capabilities?.compiledLayerCount,
         maxMacroSlots: capabilities?.macroSlots, maxCustomKeys: capabilities?.customKeySlots};
-    return {rgb: {maximumBrightness: brightnessCeiling(limits), ...depth.rgb},
+    return {rgb: {maximumBrightness: brightnessCeiling(limits), ...lightingCeilings(capabilities), ...depth.rgb},
         behaviors: {...depth.behaviors, ...(checkActions ? {actionLimits} : {})}};
 }
 // Opens a profile blob's domains as models: each decoded the first time it

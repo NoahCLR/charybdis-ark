@@ -191,8 +191,9 @@ or key caused it.
 **All accents**, after the stages, lists every accent by the stage that paints
 it and who it lights for; **Open** goes to it on its stage's tab.
 
-The keyboard holds at most 32 accents and 16 different LED sets across every
-stage: accents that light the same LEDs share one set, and a set no accent
+The keyboard holds at most 640 accents, 255 on any one stage, and 128
+different LED sets across every stage (older firmware holds 32 accents and 16
+sets; Ark uses whatever the connected keyboard reports): accents that light the same LEDs share one set, and a set no accent
 lights any more is freed. Each list shows how many are used (also **Accents**
 and **LED sets** under **Memory** on the Keyboard screen). Adding one more is
 refused in the draft, saying which is full, before the keyboard sees it;

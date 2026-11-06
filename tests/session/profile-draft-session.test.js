@@ -650,18 +650,29 @@ test("an edit past a count the keyboard caps is refused in words, by that count,
     const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
     const {RGB_DOMAIN_V1} = require("../../core/schema/rgb-domain-v1");
     const {validateSnapshot} = require("../../core/model/portable-profile");
+    // The keyboard's own ceilings, read from its capability pages, hold a
+    // draft: here firmware before D-F63, 16 LED sets and 32 accents.
+    const older = () => {
+        const {snapshot, caps} = fixture();
+        return new ProfileDraftSession(snapshot, "board", {...caps, maxReusableRgbGroups: 16, maxRgbTableGroupRows: 32, maxRgbStageGroupRows: 32});
+    };
     // Each accent lighting LEDs no other accent lights takes a group of its
     // own, until the keyboard's cap, long before its accents run out.
-    const groups = refusal(fixture().draft, led => ({type: "addRgbLedGroup", group: {target: "combo", ledIndices: [led], h: 0, s: 255, v: 100}}), 58);
+    const groups = refusal(older(), led => ({type: "addRgbLedGroup", group: {target: "combo", ledIndices: [led], h: 0, s: 255, v: 100}}), 58);
     assert.equal(groups.code, "PROFILE_FULL");
-    assert.equal(failureSentence(groups), PROFILE_FULL_WORDS.counts.lightingGroups(RGB_DOMAIN_V1.MAX_GROUPS));
+    assert.equal(failureSentence(groups), PROFILE_FULL_WORDS.counts.lightingGroups(16));
     assert.match(failureSentence(groups), /at most 16 different LED sets/, "in the words the usage table counts them in");
     assert.equal(groups.cause.code, "CAPACITY_EXCEEDED", "the format's own refusal stays beneath, for the diagnostics");
     // Colouring two reused groups on every layer, over and over, adds an LED
     // override each time: removing a behaviour or a macro frees none.
-    const overrides = refusal(fixture().draft, index => ({type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [index % 2], h: 0, s: 255, v: 100}}), 80);
-    assert.equal(failureSentence(overrides), PROFILE_FULL_WORDS.counts.lightingGroupRows(RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS));
+    const overrides = refusal(older(), index => ({type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [index % 2], h: 0, s: 255, v: 100}}), 80);
+    assert.equal(failureSentence(overrides), PROFILE_FULL_WORDS.counts.lightingGroupRows(32));
     assert.match(failureSentence(overrides), /at most 32 accents/);
+    // Current firmware holds 640 accents but 255 on one stage: the layer
+    // stage fills first, and the refusal names the stage's ceiling.
+    const stageFull = refusal(fixture().draft, index => ({type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [index % 2], h: 0, s: 255, v: 100}}), RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS + 1);
+    assert.equal(failureSentence(stageFull), PROFILE_FULL_WORDS.counts.lightingTableGroupRows(RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS));
+    assert.match(failureSentence(stageFull), /at most 255 accents on any one of layers/);
     // A behaviour past the keyboard's rows names behaviours alone.
     const {snapshot, caps} = fixture();
     const rows = validateSnapshot(snapshot.document).behaviors.rows.length;

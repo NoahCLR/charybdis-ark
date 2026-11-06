@@ -23,6 +23,7 @@ export interface ProfileDestination extends Partial<ActionLimits> {
     maxKeysPerCombo?: number;
     customKeySlots?: number;
     maxReusableRgbGroups?: number;
+    maxRgbTableGroupRows?: number;
     maxRgbStageGroupRows?: number;
     macroBytes?: number;
     macroSlots?: number;
