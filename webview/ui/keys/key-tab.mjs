@@ -3,6 +3,7 @@
 // the stack, what the key reaches, and its participation.
 
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
+import {foldOpen, keepFold} from "../disclosure.mjs";
 import {keyLed} from "../../view/lighting.mjs";
 import {sentence, slotNamed, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
@@ -50,7 +51,7 @@ export function tabKey(body) {
                 <button class="btn" data-act="pick" ${gate.editable ? "" : "disabled"}>Pick…</button></div></div>
             <div class="key-details">
                 <dl class="kv"><dt>Does</dt><dd>${position ? keyNameMarked(model, keyName(position, model), keyMeaning(position)) : "—"}</dd></dl>
-                <details class="key-more" ${state.keyDetailsOpen ? "open" : ""}><summary class="note">${DISCLOSURE}Where it is stored</summary>
+                <details class="key-more" ${foldOpen("key:stored") ? "open" : ""}><summary class="disclose">${DISCLOSURE}<span>Where it is stored</span></summary>
                 <dl class="kv">
                     <dt>Stored as</dt><dd>${esc(position ? visibleKeycode(model, position.keycode) : "—")}</dd>
                     <dt>Matrix</dt><dd>row ${esc(position?.row ?? "—")} · col ${esc(position?.column ?? "—")}</dd>
@@ -107,10 +108,10 @@ export function tabKey(body) {
         showLayer(Number(button.dataset.golayer));
         render();
     }));
-    /** @type {HTMLElement | null} */ (node.querySelector("[data-stack-open]"))?.addEventListener("click", () => { state.stackOpen = !state.stackOpen; render(); });
+    /** @type {HTMLElement | null} */ (node.querySelector("[data-stack-open]"))?.addEventListener("click", () => { keepFold("key:stack", !foldOpen("key:stack")); render(); });
     wireEmptyLayers(node);
     /** @type {HTMLDetailsElement | null} */ (node.querySelector(".key-more"))?.addEventListener("toggle", (event) => {
-        state.keyDetailsOpen = /** @type {HTMLDetailsElement} */ (event.target).open;
+        keepFold("key:stored", /** @type {HTMLDetailsElement} */ (event.target).open);
     });
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-goto]")).forEach((button) => button.addEventListener("click", () => {
         state.tab = button.dataset.goto || "key";
@@ -166,7 +167,7 @@ function stackRows(model, layer, position) {
     };
     let html = "", run = /** @type {typeof rows} */ ([]);
     const flush = () => {
-        if (run.length >= 3 && !state.stackOpen) html += `<button class="stackrow folded" data-stack-open data-tip="Show each of these layers">
+        if (run.length >= 3 && !foldOpen("key:stack")) html += `<button class="stackrow folded" data-stack-open data-tip="Show each of these layers">
             <span class="mk-slot">${layerIconOff()}</span><span class="nm">${run.length} layers</span>
             <span class="val dim">fall through · ${esc(layerCalled(run[0].other))} to ${esc(layerCalled(run[run.length - 1].other))}</span><code class="dim"></code></button>`;
         else html += run.map(row).join("");
@@ -178,7 +179,7 @@ function stackRows(model, layer, position) {
         html += row(entry);
     }
     flush();
-    if (state.stackOpen && rows.filter((entry) => entry.through).length >= 3)
+    if (foldOpen("key:stack") && rows.filter((entry) => entry.through).length >= 3)
         html += `<button class="stackrow folded" data-stack-open><span></span><span class="nm dim">Fold transparent layers</span><span></span><code></code></button>`;
     if (folded.length) html += emptyLayersToggle("key-stack", folded.length, "stack-empties");
     return html;

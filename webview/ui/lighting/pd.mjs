@@ -7,7 +7,7 @@ import {offWording, POINTING_MODE_IDS, pdColourRow} from "../../view/lighting.mj
 import {slotCalled as slotName, slotNamed, vocabulary} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
-import {aboutStage, colourControl, lightingGroup, localityLabel, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, lightingGroup, localityLabel, paintsSection, section, stack} from "./common.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 import {EMPTY_SLOTS_TIP, EMPTY_SLOTS_TITLE} from "../../view/slot-bank.mjs";
@@ -54,7 +54,7 @@ export function stagePointing(model) {
         ...offWording(model, "pd"),
         onChange: (next) => { if (row) post(edits.pdModeColour(POINTING_MODE_IDS[state.pointingSlot], row.locality, next)); },
     }));
-    const where = section("Where it paints");
+    const where = paintsSection(model, "pd", "Where it paints");
     const locality = el(`<label class="field"><span>${esc(vocabulary(model).lightingFields.locality)}</span>
         <select data-f="lighting:pointing:${esc(state.pointingSlot)}:locality" class="input" ${canEdit ? "" : "disabled"}
             data-tip="Where the colour paints while the mode runs. The trigger key choices follow the key that started it, and paint every key when no key did.">

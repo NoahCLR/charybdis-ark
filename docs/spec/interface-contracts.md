@@ -31,8 +31,9 @@ The Keys workbench keeps what the selected layer stores apart from what the
 layers in view reach:
 
 - Tab counts count what the selected layer stores (`tabReach`'s `count`,
-  `webview/view/tab-reach.mjs`); the Key tab counts mapped keys, not
-  transparent or disabled ones (`tests/view/tab-reach.test.mjs`,
+  `webview/view/tab-reach.mjs`, `tests/view/tab-reach.test.mjs`); the Key
+  tab carries none, since a number beside it read as a key number, and the
+  layer's mapped keys are counted in Rename & reorder (`mappedKeyCount`,
   `tests/view/lighting.test.mjs`).
   Reach rows name keys as the board does, never by layout index (no test).
   A route through a behaviour names its key, then each cell that sends the
@@ -141,9 +142,14 @@ The same kind of control looks and sits the same on every screen.
 - A folding card or group starts its summary with `DISCLOSURE`
   (`webview/lib/dom.mjs`): one chevron, turned down while open; a disclosure
   that is a button (the Keys groups, `groupHeader`; Typing & playback help;
-  a slot bank's Show all) has the same chevron, turned down while
-  `aria-expanded`, and is the one control that opens and closes what it
-  holds. A card that does not fold has none (no test).
+  a slot bank's Show all; the empty layers) has the same chevron, turned
+  down while `aria-expanded`, and is the one control that opens and closes
+  what it holds. A fold that is not a heading (Where it is stored, Layers it
+  runs on, Show all, the empty layers, Typing & playback help, a review
+  item's Show all) is `disclosureButton` or a `<summary class="disclose">`
+  (`webview/ui/disclosure.mjs`), one look wherever it appears: the chevron,
+  then its words at `--fs-md` in `--text-2`, 28 px tall. A card that does
+  not fold has none (no test).
 - A sheet (Review, the keycode picker, Draft history) closes with one ghost
   **Close** at the right of its header, and by Escape; its foot holds only
   actions that change something (no test).
@@ -156,8 +162,9 @@ The same kind of control looks and sits the same on every screen.
   back to) as a ghost button immediately before the primary action, and a
   destructive choice that is not the primary last
   (`browser-tests/consistency.spec.js`).
-- An editor's own actions, and buttons to another screen, are small text
-  buttons (`btn tiny ghost`) at the right of its title bar; a recorder's
+- An editor's own actions are small text buttons (`btn tiny ghost`) at the
+  right of its title bar, and a button to another screen, or into a mode on
+  one (Place on a key →), is a small link (`btn tiny link`) there; a recorder's
   Record is a regular button, never a primary that outranks Save. A
   destructive action is the last thing in its row (no test).
 - An editor opened in place (a behaviour cell, a macro step) keeps each
@@ -231,6 +238,11 @@ The same kind of control looks and sits the same on every screen.
 - Keys and Lighting draw the same layer strip on the board
   (`tests/view/navigation-profile-ui.test.mjs`), Rename & reorder included
   (no test).
+- The board fits the window: its drawing is no taller than half the window
+  and at most `--board-tall` (600px), centred in its card, so at 1920 × 1080
+  the layer strip, the workbench tabs and the first rows of the editor share
+  the first screen with it on Keymap and Lighting
+  (`browser-tests/board-fit.spec.js`).
 - Every list of layers (the layer strip, This key on every layer, a Settings
   screen's per-layer switches, Combo layer matching, a behaviour's or combo's
   Layers it runs on, Lighting's layer list, Rename & reorder) shows the
@@ -254,9 +266,13 @@ The same kind of control looks and sits the same on every screen.
   Lighting workbench tabs) scrolls sideways, never wraps or cuts a label off
   without saying so: an end with more tabs past it fades, and while it does
   not fit an arrow at each end, outside what scrolls, moves it a page; Rename &
-  reorder and a stage's switch stay outside it (`keepInView`,
-  `webview/ui/layerbar.mjs`). Lighting's stage tabs, All accents and the stage
-  switch fit a 1440px window (no test).
+  reorder stays outside it (`keepInView`, `webview/ui/layerbar.mjs`).
+  Lighting's stage tabs and All accents fit a 1440px window (no test).
+- A stage's on/off switch rides at the far end of the header line of the
+  section that says where or when the stage paints (Where it paints, When and
+  where, Timing), the body's last column, never in the tab strip or on a row
+  of its own (`stageSwitch`,
+  `webview/ui/lighting/common.mjs`; `browser-tests/lighting-controls.spec.js`).
 - The commit bar floats over the screen's foot but covers none of it: while
   it shows, the screen's scrolling area ends above it, by its height as drawn
   (`reserveCommitRoom`, `webview/ui/frame.mjs`;
@@ -285,20 +301,29 @@ The same kind of control looks and sits the same on every screen.
 - A swatch in a tab or chip is outlined in the theme's line colour, and a
   layer or stage with no colour is that outline alone, in either theme (no
   test).
+- Small capitals come in two and only two: the eyebrow (a section's heading,
+  a table's column head, a group band, a rail group, a hover card's heading;
+  one rule in `webview/styles.css`, "Two small capitals") and the tag (an
+  identifier such as a keycode or a macro's slot, `.tag`); nothing else is
+  set in small capitals (no test).
 - A button is `.btn` in one size, regular or `.tiny` (a row's or a bar's
   own actions), squared by `.icon`, and one style: plain, `.ghost` (words
-  alone), `.primary` (the one action that goes on) or `.destructive` (words
-  that remove; a ghost one turns red on hover). Something that cannot be
+  alone), `.link` (words that go to another screen, ending in →),
+  `.primary` (the one action that goes on) or `.destructive` (words
+  that remove; a ghost one is red at rest, with a hairline before it in a
+  row of actions, since nothing it does asks first). Something that cannot be
   used reads the same as a button or as a screen's name in the rail: its
   words at about `--text-disabled`, with the not-allowed pointer (no test).
 - Tokens: every font size (`--fs-*`), weight (`--fw-*`), radius (`--r-*`),
-  layer (`--z-*`), shadow (`--shadow*`) and colour in `webview/styles.css` is
-  a token from `:root` or the light theme's block, the scales named in the
-  stylesheet's header; controls take their height from `--h-*`. A rule
-  outside those blocks writes no raw font size, weight, radius, layer or
-  colour, and a value the scale lacks becomes a token. The exceptions are
-  0, 50%, `inherit`, the board's and the picker board's SVG text, and the
-  alpha masks of a strip's faded edges (`tests/scripts/conventions.test.js`).
+  layer (`--z-*`), shadow (`--shadow*`), spacing (`--sp-*`) and colour in
+  `webview/styles.css` is a token from `:root` or the light theme's block,
+  the scales named in the stylesheet's header; controls take their height
+  from `--h-*`. A rule outside those blocks writes no raw font size, weight,
+  radius, layer, padding, margin, gap or colour, and a value the scale lacks
+  becomes a token: the room an input keeps for what rides inside it is a
+  `--*-room` token, never a number. The exceptions are 0, `auto`, 50%,
+  `inherit`, the board's and the picker board's SVG text, and the alpha
+  masks of a strip's faded edges (`tests/scripts/conventions.test.js`).
   Tips and hover cards sit over a dialog's scrim; a message floating over the
   screen sits under it, as the rail's own message does (no test).
 
@@ -311,8 +336,11 @@ hold what they name.
 - A control's tip (`data-tip`) shows when the keyboard focuses the control,
   as when the pointer rests on it, and is its description while it has the
   focus: `aria-describedby` names `#ark-focus-tip`, which holds the tip's
-  words. Escape or leaving the control hides it; a tip that only names its
-  control (`data-tip-names`), or says what its `aria-label` says, adds no
+  words. Escape or leaving the control hides it, and a press hides it until
+  the pointer has left the control's place and come back, however many
+  times a render redraws the control under it
+  (`browser-tests/tooltips.spec.js`); a tip that only names its control
+  (`data-tip-names`), or says what its `aria-label` says, adds no
   description (`webview/ui/hover.mjs`; tested).
 - A strip of tabs (the workbench's, Lighting's stages, the layer tabs) is
   one tab stop, the picked tab; ← and → move to the tab beside it, wrapping,
@@ -1224,7 +1252,7 @@ escaped payload (D-L26), in `webview/ui/macros/`.
 ## Pointing mode editor
 
 A configured mode's editor (`webview/ui/pointing/editor.mjs`) is one card
-titled by the mode's name, with Place on a key…, Duplicate and Clear mode
+titled by the mode's name, with Place on a key →, Duplicate and Clear mode
 beside it, and four numbered steps read top to bottom; Advanced follows as its
 own folded card (`browser-tests/pointing-controls.spec.js`).
 

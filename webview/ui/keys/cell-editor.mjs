@@ -34,7 +34,7 @@ export function cellEditor(behaviour, step, kind) {
     const node = el(`<div class="cell-editor">
         <div class="ce-head"><span class="tag">${esc(branchName(getModel(), step.tapCount + 1))}</span><h4>${esc(tierName(getModel(), kind))}</h4>
             <span class="note">${kind === "tap" ? "A tap tier fires on release, so it has no hold style." : "Runs once this tier's threshold passes."}</span>
-            <span class="right">${DONE}${branch ? `<button class="btn tiny ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}</span></div>
+            <span class="right">${DONE}${branch ? `<button class="btn tiny ghost destructive" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}</span></div>
         <div class="ce-body">
             <label class="field"><span>Sends</span>
                 <div class="input-row"><input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:${esc(cell)}:action" data-action value="${esc(branch?.action || "")}" placeholder="None" ${canEdit ? "" : "disabled"}>

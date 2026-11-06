@@ -53,7 +53,7 @@ export function comboBuilder(canEdit, holdTerm) {
         : customKeySendsNote(model, keyIdentity(model, form.output).canonical);
     const node = el(`<div class="card combo-builder">
         <div class="card-h"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
-            <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
+            <span class="right">${editing ? `<button class="btn tiny ghost destructive" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
         <div class="card-b">
             <div class="field"><span>${esc(vocabulary(model).comboFields.sends)}</span>
                 <div class="input-row"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:output" data-output value="${esc(visibleKeycode(model, form.output))}" ${canEdit ? "" : "disabled"}>

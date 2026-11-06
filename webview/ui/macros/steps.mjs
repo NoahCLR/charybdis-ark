@@ -145,7 +145,7 @@ function paintTiles(node, model, slot, steps) {
             data-step-tile="${esc(index)}" data-step-id="${esc(step.focusId)}" data-act="macro-step:${esc(slot.keycode)}:${esc(step.focusId)}"
             draggable="${editable}" aria-pressed="${esc(selected)}" aria-label="${esc(title)}" ${issues[index] ? 'aria-invalid="true"' : ""} data-tip="${esc(title)}">
             <span class="macro-token-index" aria-hidden="true">${esc(index + 1)}</span><span class="macro-token-mark" aria-hidden="true">${stepMark(step.kind)}</span>
-            <span class="macro-token-label">${content}${step.kind === "delay" ? '<span class="macro-token-unit"> ms</span>' : ""}</span>
+            <span class="macro-token-label">${content}${step.kind === "delay" ? '<span class="macro-token-unit">ms</span>' : ""}</span>
             <span class="macro-token-kind">${esc(stepWord(model, step.kind, face.kind === "chord"))}</span>
             ${issues[index] ? '<span class="macro-token-error" aria-hidden="true">!</span>' : ""}</button>
             ${index < steps.length - 1 ? '<span class="macro-connector" aria-hidden="true">→</span>' : ""}</div>`);

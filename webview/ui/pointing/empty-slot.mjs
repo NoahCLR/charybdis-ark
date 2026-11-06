@@ -22,7 +22,8 @@ function inertNote(model, slot) {
     if (keys.length) parts.push(`${keys.length} key${keys.length === 1 ? "" : "s"} on ${esc(layers.join(", "))}`);
     if (behaviours.length) parts.push(`${behaviours.length} behaviour${behaviours.length === 1 ? "" : "s"} (${behaviours.map((row) => actionMarked(model, row.keycode)).join(", ")})`);
     if (combos.length) parts.push(`${combos.length} combo output${combos.length === 1 ? "" : "s"} (${esc(combos.map((row) => row.badge).join(", "))})`);
-    return `<div class="unavailable">${listed(parts)} still reach this slot. The keyboard refuses to activate an empty slot, so they do nothing until it holds a mode — they do not need to be removed first.</div>`;
+    const one = keys.length + behaviours.length + combos.length === 1;
+    return `<div class="unavailable">${listed(parts)} still ${one ? "reaches" : "reach"} this slot. The keyboard refuses to activate an empty slot, so ${one ? "it does" : "they do"} nothing until it holds a mode — ${one ? "it does" : "they do"} not need to be removed first.</div>`;
 }
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {import("../surface-types.js").PresentedSlot[]} slots */

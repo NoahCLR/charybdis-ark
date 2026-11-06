@@ -27,6 +27,6 @@ export type BoardNode = HTMLElement & {justDragged?: boolean};
 export interface KeyDrag {x: number; y: number; moved: boolean; target: SVGGElement | null}
 export interface TrackballOptions {ledIndex: boolean; picking: boolean; clickable: boolean}
 export type PresentedSlot = PublishedModel['pdModes'][number];
-export interface FieldOptions {unit?: string; wide?: boolean; tip?: string}
+export interface FieldOptions {unit?: string; wide?: boolean; tip?: string; help?: string}
 export type FormReaders = PdForm & Record<string, () => Scalar>;
 export type LayerStack = NonNullable<PublishedModel['portable']['layers']>;

@@ -16,6 +16,14 @@ const describe = el(`<div id="ark-focus-tip" hidden></div>`);
 /** @type {{control: Element, before: string | null} | null} */
 let described = null;
 const card = el(`<div class="hovercard" hidden></div>`);
+// Where the control last pressed was: its tip said what it would do, and it
+// is doing it, so the tip stays away until the pointer has left that place
+// and come back. The place, not the element, since a render redraws the
+// control under the pointer.
+/** @type {DOMRect | null} */
+let pressed = null;
+/** @param {DOMRect} rect @param {MouseEvent} event */
+const within = (rect, event) => event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
 // The behaviours the key's combos run, each in its own card beside the key's.
 const side = el(`<div class="hovercard-side" hidden></div>`);
 let timer = 0;
@@ -45,12 +53,18 @@ export function mountHover(root) {
         // A tip that only names its control (data-tip-names) is for when the
         // control shows no words of its own, as the rail's icons do in a
         // narrow window.
-        if (hinted && !(hinted.hasAttribute("data-tip-names") && hinted.innerText.trim())) {
+        if (pressed && !within(pressed, event)) pressed = null;
+        if (hinted && !pressed && !(hinted.hasAttribute("data-tip-names") && hinted.innerText.trim())) {
             const rect = hinted.getBoundingClientRect();
             timer = setTimeout(() => { tip.textContent = hinted.dataset.tip ?? ""; delete tip.dataset.focus; place(tip, rect, 8); }, 260);
             return;
         }
         tip.hidden = true;
+    }, true);
+    root.addEventListener("pointerdown", (event) => {
+        const control = /** @type {Element} */ (event.target).closest("[data-tip]");
+        pressed = control?.getBoundingClientRect() ?? null;
+        if (pressed) { clearTimeout(timer); tip.hidden = true; }
     }, true);
     root.addEventListener("mouseleave", hideHover, true);
     root.addEventListener("focusin", (event) => focusTip(/** @type {Element} */ (event.target)));

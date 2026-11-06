@@ -137,6 +137,7 @@ export interface Vocabulary {
     branches: readonly string[];
     localities: WordList<string>;
     paintModes: WordList<string>;
+    paintModesBrief: WordList<string>;
     fadeModes: WordList<string>;
     tapCommit: WordList<string>;
     /** Lighting's fields, as its tabs label them and the review names them. */

@@ -124,7 +124,7 @@ function editor(model, key, canEdit) {
             label: "Custom key name", perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName, canEdit})}
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
             <span class="right row actions">
-                <button class="btn tiny ghost" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key…</button></span></div>
+                <button class="btn tiny link" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key →</button></span></div>
         <div class="card-b stack">${keyFields(model, key).join("")}</div></div>`);
     attachTitleName(card, {stored: key.name, perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName,
         rename: (name) => post(edits.customKeyNameMessage(key.keycode, name, model?.customKeyEditing?.identity))});
@@ -163,8 +163,8 @@ function behaviourCard(model, key) {
     const card = el(`<div class="card custom-key-behaviour">
         <div class="card-h"><h3>What it does</h3>
             <span class="tag">${key.hasBehavior ? "Behaviour" : "No behaviour yet"}</span>
-            ${placed ? `<span class="right row actions"><button class="btn tiny ghost" data-act="show-behaviour"
-                data-tip="Open this behaviour in Keymap → Behaviours, with the board showing the keys that reach it.">Show on the Keymap screen</button></span>` : ""}</div>
+            ${placed ? `<span class="right row actions"><button class="btn tiny link" data-act="show-behaviour"
+                data-tip="Open this behaviour in Keymap → Behaviours, with the board showing the keys that reach it.">Show on the Keymap screen →</button></span>` : ""}</div>
         <div class="card-b stack"><p class="note" data-does>${esc(customKeyDoes(key))}</p></div></div>`);
     const body = /** @type {HTMLElement} */ (card.querySelector(".card-b"));
     if (behaviour) body.appendChild(behaviourEditor(behaviour));
@@ -192,7 +192,7 @@ function shortcutField(model, key, canEdit) {
             <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
                 data-tip="${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}, any` : "Any"} modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would. Pick… opens the keycode picker with its modifier row and its Layers section.">
             <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>
-            <button class="btn ghost" data-act="clear-shortcut" ${canEdit && hasShortcut(key) ? "" : "disabled"}
+            <button class="btn ghost destructive" data-act="clear-shortcut" ${canEdit && hasShortcut(key) ? "" : "disabled"}
                 data-tip="No shortcut: the key does only what its behaviour says.">Clear</button></div>
             <span class="note">${esc(customKeyShortcutLine(key))}</span></div>`);
     /** @param {import("../../contracts/panel.js").CustomKeyShortcut} shortcut */

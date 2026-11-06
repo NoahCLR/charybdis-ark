@@ -5,7 +5,8 @@
 // grouped table of slots (Lighting's pointing modes) folds them under its
 // last band instead, the same open state kept (toggleAllSlots), worded as
 // view/slot-bank.mjs words it.
-import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
+import {disclosureButton} from "./disclosure.mjs";
+import {el, esc} from "../lib/dom.mjs";
 import {render, state} from "../store.mjs";
 import {allSlotsLabel} from "../view/slot-bank.mjs";
 
@@ -37,7 +38,7 @@ export function slotBankControls(bank, {noun, count, free, canEdit, pick}) {
 /** @param {string} bank @param {string} label */
 function disclosure(bank, label) {
     const open = allSlotsShown(bank);
-    const toggle = /** @type {HTMLButtonElement} */ (el(`<button type="button" class="all-slots" data-all-slots="${esc(bank)}" aria-expanded="${open}">${DISCLOSURE}<span>${esc(label)}</span></button>`));
+    const toggle = /** @type {HTMLButtonElement} */ (el(disclosureButton(label, {open, className: "all-slots", attrs: `data-all-slots="${esc(bank)}"`})));
     toggle.addEventListener("click", () => {
         toggleAllSlots(bank);
         render();

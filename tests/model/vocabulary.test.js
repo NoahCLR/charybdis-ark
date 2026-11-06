@@ -17,6 +17,7 @@ test("every stored enum value has a word", () => {
     covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_STYLES, "holds without a long hold");
     covers(VOCABULARY.localities, rgb.RGB_LOCALITIES, "localities");
     covers(VOCABULARY.paintModes, rgb.RGB_LAYER_MODES, "layer paint modes");
+    covers(VOCABULARY.paintModesBrief, rgb.RGB_LAYER_MODES, "layer paint modes, briefly");
     covers(VOCABULARY.fadeModes, rgb.RGB_AUTOMOUSE_MODES, "auto-mouse fades");
     covers(VOCABULARY.tapCommit, rgb.RGB_TAP_COMMIT_MODES, "tap commit");
     covers(VOCABULARY.feedbackOwners, rgb.RGB_KEY_SEMANTICS, "feedback owners");

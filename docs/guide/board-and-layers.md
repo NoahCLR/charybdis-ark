@@ -2,7 +2,8 @@
 
 The **Keymap** screen opens on the board: a drawing of your Charybdis, showing
 the layer you picked in the tabs underneath. Everything on it comes from the
-keyboard, with your draft's edits on top.
+keyboard, with your draft's edits on top. The board takes at most half the
+window's height, so the workbench under it stays in reach without scrolling.
 
 ## Reading the board
 
@@ -234,8 +235,8 @@ Under the board, the workbench works on the selected key. Its tabs are:
   **Hold** or **Lock** for routes that send its own keys.
   **Edit** opens one on its own screen.
 
-Each tab counts what it holds for this layer, and a dot marks a draft change
-(an unsaved change in the live modes).
+Each tab but Key counts what it holds for this layer, and a dot marks a draft
+change (an unsaved change in the live modes).
 
 Behaviours, Combos, Macros, Custom keys and Pointing modes list what they
 hold in one kind of table: a header row per group (on this view, on this

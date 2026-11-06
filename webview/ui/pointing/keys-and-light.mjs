@@ -18,12 +18,12 @@ export function keysRow(model, slot) {
     </div>`);
 }
 
-// Place on a key…, in the editor's title bar as Macros and Custom keys have
+// Place on a key →, in the editor's title bar as Macros and Custom keys have
 // it: it puts the mode's hold key on a key picked on the board.
 /** @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit */
 export function placeButton(slot, canEdit) {
-    const button = el(`<button class="btn tiny ghost" data-act="place" ${canEdit ? "" : "disabled"}
-        data-tip="Put this mode's hold key on a key you pick on the board.">Place on a key…</button>`);
+    const button = el(`<button class="btn tiny link" data-act="place" ${canEdit ? "" : "disabled"}
+        data-tip="Put this mode's hold key on a key you pick on the board.">Place on a key →</button>`);
     button.addEventListener("click", () => {
         state.placement = {keycode: holdKeyName(slot)};
         state.screen = "keys";
@@ -48,7 +48,7 @@ export function lightRow(model, slot) {
         : "No colour reported";
     const node = el(`<div class="field pd-light"><span>Light</span><div class="pd-light-row">
         <div class="val" data-tip="While the mode runs, its colour paints where this says. A mode linked to layers paints beneath the lowest of them that is on, so those layers' own colours show over it.">${light.swatch()}<span class="note">${lightText}</span></div>
-        <button class="btn tiny ghost" data-act="lighting">Edit in Lighting</button>
+        <button class="btn tiny link" data-act="lighting">Edit in Lighting →</button>
     </div></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="lighting"]')).addEventListener("click", () => {
         state.screen = "lighting"; state.stage = "pd"; render();

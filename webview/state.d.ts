@@ -19,7 +19,7 @@ export interface PanelState {
     screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;
     reachGroups: Record<string, boolean>; resetBenchHeight: boolean; reachRow: {macros: string | null; customKeys: string | null; combos: string | null; pointing: string | null};
-    cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; flashPausesAsked: number | string | null; keyDetailsOpen: boolean; stackOpen: boolean; emptyLayersShown: string[]; allSlotsShown: string[]; definitionLayersOpen: boolean; checkGroupsOpen: {revision: number; open: Record<string, boolean>} | null;
+    cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; flashPausesAsked: number | string | null; foldsOpen: string[]; emptyLayersShown: string[]; allSlotsShown: string[]; checkGroupsOpen: {revision: number; open: Record<string, boolean>} | null;
     cellHow: {cell: string; keycode: string; style?: BranchStyle; repeatHz?: Scalar} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null;
         madeKey: {keycode: string; shortcut: import('../contracts/panel.js').CustomKeyShortcut; name: string} | null};

@@ -8,7 +8,8 @@
 // every layer's control still reads them all. A grouped table (Lighting's
 // layers, ui/groups.mjs) folds them under its last band instead, as it folds
 // every group, with this open state and the same words (view/empty-layers.mjs).
-import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
+import {disclosureButton} from "./disclosure.mjs";
+import {el, esc} from "../lib/dom.mjs";
 import {render, state} from "../store.mjs";
 import {EMPTY_LAYERS_TIP, emptyLayersLabel} from "../view/empty-layers.mjs";
 
@@ -26,8 +27,8 @@ export const toggleEmptyLayers = (place) => {
 /** @param {string} place @param {number} count @param {string} [className] */
 export function emptyLayersToggle(place, count, className = "") {
     const open = emptyLayersShown(place);
-    return `<button type="button" class="empty-layers${className ? ` ${esc(className)}` : ""}" data-empty-layers="${esc(place)}" aria-expanded="${open}"
-        data-tip="${open ? "Hide the layers with nothing in them." : `Show ${esc(EMPTY_LAYERS_TIP.charAt(0).toLowerCase() + EMPTY_LAYERS_TIP.slice(1))}`}">${DISCLOSURE}<span>${esc(emptyLayersLabel(count))}</span></button>`;
+    return disclosureButton(emptyLayersLabel(count), {open, className: `empty-layers${className ? ` ${className}` : ""}`, attrs: `data-empty-layers="${esc(place)}"`,
+        tip: open ? "Hide the layers with nothing in them." : `Show ${EMPTY_LAYERS_TIP.charAt(0).toLowerCase() + EMPTY_LAYERS_TIP.slice(1)}`});
 }
 
 // The same as an element, opening and closing on its own.

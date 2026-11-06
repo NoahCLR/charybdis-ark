@@ -2,8 +2,9 @@
 /** @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model */
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
+import {disclosureButton} from "../disclosure.mjs";
 import {choiceField} from "../segmented.mjs";
-import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
+import {el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {STEP_KINDS, addStepLabel, macroLocalState, macroShortName, protectionChoiceLabel, samePayload} from "../../view/macro.mjs";
 import {titleName, attachTitleName} from "../title-name.mjs";
@@ -35,9 +36,9 @@ export function editor(model, slot, canEdit) {
         <div class="card-h name-titlebar macro-titlebar">${nameField(model, slot, canEdit)}
             <span class="tag">${esc(macroShortName(slot))}</span>
             <span class="right row actions"><span class="chip" data-local-state><i class="dot ${chip.dot}"></i>${esc(chip.text)}</span>
-                <button class="btn tiny ghost" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key…</button>
+                <button class="btn tiny link" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key →</button>
                 <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"} data-tip="${esc(editWords(model.draft).macroBackTip)}">${esc(editWords(model.draft).macroBack)}</button>
-                <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
+                <button class="btn tiny ghost destructive" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}
             ${protectionField(model, slot, canEdit)}</div>
@@ -54,8 +55,8 @@ export function editor(model, slot, canEdit) {
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}${esc(vocabulary(model).settingsSections.host)} →</button>
-                <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">${DISCLOSURE}Typing & playback help</button>
+            <div class="macro-utilities"><button class="btn tiny link" data-host-settings>${model.macroUnicode?.layoutName ? `${esc(model.macroUnicode.layoutName)} · ` : ""}${esc(vocabulary(model).settingsSections.host)} →</button>
+                ${disclosureButton("Typing & playback help", {open: Boolean(form.guidanceOpen), className: "macro-help-link", attrs: `data-show-help aria-controls="macro-help-${esc(slot.keycode)}"`})}
             </div>
             <div class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "" : "hidden"}>${unicodeSetup(model, slot)}
                 <p class="note">${esc(word(vocabulary(model).macroProtection, "auto"))} turns ${esc(uninterruptible.label)} on when this layout needs Unicode entry. A macro that plays uninterruptibly starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.</p>

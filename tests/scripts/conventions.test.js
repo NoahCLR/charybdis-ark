@@ -36,17 +36,17 @@ const STYLESHEET_ALLOWED = [
 ];
 const stylesheetLiterals = (css) => {
     const found = [];
-    const derived = (part) => /^(0|50%|inherit|var\(--[\w-]+\))$/.test(part) || /^calc\(.*var\(--[\w-]+\)/.test(part);
+    const derived = (part) => /^(0|50%|auto|inherit|var\(--[\w-]+(,\s*0(px)?)?\))$/.test(part) || /^(calc|max|min)\(.*var\(--[\w-]+\)/.test(part);
     for (const [, selectorText, body] of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
         const selector = selectorText.trim().replace(/\s+/g, " ");
         if (selector.startsWith(":root")) continue;
         for (const [, property, raw] of body.matchAll(/(?:^|;)\s*([\w-]+)\s*:\s*([^;]+)/g)) {
             const value = raw.trim();
             if (STYLESHEET_ALLOWED.some(allowed => allowed.selector.test(selector) && allowed.property.test(property))) continue;
-            const parts = value.match(/calc\([^()]*(?:\([^()]*\)[^()]*)*\)|var\([^()]*\)|[^\s]+/g) || [];
+            const parts = value.match(/(?:calc|max|min)\([^()]*(?:\([^()]*\)[^()]*)*\)|var\([^()]*\)|[^\s]+/g) || [];
             const literal = property === "font"
                 ? value !== "inherit" && /\d/.test(value.replace(/var\([^()]*\)/g, "").replace(/\/\S+/, ""))
-                : /^(font-size|font-weight|z-index|border(-[a-z]+)*-radius)$/.test(property) ? !parts.every(derived)
+                : /^(font-size|font-weight|z-index|border(-[a-z]+)*-radius|padding(-[a-z]+)*|margin(-[a-z]+)*|(row-|column-)?gap)$/.test(property) ? !parts.every(derived)
                 : /#[\da-f]{3,8}\b|\b(rgb|hsl)a?\(/i.test(value);
             if (literal) found.push(`${selector} { ${property}: ${value} }`);
         }
@@ -54,15 +54,18 @@ const stylesheetLiterals = (css) => {
     return found;
 };
 
-test("the stylesheet writes no raw size, weight, radius, layer or colour outside its tokens", () => {
+test("the stylesheet writes no raw size, weight, radius, layer, spacing or colour outside its tokens", () => {
     assert.deepEqual(stylesheetLiterals(read("webview/styles.css")), []);
     // The check sees what it is meant to.
     assert.deepEqual(stylesheetLiterals(`:root { --fs-md: 12.5px; --x: #fff; }
         .a { font-size: 12px; border-radius: 0 6px; z-index: 3; font: 600 11px/1 var(--sans); color: rgba(0,0,0,.5); }
         .b { font-size: var(--fs-md); border-radius: calc(var(--r-sheet) - 1px) 0; z-index: calc(var(--z-popover) + 1); font: var(--fs-md)/22px var(--mono); }
-        .kc-badge { font-size: 9px; }`), [
+        .kc-badge { font-size: 9px; }
+        .c { padding: 6px 8px; margin-left: -3px; gap: 4px 12px; }
+        .d { padding: 0 auto var(--sp-2); margin: calc(-1 * var(--sp-1)); gap: var(--sp-1) var(--sp-3); padding-top: max(var(--sp-8), env(safe-area-inset-top)); }`), [
         ".a { font-size: 12px }", ".a { border-radius: 0 6px }", ".a { z-index: 3 }",
         ".a { font: 600 11px/1 var(--sans) }", ".a { color: rgba(0,0,0,.5) }",
+        ".c { padding: 6px 8px }", ".c { margin-left: -3px }", ".c { gap: 4px 12px }",
     ]);
 });
 

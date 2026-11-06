@@ -27,6 +27,10 @@ function openReview() {
 
 // Draft history's mark, shown in its words' place when the rail is narrowed to
 // its icons: a clock turned back.
+// Undo and redo: an arrow turning back, an arrow turning on, stroked as the
+// history icon is.
+const UNDO_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4 3 7l3 3M3 7h6.5a3.5 3.5 0 0 1 0 7H8"/></svg>`;
+const REDO_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 4 3 3-3 3M13 7H6.5a3.5 3.5 0 0 0 0 7H8"/></svg>`;
 const HISTORY_ICON = `<svg class="rail-history-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7M2.5 2.8v3.4h3.4M8 5v3.2l2.2 1.4"/></svg>`;
 
 export function rail() {
@@ -53,9 +57,9 @@ export function rail() {
             <button class="btn tiny ghost rail-history" data-act="history"
                 data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">${HISTORY_ICON}<span class="rail-history-label">Draft history</span>${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
             <button class="btn tiny ghost icon" data-act="undo" aria-label="Undo" aria-keyshortcuts="${ariaShortcut("Z")}" ${draft?.canUndo ? "" : "disabled"}
-                data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (${shortcut("Z")})${draft.live ? ". The keyboard takes it back at once." : ""}` : draft?.live ? `Undo the last edit (${shortcut("Z")}). The keyboard takes it back at once.` : `Undo the last edit in the draft (${shortcut("Z")}). The keyboard is not touched until you save.`)}">↺</button>
+                data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (${shortcut("Z")})${draft.live ? ". The keyboard takes it back at once." : ""}` : draft?.live ? `Undo the last edit (${shortcut("Z")}). The keyboard takes it back at once.` : `Undo the last edit in the draft (${shortcut("Z")}). The keyboard is not touched until you save.`)}">${UNDO_ICON}</button>
             <button class="btn tiny ghost icon" data-act="redo" aria-label="Redo" aria-keyshortcuts="${ariaShortcut("Z", {shift: true})}" ${draft?.canRedo ? "" : "disabled"}
-                data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (${shortcut("Z", {shift: true})})` : `Redo the edit you just undid (${shortcut("Z", {shift: true})}).`)}">↻</button>
+                data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (${shortcut("Z", {shift: true})})` : `Redo the edit you just undid (${shortcut("Z", {shift: true})}).`)}">${REDO_ICON}</button>
         </div>` : ""}
         ${railBuild(shell.build)}
     </aside>`);

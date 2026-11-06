@@ -170,7 +170,7 @@ behaviour there, once the key is placed.
 **On layers** shows where the key is used; click a layer to see it there, on
 the Keymap screen's **Custom keys** tab with the key's row picked. That tab
 lists every custom key a layer reaches, as the Macros tab does for macros.
-**Place on a key…** takes you to the board: pick a layer, then click the key
+**Place on a key →** takes you to the board: pick a layer, then click the key
 to put it on.
 
 A behaviour on another key can send a custom key too, and so can a combo. It

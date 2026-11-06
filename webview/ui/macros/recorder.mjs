@@ -38,15 +38,15 @@ export function recorder(model, slot, canEdit) {
             <div class="row record-opts">
                 <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${delays ? "checked" : ""} ${state.recordPreserveHoldTiming ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Record delays</span></label>
-                <label class="field ms-field"><span>After</span><span class="affix unit"><input class="input mono num" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
-                <label class="field ms-field"><span>Round to</span><span class="affix unit"><input class="input mono num" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
-                <label class="sw" data-tip="Keeps individual presses and releases with their timing. Record delays stays on; After and Round to set its precision."><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
+                <label class="ms-field"><span class="affix unit"><input class="input mono num" aria-label="Delay after each step" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}><i>ms</i></span><span>after each step,</span></label>
+                <label class="ms-field"><span>rounded to</span><span class="affix unit"><input class="input mono num" aria-label="Round delays to" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
+                <label class="sw" data-tip="Keeps individual presses and releases with their timing. Record delays stays on; its two times set the precision."><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Preserve hold timing</span></label>
             </div>
             <p class="note">${state.recordPreserveHoldTiming ? "Preserving hold timing: keeps every press and release, with recorded delays." : "Overlapping keys become one chord; held modifiers join each shortcut."}</p>
             <div class="row gap-8">
                 <span class="note">${recording ? "Typing is captured for this slot, Escape included. Holding Escape, Stop or clicking outside this recorder finishes the take." : "Appends key steps. Leaving this recorder finishes the take."}</span>
-                <button class="btn tiny ghost right" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
+                <button class="btn tiny ghost destructive right" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
             </div>
         </div></div>`);
 

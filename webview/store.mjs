@@ -51,11 +51,13 @@ export const STATE_FIELDS = {
     lightingGroupsShut: kept([]), // the groups of Lighting's lists folded shut, as "stage:group" ("layers:inUse", "key:tiers", "combo:layer")
     settingsOpen: kept([]),    // the Keyboard screen's folds opened by hand, so a render keeps them open
     flashPausesAsked: kept(null), // the connection whose flash pauses an open Diagnostics last asked for
-    keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
-    stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
+    // The folds opened by hand and kept open across renders, wherever they
+    // appear next, by fold id (ui/disclosure.mjs keepFold): the Key tab's
+    // Where it is stored and its runs of transparent layers, Lighting's What
+    // this stage does, a behaviour's or combo's Layers it runs on.
+    foldsOpen: kept([]),
     emptyLayersShown: kept([]), // the places showing their empty layers (ui/empty-layers.mjs)
     allSlotsShown: kept([]),   // the slot banks showing their unused slots (ui/slot-bank.mjs)
-    definitionLayersOpen: kept(false), // a behaviour's or combo's Layers it runs on, open on every one once opened, so a render keeps it
     checkGroupsOpen: kept(null), // {revision, open}: the review's check groups opened or folded by hand, for that revision of the draft
     settingsDurationUnits: kept({}), // display preferences; stored settings remain milliseconds
     // {cell, keycode, style, repeatHz}: how the open empty cell runs, chosen

@@ -8,7 +8,7 @@ import {layerColourRow, layerPaints, offWording} from "../../view/lighting.mjs";
 import {vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
-import {aboutStage, colourControl, lightingGroup, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, lightingGroup, paintsSection, section, stack} from "./common.mjs";
 import {accentsSection} from "./accents.mjs";
 import {foldEmptyLayers} from "../../view/empty-layers.mjs";
 import {emptyLayersShown, toggleEmptyLayers} from "../empty-layers.mjs";
@@ -34,7 +34,7 @@ export function stageLayers(model) {
         const lit = row && !isOff(row.color);
         return pickableRow(`${index}`, index === state.layer, [
             pickButton(`lighting-layers:${index}`, index === state.layer, `<span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(index) ? draftDot(model?.draft) : ""}`),
-            `<span class="muted">${esc(!row ? "not reported" : !layerPaints(row.color) ? "no colour" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModes, row.mode).toLowerCase()}`)}</span>`,
+            `<span class="muted">${esc(!row ? "not reported" : !layerPaints(row.color) ? "no colour" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModesBrief, row.mode)}`)}</span>`,
         ], {data: {layer: index}});
     };
     const list = groupedTable({scroll: "layers", draft: model?.draft, columns: [["Layer", "52%"], ["Paints", "48%"]], groups: [
@@ -51,7 +51,7 @@ export function stageLayers(model) {
         ...offWording(model, "layers"),
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));
-    const where = section("Where it paints");
+    const where = paintsSection(model, "layers", "Where it paints");
     const mode = el(choiceField({label: vocabulary(model).lightingFields.paintMode, f: `lighting:layer:${layer?.index}:mode`, choices: vocabulary(model).paintModes,
         current: row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY", disabled: !canEdit}));
     mode.addEventListener("change", (event) =>

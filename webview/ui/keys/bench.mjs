@@ -4,7 +4,6 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
-import {mappedKeyCount} from "../../view/lighting.mjs";
 import {currentLayer, currentView, getModel, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {keepInView} from "../layerbar.mjs";
@@ -33,9 +32,11 @@ const TABS = [
 export function bench() {
     const model = getModel();
     const view = currentView();
-    const layer = currentLayer();
     /** @type {Record<string, string>} */
-    const counts = Object.fromEntries(TABS.map(({id}) => [id, String(id === "key" ? mappedKeyCount(model, layer) : tabReach(view, id).count)]));
+    // The Key tab carries no count: beside the other tabs' counts a number
+    // there read as a key number, and the layer's mapped keys are counted
+    // where layers are listed, in Rename & reorder.
+    const counts = Object.fromEntries(TABS.filter(({id}) => id !== "key").map(({id}) => [id, String(tabReach(view, id).count)]));
     // A tab whose list holds something the draft changed says so.
     const marks = draftMarks(model?.draft?.changes);
     /** @type {Record<string, boolean>} */
@@ -44,7 +45,7 @@ export function bench() {
     const node = el(`<div class="card bench keys-bench workbench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Workbench">
             ${TABS.map((tab) => `<button role="tab" id="bench-tab-${tab.id}" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
-                <span class="tab-label">${tab.label}</span><span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot(model?.draft) : ""}</button>`).join("")}</div>
+                <span class="tab-label">${tab.label}</span>${tab.id in counts ? `<span class="c">${esc(counts[tab.id])}</span>` : ""}${drafted[tab.id] ? draftDot(model?.draft) : ""}</button>`).join("")}</div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>

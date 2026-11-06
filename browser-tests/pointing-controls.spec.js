@@ -259,7 +259,7 @@ test("pointing navigation reaches placement and lighting without an edit", async
 test("the reach row places the hold key on a key, and an empty slot names what still reaches it", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
     const place = editor(page).locator('[data-act="place"]');
-    await expect(place).toHaveText("Place on a key…");
+    await expect(place).toHaveText("Place on a key →");
     await expect(place).toHaveAttribute("data-tip", /hold key/);
     const hold = await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
