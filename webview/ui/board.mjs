@@ -33,14 +33,16 @@ const reachIcon = (kind, x, y, size, ink) => `<svg class="kc-icon" data-kind="${
 // label pinned over its cap's top-left corner, the trackball's in its middle,
 // apart from the legends, which never move or shrink for it: a cap reads the
 // same on every screen (D-L78). `x` and `y` are the corner it is pinned over;
-// `ledLabelAt` centres one on a point instead.
-const LED_LABEL = Object.freeze({height: 8.4, digit: 4.4, pad: 4, over: 3});
+// `ledLabelAt` centres one on a point instead. It reaches `height - over`
+// (6.6) into the cap, above a combo badge row (keyFaceRows' comboY, 7.2), and
+// its number is set at 8.4 (`.kc-led text`).
+const LED_LABEL = Object.freeze({height: 11.8, digit: 5.4, pad: 5, over: 5.2});
 /** @param {number} led */
 const ledLabelWidth = (led) => String(led).length * LED_LABEL.digit + LED_LABEL.pad;
 /** @param {number} x @param {number} y @param {number} led */
 const ledLabel = (x, y, led) => {
     const width = ledLabelWidth(led), left = x - LED_LABEL.over, top = y - LED_LABEL.over;
-    return `<g class="kc-led" aria-hidden="true"><rect x="${esc(left)}" y="${esc(top)}" width="${esc(width)}" height="${esc(LED_LABEL.height)}" rx="2.2"></rect>`
+    return `<g class="kc-led" aria-hidden="true"><rect x="${esc(left)}" y="${esc(top)}" width="${esc(width)}" height="${esc(LED_LABEL.height)}" rx="3"></rect>`
         + `<text x="${esc(left + width / 2)}" y="${esc(top + LED_LABEL.height / 2)}">${esc(led)}</text></g>`;
 };
 /** @param {number} cx @param {number} cy @param {number} led */
