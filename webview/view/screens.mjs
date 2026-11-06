@@ -29,9 +29,11 @@ export const SCREENS = Object.freeze({
         icon: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><g fill="currentColor" stroke="none"><rect x="3.6" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="5.9" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="8.2" y="5.6" width="1.5" height="1.5" rx=".35"/><rect x="10.5" y="5.6" width="1.5" height="1.5" rx=".35"/></g><path d="M5 9.8h6"/></svg>',
         available: configureReady, render: renderers => renderers.screenKeys(),
     }),
+    // A key backlight: a lit key with five rays fanned 36° apart above it,
+    // mirrored about the centre and centred in the box, round caps included.
     lighting: screen({
         label: "Lighting", group: "Configure", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><path d="M8 1.8v1.6M13 3l-1.1 1.1M14.2 8h-1.6M3 13l1.1-1.1M2 8h1.6M3 3l1.1 1.1"/><circle cx="8" cy="8.4" r="3.2"/></svg>',
+        icon: '<svg viewBox="0 0 16 16" stroke-linecap="round"><path d="M4.9 11.5h6.2M12.66 9.99l2-.65M10.88 7.54l1.23-1.7M8 6.6V4.5M5.12 7.54 3.89 5.84M3.34 9.99l-2-.65"/></svg>',
         available: configureReady, render: renderers => renderers.screenLighting(),
     }),
     // A robot: a macro does the typing for you. Its eyes and antenna tip are
