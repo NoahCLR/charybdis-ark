@@ -270,7 +270,10 @@ a.rail-build:hover { color: var(--text-2); }
 .topbar .sub { margin-top: 3px; font-size: var(--fs-md); line-height: var(--lh-md); height: calc(2 * var(--lh-md)); color: var(--text-2); max-width: 62ch;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .topbar > div:first-child { min-width: 0; }
-.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+/* The actions sit on the title's line, centred on it: a control taller than
+   the line (Lighting's idle timeout) spills evenly into the padding rather
+   than lowering the theme toggle beside it, so it never moves between screens. */
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; height: 24px; }
 /* A search sits in the panel it filters. */
 .card-h .card-search { margin-left: auto; width: 150px; min-width: 0; }
 .card-h .card-search + .tag { white-space: nowrap; }
