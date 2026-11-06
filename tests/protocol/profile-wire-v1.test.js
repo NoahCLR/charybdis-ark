@@ -125,8 +125,10 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         maxPopulatedBehaviorSteps: 640,
         maxCombos: 128,
         maxKeysPerCombo: 16,
-        maxReusableRgbGroups: 16,
-        maxRgbStageGroupRows: 32,
+        // Firmware D-F63: 128 LED sets, 255 accents in one table, 640 in all.
+        maxReusableRgbGroups: 128,
+        maxRgbTableGroupRows: 255,
+        maxRgbStageGroupRows: 640,
         physicalLedCount: 58,
         ledBitmapSize: 8,
         customKeySlots: 128,
@@ -201,7 +203,7 @@ test("capability pages decode the bigger profile's capacities", () => {
         assert.throws(() => decodeCapabilityPages(older), (error) => error.code === "INCOMPATIBLE_RESPONSE" && /Update both halves/.test(error.message));
     }
     // The bytes past each page's fields stay zero.
-    for (const [page, offset] of [[1, 16], [1, 24], [2, 18], [2, 24]]) {
+    for (const [page, offset] of [[1, 16], [1, 24], [2, 20], [2, 24]]) {
         const bytes = compiledOnlyPages().map((value) => Buffer.from(value));
         bytes[page][offset] = 1;
         assert.throws(() => decodeCapabilityPages(bytes), (error) => error.code === "NONCANONICAL_RESPONSE", `page ${page} byte ${offset}`);
@@ -244,6 +246,8 @@ test("patterned capability vectors decode every semantic field exactly", () => {
         maxCombos: 96,
         maxKeysPerCombo: 12,
         maxReusableRgbGroups: 16,
+        // Bytes 18-19 zero: firmware before D-F63, whose byte 7 is the total.
+        maxRgbTableGroupRows: 32,
         maxRgbStageGroupRows: 32,
         physicalLedCount: 58,
         ledBitmapSize: 8,
@@ -259,6 +263,13 @@ test("patterned capability vectors decode every semantic field exactly", () => {
         profileSlotPayload: 0x0002fff0,
         macroBytes: 0x00010203,
     });
+    // Firmware D-F63 reports the total on page 2 bytes 18-19; page 1 byte 7
+    // is then one table's.
+    wide.writeUInt16LE(600, 18);
+    capacity[7] = 200;
+    const split = decodeCapabilityPages([identity, capacity, wide]);
+    assert.equal(split.maxRgbTableGroupRows, 200);
+    assert.equal(split.maxRgbStageGroupRows, 600);
 });
 
 test("status pages expose explicit compiled-only state", () => {

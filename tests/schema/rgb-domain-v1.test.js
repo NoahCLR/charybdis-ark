@@ -193,23 +193,44 @@ test("complete RGB surfaces and negotiated feature inclusion are enforced", () =
 test("fixed v1 group, row, tap-color, LED, and payload boundaries are enforced", () => {
     const golden = fixture();
     const maximum = clone(golden.profile);
-    maximum.groups = Array.from({length: RGB_DOMAIN_V1.MAX_GROUPS}, (_, id) => ({id, leds: id === 0 ? Array.from({length: 58}, (unused, led) => led) : [id - 1]}));
-    maximum.layerGroupRows = Array.from({length: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}, () => ({selector: 255, color: {h: 0, s: 0, v: 0}, groupId: 0}));
-    maximum.pdModeGroupRows = [];
+    // Firmware D-F63: 128 LED sets, 255 rows in one table, 640 in all.
+    const ledsOf = (/** @type {number} */ id) => Array.from({length: 7}, (unused, led) => led).filter((led) => (id >> led) & 1);
+    maximum.groups = Array.from({length: RGB_DOMAIN_V1.MAX_GROUPS}, (_, id) => ({id, leds: id === 0 ? Array.from({length: 58}, (unused, led) => led) : ledsOf(id)}));
+    const rows = (/** @type {number} */ length) => Array.from({length}, (unused, row) => ({selector: 255, color: {h: 0, s: 0, v: 0}, groupId: row % RGB_DOMAIN_V1.MAX_GROUPS}));
+    const keyRows = (/** @type {number} */ length) => Array.from({length}, (unused, row) => ({semantic: 255, color: {h: 0, s: 0, v: 0}, groupId: row % RGB_DOMAIN_V1.MAX_GROUPS}));
+    const rest = RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS - 2 * RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS;
+    maximum.layerGroupRows = rows(RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS);
+    maximum.pdModeGroupRows = rows(RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS);
     maximum.comboGroupRows = [];
-    maximum.keyGroupRows = [];
+    maximum.keyGroupRows = keyRows(rest);
     const maximumBytes = encodeRgbDomainV1(maximum, golden.codecOptions);
     const maximumDecoded = decodeRgbDomainV1(maximumBytes, golden.codecOptions);
     assert.equal(maximumDecoded.groups.length, RGB_DOMAIN_V1.MAX_GROUPS);
-    assert.equal(maximumDecoded.layerGroupRows.length, RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS);
+    assert.equal(maximumDecoded.layerGroupRows.length, RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS);
+    assert.equal(maximumDecoded.layerGroupRows.length + maximumDecoded.pdModeGroupRows.length + maximumDecoded.keyGroupRows.length, RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS);
     assert.deepEqual(maximumDecoded.groups.find((group) => group.leds.length === 58).leds, Array.from({length: 58}, (unused, led) => led));
 
     const tooManyGroups = clone(golden.profile);
     tooManyGroups.groups = Array.from({length: RGB_DOMAIN_V1.MAX_GROUPS + 1}, (_, id) => ({id, leds: [id]}));
     assertCode("CAPACITY_EXCEEDED", () => encodeRgbDomainV1(tooManyGroups, golden.codecOptions));
-    const tooManyRows = clone(golden.profile);
-    tooManyRows.layerGroupRows = Array.from({length: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS + 1}, () => ({selector: 255, color: {h: 0, s: 0, v: 0}, groupId: 0}));
-    assertCode("CAPACITY_EXCEEDED", () => encodeRgbDomainV1(tooManyRows, golden.codecOptions));
+    const tooManyInTable = clone(maximum);
+    tooManyInTable.layerGroupRows = rows(RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS + 1);
+    tooManyInTable.keyGroupRows = [];
+    assert.throws(() => encodeRgbDomainV1(tooManyInTable, golden.codecOptions), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingTableGroupRows" && error.most === RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS);
+    const tooManyRows = clone(maximum);
+    tooManyRows.keyGroupRows = keyRows(rest + 1);
+    assert.throws(() => encodeRgbDomainV1(tooManyRows, golden.codecOptions), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingGroupRows" && error.most === RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS);
+    // A keyboard that reports smaller ceilings (firmware before D-F63) holds
+    // a profile to them.
+    const olderKeyboard = {...golden.codecOptions, maxGroups: 16, maxTableGroupRows: 32, maxGroupRows: 32};
+    assert.throws(() => encodeRgbDomainV1(maximum, olderKeyboard), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingGroups" && error.most === 16);
+    const olderRows = clone(maximum);
+    olderRows.groups = maximum.groups.slice(0, 16);
+    olderRows.layerGroupRows = rows(20).map((row) => ({...row, groupId: row.groupId % 16}));
+    olderRows.pdModeGroupRows = rows(13).map((row) => ({...row, groupId: row.groupId % 16}));
+    olderRows.keyGroupRows = [];
+    assert.throws(() => encodeRgbDomainV1(olderRows, olderKeyboard), (error) => error.code === "CAPACITY_EXCEEDED" && error.limit === "lightingGroupRows" && error.most === 32);
+    assert.throws(() => encodeRgbDomainV1(maximum, {...golden.codecOptions, maxGroupRows: 641}), RangeError);
     const tooManyTapColors = clone(golden.profile);
     tooManyTapColors.keyFeedback.tapBranchColors.push({h: 0, s: 0, v: 0});
     assertCode("CAPACITY_EXCEEDED", () => encodeRgbDomainV1(tooManyTapColors, golden.codecOptions));
@@ -228,11 +249,17 @@ test("decoder rejects header count overflow, truncation, and trailing bytes", ()
     groupOverflow[4] = RGB_DOMAIN_V1.MAX_GROUPS + 1;
     assertCode("CAPACITY_EXCEEDED", () => decodeRgbDomainV1(groupOverflow, golden.codecOptions));
     const rowOverflow = Buffer.from(valid);
-    rowOverflow[6] = RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS;
-    rowOverflow[8] = 1;
-    rowOverflow[9] = 0;
+    rowOverflow[6] = RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS;
+    rowOverflow[8] = RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS;
+    rowOverflow[9] = RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS + 1 - 2 * RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS;
     rowOverflow[11] = 0;
     assertCode("CAPACITY_EXCEEDED", () => decodeRgbDomainV1(rowOverflow, golden.codecOptions));
+    const olderOverflow = Buffer.from(valid);
+    olderOverflow[6] = 33;
+    olderOverflow[8] = 0;
+    olderOverflow[9] = 0;
+    olderOverflow[11] = 0;
+    assertCode("CAPACITY_EXCEEDED", () => decodeRgbDomainV1(olderOverflow, {...golden.codecOptions, maxGroupRows: 32}));
     assertCode("TRUNCATED", () => decodeRgbDomainV1(valid.subarray(0, valid.length - 1), golden.codecOptions));
     assertCode("TRAILING_BYTES", () => decodeRgbDomainV1(Buffer.concat([valid, Buffer.from([0])]), golden.codecOptions));
     assertCode("TRUNCATED", () => decodeRgbDomainV1(Buffer.alloc(RGB_DOMAIN_V1.HEADER_SIZE - 1), golden.codecOptions));

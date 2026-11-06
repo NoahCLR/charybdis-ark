@@ -66,14 +66,15 @@ function fakeKeyboard({document, compiled, settingsVersion = 11, compiledOnly = 
         p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
-        // Layers, behaviour rows, tap depth, combos, keys per combo, RGB
-        // groups, stage rows, LEDs, LED bitmap, custom keys, macros, domain
-        // mask, name bytes, mask bits, positions.
-        p.set([16, 16, 128, 5, 128, 16, 16, 32, 58, 8, 128, 128, 127, 32, 32, 60]);
+        // Layers, behaviour rows, tap depth, combos, keys per combo, LED
+        // sets, accents in one lighting table, LEDs, LED bitmap, custom keys,
+        // macros, domain mask, name bytes, mask bits, positions.
+        p.set([16, 16, 128, 5, 128, 16, 128, 255, 58, 8, 128, 128, 127, 32, 32, 60]);
     }), page(25, (p) => {
-        // Populated steps, slot size, profile payload, slot payload, macro bank.
+        // Populated steps, slot size, profile payload, slot payload, macro
+        // bank, accents in all (firmware D-F63).
         p.writeUInt16LE(640, 0); p.writeUInt32LE(131072, 2); p.writeUInt32LE(130048, 6);
-        p.writeUInt32LE(130048, 10); p.writeUInt32LE(34903, 14);
+        p.writeUInt32LE(130048, 10); p.writeUInt32LE(34903, 14); p.writeUInt16LE(640, 18);
     })];
     // Committed (or running its defaults), converged with the slave half,
     // nothing pending.

@@ -198,4 +198,8 @@ export interface RgbOptions {
     compiledStageMask?: number;
     maximumBrightness?: number;
     tapBranchColorCount?: number;
+    /** The keyboard's reported ceilings (capability pages 1 and 2), within the format's. */
+    maxGroups?: number;
+    maxTableGroupRows?: number;
+    maxGroupRows?: number;
 }

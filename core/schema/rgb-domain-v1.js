@@ -24,9 +24,14 @@ const RGB_DOMAIN_V1 = Object.freeze({
     HEADER_SIZE: 16,
     PHYSICAL_LED_COUNT: 58,
     LED_BITMAP_SIZE: 8,
-    MAX_GROUPS: 16,
+    // The format's ceilings (firmware D-F63): 128 LED sets, and 640 group rows
+    // across the four tables, at most 255 in one (its count is a header byte).
+    // A keyboard reports its own on its capability pages; the codec holds a
+    // profile to those it is given (RgbOptions).
+    MAX_GROUPS: 128,
     MAX_LOGICAL_LAYERS: LAYERS,
-    MAX_STAGE_GROUP_ROWS: 32,
+    MAX_TABLE_GROUP_ROWS: 255,
+    MAX_STAGE_GROUP_ROWS: 640,
     MAX_TAP_BRANCH_COLORS: 4,
     // The domain's own offsets are 16 bits (unchanged by schema 4, firmware
     // D-F28), so its payload stays within 65,535 bytes whatever the blob's.
@@ -306,7 +311,7 @@ function normalizeProfile(profile, limits) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${profile.formatVersion} is not supported.`);
     }
     const stageEnableMask = assertStageMask(profile.stageEnableMask, limits.compiledStageMask, "stageEnableMask");
-    const groupState = normalizeGroups(requiredArray(profile.groups, "groups"));
+    const groupState = normalizeGroups(requiredArray(profile.groups, "groups"), limits);
     const groups = groupState.groups;
     const layerColors = requiredArray(profile.layerColors, "layerColors").map((row, index) => ({
         layerId: assertU8(row?.layerId, `layerColors[${index}].layerId`),
@@ -343,9 +348,14 @@ function normalizeProfile(profile, limits) {
     const comboGroupRows = normalizeComboRows(profile.comboGroupRows, groupState, limits);
     const keyFeedback = normalizeKeyFeedback(profile.keyFeedback, limits);
     const keyGroupRows = normalizeGroupRows(profile.keyGroupRows, groupState, limits, "keyGroupRows", (semantic, row) => assertKeySemantic(semantic, "keyGroupRows", row), "semantic");
+    for (const [table, rows] of /** @type {const} */ ([["layerGroupRows", layerGroupRows], ["pdModeGroupRows", pdModeGroupRows], ["comboGroupRows", comboGroupRows], ["keyGroupRows", keyGroupRows]])) {
+        if (rows.length > limits.maxTableGroupRows) {
+            throw rgbError("CAPACITY_EXCEEDED", `RGB ${table} count ${rows.length}; maximum is ${limits.maxTableGroupRows}.`, {table, limit: "lightingTableGroupRows", most: limits.maxTableGroupRows});
+        }
+    }
     const groupRowCount = layerGroupRows.length + pdModeGroupRows.length + comboGroupRows.length + keyGroupRows.length;
-    if (groupRowCount > RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS) {
-        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`, {limit: "lightingGroupRows", most: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS});
+    if (groupRowCount > limits.maxGroupRows) {
+        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${limits.maxGroupRows}.`, {limit: "lightingGroupRows", most: limits.maxGroupRows});
     }
     const normalized = {
         formatVersion: RGB_DOMAIN_V1.FORMAT_VERSION,
@@ -384,11 +394,18 @@ function normalizeOptions(options = {}) {
         throw new RangeError(`supportedPdModeIds must contain at most ${maxPdModes} unique ids.`);
     }
     const knownPdModeIds = new Set(Object.values(RGB_POINTING_MODE_IDS).filter(id => id < maxPdModes));
+    // The keyboard's own ceilings, within the format's.
+    const maxGroups = optionCeiling(options.maxGroups, RGB_DOMAIN_V1.MAX_GROUPS, "maxGroups");
+    const maxTableGroupRows = optionCeiling(options.maxTableGroupRows, RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS, "maxTableGroupRows");
+    const maxGroupRows = optionCeiling(options.maxGroupRows, RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS, "maxGroupRows");
     if (supportedPdModeIds.some((id) => !knownPdModeIds.has(id))) {
         throw new RangeError("supportedPdModeIds contains an id outside the Profile Wire v1 pointing mode registry.");
     }
     return {
         maxPdModes,
+        maxGroups,
+        maxTableGroupRows,
+        maxGroupRows,
         compiledStageMask: assertStageMask(options.compiledStageMask === undefined ? RGB_STAGE_MASK_ALL : options.compiledStageMask, RGB_STAGE_MASK_ALL, "compiledStageMask"),
         logicalLayerCount,
         maxLogicalLayers,
@@ -399,10 +416,19 @@ function normalizeOptions(options = {}) {
     };
 }
 
-/** @param {readonly {id: number, leds: number[]}[]} input */
-function normalizeGroups(input) {
-    if (input.length > RGB_DOMAIN_V1.MAX_GROUPS) {
-        throw rgbError("CAPACITY_EXCEEDED", `RGB group count ${input.length}; maximum is ${RGB_DOMAIN_V1.MAX_GROUPS}.`, {table: "groups", limit: "lightingGroups", most: RGB_DOMAIN_V1.MAX_GROUPS});
+/** @param {unknown} value @param {number} format @param {string} name */
+function optionCeiling(value, format, name) {
+    if (value === undefined) return format;
+    if (!Number.isInteger(value) || /** @type {number} */ (value) < 0 || /** @type {number} */ (value) > format) {
+        throw new RangeError(`${name} must be an integer from 0 to ${format}.`);
+    }
+    return /** @type {number} */ (value);
+}
+
+/** @param {readonly {id: number, leds: number[]}[]} input @param {Limits} limits */
+function normalizeGroups(input, limits) {
+    if (input.length > limits.maxGroups) {
+        throw rgbError("CAPACITY_EXCEEDED", `RGB group count ${input.length}; maximum is ${limits.maxGroups}.`, {table: "groups", limit: "lightingGroups", most: limits.maxGroups});
     }
     const groupsByInputId = input.map((group, index) => {
         const leds = normalizeLeds(group?.leds, "groups", index);
@@ -500,11 +526,14 @@ function assertCompiledSurfaces(profile, limits) {
 
 /** @param {{groups: number, layerColors: number, pdColors: number, branchColors: number, layerGroups: number, pdGroups: number, comboGroups: number, keyGroups: number}} counts @param {Limits} limits */
 function assertHeaderCounts(counts, limits) {
-    if (counts.groups > RGB_DOMAIN_V1.MAX_GROUPS || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > limits.tapBranchColorCount) {
+    if (counts.groups > limits.maxGroups || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > limits.tapBranchColorCount) {
         throw rgbError("CAPACITY_EXCEEDED", "RGB payload header count exceeds a fixed v1 capacity.");
     }
-    if (counts.layerGroups + counts.pdGroups + counts.comboGroups + counts.keyGroups > RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS) {
-        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows exceed ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`);
+    if ([counts.layerGroups, counts.pdGroups, counts.comboGroups, counts.keyGroups].some((rows) => rows > limits.maxTableGroupRows)) {
+        throw rgbError("CAPACITY_EXCEEDED", `An RGB group-row table exceeds ${limits.maxTableGroupRows} rows.`);
+    }
+    if (counts.layerGroups + counts.pdGroups + counts.comboGroups + counts.keyGroups > limits.maxGroupRows) {
+        throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows exceed ${limits.maxGroupRows}.`);
     }
 }
 

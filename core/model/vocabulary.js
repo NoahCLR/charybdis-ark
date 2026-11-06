@@ -180,6 +180,7 @@ const PROFILE_FULL_WORDS = Object.freeze({
     counts: Object.freeze({
         lightingGroups: (most) => `The keyboard holds at most ${most} different LED sets across all accents. Remove an accent, or light LEDs another accent already lights.`,
         lightingGroupRows: (most) => `The keyboard holds at most ${most} accents across layers, pointing modes, combo feedback and key feedback. Remove one before adding another.`,
+        lightingTableGroupRows: (most) => `The keyboard holds at most ${most} accents on any one of layers, pointing modes, combo feedback and key feedback. Remove one there before adding another.`,
         behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
     }),

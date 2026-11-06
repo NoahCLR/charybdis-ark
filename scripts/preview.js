@@ -74,8 +74,9 @@ const capabilities = {
     maxCombos: 128,
     maxKeysPerCombo: 16,
     maxTapStepsPerBehavior: 5,
-    maxReusableRgbGroups: 16,
-    maxRgbStageGroupRows: 32,
+    maxReusableRgbGroups: 128,
+    maxRgbTableGroupRows: 255,
+    maxRgbStageGroupRows: 640,
     macroBytes: 34903,
 };
 

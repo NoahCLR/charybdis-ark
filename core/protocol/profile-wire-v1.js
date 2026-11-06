@@ -203,7 +203,7 @@ function decodeCapabilityPages(pages) {
         throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout: Ark supports only current firmware. Update both halves.");
     }
     assertZeroRange(capacity, 16, 25, "capability page 1");
-    assertZeroRange(wide, 18, 25, "capability page 2");
+    assertZeroRange(wide, 20, 25, "capability page 2");
     const decoded = {
         responseVersion: identity[0],
         protocol: {major: identity[2], minor: identity[3]},
@@ -222,7 +222,11 @@ function decodeCapabilityPages(pages) {
         maxCombos: capacity[4],
         maxKeysPerCombo: capacity[5],
         maxReusableRgbGroups: capacity[6],
-        maxRgbStageGroupRows: capacity[7],
+        // Firmware D-F63: page 1 byte 7 is the group rows of one lighting
+        // table and page 2 bytes 18-19 those of all four. Firmware before it
+        // leaves bytes 18-19 zero, and its byte 7 is the total.
+        maxRgbTableGroupRows: capacity[7],
+        maxRgbStageGroupRows: readU16(wide, 18) || capacity[7],
         physicalLedCount: capacity[8],
         ledBitmapSize: capacity[9],
         customKeySlots: capacity[10],

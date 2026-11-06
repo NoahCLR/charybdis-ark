@@ -71,6 +71,7 @@ const DEMO_CAPABILITIES = Object.freeze({
     maxCombos: COMBO_LIMITS.maxRows,
     maxKeysPerCombo: COMBO_LIMITS.maxInputs,
     maxReusableRgbGroups: RGB_DOMAIN_V1.MAX_GROUPS,
+    maxRgbTableGroupRows: RGB_DOMAIN_V1.MAX_TABLE_GROUP_ROWS,
     maxRgbStageGroupRows: RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS,
     physicalLedCount: RGB_DOMAIN_V1.PHYSICAL_LED_COUNT,
     ledBitmapSize: RGB_DOMAIN_V1.LED_BITMAP_SIZE,
