@@ -8,7 +8,10 @@ keyboard, with your draft's edits on top.
 
 Each key is painted with the light the keyboard would show on that layer: the
 background effect, then the layer's own colour. The legend is drawn in black
-or white, whichever reads. The line under the board says what the layer
+or white, whichever reads. A single letter, digit or symbol is drawn large and
+every name smaller, the same size on every key; a name of two or more words
+takes two lines. A name too wide for its key is narrowed first, and only a
+very long one is drawn a size smaller. The line under the board says what the layer
 paints, or that it has no colour and the background effect shows through.
 
 On a key face:

@@ -261,10 +261,20 @@ The same kind of control looks and sits the same on every screen.
   it shows, the screen's scrolling area ends above it, by its height as drawn
   (`reserveCommitRoom`, `webview/ui/frame.mjs`;
   `browser-tests/preview.spec.js`).
-- A key's legend alone on its cap is never drawn smaller than `LEGEND_MIN`:
-  one too long for that takes two lines, broken between words, never cut, so
-  the cap, the hover card and the key's label all read the whole name
-  (`fitLegend`, `webview/view/geometry.mjs`; `tests/view/geometry.test.mjs`).
+- A key's legends are set from one scale (D-L78): a single character at
+  the glyph size, every name at the word size, a hold under a line at its
+  own size (`LEGEND_SIZES`). A name of two or more words takes two lines,
+  broken at a " · " or between words, never before a number; a tap over a
+  line keeps one, and a hold too long is condensed into its row. A line too wide is condensed, up to `LEGEND_CONDENSE`,
+  before the legend steps down one size, and is never cut, so the cap, the
+  hover card and the key's label all read the whole name. Fit is measured in
+  the page's face (`keyLegends`, `legendBreak`, `webview/view/geometry.mjs`;
+  `pageTextMeasure`, `webview/lib/measure-text.mjs`;
+  `tests/view/geometry.test.mjs`).
+- Where the board shows LEDs, a key's LED number sits on a label pinned over
+  its top-left corner, the trackball's in its middle, and moves or shrinks no
+  legend: a key's legends are the same on Lighting as on the Keymap
+  (`webview/ui/board.mjs`; `browser-tests/lighting-controls.spec.js`).
 - The rail's message never covers the screens' names: under them it shrinks
   first, scrolling in its own box, and a window under 860px tall leaves out
   the board drawn over Ark's name. In a window 1100px wide or less the rail

@@ -12,11 +12,12 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText} from "../lib/colour.mjs";
-import {GEO, LED_CORNER, keyFaceRows, keyIconsX, keyLegends, keyVisual} from "../view/geometry.mjs";
+import {GEO, estimateWidth, keyFaceRows, keyIconsX, keyLegends, keyVisual} from "../view/geometry.mjs";
 import {boardKeys, boardTrackball} from "../view/board-keys.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
 import {REACH_ICONS} from "../view/screens.mjs";
 import {el, esc} from "../lib/dom.mjs";
+import {pageTextMeasure} from "../lib/measure-text.mjs";
 import {hideHover} from "./hover.mjs";
 
 // A key's icons stand in a centred row under the legend, above the line on a
@@ -28,11 +29,29 @@ import {hideHover} from "./hover.mjs";
 const reachIcon = (kind, x, y, size, ink) => `<svg class="kc-icon" data-kind="${esc(kind)}" x="${esc(x)}" y="${esc(y)}"
     width="${esc(size)}" height="${esc(size)}" viewBox="0 0 16 16" style="stroke:${ink};color:${ink}">${REACH_ICONS[kind]}</svg>`;
 
+// Where the board shows LEDs (Lighting), each carries its number on a small
+// label pinned over its cap's top-left corner, the trackball's in its middle,
+// apart from the legends, which never move or shrink for it: a cap reads the
+// same on every screen (D-L78). `x` and `y` are the corner it is pinned over;
+// `ledLabelAt` centres one on a point instead.
+const LED_LABEL = Object.freeze({height: 8.4, digit: 4.4, pad: 4, over: 3});
+/** @param {number} led */
+const ledLabelWidth = (led) => String(led).length * LED_LABEL.digit + LED_LABEL.pad;
+/** @param {number} x @param {number} y @param {number} led */
+const ledLabel = (x, y, led) => {
+    const width = ledLabelWidth(led), left = x - LED_LABEL.over, top = y - LED_LABEL.over;
+    return `<g class="kc-led" aria-hidden="true"><rect x="${esc(left)}" y="${esc(top)}" width="${esc(width)}" height="${esc(LED_LABEL.height)}" rx="2.2"></rect>`
+        + `<text x="${esc(left + width / 2)}" y="${esc(top + LED_LABEL.height / 2)}">${esc(led)}</text></g>`;
+};
+/** @param {number} cx @param {number} cy @param {number} led */
+const ledLabelAt = (cx, cy, led) => ledLabel(cx - ledLabelWidth(led) / 2 + LED_LABEL.over, cy - LED_LABEL.height / 2 + LED_LABEL.over, led);
+
 /** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(view, options = {}) {
     const {selected, holding = [], reach = [], pdActive = null, comboActive = null, drafted = null, faces = true, ledIndex = false, accent = null,
         onKey, onOpen, onSwap, onLed} = options;
 
+    const measure = pageTextMeasure() ?? estimateWidth;
     let glow = "", keys = "";
     for (const key of boardKeys(view, {faces, pdActive, comboActive, accent})) {
         const {index, from, glass, tiers, badges, icons, sub, led, picked} = key;
@@ -95,14 +114,9 @@ export function board(view, options = {}) {
         // face, so state is never told by recolouring it.
         /** @param {string} name */
         const ring = (name) => `<rect class="${name}" x="${visual.x + 1.4}" y="${visual.y + 1.4}" width="${GEO.keyW - 2.8}" height="${GEO.keyH - 2.8}" rx="${GEO.radius - 1}"></rect>`;
-        const {main} = key;
-        const above = (tiers.length ? 1 : 0) + (badges.length ? 1 : 0);
-        // A legend is sized to the room its row leaves, so one typeface at one
-        // weight carries every cap instead of stepping between faces by length.
-        // Alone on its cap it never shrinks past LEGEND_MIN: a long name takes
-        // two lines instead, either side of the row's middle; any line reaching
-        // the LED's number in the corner keeps clear of it (keyLegends).
-        const legend = keyLegends(visual.y, rows, {main, sub, above, ledIndex});
+        // The legends are set from one scale, a single character large and a
+        // name at the word size, two lines when it has two words (keyLegends).
+        const legend = keyLegends(rows, {main: key.main, sub}, measure);
         /** @param {{squeeze: number}} fit */
         const squeeze = (fit) => fit.squeeze ? ` textLength="${esc(fit.squeeze)}" lengthAdjust="spacingAndGlyphs"` : "";
         const fillText = text ? ` style="fill:${text}"` : "";
@@ -118,8 +132,8 @@ export function board(view, options = {}) {
             <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index || holding.includes(index) ? ring("kc-ring") : ""}
             ${picked ? ring("kc-pick") : ""}
-            ${ledIndex && led !== undefined ? `<text class="kc-led" x="${esc(visual.x + LED_CORNER.x)}" y="${esc(visual.y + LED_CORNER.baseline)}" style="fill:${text || "var(--text-3)"}">${esc(led)}</text>` : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
+            ${ledIndex && led !== undefined ? ledLabel(visual.x, visual.y, led) : ""}
             ${marks}
             ${drafted?.keys?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${esc(rows.separatorY)}" x2="${visual.x + GEO.keyW - 8}" y2="${esc(rows.separatorY)}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
@@ -235,8 +249,9 @@ function pickByDrag(group, onLed) {
 // of its accents, a previewed pointing mode, or anything at all on base,
 // which nothing lies under — and frosted when it is seen through the viewed
 // layer from underneath (view/board-keys.mjs). A mapped-keys-only layer never
-// reaches it, since no key maps to it. Like a key, it carries its LED's index
-// on Lighting and a ring while it is picked for an accent.
+// reaches it, since no key maps to it. Like a key, it carries its LED's number
+// on Lighting, in its middle since it has no corner, and a ring while it is
+// picked for an accent.
 /** @param {ReturnType<typeof boardTrackball>} ball @param {import("./surface-types.js").TrackballOptions} options */
 function trackballGlyph({led, light, glass, picked}, {ledIndex, picking, clickable}) {
     const {x, y, r} = GEO.trackball;
@@ -246,7 +261,7 @@ function trackballGlyph({led, light, glass, picked}, {ledIndex, picking, clickab
         ${picking ? (picked ? 'aria-pressed="true"' : 'aria-pressed="false"') : ""} aria-label="Trackball LED ${esc(led)}">
         <circle cx="${esc(x)}" cy="${y}" r="${r}"${lit}></circle>
         ${picked ? `<circle class="kc-pick" cx="${esc(x)}" cy="${y}" r="${r - 3}"></circle>` : ""}
-        ${ledIndex && led !== undefined ? `<text class="kc-led" x="${esc(x)}" y="${y + r - 8}" text-anchor="middle" style="fill:${idealText(light) || "var(--text-3)"}">${esc(led)}</text>` : ""}</g>`;
+        ${ledIndex && led !== undefined ? ledLabelAt(x, y, led) : ""}</g>`;
     return {
         markup,
         glow: `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${esc(x)}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
