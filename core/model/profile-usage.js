@@ -4,7 +4,7 @@
 // How full the keyboard's profile is, told the way its owner thinks of it: how
 // much of the profile's storage is used (maxProfilePayload, as the firmware
 // advertises it), and how many of each thing they set up against how many the
-// keyboard holds. Behaviours, tap counts, combos, LED groups and LED overrides
+// keyboard holds. Behaviours, tap counts, combos, LED sets and accents
 // are counted against the limits the firmware refuses an edit past; macros,
 // custom keys and pointing modes are fixed sets of slots, counted as how many
 // are in use, the way their own screens count them. Macro slots can also be
@@ -26,7 +26,7 @@ const positive = value => typeof value === "number" && Number.isInteger(value) &
 /** @type {WeakMap<import("./types.js").DecodedProfile, {capabilities: import("./types.js").ProfileDestination, usage: import("../../contracts/model.js").ProfileUsage}>} */
 const cache = new WeakMap();
 
-// The RGB domain's payload, whose header counts the LED groups and overrides.
+// The RGB domain's payload, whose header counts the LED sets (groups) and accents (group rows).
 // A validated complete profile always contains RGB. The schema's own decoder
 // walks the envelopes, so their width is written once (schema 4: 32 bits).
 /** @param {Buffer} profile @returns {Buffer} */

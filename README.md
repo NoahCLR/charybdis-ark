@@ -168,7 +168,8 @@ Pick a layer and the board shows what the keyboard will light. Lighting is
 built from six stages, from the background effect at the bottom to key
 feedback at the top. Key feedback lights tap counts and holds in their own
 colours. Any stage above the background can be switched off without losing its
-colours, and LED groups let you colour individual LEDs.
+colours, and accents light chosen LEDs in their own colour while a layer,
+pointing mode, combo or key feedback shows.
 
 <p align="center">
   <picture>

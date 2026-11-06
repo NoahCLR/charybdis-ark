@@ -21,8 +21,8 @@ const panelApi = acquirePanelApi();
 // the forms (undo, redo, a jump, discard, rebase, Apply, an import, another
 // keyboard or the demo), `resets` and `resetsTo` start a form again from the
 // model; `kept` survives. This preserves the existing reset policy, including
-// pending hold-style choices for empty cells and the LED group builder. A new
-// field takes one of the three here rather than joining a separate reset list.
+// pending hold-style choices for empty cells. A new field takes one of the
+// three here rather than joining a separate reset list.
 /** @type {import("./view/state-fields.mjs").StateFields<PanelState>} */
 export const STATE_FIELDS = {
     screen: kept("keys"),
@@ -47,6 +47,8 @@ export const STATE_FIELDS = {
     cellRow: kept(null),
     reveal: kept(null),        // a selector the next render scrolls into view and marks, then forgets
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
+    comboPreview: kept(null),  // {id, keys}: the combo Combo feedback holds on the board and the keys picked to hold it from (view/combo-held.mjs)
+    lightingGroupsShut: kept([]), // the groups of Lighting's lists folded shut, as "stage:group" ("layers:inUse", "key:tiers", "combo:layer")
     settingsOpen: kept([]),    // the Keyboard screen's folds opened by hand, so a render keeps them open
     flashPausesAsked: kept(null), // the connection whose flash pauses an open Diagnostics last asked for
     keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
@@ -89,7 +91,6 @@ export const STATE_FIELDS = {
     pdAdvanced: kept(false),  // Advanced open on the pointing editor, whichever slot is shown
     applyDismissed: kept(0),  // the failed Apply (by id) the person closed, so it stays closed
     recoveryAsk: kept(null),  // the recovery copy (by id) whose Delete is asking "Delete this copy?"
-    pdPreview: kept(false),
     feedbackRow: kept("hold"),
     macroSlot: kept(null),
     macroSearch: kept(""),
@@ -108,15 +109,12 @@ export const STATE_FIELDS = {
     recordPreserveHoldTiming: kept(false),
     recordDelayThreshold: kept(30),
     recordDelayRound: kept(10),
-    // The LED group row being built on LED groups: the LEDs picked on the
-    // board, the trackball LED, the row's colour, and its table, owner and
-    // source. Historically kept across draft replacement despite holding
-    // unstaged choices. Drawing drops a missing source group and repairs the
-    // owner; changing the reset policy is a separate behavior decision.
-    ledPicks: kept([]),
-    trackball: kept(false),
-    rowColour: kept({h: "0", s: "0", v: "0"}),
-    ledRow: kept({target: "layer", owner: "", source: ""}),
+    // The accent being added or changed on a Lighting stage (D-L77): its
+    // table, whether it lights for all of its owners, its place (null for a
+    // new one), the LEDs picked on the board, its colour and whether it takes
+    // its stage's instead. It names a row by its place, so a draft replaced
+    // under it drops it unkept.
+    accent: resets(null),
     overlay: kept(null),
     leaveDemo: kept(null),     // {ask, message}: leaving the demo (or replacing its file) waiting on its question
     modeAsk: kept(null),       // {mode, question}: a switch of edit mode waiting on Save/Revert or Send/Discard

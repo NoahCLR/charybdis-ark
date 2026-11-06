@@ -50,14 +50,16 @@ export function restoreContentScroll(root, scroll) {
 // heading is its column header, and the band of the row's own group sticks
 // under it; there only a pick that moved is revealed ([data-reveal-selected]),
 // so unfolding a group further down never pulls the list back to the pick.
+// A Lighting list's picked row (tr[data-pick][data-picked], ui/groups.mjs
+// pickRow) is always kept in view.
 /** @param {Element} root */
 export function revealSelectedListRow(root) {
     const list = root.querySelector("[data-scroll-list]");
-    const selected = list?.querySelector(".rowitem.on, [data-reveal-selected]");
+    const selected = list?.querySelector("tr[data-pick][data-picked], [data-reveal-selected]");
     if (!list || !selected) return;
     const bounds = list.getBoundingClientRect();
     const band = selected.closest?.("tbody")?.querySelector(".t-group");
-    const top = bounds.top + (list.querySelector(".rowlist-h, thead")?.getBoundingClientRect().height || 0)
+    const top = bounds.top + (list.querySelector("thead")?.getBoundingClientRect().height || 0)
         + (band?.getBoundingClientRect().height || 0);
     const row = selected.getBoundingClientRect();
     // Whole pixels, rounded out: a list scrolls by device pixels, and a row
@@ -66,19 +68,38 @@ export function revealSelectedListRow(root) {
     else if (row.bottom > bounds.bottom) list.scrollTop += Math.ceil(row.bottom - bounds.bottom);
 }
 
-// The common Keys floor keeps ordinary tabs level. If one editor grows beyond
-// it, carry that height into the next render before restoring the page scroll.
+// The common workbench floor keeps ordinary tabs level, on Keys and on
+// Lighting alike. If one editor grows beyond it, carry that height into the
+// next render on the same screen before restoring the page scroll, so its
+// list beside every tab stays as tall.
+const WORKBENCH_SCREENS = new Set(["keys", "lighting"]);
 /** @param {Element} root @param {string | null} previousScreen @param {string} nextScreen @param {boolean} [reset] */
-export function captureKeysBenchHeight(root, previousScreen, nextScreen, reset = false) {
-    if (previousScreen !== "keys" || nextScreen !== "keys" || reset) return 0;
+export function captureBenchHeight(root, previousScreen, nextScreen, reset = false) {
+    if (previousScreen !== nextScreen || !WORKBENCH_SCREENS.has(nextScreen) || reset) return 0;
     return root.querySelector(".keys-pad .bench")?.getBoundingClientRect().height || 0;
 }
 
 /** @param {Element} root @param {number} height */
-export function restoreKeysBenchHeight(root, height) {
+export function restoreBenchHeight(root, height) {
     if (!height) return;
     const bench = /** @type {HTMLElement | null} */ (root.querySelector(".keys-pad .bench"));
     if (bench) bench.style.minHeight = `${height}px`;
+}
+
+// How tall the workbench is with `sizer` laid out unseen behind its open tab,
+// in the same cell (styles.css, .bench-sizer): the editor another tab would
+// show, which sets the floor every tab keeps (ui/keys/bench.mjs,
+// ui/lighting/stage-body.mjs). The copy is taken away again before anything
+// else runs, so the page never holds a second editor.
+/** @param {HTMLElement} bench @param {HTMLElement} sizer */
+export function benchHeightWith(bench, sizer) {
+    sizer.classList.add("bench-sizer");
+    sizer.setAttribute("aria-hidden", "true");
+    sizer.inert = true;
+    bench.querySelector(".bench-body")?.appendChild(sizer);
+    const height = bench.getBoundingClientRect().height;
+    sizer.remove();
+    return height;
 }
 
 // A behaviour selected from elsewhere may sit below the visible part of the

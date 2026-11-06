@@ -41,7 +41,9 @@ export interface BehaviorView extends Omit<Behavior, 'steps'> {
 export interface ComboReachKey {layer: number; layoutIndex: number; fellThrough: boolean; whileHeld: boolean; reference?: boolean}
 /** Whether a combo fires from a layer: on `keys` under the smallest hold `held` (layer indexes) that covers all its inputs, or, when none does, the keys covering the most of them (`covered`). */
 export interface ComboReach {fires: boolean; covered: number; keys: ComboReachKey[]; held: number[]}
-export interface ComboView extends Combo {inputPositions?: number[]; /** The layers its output runs its behaviour on, judged from its last input's layer (core/model/participation.js). */ outputBehaviorLayers?: number; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
+export interface ComboView extends Combo {inputPositions?: number[]; /** The layers its output runs its behaviour on, judged from its last input's layer (core/model/participation.js). */ outputBehaviorLayers?: number;
+    /** The layers its output holds while it is held, ascending: such a combo shows no combo light, its layers' own light showing the hold (core/model/layer-effects.js comboHeldShows). */ holdsLayers?: number[];
+    /** The pointing slot its output runs, held or locked, which paints over its combo feedback; null when it runs none. */ runsPointing?: number | null; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
 export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string; /** False for an entry the keycode picker never offers (core/data/offered-keycodes.js). */ offered?: boolean}
 export interface MacroSlot {keycode: string; name: string; /** What it is called while it has no name of its own. */ defaultName: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
 /** A custom key's shortcut (firmware D-F26): a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI), its keys in press order (at most six, each once, at most one media and one system key), a mask of the layers it turns on, and how it turns them on (`layerKind`: 0 hold, 1 lock, 2 move to, 3 tap-toggle, 4 one-shot; 0 without layers). */
@@ -106,21 +108,20 @@ export interface LiveKeyboardView {
     /** How long Live edit waits before the keyboard saves, in words ("3 seconds"; core/model/vocabulary.js quietWords). */
     quietWords: string;
 }
-export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
-export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]; /** For a layer LED group that one layer owns, that layer. */ ownerLayer?: number}
+/** An accent (D-L77): its place in its table, who it lights for, its colour (HSV(0, 0, 0) takes its stage's) and the LEDs it lights, by index and in core's words. */
+export interface Accent {index: number; owner: string; color: Colour; ledIndices: number[]; leds: string; /** For a layer's own accent, that layer. */ ownerLayer?: number}
 export interface RgbView {
     stageEnableMask: number;
     stages: {id: string; label: string; bit?: number; enabled: boolean}[];
-    ledGroups: LedGroup[];
     layerColors: {layer: LayerReference; layerId: number; color: Colour; mode: string}[];
-    layerLedGroups: LedRow[];
+    layerAccents: Accent[];
     automouseFade: {mode: string; end_color: Colour};
     pdModeColors: {pointingMode: string; color: Colour; locality: string}[];
-    pdModeLedGroups: LedRow[];
+    pdModeAccents: Accent[];
     comboFeedback: {color: Colour; locality: string};
-    comboFeedbackLedGroups: LedRow[];
+    comboAccents: Accent[];
     keyBehaviorFeedback: KeyFeedback<Colour>;
-    keyBehaviorFeedbackLedGroups: LedRow[];
+    keyFeedbackAccents: Accent[];
 }
 export interface BaseRgbView {state: string; message?: string; enabled?: boolean; effectId?: number; hue?: number; saturation?: number; brightness?: number; speed?: number; readAt?: string; effectName?: string; brightnessPercent?: number; previewColor?: Colour}
 /** The fields every model of a build starts from, posted once as the catalog (core/model/profile-model.js panelCatalog). */

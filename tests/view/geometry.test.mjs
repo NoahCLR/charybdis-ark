@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {GEO, LEGEND_MIN, boardOutlineMarkup, fitLegend, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../../webview/view/geometry.mjs";
+import {GEO, LED_CORNER, LEGEND_MIN, boardOutlineMarkup, fitLegend, fitText, inLocality, isRightHalf, keyFaceRows, keyLegends, keyVisual, textWidth, trackballInLocality} from "../../webview/view/geometry.mjs";
 
 test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(0), false, "left home column");
@@ -19,7 +19,16 @@ test("locality answers for the regions the firmware defines", () => {
     assert.equal(inLocality(0, "RGB_KEY_HALF", 7), false);
     assert.equal(inLocality(7, "RGB_KEYS_ONLY", 7), true);
     assert.equal(inLocality(6, "RGB_KEYS_ONLY", 7), false);
-    assert.equal(inLocality(6, "RGB_KEYS_ONLY", undefined), false, "with no trigger, nothing is the trigger key");
+    assert.equal(inLocality(6, "RGB_KEYS_ONLY", undefined), true, "with no trigger key, as a mode no key holds, every key paints");
+    assert.equal(inLocality(0, "RGB_KEY_HALF", undefined), true, "and both halves do");
+    assert.equal(trackballInLocality("RGB_KEYS_ONLY", undefined), true);
+    assert.equal(trackballInLocality("RGB_KEYS_ONLY", 51), false, "with one, the trackball is no key");
+    // A held combo's inputs are all its trigger keys.
+    assert.equal(inLocality(9, "RGB_KEYS_ONLY", [7, 9]), true);
+    assert.equal(inLocality(0, "RGB_KEY_HALF", [7, 9]), false, "both inputs on the right paint the right half");
+    assert.equal(inLocality(0, "RGB_KEY_HALF", [1, 7]), true, "inputs spanning the halves paint both");
+    assert.equal(trackballInLocality("RGB_KEY_HALF", [1, 2]), false, "the trackball sits on the right half");
+    assert.equal(trackballInLocality("RGB_KEY_HALF", [1, 7]), true);
 });
 
 test("the trackball is drawn at its own size, clear of the keys around it", () => {
@@ -139,4 +148,28 @@ test("the board outline draws every key and the trackball", () => {
     assert.equal(markup.match(/<rect /g)?.length, 56);
     assert.equal(markup.match(/<circle /g)?.length, 1);
     assert.equal(markup.match(/rotate\(/g)?.length, 7, "the angled thumb keys stay angled");
+});
+
+test("with the LED's number in the corner, no legend line reaches it: one that falls that low fits between the corners", () => {
+    const names = ["Left Command", "Right Option", "Backspace", "A", "Slot 6 · hold (empty)", "Left Command Shift Option"];
+    const y = 100;
+    for (const tiers of [false, true]) for (const combos of [false, true]) for (const icons of [false, true]) for (const sub of ["", "Navigation"]) for (const main of names) {
+        const rows = keyFaceRows(y, {tiers, combos, sub: Boolean(sub), icons});
+        const above = Number(tiers) + Number(combos);
+        const legend = keyLegends(y, rows, {main, sub, above, ledIndex: true});
+        const drawn = [...legend.lines.map((line) => ({...line, size: legend.size})), ...(legend.sub ? [{...legend.sub, text: sub}] : [])];
+        for (const line of drawn) {
+            if (line.y + line.size / 2 <= y + LED_CORNER.top) continue;
+            const width = line.squeeze || textWidth(line.text, line.size);
+            assert.ok(width <= LED_CORNER.width + 0.01, `${main}${sub ? ` / ${sub}` : ""} (tiers ${tiers}, combos ${combos}, icons ${icons}): "${line.text}" runs ${width.toFixed(1)} wide in the corner's row`);
+        }
+    }
+    // Left Command under a tier row and a combo row takes two lines, the
+    // second down by the number.
+    const rows = keyFaceRows(y, {tiers: true, combos: true});
+    const crowded = keyLegends(y, rows, {main: "Left Command", above: 2, ledIndex: true});
+    const plain = keyLegends(y, rows, {main: "Left Command", above: 2});
+    assert.equal(crowded.lines.length, 2);
+    assert.ok(crowded.lines.at(-1).y + crowded.size / 2 > y + LED_CORNER.top, "its last line reaches the corner's row");
+    assert.ok(textWidth("Command", plain.size) > LED_CORNER.width, "set as wide as the cap, it would run into the number");
 });

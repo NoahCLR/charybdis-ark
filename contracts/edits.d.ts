@@ -1,4 +1,6 @@
 /** Posted values are editor values; the core validates and converts them to wire values. */
+/** The four tables of accents, as an accent edit names them (D-L77). */
+export type AccentTable = 'layer' | 'pdMode' | 'combo' | 'keyBehavior';
 export type LayerReference = `Layer ${number}`;
 export type Scalar = string | number;
 export interface Hsv {h: number; s: number; v: number}
@@ -94,10 +96,11 @@ export interface EditPayloads {
     updatePdModeColor: Hsv & {pointingMode: string; locality: string};
     updateComboFeedback: Hsv & {locality: string};
     updateKeyBehaviorFeedback: {config: KeyFeedback};
-    addRgbLedGroup: {group: Hsv & {target: string; owner?: string; ledGroupName?: string; ledIndices?: number[]}};
-    deleteRgbLedGroup: {target: string; index: number};
-    saveRgbReusableLedGroup: {group: {ledIndices: number[]; originalName?: string}};
-    deleteRgbReusableLedGroup: {name: string};
+    /** An accent (D-L77): the LEDs it lights, its colour (HSV(0, 0, 0) takes its stage's) and who it lights for in its table; combo accents have no owner. Ark keeps the groups. */
+    addRgbLedGroup: {group: Hsv & {target: AccentTable; owner?: string; ledIndices: number[]}};
+    /** The accent at `index` of its table, changed where it stands. */
+    updateRgbLedGroup: {target: AccentTable; index: number; group: Hsv & {owner?: string; ledIndices: number[]}};
+    deleteRgbLedGroup: {target: AccentTable; index: number};
     updateMacro: {keycode: string; expectedFingerprint?: string} & (
         {payload: string; name?: string; protection?: 'auto' | 'on' | 'off'}
         | {name: string; payload?: string; protection?: 'auto' | 'on' | 'off'}

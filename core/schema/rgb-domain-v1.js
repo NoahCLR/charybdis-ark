@@ -70,6 +70,14 @@ const RGB_KEY_SEMANTICS = Object.freeze({
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: 3,
     KEY_FEEDBACK_GROUP_ALL: RGB_DOMAIN_V1.SELECTOR_ALL,
 });
+// The owner an LED group row names when its selector is SELECTOR_ALL, by the
+// table it sits in: it lights for every layer, pointing mode or key feedback
+// state. Core reads and writes owners by these names.
+const RGB_EVERY_OWNER = Object.freeze({
+    layer: "RGB_LAYER_GROUP_ALL",
+    pdMode: "RGB_POINTING_MODE_GROUP_ALL",
+    keyBehavior: "KEY_FEEDBACK_GROUP_ALL",
+});
 /** @type {Readonly<Record<string, number>>} */
 const RGB_POINTING_MODE_IDS = Object.freeze({
     POINTING_MODE_DRAGSCROLL: 0,
@@ -708,6 +716,7 @@ function rgbError(code, message, details = {}) {
 module.exports = {
     RGB_AUTOMOUSE_MODES,
     RGB_DOMAIN_V1,
+    RGB_EVERY_OWNER,
     RGB_KEY_SEMANTICS,
     RGB_LAYER_MODES,
     RGB_LOCALITIES,

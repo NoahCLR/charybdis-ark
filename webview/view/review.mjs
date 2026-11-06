@@ -110,7 +110,7 @@ function categoryOf(item, names, stages, sections) {
         case "pointing": return ["Pointing modes", "Pointing modes", 0];
         case "lighting": {
             if (!place.stage) return ["Lighting", "Stages on or off", 0];
-            if (place.stage === "groups") return ["Lighting", "LED groups", 20];
+            if (place.stage === "accents") return ["Lighting", "All accents", 20];
             return stageRow(place.stage, stages);
         }
         case "settings": return place.stage ? stageRow(place.stage, stages) : sectionRow(place.section || "", sections)

@@ -55,6 +55,20 @@ layers in view reach:
   per tab. A pick made elsewhere scrolls its row into the pane; unfolding a
   group does not (`tests/view/scroll.test.mjs`,
   `browser-tests/keys-workbench.spec.js`).
+- Lighting's lists beside an editor (layers, pointing modes, combos, feedback
+  colours) are the same grouped table (`groupedTable`, `webview/ui/groups.mjs`),
+  in the same 330px column stretched beside the editor, its workbench as
+  tall as its tallest stage with a list whichever is open, as the Keys
+  workbench takes the Behaviours tab's (`matchTallestStageHeight`,
+  `webview/ui/lighting/stage-body.mjs`), so the two workbenches read alike: its column header, a counted band per group that
+  folds (Key feedback's tiers and tap branches; the combos, parted into those
+  lighting combo feedback and those holding a layer), rows ruled as
+  a table's that pick themselves (`pickRow`, `pickButton`, `attachPickRows`),
+  the picked one shaded with the bar and kept in view. The layers and slots
+  in use sit under an "In use" band, and the empty ones fold under the last,
+  "Empty layers" or "Empty slots", counted, keeping the open state the
+  disclosure elsewhere keeps (D-L76) (`browser-tests/lighting-controls.spec.js`,
+  `browser-tests/empty-layers.spec.js`).
 - Reach groups come in one order, `GROUP_ORDER`, so headers stay put between
   tabs, and the view's groups lead (`tests/view/reach-groups.test.mjs`).
   **On this view** is the selected layer plus exactly the lower layers
@@ -196,7 +210,7 @@ The same kind of control looks and sits the same on every screen.
   (`tests/view/settings-layout.test.mjs`,
   `browser-tests/settings-screens.spec.js`).
 - A slot bank (Macros, Custom keys, Pointing modes) and a list beside its editor (Lighting's
-  layers and pointing modes) scroll on their own and keep their place across
+  layers, pointing modes, combos and feedback colours) scroll on their own and keep their place across
   renders of the same screen, each list apart (`data-scroll-list`)
   (`tests/view/scroll.test.mjs`, `browser-tests/macro-ux.spec.js`,
   `browser-tests/lighting-controls.spec.js`).
@@ -211,9 +225,9 @@ The same kind of control looks and sits the same on every screen.
   drawn by `webview/ui/slot-bank.mjs`; `tests/view/slot-bank.test.mjs`,
   `browser-tests/consistency.spec.js`, `browser-tests/pointing-controls.spec.js`).
   Lighting's list of pointing modes folds its empty slots by the same rule,
-  behind one disclosure at its end worded as the empty layers' is, "24 empty
-  slots" (`emptySlotsButton`), which draws them after it; the picked slot and
-  one the draft changed always show (`browser-tests/lighting-controls.spec.js`).
+  under its table's last band, "Empty slots" with their count, as its layer
+  list folds the empty layers (`toggleAllSlots`); the picked slot and one the
+  draft changed always show (`browser-tests/lighting-controls.spec.js`).
 - Keys and Lighting draw the same layer strip on the board
   (`tests/view/navigation-profile-ui.test.mjs`), Rename & reorder included
   (no test).
@@ -233,12 +247,15 @@ The same kind of control looks and sits the same on every screen.
   carries it; folding posts nothing. Make base shows on the row under the
   pointer or holding the focus, and stays in the tab order
   (`tests/view/empty-layers.test.mjs`, `browser-tests/empty-layers.spec.js`).
+  Lighting's layer list is a grouped table, so there the fold is its last
+  band, "Empty layers" with their count, as every group of the table folds,
+  under the same open state (`toggleEmptyLayers`).
 - A strip of tabs too wide for its row (the layer tabs, the Keymap and
   Lighting workbench tabs) scrolls sideways, never wraps or cuts a label off
   without saying so: an end with more tabs past it fades, and while it does
   not fit an arrow at each end, outside what scrolls, moves it a page; Rename &
   reorder and a stage's switch stay outside it (`keepInView`,
-  `webview/ui/layerbar.mjs`). Lighting's stage tabs, LED groups and the stage
+  `webview/ui/layerbar.mjs`). Lighting's stage tabs, All accents and the stage
   switch fit a 1440px window (no test).
 - The commit bar floats over the screen's foot but covers none of it: while
   it shows, the screen's scrolling area ends above it, by its height as drawn
@@ -330,8 +347,9 @@ hold what they name.
   `aria-pressed` (tested for the picker).
 - A board key says what its rings and dots show: the selected key is
   `aria-current`, a key the draft changed ends its label "changed in your
-  draft" ("unsaved change" in the live modes), and an LED on LED groups is
-  `aria-pressed` while picked (tested).
+  draft" ("unsaved change" in the live modes), and on Lighting a key's label
+  ends with its LED, which is `aria-pressed` while an accent is being added or
+  changed, picked by Enter or Space as by a press (tested).
 - A trap and a warning a question asks about differ in words, not only in
   their dot's colour (no test). A field whose entry is refused
   (`aria-invalid`) is described by the reason under it (the Key tab's
@@ -473,7 +491,8 @@ here: its home and tests are in
 | The device service's adapter, as [the layers](../architecture/README.md#the-layers) say | `core/session/profile-device-service.js`, `scripts/build-web.js` | `tests/session/profile-device-service.test.js`, `tests/scripts/web-build.test.js` |
 | An Apply or Save cut short: its verdicts and the words a person reads ([more](#an-apply-or-save-cut-short)) | `core/session/interruption.js` | `tests/session/interruption.test.js`, `tests/session/portable-profile-session.test.js`, `tests/session/live-edits.test.js` |
 | Panel state fields declare their initial value and draft-replacement policy together | `webview/store.mjs`, `webview/view/state-fields.mjs` | `tests/view/state-fields.test.mjs` |
-| Lighting: one `webview/ui/lighting/` module per stage, posting the shared edit builders | `webview/ui/lighting.mjs` | `browser-tests/lighting-controls.spec.js` |
+| Lighting: one `webview/ui/lighting/` module per stage, posting the shared edit builders, and the accents every stage's tab lists (`webview/ui/lighting/accents.mjs`) | `webview/ui/lighting.mjs` | `browser-tests/lighting-controls.spec.js` |
+| Accents (D-L77): whose a stage's tab shows, which it lists, what an owner is called and when its accents light, the colour one taking its stage's lights with, and the budget | `webview/view/accents.mjs` | `tests/view/accents.test.mjs` |
 | Pointing: the slot editor holds a direction set to Ignore until its modifiers are chosen, and posts the complete record | `webview/ui/pointing.mjs`, `webview/ui/pointing/` | `browser-tests/pointing-controls.spec.js` |
 | Pointing links (firmware D-F62): which layers may start a slot's mode or be turned on by its key ([more](#pointing-links)) | `core/model/pointing-links.js`, `core/model/layer-effects.js` (`keycodeLayersOn`), `rules/pointing-link-starts.mjs` (whether a published start holds under the layers on), `webview/view/pointing-link.mjs`, `webview/view/pointing-reach.mjs` | `tests/model/pointing-links.test.js`, `tests/rules/pointing-link-starts.test.mjs`, `tests/model/layer-reach.test.js`, `tests/model/layer-effects.test.js`, `tests/session/pd-mode-editing.test.js`, `tests/view/pointing-link.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/pointing-controls.spec.js`, `browser-tests/keys-workbench.spec.js` |
 | Shortcut layers (firmware D-F26): which layers a custom key's shortcut may turn on ([more](#shortcut-layers)) | `core/model/shortcut-layers.js`, `webview/view/custom-key.mjs` (`shortcutLayerRows`) | `tests/model/shortcut-layers.test.js`, `tests/model/custom-key-editor.test.js`, `browser-tests/custom-key-shortcut.spec.js` |
@@ -483,8 +502,8 @@ here: its home and tests are in
 | Which key a spelling is, and whether two spellings are one key: the name the profile knows it by, one canonical spelling per key, what core publishes of it in a table keyed by keycode name (its label and short label, kind, layer, layer form, a layer-mod's modifiers, a layer-tap's tap, the layers it turns on, the host layout's legends), read under every name it goes by with each fact's own rule for an empty entry, the macro, custom key or pointing slot (held or locked) it is, and two ways of finding a behaviour row kept apart, the row keyed exactly by the spelling (what a key means, what a combo sends) and the row listening to the key however either is spelled (a picked or typed key); worked out once per model and spelling | `webview/view/key-identity.mjs` (`keyIdentity`, `sameKey`, `keycodeName`, `macroIndex`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
 | The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, and what a search finds (at most `SEARCH_ROWS` keycodes), drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs` |
 | What reaches one key and what it uses, which the hover card and the Key tab both draw: the layer's own key shown alone, the key answering it from below, and of its behaviour row whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold; drawn by `webview/ui/hover-card.mjs` (placed by `webview/ui/hover.mjs`) and `webview/ui/keys/key-tab.mjs` | `webview/view/key-reach.mjs` (`keyReachAt`, `keyReach`, `keyBehaviour`) | `tests/view/key-reach.test.mjs`, `browser-tests/participation.spec.js` |
-| What the board shows at each key and on the trackball: the key that answers in the view and the layer supplying it, glass or solid, its light, the dots, badges and icons of what runs there, and in the LED selector each LED's index; drawn by `webview/ui/board.mjs` | `webview/view/board-keys.mjs` (`boardKeys`, `boardTrackball`) | `tests/view/board-keys.test.mjs`, `browser-tests/marks.spec.js`, `browser-tests/participation.spec.js`, `browser-tests/lighting-controls.spec.js` |
-| Empty layers (D-L76): a layer that is not the base or a default layer, has no name of its own (core's `named`), maps no key, is turned on by no key (`layersAnyKeyTurnsOn`), starts no pointing mode, is not the pointer layer, is in no Combo layer matching but its own, has no layer colour that paints or LED override, has no key with Use behaviour or Join combos off, and whose Settings switches read as most empty layers' do (an even split counts as set); worked out once per model, and folded where a place does not keep it | `webview/view/empty-layers.mjs` (`emptyLayers`, `foldEmptyLayers`), drawn by `webview/ui/empty-layers.mjs` | `tests/view/empty-layers.test.mjs`, `tests/model/profile-model.test.js`, `browser-tests/empty-layers.spec.js` |
+| What the board shows at each key and on the trackball: the key that answers in the view and the layer supplying it, glass or solid, its light, the dots, badges and icons of what runs there, the LED it carries, which Lighting numbers it with, and whether it is picked for the accent being edited, wearing that accent's colour; drawn by `webview/ui/board.mjs` | `webview/view/board-keys.mjs` (`boardKeys`, `boardTrackball`) | `tests/view/board-keys.test.mjs`, `browser-tests/marks.spec.js`, `browser-tests/participation.spec.js`, `browser-tests/lighting-controls.spec.js` |
+| Empty layers (D-L76): a layer that is not the base or a default layer, has no name of its own (core's `named`), maps no key, is turned on by no key (`layersAnyKeyTurnsOn`), starts no pointing mode, is not the pointer layer, is in no Combo layer matching but its own, has no layer colour that paints or accent, has no key with Use behaviour or Join combos off, and whose Settings switches read as most empty layers' do (an even split counts as set); worked out once per model, and folded where a place does not keep it | `webview/view/empty-layers.mjs` (`emptyLayers`, `foldEmptyLayers`), drawn by `webview/ui/empty-layers.mjs` | `tests/view/empty-layers.test.mjs`, `tests/model/profile-model.test.js`, `browser-tests/empty-layers.spec.js` |
 | One view of the layer stack: the layer the board shows and the layers previewed with it, by their place in the stack, which is each published layer's `index`; what answers and what shows at each key in it, and the combos and behaviours it reaches, each worked out once per model and view. Screens ask the current one (`currentView()`, `webview/store.mjs`) rather than passing the layer and the preview | `webview/view/layer-view.mjs` (`layerView`, read through `view.answerAt`, `view.shownAt`, `view.combos`, `view.behaviours`) | `tests/view/layer-view.test.mjs`, `tests/view/combo-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs` |
 | What a layer view reaches as each Keymap tab lists it: the tab's groups, what each lists and says when empty, the tab's count, and the group a row asked for by name is picked under | `webview/view/tab-reach.mjs` (`tabReach`), whose lists, the view's behaviours included, sort the one walk of its routes (`routesOf`, `webview/view/reach-routes.mjs`): each key, behaviour and combo, and the behaviour a combo's output runs, worked out once per view | `tests/view/tab-reach.test.mjs`, `tests/view/reach.test.mjs`, `tests/view/pointing-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
 | A reach row picked in a Keymap tab: its id (`group:name`, `reachRowId`), and the keys the board rings for it by the route it was picked under | `webview/view/tab-reach.mjs` (`tabReach`'s `keysFor`), `webview/view/behaviour-reach.mjs` (`behaviourRouteKeys`, read as `view.behaviours.routeKeys`) | `tests/view/tab-reach.test.mjs`, `tests/view/behaviour-reach.test.mjs`, `browser-tests/keys-workbench.spec.js` |
@@ -604,7 +623,7 @@ started by one layer, says itself. One that says an edit would not fit
 (`CAPACITY_EXCEEDED`) is the person's edit, refused in `PROFILE_FULL_WORDS`
 before the keyboard sees it (`core/session/profile-draft-session.js`
 `propose`): by the count it went past, as the usage table names it (LED
-groups, LED overrides, behaviours, behaviour tap counts), or as the profile
+sets, accents, behaviours, behaviour tap counts), or as the profile
 being full. A sentence Ark wraps around a failure carries over only Ark's code
 (`arkCode`), so a fault beneath it never silences it. A Save the upload
 coordinator or the transport stopped says what its cause says (`failureReason`
@@ -741,8 +760,8 @@ A name the catalog gives a key is what the key does wherever it is placed
   `browser-tests/picker-modifiers.spec.js`).
 - A key on the board is named as the board names it, never by its layout
   index: a layout key's picker says which key on which layer ("For Esc on
-  Base", `onLayer`), and a board key's accessible name is what it shows, or
-  its LED in the LED selector (`boardKeys`' `name`;
+  Base", `onLayer`), and a board key's accessible name is what it shows,
+  followed on Lighting by its LED (`boardKeys`' `name` and `led`;
   `tests/view/board-keys.test.mjs`).
 - A layout key's picker (`layoutKey`) and a combo output's (`comboOutput`)
   keep Use off for what the draft refuses there (`keyProblem`,
@@ -972,8 +991,9 @@ standalone export reads its own snapshot and leaves the editor's alone
 
 The review lists one change per thing that differs from the keyboard (D-L29):
 a key on a layer, a layer's name, a behaviour, a combo, a macro, a settings
-section, a pointing slot, or one lighting record (LED groups and the rows that
-paint them are one record; no test).
+section, a pointing slot, or one lighting record (accents and the groups they
+light are one record, Accents, read by LEDs and never by group, with a group
+no accent lights read as an unused LED set; `tests/model/profile-review.test.js`).
 
 - A change says added, changed or removed and lists only the fields that
   differ, in the editors' words. Fields compare what is stored, not what is
@@ -1091,12 +1111,50 @@ Import checks one, under the capabilities current firmware reports
 The board is a selected-layer preview, not LED telemetry (D-L12): base
 lighting plus the selected layer (with layer preview, every layer on, lowest
 first; never the other default layers, which the keyboard's lighting does
-not read), then their LED groups, a layer's own by the layer core publishes
+not read), then their accents, a layer's own by the layer core publishes
 it for (`ownerLayer`), following the firmware's membership, pass-through and
 inheritance rules. The order the stages paint in, and the
 two "no colour" rules, are the shared compositor (`rules/led-light.mjs`,
 D-L73); `webview/view/lighting.mjs` gathers what each stage paints from the
 model (`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`).
+
+On Pointing modes the board always shows the picked mode running, as it
+paints with no layer it is linked to on, and on Combo feedback one combo held,
+of those the Keymap's Combos tab lists On this view, so they follow the layer
+picked and the layers previewed under it, never a match of keycodes of its
+own: `tabReach(view, "combos")` and its `keysFor` ring (`combosHere`,
+`comboHeld`, `webview/view/combo-held.mjs`). What holding a combo shows
+instead of its feedback is core's, published per combo (`holdsLayers`,
+`runsPointing`, from `comboHeldShows` in `core/model/layer-effects.js`,
+`tests/model/layer-effects.test.js`): the interface never reads it from a
+keycode. The list parts them by it: combo feedback first, then those whose
+output holds layers (`holdsLayers`). It is held on one key per
+input, the one picked or else one on the half its other inputs are on, and
+its feedback is judged against those keys; a combo whose output holds layers
+lights nothing of its own and the board turns them on over the view, as the
+layer strip would, since the firmware shows the layers instead
+(`viewWhileHeld`); one whose output runs a pointing mode runs it from those
+keys and paints beneath it (the compositor's combo stage `beneath`). What
+the board shows and the line under it are `lightingBoard`
+(`webview/view/lighting-board.mjs`; `tests/view/combo-held.test.mjs`,
+`tests/view/lighting-board.test.mjs`, `tests/view/lighting.test.mjs`,
+`browser-tests/lighting-controls.spec.js`).
+
+Accents (D-L77) are edited on the tab of the stage that paints them, for the
+owner it has picked (`accentOwner`), listing that owner's own accents and
+those of the owner that is all of them, tagged, in paint order and edited
+there too, and, on a layer above Base, Base's, edited on Base (`accentsFor`,
+`webview/view/accents.mjs`; `tests/view/accents.test.mjs`). There is no
+switch to the owner that is all of them: an accent's own Lights for chooses it.
+No group is shown: an accent names its LEDs by index in core's words
+(`leds`, `ledsCalled`), core shares and drops groups as accents change, and
+the budget is the profile's usage counts (`accentBudget`). An accent's LEDs
+are picked on the lit board by press or drag (`onLed`, `webview/ui/board.mjs`),
+which shows them in its colour, the stage's when it takes the stage's
+(`stageShade`); nothing posts until it is kept, and a changed accent keeps its
+place in its table (`browser-tests/lighting-controls.spec.js`). An unkept
+accent names its row by place, so a draft replaced under it drops it
+(`tests/view/state-fields.test.mjs`).
 
 Brightness is absolute HSV; the reported limit constrains editing and never
 rescales a read (`tests/session/base-rgb.test.js`). Pass-through is zero

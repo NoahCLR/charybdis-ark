@@ -63,23 +63,31 @@ test("a key is named as the board names it, never by its layout index", () => {
     assert.equal(keyOf(model, 0, [], 0).name, "C");
     assert.equal(keyOf(model, 2, [], 0).name, "Transparent", "a transparent key says so");
     assert.equal(keyOf(model, 2, [0], 0).name, "C", "and seen through to Base, names the key that answers");
-    assert.equal(keyOf(model, 0, [], 1, {mode: "leds"}).name, `LED ${keyLed(model, 1)}`, "the LED selector names its LED");
 });
 
-test("the LED selector names each key's LED, and shows no light, marks or second line", () => {
-    const led = keyOf(model, 0, [], 1, {mode: "leds"});
-    assert.deepEqual([led.main, led.sub, led.light, led.tiers, led.badges], [String(keyLed(model, 1)), "", null, [], []]);
+test("every key carries its LED, and the LEDs picked for an accent show in its colour", () => {
+    const key = keyOf(model, 0, [], 1);
+    assert.deepEqual([key.led, key.picked], [keyLed(model, 1), false], "Lighting numbers each key by the LED it carries");
+    const red = {h: 0, s: 255, v: 200};
+    const picked = keyOf(model, 0, [], 1, {accent: {leds: new Set([keyLed(model, 1)]), colour: red}});
+    assert.deepEqual([picked.picked, picked.light], [true, red], "a picked LED wears the accent's colour over the layer's");
+    assert.deepEqual([picked.main, picked.tiers.length], [key.main, key.tiers.length], "and keeps its face and marks");
+    const unpicked = keyOf(model, 0, [], 0, {accent: {leds: new Set([keyLed(model, 1)]), colour: red}});
+    assert.deepEqual([unpicked.picked, unpicked.light], [false, keyOf(model, 0, [], 0).light], "others keep the layer's light");
+    const dark = keyOf(model, 0, [], 1, {accent: {leds: new Set([keyLed(model, 1)]), colour: null}});
+    assert.deepEqual([dark.picked, dark.light], [true, key.light], "an accent that would paint nothing leaves the light as it is, still picked");
     const plain = keyOf(model, 0, [], 1, {faces: false});
     assert.ok(plain.light, "without faces a key is still lit");
     assert.deepEqual([plain.tiers, plain.badges], [[], []], "but wears no marks");
-    assert.equal(keyOf(model, 2, [1], 0, {mode: "leds"}).from, null, "and a selector shows each layer's own key");
 });
 
-test("the trackball shows its light, solid on base, and in the LED selector only its index", () => {
+test("the trackball shows its light, solid on base, and wears an accent's colour while picked", () => {
     const ball = boardTrackball(layerView(model, 0));
-    assert.deepEqual([ball.led, ball.glass], [model.leds.trackball, false]);
+    assert.deepEqual([ball.led, ball.glass, ball.picked], [model.leds.trackball, false, false]);
     assert.ok(ball.light);
-    assert.deepEqual(boardTrackball(layerView(model, 2), {mode: "leds"}), {led: model.leds.trackball, light: null, glass: false});
+    const red = {h: 0, s: 255, v: 200};
+    assert.deepEqual(boardTrackball(layerView(model, 2), {accent: {leds: new Set([model.leds.trackball]), colour: red}}),
+        {led: model.leds.trackball, picked: true, light: red, glass: false});
 });
 
 test("a key wears one icon for each kind of thing it plays, sends or runs, its own first", () => {
@@ -109,5 +117,5 @@ test("a key wears one icon for each kind of thing it plays, sends or runs, its o
 
     assert.deepEqual(icons(2, 7), [], "a transparent key shows none of its own");
     assert.deepEqual(icons(2, 7, [0]), ["pointing"], "seen through to Base, the answering key's");
-    assert.deepEqual([icons(0, 8, [], {faces: false}), icons(0, 8, [], {mode: "leds"})], [[], []], "no marks, no icons");
+    assert.deepEqual(icons(0, 8, [], {faces: false}), [], "no marks, no icons");
 });

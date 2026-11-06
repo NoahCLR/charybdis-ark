@@ -1,4 +1,5 @@
-import type {Scalar, Tier, TimingTerm} from './edits.js';
+import type {AccentTable, Scalar, Tier, TimingTerm} from './edits.js';
+export type {AccentTable};
 
 /** The setting a behaviour timing's default comes from: the dual-role tapping term or a behaviour default. */
 export type TimingSource = 'tappingTerm' | TimingTerm;
@@ -140,12 +141,19 @@ export interface Vocabulary {
     tapCommit: WordList<string>;
     /** Lighting's fields, as its tabs label them and the review names them. */
     lightingFields: Readonly<Record<LightingField, string>>;
-    /** What storing HSV(0, 0, 0) does, by lighting stage (or `groups`, a group row): Turn off's tip and the note once stored. */
+    /** What storing HSV(0, 0, 0) does, by lighting stage: Turn off's tip and the note once stored. */
     colourOff: Readonly<Record<string, {offTip: string; offNote?: string}>>;
     feedbackOwners: WordList<string>;
     /** The behaviour tier each key feedback state flashes for, by its RGB_KEY_SEMANTICS name; the others have none. */
     feedbackTiers: Readonly<Partial<Record<string, Tier>>>;
-    ledTables: WordList<string>;
+    /** Accents by the table an accent edit names (D-L77): when they light, `{owner}` standing for the owner picked; the owner that is all of a table's, by its RGB enum name, where it has one, and what all of its owners are called; what an accent that takes its stage's colour takes. */
+    accents: Readonly<Record<AccentTable, {when: string; everyOwner?: string; every: string; stageColour: string}>>;
+    /** The accent editor's own fields. */
+    accentFields: {lightsFor: string; ownColour: string};
+    /** The key feedback state (an RGB_KEY_SEMANTICS name) each Key feedback colour flashes for, by the colour's field. */
+    feedbackColourOwners: Readonly<Record<'tapCommittedColor' | 'holdActiveColor' | 'longHoldActiveColor' | 'tapBranchColors', string>>;
+    /** The groups of Lighting's lists beside an editor. */
+    lightingLists: {inUse: string; tiers: {title: string; tip: string}; tapBranches: {title: string; tip: string}; comboFeedback: {title: string; empty: string}; holdLayer: {title: string; empty: string}};
     stages: readonly {id: string; label: string; bit?: number}[];
     customKeys: {alwaysOn: {base: string; default: string}; layerKinds: WordList<number>};
     /** A layer key's second line on its cap, by its QMK function (MO, TG…). */

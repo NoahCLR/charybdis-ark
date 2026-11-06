@@ -2,7 +2,8 @@
 
 The **Lighting** screen sets what the keyboard lights, and when. The board on
 screen is painted the way the keyboard will light up with your draft, for the
-layer you pick under it.
+layer you pick under it, and numbers each key by its LED for
+[accents](#accents).
 
 ## All lighting and the idle timeout
 
@@ -25,7 +26,8 @@ Lighting is painted in six stages, each over the one before it:
 5. **Combo feedback**
 6. **Key feedback**
 
-Each stage's tab shows the colour it paints. Stages 2 to 6 have a **Stage
+Each stage's tab shows the colour it paints, and says under its controls, in
+**What this stage does**, what the stage does and what the board shows of it. Stages 2 to 6 have a **Stage
 on** switch, which turns the whole stage off without losing its colours. A
 stage that paints nothing right now is drawn off and says why.
 
@@ -37,8 +39,8 @@ the keyboard reports.
 
 **Turn off** stores HSV(0, 0, 0), and the colour then reads **Off**; what
 that does depends on the stage. A
-layer with no colour paints nothing, so what is underneath shows through, and
-an LED row with none takes its stage's colour. Everywhere else black is
+layer with no colour paints nothing, so what is underneath shows through.
+Everywhere else black is
 black: a pointing mode, combo feedback or a key feedback colour turned off
 paints its area black while it runs, and the auto-mouse fade ends on black.
 To paint nothing there, switch the tab's **Stage on** off. A colour with
@@ -89,8 +91,8 @@ A mode linked to layers paints beneath the lowest of them that is on instead
 however the mode started: those layers' own colours show over it, and higher
 layers cover both (see [Pointing](pointing.md#3-what-starts-it)). Pick a mode,
 give it a colour, and choose where it paints. The empty slots are folded at
-the list's end, as the empty layers are in Layer colours: click
-**› 24 empty slots** to show them.
+the list's end, as the empty layers are in Layer colours: click the **Empty
+slots** band to show them.
 
 - **Both halves**, **Left half** or **Right half**: that area, whichever key
   started the mode.
@@ -101,13 +103,29 @@ the list's end, as the empty layers are in Layer colours: click
   of the combo that did.
 
 A mode with no known trigger key paints every key under the last two.
-**Preview it active on the board** shows it as it paints with no linked
-layer on.
+While this tab is open, the board shows the picked mode running, with its
+accents, as it paints with no linked layer on.
 
 ### Combo feedback
 
 The colour a combo's keys wear while you hold them, and where it paints. The
-combo badges on the board take their outline from it.
+combo badges on the board take their outline from it. While this tab is open,
+the board shows one combo held, with its accents. The list on the left shows
+the combos that fire on the layer shown, with the layers previewed under it,
+as the Keymap's **Combos** tab lists them **On this view**, in two groups:
+**Combo feedback**, the combos that light this colour, then **Hold a layer**,
+the combos whose output holds a layer (MO, TT, OSL, LM, LT, or a custom key
+whose shortcut holds layers) and so show that layer's light instead.
+The first is held until you pick another. The keys that press it are ringed as on
+the Keymap, and the ones holding it get the solid ring. Where an input is on
+more than one key (two Backspace keys), it is held from the half its other
+keys are on; click another ringed key to hold it from there instead, since
+the half it lights follows the keys you press. A combo whose output holds a
+layer shows no combo light: the board turns that layer on instead, since the
+layer's own light shows the hold. A combo whose output runs a pointing mode
+paints beneath it: the board runs the mode from the combo's keys, and the mode
+covers the combo's colour wherever both paint. Where no combo fires on the
+layer shown, the line under the board says so.
 
 ### Key feedback
 
@@ -119,7 +137,6 @@ behaviour grid has a column per tier and a row per tap count:
 - **Tap branches**: one for each tap count from the double tap on, flashed
   while a run of taps waits on that count.
 
-**On the board** shows the same colours under the same names and groups.
 Under **When and where**:
 
 - **Tap branch commit**: **Double taps and more** flashes when a double tap
@@ -129,29 +146,54 @@ Under **When and where**:
   mode.
 - **Flash interval**: how long each on or off phase lasts.
 
-These are also the colours of the behaviour dots on the board.
+These are also the colours of the behaviour dots on the board and of the
+behaviour grid's branch numbers.
 
-## LED groups
+## Accents
 
-The **LED groups** tab paints single LEDs, over a stage's own colour.
+An **accent** lights some LEDs in a colour of their own while a layer is on,
+a pointing mode runs, a combo's inputs are held or a key shows a feedback
+state. **Layer colours**, **Pointing modes**, **Combo feedback** and **Key
+feedback** each end with an **Accents** list for what the tab has picked: the
+layer shown, the pointing mode, or the feedback colour. The list includes the
+accents that light for all of them, tagged **Every layer**, **Every pointing
+mode** or **Every feedback state**, which you change or remove from any of
+their lists. Combo accents light for every combo. The background effect and
+the auto-mouse fade have none.
 
-1. Click LEDs on the board to select them (the trackball's LED is a button
-   beside it).
-2. Under **New row from the selection**, choose which stage's table it goes
-   in, what it belongs to (a layer, a pointing mode or a feedback state, or
-   all of them), and its colour.
-3. **Keep row in draft** (**Send row to keyboard** in the live modes,
-   where the row takes effect at once).
+Every key on the board, and the trackball, carries its LED's number in its
+corner, and accents name their LEDs by those numbers: **LEDs 24–28, 53–55**.
+Point at an accent in a list and its LEDs glow on the board.
 
-**Make a group from the selection** keeps the selected LEDs as a reusable
-group for other rows; with nothing selected there is nothing to group.
-Groups are numbered by the LEDs they hold, so making or removing one can
-renumber the others; every row keeps its LEDs. **Used by** lists the tables
-and owners whose rows use a group, and a group in use cannot be removed. Rows
-apply in order, so a later row wins on an LED they share. A row whose colour
-is turned off takes its stage's colour.
+1. **Add accent**, then click keys on the board to pick their LEDs, or drag
+   across keys to pick each one the drag crosses. Clicking a picked key takes
+   it back. The board shows the picked LEDs in the accent's colour, ringed.
+2. **Colour**: **Its own**, set with the colour editor, or the stage's (**Same
+   as the layer**, the mode, combo feedback or the feedback colour), useful to
+   keep keys lit where a layer paints only its mapped keys.
+3. **Lights for**: just what the tab picked, or all of them.
+4. **Keep accent in draft** (**Send accent to keyboard** in the live modes,
+   where it takes effect at once). **Cancel** drops it.
 
-The keyboard holds at most 16 groups and 32 rows across every stage's table
-(the **LED groups** and **LED overrides** under **Memory** on the Keyboard
-screen). Making one more is refused in the draft, saying which is full, before
-the keyboard sees it; remove one first.
+**Change** reopens an accent with its LEDs picked; keeping it changes it where
+it stands, so it keeps its place in the order the keyboard paints them, a later
+accent repainting an earlier one where they share LEDs. **Remove** takes it
+away.
+
+On a layer above Base, the list also shows Base's accents, which stay lit over
+the layers above it; **Go to Base** is where they're changed. One exception:
+while a pointing mode linked to a layer above Base runs, it paints over Base
+and its accents, beneath that layer.
+
+An accent of a combo or a feedback state lights the same LEDs whichever combo
+or key caused it.
+
+**All accents**, after the stages, lists every accent by the stage that paints
+it and who it lights for; **Open** goes to it on its stage's tab.
+
+The keyboard holds at most 32 accents and 16 different LED sets across every
+stage: accents that light the same LEDs share one set, and a set no accent
+lights any more is freed. Each list shows how many are used (also **Accents**
+and **LED sets** under **Memory** on the Keyboard screen). Adding one more is
+refused in the draft, saying which is full, before the keyboard sees it;
+remove one first.

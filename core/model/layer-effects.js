@@ -257,4 +257,24 @@ function keycodeLayersOn(decoded) {
         effect.kind === "unowned" ? mask : mask | (effect.layers ?? bit(effect.layer)), 0) >>> 0;
 }
 
-module.exports = {bit, codeName, layerEffects, actionEffects, keyEffects, linkFacts, keycodeLayersOn, pressesModeKey};
+// What holding a combo shows in place of its combo feedback (firmware
+// feedback.c, RGB domain spec, Drawing): a combo whose output runs a pointing
+// mode, held or locked, paints beneath it, so the mode shows; one whose
+// output holds layers while it is held (MO, LM, TT, OSL or a custom key's
+// holding shortcut: a "hold" effect) shows no combo light, its layers' own
+// light showing the hold. Read as layerEffects reads the keycode, sent by a
+// combo. The model publishes it per combo (holdsLayers, runsPointing), so
+// the interface never works it out of a keycode itself.
+/** @param {LinkProfile} decoded @returns {(code: number) => {holdsLayers: number[], runsPointing: number | null}} */
+function comboHeldShows(decoded) {
+    const {modeLinks} = linkFacts(decoded);
+    return (code) => {
+        const mode = pdModeKeyOfCode(code);
+        if (mode) return {holdsLayers: [], runsPointing: mode.slot};
+        const held = layerEffects(code, modeLinks, false).reduce((mask, effect) =>
+            effect.kind === "hold" ? mask | (effect.layers ?? bit(effect.layer)) : mask, 0) >>> 0;
+        return {holdsLayers: layersOfMask(held), runsPointing: null};
+    };
+}
+
+module.exports = {bit, codeName, layerEffects, actionEffects, keyEffects, linkFacts, keycodeLayersOn, comboHeldShows, pressesModeKey};

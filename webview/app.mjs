@@ -8,7 +8,7 @@
 import {createPanelMessages} from "./messages.mjs";
 import * as controls from "./view/controls.mjs";
 import {el, esc} from "./lib/dom.mjs";
-import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
+import {captureBenchHeight, captureContentScroll, revealSelectedContentRow, revealSelectedListRow, restoreBenchHeight, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, focusDialog, redrawKeepingFocus, trapTab} from "./lib/focus.mjs";
 import {mountNumberEntry} from "./lib/number-entry.mjs";
 import {announce, mountAnnouncer} from "./lib/announce.mjs";
@@ -24,6 +24,7 @@ import {pickerOverlay} from "./ui/picker.mjs";
 import {screenKeys} from "./ui/keys.mjs";
 import {keysShortcut} from "./ui/keys/shortcuts.mjs";
 import {matchBehavioursHeight} from "./ui/keys/bench.mjs";
+import {matchTallestStageHeight} from "./ui/lighting/stage-body.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {discardLayers} from "./ui/layers.mjs";
 import {escapeKeyboardMenu} from "./ui/keyboard-menu.mjs";
@@ -58,7 +59,7 @@ function render({keepScreen = false} = {}) {
     reconcileRecording();
     const keptScreen = keepScreen && renderedScreen === state.screen ? root.querySelector(".app > .main") : null;
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
-    const benchHeight = captureKeysBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
+    const benchHeight = captureBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
     state.resetBenchHeight = false;
     redrawKeepingFocus(root, () => drawApp(keptScreen, scroll, benchHeight));
     focusDialog(root);
@@ -66,7 +67,7 @@ function render({keepScreen = false} = {}) {
     announce(announcements(getModel(), state));
 }
 
-/** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureKeysBenchHeight>} benchHeight */
+/** @param {Element | null} keptScreen @param {ReturnType<typeof captureContentScroll>} scroll @param {ReturnType<typeof captureBenchHeight>} benchHeight */
 function drawApp(keptScreen, scroll, benchHeight) {
     hideHover();
     const model = getModel();
@@ -89,8 +90,9 @@ function drawApp(keptScreen, scroll, benchHeight) {
     reserveCommitRoom(app);
     const theme = shellOf(model).theme;
     root.querySelector('[data-act="theme"]')?.addEventListener("click", () => post(setTheme(otherTheme(theme))));
-    restoreKeysBenchHeight(root, benchHeight);
+    restoreBenchHeight(root, benchHeight);
     matchBehavioursHeight(root);
+    matchTallestStageHeight(root);
     restoreContentScroll(root, scroll);
     revealSelectedListRow(root);
     revealSelectedContentRow(root);
@@ -251,12 +253,13 @@ addEventListener("keydown", (event) => {
     escapeBoardShortcuts();
 });
 // A resize lets the workbench find its height again at the new width, the
-// Behaviours tab's included, once per frame however many events come.
+// Behaviours tab's or the tallest Lighting stage's included, once per frame
+// however many events come.
 let resizing = 0;
 addEventListener("resize", () => {
     /** @type {HTMLElement | null} */ (root.querySelector(".keys-pad .bench"))?.style.removeProperty("min-height");
     cancelAnimationFrame(resizing);
-    resizing = requestAnimationFrame(() => matchBehavioursHeight(root));
+    resizing = requestAnimationFrame(() => { matchBehavioursHeight(root); matchTallestStageHeight(root); });
 });
 
 // A dropped file must never navigate away from Ark and lose the draft,

@@ -228,9 +228,22 @@ test("a colour travels as a colour, and an off one says what off means there", (
     assert.equal(layer.title,`${names[2]} colour`,"a layer's colour is named by the layer");
     assert.deepEqual(layer.fields[0].afterColour,{h:20,s:200,v:100});
     assert.ok(layer.fields[0].beforeColour,"both sides carry their colour");
-    const override=items.find(entry=>entry.unit==="rgb:groups").fields.find(field=>field.label===`Override · ${names[3]}`);
-    assert.match(override.after,/Group \d+ · 3 LEDs · inherits the stage colour/);
-    assert.deepEqual(override.afterColour,{h:0,s:0,v:0},"drawn as off, as Lighting draws it");
+    const accents=items.find(entry=>entry.unit==="rgb:groups");
+    assert.equal(accents.title,"Accents");
+    const accent=accents.fields.find(field=>field.label===`Accent · ${names[3]}`);
+    assert.equal(accent.after,"LEDs 1–3 · Same as the layer","an accent reads by its LEDs and its colour, as Lighting lists it, never by a group");
+    assert.deepEqual(accent.afterColour,{h:0,s:0,v:0},"drawn as off, as Lighting draws it");
+    assert.ok(!accents.fields.some(field=>/Group/.test(`${field.label} ${field.after} ${field.before}`)),"no group is named");
+});
+test("an accent for every layer, mode or feedback state, and the combo accents, read by who they light for", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        groups:[...rgb.groups,{id:rgb.groups.length,leds:[7,8]}],
+        layerGroupRows:[...rgb.layerGroupRows,{selector:255,color:{h:10,s:255,v:200},groupId:rgb.groups.length}],
+        pdModeGroupRows:[...rgb.pdModeGroupRows,{selector:255,color:{h:0,s:0,v:0},groupId:rgb.groups.length}],
+        comboGroupRows:[...rgb.comboGroupRows,{color:{h:0,s:0,v:0},groupId:rgb.groups.length}]})));
+    const labels=profileReview(before,after).find(entry=>entry.unit==="rgb:groups").fields.map(field=>[field.label,field.after]);
+    assert.deepEqual(labels.filter(([label])=>/Every/.test(label)),[["Accent · Every layer","LEDs 7, 8 · HSV(10, 255, 200)"],["Accent · Every pointing mode","LEDs 7, 8 · Same as the mode"],["Accent · Every combo","LEDs 7, 8 · Same as combo feedback"]]);
 });
 test("every Lighting field reads in the review as its Lighting tab labels it", () => {
     const {VOCABULARY: V} = require("../../core/model/vocabulary");

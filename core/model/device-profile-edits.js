@@ -2,7 +2,7 @@
 "use strict";
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 const {pdTapProblem, isPdMacro, PD_DOMAIN} = require("../schema/pd-mode-domain-v1");
-const {RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_POINTING_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
+const {RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_POINTING_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
 
 const catalog = require("../data/keycode-catalog");
 const keycodes = require("../schema/keycodes");
@@ -59,8 +59,9 @@ function namedId(value, prefix) {
     if (!match) throw invalid(`Choose a reported ${prefix.toLowerCase()}.`);
     return integer(match[1], 255, prefix);
 }
-// A group is its set of LEDs, so two groups never hold the same set: a row
-// or a saved selection that matches an existing group reuses it.
+// Groups are Ark's to keep, never the person's (D-L77): an accent names
+// LEDs, and a group is only the set of LEDs it lights, so two groups never
+// hold the same set and an accent that matches an existing group reuses it.
 /** @param {number[]} leds */
 const ledSet = leds => [...new Set(leds)].sort((left, right) => left - right).join(",");
 /** @param {number[]} left @param {number[]} right */
@@ -72,12 +73,52 @@ function groupFor(rgb, leds) {
     rgb.groups.push({id: rgb.groups.length, leds});
     return rgb.groups.length - 1;
 }
+// The four tables of accents, each row naming a group by id.
+/** @param {Rgb} rgb */
+const accentRows = rgb => [rgb.layerGroupRows, rgb.pdModeGroupRows, rgb.comboGroupRows, rgb.keyGroupRows].flat();
+// A group no accent lights paints nothing but still takes one of the
+// keyboard's groups, so it goes. Group ids are positions, consecutive from
+// zero: the ones after it renumber, and every accent follows its group.
+/** @param {Rgb} rgb */
+function pruneGroups(rgb) {
+    const used = new Set(accentRows(rgb).map(row => row.groupId));
+    const kept = rgb.groups.filter(group => used.has(group.id));
+    if (kept.length === rgb.groups.length) return;
+    const renumbered = new Map(kept.map((group, index) => [group.id, index]));
+    for (const row of accentRows(rgb)) row.groupId = /** @type {number} */ (renumbered.get(row.groupId));
+    kept.forEach((group, index) => {group.id = index;});
+    rgb.groups = kept;
+}
+// The LEDs an accent lights, which it must have some of.
+/** @param {unknown} value */
+function accentLeds(value) {
+    const leds = (Array.isArray(value) ? value : []).map(led => integer(led, 57, "LED index"));
+    if (!leds.length) throw invalid("Pick LEDs on the board for the accent to light.");
+    return leds;
+}
+// Puts an accent's row at `index` of its table: its colour, its group and
+// who it lights for. Who it lights for is checked before its LEDs take a group.
+/** @param {Rgb} rgb @param {{target: string, owner?: string, ledIndices?: number[]}} group @param {import("../schema/types.js").Hsv} color @param {number} index */
+function placeAccent(rgb, group, color, index) {
+    const leds = accentLeds(group.ledIndices);
+    if (group.target === "layer") {
+        const selector = group.owner === RGB_EVERY_OWNER.layer ? RGB_DOMAIN_V1.SELECTOR_ALL : namedId(group.owner, "Layer");
+        rgb.layerGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), selector});
+    } else if (group.target === "pdMode") {
+        const selector = group.owner === RGB_EVERY_OWNER.pdMode ? RGB_DOMAIN_V1.SELECTOR_ALL : enumValue(group.owner, RGB_POINTING_MODE_IDS, "pointing mode");
+        rgb.pdModeGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), selector});
+    } else if (group.target === "keyBehavior") {
+        const semantic = enumValue(group.owner, RGB_KEY_SEMANTICS, "key feedback type");
+        rgb.keyGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds), semantic});
+    } else if (group.target === "combo") rgb.comboGroupRows.splice(index, 0, {color, groupId: groupFor(rgb, leds)});
+    else throw invalid("Unknown accent table.");
+}
 /** @param {Rgb} rgb @param {string} target */
 function groupRows(rgb, target) {
     /** @type {Record<string, "layerGroupRows" | "pdModeGroupRows" | "comboGroupRows" | "keyGroupRows">} */
     const tables = {layer: "layerGroupRows", pdMode: "pdModeGroupRows", combo: "comboGroupRows", keyBehavior: "keyGroupRows"};
     const table = tables[target];
-    if (!table) throw invalid("Unknown LED group target.");
+    if (!table) throw invalid("Unknown accent table.");
     return rgb[table];
 }
 /** @template T @param {T[]} rows @param {(row: T) => boolean} predicate @param {string} label @returns {T} */
@@ -214,47 +255,30 @@ function editLighting(rgb, message, maximumBrightness) {
             rgb.keyFeedback = {tapBranchColors: feedback.tapBranchColors.map(editColor), tapCommittedColor: editColor(feedback.tapCommittedColor), holdActiveColor: editColor(feedback.holdActiveColor), longHoldActiveColor: editColor(feedback.longHoldActiveColor), tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy"), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
         }
         case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, 31, "RGB stage mask"); break;
-        case "saveRgbReusableLedGroup": {
-            const group = message.group;
-            const leds = (/** @type {number[]} */ (group.ledIndices)).map(value => integer(value, 57, "LED index"));
-            // The keyboard accepts an empty group, but saving one is never meant.
-            if (!leds.length) throw invalid("Pick LEDs on the board before saving them as a group.");
-            if (group.originalName) {
-                const target = existing(rgb.groups, row => row.id === namedId(group.originalName, "Group"), "LED group");
-                const twin = rgb.groups.find(row => row !== target && sameLeds(row.leds, leds));
-                if (twin) throw invalid(`Group ${twin.id} already holds exactly these LEDs.`);
-                target.leds = leds;
-            } else groupFor(rgb, leds);
-            break;
-        }
-        case "deleteRgbReusableLedGroup": {
-            const id = namedId(message.name, "Group");
-            existing(rgb.groups, row => row.id === id, "LED group");
-            const references = [rgb.layerGroupRows, rgb.pdModeGroupRows, rgb.comboGroupRows, rgb.keyGroupRows].flat();
-            if (references.some(row => row.groupId === id)) throw invalid("Remove this group's RGB assignments before deleting it.");
-            // Group ids are positions: consecutive from zero. Removing one
-            // renumbers the ones after it, and every row follows its group.
-            rgb.groups = rgb.groups.filter(row => row.id !== id);
-            const renumbered = new Map(rgb.groups.map((row, index) => [row.id, index]));
-            rgb.groups.forEach((row, index) => {row.id = index;});
-            for (const row of references) row.groupId = /** @type {number} */ (renumbered.get(row.groupId));
-            break;
-        }
+        // An accent is added at its table's end, changed where it stands
+        // (rows paint in stored order, so a later one wins where they
+        // overlap), or removed; each time, a group no accent lights any
+        // more goes, before a new set takes a group of its own.
         case "addRgbLedGroup": {
-            const group = message.group;
-            let groupId;
-            if (group.ledGroupName) groupId = existing(rgb.groups, row => row.id === namedId(group.ledGroupName, "Group"), "LED group").id;
-            else groupId = groupFor(rgb, (/** @type {number[]} */ (group.ledIndices)).map(value => integer(value, 57, "LED index")));
-            const row = {color: editColor(group), groupId};
-            if (group.target === "layer") rgb.layerGroupRows.push({...row, selector: group.owner === "RGB_LAYER_GROUP_ALL" ? 255 : namedId(group.owner, "Layer")});
-            else if (group.target === "pdMode") rgb.pdModeGroupRows.push({...row, selector: group.owner === "RGB_POINTING_MODE_GROUP_ALL" ? 255 : enumValue(group.owner, RGB_POINTING_MODE_IDS, "pointing mode")});
-            else if (group.target === "keyBehavior") rgb.keyGroupRows.push({...row, semantic: enumValue(group.owner, RGB_KEY_SEMANTICS, "key feedback type")});
-            else {groupRows(rgb, group.target); rgb.comboGroupRows.push(row);} break;
+            const rows = groupRows(rgb, message.group.target);
+            pruneGroups(rgb);
+            placeAccent(rgb, message.group, editColor(message.group), rows.length); break;
+        }
+        case "updateRgbLedGroup": {
+            const rows = groupRows(rgb, message.target);
+            const index = integer(message.index, rows.length - 1, "Accent");
+            // Its old LEDs give their group back first, so changing the LEDs
+            // of the only accent lighting them fits on a full keyboard.
+            rows.splice(index, 1);
+            pruneGroups(rgb);
+            placeAccent(rgb, {...message.group, target: message.target}, editColor(message.group), index);
+            break;
         }
         case "deleteRgbLedGroup": {
             const rows = groupRows(rgb, message.target);
-            const index = integer(message.index, rows.length - 1, "Assignment index");
-            rows.splice(index, 1); break;
+            const index = integer(message.index, rows.length - 1, "Accent");
+            rows.splice(index, 1);
+            pruneGroups(rgb); break;
         }
         default: throw invalid("Unsupported profile edit.");
     }

@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {actionEffects, bit, codeName, keyEffects, layerEffects, linkFacts, keycodeLayersOn} = require("../../core/model/layer-effects");
+const {actionEffects, bit, codeName, comboHeldShows, keyEffects, layerEffects, linkFacts, keycodeLayersOn} = require("../../core/model/layer-effects");
 const {PD_LINK_ENDS} = require("../../core/schema/pd-mode-domain-v1");
 const {SETTING, SHORTCUT_LAYER_KINDS} = require("../../core/schema/settings-domain-v1");
 const {LAYERS} = require("../../core/data/charybdis-layout");
@@ -56,6 +56,28 @@ test("the layers a keycode turns on, as the keyboard runs it", () => {
     assert.equal(turnsOn(PD_MODE_KEYS[5].lockCode), 1 << 3);
     assert.equal(turnsOn(customKeyCode(2)), (1 << 3) | (1 << 6), "a custom key's shortcut layers");
     assert.equal(turnsOn(customKeyCode(3)), 0);
+});
+
+test("what holding a combo shows instead of its combo feedback: the layers its output holds, or the pointing mode it runs", () => {
+    // The firmware's owned momentary layers (MO, TT, OSL, LM, a custom key's
+    // holding shortcut) and LT's hold, whose layer light shows the hold; a
+    // pointing-mode key, held or locked, runs its mode over the combo.
+    const decoded = {settings: settings(), pdModes: [{id: 5, kind: 1, name: "Zoom", linkedLayers: 0, linkTurnsOn: 1 << 3, linkEnds: 0}]};
+    decoded.settings.customKeyShortcuts = Array.from({length: 128}, (_, slot) =>
+        (slot === 2 ? {mods: 0, keys: [], layers: (1 << 3) | (1 << 6), layerKind: 0} : slot === 4 ? {mods: 0, keys: [], layers: 1 << 3, layerKind: 1} : {mods: 0, keys: [], layers: 0, layerKind: 0}));
+    const shows = comboHeldShows(decoded);
+    const none = {holdsLayers: [], runsPointing: null};
+    assert.deepEqual(shows(MO(3)), {holdsLayers: [3], runsPointing: null});
+    assert.deepEqual(shows(TT(2)), {holdsLayers: [2], runsPointing: null});
+    assert.deepEqual(shows(0x5283), {holdsLayers: [3], runsPointing: null}, "OSL(3)");
+    assert.deepEqual(shows(0x4338), {holdsLayers: [3], runsPointing: null}, "LT(3,KC_SLASH)");
+    assert.deepEqual(shows(customKeyCode(2)), {holdsLayers: [3, 6], runsPointing: null}, "a custom key holding its shortcut's layers");
+    assert.deepEqual(shows(customKeyCode(4)), none, "one locking them holds none");
+    assert.deepEqual(shows(0x5263), none, "TG(3) locks, holding nothing");
+    assert.deepEqual(shows(DF(1)), none);
+    assert.deepEqual(shows(0x0004), none);
+    assert.deepEqual(shows(PD_MODE_KEYS[5].holdCode), {holdsLayers: [], runsPointing: 5}, "a pointing-mode key runs its mode");
+    assert.deepEqual(shows(PD_MODE_KEYS[5].lockCode), {holdsLayers: [], runsPointing: 5});
 });
 
 test("a layer's bit is its place in a layer mask", () => {

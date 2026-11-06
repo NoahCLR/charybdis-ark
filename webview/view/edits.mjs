@@ -207,25 +207,21 @@ export function keyFeedback(feedback = {}, rowId, next, overrides = {}) {
     return {type: "updateKeyBehaviorFeedback", config};
 }
 
-// A new LED group row: its table, whose row it is (combo feedback has no
-// owner — every combo shares one colour), and either a saved group or the
-// LEDs picked on the board.
-/** @param {{target: string, owner: string, source: string}} row @param {number[]} ledIndices @param {Colour} colour @returns {import("../../contracts/edits.js").EditOf<'addRgbLedGroup'>} */
-export const ledRow = ({target, owner, source}, ledIndices, colour) => ({
-    type: "addRgbLedGroup",
-    group: {
-        target,
-        ...(target === "combo" ? {} : {owner}),
-        ...(source ? {ledGroupName: source} : {ledIndices}),
-        ...hsvPayload(colour),
-    },
-});
-/** @param {string} target @param {number} index @returns {import("../../contracts/edits.js").EditOf<'deleteRgbLedGroup'>} */
-export const deleteLedRow = (target, index) => ({type: "deleteRgbLedGroup", target, index});
-/** @param {number[]} ledIndices @returns {import("../../contracts/edits.js").EditOf<'saveRgbReusableLedGroup'>} */
-export const saveLedGroup = (ledIndices) => ({type: "saveRgbReusableLedGroup", group: {ledIndices}});
-/** @param {string} name @returns {import("../../contracts/edits.js").EditOf<'deleteRgbReusableLedGroup'>} */
-export const deleteLedGroup = (name) => ({type: "deleteRgbReusableLedGroup", name});
+// An accent (D-L77): the LEDs it lights, its colour (HSV(0, 0, 0) takes its
+// stage's) and who it lights for in its table, the owner that is all of them
+// included; combo accents have no owner, since every combo shares one colour.
+// Ark keeps the groups, so an accent names only its LEDs.
+/** @typedef {{target: import("../../contracts/model.js").AccentTable, owner: string, leds: readonly number[], colour: Colour}} AccentEdit */
+/** @param {AccentEdit} accent */
+const accentPayload = ({target, owner, leds, colour}) => ({...(target === "combo" ? {} : {owner}), ledIndices: [...leds].sort((left, right) => left - right), ...hsvPayload(colour)});
+/** @param {AccentEdit} accent @returns {import("../../contracts/edits.js").EditOf<'addRgbLedGroup'>} */
+export const addAccent = (accent) => ({type: "addRgbLedGroup", group: {target: accent.target, ...accentPayload(accent)}});
+// An accent changed where it stands in its table, which keeps its place in
+// the order the keyboard paints them.
+/** @param {number} index @param {AccentEdit} accent @returns {import("../../contracts/edits.js").EditOf<'updateRgbLedGroup'>} */
+export const updateAccent = (index, accent) => ({type: "updateRgbLedGroup", target: accent.target, index, group: accentPayload(accent)});
+/** @param {import("../../contracts/model.js").AccentTable} target @param {number} index @returns {import("../../contracts/edits.js").EditOf<'deleteRgbLedGroup'>} */
+export const deleteAccent = (target, index) => ({type: "deleteRgbLedGroup", target, index});
 
 // ── macros, pointing, settings ──────────────────────────────────────────
 

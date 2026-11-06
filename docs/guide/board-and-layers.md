@@ -99,7 +99,7 @@ Most keymaps use a few of the 16 layers. A layer with nothing in it is
 every key on it is transparent or KC_NO, and nothing uses it. Nothing uses it
 when no key, behaviour, combo, pointing mode or custom key turns it on, no
 pointing mode starts from it and it isn't the pointer layer, no layer matches
-its combos on it, it has no colour or LED override of its own, no key on it
+its combos on it, it has no colour or accent of its own, no key on it
 has **Use behaviour** or **Join combos** off, and its switches on the
 Settings screens read as the other empty layers' do.
 
@@ -108,7 +108,9 @@ one line at its end, such as **› 8 empty layers**. Click it, or press Enter
 or Space on it, to show them; again to fold them. In the tabs it sits after
 the last one, and the layers it shows come after the others; a list in stack
 order, such as [This key on every layer](keys.md#the-key-tab) and Rename &
-reorder, shows them in their places. The layer you picked always shows, and so
+reorder, shows them in their places. Lighting's list of layers is a table like
+the Keymap's lists, so there they fold under its last band, **Empty layers**,
+with their count. The layer you picked always shows, and so
 does one whose setting on that screen is on where the others' are off, or the
 other way round. To start using a new layer, show the empty ones and pick it,
 or name it in Rename & reorder. Folding only draws less: Ark stores and sends

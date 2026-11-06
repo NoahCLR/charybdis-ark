@@ -9,7 +9,7 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {shareHold} from "../../view/share.mjs";
 import {sectionPath, sectionsIn} from "../../view/settings-layout.mjs";
-import {colourControl, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, section, stack} from "./common.mjs";
 
 // How long the auto-mouse colour holds before it fades, as a share of the
 // timeout. The keyboard stores milliseconds and keeps them with its global
@@ -80,7 +80,7 @@ export function stageAuto(model) {
         ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${esc(id)}" ${fade.mode === id ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
         { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
-    policy.append(stack(select, el(`<p class="note">Where the fade lands once auto-mouse turns the pointer layer off. The board shows the destination, not the animation.</p>`)));
+    policy.append(stack(select, el(`<p class="note">Where the fade lands once auto-mouse turns the pointer layer off.</p>`)));
     const endColour = section(vocabulary(model).lightingFields.endColour);
     const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
     endColour.append(unused
@@ -89,6 +89,7 @@ export function stageAuto(model) {
         : colourControl(model, {colour: fade.end_color, canEdit: editFade, title: "Fade destination", ...offWording(model, "auto"),
             onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
     if (unused) endColour.append(el(`<p class="note">This mode lands on what the board would show without the pointer layer, so it uses no end colour.</p>`));
-    node.append(policy, endColour, fadeTiming(model, idle));
+    node.append(policy, endColour, fadeTiming(model, idle),
+        aboutStage("While auto-mouse keeps the pointer layer on, its light holds, then fades toward where it lands over the rest of the auto-mouse timeout, in place of the layer colours. The board shows where the fade lands, not the animation."));
     return node;
 }

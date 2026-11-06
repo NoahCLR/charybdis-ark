@@ -458,29 +458,38 @@ test("auto-mouse fade and combo feedback post their colour beside their mode", (
     assert.equal(rgb.comboFeedback.locality, RGB_LOCALITIES.RGB_KEYS_ONLY);
 });
 
-test("LED group rows land in every table, and groups renumber when one is deleted", () => {
+test("accents land in every table, change where they stand, and Ark keeps the groups they light", () => {
     const draft = session();
     const rgb = () => decoded(draft).rgb;
     const ledsOf = (id) => rgb().groups.find((group) => group.id === id).leds;
-    const startCount = rgb().groups.length;
+    const lit = () => new Set([rgb().layerGroupRows, rgb().pdModeGroupRows, rgb().comboGroupRows, rgb().keyGroupRows].flat().map((row) => row.groupId));
+    const used = rgb().groups.filter((group) => lit().has(group.id)).length;
     const colour = {h: 10, s: 255, v: 100};
     for (const [target, owner] of [["layer", "Layer 2"], ["pdMode", "POINTING_MODE_VOLUME"], ["combo", "ignored"], ["keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"]]) {
-        stage(draft, edits.ledRow({target, owner, source: ""}, [1, 2], colour));
+        stage(draft, edits.addAccent({target, owner, leds: [2, 1], colour}));
     }
-    assert.equal(rgb().groups.length, startCount + 1, "rows with the same LEDs share one group");
-    assert.equal(edits.ledRow({target: "combo", owner: "x", source: ""}, [1], colour).group.owner, undefined, "a combo row has no owner");
+    assert.equal(rgb().groups.length, used + 1, "accents lighting the same LEDs share one group, and a group no accent lit is gone");
+    assert.equal(edits.addAccent({target: "combo", owner: "x", leds: [1], colour}).group.owner, undefined, "a combo accent has no owner");
+    assert.deepEqual(edits.addAccent({target: "layer", owner: "Layer 2", leds: [9, 3], colour}).group.ledIndices, [3, 9], "LEDs go in order");
 
-    for (const leds of [[40], [41], [42]]) stage(draft, edits.saveLedGroup(leds));
-    const byLeds = (leds) => rgb().groups.find((group) => group.leds.join() === leds.join()).id;
-    stage(draft, edits.ledRow({target: "layer", owner: "Layer 3", source: `Group ${byLeds([42])}`}, [], {h: 1, s: 1, v: 1}));
-    stage(draft, edits.deleteLedGroup(`Group ${byLeds([40])}`));
+    stage(draft, edits.addAccent({target: "layer", owner: "Layer 3", leds: [42], colour: {h: 1, s: 1, v: 1}}));
+    const rows = () => rgb().layerGroupRows;
+    const first = rows().findIndex((row) => row.selector === 2);
+    stage(draft, edits.updateAccent(first, {target: "layer", owner: "RGB_LAYER_GROUP_ALL", leds: [40, 41], colour: {h: 0, s: 0, v: 0}}));
+    assert.equal(rows()[first].selector, 255, "a changed accent keeps its place in its table, now lighting for every layer");
+    assert.deepEqual([ledsOf(rows()[first].groupId), rows()[first].color], [[40, 41], {h: 0, s: 0, v: 0}], "with its new LEDs, taking its stage's colour");
+    assert.deepEqual(ledsOf(rows().find((row) => row.selector === 3).groupId), [42], "the accent after it is untouched");
+
+    stage(draft, edits.updateAccent(first, {target: "layer", owner: "Layer 2", leds: [40], colour}));
+    assert.ok(!rgb().groups.some((group) => group.leds.join() === "40,41"), "LEDs no accent lights any more give their group back");
     const ids = rgb().groups.map((group) => group.id);
     assert.deepEqual(ids, ids.map((_, index) => index), "ids stay consecutive from zero");
-    const layerRow = rgb().layerGroupRows.find((row) => row.selector === 3);
-    assert.deepEqual(ledsOf(layerRow.groupId), [42], "a row still paints the LEDs it pointed at");
-    const before = rgb().layerGroupRows.length;
-    stage(draft, edits.deleteLedRow("layer", before - 1));
-    assert.equal(rgb().layerGroupRows.length, before - 1);
+    assert.deepEqual(ledsOf(rows().find((row) => row.selector === 3).groupId), [42], "and every accent still lights the LEDs it named");
+    const before = rows().length;
+    stage(draft, edits.deleteAccent("layer", before - 1));
+    assert.equal(rows().length, before - 1);
+    assert.ok(!rgb().groups.some((group) => group.leds.join() === "42"), "a removed accent's LEDs go with it");
+    assert.throws(() => stage(draft, edits.addAccent({target: "layer", owner: "Layer 2", leds: [], colour})), /Pick LEDs/, "an accent lights some LEDs");
 });
 
 // ── macros ──────────────────────────────────────────────────────────────

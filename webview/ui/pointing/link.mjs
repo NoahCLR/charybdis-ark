@@ -10,7 +10,7 @@ import {el, esc} from "../../lib/dom.mjs";
 import {LINK_ENDS} from "../../view/pointing-config.mjs";
 import {listed} from "../../view/vocabulary.mjs";
 import {linkIgnored, linkRows, pointerLayerCovers, withLayer} from "../../view/pointing-link.mjs";
-import {emptyLayers} from "../../view/empty-layers.mjs";
+import {EMPTY_LAYERS_TITLE, emptyLayers} from "../../view/empty-layers.mjs";
 import {marked} from "../marks.mjs";
 import {tipFor, words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
@@ -77,7 +77,7 @@ function layerChips(model, rows, which, {disabled, empties, labelledBy, id, chan
         ${on.length ? "" : `<span class="note">None</span>`}
         ${off.length ? `<select class="input pd-add" data-f="${esc(id)}:add" aria-label="Add a layer" ${esc(disabled)}>
             <option value="">+ Add layer</option>${shown.map(option).join("")}
-            ${folded.length ? `<optgroup label="Empty layers">${folded.map(option).join("")}</optgroup>` : ""}</select>` : ""}
+            ${folded.length ? `<optgroup label="${esc(EMPTY_LAYERS_TITLE)}">${folded.map(option).join("")}</optgroup>` : ""}</select>` : ""}
     </div>`);
     node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () =>
         change(Number(/** @type {HTMLElement} */ (button).dataset.remove), false)));

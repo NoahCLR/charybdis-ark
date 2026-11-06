@@ -40,7 +40,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/checks.mjs", ["show(check)", "source(check)"], "the Show and source buttons the review overlay passes in, built from escaped templates there"],
     ["webview/ui/custom-keys.mjs", ['keyFields(model, key).join("")'], "an empty slot and placedOn()'s layer chips, both markup templates"],
     ["webview/ui/device.mjs", ["value"], "kv() rows hold markup their callers escaped, as its @param says"],
-    ["webview/ui/groups.mjs", ['group.rows.join("")'], "each tab's table rows, markup templates built by that tab"],
+    ["webview/ui/groups.mjs", ['group.rows.join("")'], "each list's table rows, markup templates built by the tab or stage that lists them"],
     ["webview/ui/groups.mjs", ["detail"], "a group's detail, markup its tab built: the Combos tab's selected key, named through keyNameMarked"],
     ["webview/ui/hover-card.mjs", ['own.join("")', 'reachSections(keyReach(view, layer, target, -1, []), target, {foot: false}).join("")', 'sections.join("")'], "reachSections() returns the hover card's sections, markup templates it pushes"],
     ["webview/ui/keys/behaviours-tab.mjs", ["note"], "viewBehaviourNote() and comboNote(): escaped layer names and marked combo keys"],

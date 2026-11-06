@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreKeysBenchHeight, scrollContentTo} from "../../webview/lib/scroll.mjs";
+import {captureContentScroll, captureBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreBenchHeight, scrollContentTo} from "../../webview/lib/scroll.mjs";
 
 const rootWith = (content) => ({querySelector: (selector) => selector === ".content" ? content : null});
 // A selector list matches when any of its selectors is the one asked about.
@@ -29,17 +29,20 @@ test("a slot bank keeps its own scroll position beside the page's", () => {
     assert.deepEqual(bank, {scrollTop: 2310, scrollLeft: 0});
 });
 
-test("a taller Keys tab keeps enough page height when another tab is shown", () => {
+test("a taller workbench tab keeps enough page height when another tab is shown", () => {
     const previous = {querySelector: (selector) => selector === ".keys-pad .bench"
         ? {getBoundingClientRect: () => ({height: 820})} : null};
-    const height = captureKeysBenchHeight(previous, "keys", "keys");
+    const height = captureBenchHeight(previous, "keys", "keys");
     const nextBench = {style: {minHeight: ""}};
-    restoreKeysBenchHeight({querySelector: () => nextBench}, height);
+    restoreBenchHeight({querySelector: () => nextBench}, height);
     assert.equal(nextBench.style.minHeight, "820px");
-    assert.equal(captureKeysBenchHeight(previous, "keys", "lighting"), 0,
+    assert.equal(captureBenchHeight(previous, "keys", "lighting"), 0,
         "leaving Keys starts the other screen at its own height");
-    assert.equal(captureKeysBenchHeight(previous, "keys", "keys", true), 0,
+    assert.equal(captureBenchHeight(previous, "keys", "keys", true), 0,
         "an explicit section toggle lets a collapsed workbench shrink");
+    assert.equal(captureBenchHeight(previous, "lighting", "lighting"), 820,
+        "Lighting's workbench keeps its height across its tabs too, so its lists stay as tall");
+    assert.equal(captureBenchHeight(previous, "lighting", "keys"), 0, "but not into another screen");
 });
 
 test("a list that scrolls beside its editor keeps its place, under its own key", () => {
@@ -59,7 +62,7 @@ test("a list that scrolls beside its editor keeps its place, under its own key",
 test("a list's picked row is brought into view below its heading, and left alone when visible", () => {
     const row = {getBoundingClientRect: () => ({top: 700, bottom: 760})};
     const list = {scrollTop: 0, getBoundingClientRect: () => ({top: 100, bottom: 660}),
-        querySelector: (selector) => matches(selector, ".rowitem.on") ? row : matches(selector, ".rowlist-h") ? {getBoundingClientRect: () => ({height: 34})} : null};
+        querySelector: (selector) => matches(selector, "tr[data-pick][data-picked]") ? row : matches(selector, "thead") ? {getBoundingClientRect: () => ({height: 34})} : null};
     const root = {querySelector: (selector) => selector === "[data-scroll-list]" ? list : null};
     revealSelectedListRow(root);
     assert.equal(list.scrollTop, 100, "scrolled just far enough to show the row");

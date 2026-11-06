@@ -15,7 +15,7 @@ const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES, KEY_BEHAVIOR_TIER_FIELDS} = require("../schema/key-behavior-domain-v1");
 const {PD_AXIS, PD_KIND} = require("../schema/pd-mode-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
-const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
+const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {customKeyName} = require("../data/user-keycodes");
 const {UNIT, parseUnit} = require("./review-units");
@@ -314,33 +314,40 @@ function lightingRecords(value) {
     // Named and ordered as the Key feedback tab lists them: the tiers, then
     // the tap branches, then when and where.
     record(UNIT.rgb("key"), "Key feedback", "key", [
-        [word(V.feedbackOwners, "KEY_FEEDBACK_GROUP_TAP_COMMITTED"), colour(k.tapCommittedColor)], [word(V.feedbackOwners, "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), colour(k.holdActiveColor)],
-        [word(V.feedbackOwners, "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"), colour(k.longHoldActiveColor)],
+        ...(/** @type {const} */ (["tapCommittedColor", "holdActiveColor", "longHoldActiveColor"])).map(/** @returns {[string, Field]} */ (field) =>
+            [word(V.feedbackOwners, V.feedbackColourOwners[field]), colour(k[field])]),
         ...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [V.branches[i + 1] || `${i + 2} taps`, colour(value)]),
         [F.tapBranchCommit, nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
-    // LED groups are one record with every row that paints them: rows name
-    // groups by id, so a row put back without its group could point at a
-    // group that no longer exists. Groups read as the Lighting screen shows
-    // them, "Group 1 · 3 LEDs", and each row as who it paints for.
+    // Accents are one record with the groups they light: a row names its
+    // group by id, so a row put back without its group could point at one
+    // that no longer exists. Each accent reads as Lighting lists it, by who
+    // it lights for and its LEDs (D-L77); a group reads only while no accent
+    // lights it, as the unused LED set Ark drops at the next accent edit.
     const groups = new Map(r.groups.map(group => [group.id, group]));
+    const lit = new Set([r.layerGroupRows, r.pdModeGroupRows, r.comboGroupRows, r.keyGroupRows].flat().map(row => row.groupId));
     /** @type {[string, Field][]} */
-    const fields = r.groups.map(group => [`group:${group.id}`, {label: `Group ${group.id}`, text: `LEDs ${group.leds.join(", ")}`, key: group.leds.join(",")}]);
+    const fields = r.groups.filter(group => !lit.has(group.id))
+        .map(group => [`set:${group.leds.join(",")}`, {label: "Unused LED set", text: ledsCalled(group.leds), key: group.leds.join(",")}]);
+    /** @type {Record<string, import("../../contracts/model.js").AccentTable>} */
+    const tableOf = {layerGroupRows: "layer", pdModeGroupRows: "pdMode", comboGroupRows: "combo", keyGroupRows: "keyBehavior"};
     /** @template {{color: import("../schema/types.js").Hsv, groupId: number}} T @param {string} table @param {T[]} rows @param {(row: T) => string} owner @param {(row: T) => Mark | undefined} ownerMark */
     const overrides = (table, rows, owner, ownerMark) => rows.forEach((row, i) => {
-        const group = groups.get(row.groupId), leds = group ? `Group ${group.id} · ${group.leds.length} LED${group.leds.length === 1 ? "" : "s"}` : `Group ${row.groupId}`;
-        const paint = colour(row.color, "inherits the stage colour");
-        fields.push([`${table}:${i}`, {label: `Override · ${owner(row)}`, labelMark: ownerMark(row) || undefined, text: `${leds} · ${paint.text}`,
+        const group = groups.get(row.groupId), leds = group ? ledsCalled(group.leds) : `LED set ${row.groupId}`;
+        const paint = colour(row.color, V.accents[tableOf[table]].stageColour);
+        fields.push([`${table}:${i}`, {label: `Accent · ${owner(row)}`, labelMark: ownerMark(row) || undefined, text: `${leds} · ${paint.text}`,
             key: `${group?.leds.join(",")}|${paint.key}|${owner(row)}`, colour: paint.colour}]);
     });
-    overrides("layerGroupRows", r.layerGroupRows, row => row.selector === 255 ? "all layers" : layerName(row.selector), row => row.selector === 255 ? undefined : {kind: "layer", layer: row.selector});
-    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? "all pointing modes" : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
-    overrides("comboGroupRows", r.comboGroupRows, () => "combos", () => ({kind: "combo"}));
+    // Owners and an accent's stage colour are named as Lighting names them
+    // (vocabulary.accents), the owner that is all of them included.
+    overrides("layerGroupRows", r.layerGroupRows, row => row.selector === 255 ? V.accents.layer.every : layerName(row.selector), row => row.selector === 255 ? undefined : {kind: "layer", layer: row.selector});
+    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? V.accents.pdMode.every : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
+    overrides("comboGroupRows", r.comboGroupRows, () => V.accents.combo.every, () => ({kind: "combo"}));
     overrides("keyGroupRows", r.keyGroupRows, row => nameIn(V.feedbackOwners, rgbEnums.RGB_KEY_SEMANTICS, row.semantic), row => {
         const name = Object.entries(rgbEnums.RGB_KEY_SEMANTICS).find(([, id]) => id === row.semantic)?.[0];
         const tier = name === undefined ? undefined : V.feedbackTiers[name];
         return tier ? {kind: "tier", tier} : undefined;
     });
-    record(UNIT.rgb("groups"), "LED overrides", "groups", fields);
+    record(UNIT.rgb("groups"), "Accents", "accents", fields);
     return records;
 }
 

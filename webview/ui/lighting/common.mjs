@@ -1,11 +1,32 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {currentLayer, getModel, state} from "../../store.mjs";
+import {currentLayer, getModel, render, state} from "../../store.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 
 /** @param {string} title @param {string} [extra] */
 export const section = (title, extra = "") => el(`<section><div class="sect-h"><h4>${esc(title)}</h4>${extra}</div></section>`);
+
+// A group of a Lighting list folds as the Keymap's groups do, its open state
+// kept by "stage:group" across renders (state.lightingGroupsShut).
+/** @param {string} id @returns {{open: boolean, toggle: () => void}} */
+export function lightingGroup(id) {
+    const open = !state.lightingGroupsShut.includes(id);
+    return {open, toggle: () => {
+        state.lightingGroupsShut = open ? [...state.lightingGroupsShut, id] : state.lightingGroupsShut.filter((each) => each !== id);
+        render();
+    }};
+}
+
+// What a stage does, said the same way on every stage's tab: under its
+// editors, across them, before its accents.
+/** @param {string} text @param {...Node} more */
+export function aboutStage(text, ...more) {
+    const node = section("What this stage does");
+    node.className = "span";
+    node.append(el(`<p class="note stage-about">${esc(text)}</p>`), ...more);
+    return node;
+}
 
 /** @param {...Node} nodes */
 export function stack(...nodes) {
