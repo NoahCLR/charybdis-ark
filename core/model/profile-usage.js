@@ -67,15 +67,19 @@ function profileUsage(snapshot, capabilities) {
     // A macro slot is in use once it has steps; the rest are free unless the
     // macro memory has no room left for them.
     const macros = profileMacroBudget(decoded, capabilities);
+    // In the order of the Keymap workbench's tabs (Behaviours, Combos,
+    // Macros, Custom keys, Pointing modes), then Lighting, the screen after
+    // Keymap. Behaviours come before their tap counts, and LED sets before
+    // the accents that light them.
     const counts = /** @type {[import("../../contracts/model.js").UsageCountId, number, number | undefined, number?][]} */ ([
         ["behaviours", behaviors.rows.length, capabilities.maxBehaviorRows],
         ["behaviourSteps", behaviors.populatedStepCount, capabilities.maxPopulatedBehaviorSteps],
         ["combos", combos.rows.length, capabilities.maxCombos],
-        ["lightingGroups", lighting[4], capabilities.maxReusableRgbGroups],
-        ["lightingGroupRows", lighting[6] + lighting[8] + lighting[9] + lighting[11], capabilities.maxRgbStageGroupRows],
         ["macros", macroSlots.length - macros.empty, macroSlots.length, macros.outOfRoom.size],
         ["customKeys", customKeys, settings.customKeyNames.length],
         ["pointingModes", pdModes.filter(slot => slot.kind).length, pdModes.length],
+        ["lightingGroups", lighting[4], capabilities.maxReusableRgbGroups],
+        ["lightingGroupRows", lighting[6] + lighting[8] + lighting[9] + lighting[11], capabilities.maxRgbStageGroupRows],
     ]).filter(([, , limit]) => positive(limit)).map(([id, used, limit, unavailable]) =>
         ({id, used, limit: /** @type {number} */ (limit), ...(unavailable ? {unavailable} : {}), ...(FIXED_SETS.has(id) ? {fixed: /** @type {const} */ (true)} : {})}));
 

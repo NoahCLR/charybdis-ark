@@ -608,16 +608,16 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // "this key on" that layer.
     participationPlaces: {key: "this key on this layer", layer: "this layer", keyOn: "this key on"},
     // What a profile holds that the keyboard counts against a limit
-    // (profile-usage.js), as the keyboard's usage table names each.
+    // (profile-usage.js), as the keyboard's usage table names each, in its order.
     usageCounts: {
         behaviours: {label: "Behaviours", what: "Keys with a behaviour."},
         behaviourSteps: {label: "Behaviour tap counts", what: "Each behaviour's tap counts, up to the deepest one it sets, added up across all behaviours."},
         combos: {label: "Combos", what: "Combos on any layer."},
-        lightingGroups: {label: "LED sets", what: "The different sets of LEDs accents light; accents that light the same LEDs share one."},
-        lightingGroupRows: {label: "Accents", what: "Accents on layers, pointing modes, combo feedback and key feedback."},
         macros: {label: "Macros", what: "Macro slots with steps."},
         customKeys: {label: "Custom keys", what: "Custom keys with a name, a shortcut or a behaviour."},
         pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
+        lightingGroups: {label: "LED sets", what: "The different sets of LEDs accents light; accents that light the same LEDs share one."},
+        lightingGroupRows: {label: "Accents", what: "Accents on layers, pointing modes, combo feedback and key feedback."},
     },
     pointing: {
         kinds: [[0, "Empty"], [1, "Send keys"], [2, "Scroll"]],
