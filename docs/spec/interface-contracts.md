@@ -1260,7 +1260,10 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    choices in the vocabulary's words (`kinds`, `kindsDo`;
    `webview/ui/pointing/movement-choice.mjs`). Picking the other movement
    redraws the form for it and posts nothing; its first edit posts the new
-   movement. An empty slot starts a mode by the same choice, or copies one.
+   movement. An empty slot starts a mode by the same choice, or copies one:
+   its card is titled New pointing mode in the same title box (`titleText`)
+   and shows this step alone, so making a mode leaves the header and the
+   choice where they were.
 2. **What each direction sends** draws each direction the mode reads as a key
    placed where the ball sends it, around the ball (four, or eight with the
    diagonals); a click opens the picker on the keys a pointing mode sends, ×

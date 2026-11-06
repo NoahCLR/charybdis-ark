@@ -19,6 +19,7 @@ import {movement} from "./movement.mjs";
 import {lightRow, placeButton} from "./keys-and-light.mjs";
 import {startStep} from "./link.mjs";
 import {advancedControls} from "./advanced.mjs";
+import {step as pdStep} from "./step.mjs";
 import {tipFor, words} from "./common.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
@@ -66,13 +67,7 @@ export function editor(model, slot, canEdit, slots) {
 
     const steps = /** @type {HTMLElement} */ (card.querySelector(".pd-steps"));
     /** @param {number} n @param {string} title @param {string} [hint] */
-    const step = (n, title, hint = "") => {
-        const node = el(`<section class="pd-step" aria-labelledby="pd-step-${esc(slot.id)}-${n}">
-            <div class="pd-step-h"><span class="pd-n" aria-hidden="true">${n}</span><h4 id="pd-step-${esc(slot.id)}-${n}">${esc(title)}</h4>${hint ? `<span class="note">${esc(hint)}</span>` : ""}</div>
-            <div class="pd-step-b"></div></section>`);
-        steps.append(node);
-        return /** @type {HTMLElement} */ (node.querySelector(".pd-step-b"));
-    };
+    const step = (n, title, hint = "") => pdStep(steps, slot.id, n, title, hint);
     step(1, "What the ball does").append(movementChoice(model, slot.id, kind, {disabled: !canEdit,
         // Switching movement only redraws the form for the other kind: its
         // fields start empty, so staging now would post an invalid record.
