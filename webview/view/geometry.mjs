@@ -126,44 +126,6 @@ export function keyFaceRows(y, {tiers = false, combos = false, sub = false, icon
     return /** @type {import("./types.js").FaceRows} */ (rows);
 }
 
-// The corner of a cap that carries its LED's number where the board shows
-// them (Lighting): the number's left edge and baseline, the top of the room
-// it takes, and how much narrower than the cap a legend line reaching that
-// low is set, centred still, so it fits between the corners.
-export const LED_CORNER = Object.freeze({x: 4.5, baseline: GEO.keyH - 4.5, top: GEO.keyH - 11, width: GEO.keyW - 32});
-
-/**
- * Where a cap's legends stand and how large they are drawn, for its face rows
- * (keyFaceRows): the main legend, one line or two (fitLegend, or fitText over
- * a second line), and the second line. Each line is centred on its y. With
- * the LED's number in the corner (`ledIndex`), a line that would reach down
- * into its room is set narrower, between the corners (LED_CORNER).
- * @param {number} y the cap's top
- * @param {import("./types.js").FaceRows} rows
- * @param {{main: string, sub?: string, above: number, ledIndex?: boolean}} key
- * @returns {{size: number, lines: {text: string, squeeze: number, y: number}[], sub: {size: number, squeeze: number, y: number} | null}}
- */
-export function keyLegends(y, rows, {main, sub = "", above, ledIndex = false}) {
-    /** @param {number} centre @param {number} size */
-    const intoCorner = (centre, size) => ledIndex && centre + size / 2 > y + LED_CORNER.top;
-    /** @param {number} width */
-    const mainFit = (width) => {
-        const legend = sub
-            ? (({size, squeeze}) => ({size, lines: [{text: main, squeeze}]}))(fitText(main, above ? {max: 9.1, min: 6.4, width} : {max: 12, min: 7, width}))
-            : fitLegend(main, {max: 12, width});
-        const lines = legend.lines.map((line, order) => ({...line, y: rows.mainY + (order - (legend.lines.length - 1) / 2) * legend.size * 1.1}));
-        return {size: legend.size, lines};
-    };
-    const wide = mainFit(GEO.keyW - (sub ? 12 : 10));
-    const legend = wide.lines.some((line) => intoCorner(line.y, wide.size)) ? mainFit(LED_CORNER.width) : wide;
-    /** @param {number} width */
-    const subFit = (width) => fitText(sub, above ? {max: 6.4, min: 5.2, width} : {max: 8, min: 6.2, width});
-    const subY = rows.subY ?? 0;
-    const subWide = sub ? subFit(GEO.keyW - 12) : null;
-    const second = !subWide ? null : intoCorner(subY, subWide.size) ? subFit(LED_CORNER.width) : subWide;
-    return {...legend, sub: second ? {...second, y: subY} : null};
-}
-
 // Where each of a key's `count` icons stands in its row (keyFaceRows' iconY
 // and iconSize): their left edges, the row centred on the cap's middle `cx`.
 const ICON_GAP = 2;
@@ -173,8 +135,111 @@ export function keyIconsX(cx, count, size) {
     return Array.from({length: count}, (_, order) => left + order * (size + ICON_GAP));
 }
 
-// Roughly how wide a legend runs, so a label can be sized to fit its row rather
-// than bucketed by how many characters it happens to have.
+// ── the legends ─────────────────────────────────────────────────────────
+//
+// A cap's legends are set from one small scale, never sized to their own
+// width, so the board reads as one calm surface on every layer and every
+// screen (D-L78): a single character, as a keycap prints a letter, digit or
+// symbol, large; every name (Esc, Tab, Left Shift, a macro's) at one word
+// size; the hold under a dual-role key's line at one size of its own.
+// `step` is the one size below the word size, for a name that cannot fit it
+// even condensed. Whether a key also carries its LED's number changes
+// nothing: the number sits outside the legends (webview/ui/board.mjs).
+export const LEGEND_SIZES = Object.freeze({glyph: 12, word: 9, step: 7.6, hold: 6.6});
+// How far a line may be condensed at its own size before it steps down:
+// condensing keeps its height, which is what the eye compares across caps.
+export const LEGEND_CONDENSE = 0.86;
+// The weights a legend and a hold are drawn at, as .kc-label and .kc-sub
+// draw them (styles.css --fw-regular, --fw-bold), so each is measured as drawn.
+export const LEGEND_WEIGHTS = Object.freeze({name: 400, hold: 700});
+// Lines of a two-line legend, apart by this much of their size.
+const LINE_GAP = 1.12;
+// The room a legend line has across a cap: a tap over a line sits a little
+// narrower, as the line does.
+const ROOM = GEO.keyW - 10, ROOM_OVER_LINE = GEO.keyW - 12;
+
+/**
+ * How wide `text` runs at `size` in the board's face, at `weight`. The board
+ * measures it in the page; without one (in a test) it is estimated.
+ * @typedef {(text: string, size: number, weight: number) => number} MeasureText
+ */
+
+/**
+ * Where a cap's legends stand and how large they are drawn, for its face rows
+ * (keyFaceRows): the main legend, one line or two, each centred on its y, and
+ * the hold under the line. A line's `squeeze` is the width it is condensed
+ * into, 0 when it runs at its own width.
+ * @param {import("./types.js").FaceRows} rows
+ * @param {{main: string, sub?: string}} key
+ * @param {MeasureText} [measure]
+ * @returns {{size: number, lines: {text: string, squeeze: number, y: number}[], sub: {size: number, squeeze: number, y: number} | null}}
+ */
+export function keyLegends(rows, {main, sub = ""}, measure = estimateWidth) {
+    const tap = setLegend(main, {room: sub ? ROOM_OVER_LINE : ROOM, twoLines: !sub}, measure);
+    const lines = tap.lines.map((line, order) => ({
+        ...line,
+        y: rows.mainY + (order - (tap.lines.length - 1) / 2) * tap.size * LINE_GAP,
+    }));
+    if (!sub) return {size: tap.size, lines, sub: null};
+    // The hold keeps its one size: one too long is condensed into the row.
+    const size = LEGEND_SIZES.hold;
+    return {size: tap.size, lines, sub: {size, squeeze: squeezeInto(measure(sub, size, LEGEND_WEIGHTS.hold), ROOM_OVER_LINE), y: rows.subY ?? 0}};
+}
+
+/**
+ * One legend set on the scale. A single character takes the glyph size; a
+ * name the word size, on two lines when it has two or more words and the cap
+ * leaves room for two (legendBreak), else on one. A line too wide is
+ * condensed, up to LEGEND_CONDENSE, before the whole legend steps down to
+ * `step`; past that it is condensed into the row. Every word is kept, so the
+ * cap, the hover card and the key's label all read the whole name.
+ * @param {string} text @param {{room: number, twoLines: boolean}} where @param {MeasureText} measure
+ * @returns {{size: number, lines: {text: string, squeeze: number}[]}}
+ */
+export function setLegend(text, {room, twoLines}, measure = estimateWidth) {
+    const whole = String(text ?? "");
+    if ([...whole].length === 1) return {size: LEGEND_SIZES.glyph, lines: [{text: whole, squeeze: 0}]};
+    const parts = (twoLines && legendBreak(whole, measure)) || [whole];
+    // Each part's width at the word size; at any other size it scales with it.
+    const widths = parts.map((part) => measure(part, LEGEND_SIZES.word, LEGEND_WEIGHTS.name));
+    const size = Math.max(...widths) <= room / LEGEND_CONDENSE ? LEGEND_SIZES.word : LEGEND_SIZES.step;
+    return {size, lines: parts.map((part, order) => ({text: part, squeeze: squeezeInto(widths[order] * size / LEGEND_SIZES.word, room)}))};
+}
+
+// The width a line is condensed into: its row, when it runs wider; else 0.
+/** @param {number} width @param {number} room */
+const squeezeInto = (width, room) => width > room ? room : 0;
+
+/**
+ * Where a name breaks onto two lines: at a " · ", which parts its halves
+ * ("Slot 6" over "hold (empty)"), the dot dropped since the break says it;
+ * else between words where the longer line comes out shortest. A number is
+ * never left on a line of its own ("Custom" over "key 0", "Macro 0" whole).
+ * Null for a name that does not break: one word, or a word and its number.
+ * @param {string} text @param {MeasureText} [measure]
+ * @returns {[string, string] | null}
+ */
+export function legendBreak(text, measure = estimateWidth) {
+    const words = text.split(" ").filter(Boolean);
+    /** @type {{lines: [string, string], dot: boolean, longest: number}[]} */
+    const breaks = [];
+    for (let at = 1; at < words.length; at++) {
+        const first = words.slice(0, at), second = words.slice(at);
+        const dot = first.at(-1) === "·" || second[0] === "·";
+        if (first.at(-1) === "·") first.pop();
+        if (second[0] === "·") second.shift();
+        if (!first.length || !second.length) continue;
+        const lines = /** @type {[string, string]} */ ([first.join(" "), second.join(" ")]);
+        if (lines.some((line) => /^\d+$/.test(line)) || /^\d+$/.test(second[0])) continue;
+        breaks.push({lines, dot, longest: Math.max(...lines.map((line) => measure(line, 1, LEGEND_WEIGHTS.name)))});
+    }
+    const atDot = breaks.filter((option) => option.dot);
+    const best = (atDot.length ? atDot : breaks).sort((a, b) => a.longest - b.longest)[0];
+    return best ? best.lines : null;
+}
+
+// Roughly how wide a legend runs in the board's face, for where the page
+// cannot measure it.
 /** @param {string} char */
 const charWidth = (char) => {
     if (char === " ") return 0.32;
@@ -185,61 +250,7 @@ const charWidth = (char) => {
     if (/[a-z]/.test(char)) return 0.54;
     return 0.58;
 };
-
-/**
- * The size a legend takes to sit inside `width`, never above `max` and never
- * below `min`. `squeeze` is set when even the smallest size overruns, and is
- * the width to compress the glyphs into rather than let them spill off the cap.
- */
-/** @param {unknown} text @param {{max: number, min: number, width: number}} bounds */
-export function fitText(text, {max, min, width}) {
-    const unit = units(text);
-    const preferred = unit > 0 ? Math.min(max, width / unit) : max;
-    return {size: Math.round(Math.max(min, preferred) * 100) / 100, squeeze: unit * max > width ? width : 0};
-}
-
 /** @param {unknown} text */
 const units = (text) => [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
-// Roughly how wide `text` runs at `size`, as the fitting above judges it.
-/** @param {unknown} text @param {number} size */
-export const textWidth = (text, size) => units(text) * size;
-
-// The smallest a legend with a cap to itself is drawn: past it a name stops
-// reading at a laptop's width, so it takes two lines instead.
-export const LEGEND_MIN = 8;
-// Two lines share the cap, so neither is drawn larger than this.
-const TWO_LINE_MAX = 9.5;
-
-/**
- * A legend alone on its cap (no hold under a line): one line while it fits at
- * LEGEND_MIN or more, as `fitText` sizes it; otherwise two, broken between
- * words where the longer line comes out shortest, and a " · " the break falls
- * on dropped, since the break already parts them ("Slot 6" over "hold
- * (empty)"). Each line has its own `squeeze`, set only when a single word
- * overruns the row even at LEGEND_MIN. The words are never cut, so the hover
- * card and the key's label still read the whole name.
- */
-/** @param {unknown} text @param {{max: number, width: number}} bounds @returns {{size: number, lines: {text: string, squeeze: number}[]}} */
-export function fitLegend(text, {max, width}) {
-    const whole = String(text ?? "");
-    const one = () => {
-        const fit = fitText(whole, {max, min: LEGEND_MIN, width});
-        return {size: fit.size, lines: [{text: whole, squeeze: fit.squeeze}]};
-    };
-    if (units(whole) * LEGEND_MIN <= width) return one();
-    const words = whole.split(" ").filter(Boolean);
-    /** @param {string[]} part */
-    const line = (part) => part.join(" ");
-    let best = {first: "", second: "", longest: Infinity};
-    for (let at = 1; at < words.length; at++) {
-        const first = words.slice(0, at), second = words.slice(at);
-        if (first.at(-1) === "·") first.pop();
-        if (second[0] === "·") second.shift();
-        if (!first.length || !second.length) continue;
-        const longest = Math.max(units(line(first)), units(line(second)));
-        if (longest < best.longest) best = {first: line(first), second: line(second), longest};
-    }
-    if (best.longest === Infinity) return one();
-    const size = Math.round(Math.max(LEGEND_MIN, Math.min(TWO_LINE_MAX, max, width / best.longest)) * 100) / 100;
-    return {size, lines: [best.first, best.second].map((part) => ({text: part, squeeze: units(part) * size > width ? width : 0}))};
-}
+/** @type {MeasureText} */
+export const estimateWidth = (text, size, weight) => units(text) * size * (weight >= 600 ? 1.06 : 1);

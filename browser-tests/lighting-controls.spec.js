@@ -185,6 +185,11 @@ test("an accent is added from LEDs picked on the board, posting nothing until it
     // Every key is numbered by its LED, and the trackball too.
     await expect(page.locator('.board [data-led="0"] .kc-led')).toHaveText("0");
     await expect(page.locator('.board .kc-ball .kc-led')).toHaveText("56");
+    // The trackball has no corner: its number sits in its middle.
+    const [label, ball] = await Promise.all(['.board .kc-ball .kc-led', '.board .kc-ball circle'].map((selector) => page.locator(selector).first().boundingBox()));
+    if (!label || !ball) throw new Error("the trackball and its number are drawn");
+    expect(Math.abs(label.x + label.width / 2 - (ball.x + ball.width / 2))).toBeLessThan(1);
+    expect(Math.abs(label.y + label.height / 2 - (ball.y + ball.height / 2))).toBeLessThan(1);
     await section.getByRole("button", {name: "Add accent", exact: true}).click();
     const editor = section.locator(".accent-editor");
     await expect(editor.locator('[data-act="keep"]')).toBeDisabled();
@@ -274,6 +279,20 @@ test("in a narrow window a stage's list stacks over its editor, and nothing runs
         });
         expect(spill, stage).toBe(0);
     }
+});
+
+test("a key's legends are the same on Lighting as on the Keymap: its LED number moves none of them", async ({page}) => {
+    // Every legend, line and hold, by its key: its text, size, place and condensing.
+    const legends = () => page.locator(".board [data-key]").evaluateAll((keys) => Object.fromEntries(keys.map((key) => [key.getAttribute("data-key"),
+        [...key.querySelectorAll(".kc-label tspan, .kc-sub")].map((text) => [text.textContent, text.closest("text")?.getAttribute("font-size"),
+            text.getAttribute("y"), text.getAttribute("textLength")].join(" "))])));
+    await openControls(page, "keys", {layer: 0}, "dark", "shell=demo");
+    const keymap = await legends();
+    expect(Object.keys(keymap)).toHaveLength(56);
+    await page.locator('[data-screen="lighting"]').click();
+    await page.evaluate(async () => { const store = await import("/webview/store.mjs"); Object.assign(store.state, {stage: "layers", layer: 0}); store.render(); });
+    await expect(page.locator('.board [data-led="0"] .kc-led')).toHaveText("0");
+    expect(await legends()).toEqual(keymap);
 });
 
 test("a key's LED number keeps clear of its legends", async ({page}) => {

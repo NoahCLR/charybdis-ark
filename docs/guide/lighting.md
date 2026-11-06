@@ -161,8 +161,10 @@ mode** or **Every feedback state**, which you change or remove from any of
 their lists. Combo accents light for every combo. The background effect and
 the auto-mouse fade have none.
 
-Every key on the board, and the trackball, carries its LED's number in its
-corner, and accents name their LEDs by those numbers: **LEDs 24–28, 53–55**.
+Every key on the board carries its LED's number on a small label over its
+top-left corner, and the trackball in its middle; the keys' legends stay as
+they are on the Keymap. Accents name their LEDs by those numbers: **LEDs
+24–28, 53–55**.
 Point at an accent in a list and its LEDs glow on the board.
 
 1. **Add accent**, then click keys on the board to pick their LEDs, or drag

@@ -605,9 +605,9 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .keys-pad .board { width: 100%; }
 .kc-rect { fill: var(--key); stroke: var(--line-2); stroke-width: 1; transition: fill .12s ease, stroke .12s ease; }
 .kc:hover .kc-rect { fill: var(--key-hi); stroke: var(--line-3); }
-/* One typeface at one weight carries every cap; the size comes from the room
-   its row leaves, so a long legend shrinks rather than changing face. */
-.kc-label { fill: var(--text); font-family: var(--sans); font-weight: var(--fw-regular); text-anchor: middle; dominant-baseline: middle; letter-spacing: -.02em; }
+/* One typeface at one weight carries every cap, at the sizes of one scale
+   (keyLegends, webview/view/geometry.mjs; D-L78). */
+.kc-label { fill: var(--text); font-family: var(--sans); font-weight: var(--fw-regular); text-anchor: middle; dominant-baseline: middle; }
 .kc-sub { fill: var(--text); font-family: var(--sans); font-weight: var(--fw-bold); opacity: .78; text-anchor: middle; dominant-baseline: middle; }
 /* The rule is what makes a tap legend and a hold legend read as one key. */
 .kc-sep { opacity: .42; }
@@ -625,9 +625,12 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    apart from the selection's solid one, since the key wears the accent's
    light (D-L77). */
 .kc-pick { fill: none; stroke: var(--text); stroke-width: 2.2; stroke-dasharray: 4 2.6; pointer-events: none; }
-/* Each key's LED index on Lighting, in the key's bottom-left corner, in the
-   ink that reads on its light (ui/board.mjs). */
-.kc-led { font-family: var(--mono); font-size: 7.4px; font-weight: var(--fw-label); opacity: .72; pointer-events: none; }
+/* Each key's LED number on Lighting, on a label pinned over the key's
+   top-left corner (the trackball's in its middle), apart from its light, so
+   it reads the same on every colour and moves no legend (ui/board.mjs). */
+.kc-led { pointer-events: none; }
+.kc-led rect { fill: var(--bg); stroke: var(--line-2); stroke-width: .6; }
+.kc-led text { fill: var(--text-2); font-family: var(--mono); font-size: 5.6px; font-weight: var(--fw-bold); text-anchor: middle; dominant-baseline: middle; }
 /* An accent pointed at in a list on Lighting: its LEDs glow, as a drop
    target does, since a lit key's stroke is inline and a ring already means
    selected or picked. */
@@ -677,7 +680,6 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    the row reads as one scale: squares for key states, dots for branches, the
    badge as wide as its text needs. */
 .legend-item .ldot { width: 9px; height: 9px; margin: 1.5px; border-radius: 50%; display: inline-block; flex: none; border: 1.5px solid var(--line-3); }
-.kc-led { opacity: .95; }
 .kc-glow { filter: blur(7px); opacity: .5; }
 .board-legend { display: flex; gap: 8px 18px; padding: 8px 6px 4px; flex-wrap: wrap; align-items: center; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); line-height: 12px; color: var(--text-3); }
