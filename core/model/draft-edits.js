@@ -83,9 +83,8 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     updateComboFeedback: {editor: "profile", domain: "lighting", label: "Edited lighting"},
     updateKeyBehaviorFeedback: {editor: "profile", domain: "lighting", label: "Edited lighting"},
     updateRgbStages: {editor: "profile", domain: "lighting", label: "Edited lighting"},
-    saveRgbReusableLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
-    deleteRgbReusableLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
     addRgbLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
+    updateRgbLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
     deleteRgbLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
 }));
 /** @typedef {typeof DRAFT_EDIT_TYPES} Registry */

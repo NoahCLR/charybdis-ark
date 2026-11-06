@@ -26,12 +26,14 @@ export interface PanelState {
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
     railMenu: boolean; boardShortcuts: boolean; stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pointingSlot: number; pdKind: {slot: number; kind: number} | null;
     pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
-    pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; pdPreview: boolean; feedbackRow: string | undefined;
+    pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; feedbackRow: string | undefined; comboPreview: {id: number; keys: number[]} | null; lightingGroupsShut: string[];
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
     macroClipboard: MacroStep[] | null;
     recording: {slot: string; before: string} | null; lastTake: {slot: string; before: string; after: string} | null;
     recordDelays: boolean; recordPreserveHoldTiming: boolean; recordDelayThreshold: number; recordDelayRound: number;
-    ledPicks: number[]; trackball: boolean; rowColour: {h: string; s: string; v: string}; ledRow: {target: string; owner: string; source: string};
+    /** The accent being added or changed (D-L77): its stage and table, whether it lights for all of the table's owners (else for the one the tab has picked), its place in its table (null for a new one), the LEDs picked, whether a drag on the board adds them or takes them back, its colour and whether it takes its stage's instead. */
+    accent: {stage: string; target: import('../contracts/model.js').AccentTable; every: boolean; index: number | null; leds: number[]; adding: boolean; colour: {h: number; s: number; v: number}; stageColour: boolean} | null;
+
     overlay: string | null;
     settingsDurationUnits: Record<string, 'seconds' | 'minutes'>;
     leaveDemo: {ask: {title: string; detail: string; confirm: string}; message: PanelCommand} | null;

@@ -10,7 +10,7 @@
 // (a layer key anywhere in the profile, a pointing mode's key or a custom
 // key's shortcut, `qmkKeyTurnsOn`), it starts no pointing mode and is not the
 // pointer layer, it matches its combos on its own keys and no layer matches
-// on its, it has no layer colour that paints and owns no LED override, no key
+// on its, it has no layer colour that paints and owns no accent, no key
 // on it has Use behaviour or Join combos off, and each of its switches on the
 // Settings screens reads as the other empty layers' do. Ark does not know what
 // the firmware compiled each switch to, so a switch counts as set when it
@@ -38,7 +38,7 @@ export function emptyLayers(model) {
         const starts = any((model.pdModes || []).map((slot) => slot.linkedLayers || 0));
         const references = model.comboReferenceLayers || [];
         const matched = new Set(references.flatMap((reference, layer) => reference === layer ? [] : [layer, reference]));
-        const overridden = new Set((model.rgb?.layerLedGroups || []).map((row) => row.ownerLayer));
+        const overridden = new Set((model.rgb?.layerAccents || []).map((row) => row.ownerLayer));
         const placements = model.participation?.layers || [];
         const empty = new Set(model.layers.filter((layer) => {
             const bit = 2 ** layer.index;
@@ -85,3 +85,7 @@ export function foldEmptyLayers(model, items, layerOf, keep = () => false) {
 // What the disclosure says, the same in every place.
 /** @param {number} count */
 export const emptyLayersLabel = (count) => `${count} empty layer${count === 1 ? "" : "s"}`;
+// What a group of them is called where a list groups what it lists (a menu's
+// optgroup, a grouped table's band), and what they are.
+export const EMPTY_LAYERS_TITLE = "Empty layers";
+export const EMPTY_LAYERS_TIP = "The layers with nothing in them: no name, no keys and nothing that turns them on.";

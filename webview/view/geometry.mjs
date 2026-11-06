@@ -28,16 +28,21 @@ const RIGHT_THUMBS = new Set([51, 52, 55]);
 export const isRightHalf = (layoutIndex) =>
     layoutIndex < 48 ? layoutIndex % 12 >= 6 : RIGHT_THUMBS.has(layoutIndex);
 
-// Where an overlay paints. RGB_KEY_HALF and RGB_KEYS_ONLY depend on the key
-// that triggered the mode, so they are answered against that trigger.
-/** @param {number} layoutIndex @param {string} locality @param {number} [triggerIndex] */
-export function inLocality(layoutIndex, locality, triggerIndex) {
+// Where an overlay paints. RGB_KEY_HALF and RGB_KEYS_ONLY depend on the keys
+// that triggered it: a pointing mode's key, or every input of a held combo,
+// whose half is both halves when its keys span them (firmware RGB domain,
+// Values). With no trigger key, as a mode no key holds, the half is both
+// halves and the keys are every key.
+/** @param {number | readonly number[] | undefined} trigger */
+const triggerKeys = (trigger) => trigger === undefined ? [] : typeof trigger === "number" ? [trigger] : trigger;
+/** @param {number} layoutIndex @param {string} locality @param {number | readonly number[]} [trigger] */
+export function inLocality(layoutIndex, locality, trigger) {
+    const keys = triggerKeys(trigger);
     switch (locality) {
         case "RGB_LEFT_HALF": return !isRightHalf(layoutIndex);
         case "RGB_RIGHT_HALF": return isRightHalf(layoutIndex);
-        case "RGB_KEY_HALF":
-            return triggerIndex === undefined ? true : isRightHalf(layoutIndex) === isRightHalf(triggerIndex);
-        case "RGB_KEYS_ONLY": return triggerIndex === undefined ? false : layoutIndex === triggerIndex;
+        case "RGB_KEY_HALF": return !keys.length || keys.some((key) => isRightHalf(key) === isRightHalf(layoutIndex));
+        case "RGB_KEYS_ONLY": return !keys.length || keys.includes(layoutIndex);
         default: return true;
     }
 }
@@ -68,13 +73,14 @@ export function boardOutlineMarkup(className) {
 // The trackball LED answers localities on its own terms: it is soldered on the
 // right half, and no key maps to it, so a locality that names the trigger key
 // never reaches it.
-/** @param {string} locality @param {number} [triggerIndex] */
-export function trackballInLocality(locality, triggerIndex) {
+/** @param {string} locality @param {number | readonly number[]} [trigger] */
+export function trackballInLocality(locality, trigger) {
+    const keys = triggerKeys(trigger);
     switch (locality) {
         case "RGB_LEFT_HALF": return false;
         case "RGB_RIGHT_HALF": return true;
-        case "RGB_KEY_HALF": return triggerIndex === undefined ? true : isRightHalf(triggerIndex);
-        case "RGB_KEYS_ONLY": return false;
+        case "RGB_KEY_HALF": return !keys.length || keys.some(isRightHalf);
+        case "RGB_KEYS_ONLY": return !keys.length;
         default: return true;
     }
 }
@@ -120,6 +126,44 @@ export function keyFaceRows(y, {tiers = false, combos = false, sub = false, icon
     return /** @type {import("./types.js").FaceRows} */ (rows);
 }
 
+// The corner of a cap that carries its LED's number where the board shows
+// them (Lighting): the number's left edge and baseline, the top of the room
+// it takes, and how much narrower than the cap a legend line reaching that
+// low is set, centred still, so it fits between the corners.
+export const LED_CORNER = Object.freeze({x: 4.5, baseline: GEO.keyH - 4.5, top: GEO.keyH - 11, width: GEO.keyW - 32});
+
+/**
+ * Where a cap's legends stand and how large they are drawn, for its face rows
+ * (keyFaceRows): the main legend, one line or two (fitLegend, or fitText over
+ * a second line), and the second line. Each line is centred on its y. With
+ * the LED's number in the corner (`ledIndex`), a line that would reach down
+ * into its room is set narrower, between the corners (LED_CORNER).
+ * @param {number} y the cap's top
+ * @param {import("./types.js").FaceRows} rows
+ * @param {{main: string, sub?: string, above: number, ledIndex?: boolean}} key
+ * @returns {{size: number, lines: {text: string, squeeze: number, y: number}[], sub: {size: number, squeeze: number, y: number} | null}}
+ */
+export function keyLegends(y, rows, {main, sub = "", above, ledIndex = false}) {
+    /** @param {number} centre @param {number} size */
+    const intoCorner = (centre, size) => ledIndex && centre + size / 2 > y + LED_CORNER.top;
+    /** @param {number} width */
+    const mainFit = (width) => {
+        const legend = sub
+            ? (({size, squeeze}) => ({size, lines: [{text: main, squeeze}]}))(fitText(main, above ? {max: 9.1, min: 6.4, width} : {max: 12, min: 7, width}))
+            : fitLegend(main, {max: 12, width});
+        const lines = legend.lines.map((line, order) => ({...line, y: rows.mainY + (order - (legend.lines.length - 1) / 2) * legend.size * 1.1}));
+        return {size: legend.size, lines};
+    };
+    const wide = mainFit(GEO.keyW - (sub ? 12 : 10));
+    const legend = wide.lines.some((line) => intoCorner(line.y, wide.size)) ? mainFit(LED_CORNER.width) : wide;
+    /** @param {number} width */
+    const subFit = (width) => fitText(sub, above ? {max: 6.4, min: 5.2, width} : {max: 8, min: 6.2, width});
+    const subY = rows.subY ?? 0;
+    const subWide = sub ? subFit(GEO.keyW - 12) : null;
+    const second = !subWide ? null : intoCorner(subY, subWide.size) ? subFit(LED_CORNER.width) : subWide;
+    return {...legend, sub: second ? {...second, y: subY} : null};
+}
+
 // Where each of a key's `count` icons stands in its row (keyFaceRows' iconY
 // and iconSize): their left edges, the row centred on the cap's middle `cx`.
 const ICON_GAP = 2;
@@ -156,6 +200,9 @@ export function fitText(text, {max, min, width}) {
 
 /** @param {unknown} text */
 const units = (text) => [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
+// Roughly how wide `text` runs at `size`, as the fitting above judges it.
+/** @param {unknown} text @param {number} size */
+export const textWidth = (text, size) => units(text) * size;
 
 // The smallest a legend with a cap to itself is drawn: past it a name stops
 // reading at a laptop's width, so it takes two lines instead.

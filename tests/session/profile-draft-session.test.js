@@ -650,17 +650,18 @@ test("an edit past a count the keyboard caps is refused in words, by that count,
     const {failureSentence, PROFILE_FULL_WORDS} = require("../../core/model/vocabulary");
     const {RGB_DOMAIN_V1} = require("../../core/schema/rgb-domain-v1");
     const {validateSnapshot} = require("../../core/model/portable-profile");
-    // Each new LED set is a group of its own, until the keyboard's cap.
-    const groups = refusal(fixture().draft, led => ({type: "saveRgbReusableLedGroup", group: {ledIndices: [led]}}), 58);
+    // Each accent lighting LEDs no other accent lights takes a group of its
+    // own, until the keyboard's cap, long before its accents run out.
+    const groups = refusal(fixture().draft, led => ({type: "addRgbLedGroup", group: {target: "combo", ledIndices: [led], h: 0, s: 255, v: 100}}), 58);
     assert.equal(groups.code, "PROFILE_FULL");
     assert.equal(failureSentence(groups), PROFILE_FULL_WORDS.counts.lightingGroups(RGB_DOMAIN_V1.MAX_GROUPS));
-    assert.match(failureSentence(groups), /at most 16 LED groups/, "in the words the usage table counts them in");
+    assert.match(failureSentence(groups), /at most 16 different LED sets/, "in the words the usage table counts them in");
     assert.equal(groups.cause.code, "CAPACITY_EXCEEDED", "the format's own refusal stays beneath, for the diagnostics");
     // Colouring two reused groups on every layer, over and over, adds an LED
     // override each time: removing a behaviour or a macro frees none.
     const overrides = refusal(fixture().draft, index => ({type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [index % 2], h: 0, s: 255, v: 100}}), 80);
     assert.equal(failureSentence(overrides), PROFILE_FULL_WORDS.counts.lightingGroupRows(RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS));
-    assert.match(failureSentence(overrides), /at most 32 LED overrides/);
+    assert.match(failureSentence(overrides), /at most 32 accents/);
     // A behaviour past the keyboard's rows names behaviours alone.
     const {snapshot, caps} = fixture();
     const rows = validateSnapshot(snapshot.document).behaviors.rows.length;

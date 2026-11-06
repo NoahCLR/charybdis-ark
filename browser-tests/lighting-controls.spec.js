@@ -106,18 +106,22 @@ test("all Lighting policy selects post the chosen policy and retained colour", a
     }
 });
 
-test("key feedback names each colour once, in the list and on the board, grouped the same way", async ({page}) => {
+test("key feedback names each colour once, in its list, grouped as the behaviour grid is", async ({page}) => {
     await openStage(page, "key");
-    // Tiers, then the tap branches, in the list and on the board alike.
-    await expect(body(page).locator(".rowlist .rowlist-sub")).toHaveText(["Tiers", "Tap branches"]);
-    await expect(body(page).locator(".stage-chips-k")).toHaveText(["Tiers", "Tap branches"]);
-    const grouped = await body(page).locator(".rowlist").evaluate(list => [...list.querySelectorAll(".rowlist-sub, [data-row]")]
-        .map(node => node.classList.contains("rowlist-sub") ? `# ${node.textContent}` : node.getAttribute("data-row")));
+    // Tiers, then the tap branches, in the Keymap's grouped table, each group
+    // under its band, and named nowhere else on the tab.
+    const list = body(page).locator('[data-scroll-list="lighting-feedback"]');
+    await expect(list.locator(".group-h .ttl")).toHaveText(["Tiers", "Tap branches"]);
+    const grouped = await list.evaluate(node => [...node.querySelectorAll(".group-h .ttl, tr[data-row]")]
+        .map(each => each.matches(".ttl") ? `# ${each.textContent}` : each.getAttribute("data-row")));
     expect(grouped).toEqual(["# Tiers", "tapCommittedColor", "holdActiveColor", "longHoldActiveColor",
         "# Tap branches", "branch:0", "branch:1", "branch:2", "branch:3"]);
-    const listed = await body(page).locator(".rowlist [data-row]").allInnerTexts();
-    const chips = await body(page).locator(".stage-chips .chip").allInnerTexts();
-    expect(chips.map(text => text.trim())).toEqual(listed.map(text => text.replace(/\s*off$/, "").trim()));
+    // A band folds its group, as the Keymap's do.
+    await list.locator('.group-h[data-group="branches"]').click();
+    await expect(list.locator("tr[data-row]")).toHaveCount(3);
+    await list.locator('.group-h[data-group="branches"]').click();
+    await expect(body(page).locator(".chip")).toHaveCount(0);
+    await expect(body(page).locator(".stage-about")).toContainText("behaviour dots");
     const commit = body(page).locator('.seg[aria-label="Tap branch commit"] label');
     await expect(commit).toHaveText(["Off", "Double taps and more"]);
 });
@@ -174,61 +178,213 @@ test("hue and saturation/brightness dragging preview locally and commit once on 
     }
 });
 
-test("LED groups stage every table/owner/source/colour control and remove rows/groups", async ({page}) => {
-    await openStage(page, "groups");
-    const builder = body(page).locator(".builder > aside");
-    await expect(builder.locator('[data-act="save"]')).toBeDisabled();
-    await expect(builder.locator('[data-act="save"]')).toHaveAttribute("data-tip", /Pick LEDs/);
-    await page.locator('.board [data-key="0"]').click();
-    await expect(builder.locator(".sect-h .tag")).toHaveText("1 LED");
-    await page.locator('[data-act="trackball"]').click();
-    await expect(builder.locator(".sect-h .tag")).toHaveText("2 LEDs");
-    const reusable = body(page).locator("table.t").first();
-    await expect(reusable).not.toContainText(/RGB_|KEY_FEEDBACK_|POINTING_MODE_|PD_MODE_|pdMode|keyBehavior/);
-    await expect(reusable).toContainText("Pointing-mode LED groups: All pointing modes");
-    await expect(reusable).toContainText("Key feedback LED groups: Every feedback state");
-    await expect(body(page).locator(".sect-h .tag")).toHaveText(["2 LEDs", "0 rows", "1 row", "1 row", "1 row"]);
-    await builder.locator('[data-act="save"]').click();
-    await expectPost(page, {type: "saveRgbReusableLedGroup", group: {ledIndices: [0, 56]}});
-    await clearPosts(page);
-    await builder.getByRole("button", {name: "Give it a colour", exact: true}).click();
-    for (const [index, value] of [77, 78, 79].entries()) await change(channel(page, index), value);
+test("an accent is added from LEDs picked on the board, posting nothing until it is kept", async ({page}) => {
+    await openStage(page, "layers");
+    const section = body(page).locator('[data-accents="layer"]');
+    await expect(section.locator("h4")).toHaveText(/^Accents · /);
+    // Every key is numbered by its LED, and the trackball too.
+    await expect(page.locator('.board [data-led="0"] .kc-led')).toHaveText("0");
+    await expect(page.locator('.board .kc-ball .kc-led')).toHaveText("56");
+    await section.getByRole("button", {name: "Add accent", exact: true}).click();
+    const editor = section.locator(".accent-editor");
+    await expect(editor.locator('[data-act="keep"]')).toBeDisabled();
+    await expect(page.locator('.board [data-led="0"]')).toHaveAttribute("aria-pressed", "false");
+    // A press picks an LED and a drag across keys picks each it crosses.
+    const box = async (led) => {
+        await page.locator(`.board [data-led="${led}"]`).first().scrollIntoViewIfNeeded();
+        const rect = await page.locator(`.board [data-led="${led}"]`).first().boundingBox();
+        if (!rect) throw new Error(`LED ${led} is not drawn`);
+        return {x: rect.x + rect.width / 2, y: rect.y + rect.height / 2};
+    };
+    const [from, to] = [await box(0), await box(1)];
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, {steps: 6});
+    await page.mouse.up();
+    await expect(page.locator('.board [data-led="0"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('.board [data-led="1"]')).toHaveAttribute("aria-pressed", "true");
+    await page.locator(".board .kc-ball").click();
+    await expect(editor).toContainText("3 LEDs picked");
+    await expect(page.locator(".board-foot-text")).toContainText("3 picked");
+    for (const [index, value] of [77, 78, 79].entries()) await change(editor.locator(`[data-channel="${index}"]`), value);
     expect(await posted(page)).toEqual([]);
-    const cases = [
-        ["layer", "Layer 2", {target: "layer", owner: "Layer 2"}],
-        ["pdMode", "POINTING_MODE_VOLUME", {target: "pdMode", owner: "POINTING_MODE_VOLUME"}],
-        ["combo", null, {target: "combo"}],
-        ["keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", {target: "keyBehavior", owner: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"}],
-    ];
-    for (const [target, owner, expected] of cases) {
-        await builder.locator("[data-target]").selectOption(target);
-        if (owner) await builder.locator("[data-owner]").selectOption(owner);
-        await builder.locator("[data-source]").selectOption("");
-        await clearPosts(page);
-        await builder.locator('[data-act="keep"]').click();
-        await expectPost(page, {type: "addRgbLedGroup", group: {...expected, ledIndices: [0, 56], h: 77, s: 78, v: 79}});
+    await editor.locator('[data-act="keep"]').click();
+    await expectPost(page, {type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 1", ledIndices: [0, 1, 56], h: 77, s: 78, v: 79}});
+    await expect(section.locator(".accent-editor")).toHaveCount(0);
+
+    // For every layer, in the layer's own colour.
+    await clearPosts(page);
+    await section.getByRole("button", {name: "Add accent", exact: true}).click();
+    await page.locator('.board [data-led="5"]').click();
+    await section.locator(".accent-editor").getByText("Every layer", {exact: true}).click();
+    await section.locator(".accent-editor").getByText("Same as the layer", {exact: true}).click();
+    await expect(section.locator('.accent-editor [data-channel]')).toHaveCount(0);
+    await section.locator('.accent-editor [data-act="keep"]').click();
+    await expectPost(page, {type: "addRgbLedGroup", group: {target: "layer", owner: "RGB_LAYER_GROUP_ALL", ledIndices: [5], h: 0, s: 0, v: 0}});
+
+    // Cancel posts nothing.
+    await clearPosts(page);
+    await section.getByRole("button", {name: "Add accent", exact: true}).click();
+    await page.locator('.board [data-led="7"]').click();
+    await section.locator('.accent-editor [data-act="cancel"]').click();
+    await expect(page.locator('.board [data-led="7"]')).not.toHaveAttribute("aria-pressed", "true");
+    expect(await posted(page)).toEqual([]);
+});
+
+test("an accent being added lights for the layer the board shows, and one being changed is dropped where it is not listed", async ({page}) => {
+    await openStage(page, "layers");
+    const section = () => body(page).locator('[data-accents="layer"]');
+    await section().getByRole("button", {name: "Add accent", exact: true}).click();
+    await page.locator('.board [data-led="5"]').click();
+    // Picking another layer carries the new accent to it, as the list it sits in says.
+    await page.locator("#layer-tab-2").click();
+    await expect(section().locator("h4")).toHaveText(/^Accents · /);
+    await clearPosts(page);
+    await section().locator('.accent-editor [data-act="keep"]').click();
+    await expectPost(page, {type: "addRgbLedGroup", group: expect.objectContaining({target: "layer", owner: "Layer 2", ledIndices: [5]})});
+
+    // Layer 1's own accent, being changed, is no row of Layer 2's list.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.rgb.layerAccents = [{index: 0, owner: "Layer 1", ownerLayer: 1, color: {h: "10", s: "255", v: "200"}, ledIndices: [9], leds: "LED 9"}];
+        store.state.layer = 1;
+        store.setModel(model); store.render();
+    });
+    await section().locator('.accent-row [data-act="change"]').click();
+    await expect(section().locator(".accent-editor")).toHaveCount(1);
+    await page.locator("#layer-tab-2").click();
+    await expect(section().locator(".accent-editor"), "the editor goes with the row it changes").toHaveCount(0);
+    await expect(page.locator(".board-foot b")).toHaveText("Preview");
+    await clearPosts(page);
+    expect(await posted(page)).toEqual([]);
+});
+
+test("in a narrow window a stage's list stacks over its editor, and nothing runs past the workbench", async ({page}) => {
+    await page.setViewportSize({width: 800, height: 900});
+    await openControls(page, "lighting", {stage: "combo"}, "dark", "shell=demo");
+    const list = await body(page).locator(".bench-pane").boundingBox();
+    const editor = await body(page).locator(".stage-detail").boundingBox();
+    expect(list && editor && list.y + list.height <= editor.y + 1, "the list sits above the editor").toBe(true);
+    for (const stage of ["layers", "pd", "combo", "key"]) {
+        await page.evaluate(async (next) => { const store = await import("/webview/store.mjs"); store.state.stage = next; store.render(); }, stage);
+        const spill = await page.locator(".lighting-bench").evaluate((bench) => {
+            const right = bench.getBoundingClientRect().right;
+            return [...bench.querySelectorAll(".bench-body *")].filter((node) => node.getBoundingClientRect().right > right + 1).length;
+        });
+        expect(spill, stage).toBe(0);
     }
-    await builder.locator("[data-source]").selectOption("Group 0");
+});
+
+test("a key's LED number keeps clear of its legends", async ({page}) => {
+    await openControls(page, "lighting", {stage: "layers", layer: 0}, "dark", "shell=demo");
+    // In the cap's own coordinates, before a thumb key's turn.
+    const crossings = await page.locator(".board [data-key]").evaluateAll((keys) => keys.flatMap((key) => {
+        const mark = /** @type {SVGGraphicsElement | null} */ (key.querySelector(".kc-led"));
+        if (!mark) return [];
+        const led = mark.getBBox();
+        return [...key.querySelectorAll(".kc-sub, .kc-label")].filter((text) => {
+            const box = /** @type {SVGGraphicsElement} */ (text).getBBox();
+            return box.width && led.x < box.x + box.width && box.x < led.x + led.width && led.y < box.y + box.height && box.y < led.y + led.height;
+        }).map(() => key.getAttribute("aria-label"));
+    }));
+    expect(crossings).toEqual([]);
+});
+
+test("an accent is changed where it stands or removed, on the stage that paints it", async ({page}) => {
+    // The fixture's accents light the thumbs for every pointing mode, combo
+    // and feedback state, so each shows, and is edited, on every mode's list.
+    await openStage(page, "pd");
+    const section = body(page).locator('[data-accents="pdMode"]');
+    await expect(section.locator("h4")).toHaveText("Accents · Dragscroll");
+    const shared = section.locator(".accent-row");
+    await expect(shared).toContainText("LEDs 24–28, 53–55");
+    await expect(shared.locator(".tag")).toHaveText("Every pointing mode");
+    await shared.locator('[data-act="change"]').click();
+    for (const led of [24, 25, 26, 27, 28, 53, 54, 55]) await expect(page.locator(`.board [data-led="${led}"]`)).toHaveAttribute("aria-pressed", "true");
+    await page.locator('.board [data-led="28"]').click();
     await clearPosts(page);
-    await builder.locator('[data-act="keep"]').click();
-    await expectPost(page, {type: "addRgbLedGroup", group: {target: "keyBehavior", owner: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", ledGroupName: "Group 0", h: 77, s: 78, v: 79}});
+    await section.locator('.accent-editor [data-act="keep"]').click();
+    await expectPost(page, {type: "updateRgbLedGroup", target: "pdMode", index: 0, group: {owner: "RGB_POINTING_MODE_GROUP_ALL", ledIndices: [24, 25, 26, 27, 53, 54, 55], h: 0, s: 0, v: 0}});
+    // Narrowed to the mode it is changed on.
+    await section.locator('.accent-row [data-act="change"]').click();
+    await section.locator(".accent-editor").getByText("Dragscroll", {exact: true}).click();
     await clearPosts(page);
-    await body(page).locator('[data-delete="Group 0"]').click();
-    await expectPost(page, {type: "deleteRgbReusableLedGroup", name: "Group 0"});
-    await expect(body(page).locator('[data-delete="Group 1"]')).toBeDisabled();
-    const tables = body(page).locator("table.led-rows");
-    await expect(tables).toHaveCount(3);
-    for (const [index, target] of ["pdMode", "combo", "keyBehavior"].entries()) {
+    await section.locator('.accent-editor [data-act="keep"]').click();
+    await expectPost(page, {type: "updateRgbLedGroup", target: "pdMode", index: 0, group: {owner: "POINTING_MODE_DRAGSCROLL", ledIndices: [24, 25, 26, 27, 28, 53, 54, 55], h: 0, s: 0, v: 0}});
+
+    for (const [stage, target] of [["combo", "combo"], ["key", "keyBehavior"]]) {
+        await openStage(page, stage);
+        const accents = body(page).locator(`[data-accents="${target}"]`);
         await clearPosts(page);
-        await tables.nth(index).locator("[data-remove]").click();
+        await accents.locator('.accent-row [data-act="remove"]').click();
         await expectPost(page, {type: "deleteRgbLedGroup", target, index: 0});
     }
 });
 
-test("Lighting preview switches and screen links navigate without posting edits", async ({page}) => {
+test("All accents lists every accent by stage and owner, and Open shows it on its stage", async ({page}) => {
+    await openStage(page, "accents");
+    const rows = body(page).locator(".accents-overview .accent-row");
+    await expect(rows).toHaveCount(3);
+    await expect(body(page)).not.toContainText(/Group|RGB_|KEY_FEEDBACK_|POINTING_MODE_/);
+    await expect(rows.nth(0)).toContainText("Every pointing mode");
+    await expect(rows.nth(0)).toContainText("LEDs 24–28, 53–55");
+    await rows.nth(2).getByRole("button", {name: "Open", exact: true}).click();
+    await expect(page.locator('[data-ltab="key"]')).toHaveAttribute("aria-selected", "true");
+    await expect(body(page).locator('[data-accents="keyBehavior"] .accent-row .tag')).toHaveText("Every feedback state");
+    expect(await posted(page)).toEqual([]);
+});
+
+test("Pointing modes and Combo feedback always preview what they picked, and screen links navigate without posting edits", async ({page}) => {
     await openStage(page, "pd");
-    await body(page).getByText("Preview it active on the board", {exact: true}).click();
-    await expect(page.locator(".board-foot-text")).toContainText("held, painting");
+    await expect(page.locator(".board-foot-text")).toContainText("Dragscroll held, painting right half");
+    await expect(body(page).getByText("Preview it active on the board", {exact: true})).toHaveCount(0);
+    // An empty slot never runs, so nothing is previewed for it.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        store.state.pointingSlot = store.getModel().pdModes.find((slot) => !slot.kind).id;
+        store.render();
+    });
+    await expect(page.locator(".board-foot-text")).not.toContainText("held, painting");
+    expect(await posted(page)).toEqual([]);
+    // Combo feedback shows a combo held: the first, or the one picked. The
+    // demo stores combos, one of which holds a layer.
+    await openControls(page, "lighting", {stage: "combo"}, "dark", "shell=demo");
+    await clearPosts(page);
+    await expect(page.locator(".board-foot-text")).toContainText("C0 held, painting");
+    await expect(body(page).locator('tr[data-combo="0"]')).toHaveAttribute("data-picked", "true");
+    // Parted by what holding them shows: combo feedback first, then the
+    // combos that hold a layer, whose own light shows instead.
+    const list = body(page).locator('[data-scroll-list="lighting-combos"]');
+    await expect(list.locator(".group-h .ttl")).toHaveText(["Combo feedback", "Hold a layer"]);
+    await expect(list.locator('tbody[data-rows="layer"] tr[data-combo="10"]')).toHaveCount(1);
+    await expect(list.locator('tbody[data-rows="feedback"] tr[data-combo="10"]')).toHaveCount(0);
+    // Only the combos that fire on the layer shown: C3 fires on Base, not on Navigation.
+    await expect(body(page).locator('[data-combo="3"]')).toHaveCount(1);
+    await body(page).locator('[data-combo="3"]').click();
+    await expect(page.locator(".board .kc-reach"), "its keys are ringed, as on the Keymap").toHaveCount(4);
+    await body(page).locator('[data-combo="10"]').click();
+    await expect(page.locator(".board-foot-text"), "a combo that holds a layer shows no combo light, but that layer on").toContainText("C10 held, holding Function, whose own light shows the hold");
+    await expect(page.locator(".board-foot-text")).toContainText("Function");
+    // C14 is Backspace + Enter, and Base has a Backspace on each thumb: a
+    // ringed key holds it from there instead.
+    await body(page).locator('[data-combo="14"]').click();
+    await expect(page.locator(".board-foot-text")).toContainText("click a ringed key to hold it from that key");
+    const held = () => page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const {comboHeld} = await import("/webview/view/combo-held.mjs");
+        return comboHeld(store.currentView(), store.state.comboPreview)?.held || [];
+    });
+    const ringed = await page.locator(".board [data-key]:has(.kc-reach)").evaluateAll((keys) => keys.map((key) => Number(/** @type {HTMLElement} */ (key).dataset.key)));
+    const first = await held();
+    const other = ringed.find((key) => !first.includes(key));
+    expect(other, "a key that can hold it is not holding it").toBeDefined();
+    await page.locator(`.board [data-key="${other}"]`).click();
+    await expect.poll(held).toContain(other);
+    await expect(page.locator(".board .kc-reach")).toHaveCount(ringed.length);
+    await page.locator("#layer-tab-3").click();
+    await expect(body(page).locator('[data-combo="3"]'), "only the combos on this view are listed").toHaveCount(0);
+    await expect(body(page).locator(".group-h .ttl")).toHaveText(["Combo feedback", "Hold a layer"]);
     expect(await posted(page)).toEqual([]);
     await page.locator('[data-ltab="base"]').click();
     // The background effect is edited on its own stage, with the same colour
@@ -249,25 +405,26 @@ test("the pointing-mode list folds its empty slots at its end, as the layer list
     const slots = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel()?.pdModes?.map((slot) => ({id: slot.id, empty: !slot.kind})) || []);
     const empty = slots.filter((slot) => slot.empty && slot.id !== 0).map((slot) => slot.id);
     expect(empty.length, "the preview has empty slots to fold").toBeGreaterThan(0);
-    const toggle = list.locator('[data-all-slots="lighting-pointing"]');
-    await expect(toggle).toHaveText(`${empty.length} empty slot${empty.length === 1 ? "" : "s"}`);
+    const toggle = list.locator('.group-h[data-group="empty"]');
+    await expect(toggle.locator(".ttl")).toHaveText("Empty slots");
+    await expect(toggle.locator(".n")).toHaveText(String(empty.length));
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(list.locator(".rowitem")).toHaveCount(slots.length - empty.length);
-    await expect(list.locator(":scope > :last-child"), "the disclosure ends the list").toHaveAttribute("data-all-slots", "lighting-pointing");
+    await expect(list.locator("tr[data-slot]")).toHaveCount(slots.length - empty.length);
+    await expect(list.locator("tbody").last().locator(".group-h"), "the band ends the list").toHaveAttribute("data-group", "empty");
 
     // Opened, the empty slots follow it in slot order, so nothing shown moves;
     // one picked stays shown once they fold again. Folding posts nothing.
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    const after = await list.evaluate((node) => [...node.querySelectorAll('[data-all-slots] ~ .rowitem')].map((row) => Number(/** @type {HTMLElement} */ (row).dataset.slot)));
+    const after = await list.evaluate((node) => [...node.querySelectorAll('tbody[data-rows="empty"] tr[data-slot]')].map((row) => Number(/** @type {HTMLElement} */ (row).dataset.slot)));
     expect(after).toEqual(empty);
-    const picked = list.locator(`[data-slot="${empty[0]}"]`);
+    const picked = list.locator(`tr[data-slot="${empty[0]}"]`);
     await picked.click();
-    await expect(picked).toHaveClass(/\bon\b/);
+    await expect(picked).toHaveAttribute("data-picked", "true");
     await toggle.click();
-    await expect(list.locator(".rowitem")).toHaveCount(slots.length - empty.length + 1);
-    await expect(list.locator(`[data-slot="${empty[0]}"]`)).toHaveClass(/\bon\b/);
-    await expect(toggle).toHaveText(`${empty.length - 1} empty slot${empty.length === 2 ? "" : "s"}`);
+    await expect(list.locator("tr[data-slot]")).toHaveCount(slots.length - empty.length + 1);
+    await expect(list.locator(`tr[data-slot="${empty[0]}"]`)).toHaveAttribute("data-picked", "true");
+    await expect(toggle.locator(".n")).toHaveText(String(empty.length - 1));
     expect(await posted(page)).toEqual([]);
 });
 
@@ -275,16 +432,16 @@ test("the layer and pointing-mode lists scroll on their own and keep their place
     await openStage(page, "layers");
     const list = page.locator('[data-scroll-list="layers"]');
     const content = page.locator(".content");
-    // Every layer listed, the empty ones shown too, is too many for the card.
-    await list.locator('[data-empty-layers="lighting-layers"]').click();
-    await expect(list).toHaveClass(/\bmany\b/);
-    const layer = list.locator('[data-layer="12"]');
+    // Every layer listed, the empty ones shown too, is too many for its pane.
+    await list.locator('.group-h[data-group="empty"]').click();
+    await expect.poll(() => list.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
+    const layer = list.locator('tr[data-layer="12"]');
     await layer.scrollIntoViewIfNeeded();
     const position = await list.evaluate(node => node.scrollTop);
     expect(position, "the list scrolls inside its card").toBeGreaterThan(0);
     const page_ = await content.evaluate(node => node.scrollTop);
     await layer.click();
-    await expect(layer).toHaveClass(/\bon\b/);
+    await expect(layer).toHaveAttribute("data-picked", "true");
     await expect.poll(() => list.evaluate(node => node.scrollTop), {message: "a click redraws without losing the list's place"}).toBe(position);
     expect(await content.evaluate(node => node.scrollTop)).toBe(page_);
 
@@ -295,9 +452,38 @@ test("the layer and pointing-mode lists scroll on their own and keep their place
     await expect.poll(() => pointing.evaluate(node => node.scrollTop)).toBe(0);
     await page.locator('[data-ltab="layers"]').click();
     const shown = () => page.locator('[data-scroll-list="layers"]').evaluate(node => {
-        const bounds = node.getBoundingClientRect(), row = /** @type {Element} */ (node.querySelector(".rowitem.on")).getBoundingClientRect();
+        const bounds = node.getBoundingClientRect(), row = /** @type {Element} */ (node.querySelector("tr[data-picked]")).getBoundingClientRect();
         return row.top >= bounds.top && row.bottom <= bounds.bottom;
     });
     await expect.poll(shown, {message: "the picked layer is shown inside the list"}).toBe(true);
+    expect(await posted(page)).toEqual([]);
+});
+
+test("every stage's list is as tall as the others, filling the workbench beside its editor", async ({page}) => {
+    await openStage(page, "layers", "dark");
+    /** @type {Record<string, {pane: number, body: number}>} */
+    const heights = {};
+    for (const stage of ["layers", "pd", "combo", "key"]) {
+        await page.locator(`[data-ltab="${stage}"]`).click();
+        heights[stage] = await page.evaluate(() => {
+            const height = (/** @type {string} */ selector) => Math.round(document.querySelector(selector)?.getBoundingClientRect().height || 0);
+            return {pane: height(".workbench .bench-pane"), body: height("#benchBody")};
+        });
+    }
+    // The tallest stage sets the height for all of them, from the first one
+    // shown, as the Keymap's Behaviours tab sets its workbench's.
+    expect(new Set(Object.values(heights).map((each) => each.pane)).size, JSON.stringify(heights)).toBe(1);
+    for (const each of Object.values(heights)) expect(each.pane, "the list fills the body, with no gap under it").toBeGreaterThan(each.body - 60);
+    expect(await posted(page)).toEqual([]);
+});
+
+test("every stage says what it does, in one section under the same heading", async ({page}) => {
+    await openStage(page, "base");
+    for (const stage of ["base", "layers", "auto", "pd", "combo", "key"]) {
+        await page.locator(`[data-ltab="${stage}"]`).click();
+        const about = body(page).locator("section").filter({has: page.locator("h4", {hasText: /^What this stage does$/})});
+        await expect(about, stage).toHaveCount(1);
+        await expect(about.locator(".stage-about"), stage).not.toBeEmpty();
+    }
     expect(await posted(page)).toEqual([]);
 });

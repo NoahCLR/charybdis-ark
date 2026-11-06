@@ -28,17 +28,31 @@ test("RGB policies preserve zero and reject missing or malformed values", () => 
     for (const hue of ["", "bad", null, -1, 256]) assert.throws(() => edit(base, {type: "updateLayerColor", layer: "Layer 0", hue, sat: 0, val: 0, mode: "ALL_KEYS"}));
 });
 
-test("LED membership edits preserve references and refuse deleting an assigned group", () => {
-    const next = edit(base, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [0, 1, 57]}});
-    assert.deepEqual(rgb(next).groups.find(group => group.leds.includes(57)).leds, [0, 1, 57]);
-    assert.throws(() => edit(base, {type: "deleteRgbReusableLedGroup", name: "Group 1"}), /assignments/);
-    assert.throws(() => edit(base, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [58]}}));
+// Every accent table, and the groups no accent lights.
+const accents = rgbProfile => [rgbProfile.layerGroupRows, rgbProfile.pdModeGroupRows, rgbProfile.comboGroupRows, rgbProfile.keyGroupRows].flat();
+const unused = rgbProfile => rgbProfile.groups.filter(group => !accents(rgbProfile).some(row => row.groupId === group.id));
+
+test("an accent changed in place keeps its place and the accents around it, and refuses LEDs the keyboard lacks", () => {
+    const before = rgb(base);
+    const index = before.pdModeGroupRows.length - 1;
+    const next = edit(base, {type: "updateRgbLedGroup", target: "pdMode", index, group: {owner: "POINTING_MODE_VOLUME", ledIndices: [0, 1, 57], h: 5, s: 6, v: 7}});
+    const row = rgb(next).pdModeGroupRows[index];
+    assert.equal(rgb(next).pdModeGroupRows.length, before.pdModeGroupRows.length, "changed, not added");
+    assert.deepEqual([rgb(next).groups.find(group => group.id === row.groupId).leds, row.color, row.selector], [[0, 1, 57], {h: 5, s: 6, v: 7}, 1]);
+    assert.deepEqual(rgb(next).keyGroupRows.length, before.keyGroupRows.length, "other tables keep their accents");
+    assert.throws(() => edit(base, {type: "updateRgbLedGroup", target: "pdMode", index, group: {owner: "POINTING_MODE_VOLUME", ledIndices: [58], h: 0, s: 0, v: 0}}));
+    assert.throws(() => edit(base, {type: "updateRgbLedGroup", target: "pdMode", index: index + 1, group: {owner: "POINTING_MODE_VOLUME", ledIndices: [1], h: 0, s: 0, v: 0}}), /Accent/);
 });
 
-test("saving a group refuses one with no LEDs, new or edited", () => {
-    assert.throws(() => edit(base, {type: "saveRgbReusableLedGroup", group: {ledIndices: []}}), /Pick LEDs/);
-    assert.throws(() => edit(base, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: []}}), /Pick LEDs/);
-    assert.deepEqual(rgb(base).groups.map(group => group.leds.length).filter(length => !length), []);
+test("an accent lights some LEDs, and every accent edit drops the groups no accent lights", () => {
+    assert.throws(() => edit(base, {type: "addRgbLedGroup", group: {target: "combo", ledIndices: [], h: 0, s: 0, v: 0}}), /Pick LEDs/);
+    assert.throws(() => edit(base, {type: "updateRgbLedGroup", target: "combo", index: 0, group: {ledIndices: [], h: 0, s: 0, v: 0}}), /Pick LEDs/);
+    const added = edit(base, {type: "addRgbLedGroup", group: {target: "combo", ledIndices: [30], h: 1, s: 2, v: 3}});
+    assert.deepEqual(unused(rgb(added)), [], "a group the keyboard kept unlit goes at the next accent edit");
+    const removed = edit(added, {type: "deleteRgbLedGroup", target: "combo", index: rgb(added).comboGroupRows.length - 1});
+    assert.ok(!rgb(removed).groups.some(group => group.leds.join() === "30"), "and so does one whose last accent goes");
+    assert.deepEqual(rgb(removed).groups.map(group => group.id), rgb(removed).groups.map((_, index) => index), "ids stay consecutive from zero");
+    for (const row of accents(rgb(removed))) assert.ok(rgb(removed).groups.some(group => group.id === row.groupId), "every accent still names a group");
 });
 
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");

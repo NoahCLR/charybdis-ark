@@ -84,10 +84,11 @@ test("real device RGB retains every value and reference through the presentation
     assert.deepEqual(view.automouseFade.end_color, {h: "167", s: "255", v: "199"});
     assert.equal(view.keyBehaviorFeedback.tapCommitMode, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS");
     assert.equal(view.keyBehaviorFeedback.tapBranchColors.length, 4);
-    assert.deepEqual(view.ledGroups[1].ledIndices, [24, 25, 26, 27, 28, 53, 54, 55]);
-    assert.equal(view.ledGroups[1].usageCount, 3);
-    assert.equal(view.pdModeLedGroups[0].owner, "RGB_POINTING_MODE_GROUP_ALL");
-    assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_ALL");
+    assert.deepEqual(view.pdModeAccents[0].ledIndices, [24, 25, 26, 27, 28, 53, 54, 55], "an accent carries the LEDs its group holds");
+    assert.equal(view.pdModeAccents[0].leds, "LEDs 24–28, 53–55", "named as Lighting and the review name them");
+    assert.equal("ledGroups" in view, false, "the groups themselves are Ark's to keep (D-L77)");
+    assert.equal(view.pdModeAccents[0].owner, "RGB_POINTING_MODE_GROUP_ALL");
+    assert.equal(view.keyFeedbackAccents[0].owner, "KEY_FEEDBACK_GROUP_ALL");
     assert.equal(JSON.stringify(rgb), original, "converting a snapshot cannot mutate it");
 });
 
@@ -99,10 +100,10 @@ test("RGB selectors and disabled stages are displayed without inventing enabled 
     rgb.keyGroupRows[0].semantic = 0;
     const view = rgbForView(rgb);
     assert.ok(view.stages.every(stage => !stage.enabled));
-    assert.deepEqual(view.layerLedGroups.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
-    assert.deepEqual(view.layerLedGroups.map(r => r.ownerLayer), [0, undefined], "a layer's own group names its layer by number");
-    assert.equal(view.pdModeLedGroups[0].owner, "POINTING_MODE_DRAGSCROLL");
-    assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
+    assert.deepEqual(view.layerAccents.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
+    assert.deepEqual(view.layerAccents.map(r => r.ownerLayer), [0, undefined], "a layer's own group names its layer by number");
+    assert.equal(view.pdModeAccents[0].owner, "POINTING_MODE_DRAGSCROLL");
+    assert.equal(view.keyFeedbackAccents[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
 });
 
 test("authored and built-in behaviour labels use the profile's host naming rule", () => {

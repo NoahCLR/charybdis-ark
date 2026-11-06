@@ -37,14 +37,14 @@ test("a strip of tabs is one tab stop, walked by the arrows, Home and End, each 
     await expect(page.locator(".board")).toHaveAttribute("role", "tabpanel");
     await expect(page.locator(".board")).toHaveAttribute("aria-labelledby", String(id));
 
-    // Lighting's stages, LED groups included.
+    // Lighting's stages, All accents included.
     await page.locator('[data-screen="lighting"]').click();
     const stages = page.locator(".bench [role=tab]");
     await stages.first().focus();
     await page.keyboard.press("End");
-    await expect(page.locator("#stage-tab-groups")).toBeFocused();
-    await expect(page.locator("#stage-tab-groups")).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator("#benchBody")).toHaveAttribute("aria-labelledby", "stage-tab-groups");
+    await expect(page.locator("#stage-tab-accents")).toBeFocused();
+    await expect(page.locator("#stage-tab-accents")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#benchBody")).toHaveAttribute("aria-labelledby", "stage-tab-accents");
     expect(await posted(page)).toEqual([]);
 });
 
@@ -203,13 +203,17 @@ test("a board key says it is selected, and a key the draft changed says so", asy
     await expect(page.locator(".board [data-key].sel")).toHaveAttribute("aria-current", "true");
     await expect(page.locator('.board [data-key="25"]')).toHaveAttribute("aria-label", /, unsaved change$/);
     await expect(page.locator(".board [aria-label$=', unsaved change']")).toHaveCount(1);
-    // On LED groups a key is an LED, pressed while it is picked.
+    // On Lighting a key also names its LED, and while an accent is added it
+    // is pressed once picked, from the keyboard too.
     await page.locator('[data-screen="lighting"]').click();
-    await page.locator("#stage-tab-groups").click();
-    const led = page.locator(".board [data-key]").first();
+    await page.locator("#stage-tab-layers").click();
+    await expect(page.locator('.board [data-led="0"]')).toHaveAttribute("aria-label", /, LED 0/);
+    await page.locator('#benchBody [data-accents] [data-act="add"]').click();
+    const led = page.locator('.board [data-led="0"]');
     await expect(led).toHaveAttribute("aria-pressed", "false");
-    await led.click();
-    await expect(page.locator(".board [data-key]").first()).toHaveAttribute("aria-pressed", "true");
+    await led.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator('.board [data-led="0"]')).toHaveAttribute("aria-pressed", "true");
 });
 
 test("Diagnostics' Read keyboard is no part of its summary", async ({page}) => {

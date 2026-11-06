@@ -158,8 +158,9 @@ export const mappedKeyCount = (model, layer) => (layer?.positions || []).filter(
 export {inheritsStageColour, layerPaints};
 
 // What the colour editor says about HSV(0, 0, 0) in a stage, in the
-// vocabulary's words (colourOff), spread into its options. A layer colour and
-// a group row ("groups", not a stage) are the two places black is not black.
+// vocabulary's words (colourOff), spread into its options. A layer colour is
+// the one stage colour where black is not black (an accent's black takes its
+// stage's colour, which the accent editor offers as a choice of its own).
 /** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string}} */
 export const offWording = (model, stage) => vocabulary(model).colourOff[stage] || {};
 
@@ -180,11 +181,12 @@ function mappedOn(model, layer, l, position) {
  *
  *   background effect → every active layer's solid colour, ascending (layer 0 first,
  *   so the default layer shows through a mapped-keys-only layer above it) →
- *   the layer LED group rows → a previewed pointing mode by locality → its
- *   LED group rows.
+ *   the layers' accents → a held combo whose output runs the pointing mode →
+ *   a previewed pointing mode by locality → its accents → any other held
+ *   combo by locality → its accents (rules/led-light.mjs).
  *
  * The answer says what painted the LED last: `source` is the stage ("off",
- * "base", "layer" or "pointing") and, for a layer, `layer` is its id.
+ * "base", "layer", "pointing" or "combo") and, for a layer, `layer` is its id.
  *
  * `options.held` names the layers previewed on as well (by layer id); they
  * paint in the same ascending pass, as rgb_layer_stage.c paints every active
@@ -206,6 +208,7 @@ function ledLight(model, layer, led, position, options = {}) {
     const active = [...new Set([0, layer?.index ?? 0, ...(options.held || [])])].sort((a, b) => a - b);
     const lit = (/** @type {{ledIndices?: number[]}} */ group) => (group.ledIndices || []).includes(led ?? -1);
     const preview = options.pdActive;
+    const held = options.comboActive;
     return ledColour({
         off: lightingOff(model),
         base: base ? {colour: base, source: animated ? "animated" : "base"} : null,
@@ -213,11 +216,14 @@ function ledLight(model, layer, led, position, options = {}) {
             const row = layerColourRow(model, l);
             return {layer: l, colour: row?.color, paints: Boolean(row) && (row?.mode === "ALL_KEYS" || mappedOn(model, layer, l, position))};
         }) : null,
-        layerGroups: (model?.rgb?.layerLedGroups || []).filter(lit).map((group) => ({colour: group.color,
-            owners: group.owner === "RGB_LAYER_GROUP_ALL" ? active : active.filter((l) => group.ownerLayer === l)})),
+        layerGroups: (model?.rgb?.layerAccents || []).filter(lit).map((group) => ({colour: group.color,
+            owners: group.owner === vocabulary(model).accents.layer?.everyOwner ? active : active.filter((l) => group.ownerLayer === l)})),
         pointing: preview && stageEnabled(model, "pd") ? {colour: preview.color,
             reaches: position ? inLocality(position.layoutIndex, preview.locality, preview.triggerIndex) : trackballInLocality(preview.locality, preview.triggerIndex),
-            groups: (model?.rgb?.pdModeLedGroups || []).filter((group) => lit(group) && (group.owner === "RGB_POINTING_MODE_GROUP_ALL" || group.owner === preview.mode)).map((group) => group.color)} : null,
+            groups: (model?.rgb?.pdModeAccents || []).filter((group) => lit(group) && (group.owner === vocabulary(model).accents.pdMode?.everyOwner || group.owner === preview.mode)).map((group) => group.color)} : null,
+        combo: held && stageEnabled(model, "combo") ? {colour: held.color,
+            reaches: position ? inLocality(position.layoutIndex, held.locality, held.inputs) : trackballInLocality(held.locality, held.inputs),
+            groups: (model?.rgb?.comboAccents || []).filter(lit).map((group) => group.color), beneath: Boolean(held.beneath)} : null,
     });
 }
 

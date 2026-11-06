@@ -39,7 +39,7 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
     const drawn = await page.evaluate(async ({NAVIGATION, ZOOM}) => {
         const {getModel} = await import("/webview/store.mjs");
         const {mark, marked} = await import("/webview/ui/marks.mjs");
-        const {groupRowsTable} = await import("/webview/ui/lighting/led-rows.mjs");
+        const {accentsOverview} = await import("/webview/ui/lighting/accents.mjs");
         const {reviewItem} = await import("/webview/ui/review-items.mjs");
         const model = getModel();
         // The page takes markup only through the panel's policy (Trusted Types).
@@ -55,8 +55,10 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
             layer: read(box(mark(model, {kind: "layer", layer: NAVIGATION}))),
             pointing: read(box(mark(model, {kind: "pointing", slot: ZOOM}))),
             slotted: read(box(marked(model, {kind: "layer", layer: NAVIGATION}, "Navigation", {slot: true}))),
-            owners: read(groupRowsTable([{owner: `Layer ${NAVIGATION}`, ledGroup: "Inline", ledIndices: [0], color: {h: "0", s: "0", v: "0"}}], "layer"))
-                .icons.concat(read(groupRowsTable([{owner: zoomMode, ledGroup: "Inline", ledIndices: [0], color: {h: "0", s: "0", v: "0"}}], "pdMode")).icons),
+            owners: read(accentsOverview({...model, rgb: {...model.rgb,
+                layerAccents: [{index: 0, owner: `Layer ${NAVIGATION}`, ledIndices: [0], leds: "LED 0", color: {h: "0", s: "0", v: "0"}}],
+                pdModeAccents: [{index: 0, owner: zoomMode, ledIndices: [0], leds: "LED 0", color: {h: "0", s: "0", v: "0"}}],
+                comboAccents: [], keyFeedbackAccents: []}})).icons,
             review: read(box(reviewItem(model, {unit: "x", title: "Right Option", status: "changed", fields: [
                 {label: "Hold", status: "changed", before: "Hold Navigation", after: "Zoom", beforeMark: {kind: "layer", layer: NAVIGATION}, afterMark: {kind: "pointing", slot: ZOOM}},
             ]}))),
@@ -78,7 +80,7 @@ test("a layer and a pointing mode are marked by their icon in their colour", asy
     expect(drawn.layer).toEqual({icons: ["layer"], swatches: 0});
     expect(drawn.pointing).toEqual({icons: ["pointing"], swatches: 0});
     expect(drawn.slotted).toEqual({icons: ["layer"], swatches: 0});
-    expect(drawn.owners, "Lighting's LED groups name their owners by mark").toEqual(["layer", "pointing"]);
+    expect(drawn.owners, "All accents names their owners by mark").toEqual(["layer", "pointing"]);
     expect(drawn.review).toEqual({icons: ["layer", "pointing"], swatches: 0});
     expect(drawn.colour).toBe(1);
     expect(drawn.layerSet, "a set of layers marks each layer before its name").toEqual({icons: 2, names: ["Base", "Navigation"], text: "Base, Navigation"});

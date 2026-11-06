@@ -7,7 +7,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {lightingOff} from "../../view/lighting.mjs";
 import * as edits from "../../view/edits.mjs";
 import {sectionsIn} from "../../view/settings-layout.mjs";
-import {colourControl, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, section, stack} from "./common.mjs";
 
 // The background effect is QMK's own RGB Matrix effect: drawn first, under
 // every stage, on the LED classes it is given; a layer with no colour shows
@@ -60,9 +60,7 @@ export function stageBase(model) {
     });
     how.append(stack(choice(field("effectMode")), choice(field("effectLeds")), speedControl));
 
-    const under = section("Under every stage");
-    under.append(el(`<p class="note">QMK's own effect, drawn first. Every stage paints over it.</p>`));
-    if (lightingOff(model)) under.append(el(`<div class="callout">All lighting is off, so nothing is lit. Its switch is at the top of this screen.</div>`));
-    node.append(colour, how, under);
+    node.append(colour, how, aboutStage("QMK's own effect, drawn first, under every stage: each one paints over it, and a layer with no colour shows it.",
+        ...(lightingOff(model) ? [el(`<div class="callout">All lighting is off, so nothing is lit. Its switch is at the top of this screen.</div>`)] : [])));
     return node;
 }

@@ -202,6 +202,14 @@ Showing several layers stacked on the board the way the keyboard would
 resolve them.
 _Avoid_: layer stack, overlay view
 
+**Accent**:
+LEDs that light in a colour of their own, or their stage's, while a layer is
+on, a pointing mode runs, a combo's inputs are held or a key shows a feedback
+state (D-L77). It is added and changed on that stage's tab on Lighting, its
+LEDs picked on the board and named by index ("LEDs 24–28, 53–55"). The
+different sets of LEDs accents light are **LED sets**; Ark keeps them.
+_Avoid_: LED group, LED override, group row, assignment
+
 **Empty layer**:
 A layer with nothing in it: not the base or a default layer, no name of its
 own, no key mapped, and nothing that uses it (D-L76). Lists of layers fold

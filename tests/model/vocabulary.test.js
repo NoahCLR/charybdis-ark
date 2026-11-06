@@ -74,8 +74,24 @@ test("Import's summary names only settings sections the keyboard's model publish
     assert.deepEqual(Object.keys(VOCABULARY.fileSections).filter(id => !sections.includes(id)), []);
 });
 
-test("every LED group row table has a word, by the target its edits name", () => {
-    assert.deepEqual(VOCABULARY.ledTables.map(([id]) => id), ["layer", "pdMode", "combo", "keyBehavior"]);
+test("every accent table has its words, by the target its edits name, and an owner standing for all of it where it has one", () => {
+    const {RGB_EVERY_OWNER, RGB_KEY_SEMANTICS} = require("../../core/schema/rgb-domain-v1");
+    assert.deepEqual(Object.keys(VOCABULARY.accents), ["layer", "pdMode", "combo", "keyBehavior"]);
+    for (const [target, {everyOwner, ...words}] of Object.entries(VOCABULARY.accents)) {
+        assert.ok(words.when && words.stageColour && words.every, `${target} says when its accents light, what lighting for all of it is called and what the stage's colour is`);
+        assert.equal(everyOwner, RGB_EVERY_OWNER[/** @type {keyof typeof RGB_EVERY_OWNER} */ (target)], "the owner core reads and writes for all of it, which combo's table has none of");
+        assert.doesNotMatch(Object.values(words).join(" "), /group|override|row/i, "in the words a person uses (D-L77)");
+    }
+    assert.ok(Object.hasOwn(RGB_KEY_SEMANTICS, RGB_EVERY_OWNER.keyBehavior), "every feedback state is the key semantic for all of them");
+    for (const owner of Object.values(VOCABULARY.feedbackColourOwners)) assert.ok(Object.hasOwn(RGB_KEY_SEMANTICS, owner), `${owner} is a key feedback state the keyboard knows`);
+});
+
+test("an accent's LEDs read by index, a run of three or more as a range", () => {
+    const {ledsCalled} = require("../../core/model/vocabulary");
+    assert.equal(ledsCalled([55, 24, 25, 26, 27, 28, 53, 54]), "LEDs 24–28, 53–55");
+    assert.equal(ledsCalled([39, 42, 47, 51]), "LEDs 39, 42, 47, 51");
+    assert.equal(ledsCalled([4, 5, 5]), "LEDs 4, 5", "two in a row are two, and a repeat is one");
+    assert.equal(ledsCalled([56]), "LED 56");
 });
 
 test("tap commit names the taps it flashes for: a double tap or more", () => {

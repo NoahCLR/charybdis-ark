@@ -28,7 +28,7 @@ const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema
 const {dpiChoices} = require("./pointer-dpi");
 const {pointingTapKeys} = require("./pointing-taps");
 const {linkStarts, linkTargets, pointerCoveredLayers} = require("./pointing-links");
-const {keycodeLayersOn} = require("./layer-effects");
+const {comboHeldShows, keycodeLayersOn} = require("./layer-effects");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
 const {customKeyEditorView} = require("./custom-key-editor");
@@ -157,7 +157,8 @@ function profileModel(content, capabilities, editing) {
     // and custom key's, by every name the interface reads it under, so the
     // interface says which keys reach a mode its layers start without
     // working out what a keycode does (layer-effects.js keycodeLayersOn).
-    const turnsOn = keycodeLayersOn(linkSettings ? {settings: linkSettings, pdModes: content.domains.pdModes || []} : {settings: {values: [], names: [], customKeyShortcuts: []}, pdModes: []});
+    const linkProfile = linkSettings ? {settings: linkSettings, pdModes: content.domains.pdModes || []} : {settings: {values: [], names: [], customKeyShortcuts: []}, pdModes: []};
+    const turnsOn = keycodeLayersOn(linkProfile);
     /** @type {Record<string, number>} */
     const keyTurnsOn = {};
     const pointingKeys = PD_MODE_KEYS.flatMap((keys) => [keys.holdCode, keys.lockCode]);
@@ -173,7 +174,11 @@ function profileModel(content, capabilities, editing) {
     const keyKinds = sharedRecord(keyKindsByName(catalog.aliases), base.catalog.qmkKeyKinds);
     const layers = layersForView(content.layers, catalog.labels, catalog.aliases, names, content.domains.settings?.values ? alwaysOnLayers(content.domains.settings.values) : 1);
     const outputLayers = comboOutputBehaviorLayers(content.domains.settings, content.domains.keyBehaviors?.rows || []);
-    const combos = comboRowsForView(content.comboRows, catalog.labels).map((combo, index) => ({...combo, outputBehaviorLayers: outputLayers(content.comboRows[index])}));
+    // What holding each combo shows instead of its combo feedback: the layers
+    // its output holds, or the pointing mode it runs (layer-effects.js).
+    const heldShows = comboHeldShows(linkProfile);
+    const combos = comboRowsForView(content.comboRows, catalog.labels).map((combo, index) =>
+        ({...combo, outputBehaviorLayers: outputLayers(content.comboRows[index]), ...heldShows(content.comboRows[index].output)}));
     // Which layer's keys combos match while each layer is on top
     // (combo-reach.js): the profile's records, else the keyboard's readback.
     const references = comboReferenceLayers(content.settingsView?.comboReferences, content.comboInfo?.layerReferences);

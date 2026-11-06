@@ -41,14 +41,14 @@ test("a draft change resets forms, applies each field's rule to the state before
 
 // Every field of the panel's state, by what a draft change does to it. A new
 // field joins one of these lists, so its decision is made in review.
-const RESETS = ["retarget", "pdKind", "pdTaps", "lastTake"];
+const RESETS = ["retarget", "pdKind", "pdTaps", "lastTake", "accent"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
     "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "flashPausesAsked", "keyDetailsOpen", "stackOpen", "emptyLayersShown", "allSlotsShown", "definitionLayersOpen", "checkGroupsOpen", "cellHow", "placement",
-    "macroClipboard", "keyClipboard", "stage", "railMenu", "boardShortcuts", "layersOpen", "layersAsked", "pointingSlot", "pdAdvanced", "applyDismissed", "recoveryAsk", "pdPreview", "feedbackRow",
+    "macroClipboard", "keyClipboard", "stage", "railMenu", "boardShortcuts", "layersOpen", "layersAsked", "pointingSlot", "pdAdvanced", "applyDismissed", "recoveryAsk", "feedbackRow", "comboPreview", "lightingGroupsShut",
     "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
-    "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "overlay", "leaveDemo", "modeAsk", "confirmChecks",
+    "recordDelayRound", "overlay", "leaveDemo", "modeAsk", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",
 ];
 
@@ -68,14 +68,15 @@ test("a draft change resets the existing forms and preserves historically kept p
         screen: "macros", layer: 2, layersOn: [1], selected: 7, tab: "behaviours", cell: "0-hold", cellRow: "QK_USER_16",
         cellHow: {cell: "0-hold", keycode: "QK_USER_16", style: "REPEAT_WHILE_HELD", repeatHz: "20"},
         placement: {keycode: "MACRO_1"}, keyClipboard: {keycode: "KC_A", label: "A"}, pointingSlot: 2, macroSlot: "MACRO_0",
-        macroSearch: "hello", ledPicks: [1, 4], trackball: true, rowColour: {h: "10", s: "20", v: "30"},
-        ledRow: {target: "pdMode", owner: "PD_MODE_0", source: "Thumbs"}, recordPreserveHoldTiming: true, overlay: "history",
+        macroSearch: "hello", recordPreserveHoldTiming: true, overlay: "history",
         notice: "Saved.", recording: null,
     };
     Object.assign(state, standing, {
         retarget: {from: "QK_USER_16", to: "KC_B", existing: "QK_USER_17"},
         pdKind: {slot: 1, kind: 2}, pdTaps: {slot: 1, rows: {"dir:up": {}}},
         lastTake: {slot: "MACRO_0", before: "abc"},
+        // An unkept accent names its row by place, which a replaced draft may move.
+        accent: {stage: "layers", target: "layer", every: false, index: 0, leds: [1, 4], adding: true, colour: {h: 10, s: 20, v: 30}, stageColour: false},
         macroForms: {MACRO_0: {draft: "unstaged", stepError: "bad"}},
     });
     openComboBuilder({id: 4, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: 40, followsDefault: false, enabled: true, allowedLayers: 1});

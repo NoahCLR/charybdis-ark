@@ -2,16 +2,21 @@
 // The slot bank's own controls (view/slot-bank.mjs): New, which opens the
 // first free slot in the editor with its name ready to type, and the one
 // disclosure the unused slots fold behind, its open state kept per bank. A
-// list of slots beside an editor (Lighting's pointing modes) folds its empty
-// slots behind the same disclosure, worded as a list of layers words its empty
-// layers (ui/empty-layers.mjs).
+// grouped table of slots (Lighting's pointing modes) folds them under its
+// last band instead, the same open state kept (toggleAllSlots), worded as
+// view/slot-bank.mjs words it.
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 import {render, state} from "../store.mjs";
-import {allSlotsLabel, emptySlotsLabel} from "../view/slot-bank.mjs";
+import {allSlotsLabel} from "../view/slot-bank.mjs";
 
 // Whether this bank ("macros", "customKeys", "pointing", "lighting-pointing") shows every slot.
 /** @param {string} bank */
 export const allSlotsShown = (bank) => state.allSlotsShown.includes(bank);
+// Shows this bank's unused slots, or folds them again.
+/** @param {string} bank */
+export const toggleAllSlots = (bank) => {
+    state.allSlotsShown = allSlotsShown(bank) ? state.allSlotsShown.filter((each) => each !== bank) : [...state.allSlotsShown, bank];
+};
 
 /**
  * @param {string} bank
@@ -26,23 +31,15 @@ export function slotBankControls(bank, {noun, count, free, canEdit, pick}) {
         render();
         /** @type {HTMLInputElement | null} */ (document.querySelector(".name-titlebar [data-name]"))?.focus();
     });
-    return {add, toggle: disclosure(bank, "all-slots", allSlotsLabel(count))};
+    return {add, toggle: disclosure(bank, allSlotsLabel(count))};
 }
 
-// The disclosure at the end of a list of slots, holding its `count` empty
-// ones; a slot holds no `noun` ("mode") when it is empty.
-/** @param {string} bank @param {number} count @param {string} noun @param {string} [className] */
-export const emptySlotsButton = (bank, count, noun, className = "") =>
-    disclosure(bank, `empty-slots${className ? ` ${className}` : ""}`, emptySlotsLabel(count),
-        allSlotsShown(bank) ? "Hide the empty slots." : `Show the slots with no ${noun} in them.`);
-
-/** @param {string} bank @param {string} className @param {string} label @param {string} [tip] */
-function disclosure(bank, className, label, tip = "") {
+/** @param {string} bank @param {string} label */
+function disclosure(bank, label) {
     const open = allSlotsShown(bank);
-    const toggle = /** @type {HTMLButtonElement} */ (el(`<button type="button" class="${esc(className)}" data-all-slots="${esc(bank)}" aria-expanded="${open}"
-        ${tip ? `data-tip="${esc(tip)}"` : ""}>${DISCLOSURE}<span>${esc(label)}</span></button>`));
+    const toggle = /** @type {HTMLButtonElement} */ (el(`<button type="button" class="all-slots" data-all-slots="${esc(bank)}" aria-expanded="${open}">${DISCLOSURE}<span>${esc(label)}</span></button>`));
     toggle.addEventListener("click", () => {
-        state.allSlotsShown = open ? state.allSlotsShown.filter((each) => each !== bank) : [...state.allSlotsShown, bank];
+        toggleAllSlots(bank);
         render();
     });
     return toggle;

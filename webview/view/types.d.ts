@@ -52,7 +52,11 @@ export interface DraftMarks {
     layerNames: boolean;
 }
 
-export interface LightOptions {held?: number[]; pdActive?: null | {locality: string; triggerIndex?: number; color: import('../../contracts/edits.js').Colour; mode: string}}
+export interface LightOptions {held?: number[];
+    /** A running pointing mode: its colour, locality, the key or keys that started it (a holding combo's inputs) and its mode id. */
+    pdActive?: null | {locality: string; triggerIndex?: number | readonly number[]; color: import('../../contracts/edits.js').Colour; mode: string};
+    /** A held combo's feedback: its colour, locality, the keys of its inputs in the view, and whether it paints beneath the pointing mode its output runs (comboHeld). */
+    comboActive?: null | {locality: string; inputs: readonly number[]; color: import('../../contracts/edits.js').Colour; beneath?: boolean}}
 export interface LedLight {colour: import('../../contracts/edits.js').Colour; source: string; layer?: number | null}
 
 export type PickerSection = {id: string; label: string} & ({kind: 'catalogue'; filter: (entry: Pick<import('../../contracts/panel.js').CatalogEntry, 'group'> & {value?: string; key?: string; name?: string}) => boolean} | {kind: 'board' | 'layers' | 'modes' | 'macros'});

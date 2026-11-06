@@ -19,12 +19,13 @@ test("mapped-key count follows the selected layer, excluding transparent and dis
 // transparent or disabled (qmkKeyKinds).
 const {KEY_LEDS, TRACKBALL_LED} = createRequire(import.meta.url)("../../core/data/charybdis-layout");
 const {profileDocument, publishedModel} = createRequire(import.meta.url)("../fixtures/published-model.js");
-const {qmkKeyKinds} = publishedModel();
+// The vocabulary too, which names the owner that is every layer's or mode's.
+const {qmkKeyKinds, vocabulary} = publishedModel();
 const {SETTING} = createRequire(import.meta.url)("../../core/schema/settings-domain-v1");
 function model(overrides = {}) {
     return {
         leds: {keys: [...KEY_LEDS], trackball: TRACKBALL_LED},
-        qmkKeyKinds,
+        qmkKeyKinds, vocabulary,
         rgb: {
             baseEffect: {state: "read", enabled: true, effectId: 1, previewColor: colour(140, 210, 180)},
             stages: [
@@ -123,7 +124,7 @@ test("the trackball LED says which layer painted it, so the board can tell its o
     assert.deepEqual(trackballLight(m, {index: 3}), {colour: colour(140, 210, 180), source: "base", layer: null},
         "a mapped-keys-only layer never reaches it, so the base effect shows");
     assert.equal(trackballLight(m, {index: 3}, {held: [4]}).layer, 4, "a lower layer on in a preview paints it from underneath");
-    const grouped = model({rgb: {...model().rgb, layerLedGroups: [{owner: "Layer 3", ownerLayer: 3, ledIndices: [56], color: colour(0, 0, 0)}]}});
+    const grouped = model({rgb: {...model().rgb, layerAccents: [{owner: "Layer 3", ownerLayer: 3, ledIndices: [56], color: colour(0, 0, 0)}]}});
     const light = trackballLight(grouped, {index: 3});
     assert.equal(light.source, "layer");
     assert.equal(light.layer, 3, "a layer's LED group containing LED 56 paints it as that layer");
@@ -231,24 +232,24 @@ test("the default layer's colour shows under a mapped-keys-only layer", () => {
     assert.deepEqual(keyLight(black, {index: 2}, position(13, "KC_1")).colour, colour(85, 255, 0));
 });
 
-test("LED group rows paint their LEDs, inheriting their stage colour when stored as HSV(0, 0, 0)", () => {
+test("accents paint their LEDs, taking their stage colour when stored as HSV(0, 0, 0)", () => {
     const m = withRgb({
         layerColors: [{layer: "Layer 3", layerId: 3, color: colour(180, 255, 200), mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"}],
         // LED 6 is key 13; LED 9 is key 14; LED 56 is the trackball
-        layerLedGroups: [
+        layerAccents: [
             {owner: "Layer 3", ownerLayer: 3, color: colour(0, 0, 0), ledIndices: [9]},
             {owner: "RGB_LAYER_GROUP_ALL", color: colour(40, 255, 120), ledIndices: [56]},
             {owner: "Layer 5", ownerLayer: 5, color: colour(10, 255, 255), ledIndices: [6]},
         ],
-        pdModeLedGroups: [{owner: "RGB_POINTING_MODE_GROUP_ALL", color: colour(0, 0, 0), ledIndices: [6]}],
+        pdModeAccents: [{owner: "RGB_POINTING_MODE_GROUP_ALL", color: colour(0, 0, 0), ledIndices: [6]}],
     });
     const layer = {index: 3};
     assert.deepEqual(keyLight(m, layer, position(14, "KC_TRANSPARENT")).colour, colour(180, 255, 200), "inherits the layer colour on an unmapped key");
-    assert.deepEqual(trackballLight(m, layer).colour, colour(40, 255, 120), "a group can reach the trackball");
+    assert.deepEqual(trackballLight(m, layer).colour, colour(40, 255, 120), "an accent can reach the trackball");
     assert.deepEqual(keyLight(m, layer, position(13, "KC_UP")).colour, colour(180, 255, 200), "a row for an inactive layer does not paint");
     const pdActive = {mode: "POINTING_MODE_DRAGSCROLL", color: colour(21, 255, 200), locality: "RGB_RIGHT_HALF"};
     assert.deepEqual(keyLight(m, layer, position(13, "KC_UP"), {pdActive}).colour, colour(21, 255, 200),
-        "a pointing group row paints the mode colour on the left half too");
+        "a pointing mode's accent paints the mode colour on the left half too");
 });
 
 
@@ -303,7 +304,7 @@ test("a trackball mode previews from its first placed key, and black paints dark
 
 const words = {vocabulary: createRequire(import.meta.url)("../../core/model/vocabulary").VOCABULARY};
 
-test("Turn off says what black does: literal black for modes and feedback, nothing for a layer, the stage colour for a row", () => {
+test("Turn off says what black does: literal black for modes and feedback, nothing for a layer", () => {
     for (const stage of ["pd", "combo", "key"]) {
         const {offTip, offNote} = offWording(words, stage);
         for (const words of [offTip, offNote]) {
@@ -315,8 +316,6 @@ test("Turn off says what black does: literal black for modes and feedback, nothi
     assert.match(offWording(words, "auto").offTip, /black/);
     assert.match(offWording(words, "layers").offTip, /paints nothing/);
     assert.match(offWording(words, "layers").offNote, /shows through/);
-    assert.match(offWording(words, "groups").offTip, /stage's colour/);
-    assert.match(offWording(words, "groups").offNote, /inherits its stage colour/);
     assert.deepEqual(offWording(words, "base"), {});
 });
 
@@ -337,4 +336,18 @@ test("a default layer the keyboard keeps on paints nothing unless it is shown or
     assert.notDeepEqual(keyLight(m, {index: 3}, position(13, "KC_TRANSPARENT")).colour, colour(170, 255, 200),
         "the keyboard's lighting reads the layers that are on, not its default layers");
     assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_TRANSPARENT"), {held: [2]}).colour, colour(170, 255, 200), "previewed on, it paints");
+});
+
+test("a combo held lights its feedback where its locality reaches against its held keys, then combo accents", () => {
+    const feedback = {color: colour(190, 255, 200), locality: "RGB_KEYS_ONLY"};
+    const base = model();
+    base.rgb = {...base.rgb, comboFeedback: feedback, stages: base.rgb.stages.map((stage) => ({...stage, enabled: true})),
+        comboAccents: [{index: 0, owner: "", color: colour(20, 255, 200), ledIndices: [keyLed(base, 0)], leds: "LED 0"}]};
+    const layer = {index: 3};
+    const options = {comboActive: {color: feedback.color, locality: feedback.locality, inputs: [7, 9]}};
+    assert.deepEqual(keyLight(base, layer, position(7, "KC_U"), options), {colour: feedback.color, source: "combo", layer: null}, "a held key wears the feedback");
+    assert.notEqual(keyLight(base, layer, position(8, "KC_I"), options).source, "combo", "a key not held does not, under Only the trigger key");
+    assert.deepEqual(keyLight(base, layer, position(0, "KC_ESC"), options).colour, colour(20, 255, 200), "a combo accent paints its LEDs");
+    const off = {...base, rgb: {...base.rgb, stages: base.rgb.stages.map((stage) => stage.id === "combo" ? {...stage, enabled: false} : stage)}};
+    assert.notEqual(keyLight(off, layer, position(7, "KC_U"), options).source, "combo", "with the stage off nothing of it paints");
 });

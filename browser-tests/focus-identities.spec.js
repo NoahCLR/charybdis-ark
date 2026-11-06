@@ -15,8 +15,11 @@ const surfaces = [
     ["keys", {tab: "key"}], ["keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI", cell: "1-hold", cellRow: "KC_LEFT_GUI"}],
     ["keys", {tab: "combos"}], ["keys", {layersOpen: true}],
     ["behaviours", {}], ["combos", {}], ["pointer", {}], ["host", {}], ["customKeys", {}], ["macros", {macroSlot: "MACRO_17"}],
-    ...["base", "layers", "auto", "pd", "combo", "key", "groups"].map(stage =>
+    ...["base", "layers", "auto", "pd", "combo", "key", "accents"].map(stage =>
         ["lighting", {stage, layer: 1, pointingSlot: 0, feedbackRow: "holdActiveColor"}]),
+    // An accent being changed, beside the stage's own colour editor.
+    ["lighting", {stage: "pd", pointingSlot: 0,
+        accent: {stage: "pd", target: "pdMode", every: true, index: 0, leds: [24, 25], adding: true, colour: {h: 10, s: 255, v: 200}, stageColour: false}}],
     ...[0, 4, 8].map(pointingSlot => ["pointing", {pointingSlot, pdAdvanced: true}]),
 ];
 

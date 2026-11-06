@@ -85,12 +85,17 @@ test("zero brightness retains editable HSV channels and LED black does not inher
     await clearPosts(page);
     await change(value, 100);
     await expectPost(page, {type: "updateLayerColor", layer: "Layer 1", mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY", h: 85, s: 255, v: 100});
+    // An accent at zero brightness keeps its hue and saturation too; only
+    // HSV(0, 0, 0) takes the stage's colour.
     const text = await page.evaluate(async () => {
-        const {groupRowsTable} = await import("/webview/ui/lighting/led-rows.mjs");
-        return groupRowsTable([{owner: "Layer 1", ledGroup: "Inline", ledIndices: [0], color: {h: "85", s: "255", v: "0"}}], "layer").textContent;
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.rgb.layerAccents = [{index: 0, owner: "Layer 1", ledIndices: [0], leds: "LED 0", color: {h: "85", s: "255", v: "0"}}];
+        store.setModel(model); store.render();
+        return document.querySelector('#benchBody [data-accents="layer"]')?.textContent || "";
     });
     expect(text).toContain("HSV(85, 255, 0)");
-    expect(text).not.toContain("inherits the stage colour");
+    expect(text).not.toContain("Same as the layer");
 });
 
 test("a layer name counts bytes and flags one past the limit instead of cutting it off", async ({page}) => {

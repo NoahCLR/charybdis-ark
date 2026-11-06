@@ -107,9 +107,13 @@ test("Rename & reorder folds the empty layers under its list, and offers Make ba
 test("the Lighting list and the pointing link fold the empty layers too", async ({page}) => {
     await openControls(page, "lighting", {stage: "layers"});
     const list = page.locator('[data-scroll-list="layers"]');
-    await expect(list.locator(".rowitem")).toHaveCount(8);
-    await list.locator('[data-empty-layers="lighting-layers"]').click();
-    await expect(list.locator(".rowitem")).toHaveCount(16);
+    await expect(list.locator("tr[data-layer]")).toHaveCount(8);
+    // A grouped table folds them under its last band, counted.
+    const band = list.locator('.group-h[data-group="empty"]');
+    await expect(band.locator(".ttl")).toHaveText("Empty layers");
+    await expect(band.locator(".n")).toHaveText("8");
+    await band.click();
+    await expect(list.locator("tr[data-layer]")).toHaveCount(16);
 
     // A pointing mode's Add layer menu puts the empty layers in their own group at its end.
     await page.locator('[data-screen="pointing"]').click();

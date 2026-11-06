@@ -16,6 +16,26 @@ test("each stage paints over the one before: background, layers lowest first, th
     assert.deepEqual(ledColour(stages({off: true, layers, pointing})), {colour: OFF, source: "off"});
 });
 
+test("a held combo paints over the layers where it reaches, then its groups, a black one in the combo's colour", () => {
+    const layers = [{layer: 0, colour: colour(80, 255, 255), paints: true}];
+    const combo = {colour: colour(190, 255, 200), reaches: true, groups: []};
+    assert.deepEqual(ledColour(stages({layers, combo})), {colour: combo.colour, source: "combo", layer: null});
+    assert.equal(ledColour(stages({layers, combo: {...combo, reaches: false}})).source, "layer", "outside its locality the layer shows");
+    const accent = colour(20, 255, 200);
+    assert.deepEqual(ledColour(stages({layers, combo: {...combo, reaches: false, groups: [accent]}})).colour, accent, "its accent paints wherever it names");
+    assert.deepEqual(ledColour(stages({layers, combo: {...combo, reaches: false, groups: [colour(0, 0, 0)]}})).colour, combo.colour);
+    assert.equal(ledColour(stages({layers, combo: null})).source, "layer");
+});
+
+test("a held combo whose output runs the pointing mode paints beneath it, so the mode covers it where both paint", () => {
+    const layers = [{layer: 0, colour: colour(80, 255, 255), paints: true}];
+    const combo = {colour: colour(190, 255, 200), reaches: true, groups: [], beneath: true};
+    const pointing = {colour: colour(9, 255, 255), reaches: true, groups: []};
+    assert.equal(ledColour(stages({layers, combo, pointing})).source, "pointing", "the mode paints over it");
+    assert.equal(ledColour(stages({layers, combo, pointing: {...pointing, reaches: false}})).source, "combo", "outside the mode's locality the combo shows");
+    assert.equal(ledColour(stages({layers, combo: {...combo, beneath: false}, pointing})).source, "combo", "any other combo paints above the mode");
+});
+
 test("a layer colour with no saturation or value paints nothing, and a black group takes its stage's colour", () => {
     assert.equal(layerPaints(colour(40, 0, 0)), false);
     assert.equal(inheritsStageColour(colour(0, 0, 0)), true);

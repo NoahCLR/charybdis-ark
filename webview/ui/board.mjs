@@ -12,7 +12,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText} from "../lib/colour.mjs";
-import {GEO, fitLegend, fitText, keyFaceRows, keyIconsX, keyVisual} from "../view/geometry.mjs";
+import {GEO, LED_CORNER, keyFaceRows, keyIconsX, keyLegends, keyVisual} from "../view/geometry.mjs";
 import {boardKeys, boardTrackball} from "../view/board-keys.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
 import {REACH_ICONS} from "../view/screens.mjs";
@@ -30,12 +30,12 @@ const reachIcon = (kind, x, y, size, ink) => `<svg class="kc-icon" data-kind="${
 
 /** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(view, options = {}) {
-    const {selected, mode = "light", picks = [], reach = [], pdActive = null, drafted = null,
-        faces = true, trackball = false, onKey, onOpen, onSwap, onTrackball} = options;
+    const {selected, holding = [], reach = [], pdActive = null, comboActive = null, drafted = null, faces = true, ledIndex = false, accent = null,
+        onKey, onOpen, onSwap, onLed} = options;
 
     let glow = "", keys = "";
-    for (const key of boardKeys(view, {mode, faces, pdActive})) {
-        const {index, from, glass, tiers, badges, icons, sub} = key;
+    for (const key of boardKeys(view, {faces, pdActive, comboActive, accent})) {
+        const {index, from, glass, tiers, badges, icons, sub, led, picked} = key;
         const visual = keyVisual(index);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
         const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";
@@ -45,15 +45,10 @@ export function board(view, options = {}) {
             from ? "kc-under" : "",
             options.picking ? "pickable" : ""].filter(Boolean).join(" ");
 
-        let fill = "", text = "", picked = "";
-        if (mode === "leds") {
-            picked = picks.includes(index) ? " picked" : "";
-        } else {
-            text = idealText(key.light);
-            const paint = css(key.light);
-            fill = ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
-            glow += `<rect class="kc-glow${glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
-        }
+        const text = idealText(key.light);
+        const paint = css(key.light);
+        const fill = ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
+        glow += `<rect class="kc-glow${glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
 
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: badges.length > 0, sub: Boolean(sub), icons: icons.length > 0});
@@ -105,43 +100,38 @@ export function board(view, options = {}) {
         // A legend is sized to the room its row leaves, so one typeface at one
         // weight carries every cap instead of stepping between faces by length.
         // Alone on its cap it never shrinks past LEGEND_MIN: a long name takes
-        // two lines instead, either side of the row's middle (fitLegend).
-        const tap = sub
-            ? fitText(main, above ? {max: 9.1, min: 6.4, width: GEO.keyW - 12} : {max: 12, min: 7, width: GEO.keyW - 12})
-            : null;
-        const legend = tap ? {size: tap.size, lines: [{text: main, squeeze: tap.squeeze}]} : fitLegend(main, {max: 12, width: GEO.keyW - 10});
-        const subFit = sub ? fitText(sub, above
-            ? {max: 6.4, min: 5.2, width: GEO.keyW - 12}
-            : {max: 8, min: 6.2, width: GEO.keyW - 12}) : null;
+        // two lines instead, either side of the row's middle; any line reaching
+        // the LED's number in the corner keeps clear of it (keyLegends).
+        const legend = keyLegends(visual.y, rows, {main, sub, above, ledIndex});
         /** @param {{squeeze: number}} fit */
         const squeeze = (fit) => fit.squeeze ? ` textLength="${esc(fit.squeeze)}" lengthAdjust="spacingAndGlyphs"` : "";
         const fillText = text ? ` style="fill:${text}"` : "";
-        /** @param {number} order */
-        const lineY = (order) => rows.mainY + (order - (legend.lines.length - 1) / 2) * legend.size * 1.1;
-        const label = `<text class="kc-label" font-size="${esc(legend.size)}"${fillText}>${legend.lines.map((line, order) =>
-            `<tspan x="${cx}" y="${esc(lineY(order))}"${squeeze(line)}>${esc(line.text)}</tspan>`).join("")}</text>`;
+        const label = `<text class="kc-label" font-size="${esc(legend.size)}"${fillText}>${legend.lines.map((line) =>
+            `<tspan x="${cx}" y="${esc(line.y)}"${squeeze(line)}>${esc(line.text)}</tspan>`).join("")}</text>`;
 
         // What the rings and dots say, said to a screen reader too: the
-        // selected key is the current one, a picked LED is pressed, and a
-        // key the draft changed says so after its name.
-        const said = mode === "leds" ? ` aria-pressed="${Boolean(picked)}"` : selected === index ? ' aria-current="true"' : "";
-        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}" tabindex="0" role="button"${said}
-            aria-label="${esc(key.name)}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.keys?.has(index) ? `, ${esc(drafted.after)}` : ""}"${transform}>
-            <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
-            ${selected === index ? ring("kc-ring") : ""}
+        // selected key is the current one, an LED picked for an accent is
+        // pressed, and a key the draft changed says so after its name.
+        const said = accent ? (picked ? ' aria-pressed="true"' : ' aria-pressed="false"') : selected === index ? ' aria-current="true"' : "";
+        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}"${led === undefined ? "" : ` data-led="${esc(led)}"`} tabindex="0" role="button"${said}
+            aria-label="${esc(key.name)}${ledIndex && led !== undefined ? `, LED ${esc(led)}` : ""}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.keys?.has(index) ? `, ${esc(drafted.after)}` : ""}"${transform}>
+            <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
+            ${selected === index || holding.includes(index) ? ring("kc-ring") : ""}
+            ${picked ? ring("kc-pick") : ""}
+            ${ledIndex && led !== undefined ? `<text class="kc-led" x="${esc(visual.x + LED_CORNER.x)}" y="${esc(visual.y + LED_CORNER.baseline)}" style="fill:${text || "var(--text-3)"}">${esc(led)}</text>` : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
             ${drafted?.keys?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${esc(rows.separatorY)}" x2="${visual.x + GEO.keyW - 8}" y2="${esc(rows.separatorY)}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
             ${label}
-            ${subFit ? `<text class="kc-sub" x="${cx}" y="${esc(rows.subY)}" font-size="${subFit.size}"${squeeze(subFit)}${fillText}>${esc(sub)}</text>` : ""}
+            ${legend.sub ? `<text class="kc-sub" x="${cx}" y="${esc(legend.sub.y)}" font-size="${esc(legend.sub.size)}"${squeeze(legend.sub)}${fillText}>${esc(sub)}</text>` : ""}
         </g>`;
     }
 
     // The trackball LED is index 56 and belongs to no key, but it is lit like
     // every other LED, so it is drawn with the light it emits rather than as an
     // outline of where the ball sits.
-    const ball = trackballGlyph(boardTrackball(view, {mode, pdActive}), {mode, trackball, clickable: Boolean(onTrackball)});
+    const ball = trackballGlyph(boardTrackball(view, {pdActive, comboActive, accent}), {ledIndex, picking: Boolean(accent), clickable: Boolean(onLed)});
     if (ball.glow) glow += ball.glow;
     const node = /** @type {import("./surface-types.js").BoardNode} */ (el(`<div class="board ${options.picking ? "picking" : ""}">
         <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`));
@@ -152,7 +142,7 @@ export function board(view, options = {}) {
         if (onOpen) group.addEventListener("dblclick", () => onOpen(index));
         if (onSwap) dragToSwap(node, group, index, onSwap);
     });
-    /** @type {SVGGElement | null} */ (node.querySelector("[data-trackball]"))?.addEventListener("click", () => onTrackball?.());
+    if (onLed) node.querySelectorAll("[data-led], [data-trackball]").forEach((group) => pickByDrag(/** @type {SVGGElement} */ (group), onLed));
     return node;
 }
 
@@ -221,26 +211,44 @@ function dragToSwap(node, group, index, onSwap) {
     group.addEventListener("pointercancel", reset);
 }
 
-// The trackball's own LED. In light mode it shows what it emits, by the rule
-// the keys follow: solid when its light is the viewed layer's own — an
-// all-keys colour or one of its LED groups, a previewed pointing mode, or
-// anything at all on base, which nothing lies under — and frosted when it is
-// seen through the viewed layer from underneath (view/board-keys.mjs).
-// A mapped-keys-only layer never reaches it, since no key maps to it. In the LED
-// selector it shows its index and whether the pending group has picked it, the
-// same two things every key shows there.
+// Picking an accent's LEDs: a press picks the LED under it, or takes it back,
+// and dragging on across keys does the same to each, so one stroke picks a
+// row. Enter or Space does it for the key with focus.
+/** @param {SVGGElement} group @param {(led: number, starting: boolean) => void} onLed */
+function pickByDrag(group, onLed) {
+    const led = Number(group.dataset.led ?? group.dataset.trackball);
+    group.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        onLed(led, true);
+    });
+    group.addEventListener("pointerenter", (event) => { if (event.buttons & 1) onLed(led, false); });
+    group.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onLed(led, true);
+    });
+}
+
+// The trackball's own LED shows what it emits, by the rule the keys follow:
+// solid when its light is the viewed layer's own — an all-keys colour or one
+// of its accents, a previewed pointing mode, or anything at all on base,
+// which nothing lies under — and frosted when it is seen through the viewed
+// layer from underneath (view/board-keys.mjs). A mapped-keys-only layer never
+// reaches it, since no key maps to it. Like a key, it carries its LED's index
+// on Lighting and a ring while it is picked for an accent.
 /** @param {ReturnType<typeof boardTrackball>} ball @param {import("./surface-types.js").TrackballOptions} options */
-function trackballGlyph({led, light, glass}, {mode, trackball, clickable}) {
+function trackballGlyph({led, light, glass, picked}, {ledIndex, picking, clickable}) {
     const {x, y, r} = GEO.trackball;
     const paint = css(light);
-    // Picking LEDs, the ball is drawn like a key (.kc-ball.leds); otherwise in its light.
-    const lit = mode === "leds" ? "" : ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
-    const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}${mode === "leds" ? " leds" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
-        aria-label="Trackball LED ${esc(led)}">
+    const lit = ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
+    const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${picked ? " picked" : ""}"${led === undefined ? "" : ` data-led="${esc(led)}"`}${clickable ? ` data-trackball="${esc(led)}" tabindex="0" role="button"` : ""}
+        ${picking ? (picked ? 'aria-pressed="true"' : 'aria-pressed="false"') : ""} aria-label="Trackball LED ${esc(led)}">
         <circle cx="${esc(x)}" cy="${y}" r="${r}"${lit}></circle>
-        ${mode === "leds" ? `<text class="kc-label sm" x="${esc(x)}" y="${y}">${esc(led)}</text>` : ""}</g>`;
+        ${picked ? `<circle class="kc-pick" cx="${esc(x)}" cy="${y}" r="${r - 3}"></circle>` : ""}
+        ${ledIndex && led !== undefined ? `<text class="kc-led" x="${esc(x)}" y="${y + r - 8}" text-anchor="middle" style="fill:${idealText(light) || "var(--text-3)"}">${esc(led)}</text>` : ""}</g>`;
     return {
         markup,
-        glow: mode === "leds" ? "" : `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${esc(x)}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
+        glow: `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${esc(x)}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
     };
 }

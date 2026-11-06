@@ -9,7 +9,7 @@
 // interface as `model.vocabulary`, so an editor, its dropdown and the review
 // never name one thing two ways. Lists are ordered as the editors offer them.
 
-const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
+const {RGB_EVERY_OWNER, RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
 const {FIRMWARE_UPDATE} = require("../schema/profile-blob-v1");
 const {hostLayouts} = require("../data/host-layouts");
 const {MACRO_LIMITS, macroProblemWords: wordedProblem} = require("../../rules/macro-payload.mjs");
@@ -178,12 +178,12 @@ const SAVE_FAILURE_WORDS = Object.freeze({
 const PROFILE_FULL_WORDS = Object.freeze({
     /** @type {Readonly<Record<string, (most: number) => string>>} */
     counts: Object.freeze({
-        lightingGroups: (most) => `The keyboard holds at most ${most} LED groups. Remove one before adding another.`,
-        lightingGroupRows: (most) => `The keyboard holds at most ${most} LED overrides across layers, pointing modes, combo feedback and key feedback. Remove one before adding another.`,
+        lightingGroups: (most) => `The keyboard holds at most ${most} different LED sets across all accents. Remove an accent, or light LEDs another accent already lights.`,
+        lightingGroupRows: (most) => `The keyboard holds at most ${most} accents across layers, pointing modes, combo feedback and key feedback. Remove one before adding another.`,
         behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
     }),
-    profile: "This change does not fit: the keyboard's profile is full. Remove an LED group, a behaviour, a combo or a macro first.",
+    profile: "This change does not fit: the keyboard's profile is full. Remove an accent, a behaviour, a combo or a macro first.",
     name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
 });
 
@@ -478,10 +478,6 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
             offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
             offNote: "No colour is stored for this layer, so the background effect shows through wherever it would paint.",
         },
-        groups: {
-            offTip: "Store HSV(0, 0, 0): this row then takes its stage's colour.",
-            offNote: "A row stored as HSV(0, 0, 0) inherits its stage colour instead of painting its own.",
-        },
         auto: {
             offTip: "Store HSV(0, 0, 0): the fade then ends on black.",
         },
@@ -509,8 +505,42 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // rows with that tier's dot, as the review does; the other states have
     // none.
     feedbackTiers: {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"},
-    // The four tables of LED group rows, by the target an LED row edit names.
-    ledTables: [["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]],
+    // Accents (D-L77), by the table an accent edit names: when they light,
+    // with {owner} for the layer, mode or feedback state picked; the owner
+    // that is all of a table's, by the name core reads and writes
+    // (`everyOwner`, the schema's RGB_EVERY_OWNER), and what it is called, as an accent lighting for it is
+    // tagged and offered and the review names it (combo accents all light for
+    // every combo, so that table has no such owner, only its words); and
+    // what an accent that takes its stage's colour (HSV(0, 0, 0)) takes.
+    accents: {
+        layer: {when: "LEDs that light in a colour of their own while {owner} is on, with those for every layer. An accent on a lower layer stays lit over the layers above it.",
+            everyOwner: RGB_EVERY_OWNER.layer, every: "Every layer", stageColour: "Same as the layer"},
+        pdMode: {when: "LEDs that light in a colour of their own while {owner} runs, with those for every pointing mode.",
+            everyOwner: RGB_EVERY_OWNER.pdMode, every: "Every pointing mode", stageColour: "Same as the mode"},
+        combo: {when: "LEDs that light in a colour of their own while a combo's inputs are held: the same LEDs for every combo.",
+            every: "Every combo", stageColour: "Same as combo feedback"},
+        keyBehavior: {when: "LEDs that light in a colour of their own while a key shows {owner}, with those for every feedback state: the same LEDs whichever key it is.",
+            everyOwner: RGB_EVERY_OWNER.keyBehavior, every: "Every feedback state", stageColour: "Same as the feedback colour"},
+    },
+    // The accent editor's own fields; its colour field is lightingFields.colour.
+    accentFields: {lightsFor: "Lights for", ownColour: "Its own"},
+    // The key feedback state each Key feedback colour flashes for, by the
+    // colour's field: the tiers', then the tap branches', which all wait as
+    // one state. Key feedback lists its colours by it, the review names them
+    // by it, and an accent of the state is found by it.
+    feedbackColourOwners: {tapCommittedColor: "KEY_FEEDBACK_GROUP_TAP_COMMITTED", holdActiveColor: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
+        longHoldActiveColor: "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", tapBranchColors: "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING"},
+    // The groups of Lighting's lists beside an editor (webview/ui/groups.mjs
+    // groupedTable): the layers and slots in use, ahead of the empty ones;
+    // Key feedback's two groups of colours, as the behaviour grid's columns
+    // and rows; and the combos by what holding one shows.
+    lightingLists: {
+        inUse: "In use",
+        tiers: {title: "Tiers", tip: "Flash as a key's tap, hold or long hold fires."},
+        tapBranches: {title: "Tap branches", tip: "Flash while a run of taps waits on that tap count, until it resolves."},
+        comboFeedback: {title: "Combo feedback", empty: "No combo on this view lights combo feedback."},
+        holdLayer: {title: "Hold a layer", empty: "No combo on this view holds a layer."},
+    },
     // The lighting stages in the order the firmware paints them. A stage is
     // found by its id or bit, never by its words.
     stages: [
@@ -580,8 +610,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         behaviours: {label: "Behaviours", what: "Keys with a behaviour."},
         behaviourSteps: {label: "Behaviour tap counts", what: "Each behaviour's tap counts, up to the deepest one it sets, added up across all behaviours."},
         combos: {label: "Combos", what: "Combos on any layer."},
-        lightingGroups: {label: "LED groups", what: "Named LED groups on Lighting."},
-        lightingGroupRows: {label: "LED overrides", what: "LED override rows on layers, pointing modes, combo feedback and key feedback."},
+        lightingGroups: {label: "LED sets", what: "The different sets of LEDs accents light; accents that light the same LEDs share one."},
+        lightingGroupRows: {label: "Accents", what: "Accents on layers, pointing modes, combo feedback and key feedback."},
         macros: {label: "Macros", what: "Macro slots with steps."},
         customKeys: {label: "Custom keys", what: "Custom keys with a name, a shortcut or a behaviour."},
         pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode."},
@@ -701,6 +731,20 @@ const macroDefaultName = (index) => `Macro ${index}`;
 const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Slot ${id}`;
 /** @param {number} count */
 const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
+// The LEDs an accent lights, by the indices the board numbers them with, a
+// run of three or more as a range: "LEDs 24–28, 53–55" (D-L77).
+/** @param {readonly number[]} leds */
+const ledsCalled = (leds) => {
+    const sorted = [...new Set(leds)].sort((left, right) => left - right);
+    /** @type {[number, number][]} */
+    const runs = [];
+    for (const led of sorted) {
+        const last = runs[runs.length - 1];
+        if (last && led === last[1] + 1) last[1] = led; else runs.push([led, led]);
+    }
+    const parts = runs.flatMap(([from, to]) => to - from >= 2 ? [`${from}–${to}`] : from === to ? [`${from}`] : [`${from}`, `${to}`]);
+    return `LED${sorted.length === 1 ? "" : "s"} ${parts.join(", ")}`;
+};
 // Why a macro does not read, in words (rules/macro-payload.mjs).
 /** @param {{code: string, key?: string}} problem */
 const macroProblemWords = (problem) => wordedProblem(problem, VOCABULARY.macroProblems);
@@ -785,4 +829,4 @@ function failureSentence(error) {
     return INCOMPATIBLE_ANSWERS.has(String(code)) ? FAILURE_WORDS.incompatible : FAILURE_WORDS.unreadable;
 }
 
-module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};
+module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};
