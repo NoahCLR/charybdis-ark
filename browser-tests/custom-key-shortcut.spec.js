@@ -11,6 +11,8 @@ const shortcut = (mods, keys, layers = 0, layerKind = 0) => expect.objectContain
 for (const theme of ["dark"]) {
     test(`a custom key's shortcut is picked with mixed-side modifiers, and cleared (${theme})`, async ({page}) => {
         await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"}, theme);
+        // The field says what a shortcut is, with or without one set.
+        await expect(page.locator("[data-shortcut-means]")).toHaveText(/^Like a one-step macro, but it acts as a normal key/);
         await expect(page.locator('[data-f^="custom-key:1:shortcut:modifier"]'), "no separate modifier grid").toHaveCount(0);
         await page.locator('[data-act="pick-shortcut"]').click();
         await expect(page.locator(".picker")).toBeVisible();

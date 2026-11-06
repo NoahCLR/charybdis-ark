@@ -118,7 +118,8 @@ by name** finds it by name or number, through every key). Its name is the
 editor's title: click it to rename, Enter to keep, Escape to put it back.
 
 **Shortcut** is what the key sends: up to six keys held together, any
-modifiers and any layers. The keys and modifiers are held while you hold the
+modifiers and any layers. The field says so above it: like a one-step macro,
+but it acts as a normal key rather than playing once. The keys and modifiers are held while you hold the
 custom key and tapped when you tap it: the modifiers go down first, then the
 keys in the order you picked them, and they come back up the other way round.
 **Pick…** opens the picker with only the keys a shortcut can send: keyboard
