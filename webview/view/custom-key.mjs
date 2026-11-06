@@ -90,6 +90,12 @@ export const customKeyOf = (model, keycode) => {
     return (model?.customKeys || []).find((key) => key.keycode === name);
 };
 
+// What a shortcut is, said above the field that sets it, for someone who has
+// never met one, against the macro they may know: held as the key is, not
+// played once (docs/guide/keys.md). The line under the field says what this
+// key's shortcut does (customKeyShortcutLine).
+export const SHORTCUT_MEANS = "Like a one-step macro, but it acts as a normal key: the keys and modifiers go down when you press this key and stay down until you let go. It can also turn on layers.";
+
 // "What it does": its shortcut, its behaviour on top, both, or nothing yet.
 /** @param {CustomKey} key */
 export function customKeyDoes(key) {

@@ -799,6 +799,9 @@ no keys and no layers is no shortcut, any part alone is one, and a kind other
 than hold needs layers. Ark reads and writes settings version 11 only (D-L64;
 `tests/schema/settings-domain-v1.test.js`).
 
+- The Custom keys screen's Shortcut field says what a shortcut is above its
+  input (`SHORTCUT_MEANS`) and what this key's does below it
+  (`customKeyShortcutLine`).
 - The Custom keys screen edits it through `updateCustomKeyShortcut`, with keys
   and modifiers in the keycode picker's `shortcut` mode, where modifiers may
   mix sides and each click adds a key in press order or takes it out; a symbol

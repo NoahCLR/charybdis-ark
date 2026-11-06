@@ -24,7 +24,7 @@ import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar} from "./frame.mjs";
 import {keycodeName} from "../view/key-identity.mjs";
-import {customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine, sameShortcut, shortcutAct, shortcutLimitWords} from "../view/custom-key.mjs";
+import {SHORTCUT_MEANS, customKeyDoes, customKeyInUse, hasShortcut, customKeyShortcutLine, sameShortcut, shortcutAct, shortcutLimitWords} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourEditor} from "./keys/behaviour-editor.mjs";
@@ -178,8 +178,8 @@ function behaviourCard(model, key) {
     return card;
 }
 
-// The key's shortcut, set in the keycode picker as any key is on the Keys
-// screen: a key from those the keyboard accepts, and the modifiers in the
+// The key's shortcut, under a line saying what a shortcut is (SHORTCUT_MEANS),
+// set in the keycode picker as any key is on the Keys screen: a key from those the keyboard accepts, and the modifiers in the
 // picker's row, here left and right mixed. Each change posts the whole
 // shortcut; Clear posts none. The picker stays open while new models arrive,
 // and what it posts is its own whole choice, so it names the draft, and is
@@ -188,6 +188,7 @@ function behaviourCard(model, key) {
 function shortcutField(model, key, canEdit) {
     const names = key.shortcut.keys.map((code) => keycodeName(model, code)).filter(Boolean);
     const node = el(`<div class="field"><span>Shortcut</span>
+            <span class="note" data-shortcut-means>${esc(SHORTCUT_MEANS)}</span>
             <div class="input-row"><input data-f="custom-key:${esc(key.slot)}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
                 data-tip="${shortcutLimitWords(model) ? `${esc(shortcutLimitWords(model, true))}, any` : "Any"} modifiers, left and right mixed, and any layers, held, locked, moved to, tap-toggled or one-shot as a layer key would. Pick… opens the keycode picker with its modifier row and its Layers section.">
             <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>
