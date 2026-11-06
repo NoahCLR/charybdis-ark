@@ -61,7 +61,7 @@ for (const stage of stages) {
 
     test(`${stage.id}: the stage switch posts its own bit without changing other stages`, async ({page}) => {
         await openStage(page, stage.id);
-        await page.locator("#benchRight label.sw").click();
+        await page.locator(".bench-body .sect-h label.sw").click();
         await expectPost(page, {type: "updateRgbStages", stageEnableMask: 31 & ~stage.bit});
     });
 }
@@ -454,7 +454,7 @@ test("the layer and pointing-mode lists scroll on their own and keep their place
     // Every layer listed, the empty ones shown too, is too many for its pane.
     await list.locator('.group-h[data-group="empty"]').click();
     await expect.poll(() => list.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
-    const layer = list.locator('tr[data-layer="12"]');
+    const layer = list.locator('tr[data-layer="15"]');
     await layer.scrollIntoViewIfNeeded();
     const position = await list.evaluate(node => node.scrollTop);
     expect(position, "the list scrolls inside its card").toBeGreaterThan(0);
@@ -496,13 +496,17 @@ test("every stage's list is as tall as the others, filling the workbench beside 
     expect(await posted(page)).toEqual([]);
 });
 
-test("every stage says what it does, in one section under the same heading", async ({page}) => {
+test("every stage says what it does, behind one fold that stays as it was left", async ({page}) => {
     await openStage(page, "base");
-    for (const stage of ["base", "layers", "auto", "pd", "combo", "key"]) {
+    for (const [index, stage] of ["base", "layers", "auto", "pd", "combo", "key"].entries()) {
         await page.locator(`[data-ltab="${stage}"]`).click();
-        const about = body(page).locator("section").filter({has: page.locator("h4", {hasText: /^What this stage does$/})});
+        const about = body(page).locator("section.stage-fold");
         await expect(about, stage).toHaveCount(1);
-        await expect(about.locator(".stage-about"), stage).not.toBeEmpty();
+        await expect(about.locator("summary"), stage).toHaveText("What this stage does");
+        // Opened on the first stage, it stays open on every stage after.
+        if (!index) await about.locator("summary").click();
+        await expect(about.locator("details"), stage).toHaveAttribute("open", "");
+        await expect(about.locator(".stage-about"), stage).toBeVisible();
     }
     expect(await posted(page)).toEqual([]);
 });

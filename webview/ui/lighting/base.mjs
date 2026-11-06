@@ -60,7 +60,8 @@ export function stageBase(model) {
     });
     how.append(stack(choice(field("effectMode")), choice(field("effectLeds")), speedControl));
 
-    node.append(colour, how, aboutStage("QMK's own effect, drawn first, under every stage: each one paints over it, and a layer with no colour shows it.",
-        ...(lightingOff(model) ? [el(`<div class="callout">All lighting is off, so nothing is lit. Its switch is at the top of this screen.</div>`)] : [])));
+    // That nothing is lit is news, so it stays in view, not behind the fold.
+    if (lightingOff(model)) node.append(el(`<div class="callout span">All lighting is off, so nothing is lit. Its switch is at the top of this screen.</div>`));
+    node.append(colour, how, aboutStage("QMK's own effect, drawn first, under every stage: each one paints over it, and a layer with no colour shows it."));
     return node;
 }

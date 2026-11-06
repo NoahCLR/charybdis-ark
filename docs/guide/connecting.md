@@ -81,7 +81,7 @@ The column on the left is the rail. From the top:
   Behaviour settings, Combo settings, Pointer settings and Host settings.
 - Messages from Ark, each with ✕ to dismiss it. A long one scrolls in its own
   box rather than hiding the screens above it.
-- **Draft history**, with undo (↺) and redo (↻).
+- **Draft history**, with undo and redo arrows and a count of the steps so far.
 
 In a window 1100 pixels wide or less, the rail keeps only its icons, so the
 screen gets the width: hover an icon for its screen's name, and the keyboard

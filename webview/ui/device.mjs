@@ -13,6 +13,7 @@
 import * as controls from "../view/controls.mjs";
 import * as edits from "../view/edits.mjs";
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
+import {meterFill} from "./meter.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {demoOf} from "../view/demo.mjs";
@@ -152,17 +153,17 @@ function usageCard(usage) {
         <div class="card-b stack gap-12">
             <div><div class="sect-h"><h4>Profile</h4>
                 <span class="right note">${esc(bytes(usage.used))} of ${esc(bytes(usage.capacity))} bytes used · ${esc(bytes(usage.free))} free</span></div>
-                <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used"><i style="width:${usage.share * 100}%"></i></div></div>
+                <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used">${meterFill(usage.share * 100)}</div></div>
             <p class="note">Behaviours, combos, lighting, pointing modes, custom keys, settings and names are stored together here${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
             ${usage.counts.length ? `<table class="t usage-counts"><thead><tr><th>In use</th><th class="count num"></th><th></th><th></th></tr></thead>
                 <tbody>${usage.counts.map((count) => `<tr data-tip="${esc(count.tip)}"><td>${esc(count.label)}</td>
                     <td class="mono count num">${esc(count.used)} of ${esc(count.limit)}</td>
-                    <td class="bar"><div class="meter"><i style="width:${count.share * 100}%"></i>${count.unavailable
+                    <td class="bar"><div class="meter">${meterFill(count.share * 100)}${count.unavailable
                         ? `<span class="out" style="width:${count.unavailableShare * 100}%"></span>` : ""}</div></td>
                     <td class="note">${esc(count.note)}</td></tr>`).join("")}</tbody></table>` : ""}
             ${usage.macros ? `<div><div class="sect-h"><h4>Macro memory</h4>
                 <span class="right note">${esc(bytes(usage.macros.used))} of ${esc(bytes(usage.macros.capacity))} bytes used</span></div>
-                <div class="meter"><i style="width:${usage.macros.share * 100}%"></i></div>
+                <div class="meter">${meterFill(usage.macros.share * 100)}</div>
                 <p class="note meter-note">Macro steps are part of the profile above, within their own limit, and counted slot by slot on Macros.</p></div>` : ""}
         </div></div>`;
 }

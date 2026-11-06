@@ -26,15 +26,18 @@ Lighting is painted in six stages, each over the one before it:
 5. **Combo feedback**
 6. **Key feedback**
 
-Each stage's tab shows the colour it paints, and says under its controls, in
-**What this stage does**, what the stage does and what the board shows of it. Stages 2 to 6 have a **Stage
-on** switch, which turns the whole stage off without losing its colours. A
+Each stage's tab shows the colour it paints, and says under its controls,
+behind **What this stage does**, what the stage does and what the board
+shows of it; opened once, it stays open on every stage. Stages 2 to 6 have a **Stage
+on** switch on the line of the section that says where or when the stage
+paints (**Where it paints**, **When and where**, **Timing**), which turns the
+whole stage off without losing its colours. A
 stage that paints nothing right now is drawn off and says why.
 
 ### Colours
 
 Every stage uses the same colour editor: drag in the square and along the
-**Hue** strip, or type **H**, **S** and **V**. Brightness stops at the limit
+**Hue** strip, or type **Hue**, **Saturation** and **Brightness**. Brightness stops at the limit
 the keyboard reports.
 
 **Turn off** stores HSV(0, 0, 0), and the colour then reads **Off**; what
@@ -43,7 +46,7 @@ layer with no colour paints nothing, so what is underneath shows through.
 Everywhere else black is
 black: a pointing mode, combo feedback or a key feedback colour turned off
 paints its area black while it runs, and the auto-mouse fade ends on black.
-To paint nothing there, switch the tab's **Stage on** off. A colour with
+To paint nothing there, switch the stage's **Stage on** off. A colour with
 brightness at zero but some hue and saturation also paints black, and keeps
 its hue and saturation for when you raise the brightness again.
 

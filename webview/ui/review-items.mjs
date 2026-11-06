@@ -59,7 +59,7 @@ const fields = (model, item) => {
     const head = item.fields.slice(0, FIELDS_SHOWN), rest = item.fields.slice(FIELDS_SHOWN);
     const row = field(model, item.fields.some((entry) => entry.labelMark));
     return `<div class="rv-fields">${head.map(row).join("")}${rest.length
-        ? `<details class="rv-more"><summary>${DISCLOSURE}Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
+        ? `<details class="rv-more"><summary class="disclose">${DISCLOSURE}<span>Show all ${item.fields.length}</span></summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
 };
 
 // A behaviour is titled by its key's name, named as every surface names that

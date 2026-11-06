@@ -54,9 +54,11 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
         <span class="hue-ramp"><span class="thumb" style="left:${(h / 255) * 100}%"></span></span></div>`);
     node.append(ramp);
 
-    const fields = el(`<div class="grid3">
-        ${[["H", h, 255], ["S", s, 255], [`V · max ${maximum}`, v, maximum]].map(([name, value, max], index) =>
-            `<label class="field"><span>${esc(name)}</span><input type="number" min="0" max="${esc(max)}" step="1" class="input mono" value="${esc(value)}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
+    // Three number fields as wide as their three digits, each named with its
+    // range, as every other number in the app is.
+    const fields = el(`<div class="colour-fields">
+        ${[["Hue", h, 255], ["Saturation", s, 255], ["Brightness", v, maximum]].map(([name, value, max], index) =>
+            `<label class="field"><span>${esc(name)} 0–${esc(max)}</span><input type="number" min="0" max="${esc(max)}" step="1" class="input mono num" value="${esc(value)}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
     /** @type {NodeListOf<HTMLInputElement>} */ (fields.querySelectorAll("[data-channel]")).forEach((input) => input.addEventListener("change", () => {
         const next = [h, s, v];
         next[Number(input.dataset.channel)] = Number(input.value) || 0;

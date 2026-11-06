@@ -460,6 +460,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["RGB_KEY_HALF", "The half holding the trigger key"], ["RGB_KEYS_ONLY", "Only the trigger key"],
     ],
     paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys mapped on this layer only"], ["ALL_KEYS", "All keys"]],
+    // The same modes in two words, for a list's cell.
+    paintModesBrief: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "mapped keys"], ["ALL_KEYS", "all keys"]],
     fadeModes: [
         ["FOLLOW_REAL_DESTINATION", "Follow the real destination"],
         ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the background effect would show"],

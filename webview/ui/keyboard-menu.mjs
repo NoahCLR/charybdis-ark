@@ -39,7 +39,7 @@ export function keyboardMenu() {
     return `<div class="rail-keyboard-wrap">
         <button class="rail-keyboard" id="rail-keyboard" data-act="keyboard-menu" aria-haspopup="menu" aria-expanded="${open}"
             ${open ? 'aria-controls="rail-menu"' : ""} aria-describedby="rail-keyboard-status" ${control.disabled ? "disabled" : ""}>
-            ${inner}<span class="rail-chevron" aria-hidden="true">▾</span></button>
+            ${inner}<svg class="rail-chevron" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3"/></svg></button>
         ${status}${open ? menu(control) : ""}</div>`;
 }
 

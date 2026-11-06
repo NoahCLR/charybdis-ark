@@ -7,7 +7,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {offWording, stageEnabled} from "../../view/lighting.mjs";
 import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
-import {aboutStage, colourControl, lightingGroup, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, lightingGroup, paintsSection, section, stack} from "./common.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
 import {sectionsIn} from "../../view/settings-layout.mjs";
@@ -81,7 +81,7 @@ export function stageKey(model) {
         ...offWording(model, "key"),
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
-    const policy = section("When and where");
+    const policy = paintsSection(model, "key", "When and where");
     const commit = el(choiceField({label: vocabulary(model).lightingFields.tapBranchCommit, f: "lighting:key:tap-commit", choices: vocabulary(model).tapCommit,
         current: feedback.tapCommitMode, disabled: !canEdit}));
     commit.addEventListener("change", (event) =>

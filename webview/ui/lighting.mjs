@@ -24,9 +24,6 @@ import {lightingBoard} from "../view/lighting-board.mjs";
 import {durationControl} from "./duration.mjs";
 import {sectionsIn} from "../view/settings-layout.mjs";
 
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} id */
-const stageBit = (model, id) => (model?.rgb?.stages || []).find((stage) => stage.id === id)?.bit;
-
 export function screenLighting() {
     const model = getModel();
     if (!model?.rgb?.stages) {
@@ -71,12 +68,17 @@ export function screenLighting() {
         onLed: editing ? (led, starting) => pickLed(model, stage, led, starting) : undefined,
     }));
     if (editing) drawn.classList.add("picking-leds");
-    card.appendChild(el(`<div class="board-foot">
+    // The caption lies over the board's bottom-left corner, which the drawing
+    // leaves empty, so the card stays as tall as the Keymap's; while LEDs
+    // are picked, the instructions take a row under the board instead, as
+    // the Keymap's layer preview does, so none of them is cut.
+    const foot = el(`<div class="board-foot">
         <b>${editing ? "Picking LEDs" : "Preview"}</b>
-        <span class="board-foot-text">${editing
+        <span class="board-foot-text" data-tip="${esc(shows.caption)}">${editing
             ? `Click or drag across keys to pick the accent's LEDs, or take them back · ${esc(editing.leds.length)} picked`
             : esc(shows.caption)}</span>
-    </div>`));
+    </div>`);
+    if (editing) card.appendChild(foot); else drawn.appendChild(foot);
     // The same strip as Keys, Rename & Reorder included: a layer is renamed
     // and reordered wherever its tabs are.
     const bar = layerBar();
@@ -112,9 +114,6 @@ export function screenLighting() {
         state.stage = /** @type {string} */ (button.dataset.ltab);
         render();
     }));
-    const right = /** @type {HTMLElement} */ (bench.querySelector("#benchRight"));
-    const bit = stageBit(model, state.stage);
-    if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
     stageBody(/** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
     keepInView(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
     rovingTabs(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")), /** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
@@ -148,19 +147,6 @@ function powerControls(model) {
     const duration = durationControl(timeout, editable && !timeout.readOnly, submit);
     /** @type {HTMLElement} */ (node.querySelector(".lighting-timeout")).append(duration.node);
     /** @type {HTMLInputElement} */ (node.querySelector("input[type=checkbox]")).addEventListener("change", submit);
-    return node;
-}
-
-/** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id @param {number} bit */
-function stageSwitch(model, id, bit) {
-    const on = stageEnabled(model, id);
-    const node = el(`<label class="sw" data-tip="Turn this whole stage off without losing the colours it stores.">
-        <input data-f="lighting:${esc(id)}:enabled" type="checkbox" ${on ? "checked" : ""} ${editGate(model, "lighting").editable ? "" : "disabled"}><span class="track"></span>
-        <span class="txt">${on ? "Stage on" : "Stage off"}</span></label>`);
-    /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
-        const mask = model.rgb.stageEnableMask ?? 0;
-        post(edits.rgbStages(mask, bit, /** @type {HTMLInputElement} */ (event.target).checked));
-    });
     return node;
 }
 

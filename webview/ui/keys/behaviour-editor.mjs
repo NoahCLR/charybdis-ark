@@ -160,7 +160,7 @@ export function behaviourEditor(behaviour) {
             ${behaviour.stored ? `<div class="right row beh-actions">
                 <button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
                     data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
-                <button class="btn tiny ghost" data-act="remove" ${canEdit ? "" : "disabled"}
+                <button class="btn tiny ghost destructive" data-act="remove" ${canEdit ? "" : "disabled"}
                     data-tip="${esc(editWords(model?.draft).removeBehaviour)}. Its keys then send their plain keycode.">Remove behaviour</button>
             </div>` : ""}
         </div>

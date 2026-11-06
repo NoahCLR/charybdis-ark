@@ -9,7 +9,7 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
 import {shareHold} from "../../view/share.mjs";
 import {sectionPath, sectionsIn} from "../../view/settings-layout.mjs";
-import {aboutStage, colourControl, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, section, stack, stageSwitch} from "./common.mjs";
 
 // How long the auto-mouse colour holds before it fades, as a share of the
 // timeout. The keyboard stores milliseconds and keeps them with its global
@@ -20,6 +20,9 @@ function fadeTiming(model, idle) {
     const section = sectionsIn(model, "Lighting").find((entry) => entry.stage === "auto");
     const gate = editGate(model, "settings");
     const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h4></div></section>`);
+    // The stage's switch rides here, the last column, as on every stage.
+    const sw = stageSwitch(model, "auto");
+    if (sw) /** @type {HTMLElement} */ (node.querySelector(".sect-h")).appendChild(sw);
     if (!section) {
         node.append(el(`<p class="note">${esc(gate.why || "Choose Read keyboard to read the auto-mouse timing.")}</p>`));
         return node;
@@ -44,7 +47,7 @@ function fadeTiming(model, idle) {
     };
     preview();
     range.addEventListener("input", preview);
-    const open = el(`<button class="btn tiny self-start">Open ${esc(sectionPath(model, "autoMouse"))}</button>`);
+    const open = el(`<button class="btn tiny link self-start">Open ${esc(sectionPath(model, "autoMouse"))}</button>`);
     open.addEventListener("click", () => { state.screen = "pointer"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
     range.addEventListener("change", () => post(edits.settingsSection(section, () => range.value, model.settingsEditing?.identity)));
     const box = el(`<div class="stack gap-12"></div>`);
@@ -71,7 +74,7 @@ export function stageAuto(model) {
     if (idle) {
         node.classList.add("idle");
         const notice = el(`<div class="unavailable span"><span>${esc(idle)} A pointer layer turned on by hand shows its own layer lighting. The fade settings below are kept for when auto-mouse is back on.</span>
-            <button class="btn tiny self-start">Open ${esc(sectionPath(model, "autoMouse"))}</button></div>`);
+            <button class="btn tiny link self-start">Open ${esc(sectionPath(model, "autoMouse"))}</button></div>`);
         /** @type {HTMLButtonElement} */ (notice.querySelector("button")).addEventListener("click", () => { state.screen = "pointer"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
         node.append(notice);
     }

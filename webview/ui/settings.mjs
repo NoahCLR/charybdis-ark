@@ -296,10 +296,10 @@ function snipingKeys(model, canEdit) {
         <p class="note">Sniping is on while one of these keys is held or toggled.</p></div>`);
     for (const keycode of ["SNIPING", "SNP_TOG"]) {
         const words = keyIdentity(model, keycode).label;
-        const row = el(`<div class="row gap-10 sniping-key">
+        const row = el(`<div class="row gap-12 sniping-key">
             <span class="sniping-name">${esc(words)}</span>
             <span class="note">${esc(reachLine(keycodePlacements(model, [keycode])))}</span>
-            <button class="btn tiny ghost right" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key…</button></div>`);
+            <button class="btn tiny link right" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key →</button></div>`);
         /** @type {HTMLButtonElement} */ (row.querySelector("[data-place]")).addEventListener("click", () => {
             state.placement = {keycode};
             state.screen = "keys";

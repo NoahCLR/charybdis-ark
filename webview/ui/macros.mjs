@@ -15,6 +15,7 @@
 // real when the slot is staged, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
+import {meterFill} from "./meter.mjs";
 import {macroMatches, macroPeekSteps} from "../view/macro.mjs";
 import {readMacro} from "../view/macro-cache.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
@@ -106,7 +107,7 @@ function memoryMeter(memory) {
     const used = memory.stored, share = Math.min(100, (used / memory.capacity) * 100);
     const unavailable = memory.slots - memory.available;
     return `<div class="sect-h memory-h"><h4>Macro memory</h4>
-            <span class="right note">${esc(used.toLocaleString("en-US"))} of ${esc(memory.capacity.toLocaleString("en-US"))} bytes used · ${esc(memory.free.toLocaleString("en-US"))} free</span></div>
-        <div class="meter"><i style="width:${share}%"></i></div>
-        <p class="note meter-note">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${esc(memory.reserveTaps)} key taps${unavailable ? `; ${esc(unavailable)} slot${unavailable === 1 ? " is" : "s are"} unavailable until there is room again` : ""}.</p>`;
+            <span class="right note">${esc(used.toLocaleString("en-US"))} / ${esc(memory.capacity.toLocaleString("en-US"))} bytes</span></div>
+        <div class="meter">${meterFill(share)}</div>
+        <p class="note meter-note">${esc(memory.free.toLocaleString("en-US"))} bytes free. A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${esc(memory.reserveTaps)} key taps${unavailable ? `; ${esc(unavailable)} slot${unavailable === 1 ? " is" : "s are"} unavailable until there is room again` : ""}.</p>`;
 }

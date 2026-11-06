@@ -155,7 +155,7 @@ function accentRow(model, stage, target, row, {editable = false, tag, go}) {
         <span class="right row gap-8">${go
             ? `<button class="btn tiny ghost" data-act="go">${esc(go.label)}</button>`
             : `<button class="btn tiny ghost" data-act="change" ${editable ? "" : "disabled"}>Change</button>
-               <button class="btn tiny ghost" data-act="remove" ${editable ? "" : "disabled"}>Remove</button>`}</span></div>`);
+               <button class="btn tiny ghost destructive" data-act="remove" ${editable ? "" : "disabled"}>Remove</button>`}</span></div>`);
     node.addEventListener("mouseenter", () => pointAt(row.ledIndices));
     node.addEventListener("mouseleave", () => pointAt([]));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="go"]'))?.addEventListener("click", () => go?.then());

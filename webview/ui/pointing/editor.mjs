@@ -54,7 +54,7 @@ export function editor(model, slot, canEdit, slots) {
             <span class="right row actions">
                 ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${canEdit ? "" : "disabled"}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
-                <button class="btn tiny ghost" data-act="clear" ${canEdit ? "" : "disabled"}
+                <button class="btn tiny ghost destructive" data-act="clear" ${canEdit ? "" : "disabled"}
                     data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it holds a mode again.">Clear mode</button>
             </span></div>
         <div class="card-b pd-steps"></div></div>`);

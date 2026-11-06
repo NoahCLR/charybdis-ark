@@ -145,7 +145,7 @@ character it can't type says which one and isn't kept.
 
 A pointing mode changes what the ball does while its key is held or locked.
 Choose **Scroll** or **Send keys**, click a direction to set what it sends,
-and use **Place on a key…** to put the mode's hold key on the board. An
+and use **Place on a key →** to put the mode's hold key on the board. An
 empty mode can be placed on a key and set up later.
 
 <p align="center">

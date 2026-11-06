@@ -115,6 +115,9 @@ function drawApp(keptScreen, scroll, benchHeight) {
 /** @param {NonNullable<ReturnType<typeof readScreen>>} read @param {import("../contracts/panel.js").PublishedModel | null} model */
 function readPlaceholder(read, model) {
     const loading = read.state === "loading";
+    // The dot is red only when the keyboard reports an error; otherwise the
+    // page is waiting, and nothing is wrong.
+    const tone = model?.device?.health?.error ? "err" : "";
     // Without a keyboard, the page offers its picker first.
     const choose = shellOf(model).chooseKeyboard && !model?.device?.connected;
     // Without a keyboard the demo is offered beside it; a shell that cannot
@@ -125,7 +128,7 @@ function readPlaceholder(read, model) {
     const secondary = secondaryScreen(model, state.screen);
     const screen = el(`<div class="main">${topbar(screenTitle, "Change what your Charybdis does. Nothing is saved until you review it.")}
         <div class="content"><div class="pad"><div class="read-placeholder" role="status" aria-live="polite">
-            ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}
+            ${loading ? '<span class="spin" aria-hidden="true"></span>' : `<i class="dot ${tone}" aria-hidden="true"></i>`}
             <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
                 : read.state === "blocked" ? (demoHere ? `<div class="read-actions">${exploreButton("primary")}</div>` : "")

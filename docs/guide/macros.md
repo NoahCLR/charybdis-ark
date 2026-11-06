@@ -64,7 +64,7 @@ the button is **Back to keyboard**, which drops an edit that hasn't reached the
 keyboard yet. The chip says **unsaved** while the keyboard runs a change it
 hasn't saved, and **saved** when the macro matches what it saved.
 
-**Clear macro** empties the slot. **Place on a key…** takes you to the Keymap
+**Clear macro** empties the slot. **Place on a key →** takes you to the Keymap
 screen to put the macro on a key. Beside the title, chips name the layers
 that use the macro; click one to see it there.
 
@@ -91,8 +91,8 @@ switching to another window. A chord you were in the middle of when you
 switched away (⌘Tab, Alt+Tab) is left out. The recorder's heading says **recording** while
 it captures, and **recorded** while **Clear take** can still put the slot back.
 
-- **Record delays** keeps pauses longer than **After**, rounded to **Round
-  to**. The wait before the first key is never recorded.
+- **Record delays** keeps the pauses longer than the time after each step,
+  rounded to the second time. The wait before the first key is never recorded.
 - **Preserve hold timing** keeps every press and release with its timing, for
   a macro that needs keys held for a while. It keeps Record delays on.
 - **Clear take** puts back what the slot held before you recorded. Once you

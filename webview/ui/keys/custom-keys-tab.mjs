@@ -20,7 +20,7 @@ export function tabCustomKeys(body, right) {
     const model = getModel();
     const reach = tabReach(currentView(), "customKeys");
     right.replaceChildren();
-    const open = el(`<button class="btn tiny ghost">Open the Custom keys screen</button>`);
+    const open = el(`<button class="btn tiny link">Open the Custom keys screen →</button>`);
     open.addEventListener("click", () => { state.screen = "customKeys"; render(); });
     right.appendChild(open);
 

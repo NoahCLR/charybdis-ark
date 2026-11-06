@@ -1,6 +1,7 @@
 // @ts-check
 // Selector assertions refer to elements created by this module's authored markup.
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
+import {foldOpen, keepFold} from "./disclosure.mjs";
 import {getModel, state} from "../store.mjs";
 import {layerSwitchGrid, switchedLayers} from "./layer-switches.mjs";
 import {ALL_LAYERS} from "../view/layout.mjs";
@@ -13,10 +14,10 @@ import {vocabulary} from "../view/vocabulary.mjs";
 /** @param {{index: number, label?: string, name: string}[]} layers @param {{enabled?: boolean, allowedLayers?: number}} definition @param {boolean} editable @param {(patch: {enabled: boolean, allowedLayers: number}) => void} changed @param {string} identity @param {"behaviour" | "combo"} noun */
 export function definitionControls(layers, definition, editable, changed, identity, noun) {
     const words = vocabulary(getModel()).definitionFields;
-    const node = el(`<div class="stack gap-10">
+    const node = el(`<div class="stack gap-12">
         <label class="sw" data-tip="Off, this ${noun} keeps its actions and timing but does nothing until it is on again."><input type="checkbox" data-f="${esc(identity)}:enabled" data-definition-enabled ${definition.enabled !== false ? "checked" : ""} ${editable ? "" : "disabled"}>
             <span class="track"></span><span class="txt">${esc(words.use[noun])}</span></label>
-        <details class="def-layers" ${state.definitionLayersOpen ? "open" : ""}><summary class="note" data-tip="The layers a key can come from for this ${noun} to run.">${DISCLOSURE}${esc(words.allowedLayers)}</summary></details>
+        <details class="def-layers" ${foldOpen("definition:layers") ? "open" : ""}><summary class="disclose" data-tip="The layers a key can come from for this ${noun} to run.">${DISCLOSURE}<span>${esc(words.allowedLayers)}</span></summary></details>
         <p class="note">It runs only where Settings and the key's own switch allow it too.</p>
     </div>`);
     const allowed = definition.allowedLayers ?? ALL_LAYERS;
@@ -26,7 +27,7 @@ export function definitionControls(layers, definition, editable, changed, identi
     {place: `runs-on:${noun}`, keep: (layer) => !(allowed & 2 ** layer)});
     const fold = /** @type {HTMLDetailsElement} */ (node.querySelector(".def-layers"));
     fold.appendChild(grid);
-    fold.addEventListener("toggle", () => { state.definitionLayersOpen = fold.open; });
+    fold.addEventListener("toggle", () => { keepFold("definition:layers", fold.open); });
     /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("input")).forEach(input => input.addEventListener("change", () => changed({
         enabled: /** @type {HTMLInputElement} */ (node.querySelector("[data-definition-enabled]")).checked,
         allowedLayers: switchedLayers(grid),

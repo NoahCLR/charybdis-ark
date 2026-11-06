@@ -14,7 +14,7 @@ Hover any label on Pointer settings for what it does.
 - **Normal pointer DPI**: the everyday speed, 400 to 3400 DPI.
 - **Sniping DPI**: a slower speed for precise work, 100 to 400 DPI.
 - **Sniping keys**, under it, shows where the **Sniping (hold)** and
-  **Sniping toggle** keys are placed, with **Place on a key…** for each.
+  **Sniping toggle** keys are placed, with **Place on a key →** for each.
   Sniping is on while one of them is held or toggled, or one of the
   auto-sniping layers is on.
 
@@ -52,7 +52,7 @@ locks it on until pressed again. The picker shows them as **Hold** and
 **Lock** under Pointing modes.
 
 The mode's name is the editor's title: click it to rename, up to 32 bytes
-(an accented letter takes two). **Place on a key…** beside it puts the
+(an accented letter takes two). **Place on a key →** beside it puts the
 mode's hold key on a key you pick on the board. **Duplicate** copies the mode
 into the first empty slot, and **Clear mode** empties the slot.
 
@@ -212,7 +212,7 @@ slots:
 - **Held modifiers**: what each direction does when you are already holding
   modifiers. **Inherit modifiers** adds them, **Ignore** leaves out the ones
   you pick, and **Exact shortcut** sends only its own. A macro always inherits.
-- **Scroll tuning** for scrolling modes. Hover a setting for what it does:
+- **Scroll tuning** for scrolling modes. Each setting says what it does under it:
   - **Horizontal** and **Vertical activation threshold**: how far the ball
     must move on an axis before a scroll can use it. When both axes are below
     their thresholds, the scroll lets go of its axis.
