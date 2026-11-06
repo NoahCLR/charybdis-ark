@@ -1,6 +1,6 @@
 // @ts-check
-// An empty slot's card: it starts a mode by the same choice step 1 of a mode
-// offers, Scroll or Send keys, or copies a mode already made.
+// An empty slot's card: it starts a mode by step 1 of a mode, Scroll or Send
+// keys, drawn where a mode draws it, or copies a mode already made.
 import {el, esc} from "../../lib/dom.mjs";
 import {newMode, scrollStarter} from "../../view/pointing-config.mjs";
 import {whatReachesSlot} from "../../view/pointing-reach.mjs";
@@ -11,6 +11,8 @@ import {actionMarked, mark} from "../marks.mjs";
 import {listed} from "../../view/vocabulary.mjs";
 import {movementChoice} from "./movement-choice.mjs";
 import {placeButton} from "./keys-and-light.mjs";
+import {titleText} from "../title-name.mjs";
+import {step} from "./step.mjs";
 
 // A key for an empty slot is allowed by the keyboard, so the card explains
 // the consequence instead of the app refusing the edit.
@@ -31,18 +33,19 @@ export function emptySlot(model, slot, slots) {
     const gate = editGate(model, "pointing"), canEdit = gate.editable;
     const sources = slots.filter((row) => row.kind);
     const node = el(`<div class="pd-editor stack" data-pd-editor="${esc(slot.id)}"><div class="card">
-        <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span><h3>New pointing mode</h3>
+        <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>${titleText("New pointing mode")}
             <span class="tag">Slot ${esc(slot.id)}</span><span class="right row actions"></span></div>
-        <div class="card-b stack">
-        <p class="note">Nothing is stored here yet. What should the trackball do while this mode runs?</p>
+        <div class="card-b pd-steps"></div></div></div>`);
+    // Step 1 of a mode, where a mode has it, so the choice stays put once made.
+    const first = step(/** @type {HTMLElement} */ (node.querySelector(".pd-steps")), slot.id, 1, "What the ball does", "Nothing is stored here yet.");
+    first.append(el(`<div class="stack"><div data-kinds></div>
         ${inertNote(model, slot)}
-        <div data-kinds></div>
         ${sources.length ? `<div class="pd-copy"><label class="field"><span>Or copy a mode</span><select class="input" data-f="pointing:${esc(slot.id)}:copy" data-source ${canEdit ? "" : "disabled"}>
             ${sources.map((row) => `<option value="${esc(row.id)}">${esc(row.name)} · slot ${esc(row.id)}</option>`).join("")}</select></label>
             <button class="btn" data-act="copy" ${canEdit ? "" : "disabled"}>Copy into this slot</button></div>`
             : ""}
         ${canEdit || gate.quiet ? "" : `<div class="unavailable">${esc(gate.why || "This slot cannot be edited right now.")}</div>`}
-    </div></div></div>`);
+    </div>`));
     /** @type {HTMLElement} */ (node.querySelector(".right")).append(placeButton(slot, editGate(model, "keys").editable));
     /** @type {HTMLElement} */ (node.querySelector("[data-kinds]")).replaceWith(movementChoice(model, slot.id, null, {disabled: !canEdit,
         pick: (kind) => post(edits.pdMode(slot.id, newMode(slot, kind, scrollStarter(slots)), model.profileIdentity))}));

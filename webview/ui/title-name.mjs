@@ -17,6 +17,14 @@ export function titleName({f, value, placeholder, label, perName, canEdit}) {
             data-tip="Click the title to rename. ${esc(NAME_TIP)}"><span class="title-name-count note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></div>`;
 }
 
+// A title that cannot be renamed yet, in the same box as titleName, so an
+// editor's header keeps its size and layout when the title becomes a name:
+// an empty pointing slot's card, until a mode is made there.
+/** @param {string} text */
+export function titleText(text) {
+    return `<div class="title-name"><h3 class="title-name-text">${esc(text)}</h3></div>`;
+}
+
 /**
  * @param {HTMLElement} node holding one titleName
  * @param {{stored: string, perName: number, rename: (name: string) => void}} options

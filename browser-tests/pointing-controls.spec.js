@@ -245,6 +245,34 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
     await expectPost(page, {type: "duplicatePdMode", slot: 8, source: 5});
 });
 
+test("making a mode leaves its card's header and step 1 where they were", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 8});
+    /** @param {number} slot */
+    const header = async slot => {
+        await page.evaluate(async slot => {
+            const store = await import("/webview/store.mjs");
+            store.state.pointingSlot = slot;
+            store.render();
+        }, slot);
+        const head = editor(page).locator(".name-titlebar");
+        await expect(head.locator(".tag")).toHaveText(`Slot ${slot}`);
+        const box = async locator => {
+            const {x, y, height} = /** @type {{x: number, y: number, height: number}} */ (await locator.boundingBox());
+            return {x, y, height};
+        };
+        const title = head.locator(".title-name"), first = editor(page).locator(".pd-step").first();
+        return {
+            head: await box(head), title: await box(title), tag: {y: (await box(head.locator(".tag"))).y},
+            font: await title.locator("h3, input").evaluate(node => getComputedStyle(node).font),
+            step: await box(first.locator(".pd-step-h h4")), kinds: await box(first.locator(".pd-kinds")),
+        };
+    };
+    const empty = await header(8);
+    await expect(editor(page).locator(".card-h h3")).toHaveText("New pointing mode");
+    await expect(editor(page).locator(".pd-step h4")).toHaveText(["What the ball does"]);
+    expect(await header(4)).toEqual(empty);
+});
+
 test("pointing navigation reaches placement and lighting without an edit", async ({page}) => {
     await openControls(page, "pointing", {pointingSlot: 4});
     await editor(page).locator('[data-act="place"]').click();

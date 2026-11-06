@@ -60,8 +60,9 @@ The editor runs in four steps, top to bottom.
 
 ### Starting a mode
 
-An empty slot asks what the trackball should do: **Scroll** or **Send keys**.
-Pick one and the slot holds a new mode that moves that way. Or pick a mode
+An empty slot shows the editor's first step, **What the ball does**: **Scroll**
+or **Send keys**. Pick one and the slot holds a new mode that moves that way,
+with the rest of the steps below. Or pick a mode
 you already have under **Or copy a mode** and choose **Copy into this slot**.
 
 A key can point at an empty slot. It just does nothing until the slot holds a
