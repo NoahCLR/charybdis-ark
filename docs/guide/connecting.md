@@ -147,9 +147,9 @@ same saved settings.
 
 **Memory** shows how full the profile is. Behaviours, combos, lighting,
 pointing modes, custom keys, settings and names share one space. **In use**
-counts what you have set up against what the keyboard holds: behaviours, tap
-counts, combos, accents, LED sets, macros, custom keys and pointing
-modes. Macro steps live in the same space, within a limit of their own, shown
+counts what you have set up against what the keyboard holds, in the order of
+Keymap's tabs and then Lighting: behaviours, tap counts, combos, macros, custom
+keys, pointing modes, LED sets and accents. Macro steps live in the same space, within a limit of their own, shown
 as **Macro memory**. The bar turns orange from 90%, when the next edit may not
 fit. While your draft has changes, the figures are the draft's. An edit that
 would go past one of these counts, or past the shared space, is refused in the

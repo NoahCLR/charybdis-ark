@@ -28,7 +28,8 @@ test("the bar is the bytes Apply writes, and each count is what its screen sets 
     assert.equal(usage.used, validateSnapshot(value).candidate.length);
     assert.equal(usage.capacity, 130048, "the size is the one the firmware advertises");
     assert.deepEqual(usage.counts.map(entry => entry.id),
-        ["behaviours", "behaviourSteps", "combos", "lightingGroups", "lightingGroupRows", "macros", "customKeys", "pointingModes"], "in the rail's order");
+        ["behaviours", "behaviourSteps", "combos", "macros", "customKeys", "pointingModes", "lightingGroups", "lightingGroupRows"],
+        "in the order of Keymap's workbench tabs, then Lighting");
     const {behaviors, combos, pdModes, settings} = validateSnapshot(value);
     assert.deepEqual(count(usage, "behaviours"), {id: "behaviours", used: behaviors.rows.length, limit: 64});
     assert.deepEqual(count(usage, "behaviourSteps"), {id: "behaviourSteps", used: behaviors.populatedStepCount, limit: 128});
