@@ -694,7 +694,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    it reads the same on every colour and moves no legend (ui/board.mjs). */
 .kc-led { pointer-events: none; }
 .kc-led rect { fill: var(--bg); stroke: var(--line-2); stroke-width: .6; }
-.kc-led text { fill: var(--text-2); font-family: var(--mono); font-size: 5.6px; font-weight: var(--fw-bold); text-anchor: middle; dominant-baseline: middle; }
+.kc-led text { fill: var(--text-2); font-family: var(--mono); font-size: 8.4px; font-weight: var(--fw-bold); text-anchor: middle; dominant-baseline: middle; }
 /* An accent pointed at in a list on Lighting: its LEDs glow, as a drop
    target does, since a lit key's stroke is inline and a ring already means
    selected or picked. */
