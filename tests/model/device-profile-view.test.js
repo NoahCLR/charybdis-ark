@@ -26,7 +26,10 @@ test("a row carries its key's built-in first tap and hold, named as a person rea
         hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI"},
     }, "a modifiers-only hold reads as its modifiers, not Shift+GUI+N/A");
     assert.deepEqual(rows["LT(3,KC_SLASH)"].hold, {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)", repeatHz: "0"});
-    assert.deepEqual(rows.KC_LEFT_GUI, {});
+    assert.deepEqual(rows.KC_LEFT_GUI, {releaseTaps: true,
+        tap: {style: "TAP_SENDS", action: "KC_LEFT_GUI", label: "Left GUI"},
+        hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_LEFT_GUI", repeatHz: "0", label: "Left GUI", fallback: true},
+    }, "a bare modifier taps and holds itself, like any plain key");
 });
 
 test("a behaviour branch carries the readable name of the keycode it stores, when one exists", () => {

@@ -59,8 +59,9 @@ cell is dashed and shows it, marked **built in**:
   so the two modes never overlap. That holds however the key is stored, by
   its name or as its keycode.
 
-Setting an action in a dashed cell replaces what it shows. Modifier keys on
-their own show nothing built in.
+Setting an action in a dashed cell replaces what it shows. A modifier key on
+its own, such as Left Command, is a key like any other: a quick Single tap
+sends it, and holding it holds it.
 
 Tapping faster than the deepest tap count you set is just typing: each press
 sends the Single tap again. So a Backspace whose Double tap types V sends
