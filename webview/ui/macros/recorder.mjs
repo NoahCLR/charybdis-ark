@@ -113,7 +113,7 @@ function detachCapture() {
 // Discard cancels its active take before resetting the form. The outside-click
 // listener must not turn that cancelled capture into a staged edit afterward.
 /** @param {string} keycode */
-export function cancelRecording(keycode) {
+function cancelRecording(keycode) {
     if (state.recording?.slot !== keycode) return;
     detachCapture();
     state.recording = null;

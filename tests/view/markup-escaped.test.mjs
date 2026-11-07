@@ -38,7 +38,6 @@ const SAFE_HELPERS = {
 const PASSES_ON_PURPOSE = [
     ["webview/lib/dom.mjs", ["html(String(markup).trim())"], "el() itself: what callers hand it is judged at each call"],
     ["webview/ui/checks.mjs", ["show(check)", "source(check)"], "the Show and source buttons the review overlay passes in, built from escaped templates there"],
-    ["webview/ui/custom-keys.mjs", ['keyFields(model, key).join("")'], "an empty slot and placedOn()'s layer chips, both markup templates"],
     ["webview/ui/device.mjs", ["value"], "kv() rows hold markup their callers escaped, as its @param says"],
     ["webview/ui/groups.mjs", ['group.rows.join("")'], "each list's table rows, markup templates built by the tab or stage that lists them"],
     ["webview/ui/groups.mjs", ["detail"], "a group's detail, markup its tab built: the Combos tab's selected key, named through keyNameMarked"],

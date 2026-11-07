@@ -1566,6 +1566,7 @@ table.t tr.quiet > td { color: var(--text-3); }
 .pd-steps { padding: 0; }
 .pd-step { padding: var(--sp-5); }
 .pd-step + .pd-step { border-top: 1px solid var(--line); }
+.pd-steps > .slot-context { padding: var(--sp-4) var(--sp-5); }
 .pd-step-h { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .pd-step-h h4 { font-size: var(--fs-base); font-weight: var(--fw-strong); }
 .pd-step-h .note { margin-left: auto; }
@@ -1783,7 +1784,9 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .name-bytes > .input { width: 100%; }
 .name-bytes-count { position: absolute; top: 100%; left: 6px; z-index: var(--z-raised); opacity: 0; pointer-events: none; font-size: var(--fs-xs); }
 .name-bytes:focus-within .name-bytes-count, .name-bytes-count.warn { opacity: 1; }
-.macro-context { display: flex; gap: var(--sp-3) var(--sp-5); flex-wrap: wrap; align-items: center; justify-content: space-between; padding-bottom: var(--sp-4); border-bottom: 1px solid var(--line); }
+.slot-context { display: flex; gap: var(--sp-3) var(--sp-5); flex-wrap: wrap; align-items: center; justify-content: space-between; padding-bottom: var(--sp-4); border-bottom: 1px solid var(--line); }
+/* "Not placed yet" stands as tall as a layer chip, so placing it moves nothing below. */
+.slot-context > .note[data-placed-on] { display: inline-flex; align-items: center; min-height: var(--h-compact); }
 .macro-protection { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-2); }
 .macro-protection select.input { width: auto; min-width: 135px; height: var(--h-compact); padding: var(--sp-1) var(--select-room) var(--sp-1) var(--sp-2); font-size: var(--fs-sm); background-position: calc(100% - 15px) 12px, calc(100% - 10px) 12px; }
 .macro-sequence-heading { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; justify-content: space-between; }

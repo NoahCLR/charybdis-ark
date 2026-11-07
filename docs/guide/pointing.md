@@ -56,6 +56,12 @@ The mode's name is the editor's title: click it to rename, up to 32 bytes
 mode's hold key on a key you pick on the board. **Duplicate** copies the mode
 into the first empty slot, and **Clear mode** empties the slot.
 
+Under the title, chips name the layers that start the mode and how: a key, a
+behaviour, a combo, or the layer itself when the mode is linked to it
+(**starts it**). Click one to see it on the Keymap screen's **Pointing modes**
+tab. An empty slot shows the keys still bound to it, which do nothing until it
+holds a mode.
+
 The editor runs in four steps, top to bottom.
 
 ### Starting a mode
@@ -119,8 +125,8 @@ For a scrolling mode:
 
 ### 3. What starts it
 
-**Its keys** shows the mode's hold and lock keys, by the mode's name, and
-where they sit on the board.
+**Its keys** shows the mode's hold and lock keys, by the mode's name. Where
+they sit is in the chips under the title.
 
 Then the layers. A layer the mode is linked to lends it its keys, whatever
 they are: clicks, modifiers, layer keys, behaviours. This is where a mode gets

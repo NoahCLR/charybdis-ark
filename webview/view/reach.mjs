@@ -136,18 +136,25 @@ export const customKeyNamesOf = (model) => namesOfKind(model, "customKey");
  * keys the board rings. What a layer only reaches under a transparent key is
  * the lower layer's route, listed for that layer, not repeated for every layer
  * above it. `at` is the layer's position in the stack, which is how a screen
- * selects it.
+ * selects it. A pointing mode's are pointing-reach.mjs's (pointingPlacements).
  */
 /** @param {ViewModel} model @param {"macros" | "customKeys"} tab @param {string} keycode */
 export function placementsOf(model, tab, keycode) {
     const namesOf = namesOfKind(model, tab === "macros" ? "macro" : "customKey");
+    return placementsBy(model, (view) => reachGroups(view, namesOf, [keycode]), keycode);
+}
+
+// The layers that reach `name`, from each layer's own groups as `reachOf`
+// finds them: placementsOf's rule for whatever a Keymap tab lists.
+/** @param {ViewModel} model @param {(view: import("./keyface-types.js").LayerView) => Pick<import("./keyface-types.js").ReachGroup, "onKeys" | "fromBranches" | "fromCombos">} reachOf @param {string} name */
+export function placementsBy(model, reachOf, name) {
     return (model?.layers || []).map((layer, at) => {
         const view = layerView(model, at);
-        const reach = reachGroups(view, namesOf, [keycode]);
+        const reach = reachOf(view);
         /** @type {['here' | 'branches' | 'combos', ReachEntry[]][]} */
         const groups = [["here", reach.onKeys], ["branches", reach.fromBranches], ["combos", reach.fromCombos]];
         const routes = groups
-            .map(([group, entries]) => ({group, entry: entries.find((entry) => entry.name === keycode)}))
+            .map(([group, entries]) => ({group, entry: entries.find((entry) => entry.name === name)}))
             .filter((route) => route.entry !== undefined)
             .map((route) => {
                 // The preceding filter kept only routes with an entry.

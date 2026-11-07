@@ -185,6 +185,26 @@ test("one message can name a custom key and set its shortcut together", () => {
         /not modifier keys/, "the shortcut is still checked");
 });
 
+test("clearing a custom key empties its name, shortcut and behaviour in one step, and leaves what sends it", () => {
+    let before = snapshot(pdDocument());
+    before = snapshot(draftEdit(before, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", name: "Click Spam", shortcut: {mods: 0x01, keys: [0x06], layers: 0, layerKind: 0}}, capabilities));
+    before = snapshot(draftEdit(before, {type: "updateCustomKey", keycode: "CUSTOM_KEY_3", name: "Neighbour"}, capabilities));
+    const was = validateSnapshot(before.document, capabilities);
+    assert.ok(customKeyEditorView(before, capabilities).keys[2].hasBehavior, "the compiled profile gives it a behaviour");
+    const cleared = draftEdit(before, {type: "clearCustomKey", keycode: "CUSTOM_KEY_2", expectedFingerprint: before.fingerprint}, capabilities);
+    const after = validateSnapshot(cleared, capabilities);
+    assert.deepEqual(customKeyEditorView(snapshot(cleared), capabilities).keys[2],
+        {slot: 2, keycode: "CUSTOM_KEY_2", code: 0x7f02, name: "", hasBehavior: false, shortcut: {mods: 0, keys: [], layers: 0, layerKind: 0}});
+    assert.equal(after.settings.customKeyNames[3], "Neighbour", "another key keeps its name");
+    assert.equal(after.behaviors.rows.length, was.behaviors.rows.length - 1, "only its own behaviour row goes");
+    assert.deepEqual(profileLayers(cleared), profileLayers(before.document), "keys that send it stay on the board");
+    assert.ok(profileReview(before, snapshot(cleared)).some(row => row.unit === "customKey:2"), "Review shows the key changed");
+    const empty = draftEdit(snapshot(cleared), {type: "clearCustomKey", keycode: "CUSTOM_KEY_2"}, capabilities);
+    assert.equal(empty, cleared, "an empty key is left as it is");
+    assert.throws(() => draftEdit(before, {type: "clearCustomKey", keycode: "CUSTOM_KEY_200"}, capabilities), /custom key the keyboard has/);
+    assert.throws(() => draftEdit(before, {type: "clearCustomKey", keycode: "CUSTOM_KEY_2", expectedFingerprint: "stale"}, capabilities), /changed since this draft/);
+});
+
 test("a shortcut's layers are staged, listed by name, moved by a reorder and kept off the default layers", () => {
     const {reorderLayers} = require("../../core/model/portable-profile");
     const {settingsEditorView} = require("../../core/model/settings-editor");

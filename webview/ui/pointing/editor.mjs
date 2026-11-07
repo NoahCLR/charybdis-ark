@@ -17,6 +17,7 @@ import {formControls} from "./form-controls.mjs";
 import {movementChoice} from "./movement-choice.mjs";
 import {movement} from "./movement.mjs";
 import {lightRow, placeButton} from "./keys-and-light.mjs";
+import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
 import {startStep} from "./link.mjs";
 import {advancedControls} from "./advanced.mjs";
 import {step as pdStep} from "./step.mjs";
@@ -58,8 +59,10 @@ export function editor(model, slot, canEdit, slots) {
                 <button class="btn tiny ghost destructive" data-act="clear" ${canEdit ? "" : "disabled"}
                     data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it holds a mode again.">Clear mode</button>
             </span></div>
-        <div class="card-b pd-steps"></div></div>`);
+        <div class="card-b pd-steps"><div class="slot-context">${placedOnMarkup(model, "pointing", String(slot.id),
+            "No key, behaviour, combo or layer starts this mode. Place it on a key to use it.")}</div></div></div>`);
     /** @type {HTMLElement} */ (card.querySelector(".right")).prepend(placeButton(slot, editGate(model, "keys").editable));
+    showPlacements(card, "pointing", String(slot.id));
     const nameInput = /** @type {HTMLInputElement} */ (card.querySelector("[data-name]"));
     form.name = () => nameInput.value.trim();
     // A rename stages the whole record, as every field of the mode does.

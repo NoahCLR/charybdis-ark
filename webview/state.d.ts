@@ -2,7 +2,10 @@ import type {BranchStyle, Combo, PdTap, Scalar} from '../contracts/edits.js';
 import type {PanelCommand, PanelResponse} from '../contracts/messages.js';
 import type {MacroStep} from './view/types.js';
 import type {ScreenId} from './view/screens.mjs';
-export interface MacroHistoryEntry {payload: string; steps?: MacroStep[]; selectedStep: string | null; selectedSteps: string[]}
+/** A macro slot's name and playback protection, which Clear macro empties with its steps. */
+export interface MacroSlotFields {name: string; protection: 'auto' | 'on' | 'off'}
+/** `emptied`: this entry is Clear macro's, and undoing it puts back the name and protection the slot had. */
+export interface MacroHistoryEntry {payload: string; steps?: MacroStep[]; selectedStep: string | null; selectedSteps: string[]; emptied?: MacroSlotFields}
 export interface MacroHistory {past: MacroHistoryEntry[]; present: MacroHistoryEntry; future: MacroHistoryEntry[]; group: string | null}
 export interface MacroForm {
     draft?: string; steps?: MacroStep[]; stepError?: string; cancelBlur?: boolean; wantsStage?: boolean; requestId?: number;
@@ -13,6 +16,8 @@ export interface MacroForm {
     selectedStep?: string | null;
     moveNotice?: string;
     selectionAnchor?: string | null; selectedSteps?: string[]; stepHistory?: MacroHistory;
+    /** The name and protection the next staged steps carry: an empty slot's after Clear macro, the old ones when it is undone. */
+    stageFields?: MacroSlotFields;
 }
 export interface PickerState {title: string; context?: string; contextKeycode?: string; onLayer?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; own?: string[]; symbols?: Record<string, string[]>; layerTap: string | null; onPick?: (expression: string) => void; layers?: number; layerKind?: number; onShortcut?: (shortcut: import('../contracts/panel.js').CustomKeyShortcut) => void; onCustomKey?: (keycode: string, shortcut: import('../contracts/panel.js').CustomKeyShortcut, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'; layoutKey?: boolean; comboOutput?: boolean}
 export interface PanelState {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {keycodePlacements, keysPlacedOn, reachLine} from "../../webview/view/placements.mjs";
+import {keycodePlacements, reachLine} from "../../webview/view/placements.mjs";
 import {deleteBehaviour, saveBehaviour} from "../../webview/view/edits.mjs";
 
 const require = createRequire(import.meta.url);
@@ -27,8 +27,7 @@ test("a key is found on layers, behaviours and combos, by its name or the value 
     assert.equal(reachLine({keys: [], behaviours: [], combos: [], layers: []}), "Not placed");
 });
 
-test("where keys are placed reads on after what they are, layer by layer", () => {
+test("keys are counted layer by layer", () => {
     const found = keycodePlacements(model, ["SNIPING", "SNP_TOG", "PD_MODE_4"]);
-    assert.equal(keysPlacedOn(found.keys), "on Base · 1 key, Navigation · 2 keys");
-    assert.equal(keysPlacedOn([]), "not placed on any layer");
+    assert.equal(reachLine({...found, behaviours: [], combos: []}), "Base · 1 key, Navigation · 2 keys");
 });

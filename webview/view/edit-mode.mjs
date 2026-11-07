@@ -180,8 +180,6 @@ export const renameNote = (draft) => liveMode(draft) === null
 //   removeBehaviour   Remove behaviour's tip, before what its keys then send
 //   macroFixFirst     a failed macro edit's note
 //   macroNotIn        a failed macro edit, after its error
-//   macroBack         the macro editor's way back from its own edit, and tip
-//   macroChanged, macroUnchanged   the macro editor's chip
 //   mark, holds, after   a change's mark: its tip, a folded group's, and what
 //                     follows a thing's name (view/review.mjs draftDot)
 const REVIEW_AND_SAVE_WORDS = Object.freeze({
@@ -191,9 +189,6 @@ const REVIEW_AND_SAVE_WORDS = Object.freeze({
     removeBehaviour: "Remove this behaviour from the draft",
     macroFixFirst: "Fix this edit before it can be kept in your draft.",
     macroNotIn: "This edit is not in your draft.",
-    macroBack: "Back to draft",
-    macroBackTip: "Put this macro back to what your draft holds, dropping the edit made here that is not in the draft yet.",
-    macroChanged: "changed in draft", macroUnchanged: "as read",
     mark: "Changed in your draft", holds: "Holds a change in your draft", after: "changed in your draft",
 });
 const LIVE_WORDS = Object.freeze({
@@ -203,9 +198,6 @@ const LIVE_WORDS = Object.freeze({
     removeBehaviour: "Remove this behaviour from the keyboard at once",
     macroFixFirst: "Fix this edit before it can be sent to the keyboard.",
     macroNotIn: "This edit has not reached the keyboard.",
-    macroBack: "Back to keyboard",
-    macroBackTip: "Put this macro back to what the keyboard runs, dropping the edit made here that has not reached it yet.",
-    macroChanged: "unsaved", macroUnchanged: "saved",
     mark: "Unsaved change", holds: "Holds an unsaved change", after: "unsaved change",
 });
 /** @param {Pick<Draft, "live"> | null | undefined} draft */

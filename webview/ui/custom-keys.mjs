@@ -6,8 +6,8 @@
 // Custom keys: the keyboard's 128 named keys. A key here is its name, its
 // shortcut, which is the key's own action (firmware D-F26), and its behaviour,
 // which works on top. The selected key shows two cards: the key itself (its
-// name as the card's title, as a macro's is, then its shortcut and where it is
-// placed; each field is one entry in `keyFields`) and what it does, which is the Keymap screen's behaviour editor for
+// name as the card's title, as a macro's is, then the layers it is placed on,
+// as a macro's are, and its shortcut) and what it does, which is the Keymap screen's behaviour editor for
 // that key, placed or not. A key with no stored behaviour shows the unstored
 // grid with its built-in defaults; the first edit adds the row. This is the
 // only behaviour editor on screen, so the open cell and the timing fields it
@@ -28,7 +28,8 @@ import {SHORTCUT_MEANS, customKeyDoes, customKeyInUse, hasShortcut, customKeySho
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourEditor} from "./keys/behaviour-editor.mjs";
-import {placementChipsMarkup, showPlacements} from "./keys/reach.mjs";
+import {placedOnMarkup, showPlacements} from "./keys/reach.mjs";
+import {mark} from "./marks.mjs";
 import {slotBank} from "../view/slot-bank.mjs";
 import {allSlotsShown, slotBankControls} from "./slot-bank.mjs";
 
@@ -120,12 +121,15 @@ export function screenCustomKeys() {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function editor(model, key, canEdit) {
     const card = el(`<div class="card">
-        <div class="card-h name-titlebar">${titleName({f: `custom-key:${key.slot}:name`, value: key.name, placeholder: `Custom key ${key.slot}`,
+        <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "customKey"})}</span>${titleName({f: `custom-key:${key.slot}:name`, value: key.name, placeholder: `Custom key ${key.slot}`,
             label: "Custom key name", perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName, canEdit})}
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
             <span class="right row actions">
-                <button class="btn tiny link" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key →</button></span></div>
-        <div class="card-b stack">${keyFields(model, key).join("")}</div></div>`);
+                <button class="btn tiny link" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key →</button>
+                <button class="btn tiny ghost destructive" data-act="clear" ${canEdit && customKeyInUse(key) ? "" : "disabled"}
+                    data-tip="Empty this custom key: its name, shortcut and behaviour. Keys, behaviours and combos that send it stay, and send nothing until it holds something again.">Clear custom key</button></span></div>
+        <div class="card-b stack"><div class="slot-context">${placedOnMarkup(model, "customKeys", key.keycode,
+            "No key, behaviour or combo sends this custom key. Place it on a key to use it.")}</div><div data-shortcut></div></div></div>`);
     attachTitleName(card, {stored: key.name, perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName,
         rename: (name) => post(edits.customKeyNameMessage(key.keycode, name, model?.customKeyEditing?.identity))});
     /** @type {HTMLElement} */ (card.querySelector("[data-shortcut]")).replaceWith(shortcutField(model, key, canEdit));
@@ -133,22 +137,14 @@ function editor(model, key, canEdit) {
         state.placement = {keycode: key.keycode};
         state.screen = "keys"; state.tab = "key"; render();
     });
+    /** @type {HTMLElement} */ (card.querySelector('[data-act="clear"]')).addEventListener("click", () => {
+        // Its behaviour goes with it, so a cell of it open here closes.
+        if (state.cellRow === key.keycode) Object.assign(state, {cell: null, cellRow: null, cellHow: null});
+        post(edits.clearCustomKeyMessage(key.keycode, model?.customKeyEditing?.identity));
+    });
     showPlacements(card, "customKeys", key.keycode);
     return card;
 }
-
-// The key's own fields, in the order the card shows them; its name is the
-// card's title. The shortcut is a placeholder filled in once the card exists
-// (shortcutField). Then the layers where a key carries it, a behaviour sends
-// it or a combo does, each in its layer colour; a click shows that layer with
-// the key picked.
-/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
-const keyFields = (model, key) => {
-    const chips = placementChipsMarkup(model, "customKeys", key.keycode);
-    return [`<div data-shortcut></div>`, `<div class="field"><span>On layers</span>
-        ${chips ? `<div class="row layer-chips">${chips}</div>`
-            : `<span class="note">No key, behaviour or combo sends this custom key. Place it on a key to use it.</span>`}</div>`];
-};
 
 // What the key does: in words (its shortcut, its behaviour on top, both, or
 // nothing yet), then its behaviour editor, the same one the Keymap screen's

@@ -3,7 +3,7 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {macroLocalState, samePayload, unreleased} from "../../view/macro.mjs";
+import {samePayload, unreleased} from "../../view/macro.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {listed, vocabulary} from "../../view/vocabulary.mjs";
@@ -58,8 +58,10 @@ export function inspectEdit(slot, stage) {
 function keepValidated(slot) {
     const model = getModel(), form = macroForm(slot.keycode);
     if (!editGate(getModel(), "macros").editable || slot.available === false || !form.wantsStage || form.stepError || state.recording || !matchingValidation(form, model, slot) || form.validation?.validation.error) return;
-    setMacroForm(slot.keycode, {wantsStage: false});
-    if (form.draft !== slot.payload) post(edits.macroMessage(slot.keycode, form.draft ?? slot.payload, model?.macroEditing?.identity));
+    // Clear macro, or its undo, also sets the name and protection.
+    const fields = form.stageFields && (form.stageFields.name !== (slot.name || "") || form.stageFields.protection !== slot.protection) ? form.stageFields : undefined;
+    setMacroForm(slot.keycode, {wantsStage: false, stageFields: undefined});
+    if (form.draft !== slot.payload || fields) post(edits.macroMessage(slot.keycode, form.draft ?? slot.payload, model?.macroEditing?.identity, fields));
 }
 
 /** @param {Extract<import("../../../contracts/messages.js").PanelResponse, {type: "macroValidation"}>} message */
@@ -99,9 +101,6 @@ export function paintFeedback(card, model, slot) {
         ${error ? `<div class="unavailable">${esc(error)} ${local ? esc(editWords(model?.draft).macroNotIn) : `This stored macro cannot play with the current settings in ${esc(vocabulary(model).settingsSections.host)}.`}</div>` : ""}
         ${note ? `<p class="note">${esc(note)}</p>` : ""}
     </div>`));
-    const chip = macroLocalState(model?.draft, slot.keycode, local);
-    /** @type {HTMLElement} */ (card.querySelector("[data-local-state]")).replaceChildren(el(`<i class="dot ${chip.dot}"></i>`), document.createTextNode(chip.text));
-    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="discard"]')).disabled = !local;
 }
 
 /** @param {Model} model @param {MacroSlot} slot @param {string} payload */

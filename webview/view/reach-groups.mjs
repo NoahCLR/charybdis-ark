@@ -44,12 +44,14 @@ export const setReachGroupOpen = (groups, id, open) => ({...groups, [id]: open})
 /** @param {string} group @param {string | number} name */
 export const reachRowId = (group, name) => `${group}:${name}`;
 
-// The layers a macro or custom key is placed on (placementsOf), as their
-// chips read: the layer, its place in the stack, and how it is reached there
-// ("key ×2 · combo").
+// The layers a macro, custom key or pointing mode is placed on
+// (placementsOf), as their chips read: the layer, its place in the stack, and
+// how it is reached there ("key ×2 · combo"). A layer that starts a pointing
+// mode with no key of its own says so ("starts it").
 /** @param {ReturnType<typeof import("./reach.mjs").placementsOf>} placements */
 export const placementChips = (placements) => placements.map(({layer, at, routes}) => ({layer, at,
-    how: routes.map((route) => `${ROUTE_WORDS[route.group]}${route.group === "here" && route.keys.length > 1 ? ` ×${route.keys.length}` : ""}`).join(" · ")}));
+    how: routes.map((route) => route.group === "here" && !route.keys.length && route.entry.starts?.length ? "starts it"
+        : `${ROUTE_WORDS[route.group]}${route.group === "here" && route.keys.length > 1 ? ` ×${route.keys.length}` : ""}`).join(" · ")}));
 
 // Where a chip opens its layer in a Keymap tab: on the row of the first route
 // that reaches it there, the group that row is under open, with the first key

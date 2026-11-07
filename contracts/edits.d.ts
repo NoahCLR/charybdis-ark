@@ -117,6 +117,8 @@ export interface EditPayloads {
      * modifiers no keycode can hold (D-L63).
      */
     updateCustomKeyShortcut: {keycode: string; shortcut: import('./panel.js').CustomKeyShortcut; name?: string; then?: Extract<PanelEdit, {type: 'updateLayoutKeys' | 'saveBehavior' | 'addCombo' | 'saveCombo'}>; expectedFingerprint?: string};
+    /** Empties a custom key in one step: its name, its shortcut and its behaviour row. Keys, behaviours and combos that send it stay. */
+    clearCustomKey: {keycode: string; expectedFingerprint?: string};
     renameKeyboard: {name: string; expectedFingerprint?: string};
     savePdMode: {slot: number; config: PdConfig; expectedBase?: Partial<BaseIdentity>};
     clearPdMode: {slot: number; expectedBase?: Partial<BaseIdentity>};

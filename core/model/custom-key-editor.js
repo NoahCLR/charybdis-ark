@@ -50,11 +50,13 @@ const SHORTCUT_KEY_NAMES = Object.freeze(keycodes.entries()
     .flatMap(entry => [entry.name, ...entry.aliases]));
 
 // A custom key's name, or its shortcut. Both live in the profile's settings
-// domain; a message carries one or the other.
-/** @param {import("./types.js").PortableDocument} document @param {import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']} message @param {import("./types.js").Draft} draft */
+// domain; a message carries one or the other. Clearing the key empties both
+// and takes its behaviour row away, in one step.
+/** @param {import("./types.js").PortableDocument} document @param {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'updateCustomKey' | 'updateCustomKeyShortcut' | 'clearCustomKey'}>} message @param {import("./types.js").Draft} draft */
 function editCustomKey(document, message, draft) {
     const slot = customKeyOfName(message.keycode);
     if (slot === undefined) throw fail("Choose a custom key the keyboard has.");
+    if (message.type === "clearCustomKey") return clearCustomKey(document, slot, draft);
     // A message renames the key, sets its shortcut, or both at once (a key
     // made for a shortcut the picker could not store as a keycode).
     const renaming = "name" in message && message.name !== undefined;
@@ -82,5 +84,25 @@ function editCustomKey(document, message, draft) {
         if (given) settings.customKeyShortcuts[slot] = now;
     });
 }
+
+// An empty custom key has no name, no shortcut and no behaviour, so it is no
+// longer in use. Whatever sends it (a layout key, a behaviour step, a combo)
+// stays, and sends nothing until the key holds something again.
+/** @param {import("./types.js").PortableDocument} document @param {number} slot @param {import("./types.js").Draft} draft */
+function clearCustomKey(document, slot, draft) {
+    if (!customKeysSupported(document, draft.capabilities)) throw fail("Custom keys need firmware with the userspace keycode blocks.", "CUSTOM_KEYS_UNSUPPORTED");
+    return editProfileDomains(document, draft, (open, read) => {
+        const {settings, behaviors} = read();
+        /** @param {import("../schema/types.js").BehaviorRow} row */
+        const its = row => row.target.kind === ACTION.CUSTOM_KEY && row.target.operand === slot;
+        if (settings.customKeyNames[slot]) open("settings").customKeyNames[slot] = "";
+        if (shortcutIdentity(settings.customKeyShortcuts[slot]) !== shortcutIdentity(NO_SHORTCUT)) open("settings").customKeyShortcuts[slot] = {mods: 0, keys: [], layers: 0, layerKind: 0};
+        if (behaviors.rows.some(its)) {
+            const opened = open("behaviors");
+            opened.rows = opened.rows.filter(row => !its(row));
+        }
+    });
+}
+const NO_SHORTCUT = {mods: 0, keys: [], layers: 0, layerKind: 0};
 
 module.exports = {customKeyEditorView, editCustomKey};
