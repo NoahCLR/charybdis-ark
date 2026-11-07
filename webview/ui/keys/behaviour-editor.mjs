@@ -23,27 +23,19 @@ import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
 import {saveBehaviour} from "./save-behaviour.mjs";
 
 const {TIER_FIELDS, TIERS} = edits;
-// The timings in the order the grid draws them: the window between taps, then
-// each hold tier's threshold.
-/** @type {readonly import("../../../contracts/edits.js").TimingTerm[]} */
-const TIMING_ORDER = ["multiTapTerm", "tapHoldTerm", "longHoldTerm"];
 
 // How a tier runs, as the vocabulary words it.
 /** @param {import("../../../contracts/edits.js").Tier} kind @param {string | undefined} style */
 const styleLabel = (kind, style) => styleWord(getModel(), kind, style || "");
 
 // An empty timing field falls back to the keyboard's own default, which it
-// reports and Behaviour settings → Tap & hold timing edits — so the note
-// names both, the path and the thresholds in their owners' words.
-/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {EditorBehavior} behaviour */
-function timingDefaultsNote(model, behaviour) {
-    const defaults = behaviour.timingDefaults, names = vocabulary(model).thresholdNames, where = sectionPath(model, "keyTiming");
-    const values = TIMING_ORDER.map((term) => [names[term], defaults[term]])
-        .filter(([, value]) => String(value ?? "").trim() !== "")
-        .map(([name, value]) => `${name} ${value} ms`);
-    return values.length
-        ? `Empty fields follow ${where}: ${values.join(", ")}.`
-        : `Empty fields follow ${where}.`;
+// reports and Behaviour settings → Tap & hold timing edits — so each field's
+// tip names both, the path and the threshold, in their owners' words. The
+// field itself shows the value it follows, greyed.
+/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {EditorBehavior} behaviour @param {import("../../../contracts/edits.js").TimingTerm} term */
+function timingFallbackNote(model, behaviour, term) {
+    const value = behaviour.timingDefaults[term], where = sectionPath(model, "keyTiming");
+    return String(value ?? "").trim() !== "" ? `Empty, it follows ${where} (${value} ms).` : `Empty, it follows ${where}.`;
 }
 
 // The cell open in this behaviour's grid: one opened in another behaviour's
@@ -75,8 +67,17 @@ function cellAt(steps, cell) {
     return step ? {step, kind: /** @type {import("../../../contracts/edits.js").Tier} */ (tier)} : null;
 }
 
-/** @param {EditorBehavior} behaviour */
-export function behaviourEditor(behaviour) {
+// Drawn with its head (the key's name, Change key… and Remove behaviour) on
+// the Behaviours tab; the Custom keys screen titles its card with the key and
+// carries the actions itself, so it asks for the editor without one.
+/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {boolean} canEdit */
+export const behaviourActions = (model, canEdit) => `<button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
+        data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
+    <button class="btn tiny ghost destructive" data-act="remove" ${canEdit ? "" : "disabled"}
+        data-tip="${esc(editWords(model?.draft).removeBehaviour)}. Its keys then send their plain keycode.">Remove behaviour</button>`;
+
+/** @param {EditorBehavior} behaviour @param {{head?: boolean}} [options] */
+export function behaviourEditor(behaviour, {head = true} = {}) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
     const canEdit = editGate(model, "behaviours").editable;
@@ -91,7 +92,7 @@ export function behaviourEditor(behaviour) {
     const timingControl = (name) => {
         const field = behaviourTimingField(behaviour, name);
         const placeholder = field.fallback === "" ? "default unavailable" : field.placeholder;
-        return `<label class="field bterm-field" data-tip="${esc(thresholdTips[name])}"><span>${esc(sentence(thresholdNames[name]))}</span>
+        return `<label class="field bterm-field" data-tip="${esc(`${thresholdTips[name]} ${timingFallbackNote(model, behaviour, name)}`)}"><span>${esc(sentence(thresholdNames[name]))}</span>
             <span class="affix unit"><input class="input mono num" style="--digits: ${esc(Math.max(5, placeholder.length))}" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
                 placeholder="${esc(placeholder)}" ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
@@ -147,23 +148,16 @@ export function behaviourEditor(behaviour) {
             <span class="bl">${esc([sendsKind(model, branch.action), styleLabel(kind, branch.style)].filter(Boolean).join(" · "))}</span></button>`;
     };
 
-    const dashed = steps.some((step) => TIERS.some((kind) => !step[TIER_FIELDS[kind]]
-        && (inheritedBranch(behaviour, step, kind) || impliedBranch(behaviour, step, kind))));
+    const notes = storageNotes(behaviour).map((note) => `<p class="note">${esc(note)}</p>`).join("");
     const node = el(`<div>
-        <div class="beh-head">
+        ${head ? `<div class="beh-head">
             <div>
                 <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
                     ${keyIdentity(model, behaviour.keycode).label === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
-                <p class="note">${esc(timingDefaultsNote(model, behaviour))}</p>
-                ${storageNotes(behaviour).map((note) => `<p class="note">${esc(note)}</p>`).join("")}
+                ${notes}
             </div>
-            ${behaviour.stored ? `<div class="right row beh-actions">
-                <button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
-                    data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
-                <button class="btn tiny ghost destructive" data-act="remove" ${canEdit ? "" : "disabled"}
-                    data-tip="${esc(editWords(model?.draft).removeBehaviour)}. Its keys then send their plain keycode.">Remove behaviour</button>
-            </div>` : ""}
-        </div>
+            ${behaviour.stored ? `<div class="right row beh-actions">${behaviourActions(model, canEdit)}</div>` : ""}
+        </div>` : notes ? `<div class="beh-notes">${notes}</div>` : ""}
         <div class="beh-intro">
             <label class="sw" data-tip="Treat this key as part of using the trackball, so pressing it keeps the pointer layer on instead of letting auto-mouse turn it off.">
                 <input type="checkbox" data-f="behaviour:${esc(behaviour.keycode)}:anchor" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
@@ -172,9 +166,9 @@ export function behaviourEditor(behaviour) {
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>Timing ${esc(checkLevelWord(model, check.level).toLowerCase())}.</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="bgrid">
             <span></span>
-            ${TIERS.map((kind) => `<div class="btier">${tierDot(model, kind)}${esc(tierName(model, kind))}</div>`).join("")}
+            ${TIERS.map((kind) => `<div class="btier" data-tip="${esc(vocabulary(model).tierTips[kind] || "")}">${tierDot(model, kind)}${esc(tierName(model, kind))}</div>`).join("")}
             ${timingControl("multiTapTerm")}
-            <p class="bterm">On release, before the Tap / hold threshold</p>
+            <span class="bterm"></span>
             ${timingControl("tapHoldTerm")}
             ${timingControl("longHoldTerm")}
             ${steps.map((step) => `
@@ -183,7 +177,6 @@ export function behaviourEditor(behaviour) {
                 ${TIERS.map((kind) => cellFor(step, kind)).join("")}`).join("")}
         </div>
         <div id="cellEditor"></div>
-        <p class="note beh-foot">Each cell is one action and how it runs. Empty cells are not stored.${dashed ? " A dashed cell is what the key does with nothing set; an action there replaces it." : ""}</p>
     </div>`);
 
     // A click opens a cell's editor, or closes it again. A double-click opens

@@ -82,7 +82,7 @@ setting it comes from: `200 · dual-role` for the tap / hold threshold of an
 `LT` or `MT` key, and otherwise `default`, such as `150 · default`. Type a
 value to give this behaviour its own; clear the field to follow the default
 again. The defaults are under **Tap & hold timing** on Behaviour settings
-(below).
+(below); hover a timing field, or a tier's heading, to read what it means.
 
 When Review's checks find a problem with the timing, a note above the grid
 says so, headed **Timing notice** or **Timing warning**.
@@ -91,8 +91,8 @@ says so, headed **Timing notice** or **Timing warning**.
 
 - **Use this behaviour**: turn it off to keep everything it does but stop it
   running, until you turn it on again.
-- **Layers it runs on**: the layers a key can come from for this behaviour to
-  run.
+- **Layers it runs on**: opens a panel of the layers a key can come from for
+  this behaviour to run. Click outside it, or press Esc, to close it.
 - **Keeps the pointer layer on**: pressing this key counts as using the
   trackball, so auto-mouse keeps the pointer layer on instead of turning it
   off.
