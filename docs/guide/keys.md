@@ -125,8 +125,8 @@ and press Shift+Space to hold it, then Shift+Space on the other; Escape lets
 go. Review lists the swaps as one **Custom key order** change.
 
 **Shortcut** is what the key sends: up to six keys held together, any
-modifiers and any layers. The field says so above it: like a one-step macro,
-but it acts as a normal key rather than playing once. The keys and modifiers are held while you hold the
+modifiers and any layers. Hover its label and it says so: like a one-step
+macro, but it acts as a normal key rather than playing once. The keys and modifiers are held while you hold the
 custom key and tapped when you tap it: the modifiers go down first, then the
 keys in the order you picked them, and they come back up the other way round.
 **Pick…** opens the picker with only the keys a shortcut can send: keyboard
@@ -168,11 +168,11 @@ a move happens from either. The base layer and the default layers are always
 on, so their rows are dimmed and say so. Modifiers alone, a key alone or
 layers alone are a shortcut too. **Clear** removes it.
 
-**What it does** says whether the key sends its shortcut, its behaviour, both
-or nothing yet, and holds the same behaviour editor as the Keymap screen. It
-works before the key is on any layer. Where the behaviour leaves a tap or hold
-empty, the key sends its shortcut. **Show on the Keymap screen** opens its
-behaviour there, once the key is placed.
+**What it does** holds the same behaviour editor as the Keymap screen, with
+**Change key…** and **Remove behaviour** in its title bar. It works before the
+key is on any layer. Where the behaviour leaves a tap or hold empty, the key
+sends its shortcut; the line under the shortcut says so. **Show on the Keymap
+screen** opens its behaviour there, once the key is placed.
 
 Under the title, chips show where the key is used, as a macro's do; click a
 layer to see it there, on the Keymap screen's **Custom keys** tab with the

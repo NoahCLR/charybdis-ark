@@ -150,12 +150,17 @@ The same kind of control looks and sits the same on every screen.
   that is a button (the Keys groups, `groupHeader`; Typing & playback help;
   a slot bank's Show all; the empty layers) has the same chevron, turned
   down while `aria-expanded`, and is the one control that opens and closes
-  what it holds. A fold that is not a heading (Where it is stored, Layers it
-  runs on, Show all, the empty layers, Typing & playback help, a review
-  item's Show all) is `disclosureButton` or a `<summary class="disclose">`
+  what it holds. A fold that is not a heading (Where it is stored, Show all,
+  the empty layers, Typing & playback help, a review item's Show all) is
+  `disclosureButton` or a `<summary class="disclose">`
   (`webview/ui/disclosure.mjs`), one look wherever it appears: the chevron,
   then its words at `--fs-md` in `--text-2`, 28 px tall. A card that does
-  not fold has none (no test).
+  not fold has none (no test). A behaviour's or combo's Layers it runs on
+  wears the same look but opens its layer switches in a panel under the
+  button (`aria-haspopup="dialog"`, `.def-pop`), two layers to a row, so the
+  editor keeps its height: it stays open across the redraws its switches
+  cause, and a press outside or Esc closes it
+  (`browser-tests/participation.spec.js`).
 - A sheet (Review, the keycode picker, Draft history) closes with one ghost
   **Close** at the right of its header, and by Escape; its foot holds only
   actions that change something (no test).
@@ -182,9 +187,10 @@ The same kind of control looks and sits the same on every screen.
   `browser-tests/consistency.spec.js`).
 - → marks a button that goes to another place in Ark; ↗ a link that leaves
   it, in a new tab (no test).
-- A switch on a Settings screen's row sits at the row's right, with On or Off
-  beside it; an editor's option reads switch, then its words, from the left
-  edge (no test).
+- Every control on a Settings screen's row ends at the row's right edge: a
+  switch (its state is its look, its name the row's, as its `aria-label`), a
+  number, a menu, a choice on show; an editor's option reads switch, then its
+  words, from the left edge (no test).
 - A choice of two to four options whose words fit one line together
   (`ON_SCREEN_MAX_OPTIONS`, `ON_SCREEN_MAX_CHARACTERS`: 60 characters) shows them on screen, as one segmented radio group
   (`webview/ui/segmented.mjs`), so each is read without opening anything and
@@ -509,7 +515,9 @@ macro and a custom key, which have none:
   words it (`qmkKeyLayerTaps`), never by cutting its label. A built-in cell
   draws it the same way, dim and dashed, and says "standard key"
   (`browser-tests/behaviour-named-actions.spec.js`).
-- The behaviour grid draws what an empty cell does, dashed: the standard
+- The behaviour grid draws what an empty cell does as a placeholder, a
+  faint dashed edge with no fill and dim words, where a placed cell is a
+  filled, raised box with its action in strong type: the standard
   key, what the key does with no row (firmware D-F64), never another tap
   count's action. Core works out every cell and publishes it with the key's
   built-ins (`builtIn.cells`, `core/model/empty-cells.js`, D-L73), each
@@ -896,9 +904,13 @@ no keys and no layers is no shortcut, any part alone is one, and a kind other
 than hold needs layers. Ark reads and writes settings version 11 only (D-L64;
 `tests/schema/settings-domain-v1.test.js`).
 
-- The Custom keys screen's Shortcut field says what a shortcut is above its
-  input (`SHORTCUT_MEANS`) and what this key's does below it
-  (`customKeyShortcutLine`).
+- The Custom keys screen's Shortcut field says what a shortcut is in its
+  label's tip (`SHORTCUT_MEANS`) and what this key's does below its input
+  (`customKeyShortcutLine`); the key's keycode reads beside its number in the
+  card's title bar. Its What it does card holds the behaviour editor without
+  the editor's own head, Change key… and Remove behaviour in the card's
+  title bar instead (`behaviourEditor(…, {head: false})`,
+  `browser-tests/custom-key-behaviour.spec.js`).
 - The Custom keys screen edits it through `updateCustomKeyShortcut`, with keys
   and modifiers in the keycode picker's `shortcut` mode, where modifiers may
   mix sides and each click adds a key in press order or takes it out; a symbol
@@ -1346,10 +1358,13 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    diagonals); a click opens the picker on the keys a pointing mode sends, ×
    clears it, and a macro's notes sit under its key. Reads sits above them,
    When a direction has no key and How often it sends below, each a
-   segmented choice (`webview/ui/segmented.mjs`). **How it scrolls** groups
-   its fields as which way (Scrolls, a segmented choice; Reverse scrolling, a
-   switch per axis named as the vocabulary names each bit, the record's two bits), Speed and Feel, under the
-   vocabulary's names, and the held modifiers
+   segmented choice (`webview/ui/segmented.mjs`); that a direction can also
+   click a mouse button or play a macro is an empty key's tip. **How it
+   scrolls** lays its fields in four columns (`.pd-cols`, two on a narrow
+   card): which way (Scrolls, a segmented choice; Reverse scrolling, a
+   switch per axis named as the vocabulary names each bit, the record's two
+   bits) over two columns each, then Speed's two fields and Feel's two under
+   the vocabulary's names, and the held modifiers
    (`webview/ui/pointing/movement.mjs`). Each direction's held-modifier handling,
    under Advanced, is a segmented choice too.
    Every setting, Reverse scrolling and the held modifiers included, says what it does as its field's tip: a scroll field's from
@@ -1359,7 +1374,7 @@ own folded card (`browser-tests/pointing-controls.spec.js`).
    by `PD_MODE_n`, and where they sit; then its link as layer chips
    ([Pointing links](#pointing-links)).
 4. **While it runs**: its pointer speed, its light with Edit in Lighting,
-   and its pointer layer, a segmented choice. Advanced's sections are named
+   and its pointer layer, a segmented choice, in step 2's four columns. Advanced's sections are named
    for what they set (Distance, Held modifiers, Scroll tuning), never
    Behaviour, which is a key's in Ark.
 

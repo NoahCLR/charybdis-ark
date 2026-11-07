@@ -76,14 +76,15 @@ export function editor(model, slot, canEdit, slots) {
         // fields start empty, so staging now would post an invalid record.
         // The slot is staged once a field of the new form is changed.
         pick: (picked) => { state.pdKind = {slot: slot.id, kind: picked}; render(); }}));
-    step(2, scrolling ? "How it scrolls" : "What each direction sends", scrolling ? "" : "Click a key to change it.")
-        .append(movement(model, slot, scrolling, controls, stage));
+    step(2, scrolling ? "How it scrolls" : "What each direction sends").append(movement(model, slot, scrolling, controls, stage));
     step(3, "What starts it").append(startStep(model, slot, controls, stage));
-    const runs = el(`<div class="pd-pair"></div>`);
+    // The same four columns step 2 lays its fields in.
+    const runs = el(`<div class="pd-cols"></div>`);
+    const pointerLayer = controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: tipFor(model, "pointerLayer")});
+    pointerLayer.classList.add("span2");
     runs.append(controls.choice(words(model).fieldLabels.dpi, dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: `${tipFor(model, "dpi")} Normal pointer speed keeps the DPI set in ${sectionPath(model, "normalPointerSpeed")}.`}),
-    lightRow(model, slot));
-    runs.append(controls.choice(words(model).pointerLayerLabel, words(model).pointerLayer, slot.pointerLayer, "pointerLayer", {tip: tipFor(model, "pointerLayer")}));
+    lightRow(model, slot), pointerLayer);
     step(4, "While it runs").append(runs);
     wrap.append(card, advancedControls(model, slot, scrolling, controls));
 

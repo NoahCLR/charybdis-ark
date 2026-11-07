@@ -49,9 +49,8 @@ function followedBelow(behaviour) {
     if (!followed.from || followed.keycode !== state.behaviourRow) return "";
     const model = getModel();
     const name = actionMarked(model, behaviour.keycode);
-    return `<p class="note beh-note">The selected key on <b>${esc(layerCalled(currentLayer()))}</b> is transparent,
-        so ${currentView().previewing ? "in this preview " : ""}<b>${esc(layerCalled(followed.from))}</b> answers with ${name}. A behaviour belongs to its keycode:
-        this is ${name}’s, and a change here applies wherever ${name} is pressed, not only at this position.</p>`;
+    return `<p class="note beh-note">Shown through from <b>${esc(layerCalled(followed.from))}</b>${currentView().previewing ? " in this preview" : ""}:
+        the selected key on <b>${esc(layerCalled(currentLayer()))}</b> is transparent. A change here applies wherever ${name} is pressed.</p>`;
 }
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
