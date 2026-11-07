@@ -542,7 +542,7 @@ test("the hover card draws a shortcut's keys and layers as the behaviour rows do
     await hover();
     await expect(page.locator(".hovercard .hc-head .hc-sub"), "the header leaves the shortcut to its section").toHaveCount(0);
     await expect(section.locator(".hc-sub").first()).toHaveText("Held while the key is held, tapped when it is tapped");
-    await expect(section.locator(".hc-key")).toHaveText(["Left GUI", "Space"]);
+    await expect(section.locator(".tok")).toHaveText(["Left GUI", "Space"]);
     await expect(section.locator(".hc-layers .sends-name")).toHaveText(["Navigation", "Extra 1"]);
     await expect(section.locator(".hc-layers .sends-tag")).toHaveText(["hold", "hold"]);
     expect(await section.locator(".hc-layers .kind-icon.layer").count(), "each layer by its mark").toBe(2);
@@ -552,14 +552,14 @@ test("the hover card draws a shortcut's keys and layers as the behaviour rows do
     // among them, beside its layers.
     await place({mods: 0x02, keys: [0x04, 0x16, 0x07, 0xae], layers: 0b1000, layerKind: 1}, "Left Shift + A + S + D + Play/Pause + Lock Navigation", ["Left Shift", "A", "S", "D", "Play/Pause"]);
     await hover();
-    await expect(section.locator(".hc-key")).toHaveText(["Left Shift", "A", "S", "D", "Play/Pause"]);
+    await expect(section.locator(".tok")).toHaveText(["Left Shift", "A", "S", "D", "Play/Pause"]);
     await expect(section.locator(".hc-layers .sends-tag")).toHaveText(["lock"]);
     await page.locator(".hovercard").first().screenshot({path: test.info().outputPath("chord-hover.png")});
 
     // Layers alone: no Sends row.
     await place({mods: 0, keys: [], layers: 0b1000, layerKind: 0}, "Navigation", []);
     await hover();
-    await expect(section.locator(".hc-key")).toHaveCount(0);
+    await expect(section.locator(".tok")).toHaveCount(0);
     await expect(section.locator(".hc-stage")).toHaveText(["Layers"]);
 
     // A lock tags its layers as locked, and says what that does.

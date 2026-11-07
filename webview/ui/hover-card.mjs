@@ -13,7 +13,7 @@ import {behaviourThresholds, styleDetail} from "../view/behavior-editor.mjs";
 import {keyReach, keyReachAt} from "../view/key-reach.mjs";
 import {stageEnabled} from "../view/lighting.mjs";
 import {currentView, getModel, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, layerTagged, macroSteps, marked, sends, sendsKind, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, comboInputChips, comboOutputMarked, comboTint, keyChips, keyNameMarked, layerTagged, macroSteps, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {sentence, styleWord, tierName, vocabulary, layerCalled, macroNamed} from "../view/vocabulary.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
 
@@ -149,7 +149,7 @@ function reachSections(reach, position, {foot = true} = {}) {
             return `<div class="hc-combo${use.fires ? "" : " hc-off"}">${comboBadge(getModel(), combo.badge || "C")}
             <span class="hc-sends"><span class="hc-life">→</span>${sent}<span class="hc-life hc-count">${inputs.length} key${inputs.length === 1 ? "" : "s"}</span>${runs ? `<span class="hc-life hc-runs">runs its behaviour</span>`
                 : sendsInstead ? `<span class="hc-life hc-runs">${esc(sendsInstead)}</span>` : ""}</span>
-            <span class="hc-keys">${inputs.map((input, at) => `<span class="hc-key${comboInputIsKey(combo, at, position) ? " here" : ""}">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join('<span class="hc-life">+</span>')}</span>
+            <span class="hc-keys">${comboInputChips(model, combo, {small: true, here: (at) => comboInputIsKey(combo, at, position)})}</span>
             ${use.fires ? "" : `<span class="hc-sub hc-quiet">Not used: ${esc(use.reasons.join("; "))}.</span>`}</div>`;
         }).join("")}</div>`);
     }
@@ -165,7 +165,7 @@ function shortcutSection(model, custom) {
     const layers = shortcutLayerList(custom);
     const rows = [];
     if (keys.length) rows.push(`<div class="hc-act"><span class="hc-stage">Sends</span>
-        <span class="hc-keys">${keys.map((part) => `<span class="hc-key">${esc(part)}</span>`).join('<span class="hc-life">+</span>')}</span></div>`);
+        <span class="hc-keys">${keyChips(keys.map((part) => ({html: esc(part)})), {small: true})}</span></div>`);
     if (layers.length) rows.push(`<div class="hc-act"><span class="hc-stage">Layers</span>
         <span class="hc-layers">${layers.map((at) => layerTagged(model, at, layerCalled(model?.layers?.[at]), [shortcutLayerTag(model, custom)])).join("")}
         ${under(shortcutLayerUnder(custom))}</span></div>`);

@@ -150,3 +150,31 @@ test("a choice shows a few short options on screen and keeps a longer list in a 
     await expect(page.locator('select[data-f="setting:hostLayout"]')).toHaveCount(1);
     await expect(page.locator('.seg[aria-label="Keyboard layout"]')).toHaveCount(0);
 });
+
+test("keys pressed together are one chip in two sizes, each + kept with the key before it", async ({page}) => {
+    // The demo's combo 0 is D + F / Navigation, and key 27 is its D.
+    /** @param {import("@playwright/test").Locator} keys */
+    const chips = (keys) => keys.evaluate((node) => ({
+        small: node.classList.contains("small"),
+        keys: node.querySelectorAll(":scope > .key-chip > .tok").length,
+        // Every chip but the last carries its +, so no line starts with one.
+        plus: [...node.querySelectorAll(":scope > .key-chip")].map((chip) => chip.querySelector(":scope > .key-plus") ? "+" : ""),
+        height: Math.round(node.querySelector(".tok").getBoundingClientRect().height),
+    }));
+
+    await openControls(page, "keys", {}, "dark", "shell=demo");
+    await page.locator('[data-tab="combos"]').click();
+    const table = await chips(page.locator('tr[data-combo="0"] .key-chips').first());
+    expect(table).toMatchObject({small: false, keys: 2, plus: ["+", ""]});
+
+    await page.locator('.board [data-key="27"]').first().hover();
+    const card = page.locator(".hovercard:visible .hc-combo .key-chips").first();
+    await expect(card.locator(".tok.here")).toHaveText("D");
+    const hover = await chips(card);
+    expect(hover).toMatchObject({small: true, keys: 2, plus: ["+", ""]});
+    expect(hover.height).toBeLessThan(table.height);
+
+    await page.mouse.move(0, 0);
+    await openControls(page, "lighting", {stage: "combo"}, "dark", "shell=demo");
+    expect(await chips(page.locator('tr[data-combo="0"] .key-chips').first())).toEqual(hover);
+});

@@ -6,7 +6,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {offWording} from "../../view/lighting.mjs";
-import {comboBadge, comboInputsMarked, comboOutputMarked} from "../marks.mjs";
+import {comboBadge, comboInputChips, comboOutputMarked} from "../marks.mjs";
 import {aboutStage, colourControl, lightingGroup, paintsSection, section, stack} from "./common.mjs";
 import {accentsSection} from "./accents.mjs";
 import {attachPickRows, groupedTable, pickButton, pickableRow} from "../groups.mjs";
@@ -30,14 +30,14 @@ export function stageCombo(model) {
         const on = row.id === held?.combo.id;
         return pickableRow(String(row.id), on, [
             pickButton(`lighting-combos:${row.id}`, on, comboBadge(model, row.badge || "C"), `${row.badge || "C"}`),
-            comboInputsMarked(model, row),
+            comboInputChips(model, row, {small: true}),
             comboOutputMarked(model, row),
         ], {data: {combo: row.id}});
     };
     const lists = vocabulary(model).lightingLists;
     /** @param {"feedback" | "layer"} id @param {{title: string, empty: string}} words @param {typeof here} rows */
     const group = (id, words, rows) => ({id, title: words.title, empty: words.empty, ...lightingGroup(`combo:${id}`), rows: rows.map(comboRow)});
-    const list = groupedTable({scroll: "lighting-combos", draft: model?.draft, columns: [["", "13%"], [fields.inputs, "42%"], [fields.sends, "45%"]], groups: [
+    const list = groupedTable({scroll: "lighting-combos", draft: model?.draft, columns: [["", "12%"], [fields.inputs, "53%"], [fields.sends, "35%"]], groups: [
         group("feedback", lists.comboFeedback, here.filter((entry) => !holdsLayers(entry.combo))),
         group("layer", lists.holdLayer, here.filter((entry) => holdsLayers(entry.combo))),
     ]});
