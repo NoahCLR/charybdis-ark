@@ -30,23 +30,31 @@ test("participation controls post placements, shared definitions and master/sour
     await expect.poll(posted).toEqual([expect.objectContaining({type: "updatePlacementPolicy", useBehavior: false, joinCombos: false})]);
 
     await page.locator('[data-tab="behaviours"]').click();
+    const layersPanel = page.locator(".def-layers [aria-haspopup]");
     await page.getByText("Layers it runs on", {exact: true}).click();
     // Each layer by its name and mark, as Settings draws its layer switches;
     // layer 15 is empty, so it shows once the empty layers do.
+    await expect(layersPanel).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator('.def-layers .layer-grid .sw .mk').first()).toBeVisible();
     await page.locator('.def-layers [data-empty-layers]').click();
     await clear();
-    await page.getByText('Use this behaviour', {exact: true}).click();
-    await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: false, allowedLayers: 65535})})]);
-    await clear();
     await page.locator('.def-layers label').filter({has: page.locator('[data-switch-layer="15"]')}).click();
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: true, allowedLayers: 32767})})]);
+    // The panel stays open across the redraw the switch caused; a press
+    // outside it closes it, and the press still lands.
+    await expect(layersPanel).toHaveAttribute("aria-expanded", "true");
+    await clear();
+    await page.getByText('Use this behaviour', {exact: true}).click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: false, allowedLayers: 32767})})]);
+    await expect(layersPanel).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator(".def-pop")).toHaveCount(0);
 
     await page.locator('[data-tab="combos"]').click();
     await page.getByRole("button", {name: "New combo", exact: true}).click();
     await page.getByText('Use this combo', {exact: true}).click();
-    // Layers it runs on stays open once opened, on a combo as on a behaviour.
-    await expect(page.locator(".def-layers")).toHaveAttribute("open", "");
+    // A combo opens the same panel.
+    await page.getByText("Layers it runs on", {exact: true}).click();
+    await expect(layersPanel).toHaveAttribute("aria-expanded", "true");
     await page.locator('.def-layers [data-empty-layers]').click();
     await page.locator('.def-layers label').filter({has: page.locator('[data-switch-layer="15"]')}).click();
     await page.locator('[data-output]').fill("KC_A");

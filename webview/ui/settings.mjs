@@ -260,8 +260,8 @@ function fieldRow(field, canEdit, submit, slot, durations) {
         return row;
     }
     if (field.kind === "toggle") {
-        const node = el(`<label class="sw"><input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
-            <span class="track"></span><span class="txt muted">${field.enabled ? "On" : "Off"}</span></label>`);
+        const node = el(`<label class="sw"><input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(label)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
+            <span class="track"></span></label>`);
         /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
         control.appendChild(node);
         return row;

@@ -949,10 +949,16 @@ button.tier:hover { background: var(--surface-3); }
    switch, then the layers it runs on, which unfold in the room left on the
    row, or under it when there is none. Its controls bring no box of their own
    (participation.mjs). */
-.beh-intro { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-3) var(--sp-6); padding: var(--sp-3) 0 var(--sp-4); }
+.beh-intro { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-6); padding: var(--sp-3) 0 var(--sp-4); }
 .def-controls { display: contents; }
-.beh-intro .sw { flex: none; min-height: var(--h-compact); }
-.beh-intro .def-layers { order: 1; flex: 1 1 360px; min-width: 0; }
+.beh-intro .sw { flex: none; }
+.beh-intro .def-layers { order: 1; }
+/* Layers it runs on opens its layers in a panel under the button, over the
+   grid, so the editor keeps its height; two layers to a row. */
+.def-layers { position: relative; }
+.def-pop { position: absolute; z-index: var(--z-popover); top: calc(100% + 4px); left: 0; width: min(460px, calc(100vw - 2 * var(--sp-6))); padding: var(--sp-3);
+  border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-3); box-shadow: var(--shadow); }
+.def-pop .layer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-4); }
 /* One row per tap count the keyboard allows, all shown; a column per tier.
    Each timing heads what it governs: Multi tap window the tap counts, Tap /
    hold and Long hold their tiers. */
@@ -1027,7 +1033,6 @@ button.tier:hover { background: var(--surface-3); }
 .key-reaches { gap: var(--sp-2); }
 .key-participation { gap: var(--sp-2); margin-top: var(--sp-4); }
 .key-participation > .sect-h { margin: var(--sp-2) 0 var(--sp-0); }
-.def-layers > .layer-grid { margin-top: var(--sp-3); }
 /* The Behaviours tab: nothing to open, and the open behaviour's title, its
    keycode, the notes under them and its actions (ui/keys/behaviour-editor.mjs). */
 .beh-empty { padding: var(--sp-4); }
@@ -1622,13 +1627,12 @@ table.t tr.quiet > td { color: var(--text-3); }
 .pd-kind-art path { fill: var(--text-2); }
 .pd-kind-art rect { fill: var(--text-3); }
 /* Step 2: each direction a key placed where the ball sends it. */
-/* The ball and its keys on the left, the choices stacked beside them. */
-.pd-directions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-4) var(--sp-8); align-items: start; }
-.pd-direction-fields { display: grid; gap: var(--sp-3); align-content: start; min-width: 0; }
+.pd-directions { display: grid; gap: var(--sp-4); }
+.pd-direction-fields { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-7); align-items: start; }
 .pd-editor .seg { flex-wrap: wrap; max-width: 100%; }
 .pd-switches { display: flex; gap: var(--sp-2) var(--sp-5); flex-wrap: wrap; min-height: var(--h-control); align-items: center; }
 .pd-compass { display: grid; gap: var(--sp-3) var(--sp-4); align-items: center; justify-items: center; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  max-width: 560px; justify-self: start;
+  max-width: 560px; width: 100%; justify-self: center;
   grid-template-areas: ". up ." "left ball right" ". down ."; }
 .pd-compass.vertical { grid-template-columns: auto; grid-template-areas: "up" "ball" "down"; justify-content: center; }
 .pd-compass.horizontal { grid-template-areas: "left ball right"; }
@@ -1702,7 +1706,6 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .pd-taps .mods { grid-column: 2 / -1; padding-bottom: var(--sp-2); }
 @container pd (max-width: 720px) {
   .pd-directions { grid-template-columns: minmax(0, 1fr); }
-  .pd-compass { justify-self: center; width: 100%; }
   .pd-row { grid-template-columns: minmax(0, 1fr); gap: var(--sp-2); }
 }
 @container pd (max-width: 560px) {

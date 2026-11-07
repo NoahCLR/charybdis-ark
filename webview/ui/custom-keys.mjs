@@ -136,7 +136,7 @@ function editor(model, key, canEdit) {
     const card = el(`<div class="card">
         <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "customKey"})}</span>${titleName({f: `custom-key:${key.slot}:name`, value: key.name, placeholder: `Custom key ${key.slot}`,
             label: "Custom key name", perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName, canEdit})}
-            <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
+            <span class="tag">Key ${esc(key.slot)}</span><code class="dim">${esc(key.keycode)}</code>
             <span class="right row actions">
                 <button class="btn tiny link" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key →</button>
                 <button class="btn tiny ghost destructive" data-act="clear" ${canEdit && customKeyInUse(key) ? "" : "disabled"}
