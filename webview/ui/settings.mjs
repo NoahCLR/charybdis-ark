@@ -287,19 +287,18 @@ function fieldRow(field, canEdit, submit, slot, durations) {
 }
 
 // Sniping is on while a sniping key is held or toggled, and while an
-// auto-sniping layer is on; this says where those keys are, places one, and
-// says what sniping slows.
+// auto-sniping layer is on; these rows, drawn as the card's settings are,
+// say where those keys are and place one, and their tips say what sniping
+// slows.
+const SNIPING_SLOWS = "It slows directional pointing modes too, not scrolling ones.";
 /** @param {Model | null} model @param {boolean} canEdit */
 function snipingKeys(model, canEdit) {
-    const node = el(`<div class="card-b sniping-keys">
-        <div class="sect-h"><h4>Sniping keys</h4></div>
-        <p class="note">Sniping is on while one of these keys is held or toggled.</p></div>`);
-    for (const keycode of ["SNIPING", "SNP_TOG"]) {
+    const node = el(`<div class="rows sniping-keys"><div class="setrow-part">Sniping keys</div></div>`);
+    for (const [keycode, how] of [["SNIPING", "Sniping is on while this key is held."], ["SNP_TOG", "One press turns sniping on, the next turns it off."]]) {
         const words = keyIdentity(model, keycode).label;
-        const row = el(`<div class="row gap-12 sniping-key">
-            <span class="sniping-name">${esc(words)}</span>
-            <span class="note">${esc(reachLine(keycodePlacements(model, [keycode])))}</span>
-            <button class="btn tiny link right" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key →</button></div>`);
+        const row = el(`<div class="setrow sniping-key" data-tip="${esc(`${how} ${SNIPING_SLOWS}`)}">
+            <div><div class="nm">${esc(words)}</div><div class="hint">${esc(reachLine(keycodePlacements(model, [keycode])))}</div></div>
+            <div class="control"><button class="btn tiny link" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key →</button></div></div>`);
         /** @type {HTMLButtonElement} */ (row.querySelector("[data-place]")).addEventListener("click", () => {
             state.placement = {keycode};
             state.screen = "keys";
@@ -308,7 +307,6 @@ function snipingKeys(model, canEdit) {
         });
         node.appendChild(row);
     }
-    node.appendChild(el(`<p class="note">It slows directional pointing modes too, not scrolling ones.</p>`));
     return node;
 }
 

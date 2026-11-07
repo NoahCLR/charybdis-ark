@@ -504,8 +504,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 /* A row or stack spaced off its default; declared after them so it wins. */
 .gap-4 { gap: var(--sp-1); }
 /* Pointer: the sniping keys under Auto-sniping, each with where it is placed. */
-.sniping-keys { display: grid; gap: var(--sp-2); border-top: 1px solid var(--line); }
-.sniping-key .sniping-name { min-width: 140px; color: var(--text); }
+.sniping-keys { border-top: 1px solid var(--line); }
 .gap-8 { gap: var(--sp-2); }
 .gap-12 { gap: var(--sp-3); }
 .gap-16 { gap: var(--sp-4); }
@@ -1970,12 +1969,18 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .import-fits.warn { color: var(--warning); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: var(--sp-4); align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
+/* Every control ends at the same right edge, whatever its width: a switch
+   and its word, a number, a menu, a choice on show. */
+.setrow > .control { display: flex; justify-content: flex-end; align-items: center; min-width: 0; }
+.setrow > .control > .field:not(.segmented) { flex: 1; min-width: 0; }
+.setrow > .control select.input { width: 100%; }
 /* A choice on show (ui/segmented.mjs) takes the width its options need, and
    wraps under the name when the row cannot give it. */
 .setrow:has(> .control > .segmented) { grid-template-columns: minmax(0,1fr) auto; }
 .setrow > .control > .segmented { justify-items: end; }
 @container content (max-width: 788px) {
   .setrow:has(> .control > .segmented) { grid-template-columns: minmax(0,1fr); }
+  .setrow > .control { justify-content: flex-start; }
   .setrow > .control > .segmented { justify-items: start; }
 }
 .setrow.ro .nm { color: var(--text-2); }
