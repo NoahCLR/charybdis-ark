@@ -161,7 +161,7 @@ export {inheritsStageColour, layerPaints};
 // vocabulary's words (colourOff), spread into its options. A layer colour is
 // the one stage colour where black is not black (an accent's black takes its
 // stage's colour, which the accent editor offers as a choice of its own).
-/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string}} */
+/** @param {import("./vocabulary.mjs").VocabularyModel | null | undefined} model @param {string} stage @returns {{offTip?: string, offNote?: string, offAction?: string, offWord?: string}} */
 export const offWording = (model, stage) => vocabulary(model).colourOff[stage] || {};
 
 

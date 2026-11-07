@@ -6,7 +6,7 @@ const {openControls, clearPosts, posted, expectPost, change, publishAccepted} = 
 const body = page => page.locator("#benchBody");
 const channel = (page, index) => body(page).locator(`[data-channel="${index}"]`);
 const stages = [
-    {id: "layers", offTip: /paints nothing/, bit: 1, path: ["rgb", "layerColors", 1, "color"], colour: [85, 255, 200],
+    {id: "layers", offTip: /paints nothing/, offAction: "Make passthrough", offWord: "Passthrough", bit: 1, path: ["rgb", "layerColors", 1, "color"], colour: [85, 255, 200],
         message: colour => ({type: "updateLayerColor", layer: "Layer 1", mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY", ...colour})},
     {id: "auto", offTip: /ends on black/, bit: 2, path: ["rgb", "automouseFade", "end_color"], colour: [167, 255, 199],
         message: colour => ({type: "updateAutomouseFade", mode: "END_COLOR_ON_ALL_KEYS", ...colour})},
@@ -50,10 +50,12 @@ for (const stage of stages) {
         }
         await clearPosts(page);
         await expect(body(page).locator("[data-off]")).toHaveAttribute("data-tip", stage.offTip);
+        await expect(body(page).locator("[data-off]")).toHaveText(stage.offAction || "Turn off");
         await body(page).locator("[data-off]").click();
         await expectPost(page, stage.message({h: 0, s: 0, v: 0}));
         await publishAccepted(page, stage.path, {h: "0", s: "0", v: "0"});
         await expect(body(page).locator("[data-channel]")).toHaveCount(0);
+        await expect(body(page).locator(".colour-head .note")).toHaveText(stage.offWord || "Off");
         await clearPosts(page);
         await body(page).getByRole("button", {name: "Give it a colour", exact: true}).click();
         await expectPost(page, stage.message({h: 140, s: 255, v: 200}));

@@ -41,8 +41,9 @@ Every stage uses the same colour editor: drag in the square and along the
 the keyboard reports.
 
 **Turn off** stores HSV(0, 0, 0), and the colour then reads **Off**; what
-that does depends on the stage. A
-layer with no colour paints nothing, so what is underneath shows through.
+that does depends on the stage. On a layer the button is **Make
+passthrough** and the colour reads **Passthrough**: the layer paints nothing,
+so what is underneath shows through.
 Everywhere else black is
 black: a pointing mode, combo feedback or a key feedback colour turned off
 paints its area black while it runs, and the auto-mouse fade ends on black.
@@ -52,7 +53,7 @@ its hue and saturation for when you raise the brightness again.
 
 ### Background effect
 
-QMK's own effect, drawn first, under everything else. A layer with no colour
+QMK's own effect, drawn first, under everything else. A passthrough layer
 shows it.
 
 - **Colour**: solid colour shows it as it is; most animated effects build on
@@ -69,8 +70,9 @@ Pick a layer in the list to give it a colour; the
 one with a colour is not empty. **Which keys light up**: **Keys
 mapped on this layer only** leaves the keys that are transparent or empty on
 the layer unpainted, so what is beneath shows there; **All keys** paints
-every key. Transparent keys keep their ▽ on the board either way. A layer with
-no colour shows the background effect; **Give it a colour** adds one.
+every key. Transparent keys keep their ▽ on the board either way. A
+passthrough layer shows the background effect, and the list says
+**passthrough** for it; **Give it a colour** adds one.
 
 ### Auto-mouse fade
 

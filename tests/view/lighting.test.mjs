@@ -315,7 +315,9 @@ test("Turn off says what black does: literal black for modes and feedback, nothi
     }
     assert.match(offWording(words, "auto").offTip, /black/);
     assert.match(offWording(words, "layers").offTip, /paints nothing/);
-    assert.match(offWording(words, "layers").offNote, /shows through/);
+    assert.match(offWording(words, "layers").offNote, /passthrough.*shows through/);
+    assert.deepEqual([offWording(words, "layers").offAction, offWording(words, "layers").offWord], ["Make passthrough", "Passthrough"]);
+    for (const stage of ["auto", "pd", "combo", "key"]) assert.equal(offWording(words, stage).offWord, undefined, `${stage}: off is black, so it keeps Turn off and Off`);
     assert.deepEqual(offWording(words, "base"), {});
 });
 

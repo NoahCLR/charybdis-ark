@@ -215,6 +215,13 @@ LEDs picked on the board and named by index ("LEDs 24–28, 53–55"). The
 different sets of LEDs accents light are **LED sets**; Ark keeps them.
 _Avoid_: LED group, LED override, group row, assignment
 
+**Passthrough**:
+A layer colour that paints nothing, so what is beneath it shows through: the
+layers on under it, or the background effect. Ark stores it as HSV(0, 0, 0);
+the keyboard treats any layer colour with no saturation or brightness so. It
+is a layer's alone: black in every other stage is black.
+_Avoid_: no colour, off (for a layer), transparent (that is a key)
+
 **Empty layer**:
 A layer with nothing in it: not the base or a default layer, no name of its
 own, no key mapped, and nothing that uses it (D-L76). Lists of layers fold
