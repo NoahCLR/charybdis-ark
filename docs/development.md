@@ -294,9 +294,9 @@ that is not on its published trunk. No automated check is hardware acceptance.
 
 A branch is tried through its pull request's preview: Cloudflare Pages builds
 every pull request's head and serves the branch at its Branch Preview URL,
-which follows the branch's latest build, given in Cloudflare's comment or
-check on the pull request. Open that **Try this PR** link in Chrome or Edge
-once the build has succeeded and the page's footer shows the head's commit
+which follows the branch's latest build. Open that **Try this PR** link in
+Chrome or Edge; the page's footer shows which commit it serves, so it is the
+head once the footer shows the head's commit
 ([publishing the web page](#publishing-the-web-page)).
 The preview has its own origin, so its recovery copies and remembered
 keyboard are its own; close any other Ark tab first, since one tab holds the
@@ -368,11 +368,21 @@ stand in for `verify` or release CI. `npm run check` already holds the
 static-output contract (`tests/scripts/web-build.test.js`,
 `tests/scripts/check-static-site.test.js`).
 
-A pull request handoff includes a **Try this PR** link only once that head's
-Cloudflare build has succeeded and the page's footer shows that commit. The
-link is the Branch Preview URL from Cloudflare's pull request comment or
-check, which follows the branch, so the same link stays current as the
-branch moves; never build the address from the branch name yourself.
+Every pull request handoff includes a **Try this PR** link: the branch's
+Branch Preview URL, which follows the branch, so the same link stays current
+as the branch moves. It is never a commit's own
+`https://<hash>.charybdis-ark.pages.dev` address. The address follows from the
+branch name, so it is given before Cloudflare has finished building:
+`https://<alias>.charybdis-ark.pages.dev`, the alias being the branch name
+lowercased, each character outside `a-z0-9` replaced with `-`, cut to 28
+characters, and a `-` left at the end of the cut dropped (`fix/combo-inputs-wrap`
+is `fix-combo-inputs-wrap`, `refactor/keycode-layout-one-home` is
+`refactor-keycode-layout-one`). The handoff also gives the state of the
+head's build in the `Cloudflare Pages` check: done, so the footer shows the
+head's commit; still building, so until it finishes the link shows the
+branch's previous build, or does not load yet on a new branch; or failed.
+Where Cloudflare's comment or check reports a different Branch Preview URL,
+Cloudflare's address is the one to use.
 
 **Cloudflare project settings (Noah).** In the `charybdis-ark` project,
 connect `NoahCLR/charybdis-ark` with production branch `main`, framework
