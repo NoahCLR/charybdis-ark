@@ -14,6 +14,7 @@ const {editSettings} = require("./settings-editor");
 const {editMacro} = require("./macro-editor");
 const {editCustomKey} = require("./custom-key-editor");
 const {editKeyboardName} = require("./keyboard-name");
+const {editSlots} = require("./slot-editor");
 const {PROFILE_EDITS} = require("./device-profile-edits");
 const {keyPlacementProblem} = require("./profile-placement");
 const {knownActionAbi, layerOfRef} = require("../schema/actions");
@@ -69,6 +70,7 @@ const HANDLERS = Object.freeze(/** @satisfies {{[E in Exclude<Editor, "profile">
     macro: editMacro,
     customKey: editCustomKey,
     keyboardName: editKeyboardName,
+    slots: editSlots,
     ...PROFILE_EDITS,
 }));
 
@@ -79,6 +81,7 @@ const CHANGED_SINCE = {
     macro: ["The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.", "MACRO_EDIT_CONFLICT"],
     customKey: ["The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.", "CUSTOM_KEY_EDIT_CONFLICT"],
     keyboardName: ["The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.", "KEYBOARD_NAME_EDIT_CONFLICT"],
+    slots: ["The keyboard changed since this draft was opened. Read the keyboard and review the draft before swapping slots again.", "SLOT_EDIT_CONFLICT"],
 };
 const IDENTITY = /** @type {const} */ (["source", "generation", "digest", "originHalf"]);
 

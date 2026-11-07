@@ -468,4 +468,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, brightnessCeiling, editProfileDomains, readProfileDomains, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, brightnessCeiling, editProfileDomains, readProfileDomains, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf, walkActions};

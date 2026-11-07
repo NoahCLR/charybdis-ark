@@ -41,7 +41,7 @@ test("a draft change resets forms, applies each field's rule to the state before
 
 // Every field of the panel's state, by what a draft change does to it. A new
 // field joins one of these lists, so its decision is made in review.
-const RESETS = ["retarget", "pdKind", "pdTaps", "lastTake", "accent"];
+const RESETS = ["retarget", "pdKind", "pdTaps", "lastTake", "accent", "heldSlot"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
@@ -75,6 +75,7 @@ test("a draft change resets the existing forms and preserves historically kept p
         retarget: {from: "QK_USER_16", to: "KC_B", existing: "QK_USER_17"},
         pdKind: {slot: 1, kind: 2}, pdTaps: {slot: 1, rows: {"dir:up": {}}},
         lastTake: {slot: "MACRO_0", before: "abc"},
+        heldSlot: {bank: "macros", key: "MACRO_0"},
         // An unkept accent names its row by place, which a replaced draft may move.
         accent: {stage: "layers", target: "layer", every: false, index: 0, leds: [1, 4], adding: true, colour: {h: 10, s: 20, v: 30}, stageColour: false},
         macroForms: {MACRO_0: {draft: "unstaged", stepError: "bad"}},

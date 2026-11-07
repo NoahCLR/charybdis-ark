@@ -13,6 +13,13 @@ macro** opens the first free slot with its name ready to type. **Show all
 the slots in use, such as "18 of 128 used". **Search by name** finds a macro
 by its name or its slot, through every slot.
 
+Drag a slot onto another to swap the two. Each macro moves with its steps and
+its name, and every key, behaviour, combo and pointing mode that played it
+still plays it, under its new number. From the keyboard, focus a slot and
+press Shift+Space to hold it, then Shift+Space on the other slot; Escape lets
+go. Review lists the swaps as one **Macro order** change (see [Review and
+save](review-and-save.md#review)).
+
 A slot can carry a mark:
 
 - **setup**: a character in it needs Unicode entry that isn't set up (see

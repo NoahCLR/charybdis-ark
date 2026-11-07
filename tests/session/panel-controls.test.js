@@ -379,7 +379,7 @@ test("the layer panel's keys-follow toggle decides whether layer keys are renumb
         const after = draft.current.document;
         assert.deepEqual(profileLayers(after)[1].slice(2), profileLayers(before)[4].slice(2), "layer 4 moved to 1 with its keys");
         assert.equal(draft.current.summary.names[1], layer4Name, "its name moved with it");
-        assert.deepEqual(draft.order, [0, 4, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "the draft knows which layer each slot now holds");
+        assert.deepEqual(draft.order.layers, [0, 4, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "the draft knows which layer each slot now holds");
         const units = draft.changes().map((row) => row.unit);
         assert.equal(units.filter((unit) => unit === "layerOrder").length, 1, "the move is one item");
         if (keysFollow) assert.deepEqual(units.filter((unit) => unit.startsWith("layout:")).sort(), ["layout:0:0", "layout:0:1"], "only the keys edited before the move");

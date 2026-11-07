@@ -1,7 +1,10 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {UNIT, parseUnit, unitByLayer} = require("../../core/model/review-units");
-const {layerOrderReview, profileReview} = require("../../core/model/profile-review");
+const {UNIT, ORDER_UNITS, parseUnit, unitByIdentity} = require("../../core/model/review-units");
+const {layerOrderReview, profileReview, slotOrderReview} = require("../../core/model/profile-review");
+const {IDENTITY, compose} = require("../../core/model/draft-order");
+const {swapStep} = require("../../core/model/slot-order");
+const {customKeyCode} = require("../../core/data/user-keycodes");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {capabilities, editedDraft} = require("../fixtures/edited-draft");
 
@@ -20,6 +23,9 @@ test("every unit the review names reads back as itself, and Discard takes it", (
     assert.deepEqual([...kinds].sort(), ["behavior", "combo", "comboTiming", "customKey", "keyboardName", "layerName", "layout", "macro", "pd", "placement",
         "rgb:automouse", "rgb:combo", "rgb:groups", "rgb:key", "rgb:layer", "rgb:pd", "rgb:stages", "settings"], "the draft edits every area");
     assert.deepEqual(parseUnit(layerOrderReview(current, SWAP).unit), {kind: "layerOrder"});
+    for (const bank of /** @type {const} */ (["macros", "customKeys", "pdModes"])) {
+        assert.deepEqual(parseUnit(slotOrderReview(current, bank, swapStep(bank, 1, 2)).unit), {kind: ORDER_UNITS[bank]}, bank);
+    }
 });
 
 test("each builder writes a unit that reads back as what it names", () => {
@@ -42,13 +48,17 @@ test("each builder writes a unit that reads back as what it names", () => {
         [UNIT.rgbPd(1), {kind: "rgb", record: "pd", slot: 1}],
         [UNIT.profile, {kind: "profile"}],
         [UNIT.layerOrder, {kind: "layerOrder"}],
+        [UNIT.macroOrder, {kind: "macroOrder"}],
+        [UNIT.customKeyOrder, {kind: "customKeyOrder"}],
+        [UNIT.pdOrder, {kind: "pdOrder"}],
     ];
     for (const [unit, read] of units) {
         assert.deepEqual(parseUnit(unit), read, unit);
     }
     // The strings the panel already reads keep their bytes.
     assert.deepEqual(units.map(([unit]) => unit), ["layout:2:5", "placement:2:5", "layerName:3", 'behavior:{"kind":1,"flags":0,"operand":41}', "combo:7", "comboTiming",
-        "macro:2", "customKey:9", "keyboardName", "settings:host", "settings:otherKeyOptions", "pd:4", "rgb:groups", "rgb:layer:2", "rgb:pd:1", "profile", "layerOrder"]);
+        "macro:2", "customKey:9", "keyboardName", "settings:host", "settings:otherKeyOptions", "pd:4", "rgb:groups", "rgb:layer:2", "rgb:pd:1", "profile", "layerOrder",
+        "macroOrder", "customKeyOrder", "pdOrder"]);
 });
 
 test("a string review never writes is no unit", () => {
@@ -59,11 +69,31 @@ test("a string review never writes is no unit", () => {
 });
 
 test("units that belong to a layer are named by the layer, not the slot", () => {
-    assert.equal(unitByLayer("layout:2:5", SWAP), "layout:3:5");
-    assert.equal(unitByLayer("placement:3:5", SWAP), "placement:2:5");
-    assert.equal(unitByLayer("layerName:3", SWAP), "layerName:2");
-    assert.equal(unitByLayer("rgb:layer:2", SWAP), "rgb:layer:3");
-    assert.equal(unitByLayer("macro:2", SWAP), "macro:2", "other units have no layer");
-    assert.equal(unitByLayer("rgb:pd:2", SWAP), "rgb:pd:2");
-    assert.equal(unitByLayer("mystery:2", SWAP), "mystery:2");
+    const order = compose(IDENTITY, {layers: SWAP});
+    assert.equal(unitByIdentity("layout:2:5", order), "layout:3:5");
+    assert.equal(unitByIdentity("placement:3:5", order), "placement:2:5");
+    assert.equal(unitByIdentity("layerName:3", order), "layerName:2");
+    assert.equal(unitByIdentity("rgb:layer:2", order), "rgb:layer:3");
+    assert.equal(unitByIdentity("macro:2", order), "macro:2", "other units have no layer");
+    assert.equal(unitByIdentity("rgb:pd:2", order), "rgb:pd:2");
+    assert.equal(unitByIdentity("mystery:2", order), "mystery:2");
+});
+
+test("units that belong to a macro, a custom key or a pointing mode are named by what the slot holds (D-L81)", () => {
+    const order = compose(IDENTITY, {macros: swapStep("macros", 2, 7), customKeys: swapStep("customKeys", 9, 1), pdModes: swapStep("pdModes", 4, 0)});
+    assert.equal(unitByIdentity("macro:2", order), "macro:7");
+    assert.equal(unitByIdentity("macro:7", order), "macro:2");
+    assert.equal(unitByIdentity("macro:3", order), "macro:3");
+    assert.equal(unitByIdentity("customKey:9", order), "customKey:1");
+    assert.equal(unitByIdentity("pd:4", order), "pd:0");
+    assert.equal(unitByIdentity("rgb:pd:0", order), "rgb:pd:4", "a pointing mode's colour follows the mode");
+    assert.equal(unitByIdentity("layout:2:5", order), "layout:2:5", "the layers stayed");
+    // A behaviour is named by the key it listens to: a custom key by its own
+    // kind, and by its keycode when a layout key stores it that way.
+    assert.equal(unitByIdentity(UNIT.behavior({kind: 7, flags: 0, operand: 9}), order), UNIT.behavior({kind: 7, flags: 0, operand: 1}));
+    assert.equal(unitByIdentity(UNIT.behavior({kind: 1, flags: 0, operand: customKeyCode(1)}), order), UNIT.behavior({kind: 1, flags: 0, operand: customKeyCode(9)}));
+    assert.equal(unitByIdentity(UNIT.behavior({kind: 6, flags: 0, operand: 7}), order), UNIT.behavior({kind: 6, flags: 0, operand: 2}), "a behaviour on a macro key");
+    assert.equal(unitByIdentity(UNIT.behavior({kind: 4, flags: 0, operand: 0}), order), UNIT.behavior({kind: 4, flags: 0, operand: 4}), "a behaviour on a pointing key");
+    assert.equal(unitByIdentity(UNIT.behavior({kind: 1, flags: 0, operand: 41}), order), UNIT.behavior({kind: 1, flags: 0, operand: 41}), "an ordinary key");
+    assert.deepEqual(ORDER_UNITS, {layers: "layerOrder", macros: "macroOrder", customKeys: "customKeyOrder", pdModes: "pdOrder"});
 });

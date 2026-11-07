@@ -118,6 +118,12 @@ by name** finds it by name or number, through every key). The heading counts
 the keys in use, such as "5 of 128 used". Its name is the editor's title:
 click it to rename, Enter to keep, Escape to put it back.
 
+Drag a key onto another to swap the two. Each moves with its name, its
+shortcut and its taps and holds, and every layer key, behaviour and combo that
+sent it still sends it, under its new number. From the keyboard, focus a key
+and press Shift+Space to hold it, then Shift+Space on the other; Escape lets
+go. Review lists the swaps as one **Custom key order** change.
+
 **Shortcut** is what the key sends: up to six keys held together, any
 modifiers and any layers. The field says so above it: like a one-step macro,
 but it acts as a normal key rather than playing once. The keys and modifiers are held while you hold the

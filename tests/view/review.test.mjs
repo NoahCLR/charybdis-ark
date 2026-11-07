@@ -75,6 +75,10 @@ test("Show goes to where each kind of item is edited", () => {
     assert.deepEqual(categorySummary(words, [{place: {kind: "customKey", index: 2, keycode: "CUSTOM_KEY_2"}, status: "changed"}]).map(({category, rows}) => [category, rows]),
         [["Keys", [{label: "Custom keys", count: 1}]]], "names and shortcuts alike");
     assert.equal(placeState({kind: "pointing", slot: 6}).pointingSlot, 6);
+    // A bank's order (D-L81) opens its screen on the lowest slot that moved.
+    assert.deepEqual(placeState({kind: "slots", bank: "macros", keycodes: ["MACRO_2", "MACRO_10"]}), {screen: "macros", macroSlot: "MACRO_2"});
+    assert.deepEqual(placeState({kind: "slots", bank: "customKeys", keycodes: ["CUSTOM_KEY_3", "CUSTOM_KEY_20"]}), {screen: "customKeys", customKey: "CUSTOM_KEY_3"});
+    assert.deepEqual(placeState({kind: "slots", bank: "pdModes", slots: [1, 6]}), {screen: "pointing", pointingSlot: 1, pdKind: null, pdTaps: null});
     assert.equal(placeState({kind: "lighting", stage: "pd"}).stage, "pd");
     assert.equal(placeState(null), null, "the profile fallback has nowhere to go");
     const combo = placeState({kind: "combo", index: 3});
@@ -191,4 +195,18 @@ test("a change's mark says it is in the draft, or in the live modes unsaved", ()
     assert.equal(draftDot(/** @type {any} */ ({live: {mode: LIVE_REVIEW}}), "corner"), '<i class="draft-dot corner" data-tip="Unsaved change" aria-label="Unsaved change"></i>');
     assert.match(draftDot(/** @type {any} */ ({live: {mode: LIVE}}), "", {holds: true}), /data-tip="Holds an unsaved change"/);
     assert.match(draftDot({live: null}, "", {holds: true}), /data-tip="Holds a change in your draft"/);
+});
+
+test("a swap marks the slots it moved on their screen, a pointing mode's on Lighting's list too, and counts under its bank's order (D-L81)", () => {
+    const macros = draftMarks([{status: "changed", place: {kind: "slots", bank: "macros", keycodes: ["MACRO_2", "MACRO_10"]}}]);
+    assert.deepEqual([...macros.macros], ["MACRO_2", "MACRO_10"]);
+    const keys = draftMarks([{status: "changed", place: {kind: "slots", bank: "customKeys", keycodes: ["CUSTOM_KEY_3"]}}]);
+    assert.deepEqual([...keys.customKeys], ["CUSTOM_KEY_3"]);
+    const pointing = draftMarks([{status: "changed", place: {kind: "slots", bank: "pdModes", slots: [1, 6]}}]);
+    assert.deepEqual([[...pointing.pointing], [...pointing.lightingSlots]], [[1, 6], [1, 6]], "its colour went with it");
+    assert.deepEqual(categorySummary(words, [
+        {place: {kind: "slots", bank: "macros", keycodes: ["MACRO_2", "MACRO_10"]}, status: "changed"},
+        {place: {kind: "slots", bank: "customKeys", keycodes: ["CUSTOM_KEY_3", "CUSTOM_KEY_20"]}, status: "changed"},
+        {place: {kind: "slots", bank: "pdModes", slots: [1, 6]}, status: "changed"},
+    ]).map(({category, rows}) => [category, rows.map((row) => row.label)]), [["Keys", ["Custom key order"]], ["Macros", ["Macro order"]], ["Pointing modes", ["Pointing mode order"]]]);
 });

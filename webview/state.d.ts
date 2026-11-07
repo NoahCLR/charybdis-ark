@@ -33,6 +33,8 @@ export interface PanelState {
     pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
     pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; feedbackRow: string | undefined; comboPreview: {id: number; keys: number[]} | null; lightingGroupsShut: string[];
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
+    /** The slot tile held for a keyboard swap (D-L81): its bank and the key its screen picks it by. */
+    heldSlot: {bank: string; key: string} | null;
     macroClipboard: MacroStep[] | null;
     recording: {slot: string; before: string} | null; lastTake: {slot: string; before: string; after: string} | null;
     recordDelays: boolean; recordPreserveHoldTiming: boolean; recordDelayThreshold: number; recordDelayRound: number;

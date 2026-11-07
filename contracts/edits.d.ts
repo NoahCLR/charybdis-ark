@@ -120,6 +120,10 @@ export interface EditPayloads {
     /** Empties a custom key in one step: its name, its shortcut and its behaviour row. Keys, behaviours and combos that send it stay. */
     clearCustomKey: {keycode: string; expectedFingerprint?: string};
     renameKeyboard: {name: string; expectedFingerprint?: string};
+    /** Two slots of a bank trade places, each with everything that is its own, and every key, behaviour, combo and pointing tap that reaches one follows it (D-L81). */
+    swapMacros: {keycodes: [string, string]};
+    swapCustomKeys: {keycodes: [string, string]};
+    swapPdModes: {slots: [number, number]};
     savePdMode: {slot: number; config: PdConfig; expectedBase?: Partial<BaseIdentity>};
     clearPdMode: {slot: number; expectedBase?: Partial<BaseIdentity>};
     duplicatePdMode: {slot: number; source: number; expectedBase?: Partial<BaseIdentity>};

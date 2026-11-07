@@ -97,6 +97,7 @@ export const STATE_FIELDS = {
     feedbackRow: kept("hold"),
     macroSlot: kept(null),
     macroSearch: kept(""),
+    heldSlot: resets(null),    // {bank, key}: the tile held for a keyboard swap, let go when the draft is replaced
     customKey: kept(null),
     customKeySearch: kept(""),
     // keycode → one macro slot's local steps, raw input and validation. A take

@@ -11,17 +11,33 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
 import {whatReachesSlot} from "../view/pointing-reach.mjs";
-import {getModel, render, state} from "../store.mjs";
+import {getModel, post, render, state} from "../store.mjs";
+import * as edits from "../view/edits.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {slotBank} from "../view/slot-bank.mjs";
 import {slotLight} from "./marks.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {word} from "../view/vocabulary.mjs";
 import {topbar} from "./frame.mjs";
-import {allSlotsShown, slotBankControls} from "./slot-bank.mjs";
+import {SWAP_TIP, allSlotsShown, slotBankControls, swappable} from "./slot-bank.mjs";
 import {words} from "./pointing/common.mjs";
 import {editor} from "./pointing/editor.mjs";
 import {emptySlot} from "./pointing/empty-slot.mjs";
+
+// Two pointing slots trade places (D-L81), Lighting's colour and accents
+// included. The dragged mode is the one open afterwards, where it is now;
+// a movement or taps chosen in its editor but not kept go with it.
+/** @param {string} from @param {string} to */
+function swapPointing(from, to) {
+    const a = Number(from), b = Number(to);
+    post(edits.swapPdModes(a, b));
+    /** @param {number} slot */
+    const follows = (slot) => (slot === a ? b : slot === b ? a : slot);
+    if (state.pdKind) state.pdKind = {...state.pdKind, slot: follows(state.pdKind.slot)};
+    if (state.pdTaps) state.pdTaps = {...state.pdTaps, slot: follows(state.pdTaps.slot)};
+    state.pointingSlot = b;
+    render();
+}
 
 export function screenPointing() {
     const model = getModel();
@@ -69,11 +85,12 @@ export function screenPointing() {
         const kind = row.kind ? word(words(model).kinds, row.kind) : "";
         const tip = row.kind ? `Slot ${row.id} · ${row.name} · ${kind}` : `Slot ${row.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} still reach it` : ""}`;
         const cell = el(`<button class="mslot pd-tile ${row.kind ? "filled" : ""} ${inert ? "warn" : ""}" data-slot="${esc(row.id)}" role="listitem"
-            aria-current="${row.id === slot.id}" aria-label="${esc(tip)}" data-tip="${esc(tip)}">
+            aria-current="${row.id === slot.id}" aria-label="${esc(tip)}" data-tip="${esc(gate.editable ? `${tip} · ${SWAP_TIP}` : tip)}">
             ${changed.has(row.id) ? draftDot(model?.draft, "corner") : ""}
             <span class="pd-tile-top">${row.kind ? slotLight(model, row).swatch() : ""}<span class="n">${esc(row.id)}</span></span>
             <span class="v">${row.kind ? esc(row.name) : "—"}</span></button>`);
         cell.addEventListener("click", () => { state.pointingSlot = row.id; state.pdKind = null; state.pdTaps = null; render(); });
+        swappable(cell, {bank: "pointing", key: String(row.id), canEdit: gate.editable, keyOf: (other) => /** @type {HTMLElement} */ (other).dataset.slot ?? null, onSwap: swapPointing});
         return cell;
     };
     grid.append(...shelf.shown.map(tile));

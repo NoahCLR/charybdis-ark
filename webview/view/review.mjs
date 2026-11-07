@@ -108,6 +108,7 @@ function categoryOf(item, names, stages, sections) {
         case "macro": return ["Macros", "Macros", 0];
         case "customKey": return ["Keys", "Custom keys", 35];
         case "pointing": return ["Pointing modes", "Pointing modes", 0];
+        case "slots": return place.bank === "macros" ? ["Macros", "Macro order", 1] : place.bank === "customKeys" ? ["Keys", "Custom key order", 36] : ["Pointing modes", "Pointing mode order", 1];
         case "lighting": {
             if (!place.stage) return ["Lighting", "Stages on or off", 0];
             if (place.stage === "accents") return ["Lighting", "All accents", 20];
@@ -190,6 +191,10 @@ export function placeState(place, layers = []) {
             return screen ? {screen, reveal: `.settings-group[data-section="${place.section}"]`} : null;
         }
         case "layers": return {screen: "keys", layersOpen: true};
+        // A bank's order opens its screen on the lowest slot that moved.
+        case "slots": return place.bank === "macros" ? {screen: "macros", macroSlot: place.keycodes[0] ?? null}
+            : place.bank === "customKeys" ? {screen: "customKeys", customKey: place.keycodes[0] ?? null}
+            : {screen: "pointing", pointingSlot: place.slots[0] ?? 0, pdKind: null, pdTaps: null};
         default: return null;
     }
 }
@@ -247,6 +252,12 @@ function computeMarks(changes) {
             // A reorder marks the layers it moved, not every key they hold.
             marks.layerNames = true;
             for (const layer of place.layers || []) marks.layers.add(layer);
+        } else if (place.kind === "slots") {
+            // A swap marks the slots it moved, on their screen and, for a
+            // pointing mode, on Lighting's list, whose colour went with it.
+            if (place.bank === "macros") for (const keycode of place.keycodes) marks.macros.add(keycode);
+            else if (place.bank === "customKeys") for (const keycode of place.keycodes) marks.customKeys.add(keycode);
+            else for (const slot of place.slots) { marks.pointing.add(slot); marks.lightingSlots.add(slot); }
         }
     }
     return marks;

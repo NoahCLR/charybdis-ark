@@ -5,13 +5,14 @@
 // place.
 //
 // Each type names the editor that makes it (the layout, a whole-document
-// editor, or one domain of the profile blob, which model/device-profile-edits.js
-// rewrites), whether it may follow a custom key made for a shortcut in the
-// same step (D-L63), and the words its history step and review group are
-// titled with. The router takes a message as a draft edit only when its type
-// is here, and applyDraftEdit (model/draft-editor.js) sends it to the handler
-// of the domain or editor named here, so a new edit is one line and its
-// handler. The
+// editor, a swap of two slots, or one domain of the profile blob, which
+// model/device-profile-edits.js rewrites), whether it may follow a custom key
+// made for a shortcut in the same step (D-L63), and the words its history
+// step and review group are titled with. The router takes a message as a
+// draft edit only when its type is here, and applyDraftEdit
+// (model/draft-editor.js) sends it to the handler of the domain or editor
+// named here, so a new edit is one line and its handler. A swap also moves
+// the draft's order (draft-order.js), which draftEditStep says. The
 // contract's EditPayloads names the same types (tests/model/draft-edits.test.js).
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
@@ -23,7 +24,7 @@ const {shortcutPresent} = require("../schema/settings-domain-v1");
  * @typedef {import("../../contracts/edits.js").DraftEditType} DraftEditType
  * @typedef {import("../../contracts/edits.js").PanelEdit} PanelEdit
  * @typedef {import("./types.js").PortableDocument} Document
- * @typedef {"keymap" | "settings" | "macro" | "customKey" | "keyboardName" | "profile"} Editor
+ * @typedef {"keymap" | "settings" | "macro" | "customKey" | "keyboardName" | "slots" | "profile"} Editor
  * @typedef {"placement" | "pointing" | "combos" | "behaviours" | "lighting"} Domain
  */
 /**
@@ -57,6 +58,10 @@ function behaviorLabel({behavior}, document) {
     return require("./key-behavior-edits").hasBehaviorFor(rows, behavior.keycode) ? "Edited a behaviour" : "Added a behaviour";
 }
 
+// A swap names the two slots as they were called before it (slot-editor.js).
+/** @param {import("./slot-editor.js").SwapEdit} message @param {Document} document */
+const swapLabel = (message, document) => require("./slot-editor").swapLabel(message, document);
+
 const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: Entry<K>}} */ ({
     updateLayoutKeys: {editor: "keymap", label: layoutLabel, follows: true},
     updateConfigDefaults: {editor: "settings", label: "Saved a settings section"},
@@ -66,6 +71,9 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
         : shortcutPresent(message.shortcut) ? "Changed a custom key's shortcut" : "Cleared a custom key's shortcut"},
     clearCustomKey: {editor: "customKey", label: "Cleared a custom key"},
     renameKeyboard: {editor: "keyboardName", label: "Renamed the keyboard"},
+    swapMacros: {editor: "slots", label: swapLabel},
+    swapCustomKeys: {editor: "slots", label: swapLabel},
+    swapPdModes: {editor: "slots", label: swapLabel},
     updatePlacementPolicy: {editor: "profile", domain: "placement", label: "Edited the draft"},
     savePdMode: {editor: "profile", domain: "pointing", label: "Edited a pointing mode"},
     clearPdMode: {editor: "profile", domain: "pointing", label: "Cleared a pointing mode"},
@@ -110,4 +118,13 @@ function draftEditLabel(message, document) {
     return /** @type {(message: PanelEdit, document: Document) => string} */ (label)(message, document);
 }
 
-module.exports = {DRAFT_EDIT_TYPES, DRAFT_EDITS, draftEditEntry, draftEditLabel};
+// The step one staged message makes of the draft's order (draft-order.js):
+// a swap trades two slots of its bank; every other edit leaves the order as
+// it is.
+/** @param {PanelEdit} message @returns {import("./draft-order.js").Step | undefined} */
+function draftEditStep(message) {
+    if (draftEditEntry(message.type)?.editor !== "slots") return undefined;
+    return require("./slot-editor").slotEditStep(/** @type {import("./slot-editor.js").SwapEdit} */ (message));
+}
+
+module.exports = {DRAFT_EDIT_TYPES, DRAFT_EDITS, draftEditEntry, draftEditLabel, draftEditStep};

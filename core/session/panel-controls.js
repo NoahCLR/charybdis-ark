@@ -32,8 +32,7 @@ const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {SHELL_WORDS, applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
 const {followRead, readFailed} = require("./draft-follow");
 const {closeEditors, whileApplying} = require("./panel-session-state");
-const {compose} = require("../model/layer-order");
-const {LAYER_IDENTITY} = require("../data/charybdis-layout");
+const {IDENTITY, compose} = require("../model/draft-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {LIVE_ACTIONS, proposeLive, readNews, setEditMode} = require("./live-edits");
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
@@ -221,7 +220,7 @@ const DRAFT_ACTIONS = Object.freeze({
     putBack: liveOr("putBack", ({draft, revision, session}) => {
         const before = keptFor(session, "beforeApply", session.service.snapshot(), draft.deviceId);
         if (!before) throw new Error("There is no copy from before a save on this keyboard to put back.");
-        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before the save", LAYER_IDENTITY);
+        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before the save", IDENTITY);
         session.resetDraftForms = true;
     }),
     apply: async ({draft, revision, message, session, service, shell}) => {
@@ -325,15 +324,15 @@ const PORTABLE_ACTIONS = Object.freeze({
             // replacement, which needs nothing unsaved (firmware D-F32).
             const draft = session.draft;
             closeEditors(session, {resetForms: true});
-            if (entry.kind === "layers") await proposeLive(session, {document, origin: "layers", label: "Edited layers", order: compose(draft.order, entry.editor.order)});
-            else await proposeLive(session, {document, origin: "edit", label: "Imported a profile", order: LAYER_IDENTITY}, {replaceWhenLarge: true});
+            if (entry.kind === "layers") await proposeLive(session, {document, origin: "layers", label: "Edited layers", order: compose(draft.order, {layers: entry.editor.order})});
+            else await proposeLive(session, {document, origin: "edit", label: "Imported a profile", order: IDENTITY}, {replaceWhenLarge: true});
             return;
         }
         if (session.draft) {
             // An import has no layer order to keep: its layers are
             // compared slot by slot with the keyboard's.
             if (entry.kind === "layers") session.draft.editLayers(document, session.draft.revision, entry.editor.order);
-            else session.draft.replace(document, session.draft.revision, "edit", "Imported a profile", LAYER_IDENTITY);
+            else session.draft.replace(document, session.draft.revision, "edit", "Imported a profile", IDENTITY);
             closeEditors(session, {resetForms: true});
             return;
         }

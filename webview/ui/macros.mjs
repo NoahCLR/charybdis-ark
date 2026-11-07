@@ -19,14 +19,15 @@ import {meterFill} from "./meter.mjs";
 import {macroMatches, macroPeekSteps} from "../view/macro.mjs";
 import {readMacro} from "../view/macro-cache.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
-import {getModel, render, state} from "../store.mjs";
+import {getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
 import {topbar} from "./frame.mjs";
 import {editor} from "./macros/editor.mjs";
 import {slotBank} from "../view/slot-bank.mjs";
-import {allSlotsShown, slotBankControls} from "./slot-bank.mjs";
+import {SWAP_TIP, allSlotsShown, slotBankControls, swappable} from "./slot-bank.mjs";
+import * as edits from "../view/edits.mjs";
 
 export function screenMacros() {
     const model = getModel();
@@ -81,10 +82,11 @@ export function screenMacros() {
         const tip = out ? `Slot ${index} · unavailable: macro memory keeps its free room for the lower empty slots. Shorten or clear a macro to make it available.`
             : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"} · ${row.payload}`;
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
-            aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
+            aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(gate.editable && !out ? `${tip} · ${SWAP_TIP}` : tip)}">
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot(model?.draft, "corner") : ""}
             <span class="v">${row.needsUnicodeSetup ? esc(vocabulary(model).macroPlayback?.setup) : row.playable === false ? esc(vocabulary(model).macroPlayback?.blocked) : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? esc(vocabulary(model).macroPlayback?.unavailable) : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
+        swappable(cell, {bank: "macros", key: row.keycode, canEdit: gate.editable && !out, keyOf: (other) => /** @type {HTMLElement} */ (other).dataset.slot ?? null, onSwap: swapMacros});
         return cell;
     };
     cells.append(...shelf.shown.map(tile));
@@ -97,6 +99,26 @@ export function screenMacros() {
     pad.appendChild(slot ? editor(/** @type {import("../../contracts/panel.js").PublishedModel} */ (model), slot, canEdit) : el(`<div class="empty-card"><p class="note">Pick a slot.</p></div>`));
     main.appendChild(content);
     return main;
+}
+
+// Two macro slots trade places (D-L81). The dragged macro is the one open
+// afterwards, where it is now; what was typed into either slot's editor but
+// not kept goes with its macro, and so does a take being recorded.
+/** @param {string} from @param {string} to */
+function swapMacros(from, to) {
+    post(edits.swapMacros(from, to));
+    /** @param {string} keycode */
+    const follows = (keycode) => (keycode === from ? to : keycode === to ? from : keycode);
+    const forms = {...state.macroForms};
+    const [a, b] = [forms[from], forms[to]];
+    delete forms[from]; delete forms[to];
+    if (a) forms[to] = a;
+    if (b) forms[from] = b;
+    state.macroForms = forms;
+    if (state.recording) state.recording = {...state.recording, slot: follows(state.recording.slot)};
+    if (state.lastTake) state.lastTake = {...state.lastTake, slot: follows(state.lastTake.slot)};
+    state.macroSlot = to;
+    render();
 }
 
 // All slots share one block of macro memory. Each empty slot keeps room for

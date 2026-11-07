@@ -32,7 +32,7 @@
 const {fingerprint} = require("../model/portable-profile");
 const {EDIT_MODE, isEditMode} = require("../protocol/profile-edit-v1");
 const {EDIT_MODE_WORDS, INTERRUPTION_REASONS, PHASE, SAVE_WORDS, arkCode, failureSentence, quietWords} = require("../model/vocabulary");
-const {LAYER_IDENTITY} = require("../data/charybdis-layout");
+const {IDENTITY} = require("../model/draft-order");
 const {replaceDraft} = require("./panel-session-state");
 const {keepStale, needRead, readAndFollow, replaceFromRead, takeNews, takeRead} = require("./draft-follow");
 const {expectReconnect, renamedTo} = require("./keyboard-reconnect");
@@ -262,9 +262,9 @@ async function reread(session) {
 /** @param {Session} session @param {import("./types.js").DraftEdit} message */
 async function liveEdit(session, message) {
     const draft = liveDraft(session);
-    const {document, label, previousFingerprint} = draft.propose(message);
+    const {document, label, previousFingerprint, order} = draft.propose(message);
     const accepted = {message: JSON.parse(JSON.stringify(message)), previousFingerprint, fingerprint: fingerprint(document)};
-    return proposeLive(session, {document, label, origin: "edit", order: draft.order}, {accepted});
+    return proposeLive(session, {document, label, origin: "edit", order}, {accepted});
 }
 
 /** @typedef {{session: Session, draft: Draft, service: Session["service"], revision: number, message: import("../../contracts/messages.js").DraftControl & {draftRevision: number}, shell: Shell, saveRecovery: (document: import("../model/types.js").PortableDocument) => Promise<string | undefined>}} LiveContext */
@@ -281,14 +281,14 @@ const LIVE_ACTIONS = Object.freeze({
         draft.assertRevision(revision);
         const before = keptFor(session, "beforeApply", session.service.snapshot(), draft.deviceId);
         if (!before) throw new Error("There is no copy from before a save on this keyboard to put back.");
-        return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before the save", origin: "edit", order: LAYER_IDENTITY}, {replaceWhenLarge: true});
+        return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before the save", origin: "edit", order: IDENTITY}, {replaceWhenLarge: true});
     },
     // Discard all is Revert: the keyboard runs its saved profile again, and
     // the history keeps a step for it, so undo sends the edits back.
     discard: context => LIVE_ACTIONS.revert(context),
     revert: async ({draft, revision, session}) => {
         draft.assertRevision(revision, {allowStale: false});
-        if (await revertTo(session, draft, {document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: LAYER_IDENTITY})) {
+        if (await revertTo(session, draft, {document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: IDENTITY})) {
             session.notice = "Reverted: the keyboard runs its saved profile again. Undo sends the edits back.";
         }
     },
