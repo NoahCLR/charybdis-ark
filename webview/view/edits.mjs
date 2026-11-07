@@ -259,6 +259,17 @@ export const customKeyForShortcut = (keycode, shortcut, name, then, identity) =>
 /** @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'renameKeyboard'>} */
 export const keyboardNameMessage = (name, identity) => ({type: "renameKeyboard", name: String(name ?? "").trim(), expectedFingerprint: identity});
 
+// ── swapping slots (D-L81) ──────────────────────────────────────────────
+
+// Two slots of a bank trade places, named as their screens pick them: a
+// macro and a custom key by keycode, a pointing mode by slot.
+/** @param {string} a @param {string} b @returns {import("../../contracts/edits.js").EditOf<'swapMacros'>} */
+export const swapMacros = (a, b) => ({type: "swapMacros", keycodes: [a, b]});
+/** @param {string} a @param {string} b @returns {import("../../contracts/edits.js").EditOf<'swapCustomKeys'>} */
+export const swapCustomKeys = (a, b) => ({type: "swapCustomKeys", keycodes: [a, b]});
+/** @param {number} a @param {number} b @returns {import("../../contracts/edits.js").EditOf<'swapPdModes'>} */
+export const swapPdModes = (a, b) => ({type: "swapPdModes", slots: [a, b]});
+
 /** @param {number} slot @param {import("../../contracts/edits.js").PdConfig} config @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'savePdMode'>} */
 export const pdMode = (slot, config, identity) => ({type: "savePdMode", slot, expectedBase: identity ?? undefined, config});
 /** @param {number} slot @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'clearPdMode'>} */

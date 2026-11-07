@@ -18,7 +18,8 @@ const {effectiveTimings} = require("./gesture-timing");
 const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {customKeyName} = require("../data/user-keycodes");
-const {UNIT, parseUnit} = require("./review-units");
+const {ORDER_UNITS, UNIT, parseUnit} = require("./review-units");
+const {movedBanks} = require("./draft-order");
 
 // Field labels are the editors' own words, from the vocabulary (D: what a
 // behaviour and a combo share; T: the behaviour thresholds).
@@ -621,7 +622,37 @@ function layerOrderReview(after, order) {
         ...(order[0] !== 0 ? [{label: "Base layer", status: /** @type {const} */ ("changed"), before: layerCalled(names, order.indexOf(0)), after: layerCalled(names, 0)}] : []),
         ...moved.map(/** @returns {import("../../contracts/model.js").ReviewField} */ slot => ({label: layerCalled(names, slot), labelMark: {kind: "layer", layer: slot}, status: "changed", before: String(order[slot]), after: where(slot)})),
     ];
-    return {area: AREA.layers, unit: UNIT.layerOrder, title: "Layer priority", note: "Higher layers win", status: "changed", fields,
+    return {area: AREA.layers, unit: UNIT.layerOrder, title: ORDER_TITLES.layers, note: "Higher layers win", status: "changed", fields,
         place: {kind: "layers", layers: moved}};
 }
-module.exports = {layerOrderReview, profileReview, singleComboRemovalIndex};
+// What each bank's order item is called: the layers' priority, and the
+// slots' order (D-L81).
+/** @type {Readonly<Record<import("./draft-order.js").Bank, string>>} */
+const ORDER_TITLES = Object.freeze({layers: "Layer priority", macros: "Macro order", customKeys: "Custom key order", pdModes: "Pointing mode order"});
+// A bank's swaps as one item: each macro, custom key or pointing mode that
+// sits in another slot than on the keyboard, named as the draft names it now,
+// in its mark, with the slot it sat in and the one it sits in, lowest first
+// as its screen lists them. Swaps compose, so three swaps are one item that
+// says where each thing is now.
+/** @param {Snapshot} after @param {import("./slot-order.js").SlotBank} bank @param {readonly number[]} order @returns {Change} */
+function slotOrderReview(after, bank, order) {
+    const {settings, pdModes} = decodedOf(after);
+    const moved = order.map((held, slot) => slot).filter(slot => order[slot] !== slot);
+    /** @param {number} slot */
+    const called = slot => bank === "macros" ? settings.macroNames[slot] || macroDefaultName(slot)
+        : bank === "customKeys" ? settings.customKeyNames[slot] || `Custom key ${slot}` : slotName(pdModes[slot], slot);
+    /** @param {number} slot @returns {import("../../contracts/model.js").ReviewMark} */
+    const mark = slot => bank === "pdModes" ? {kind: "pointing", slot} : {kind: bank === "macros" ? "macro" : "customKey"};
+    const fields = moved.map(/** @returns {import("../../contracts/model.js").ReviewField} */ slot =>
+        ({label: called(slot), labelMark: mark(slot), status: "changed", before: `slot ${order[slot]}`, after: `slot ${slot}`}));
+    /** @type {import("./types.js").ModelReviewPlace} */
+    const place = bank === "pdModes" ? {kind: "slots", bank, slots: moved}
+        : {kind: "slots", bank, keycodes: moved.map(slot => bank === "macros" ? macroName(slot) : customKeyName(slot))};
+    return {area: bank === "macros" ? AREA.macros : bank === "customKeys" ? AREA.customKeys : AREA.pointing, unit: UNIT[ORDER_UNITS[bank]], title: ORDER_TITLES[bank],
+        status: "changed", fields, place};
+}
+// The order items of a draft in `order` (draft-order.js): the layer priority,
+// then each slot bank's order, for every bank that moved anything.
+/** @param {Snapshot} after @param {import("./draft-order.js").Order} order @returns {Change[]} */
+const orderReview = (after, order) => movedBanks(order).map(bank => bank === "layers" ? layerOrderReview(after, order.layers) : slotOrderReview(after, bank, order[bank]));
+module.exports = {ORDER_TITLES, layerOrderReview, orderReview, profileReview, singleComboRemovalIndex, slotOrderReview};

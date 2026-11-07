@@ -6,10 +6,12 @@
 // name, a key's participation, a behaviour, a combo, the combo timing, a macro
 // with its name, a custom key's name and shortcut, the keyboard's name, one
 // settings section, a pointing slot, one lighting record, a change no item
-// describes (`profile`), or the layer order. The panel gets a unit as a string
-// (`ReviewChange.unit`); this is where that string is written and read. The
-// interface keeps pinned copies of the units it reads
-// (`tests/view/enum-drift.test.mjs`).
+// describes (`profile`), the layer order, or a slot bank's order (D-L81). The
+// panel gets a unit as a string (`ReviewChange.unit`); this is where that
+// string is written and read. The interface keeps pinned copies of the units
+// it reads (`tests/view/enum-drift.test.mjs`).
+
+const {actionByIdentity} = require("./slot-order");
 
 /** @typedef {"stages" | "automouse" | "combo" | "key" | "groups"} RgbRecord */
 /**
@@ -28,7 +30,11 @@
 
 const RGB_RECORDS = /** @type {readonly string[]} */ (/** @type {readonly RgbRecord[]} */ (["stages", "automouse", "combo", "key", "groups"]));
 // The kinds a unit names by itself alone.
-const BARE = /** @type {const} */ (["comboTiming", "keyboardName", "profile", "layerOrder"]);
+const BARE = /** @type {const} */ (["comboTiming", "keyboardName", "profile", "layerOrder", "macroOrder", "customKeyOrder", "pdOrder"]);
+// Each bank's order unit, by the bank as the draft's order names it
+// (draft-order.js), and back.
+/** @type {Readonly<Record<import("./draft-order.js").Bank, BareKind>>} */
+const ORDER_UNITS = Object.freeze({layers: "layerOrder", macros: "macroOrder", customKeys: "customKeyOrder", pdModes: "pdOrder"});
 /** @param {string} text @returns {text is BareKind} */
 const isBare = (text) => /** @type {readonly string[]} */ (BARE).includes(text);
 
@@ -62,10 +68,13 @@ const UNIT = Object.freeze({
     rgbPd: slot => `rgb:pd:${slot}`,
     profile: "profile",
     layerOrder: "layerOrder",
+    macroOrder: "macroOrder",
+    customKeyOrder: "customKeyOrder",
+    pdOrder: "pdOrder",
 });
 
 // A read unit as its builder writes it, for parseUnit's exact match and
-// unitByLayer; everything else writes a unit with UNIT.
+// unitByIdentity; everything else writes a unit with UNIT.
 /** @param {ReviewUnit} unit @returns {string} */
 function formatUnit(unit) {
     switch (unit.kind) {
@@ -113,15 +122,22 @@ function read(text) {
     return null;
 }
 
-// A unit named by the keyboard layer it belongs to rather than the slot it
-// sits in (`order[slot]` is the layer a slot holds, layer-order.js), so
-// edits made before and after a reorder link by what they touched. A unit
-// with no layer, or no unit at all, is itself.
-/** @param {string} text @param {readonly number[]} order */
-function unitByLayer(text, order) {
+// A unit named by the keyboard layer, macro, custom key or pointing mode it
+// belongs to rather than the slot it sits in (`order[bank][slot]` is what a
+// slot holds, draft-order.js), so edits made before and after a reorder or a
+// swap link by what they touched. A behaviour is named by the key it listens
+// to, which may be one of them. A unit with nothing that moves, or no unit at
+// all, is itself.
+/** @param {string} text @param {import("./draft-order.js").Order} order */
+function unitByIdentity(text, order) {
     const unit = parseUnit(text);
-    if (!unit || !("layer" in unit)) return text;
-    return formatUnit({...unit, layer: order[unit.layer]});
+    if (!unit) return text;
+    if ("layer" in unit) return formatUnit({...unit, layer: order.layers[unit.layer]});
+    if (unit.kind === "macro") return formatUnit({...unit, index: order.macros[unit.index]});
+    if (unit.kind === "customKey") return formatUnit({...unit, index: order.customKeys[unit.index]});
+    if (unit.kind === "pd" || (unit.kind === "rgb" && unit.record === "pd")) return formatUnit({...unit, slot: order.pdModes[unit.slot]});
+    if (unit.kind === "behavior") return formatUnit({...unit, target: actionByIdentity(unit.target, order)});
+    return text;
 }
 
-module.exports = {UNIT, parseUnit, unitByLayer};
+module.exports = {UNIT, ORDER_UNITS, parseUnit, unitByIdentity};

@@ -271,6 +271,10 @@ export interface NamedKey {name: string; native: string; code: number; label: st
 
 export type ReviewPlace = FindingPlace
     | {kind: 'layers'; layers?: number[]}
+    /** A bank's order: the slots a swap moved, by the name each screen picks them by (D-L81). */
+    | {kind: 'slots'; bank: 'macros'; keycodes: string[]}
+    | {kind: 'slots'; bank: 'customKeys'; keycodes: string[]}
+    | {kind: 'slots'; bank: 'pdModes'; slots: number[]}
     /** `keycode`: the key's name, as the Custom keys screen picks it. */
     | {kind: 'customKey'; index: number; keycode: string}
     | {kind: 'lighting'; stage?: string | null; layer?: number; slot?: number};

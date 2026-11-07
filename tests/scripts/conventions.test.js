@@ -268,6 +268,7 @@ const EDITOR_RUNNERS = {
     editMacro: ["core/model/macro-editor.js", "core/model/draft-editor.js"],
     editCustomKey: ["core/model/custom-key-editor.js", "core/model/draft-editor.js"],
     editKeyboardName: ["core/model/keyboard-name.js", "core/model/draft-editor.js"],
+    editSlots: ["core/model/slot-editor.js", "core/model/draft-editor.js"],
     PROFILE_EDITS: ["core/model/device-profile-edits.js", "core/model/draft-editor.js"],
     editKeyBehaviors: ["core/model/key-behavior-edits.js", "core/model/device-profile-edits.js", "tests/model/key-behavior-edits.test.js"],
 };

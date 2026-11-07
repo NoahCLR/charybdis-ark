@@ -31,8 +31,18 @@ import {behaviourEditor} from "./keys/behaviour-editor.mjs";
 import {placedOnMarkup, showPlacements} from "./keys/reach.mjs";
 import {mark} from "./marks.mjs";
 import {slotBank} from "../view/slot-bank.mjs";
-import {allSlotsShown, slotBankControls} from "./slot-bank.mjs";
+import {SWAP_TIP, allSlotsShown, slotBankControls, swappable} from "./slot-bank.mjs";
 
+
+// Two custom keys trade places (D-L81). The dragged key is the one open
+// afterwards, where it is now, with its behaviour's open cell if it had one.
+/** @param {string} from @param {string} to */
+function swapCustomKeys(from, to) {
+    post(edits.swapCustomKeys(from, to));
+    if (state.cellRow === from || state.cellRow === to) state.cellRow = state.cellRow === from ? to : from;
+    state.customKey = to;
+    render();
+}
 
 export function screenCustomKeys() {
     const model = getModel();
@@ -85,7 +95,7 @@ export function screenCustomKeys() {
         const does = [hasShortcut(row) ? shortcutAct(row) : "", row.hasBehavior ? "has a behaviour" : ""].filter(Boolean).join(" · ");
         const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
         const cell = el(`<button class="mslot ${customKeyInUse(row) ? "filled" : ""}" data-custom-key="${esc(row.keycode)}"
-            aria-current="${row.keycode === key?.keycode}" data-tip="${esc(tip)}">
+            aria-current="${row.keycode === key?.keycode}" data-tip="${esc(canEdit ? `${tip} · ${SWAP_TIP}` : tip)}">
             <span class="n">K${esc(row.slot)}</span>${changed.has(row.keycode) ? draftDot(model?.draft, "corner") : ""}
             <span class="v">${esc(clip(tileWords(row)))}</span></button>`);
         cell.addEventListener("click", () => {
@@ -96,6 +106,7 @@ export function screenCustomKeys() {
             state.customKey = row.keycode;
             render();
         });
+        swappable(cell, {bank: "customKeys", key: row.keycode, canEdit, keyOf: (other) => /** @type {HTMLElement} */ (other).dataset.customKey ?? null, onSwap: swapCustomKeys});
         return cell;
     };
     cells.append(...shelf.shown.map(tile));

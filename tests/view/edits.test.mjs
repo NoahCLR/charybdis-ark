@@ -1321,7 +1321,7 @@ test("the layer panel's toggle, moves and save reach the draft through the real 
     assert.deepEqual(draft.document, before, "the layer panel stages nothing until it is saved");
     await send(controls.saveLayers(panel.portableLayers.names));
     assert.equal(panel.portableLayers, undefined);
-    assert.deepEqual(draft.order, order);
+    assert.deepEqual(draft.order.layers, order);
     assert.equal(draft.current.summary.names[1], "777", "the renamed layer moved to its new slot");
     assert.deepEqual(profileLayers(draft.document)[0], profileLayers(before)[5], "Make base put layer 5's keys at the bottom");
     draft.undo(draft.revision);

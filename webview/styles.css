@@ -1752,6 +1752,12 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 /* A slot bank opens on its slots in use; New makes one in the first free
    slot, and the unused slots fold behind one disclosure across the bank
    (ui/slot-bank.mjs). */
+/* Swapping slots (D-L81): the dragged tile rides over the grid and takes no
+   pointer events, so the tile under the pointer is the drop; it and a tile
+   held for a keyboard swap are outlined. */
+.macro-grid.swapping { cursor: grabbing; user-select: none; }
+.mslot.dragging { position: relative; z-index: var(--z-raised); pointer-events: none; box-shadow: var(--shadow-drag); cursor: grabbing; }
+.mslot.drop-target, .mslot.held { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
 .mslot.new-slot { border-style: dashed; background: none; color: var(--text-2); }
 .mslot.new-slot:hover:not(:disabled) { color: var(--text); border-color: var(--line-3); }
 .pad.library .mslot.new-slot .v { white-space: normal; text-align: center; line-height: 1.25; padding: 0 var(--sp-1); }

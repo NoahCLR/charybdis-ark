@@ -246,6 +246,16 @@ The same kind of control looks and sits the same on every screen.
   search looks through every slot (`slotBank`, `webview/view/slot-bank.mjs`,
   drawn by `webview/ui/slot-bank.mjs`; `tests/view/slot-bank.test.mjs`,
   `browser-tests/consistency.spec.js`, `browser-tests/pointing-controls.spec.js`).
+  A tile dragged onto another slot's tile posts the bank's swap (D-L81), and
+  so does Shift+Space on a focused tile, which holds it (outlined, said by
+  the live region, let go by Escape or a draft change), then Shift+Space on
+  another;
+  New and the disclosure take no drop. The screen's selection follows the
+  dragged thing to its new slot, with the editor state keyed by the slot
+  (a macro's unkept form text and take, a pointing mode's chosen movement and
+  taps, a custom key's open behaviour cell) (`swappable`,
+  `webview/ui/slot-bank.mjs`; `tests/view/edits.test.mjs`,
+  `browser-tests/slot-swap.spec.js`).
   Lighting's list of pointing modes folds its empty slots by the same rule,
   under its table's last band, "Empty slots" with their count, as its layer
   list folds the empty layers (`toggleAllSlots`); the picked slot and one the
@@ -1085,11 +1095,20 @@ no accent lights read as an unused LED set; `tests/model/profile-review.test.js`
   (`tests/session/profile-draft-session.test.js`,
   `tests/view/review.test.mjs`). A recovery review is discarded whole (no
   test).
-- Layers are compared by identity, not slot: beside every history entry the
-  draft keeps which keyboard layer each slot holds, set by Rename & reorder
-  and never inferred. A reorder is one **Layer priority** change; undo, redo
-  and rebase carry the order, and an import, a whole discard and an Apply
-  start again from the keyboard's (`tests/model/layer-order.test.js`,
+- Layers, macros, custom keys and pointing modes are compared by identity,
+  not slot: beside every history entry the draft keeps which keyboard layer,
+  macro, custom key and pointing mode each slot holds, set by Rename & reorder
+  and by slot swaps (D-L81) and never inferred; swaps compose. A reorder is one
+  **Layer priority** change and a bank's swaps one **Macro order**, **Custom
+  key order** or **Pointing mode order** change, each saying where every
+  thing that moved sits now; everything else is compared thing with thing,
+  review groups link by identity, and the checks are matched slot with slot
+  (`keyboardInSlots`), so a swap makes or mends no check by itself. Discard
+  on an order item moves that bank back and leaves every other change with
+  its thing. Undo, redo and rebase carry the order, and an import, a whole
+  discard and an Apply start again from the keyboard's
+  (`tests/model/layer-order.test.js`, `tests/model/draft-order.test.js`,
+  `tests/model/slot-order.test.js`, `tests/model/review-units.test.js`,
   `tests/session/profile-draft-session.test.js`).
 
 ## How the review presents checks

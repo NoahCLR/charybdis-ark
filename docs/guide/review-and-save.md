@@ -137,7 +137,13 @@ keyboard do, and what must be fixed first.
 - Changes made by one edit, such as two keys swapped, are discarded together.
 
 Layers are compared by which layer they are, not where they sit, so a
-reorder is one change and a key edited afterwards is another.
+reorder is one change and a key edited afterwards is another. Macros, custom
+keys and pointing modes are compared the same way when their slots are
+swapped: the swaps of a bank are one change, **Macro order**, **Custom key
+order** or **Pointing mode order**, listing where each thing sits now, and a
+macro edited after a swap is its own change. Discarding the order puts every
+macro, key or mode of that bank back where the keyboard holds it; the edits
+stay with their things.
 
 ## Checks
 

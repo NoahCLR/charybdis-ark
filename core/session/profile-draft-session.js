@@ -2,17 +2,17 @@
 "use strict";
 
 const {validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
-const {layerOrderReview, profileReview} = require("../model/profile-review");
-const {compose, inverse, isIdentity, rearranged} = require("../model/layer-order");
-const {UNIT, unitByLayer} = require("../model/review-units");
+const {ORDER_TITLES, orderReview, profileReview} = require("../model/profile-review");
+const {BANKS, IDENTITY, compose, inverse, isIdentity, relative, slotsOnly, rearranged} = require("../model/draft-order");
+const {ORDER_UNITS, UNIT, unitByIdentity} = require("../model/review-units");
 const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
 const {LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
 const {draftProfileChecks} = require("../model/profile-checks");
 const {applyDraftEdit} = require("../model/draft-editor");
-const {draftEditLabel} = require("../model/draft-edits");
+const {draftEditLabel, draftEditStep} = require("../model/draft-edits");
 const {actionName, knownActionAbi} = require("../schema/actions");
-const {LAYERS, LAYER_IDENTITY} = require("../data/charybdis-layout");
+const {LAYERS} = require("../data/charybdis-layout");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 const {liveKeyboardStatus} = require("./live-profile-session");
 const {LIVE_RESULT_WORDS, REVIEW_AREAS, quietWords} = require("../model/vocabulary");
@@ -30,7 +30,7 @@ const liveKeyboardView = keyboard => keyboard ? {saving: keyboard.saving, autoSa
  * @typedef {import("../../contracts/model.js").ReviewChange} Review
  * @typedef {import("../model/types.js").ModelReviewChange} ModelReview
  * @typedef {import("./types.js").DraftEdit} Edit
- * @typedef {readonly number[]} Order
+ * @typedef {import("../model/draft-order.js").Order} Order
  * @typedef {{readonly document: Document, readonly origin: string | null, readonly label: string | null, readonly at: number, readonly order: Order}} HistoryEntry
  * @typedef {{decoded: Decoded, fingerprint: string, summary: import("../model/types.js").ProfileSummary}} DecodeEntry
  * @typedef {{snapshot: Complete, order: Order | null}} Reference
@@ -62,7 +62,7 @@ const savedSnapshot = snapshot => ({...copy({document: snapshot.saved.document, 
 
 // What one Rename & Reorder save did: the order it changed and the names it
 // changed, each named as the layers were called before it.
-/** @param {Order} step @param {string[]} before @param {string[]} after */
+/** @param {readonly number[]} step @param {string[]} before @param {string[]} after */
 function layersLabel(step, before, after) {
     const moved = step.map((from, slot) => slot).filter(slot => step[slot] !== slot);
     const renamed = step.map((from, slot) => [from, slot]).filter(([from, slot]) => layerCalled(before, from) !== layerCalled(after, slot));
@@ -125,10 +125,10 @@ class ProfileDraftSession {
     decodeCache;
     /** @type {WeakMap<Order, {base: Snapshot, reference: Reference}> | undefined} */
     referenceCache;
+    /** @type {WeakMap<Order, {base: Snapshot, decoded: Decoded}> | undefined} */
+    slotReferenceCache;
     /** @type {WeakMap<Document, {previous: Document, before: Order, after: Order, rows: Review[]}> | undefined} */
     reviewCache;
-    /** @type {WeakMap<Document, {previous: Document, units: string[]}> | undefined} */
-    stepCache;
     /** @type {WeakMap<Decoded, {keyboard: Decoded | null | undefined, order: Order, checks: import("../../contracts/model.js").Check[]}> | undefined} */
     checksCache;
     /** @type {boolean | undefined} */
@@ -136,11 +136,12 @@ class ProfileDraftSession {
     /** @type {LiveExpectation | undefined} Ark's own live edit the keyboard took whole but whose outcome Ark has not heard (live-edits.js): the next read confirms it if it shows exactly that edit. */
     expectedLive;
     now() {return Date.now();}
-    // A step keeps its document, edit grouping, words, time and layer order
+    // A step keeps its document, edit grouping, words, time and order (its
+    // layers', macros', custom keys' and pointing modes'; draft-order.js)
     // together. All of them stay fixed as undo, branching and trimming move it.
     /** @param {Document} document @param {string | null} [origin] @param {string | null} [label] @param {Order} [order] @returns {HistoryEntry} */
-    historyEntry(document, origin = null, label = null, order = LAYER_IDENTITY) {
-        return freeze({document: copy(document), origin, label, at: this.now(), order: [...order]});
+    historyEntry(document, origin = null, label = null, order = IDENTITY) {
+        return freeze({document: copy(document), origin, label, at: this.now(), order: copy(order)});
     }
     get document() {return copy(this.history[this.cursor].document);}
     get order() {return this.history[this.cursor].order;}
@@ -274,6 +275,7 @@ class ProfileDraftSession {
         if (JSON.stringify(hostOs) !== JSON.stringify(this.hostOs)) {
             this.hostOs = hostOs;
             this.referenceCache = new WeakMap();
+            this.slotReferenceCache = new WeakMap();
             this.reviewCache = new WeakMap();
             this.checksCache = new WeakMap();
         }
@@ -356,6 +358,7 @@ class ProfileDraftSession {
         this.base = savedSnapshot(snapshot); this.latest = copy(this.base);
         this.hostOs = copy(snapshot.hostOs ?? null);
         this.referenceCache = new WeakMap();
+        this.slotReferenceCache = new WeakMap();
         this.reviewCache = new WeakMap();
         this.history = [this.historyEntry(snapshot.document)]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
@@ -374,6 +377,7 @@ class ProfileDraftSession {
         this.base = copy(snapshot); this.latest = copy(snapshot);
         this.hostOs = copy(snapshot.hostOs ?? null);
         this.referenceCache = new WeakMap();
+        this.slotReferenceCache = new WeakMap();
         this.reviewCache = new WeakMap();
         this.history = [this.historyEntry(snapshot.document)]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
@@ -389,11 +393,11 @@ class ProfileDraftSession {
         this.capabilities = copy(capabilities);
         this.decodeCache = new WeakMap();
         this.referenceCache = new WeakMap();
+        this.slotReferenceCache = new WeakMap();
         this.reviewCache = new WeakMap();
-        this.stepCache = new WeakMap();
         this.checksCache = new WeakMap();
     }
-    // A new entry keeps the entry's layer order unless it says otherwise.
+    // A new entry keeps the entry's order unless it says otherwise.
     /** @param {Document} document @param {number} revision @param {string} [origin] @param {string | null} [label] @param {Order} [order] */
     replace(document, revision, origin = "edit", label = null, order = this.order) {
         this.assertLocal();
@@ -412,27 +416,29 @@ class ProfileDraftSession {
     /** @param {Edit} message */
     stage(message) {
         if (this.live) throw fail("This keyboard takes edits live; Ark sends each one to it.");
-        const {document, label, previousFingerprint} = this.propose(message);
-        this.replace(document, message.draftRevision, "edit", label);
+        const {document, label, previousFingerprint, order} = this.propose(message);
+        this.replace(document, message.draftRevision, "edit", label, order);
         return {message: copy(message), previousFingerprint, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
     }
-    // The document an edit would make, without making it: Review and save
-    // stages it at once, Live preview + save sends it to the keyboard first
-    // (live-edits.js).
-    /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
+    // The document an edit would make, without making it, and the order it
+    // leaves the draft in (a swap moves two slots; draft-order.js): Review
+    // and save stages it at once, Live preview + save sends it to the keyboard
+    // first (live-edits.js).
+    /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string, order: Order}} */
     propose(message) {
         this.assertRevision(message.draftRevision);
         const current = this.current;
         const document = applyDraftEdit(current, message, {capabilities: this.capabilities, identity: this.identity()});
-        return {document, label: draftEditLabel(message, current.document), previousFingerprint: current.fingerprint};
+        const step = draftEditStep(message);
+        return {document, label: draftEditLabel(message, current.document), previousFingerprint: current.fingerprint, order: step ? compose(this.order, step) : this.order};
     }
     // A Rename & Reorder save: its document, and the order it saved, which
-    // rearranges this revision. An order and each name are separate
+    // rearranges this revision's layers. An order and each name are separate
     // decisions, so the step links nothing in the review.
-    /** @param {Document} document @param {number} revision @param {Order} step */
+    /** @param {Document} document @param {number} revision @param {readonly number[]} step */
     editLayers(document, revision, step) {
         const before = this.current.decoded.settings.names, after = validateSnapshot(document, this.capabilities).settings.names;
-        this.replace(document, revision, "layers", layersLabel(step, before, after), compose(this.order, step));
+        this.replace(document, revision, "layers", layersLabel(step, before, after), compose(this.order, {layers: step}));
     }
     // The keyboard's profile rearranged into an order, with the order it
     // stands for; the keyboard's own profile, and no order, when the order
@@ -451,14 +457,31 @@ class ProfileDraftSession {
         this.referenceCache.set(order, {base: this.base, reference});
         return reference;
     }
-    // What a document in an order differs from the keyboard by: the order,
-    // then everything else compared with the reference.
+    // The keyboard's profile with its slots in `order` and its layers as they
+    // are: what the checks compare the draft with. A swap makes or mends no
+    // finding by itself, since everything follows the thing it names, so
+    // matching slot with slot hides nothing; a layer reorder can (a new base
+    // leaves the old one unreached), so layers are matched through the order
+    // instead (compare-findings.js).
+    /** @param {Order} order @returns {Decoded} */
+    keyboardInSlots(order) {
+        const base = this.completeBase, slots = slotsOnly(order);
+        if (isIdentity(slots)) return base.decoded;
+        this.slotReferenceCache ??= new WeakMap();
+        const known = this.slotReferenceCache.get(order);
+        if (known?.base === this.base) return known.decoded;
+        const decoded = validateSnapshot(rearranged(base.document, slots), this.capabilities);
+        this.slotReferenceCache.set(order, {base: this.base, decoded});
+        return decoded;
+    }
+    // What a document in an order differs from the keyboard by: each bank's
+    // order, then everything else compared with the reference.
     /** @param {Document} document @param {Order} order @returns {ModelReview[]} */
     describe(document, order) {
         const {snapshot, order: moved} = this.referenceFor(order);
         /** @type {Complete} */
         const after = {...this.snapshotFacts, incomplete: false, document, ...this.decode(document)};
-        return [...(moved ? [layerOrderReview(after, moved)] : []), ...profileReview(snapshot, after, this.capabilities)];
+        return [...(moved ? orderReview(after, moved) : []), ...profileReview(snapshot, after, this.capabilities)];
     }
     // The review rows, each with the group it belongs to. Rows are grouped by
     // the edits that made them: the units one staged message changed belong
@@ -467,22 +490,23 @@ class ProfileDraftSession {
     // still shows link; a unit edited back to the keyboard's value no longer
     // ties anything. Steps from a rebase, a discard, Rename & Reorder, or before
     // the bounded history leave their units on their own. Units link by the
-    // layer they belong to, not the slot, so a reorder between two edits
-    // never ties two different layers' keys.
+    // layer, macro, custom key or pointing mode they belong to, not the slot,
+    // so a reorder or a swap between two edits never ties two different
+    // things' changes.
     /** @returns {Review[]} */
     changes() {
         if (!this.dirty) return [];
         const current = this.current;
         if (this.base.incomplete) return [{area: REVIEW_AREAS.recovery, unit: null, title: "Complete profile", status: "changed", group: null, place: null,
             fields: [{label: "", before: "Interrupted profile; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
-        const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => unitByLayer(row.unit, this.order)));
+        const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => unitByIdentity(row.unit, this.order)));
         const parent = new Map([...shown].map(unit => [unit, unit]));
         /** @param {string} unit @returns {string} */
         const find = unit => {while (parent.get(unit) !== unit) unit = /** @type {string} */ (parent.get(unit)); return unit;};
         const steps = [];
         for (let step = 1; step <= this.cursor; step++) {
             if (this.history[step].origin !== "edit") continue;
-            const touched = this.stepUnits(step).map(unit => unitByLayer(unit, this.history[step].order)).filter(unit => shown.has(unit));
+            const touched = this.stepUnits(step).map(unit => unitByIdentity(unit, this.history[step].order)).filter(unit => shown.has(unit));
             for (const unit of touched.slice(1)) parent.set(find(unit), find(touched[0]));
             if (touched.length) steps.push({label: this.history[step].label, unit: touched[0]});
         }
@@ -499,23 +523,17 @@ class ProfileDraftSession {
         const title = list => !list?.length ? null : list.length === 1 ? list[0] : `${list[0]} and ${list.length - 1} more edit${list.length === 2 ? "" : "s"}`;
         const groups = new Map();
         return rows.map(row => {
-            const root = find(unitByLayer(row.unit, this.order));
+            const root = find(unitByIdentity(row.unit, this.order));
             if (!groups.has(root)) groups.set(root, groups.size);
             return placed({...row, group: groups.get(root), groupTitle: title(titles.get(root))});
         });
     }
-    // The units one history step changed, remembered with the entry: history
-    // entries are never edited in place, so the answer never goes stale.
+    // The units one history step changed, from the entry before it as the
+    // step's review compares them: a swap's unit is its bank's order, not
+    // every key and behaviour that followed the two slots.
     /** @param {number} step @returns {string[]} */
     stepUnits(step) {
-        this.stepCache ??= new WeakMap();
-        const entry = this.history[step].document, previous = this.history[step - 1].document, cached = this.stepCache.get(entry);
-        if (cached?.previous === previous) return cached.units;
-        /** @param {Document} document @returns {Complete} */
-        const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
-        const units = [...new Set(profileReview(snapshot(previous), snapshot(entry), this.capabilities).map(row => row.unit))];
-        this.stepCache.set(entry, {previous, units});
-        return units;
+        return [...new Set(this.stepReview(step).flatMap(row => row.unit === null ? [] : [row.unit]))];
     }
     // The draft history, oldest first: every entry with when it was made, in
     // the words it was recorded with, and what it changed from the entry
@@ -540,10 +558,10 @@ class ProfileDraftSession {
         if (cached?.previous === previous && cached.before === before && cached.after === after) return cached.rows;
         /** @param {Document} document @returns {Complete} */
         const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
-        const back = inverse(before), moved = Object.freeze(after.map(layer => back[layer]));
+        const moved = relative(before, after);
         const now = snapshot(entry);
         const rows = isIdentity(moved) ? profileReview(snapshot(previous), now, this.capabilities)
-            : [layerOrderReview(now, moved), ...profileReview(snapshot(validateSnapshot(rearranged(previous, moved), this.capabilities).document), now, this.capabilities)];
+            : [...orderReview(now, moved), ...profileReview(snapshot(validateSnapshot(rearranged(previous, moved), this.capabilities).document), now, this.capabilities)];
         const shown = rows.map(placed);
         this.reviewCache.set(entry, {previous, before, after, rows: shown});
         return shown;
@@ -565,20 +583,21 @@ class ProfileDraftSession {
         const items = this.changes().filter(row => row.group === group), units = new Set(items.map(row => /** @type {string} */ (row.unit)));
         if (!units.size) throw fail("That change is no longer in the draft.");
         const reviewed = this.reviewedRevision === revision;
-        // The order goes back by moving the layers back, so everything else
-        // moves with its layer and stays; anything else goes back to the
-        // reference, so the order stays.
+        // A bank's order goes back by moving its layers or slots back, so
+        // everything else moves with its thing and stays; anything else goes
+        // back to the reference, so the order stays.
         let document, order = this.order;
-        if (units.has(UNIT.layerOrder)) {
-            if (units.size > 1) throw fail("Discard the layer priority on its own.");
-            document = rearranged(this.current.document, inverse(order));
-            order = LAYER_IDENTITY;
+        const [bank, ...more] = BANKS.filter(each => units.has(UNIT[ORDER_UNITS[each]]));
+        if (bank) {
+            if (units.size > 1 || more.length) throw fail(`Discard the ${ORDER_TITLES[bank].toLowerCase()} on its own.`);
+            document = rearranged(this.current.document, {[bank]: inverse(order)[bank]});
+            order = Object.freeze({...order, [bank]: IDENTITY[bank]});
         } else document = revertUnits(this.referenceFor(order).snapshot, this.current, units, this.capabilities);
         // Some bytes carry no row of their own, such as reserved macro-bank padding. Once nothing described is left, the draft is
         // the keyboard's profile again, not an indescribable difference.
         const left = this.describe(validateSnapshot(document, this.capabilities).document, order);
-        if (left.every(row => row.unit === UNIT.profile)) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = LAYER_IDENTITY;}
-        const label = units.has(UNIT.layerOrder) ? "Put the layer priority back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
+        if (left.every(row => row.unit === UNIT.profile)) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = IDENTITY;}
+        const label = bank ? `Put the ${ORDER_TITLES[bank].toLowerCase()} back` : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
         return {document: validateSnapshot(document, this.capabilities).document, label, order, reviewed};
     }
     // Discard the whole draft as one more step, so undo brings it back: the
@@ -589,7 +608,7 @@ class ProfileDraftSession {
         if (this.base.incomplete) throw fail("Read the keyboard again to discard a recovery draft.");
         if (!this.dirty) return;
         const count = this.changes().length;
-        this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`, LAYER_IDENTITY);
+        this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`, IDENTITY);
     }
     // A live draft changes only by what the keyboard confirms (confirmLive).
     assertLocal() {if (this.live) throw fail("This keyboard takes edits live; Ark sends each one to it.");}
@@ -655,16 +674,16 @@ class ProfileDraftSession {
         }
     }
     // What the layer walk finds in this revision beside the keyboard as it is,
-    // matched layer with layer through this revision's order
-    // (model/layer-reach.js), kept with the entry and the keyboard it was
-    // compared with.
+    // matched layer with layer through this revision's order and slot with
+    // slot through its slots (keyboardInSlots; model/layer-reach.js), kept
+    // with the entry and the keyboard it was compared with.
     checks() {
         const draft = this.current.decoded, order = this.order;
-        const keyboard = this.base.incomplete ? undefined : this.baseSnapshot.decoded;
+        const keyboard = this.base.incomplete ? undefined : this.keyboardInSlots(order);
         this.checksCache ??= new WeakMap();
         const known = this.checksCache.get(draft);
         if (known && known.keyboard === keyboard && known.order === order) return known.checks;
-        const checks = draftProfileChecks(keyboard ?? null, draft, order, {brightnessMax: this.current.limits?.brightnessMax,
+        const checks = draftProfileChecks(keyboard ?? null, draft, order.layers, {brightnessMax: this.current.limits?.brightnessMax,
             detectedHostOs: this.current.hostOs?.detected,
             effects: this.current.options?.effects});
         this.checksCache.set(draft, {keyboard, order, checks});
@@ -675,11 +694,14 @@ class ProfileDraftSession {
     hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING])).includes(check.level));}
     hasBlockers() {return this.checks().some(check => check.status !== "fixed" && check.level === "blocker");}
     // The traps and warnings a proposed document would add to what the
-    // keyboard runs now (plan answer 2: asked before an edit is sent live).
+    // keyboard runs now (plan answer 2: asked before an edit is sent live),
+    // matched through what moved between this revision's order and the
+    // document's.
     /** @param {Document} document @param {Order} [order] */
     checksAdded(document, order = this.order) {
-        const decoded = this.decode(document).decoded;
-        return draftProfileChecks(this.current.decoded, decoded, order, {brightnessMax: this.current.limits?.brightnessMax,
+        const decoded = this.decode(document).decoded, moved = relative(this.order, order);
+        const now = isIdentity(slotsOnly(moved)) ? this.current.decoded : validateSnapshot(rearranged(this.current.document, slotsOnly(moved)), this.capabilities);
+        return draftProfileChecks(now, decoded, moved.layers, {brightnessMax: this.current.limits?.brightnessMax,
             detectedHostOs: this.current.hostOs?.detected, effects: this.current.options?.effects})
             .filter(check => check.status === "new" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING, "blocker"])).includes(check.level));
     }

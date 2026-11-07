@@ -107,7 +107,9 @@ slots** band to show them.
 
 A mode with no known trigger key paints every key under the last two.
 While this tab is open, the board shows the picked mode running, with its
-accents, as it paints with no linked layer on.
+accents, as it paints with no linked layer on. When two pointing slots are
+swapped on the Pointing modes screen, each mode's colour and accents go with
+it (see [Pointing modes](pointing.md#pointing-modes)).
 
 ### Combo feedback
 

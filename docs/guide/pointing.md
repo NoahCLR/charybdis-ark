@@ -48,6 +48,13 @@ mode** opens the first empty slot, and **Show all 32 slots** shows the empty
 ones too. **Search by name** finds a mode by its name or slot number, through
 every slot. An empty slot in amber still has keys pointing at it.
 
+Drag a slot onto another to swap the two. A mode moves with everything that
+is its own: its settings, its link, its colour and accents on Lighting, and
+every key, behaviour and combo that started it still starts it, under its new
+number. From the keyboard, focus a slot and press Shift+Space to hold it, then
+Shift+Space on the other; Escape lets go. Review lists the swaps as one
+**Pointing mode order** change.
+
 Each slot has two keys: one that runs the mode while it is held, and one that
 locks it on until pressed again. The picker shows them as **Hold** and
 **Lock** under Pointing modes.
