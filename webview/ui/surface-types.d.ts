@@ -12,6 +12,8 @@ export interface BoardOptions {
     /** The keys the draft changed, and what a screen reader hears after such a key's name (view/edit-mode.mjs editWords `after`). */
     drafted?: {keys: ReadonlySet<number | undefined> | undefined; after: string} | null;
     faces?: boolean;
+    /** Open the hover card on a key the pointer rests on (data-card, webview/ui/hover.mjs); Lighting's board, which is about light, opens none. */
+    card?: boolean;
     /** Number each key, and the trackball, with its LED's index (Lighting, D-L77). */
     ledIndex?: boolean;
     /** The LEDs picked for the accent being edited and the colour it lights them (view/board-keys.mjs). */

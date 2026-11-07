@@ -56,6 +56,7 @@ export function screenLighting() {
     const stage = state.stage;
     const drawn = card.appendChild(board(shows.shown, {
         ledIndex: true,
+        card: false,
         accent: accentPicks(model, stage),
         pdActive: shows.pdActive,
         comboActive: shows.comboActive,

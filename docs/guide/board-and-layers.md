@@ -50,7 +50,8 @@ Escape or a click elsewhere closes the list.
 
 ## The hover card
 
-Rest the pointer on a key and a card opens with everything it does:
+Rest the pointer on a key of the Keymap and a card opens with everything it
+does:
 
 - its name and the keycode it stores
 - for a key that taps one thing and holds another, both, and the tap / hold
@@ -66,6 +67,9 @@ Rest the pointer on a key and a card opens with everything it does:
 
 When a behaviour doesn't run on this key, or changes nothing, the card says
 so and what the key sends instead.
+
+Lighting's board opens no card: it shows the light, and the Keymap says what
+a key does.
 
 ## Editing on the board
 

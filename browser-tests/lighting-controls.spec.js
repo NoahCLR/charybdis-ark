@@ -295,6 +295,19 @@ test("a key's legends are the same on Lighting as on the Keymap: its LED number 
     expect(await legends()).toEqual(keymap);
 });
 
+test("a key opens its hover card on the Keymap and none on Lighting, whose board is about light", async ({page}) => {
+    await openControls(page, "keys", {layer: 0}, "dark", "shell=demo");
+    await page.locator('.board [data-key="27"]').first().hover();
+    await expect(page.locator(".hovercard")).toBeVisible();
+    await page.mouse.move(0, 0);
+    await page.locator('[data-screen="lighting"]').click();
+    await page.locator('.board [data-key="27"]').first().hover();
+    // Longer than the card takes to open on the Keymap.
+    await page.waitForTimeout(500);
+    await expect(page.locator(".hovercard")).toBeHidden();
+    await expect(page.locator(".hovercard-side")).toBeHidden();
+});
+
 test("a key's LED number keeps clear of its legends", async ({page}) => {
     await openControls(page, "lighting", {stage: "layers", layer: 0}, "dark", "shell=demo");
     // In the cap's own coordinates, before a thumb key's turn.

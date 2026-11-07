@@ -178,8 +178,8 @@ combos and what the layer reaches.
 _Avoid_: key inspector, detail panel, editor pane
 
 **Hover card**:
-The card that opens when the pointer rests on a key on the board, listing
-everything the key reaches.
+The card that opens when the pointer rests on a key on the Keymap's board,
+listing everything the key reaches. Lighting's board opens none.
 _Avoid_: tooltip, key card, popover
 
 **Tip**:

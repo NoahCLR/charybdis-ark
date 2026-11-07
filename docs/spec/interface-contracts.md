@@ -347,8 +347,10 @@ The same kind of control looks and sits the same on every screen.
   window, above it when the window's bottom is too near, and there it stays while the pointer stays on
   the control, even as a render redraws the control under it. No interface
   module writes a `title` attribute, the browser's own tip, or a tip of its
-  own; the hover card is not a tip and opens beside its key
-  (`tests/scripts/conventions.test.js`, `browser-tests/tooltips.spec.js`).
+  own; the hover card is not a tip and opens beside its key, on the Keymap's
+  board alone: Lighting's board, which shows light, opens none (`card: false`
+  in `webview/ui/board.mjs`; `tests/scripts/conventions.test.js`,
+  `browser-tests/tooltips.spec.js`, `browser-tests/lighting-controls.spec.js`).
 
 ## Accessibility
 
