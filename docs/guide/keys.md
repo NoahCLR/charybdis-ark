@@ -114,8 +114,9 @@ lists them under **Custom keys**.
 The list opens on the keys in use, each by its name or what it sends.
 **+ New custom key** opens the first free one with its name ready to type,
 and **Show all 128 slots** lists the rest. Pick one from the list (**Search
-by name** finds it by name or number, through every key). Its name is the
-editor's title: click it to rename, Enter to keep, Escape to put it back.
+by name** finds it by name or number, through every key). The heading counts
+the keys in use, such as "5 of 128 used". Its name is the editor's title:
+click it to rename, Enter to keep, Escape to put it back.
 
 **Shortcut** is what the key sends: up to six keys held together, any
 modifiers and any layers. The field says so above it: like a one-step macro,

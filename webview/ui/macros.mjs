@@ -54,7 +54,7 @@ export function screenMacros() {
     // without room in macro memory is counted only when there is one.
     const filled = bank.filter((row) => !row.empty).length;
     const available = memory?.available ?? bank.length;
-    const grid = el(`<div class="card"><div class="card-h"><h3>Slots</h3>
+    const grid = el(`<div class="card"><div class="card-h"><h3>Macros</h3>
         <input class="input search card-search" id="macroSearch" data-f="macros:search" type="search" aria-label="Search macros by name" placeholder="Search by name" value="${esc(state.macroSearch || "")}">
         <span class="tag" data-tip="${esc(available)} of ${bank.length} slots have room in macro memory">${filled} of ${bank.length} used${available < bank.length ? ` · ${bank.length - available} without room` : ""}</span></div>
         <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);

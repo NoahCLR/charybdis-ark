@@ -52,7 +52,7 @@ export function editor(model, slot, canEdit, slots) {
         <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>
             ${titleName({f: `pointing:${slot.id}:name`, value: slot.name || "", placeholder: slot.displayName,
                 label: words(model).fieldLabels.name, perName: NAME_MAX_BYTES, canEdit})}
-            <span class="tag">Slot ${esc(slot.id)}</span>
+            <span class="tag">Mode ${esc(slot.id)}</span>
             <span class="right row actions">
                 ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${canEdit ? "" : "disabled"}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}

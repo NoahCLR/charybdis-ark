@@ -33,13 +33,31 @@ test("the slot list opens on the modes in use; New opens the first free slot, an
     await list.locator('[data-act="new-slot"]').click();
     const free = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().pdModes.find(slot => !slot.kind).id);
     await expect(editor(page).locator(".card-h h3")).toHaveText("New pointing mode");
-    await expect(editor(page).locator(".card-h .tag")).toHaveText(`Slot ${free}`);
+    await expect(editor(page).locator(".card-h .tag")).toHaveText(`Mode ${free}`);
     expect(await posted(page)).toEqual([]);
     await list.locator('[data-all-slots="pointing"]').click();
     await expect(list.locator(".pd-tile")).toHaveCount(32);
     // An empty slot that keys still reach is marked, and says so.
     await expect(list.locator(`.pd-tile[data-slot="${free}"]`)).toHaveClass(/warn/);
     await expect(list.locator(`.pd-tile[data-slot="${free}"]`)).toHaveAttribute("data-tip", /still reach it/);
+});
+
+test("a search finds a mode by its name or slot number, through every slot, and says when none is", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 0});
+    const list = page.getByRole("list", {name: "Pointing slots"});
+    const search = page.locator("#pointingSearch");
+    const named = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().pdModes.find(slot => slot.kind));
+    await search.fill(named.name.slice(1, 4).toUpperCase());
+    await expect(list.locator(`.pd-tile[data-slot="${named.id}"]`)).toBeVisible();
+    await expect(list.locator('[data-act="new-slot"], [data-all-slots]')).toHaveCount(0);
+    // An empty slot, folded until now, by its number.
+    await search.fill("31");
+    await expect(list.locator(".pd-tile")).toHaveCount(1);
+    await expect(list.locator('.pd-tile[data-slot="31"]')).toBeVisible();
+    await search.fill("no such mode");
+    await expect(page.locator(".card:has(#pointingSearch) .card-b > .note")).toHaveText("No pointing mode is named “no such mode”.");
+    await search.fill("");
+    await expect(list.locator('[data-all-slots="pointing"]')).toBeVisible();
 });
 
 test("every scrolling tuning field posts the visible value once, retaining the rest of the record", async ({page}) => {
@@ -255,7 +273,7 @@ test("making a mode leaves its card's header and step 1 where they were", async 
             store.render();
         }, slot);
         const head = editor(page).locator(".name-titlebar");
-        await expect(head.locator(".tag")).toHaveText(`Slot ${slot}`);
+        await expect(head.locator(".tag")).toHaveText(`Mode ${slot}`);
         const box = async locator => {
             const {x, y, height} = /** @type {{x: number, y: number, height: number}} */ (await locator.boundingBox());
             return {x, y, height};

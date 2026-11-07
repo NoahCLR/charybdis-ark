@@ -68,7 +68,7 @@ function keyButton(entry, picked) {
 
 // A macro slot shows by its name when it has one, with its slot and size
 // underneath, so a named macro is recognisable wherever it is offered. An
-// unnamed slot's face is its slot tag ("M3"), as the Slots list and the
+// unnamed slot's face is its slot tag ("M3"), as the Macros list and the
 // macro editor's tag show it: a key-sized tile, where core's longer name
 // ("Macro 3", macroNamed) would need a wide one.
 /** @param {MacroSlot} slot @param {boolean} picked */

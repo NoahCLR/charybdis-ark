@@ -6,7 +6,7 @@ on the board and in the keycode picker.
 
 ## The slots
 
-The **Slots** list opens on the slots in use, in order, each with its name
+The **Macros** list opens on the slots in use, in order, each with its name
 or a preview of its steps, and on the slot open in the editor. **+ New
 macro** opens the first free slot with its name ready to type. **Show all
 128 slots** lists the unused ones after it, M0 to M127. The heading counts
