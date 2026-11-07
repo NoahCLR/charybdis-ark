@@ -205,6 +205,18 @@ test("an empty later tap repeats the row's own first tap, up to the deepest tap 
     assert.equal(inheritedBranch(thumb, {tapCount: 3}, "tap"), null, "past the depth the run types, so that row is never reached");
 });
 
+test("a bare modifier taps and holds itself like any plain key", () => {
+    const optionHeld = {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_LEFT_ALT"};
+    const shift = {style: "TAP_SENDS", action: "OSM(MOD_LSFT)"};
+    const command = behaviourOf("KC_LEFT_GUI", [{tapCount: 1, hold: optionHeld, longHold: optionHeld}, {tapCount: 2, tap: shift}]);
+    const {tap, hold} = command.builtIn;
+    assert.deepEqual([tap.action, hold.action, hold.fallback], ["KC_LEFT_GUI", "KC_LEFT_GUI", true]);
+    assert.equal(inheritedBranch(command, {tapCount: 0}, "tap"), tap, "a lone tap sends it");
+    assert.equal(inheritedBranch(command, {tapCount: 0}, "hold"), hold, "held, it is Left Command until release");
+    assert.deepEqual(impliedBranch(command, {tapCount: 0}, "long"), {meaning: "continues", hold});
+    assert.deepEqual(inheritedBranch(command, {tapCount: 1, hold: optionHeld, longHold: optionHeld}, "tap"), {...tap, times: 2}, "two quick taps send it twice");
+});
+
 test("a plain key's fallback hold gives way to any authored first-press hold or long hold", () => {
     const behaviour = behaviourOf("KC_MINUS");
     const {hold} = behaviour.builtIn;

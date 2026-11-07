@@ -40,20 +40,22 @@
 // key_behavior_step_references_foreign_pointing_mode); given the row's steps,
 // `fromPress` says so.
 //
+// A bare modifier key (KC_LEFT_CTRL to KC_RIGHT_GUI) is a plain key: it taps
+// itself, a lone tap included, and holds itself as a fallback.
+//
 // The keyboard owns the gesture timing of authored LT(), MT() and OSM() rows
-// (physical gesture timing and runtime-owned tapping). A bare modifier key is
-// buffered rather than tapped, so it claims nothing.
+// (physical gesture timing and runtime-owned tapping).
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
 const {pdModeKeyOfCode} = require("../data/pd-mode-keys");
-const {QK, inBlock, BASIC_KEYS, MODIFIER_KEYS, MOD_MASK, keyOf, modsOf, layerFormLayer, layerTapLayer} = require("../../rules/qmk-keycodes.mjs");
+const {QK, inBlock, BASIC_KEYS, MOD_MASK, keyOf, modsOf, layerFormLayer, layerTapLayer} = require("../../rules/qmk-keycodes.mjs");
 const {SHORTCUT_LAYER_KINDS, shortcutPresent} = require("../schema/settings-domain-v1");
 
-// A key a tap sends: a basic key past KC_NO and KC_TRNS that is no modifier,
-// or a modified key.
+// A key a tap sends: a basic key past KC_NO and KC_TRNS, a bare modifier
+// among them, or a modified key.
 /** @param {number} code */
-const plainKey = (code) => (inBlock(code, BASIC_KEYS) && !inBlock(code, MODIFIER_KEYS)) || inBlock(code, QK.MODS);
+const plainKey = (code) => inBlock(code, BASIC_KEYS) || inBlock(code, QK.MODS);
 
 /** @typedef {{customKeyShortcuts?: readonly import("../schema/types.js").CustomKeyShortcut[]}} BuiltInFeatures */
 // The pointing slot an action holds or locks: a pointing-mode action's, or

@@ -58,8 +58,14 @@ test("a custom key with a shortcut taps it and holds it as a fallback, like a pl
     assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {hold: own(3), fromPress: true});
 });
 
-test("bare modifiers, other key families and non-keycode targets inherit nothing", () => {
-    const others = [key(0x00), key(0x01), key(0x03), key(0xe0), key(0xe3), key(0xe7), key(0x5310), key(0x7e00), key(0x7ea0), key(0x7ec0), undefined];
+test("a bare modifier is a plain key: it taps itself and holds itself as a fallback", () => {
+    for (const code of [0xe0, 0xe3, 0xe7]) {
+        assert.deepEqual(builtInActions(key(code)), {tap: key(code), hold: key(code), fallback: true, releaseTaps: true}, `0x${code.toString(16)}`);
+    }
+});
+
+test("other key families and non-keycode targets inherit nothing", () => {
+    const others = [key(0x00), key(0x01), key(0x03), key(0x5310), key(0x7e00), key(0x7ea0), key(0x7ec0), undefined];
     for (const target of others) assert.deepEqual(builtInActions(target), {});
 });
 
