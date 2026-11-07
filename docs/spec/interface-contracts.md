@@ -216,6 +216,15 @@ The same kind of control looks and sits the same on every screen.
   sections as open cards, none folding, and offers no search
   (`tests/view/settings-layout.test.mjs`,
   `browser-tests/settings-screens.spec.js`).
+- The Macros, Custom keys and Pointing modes editors open on one row of
+  placement chips under the title (`placedOnMarkup`,
+  `webview/ui/keys/reach.mjs`): each layer that reaches the slot, in its
+  colour, with how ("key ×2 · combo"; a layer starting a pointing mode by its
+  link "starts it"), opening that layer on the Keymap tab's row; "Not placed
+  yet" stands as tall, so placing one moves nothing below
+  (`placementsOf`, `pointingPlacements`; `tests/view/reach-groups.test.mjs`,
+  `tests/view/pointing-reach.test.mjs`, `browser-tests/keys-workbench.spec.js`,
+  `browser-tests/pointing-controls.spec.js`).
 - A slot bank (Macros, Custom keys, Pointing modes) and a list beside its editor (Lighting's
   layers, pointing modes, combos and feedback colours) scroll on their own and keep their place across
   renders of the same screen, each list apart (`data-scroll-list`)
@@ -417,8 +426,8 @@ macro and a custom key, which have none:
 | Every tap count at once (what the Multi tap window governs) | a branch badge counting "N×", its border and fill split into an equal, hard-edged share per tap-branch colour, in tap order (`branchesBadge`) |
 | A layer | the board's icon in its layer colour (`kindIcon`); in a set of layers, before each layer's name (`valueMarked`) |
 | A pointing mode | the Pointing modes screen's icon in the light its slot paints (`kindIcon`, `slotLight`) |
-| A macro | the Macros screen's icon in the words' colour (`plainIcon`, `REACH_ICONS`), wherever a key or action names one, the review's values included (core's `keyMark`); not in the Macros screen's own list |
-| A custom key | the Custom keys screen's icon in the words' colour (`plainIcon`, `REACH_ICONS`), wherever a key or action names one, the review's values included (core's `keyMark`); not in the Custom keys screen's own list |
+| A macro | the Macros screen's icon in the words' colour (`plainIcon`, `REACH_ICONS`), wherever a key or action names one, the review's values included (core's `keyMark`), and before its name in its editor's title, as a pointing mode's; not in the Macros screen's own list |
+| A custom key | the Custom keys screen's icon in the words' colour (`plainIcon`, `REACH_ICONS`), wherever a key or action names one, the review's values included (core's `keyMark`), and before its name in its editor's title, as a pointing mode's; not in the Custom keys screen's own list |
 | A combo | its badge in the combo feedback colour (`comboBadge`) |
 | A lighting stage | its on/off dot |
 
@@ -427,7 +436,7 @@ macro and a custom key, which have none:
   where the colour is the subject (Lighting's colour fields and its lists of
   layer and pointing-mode colours, colour values in the review, a pointing
   slot's Light value) or where every item is a layer (the layer bar, the
-  "On layers" chips on Custom keys and Macros); a pointing slot is named by
+  placement chips atop the Macros, Custom keys and Pointing modes editors); a pointing slot is named by
   its mark everywhere, its slot card, editor header and the Keymap tab's
   Pointing modes table included; those call `layerSwatch` or
   `slotLight` directly, never `mark` (`browser-tests/marks.spec.js`).
@@ -892,6 +901,11 @@ than hold needs layers. Ark reads and writes settings version 11 only (D-L64;
 - A behaviour step sending a custom key sends only its shortcut. The firmware
   allows one without a shortcut, so Review warns rather than refusing
   (`shortcutlessCustomKeyStep`; `tests/model/profile-checks.test.js`).
+- Clear custom key posts `clearCustomKey`, one draft step that empties the
+  key's name, shortcut and behaviour row; what sends the key stays. It is off
+  for a key not in use (`customKeyInUse`;
+  `tests/model/custom-key-editor.test.js`,
+  `browser-tests/custom-key-behaviour.spec.js`).
 
 ## Draft binding and panel controls
 
@@ -1005,9 +1019,8 @@ standalone export reads its own snapshot and leaves the editor's alone
   and save a mark says "Changed in your draft" and a builder's Keep **Keep …
   in draft**. In the live modes, where an edit runs on the keyboard at once
   and the draft's base is what it saved, a mark says "Unsaved change", a
-  builder's Keep **Send … to keyboard**, and a macro's chip "unsaved" or
-  "saved" with **Back to keyboard** (`tests/view/edit-mode.test.mjs`,
-  `tests/view/review.test.mjs`, `tests/view/macro.test.mjs`,
+  builder's Keep **Send … to keyboard** (`tests/view/edit-mode.test.mjs`,
+  `tests/view/review.test.mjs`,
   `browser-tests/live-edits.spec.js`).
 - **Discard all** is one more step that undo takes back; the keyboard is read
   again only for a stale draft, one bound to another keyboard, or a recovery
@@ -1223,6 +1236,11 @@ escaped payload (D-L26), in `webview/ui/macros/`.
 - `webview/view/macro-sequence.mjs` marks orphan releases, repeated holds and
   unfinished holds without repairing them
   (`tests/view/macro-sequence.test.mjs`).
+- Clear macro empties the slot in one `updateMacro`: no steps, no name and
+  automatic protection, so it stores no bytes. It is one step of the macro's
+  history, whose undo posts the steps, name and protection it had
+  (`stageFields`; `tests/model/macro-editor.test.js`,
+  `browser-tests/macro-history.spec.js`).
 - Every empty slot keeps room for ten key taps; when memory runs short the
   highest-numbered empty slots are unavailable. A name takes up to 32 UTF-8
   bytes (`tests/model/macro-editor.test.js`).

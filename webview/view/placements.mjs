@@ -46,14 +46,6 @@ function keysByLayer(keys) {
     return [...counts].map(([name, count]) => `${name} · ${plural(count, "key")}`);
 }
 
-// Where keys are placed, read on after what they are: "on Base · 2 keys,
-// Numbers · 1 key", or "not placed on any layer".
-/** @param {Placements["keys"]} keys */
-export const keysPlacedOn = (keys) => {
-    const places = keysByLayer(keys);
-    return places.length ? `on ${places.join(", ")}` : "not placed on any layer";
-};
-
 // The layers its keys are on and how many, then the behaviours and combos
 // that send it. Nothing at all reads as "Not placed".
 /** @param {Placements} placements */

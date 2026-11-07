@@ -13,7 +13,7 @@ import {stepMark, stepWord} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {inspectEdit} from "./validation.mjs";
 import {DONE, closesInPlace} from "../inline-editor.mjs";
-import {finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
+import {EMPTY_MACRO_FIELDS, finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
 
 // Like the board's deletion shortcut, consume Backspace before the shell turns
 // it into navigation. Keep normal editing keys inside form fields and dialogs.
@@ -35,14 +35,16 @@ export function macroStepShortcut(event) {
     return true;
 }
 
-/** @param {MacroSlot} slot @param {MacroStep[]} steps @param {boolean} [stage] @param {string | null} [group] */
-export function saveSteps(slot, steps, stage = false, group = null) {
+// `emptied` is Clear macro's: the slot's name and protection, which the
+// staged steps empty with them and an undo puts back.
+/** @param {MacroSlot} slot @param {MacroStep[]} steps @param {boolean} [stage] @param {string | null} [group] @param {import("../../state.js").MacroSlotFields} [emptied] */
+export function saveSteps(slot, steps, stage = false, group = null, emptied) {
     steps = focusSteps(slot, steps);
     const model = getModel();
     const {payload, error} = macroStepsInput(steps, model);
-    rememberMacroEdit(slot, payload, steps, group);
+    rememberMacroEdit(slot, payload, steps, group, emptied);
     const issues = sequenceIssues(steps, model, key => keyIdentity(model, key).label);
-    setMacroForm(slot.keycode, {steps, draft: payload, stepError: error || issues.find(Boolean) || "", cancelBlur: false});
+    setMacroForm(slot.keycode, {steps, draft: payload, stepError: error || issues.find(Boolean) || "", cancelBlur: false, ...(emptied ? {stageFields: EMPTY_MACRO_FIELDS} : {})});
     const raw = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`[data-raw-payload="${slot.keycode}"]`));
     if (raw && document.activeElement !== raw) raw.value = payload;
     inspectEdit(slot, stage);

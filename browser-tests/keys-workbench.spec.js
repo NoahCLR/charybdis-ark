@@ -154,7 +154,7 @@ test("the Custom keys tab lists the custom keys a layer reaches, and opens one o
     await expect(page.locator('[data-screen="customKeys"]')).toHaveAttribute("aria-current", "true");
     await expect(page.locator('.mslot[data-custom-key="CUSTOM_KEY_0"]')).toHaveAttribute("aria-current", "true");
 
-    // And back: a layer under On layers opens the tab on the key's row.
+    // And back: a layer chip at the top of its editor opens the tab on the key's row.
     await page.locator("[data-goto-layer]").first().click();
     await expect(tab(page, "customKeys")).toHaveAttribute("aria-selected", "true");
     await expect(page.locator('.bench-pane tr[data-reach="here:CUSTOM_KEY_0"]')).toHaveAttribute("data-picked", "true");

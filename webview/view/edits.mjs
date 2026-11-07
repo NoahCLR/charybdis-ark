@@ -225,8 +225,10 @@ export const deleteAccent = (target, index) => ({type: "deleteRgbLedGroup", targ
 
 // ── macros, pointing, settings ──────────────────────────────────────────
 
-/** @param {string} keycode @param {string} payload @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {payload: string}} */
-export const macroMessage = (keycode, payload, identity) => ({type: "updateMacro", keycode, payload, expectedFingerprint: identity});
+// A macro's steps; with `fields`, its name and playback protection in the same
+// step (Clear macro, and undoing it).
+/** @param {string} keycode @param {string} payload @param {string} [identity] @param {import("../state.js").MacroSlotFields} [fields] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {payload: string}} */
+export const macroMessage = (keycode, payload, identity, fields) => ({type: "updateMacro", keycode, payload, ...(fields ? {name: fields.name, protection: fields.protection} : {}), expectedFingerprint: identity});
 /** @param {string} keycode @param {string} payload @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateMacro'>} */
 export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateMacro", keycode, payload, requestId});
 // A macro's name; its steps stay as they are.
@@ -236,6 +238,9 @@ export const macroNameMessage = (keycode, name, identity) => ({type: "updateMacr
 export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateMacro", keycode, protection, expectedFingerprint: identity});
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKey'>} */
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
+// An empty custom key: no name, no shortcut and no behaviour, in one step.
+/** @param {string} keycode @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'clearCustomKey'>} */
+export const clearCustomKeyMessage = (keycode, identity) => ({type: "clearCustomKey", keycode, expectedFingerprint: identity});
 // A custom key's shortcut: the eight-bit modifier mask the grid reads, its keys
 // in the order they are pressed (none for none), the mask of layers it turns
 // on and how it turns them on

@@ -141,6 +141,18 @@ test("the hover card names a macro and a custom key after their screen's icon", 
     expect(review).toEqual(["macro", "customKey"]);
 });
 
+test("every slot editor's title starts with its thing's icon, as a pointing mode's does", async ({page}) => {
+    for (const [screen, options, kind] of /** @type {const} */ ([["macros", {macroSlot: "MACRO_0"}, "macro"], ["customKeys", {customKey: "CUSTOM_KEY_0"}, "customKey"]])) {
+        await openControls(page, screen, options);
+        const icon = page.locator(`.name-titlebar > .mark-lg .kind-icon.plain[data-kind="${kind}"]`);
+        await expect(icon).toHaveCount(1);
+        const [mark, title] = await Promise.all([icon.boundingBox(), page.locator(".name-titlebar .title-name").boundingBox()]);
+        expect((mark?.x ?? 0) < (title?.x ?? 0), `${kind}'s icon comes before its name`).toBe(true);
+    }
+    await openControls(page, "pointing", {pointingSlot: 0});
+    await expect(page.locator(".name-titlebar > .mark-lg .kind-icon.pointing")).toHaveCount(1);
+});
+
 test("the hover card's title and the Combos table mark a layer by its icon", async ({page}) => {
     await openControls(page, "keys");
     await withLayerTapAndCombo(page);

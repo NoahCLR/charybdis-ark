@@ -153,14 +153,14 @@ test("the combo builder's Keep says it sends the combo to the keyboard, and post
 
 // In the live modes a change runs on the keyboard and the draft's base is what
 // it saved, so the marks say unsaved, not in your draft.
-test("change marks say unsaved, and the macro editor goes back to the keyboard", async ({page}) => {
+test("change marks say unsaved, and the macro editor has no way back but ⌘Z", async ({page}) => {
     await openLive(page, "keys");
     await expect(page.locator(".legend-item").filter({has: page.locator(".draft-dot")})).toHaveText("Unsaved change");
     await expect(page.locator(".board [aria-label$=', unsaved change']")).toHaveCount(1);
     await expect(page.locator(".board [aria-label$=', changed in your draft']")).toHaveCount(0);
     await openLive(page, "macros", {macroSlot: "MACRO_0"});
-    await expect(page.locator(".macro-titlebar [data-local-state]")).toHaveText("saved");
-    await expect(page.locator('.macro-titlebar [data-act="discard"]')).toHaveText("Back to keyboard");
+    await expect(page.locator(".macro-titlebar [data-local-state]"), "the slot's dot marks a change").toHaveCount(0);
+    await expect(page.locator('.macro-titlebar [data-act="discard"]'), "⌘Z takes an edit back").toHaveCount(0);
 });
 
 // The change goes in as the expression Playwright evaluates: the page runs

@@ -11,6 +11,7 @@ import {actionMarked, mark} from "../marks.mjs";
 import {listed} from "../../view/vocabulary.mjs";
 import {movementChoice} from "./movement-choice.mjs";
 import {placeButton} from "./keys-and-light.mjs";
+import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
 import {titleText} from "../title-name.mjs";
 import {step} from "./step.mjs";
 
@@ -35,7 +36,8 @@ export function emptySlot(model, slot, slots) {
     const node = el(`<div class="pd-editor stack" data-pd-editor="${esc(slot.id)}"><div class="card">
         <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>${titleText("New pointing mode")}
             <span class="tag">Slot ${esc(slot.id)}</span><span class="right row actions"></span></div>
-        <div class="card-b pd-steps"></div></div></div>`);
+        <div class="card-b pd-steps"><div class="slot-context">${placedOnMarkup(model, "pointing", String(slot.id),
+            "No key, behaviour or combo is bound to this slot.")}</div></div></div></div>`);
     // Step 1 of a mode, where a mode has it, so the choice stays put once made.
     const first = step(/** @type {HTMLElement} */ (node.querySelector(".pd-steps")), slot.id, 1, "What the ball does", "Nothing is stored here yet.");
     first.append(el(`<div class="stack"><div data-kinds></div>
@@ -47,6 +49,7 @@ export function emptySlot(model, slot, slots) {
         ${canEdit || gate.quiet ? "" : `<div class="unavailable">${esc(gate.why || "This slot cannot be edited right now.")}</div>`}
     </div>`));
     /** @type {HTMLElement} */ (node.querySelector(".right")).append(placeButton(slot, editGate(model, "keys").editable));
+    showPlacements(node, "pointing", String(slot.id));
     /** @type {HTMLElement} */ (node.querySelector("[data-kinds]")).replaceWith(movementChoice(model, slot.id, null, {disabled: !canEdit,
         pick: (kind) => post(edits.pdMode(slot.id, newMode(slot, kind, scrollStarter(slots)), model.profileIdentity))}));
     // Copying fills the slot, so it waits for its button, as making a mode does.

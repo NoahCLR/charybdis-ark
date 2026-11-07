@@ -6,19 +6,19 @@ import {disclosureButton} from "../disclosure.mjs";
 import {choiceField} from "../segmented.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
-import {STEP_KINDS, addStepLabel, macroLocalState, macroShortName, protectionChoiceLabel, samePayload} from "../../view/macro.mjs";
+import {STEP_KINDS, addStepLabel, protectionChoiceLabel} from "../../view/macro.mjs";
 import {titleName, attachTitleName} from "../title-name.mjs";
 import {getModel, macroForm, post, render, setMacroForm, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
 import {sectionPath} from "../../view/settings-layout.mjs";
 import {macroNamed, vocabulary, word} from "../../view/vocabulary.mjs";
-import {editWords} from "../../view/edit-mode.mjs";
 import {insertStep, sequenceEditor, saveSteps, focusSteps} from "./steps.mjs";
 import {inspectEdit, paintFeedback, matchingValidation, requestInspection} from "./validation.mjs";
-import {ensureMacroHistory, finishMacroHistoryGroup, rememberMacroEdit} from "./history.mjs";
-import {cancelRecording, recorder} from "./recorder.mjs";
-import {placementChipsMarkup, showPlacements} from "../keys/reach.mjs";
+import {EMPTY_MACRO_FIELDS, ensureMacroHistory, finishMacroHistoryGroup, rememberMacroEdit} from "./history.mjs";
+import {recorder} from "./recorder.mjs";
+import {placedOnMarkup, showPlacements} from "../keys/reach.mjs";
+import {mark} from "../marks.mjs";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function editor(model, slot, canEdit) {
     const form = macroForm(slot.keycode);
@@ -28,19 +28,17 @@ export function editor(model, slot, canEdit) {
     let steps = focusSteps(slot, form.steps ?? parsed.steps);
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
-    const dirty = form.draft !== undefined && !samePayload(payload, slot.payload, model);
-    const chip = macroLocalState(model.draft, slot.keycode, dirty);
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
     const wrap = el(`<div class="stack"></div>`), uninterruptible = vocabulary(model).macroUninterruptible;
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
-        <div class="card-h name-titlebar macro-titlebar">${nameField(model, slot, canEdit)}
-            <span class="tag">${esc(macroShortName(slot))}</span>
-            <span class="right row actions"><span class="chip" data-local-state><i class="dot ${chip.dot}"></i>${esc(chip.text)}</span>
+        <div class="card-h name-titlebar macro-titlebar"><span class="mark-lg">${mark(model, {kind: "macro"})}</span>${nameField(model, slot, canEdit)}
+            <span class="tag">${esc(slot.defaultName)}</span>
+            <span class="right row actions">
                 <button class="btn tiny link" data-act="place" ${editGate(model, "keys").editable ? "" : "disabled"}>Place on a key →</button>
-                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"} data-tip="${esc(editWords(model.draft).macroBackTip)}">${esc(editWords(model.draft).macroBack)}</button>
-                <button class="btn tiny ghost destructive" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
+                <button class="btn tiny ghost destructive" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}
+                    data-tip="Empty this slot: its steps, name and protection. Keys bound to it stay on the board and do nothing until it holds a macro again.">Clear macro</button></span></div>
         <div class="card-b stack">
-            <div class="macro-context">${placedOn(model, slot)}
+            <div class="slot-context">${placedOnMarkup(model, "macros", slot.keycode, "No key, behaviour or combo sets this macro off. Place it on a key to use it.")}
             ${protectionField(model, slot, canEdit)}</div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
@@ -63,10 +61,9 @@ export function editor(model, slot, canEdit) {
             </div>
             </div>
         </div></div>`);
-    // Pointer actions that discard/clear this input take precedence over the
-    // change event caused by leaving its field.
+    // Clear takes precedence over the change event caused by leaving a field.
     card.addEventListener("pointerdown", event => {
-        if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="discard"], [data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
+        if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
     // The host section, on Host settings.
     /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => {
@@ -119,13 +116,11 @@ export function editor(model, slot, canEdit) {
         rawToggle.checked = rawPanel.open;
         setMacroForm(slot.keycode, {rawOpen: rawPanel.open});
     });
-    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="discard"]')).addEventListener("click", () => {
-        cancelRecording(slot.keycode);
-        rememberMacroEdit(slot, slot.payload);
-        setMacroForm(slot.keycode, {draft: undefined, steps: undefined, stepError: "", validation: undefined, wantsStage: false, cancelBlur: false, selectedStep: undefined, selectionAnchor: null, selectedSteps: [], moveNotice: ""}); render();
-    });
+    // Clear macro empties the slot: its steps, its name and its protection,
+    // in one step of the draft and of the macro's own history.
     /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="clear"]')).addEventListener("click", () => {
-        saveSteps(slot, [], true);
+        const named = Boolean(slot.name) || slot.protection !== EMPTY_MACRO_FIELDS.protection;
+        saveSteps(slot, [], true, null, named ? {name: slot.name || "", protection: slot.protection} : undefined);
         setMacroForm(slot.keycode, {cancelBlur: false, selectedStep: null, selectionAnchor: null, selectedSteps: [], moveNotice: ""}); render();
     });
     if (slot.available === false) /** @type {HTMLElement} */ (card.querySelector(".card-b")).prepend(el(`<div class="unavailable">This slot is unavailable: macro memory has no room left for it. Shorten or clear another macro to make it available.</div>`));
@@ -163,13 +158,6 @@ function nameField(model, slot, canEdit) {
 // in its layer colour and naming how. A click opens that layer in Keymap with
 // this macro picked in its Macros tab, on the row for the first of those
 // routes, so the board rings its keys and the table marks the row.
-
-/** @param {Model} model @param {MacroSlot} slot */
-function placedOn(model, slot) {
-    const chips = placementChipsMarkup(model, "macros", slot.keycode);
-    return chips ? `<div class="row layer-chips" aria-label="Used on layers">${chips}</div>`
-        : `<span class="note" data-tip="No key, behaviour or combo sets this macro off. Place it on a key to use it.">Not placed yet</span>`;
-}
 
 /** @param {Model} model @param {MacroSlot} slot */
 function unicodeSetup(model, slot) {

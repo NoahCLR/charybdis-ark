@@ -29,7 +29,7 @@ export function startStep(model, slot, {form, disabled}, stage) {
         <div class="pd-row" data-tip="${esc(tipFor(model, "linkedLayers"))}"><span class="pd-row-l" id="pd-starts-${esc(slot.id)}">Layers</span></div>
         <div class="pd-row" data-tip="${esc(tipFor(model, "linkTurnsOn"))}"><span class="pd-row-l" id="pd-turns-${esc(slot.id)}">${esc(L.keyTurnsOnShort)}</span></div></div>`);
     const [keys, starts, turns] = /** @type {HTMLElement[]} */ ([...node.querySelectorAll(".pd-row")]);
-    keys.append(keysRow(model, slot));
+    keys.append(keysRow(slot));
     let linked = slot.linkedLayers, turnsOn = slot.linkTurnsOn;
     form.linkedLayers = () => linked;
     form.linkTurnsOn = () => turnsOn;

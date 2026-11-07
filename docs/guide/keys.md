@@ -167,11 +167,17 @@ works before the key is on any layer. Where the behaviour leaves a tap or hold
 empty, the key sends its shortcut. **Show on the Keymap screen** opens its
 behaviour there, once the key is placed.
 
-**On layers** shows where the key is used; click a layer to see it there, on
-the Keymap screen's **Custom keys** tab with the key's row picked. That tab
+Under the title, chips show where the key is used, as a macro's do; click a
+layer to see it there, on the Keymap screen's **Custom keys** tab with the
+key's row picked. That tab
 lists every custom key a layer reaches, as the Macros tab does for macros.
 **Place on a key →** takes you to the board: pick a layer, then click the key
 to put it on.
+
+**Clear custom key** empties the key: its name, its shortcut and its
+behaviour, in one step you can undo. Keys, behaviours and combos that send it
+stay, and send nothing until it holds something again. It is off for a key
+with none of the three.
 
 A behaviour on another key can send a custom key too, and so can a combo. It
 sends only that key's shortcut, layers included, never its behaviour. Sent

@@ -276,3 +276,8 @@ for (const theme of ["dark", "light"]) {
         await expect(page.locator('[data-raw-payload]')).toBeHidden();
     });
 }
+
+test("the editor's title bar names its slot in full, as Macro 17", async ({page}) => {
+    await openControls(page, "macros", {macroSlot: "MACRO_17"});
+    await expect(page.locator(".macro-titlebar .tag")).toHaveText("Macro 17");
+});

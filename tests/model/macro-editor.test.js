@@ -42,6 +42,16 @@ test("an empty macro may store protection and keeps its empty-slot reserve", () 
     assert.equal(view.macroBank.stored, macroEditorView(current, capabilities).macroBank.stored + 3);
 });
 
+test("Clear macro's one message empties the steps, the name and the protection, freeing the slot's bytes", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot: fresh, capabilities} = hostMacros(1, []);
+    const filled = snapshot(draftEdit(fresh, {type: "updateMacro", keycode: "MACRO_0", payload: "hi", name: "Greeting", protection: "on"}, capabilities));
+    const cleared = snapshot(draftEdit(filled, {type: "updateMacro", keycode: "MACRO_0", payload: "", name: "", protection: "auto"}, capabilities));
+    const slot = macroEditorView(cleared, capabilities).macros[0];
+    assert.deepEqual([slot.empty, slot.name, slot.protection, slot.bytes], [true, "", "auto", 0]);
+    assert.equal(macroEditorView(cleared, capabilities).macroBank.stored, macroEditorView(fresh, capabilities).macroBank.stored);
+});
+
 test("stored macro status agrees with editing after a host layout change", () => {
     const {hostMacros} = require("../fixtures/host-macros");
     for (const host of [1 | (2 << 16), 1 | (3 << 16)]) {

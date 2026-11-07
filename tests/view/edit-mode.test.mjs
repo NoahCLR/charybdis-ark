@@ -259,8 +259,6 @@ test("the editors say where an edit goes, and what a change is, in each edit mod
     assert.equal(review.keepVerb, "keep");
     assert.equal(review.cellNote, "Changes are kept in the draft automatically.");
     assert.equal(review.macroNotIn, "This edit is not in your draft.");
-    assert.equal(review.macroBack, "Back to draft");
-    assert.deepEqual([review.macroChanged, review.macroUnchanged], ["changed in draft", "as read"]);
     assert.deepEqual([review.mark, review.holds, review.after], ["Changed in your draft", "Holds a change in your draft", "changed in your draft"]);
     for (const mode of [LIVE, LIVE_REVIEW]) {
         const live = editWords(/** @type {any} */ ({live: {mode}}));
@@ -270,8 +268,6 @@ test("the editors say where an edit goes, and what a change is, in each edit mod
         assert.equal(live.cellNote, "Changes reach the keyboard as you make them.");
         assert.equal(live.macroFixFirst, "Fix this edit before it can be sent to the keyboard.");
         assert.equal(live.macroNotIn, "This edit has not reached the keyboard.");
-        assert.equal(live.macroBack, "Back to keyboard");
-        assert.deepEqual([live.macroChanged, live.macroUnchanged], ["unsaved", "saved"]);
         assert.deepEqual([live.mark, live.holds, live.after], ["Unsaved change", "Holds an unsaved change", "unsaved change"]);
         // Nothing in the live words says an edit waits in, or is kept in, the draft.
         for (const [field, words] of Object.entries(live)) {

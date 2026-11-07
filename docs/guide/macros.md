@@ -52,21 +52,17 @@ Text fields keep their own typing undo.
 
 A step that can't work, such as a key let go before it was pressed or still
 held at the end, is marked ! and explained. Ark keeps such an edit out of
-your draft until it is fixed, and never loses the last good version.
-**Back to draft** puts the macro back to what your draft holds, dropping an
-edit that isn't in the draft yet. The chip
-beside it says where the macro stands: **edited here** while an edit is not in
-the draft yet, **changed in draft** once the draft changes the macro, and
-**as read** when it matches the keyboard (in the demo, the demo profile).
+your draft until it is fixed, and never loses the last good version: ⌘Z
+takes the edit back. A macro your draft changes has a dot on its slot. In the
+live modes an edit reaches the keyboard once Ark has checked it, and the dot
+marks a change the keyboard hasn't saved.
 
-In the live modes an edit reaches the keyboard once Ark has checked it, so
-the button is **Back to keyboard**, which drops an edit that hasn't reached the
-keyboard yet. The chip says **unsaved** while the keyboard runs a change it
-hasn't saved, and **saved** when the macro matches what it saved.
-
-**Clear macro** empties the slot. **Place on a key →** takes you to the Keymap
-screen to put the macro on a key. Beside the title, chips name the layers
-that use the macro; click one to see it there.
+**Clear macro** empties the slot: its steps, its name and its playback
+protection, in one step you can undo. Keys that play it stay on the board and
+do nothing until the slot holds a macro again. **Place on a key →** takes you to the Keymap
+screen to put the macro on a key. Under the title, chips name the layers
+that use the macro and how (a key, a behaviour or a combo), or say it is not
+placed yet; click one to see it there.
 
 ### Edit as text
 

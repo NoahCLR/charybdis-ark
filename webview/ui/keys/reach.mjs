@@ -9,6 +9,7 @@
 import {esc} from "../../lib/dom.mjs";
 import {keyMeaning, keyName} from "../../view/keyface.mjs";
 import {placementsOf, reachText} from "../../view/reach.mjs";
+import {pointingPlacements} from "../../view/pointing-reach.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {customKeyOf, shortcutLayerList, shortcutLayerTag} from "../../view/custom-key.mjs";
@@ -29,26 +30,45 @@ export function reachHighlight(view) {
         : state.reachRow[/** @type {keyof typeof state.reachRow} */ (state.tab)]);
 }
 
-// The layers a macro or custom key is placed on, each a chip in its layer
-// colour naming how it is reached there, "" where it is placed nowhere; a
-// click shows that layer in its Keymap tab (showPlacements).
-/** @param {Model} model @param {"macros" | "customKeys"} tab @param {string} keycode */
-export const placementChipsMarkup = (model, tab, keycode) => placementChips(placementsOf(model, tab, keycode)).map(({layer, at, how}) => {
+/** @typedef {"macros" | "customKeys" | "pointing"} PlacementTab */
+// Where a macro, custom key or pointing mode is placed. A pointing mode is
+// named by its slot's id, as the Pointing tab's rows are.
+/** @param {Model} model @param {PlacementTab} tab @param {string} name */
+function placementsFor(model, tab, name) {
+    if (tab !== "pointing") return placementsOf(model, tab, name);
+    const slot = (model?.pdModes || []).find((entry) => String(entry.id) === name);
+    return slot ? pointingPlacements(model, slot) : [];
+}
+
+// The layers a macro, custom key or pointing mode is placed on, each a chip
+// in its layer colour naming how it is reached there, "" where it is placed
+// nowhere; a click shows that layer in its Keymap tab (showPlacements).
+/** @param {Model} model @param {PlacementTab} tab @param {string} keycode */
+export const placementChipsMarkup = (model, tab, keycode) => placementChips(placementsFor(model, tab, keycode)).map(({layer, at, how}) => {
     const swatch = layerSwatch(model, layer);
     return `<button class="layer-chip link" data-goto-layer="${esc(at)}"
             data-tip="${esc(swatch.tip)} · reached by ${esc(how)} · show on the board">${swatch.html}
             <span>${esc(layerCalled(layer))}</span><span class="idx">${esc(how)}</span></button>`;
 }).join("");
 
+// The first row of a macro's, custom key's or pointing mode's editor: the
+// chips of the layers it is placed on, or that it is placed nowhere yet.
+/** @param {Model} model @param {PlacementTab} tab @param {string} keycode @param {string} unplaced the tip of "Not placed yet" */
+export function placedOnMarkup(model, tab, keycode, unplaced) {
+    const chips = placementChipsMarkup(model, tab, keycode);
+    return chips ? `<div class="row layer-chips" aria-label="Used on layers" data-placed-on>${chips}</div>`
+        : `<span class="note" data-placed-on data-tip="${esc(unplaced)}">Not placed yet</span>`;
+}
+
 // Each placement chip in `node` opens Keymap on its layer, in the tab for
 // what is placed, on the row of the route that reaches it there, its first
 // key picked.
-/** @param {ParentNode} node @param {"macros" | "customKeys"} tab @param {string} keycode */
+/** @param {ParentNode} node @param {PlacementTab} tab @param {string} keycode */
 export const showPlacements = (node, tab, keycode) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-goto-layer]"))
     .forEach((button) => button.addEventListener("click", () => openPlacement(tab, keycode, Number(button.dataset.gotoLayer))));
-/** @param {"macros" | "customKeys"} tab @param {string} keycode @param {number} at */
+/** @param {PlacementTab} tab @param {string} keycode @param {number} at */
 function openPlacement(tab, keycode, at) {
-    const opening = placementOpening(placementsOf(getModel(), tab, keycode), keycode, at);
+    const opening = placementOpening(placementsFor(getModel(), tab, keycode), keycode, at);
     if (!opening) return;
     Object.assign(state, {screen: "keys", tab, layer: opening.layer, placement: null});
     if (opening.selected !== undefined) state.selected = opening.selected;

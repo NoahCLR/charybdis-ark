@@ -41,7 +41,6 @@ test("Text accepts code literally and inspection measures pending input without 
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe(text.replaceAll("{", "{{").replaceAll("}", "}}"));
     await expect(page.locator("[data-raw]")).not.toHaveAttribute("open");
     await expect(page.locator("[data-macro-feedback] .unavailable")).toHaveCount(0);
-    await expect(page.locator("[data-local-state]")).toHaveText("edited here");
 });
 
 test("a long macro stages up to the free memory", async ({page}) => {
@@ -145,32 +144,26 @@ test("recording appends keys to literal text and Clear take restores the exact t
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe(escaped);
 });
 
-test("discarded input ignores delayed validation and can be entered again", async ({page}) => {
+test("undone input ignores delayed validation and can be entered again", async ({page}) => {
     await editor(page);
     await page.locator("[data-step-text]").fill("pending");
     await expect.poll(() => inspection(page).then(value => value?.bytes)).toBe(7);
     const request = await page.evaluate(() => window.__posted.find(m => m.type === "validateMacro"));
-    await page.locator('[data-act="discard"]').click();
+    await page.locator("[data-sequence-tiles]").focus(); await page.keyboard.press("Control+z");
     await page.evaluate(message => window.dispatchEvent(new MessageEvent("message", {data: {...message, type: "macroValidation", validation: {error: "OLD ERROR"}}})), request);
     await expect(page.locator("[data-macro-feedback]")).not.toContainText("OLD ERROR");
-    await expect(page.locator(".macro-empty")).toBeVisible();
-    await expect(page.locator("[data-step-text]")).toHaveCount(0);
-    expect(await updates(page)).toHaveLength(0);
-    await add(page, "text");
+    await expect(page.locator("[data-step-text]"), "back to the blank Text step").toHaveValue("");
+    // Leaving the field for the sequence kept "pending" once; undo took it back.
+    expect((await updates(page)).map(row => row.payload)).toEqual(["pending"]);
     await page.locator("[data-step-text]").fill("pending");
     await page.locator("[data-step-text]").dispatchEvent("change");
-    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("pending");
+    await expect.poll(() => updates(page).then(rows => rows.map(row => row.payload))).toEqual(["pending", "pending"]);
 });
 
 test("raw edits preserve the next action or step control click", async ({page}) => {
     await editor(page);
     await page.locator("[data-raw-toggle]").click();
     const raw = page.locator("[data-raw-payload]");
-    await raw.fill("invalid {");
-    await page.locator('[data-act="discard"]').click();
-    await expect(raw).toHaveValue("");
-    expect(await updates(page)).toHaveLength(0);
-
     await raw.fill("another {");
     await page.locator('[data-act="clear"]').click();
     await expect(raw).toHaveValue("");

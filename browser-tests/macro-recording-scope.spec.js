@@ -195,10 +195,10 @@ for (const ending of ['stop', 'escape', 'screen', 'slot', 'editor']) {
 }
 
 for (const explicit of [false, true]) {
-    test(`Discard cancels a ${explicit ? 'timed' : 'compact'} take without staging or resuming it`, async ({page}) => {
+    test(`Clear take cancels a ${explicit ? 'timed' : 'compact'} take without staging or resuming it`, async ({page}) => {
         await openControls(page, 'macros', {macroSlot: 'MACRO_17', recordPreserveHoldTiming: explicit, recordDelays: false});
         await page.locator('[data-act="record"]').click(); await page.keyboard.press('a');
-        await page.locator('.macro-editor-card [data-act="discard"]').click();
+        await page.locator('.macro-editor-card [data-act="clear-take"]').click();
         await expect.poll(() => take(page).then(value => value.recording)).toBeNull();
         await expect(page.locator('.macro-empty')).toBeVisible();
         await expect(page.locator('.macro-editor-card [data-act="clear-take"]')).toBeDisabled();
@@ -212,7 +212,7 @@ for (const explicit of [false, true]) {
     });
 }
 
-test('Discard during a take restores an existing macro and preserves its name/protection', async ({page}) => {
+test('Clear take during a take restores the macro as it was before Record and preserves its name/protection', async ({page}) => {
     await openControls(page, 'macros', {macroSlot: 'MACRO_17', recordDelays: false});
     await page.evaluate(async () => {
         const store = await import('/webview/store.mjs'), model = structuredClone(store.getModel());
@@ -224,12 +224,12 @@ test('Discard during a take restores an existing macro and preserves its name/pr
     await page.locator('[data-act="record"]').click();
     await page.evaluate(() => {window.__posted.length = 0;});
     await page.keyboard.press('a');
-    await page.locator('.macro-editor-card [data-act="discard"]').click();
-    await expect(page.locator('[data-step-text]')).toHaveValue('original');
+    await page.locator('.macro-editor-card [data-act="clear-take"]').click();
+    await expect(page.locator('[data-step-text]')).toHaveValue('local edit');
     await expect(page.locator('[data-name]')).toHaveValue('Keep me');
     await expect(page.locator('[data-protection] input[value="off"]')).toBeChecked();
     expect(await updates(page)).toEqual([]);
     await expect.poll(() => take(page).then(value => value.recording)).toBeNull();
     await page.locator('[data-sequence-tiles]').focus(); await page.keyboard.press('Control+z');
-    await expect(page.locator('[data-step-text]')).toHaveValue('local edit');
+    await expect(page.locator('[data-step-text]')).toHaveValue('original');
 });

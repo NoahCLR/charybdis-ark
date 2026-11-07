@@ -304,6 +304,19 @@ test("Delete on Custom keys clears the open cell of the selected key's behaviour
     expect(await posted(page)).toEqual([]);
 });
 
+test("Clear custom key empties its name, shortcut and behaviour in one edit, and is off for an unused key", async ({page}) => {
+    await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
+    const clear = page.locator('.name-titlebar [data-act="clear"]');
+    await pick(page, 5);
+    await expect(clear, "an unused key has nothing to clear").toBeDisabled();
+    await pick(page, 2);
+    await expect(editor(page).locator(".card-h .tag")).toHaveText("Behaviour");
+    await expect(clear).toBeEnabled();
+    await clearPosts(page);
+    await clear.click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "clearCustomKey", keycode: "CUSTOM_KEY_2"})]);
+});
+
 test("a custom key is named by its title, as a macro is: Enter commits, Escape cancels", async ({page}) => {
     await openControls(page, "customKeys");
     await pick(page, 3);

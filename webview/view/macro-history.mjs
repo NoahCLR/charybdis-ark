@@ -5,7 +5,7 @@ const LIMIT = 100;
 /** @param {Entry} entry @returns {Entry} */
 const copy = entry => structuredClone(entry);
 /** @param {Entry} entry */
-const content = entry => JSON.stringify([entry.payload, entry.steps]);
+const content = entry => JSON.stringify([entry.payload, entry.steps, entry.emptied]);
 /** @param {Entry} entry @returns {History} */
 export const createMacroHistory = entry => ({past: [], present: copy(entry), future: [], group: null});
 /** @param {History} history @param {Entry} entry @param {string | null} [group] @returns {History} */

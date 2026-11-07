@@ -64,6 +64,7 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     updateCustomKey: {editor: "customKey", label: "Renamed a custom key"},
     updateCustomKeyShortcut: {editor: "customKey", label: message => message.then || message.name !== undefined ? "Made a custom key for a shortcut"
         : shortcutPresent(message.shortcut) ? "Changed a custom key's shortcut" : "Cleared a custom key's shortcut"},
+    clearCustomKey: {editor: "customKey", label: "Cleared a custom key"},
     renameKeyboard: {editor: "keyboardName", label: "Renamed the keyboard"},
     updatePlacementPolicy: {editor: "profile", domain: "placement", label: "Edited the draft"},
     savePdMode: {editor: "profile", domain: "pointing", label: "Edited a pointing mode"},

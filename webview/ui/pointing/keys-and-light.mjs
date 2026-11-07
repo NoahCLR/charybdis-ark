@@ -1,20 +1,18 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {holdKeyName, whatReachesSlot} from "../../view/pointing-reach.mjs";
+import {holdKeyName} from "../../view/pointing-reach.mjs";
 import {stageEnabled} from "../../view/lighting.mjs";
-import {keysPlacedOn} from "../../view/placements.mjs";
 import {slotNamed, vocabulary, word} from "../../view/vocabulary.mjs";
 import {render, state} from "../../store.mjs";
 import {slotLight} from "../marks.mjs";
 
 // The keys that start the mode, held or locked, named by the mode as the
-// picker names them, and where they sit.
-/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot */
-export function keysRow(model, slot) {
+// picker names them. Where they sit is the editor's layer chips.
+/** @param {import("../surface-types.js").PresentedSlot} slot */
+export function keysRow(slot) {
     return el(`<div class="pd-keys">
         <span class="pd-cap" data-tip="${esc(`Runs the mode while it is held. Stored as ${holdKeyName(slot)}.`)}"><b>${esc(slotNamed(slot))}</b> <i>hold</i></span>
         <span class="pd-cap" data-tip="${esc(`One press turns the mode on, the next turns it off. Stored as ${slot.keys?.lock || ""}.`)}"><b>${esc(slotNamed(slot))}</b> <i>lock</i></span>
-        <span class="note" data-placed>${esc(placedLine(whatReachesSlot(model, slot).keys))}</span>
     </div>`);
 }
 
@@ -32,9 +30,6 @@ export function placeButton(slot, canEdit) {
     });
     return button;
 }
-
-/** @param {Parameters<typeof keysPlacedOn>[0]} keys */
-const placedLine = (keys) => keys.length ? keysPlacedOn(keys) : "Not on the board yet";
 
 // The mode's light: its colour and where it paints, with a way to Lighting.
 // It belongs with the slot's identity, whose mark already shows the colour.
