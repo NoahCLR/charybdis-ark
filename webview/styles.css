@@ -296,7 +296,11 @@ a.rail-build:hover { color: var(--text-2); }
 .card-h .card-search { margin-left: auto; width: 150px; min-width: 0; }
 .card-h .card-search + .tag { white-space: nowrap; }
 .theme-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.4; }
-.content { flex: 1; overflow: auto; min-height: 0; container: content / inline-size; }
+/* The gutter for the scrollbar is always kept, so a screen growing past the
+   window (a cell editor opening, a longer list) never narrows what is drawn
+   beside it: things sit in fixed places (D-L32). Overlay scrollbars take no
+   room either way. */
+.content { flex: 1; overflow: auto; scrollbar-gutter: stable; min-height: 0; container: content / inline-size; }
 /* While the commit bar shows, the scrolling area ends above it, so it never
    covers what you are reading (reserveCommitRoom, ui/frame.mjs). */
 .main > .content { margin-bottom: var(--commit-room, 0px); }
@@ -946,26 +950,29 @@ button.tier:hover { background: var(--surface-3); }
 
 .beh-head { display: flex; align-items: flex-start; gap: var(--sp-4); padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
 /* The behaviour's switches read as one row: whether it runs, the pointer-layer
-   switch, then the layers it runs on, which unfold in the room left on the
-   row, or under it when there is none. Its controls bring no box of their own
-   (participation.mjs). */
+   switch, then the layers it runs on and its timings, which unfold in the
+   room left on the row, or under it when there is none. Its controls bring no
+   box of their own (participation.mjs). */
 .beh-intro { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-6); padding: var(--sp-3) 0 var(--sp-4); }
 .def-controls { display: contents; }
 .beh-intro .sw { flex: none; }
 .beh-intro .def-layers { order: 1; }
-/* Layers it runs on opens its layers in a panel under the button, over the
-   grid, so the editor keeps its height; two layers to a row. */
-.def-layers { position: relative; }
+.beh-intro .beh-timings { order: 2; }
+/* Layers it runs on and Timings open their controls in a panel under the
+   button, over the grid, so the editor keeps its height (panelDisclosure,
+   ui/disclosure.mjs): two layers to a row; the three timings one to a row,
+   each its name then its field. */
+.def-layers, .beh-timings { position: relative; }
 .def-pop { position: absolute; z-index: var(--z-popover); top: calc(100% + 4px); left: 0; width: min(460px, calc(100vw - 2 * var(--sp-6))); padding: var(--sp-3);
   border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-3); box-shadow: var(--shadow); }
 .def-pop .layer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-4); }
-/* One row per tap count the keyboard allows, all shown; a column per tier.
-   Each timing heads what it governs: Multi tap window the tap counts, Tap /
-   hold and Long hold their tiers. */
-/* The timings are one row over the grid, each its name then its field,
-   wrapping only when the editor is too narrow for all three. */
-.beh-timings { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-6); padding-bottom: var(--sp-4); }
-.beh-timings .bterm-field > span:not(.sr) { white-space: nowrap; }
+.def-pop.timings { width: auto; min-width: 300px; display: grid; gap: var(--sp-2); }
+.def-pop.timings .bterm-field { justify-content: space-between; }
+.def-pop.timings .bterm-field > span:not(.sr) { white-space: nowrap; }
+/* Closed, Timings wears the mark of each timing the behaviour sets, after
+   its name (D-L31). */
+.beh-timings .own-timings { display: inline-flex; align-items: center; gap: var(--sp-1); margin-left: var(--sp-1); }
+/* One row per tap count the keyboard allows, all shown; a column per tier. */
 .bgrid { display: grid; grid-template-columns: 150px repeat(3, minmax(110px, 1fr)); gap: var(--sp-2); align-items: stretch; overflow-x: auto; padding-bottom: var(--sp-0); }
 /* The head is the tier names alone, one centred over each column. */
 .bgrid .btier { display: flex; align-items: center; justify-content: center; gap: var(--sp-2); margin-bottom: var(--sp-1); }
@@ -1042,14 +1049,14 @@ button.tier:hover { background: var(--surface-3); }
 .key-participation { gap: var(--sp-2); margin-top: var(--sp-4); }
 .key-participation > .sect-h { margin: var(--sp-2) 0 var(--sp-0); }
 /* The Behaviours tab: nothing to open, and the open behaviour's title, its
-   keycode, the notes under them and its actions (ui/keys/behaviour-editor.mjs). */
+   keycode and its actions (ui/keys/behaviour-editor.mjs). The title row is as
+   tall as the actions, so the head keeps one height whether the behaviour is
+   stored, with Change key… and Remove behaviour, or not yet (D-L32). */
 .beh-empty { padding: var(--sp-4); }
-.beh-title { gap: var(--sp-2); }
+.beh-title { gap: var(--sp-2); min-height: var(--h-chip); }
 .beh-title h3 { font-size: var(--fs-lg); }
-.beh-head .note { margin-top: var(--sp-1); }
 .beh-actions { gap: var(--sp-2); margin-left: auto; }
 .beh-note { margin-bottom: var(--sp-3); }
-.beh-notes { display: grid; gap: var(--sp-1); padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
 .ce-actions { align-self: center; max-width: 24ch; }
 /* Moving a behaviour onto a key that has one asks first (ui/keys/retarget.mjs). */
 .sheet.retarget { width: min(520px, 100%); }
@@ -1243,7 +1250,7 @@ td > .sends.inline { flex-wrap: wrap; row-gap: 0; }
 .mk-badge { white-space: nowrap; display: inline-grid; place-items: center; min-width: 26px; height: var(--h-tiny); padding: 0 var(--sp-1); border-radius: var(--r-chip); flex: none; vertical-align: middle;
   border: 1.2px solid var(--badge-outline); background: var(--badge-ink); color: var(--badge-text);
   font-family: var(--mono); font-size: var(--fs-xs); line-height: 1; font-weight: var(--fw-bold); font-style: normal; }
-.mk .bn, .rv-fields .bn { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 0 var(--sp-1); }
+.mk .bn, .rv-fields .bn, .own-timings .bn { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 0 var(--sp-1); }
 /* Checks (ui/checks.mjs): active blockers, warnings and traps carry their severity
    through the card and Apply confirmation; fixed findings stay quiet. */
 .ck .sect-h .note { margin-left: var(--sp-3); }

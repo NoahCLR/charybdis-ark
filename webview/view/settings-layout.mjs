@@ -31,6 +31,15 @@ const isSettingsScreen = (screen) => typeof screen === "string" && Object.hasOwn
 /** @param {{configDefaults?: readonly Section[]} | null | undefined} model @param {string} area @returns {Section[]} */
 export const sectionsIn = (model, area) => (model?.configDefaults || []).filter((section) => section.area === area);
 
+// What a setting governs, as core marks it (`governs`,
+// core/model/settings-editor.js), by the setting's name: a control elsewhere
+// that stands in for the setting, a behaviour's own timing, wears the same
+// mark (D-L31). Null for a setting the keyboard has not reported, or one that
+// marks nothing.
+/** @param {{configDefaults?: readonly Section[]} | null | undefined} model @param {string} name @returns {import("../../contracts/model.js").ReviewMark | null} */
+export const settingGoverns = (model, name) =>
+    (model?.configDefaults || []).flatMap((section) => section.fields).find((field) => field.macro === name)?.governs ?? null;
+
 // The sections a Settings screen draws, in its order; one the keyboard has
 // not reported is left out.
 /** @param {readonly Section[]} sections @param {string} screen @returns {Section[]} */

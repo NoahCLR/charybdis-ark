@@ -205,7 +205,7 @@ export interface Vocabulary {
     comboOptions: Readonly<Record<string, string>>;
     /** What a behaviour and a combo share: whether it runs, and on which layers. */
     definitionFields: {use: Readonly<Record<'behaviour' | 'combo', string>>; allowedLayers: string};
-    behaviourFields: Readonly<Record<'anchor', string>>;
+    behaviourFields: Readonly<Record<'anchor' | 'timings', string>>;
     comboFields: Readonly<Record<'inputs' | 'sends' | 'window' | 'conditions', string>>;
 }
 

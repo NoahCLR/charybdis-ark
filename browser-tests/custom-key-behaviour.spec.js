@@ -86,7 +86,9 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
     const fromHere = (await posted(page))[0];
 
     // A timing alone does nothing on a custom key without a shortcut (firmware
-    // D-F27 "Rows without steps"), so its fields wait for a branch.
+    // D-F27 "Rows without steps"), so its fields, under Timings, wait for a
+    // branch.
+    await editor(page).locator('[data-act="behaviour-timings"]').click();
     await expect(page.locator('[data-f="behaviour:CUSTOM_KEY_5:timing:multiTapTerm"]')).toBeDisabled();
     // Where the core says a timing alone counts, as for a custom key with a
     // shortcut, a timing posts the row too, with the timing as typed.
@@ -194,6 +196,7 @@ test("the behaviour editor on Custom keys follows the behaviours edit gate", asy
         store.setModel(model); store.render();
     });
     await expect(page.locator('[data-f="custom-key:0:name"]'), "the name is the custom keys area's").toBeEnabled();
+    await editor(page).locator('[data-act="behaviour-timings"]').click();
     await expect(page.locator('[data-f="behaviour:CUSTOM_KEY_0:timing:tapHoldTerm"]')).toBeDisabled();
     await expect(page.locator('[data-f="behaviour:CUSTOM_KEY_0:anchor"]')).toBeDisabled();
     await expect(editor(page).locator('[data-act="remove"]')).toBeDisabled();
