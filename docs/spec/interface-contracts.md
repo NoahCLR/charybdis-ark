@@ -139,6 +139,12 @@ The same kind of control looks and sits the same on every screen.
   `type="number"`; the colour editor's channels are the one exception left
   (no test).
 - A field that holds nothing reads **None** (no test).
+- Keys pressed together, a combo's inputs or a custom key's shortcut keys,
+  are chips (`keyChips`, `webview/ui/marks.mjs`): one look in two sizes, full
+  in the Keymap's Combos table and small in Lighting's combo list and the
+  hover card, which marks the key it is about. They wrap with room between
+  lines, each **+** kept on the line of the key before it
+  (`browser-tests/consistency.spec.js`).
 - A folding card or group starts its summary with `DISCLOSURE`
   (`webview/lib/dom.mjs`): one chevron, turned down while open; a disclosure
   that is a button (the Keys groups, `groupHeader`; Typing & playback help;

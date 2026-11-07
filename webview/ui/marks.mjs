@@ -229,8 +229,22 @@ export const keyNameText = (model, keycode) => keyIdentity(model, keycode).label
 export const comboOutputMarked = (model, combo) =>
     keyNameMarked(model, combo.outputDisplay || combo.output, visibleKeycode(model, combo.output) || combo.output);
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
-export const comboInputsMarked = (model, combo) =>
-    (combo.inputs || []).map((input, at) => keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)).join(" + ");
+const comboInputNames = (model, combo) =>
+    (combo.inputs || []).map((input, at) => keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input));
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
+export const comboInputsMarked = (model, combo) => comboInputNames(model, combo).join(" + ");
+// Keys pressed together as chips, one chip style wherever keys are listed:
+// they wrap onto more lines with room between them, each "+" kept with the
+// key before it. Small chips suit a narrow list (Lighting's combos) and the
+// hover card; `here` marks the key the hover card is about.
+/** @param {{html: string, here?: boolean}[]} keys @param {{small?: boolean}} [options] */
+export const keyChips = (keys, {small = false} = {}) =>
+    `<span class="key-chips${small ? " small" : ""}">${keys.map(({html, here}, at) => `<span class="key-chip"><span class="tok${here ? " here" : ""}">${html}</span>${
+        at < keys.length - 1 ? '<span class="key-plus">+</span>' : ""}</span>`).join("")}</span>`;
+// A combo's input keys as chips, where a list names a combo by them.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo @param {{small?: boolean, here?: (at: number) => boolean}} [options] */
+export const comboInputChips = (model, combo, {small = false, here = () => false} = {}) =>
+    keyChips(comboInputNames(model, combo).map((html, at) => ({html, here: here(at)})), {small});
 
 // A layer-tap by the core's name for it, built from its halves: the key it
 // taps, then its layer marked, "F / ▦ Navigation". Empty for any other key,

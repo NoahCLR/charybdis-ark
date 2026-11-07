@@ -1052,6 +1052,23 @@ button.tier:hover { background: var(--surface-3); }
 .combo-pick { gap: var(--sp-2); margin-top: var(--sp-1); }
 .combo-flags { gap: var(--sp-4); flex-wrap: wrap; }
 .combo-actions { gap: var(--sp-2); }
+/* Keys pressed together as chips (keyChips in ui/marks.mjs): one chip, .tok,
+   in two sizes. They wrap with room between lines, each "+" kept on the line
+   of the key before it. */
+.key-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); }
+.key-chip { display: inline-flex; align-items: center; gap: var(--sp-2); max-width: 100%; min-width: 0; }
+.key-plus { color: var(--text-3); }
+/* A chip wider than its column, a layer-tap in Lighting's narrow list, breaks
+   between its key and its layer, never inside a word. */
+.key-chips .tok { flex-wrap: wrap; column-gap: var(--sp-1); height: auto; min-height: var(--h-chip); min-width: 0; overflow-wrap: normal; }
+/* The small size: Lighting's combo list and the hover card. */
+.key-chips.small { gap: var(--sp-1) var(--sp-0); }
+.key-chips.small .key-chip { gap: var(--sp-0); }
+.key-chips.small .tok, .key-chips.small .tok .mk { column-gap: var(--sp-0); }
+.key-chips.small .tok { min-height: var(--h-tiny); padding: 0 var(--sp-1); font-size: var(--fs-xs); line-height: 16px; }
+.key-chips.small .kind-icon.layer svg { width: 18px; height: 8px; }
+/* The key a hover card is about, among the keys that press a combo. */
+.tok.here { border-color: var(--text-3); font-weight: var(--fw-label); }
 /* A reach table's last column holds the row's Edit, at its end. */
 .reach-edit { text-align: right; }
 /* A reach cell with a line per route (the Pointing modes tab). */
@@ -1190,14 +1207,16 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* Named inline, in a sentence, a table or the review (ui/marks.mjs keyNameMarked), an action keeps
    the words' own type and colour and their baseline; a name too long for its column wraps between words. */
 .sends.inline { font: inherit; color: inherit; vertical-align: baseline; align-items: baseline; }
+/* In a table cell too narrow for it, its tag drops below the name rather than past the column. */
+td > .sends.inline { flex-wrap: wrap; row-gap: 0; }
 /* A named thing reads in the interface's own face wherever it is named, in a
    monospace keycode cell or key box included, so it looks the same everywhere. */
 .sends, .sends.inline { font-family: var(--sans); letter-spacing: normal; }
 /* In a row of key boxes (a combo's inputs) a named thing is not one more box:
    its icon, name and tag already set it apart. */
-.hc-key:has(> .sends), .hc-key.here:has(> .sends), .tok:has(> .sends) { border-color: transparent; background: none; padding: 0; font-size: var(--fs-md); }
+.tok:has(> .sends), .key-chips.small .tok:has(> .sends) { border-color: transparent; background: none; padding: 0; font-size: var(--fs-md); }
 /* The hovered key's own input is told apart by its weight alone. */
-.hc-key.here:has(> .sends) .sends-name { font-weight: var(--fw-label); }
+.tok.here:has(> .sends) .sends-name { font-weight: var(--fw-label); }
 .sends.inline > .kind-icon { align-self: center; }
 .sends.inline .sends-name { overflow: visible; white-space: normal; overflow-wrap: normal; }
 /* The keyboard's side of the review strikes the whole action through, its tag too. */
@@ -1432,10 +1451,7 @@ table.t tr.quiet > td { color: var(--text-3); }
 .hc-sends { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--sp-2); row-gap: var(--sp-0); min-width: 0; font-size: var(--fs-sm); line-height: 18px; overflow-wrap: anywhere; }
 .hc-stored { font-family: var(--mono); font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-3); }
 .hc-count { margin-left: auto; }
-.hc-keys { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }
-.hc-key { border: 1px solid var(--line); border-radius: var(--r-chip); padding: 0 var(--sp-1); font-family: var(--mono); font-size: var(--fs-xs); line-height: 16px; color: var(--text-2); }
-.hc-key .mk { gap: var(--sp-1); }
-.hc-key.here { color: var(--text); border-color: var(--line-2); background: var(--surface-3); font-weight: var(--fw-label); }
+.hc-keys { grid-column: 2; min-width: 0; }
 /* A combo a switch keeps off for this key: dimmed, with why under its keys. */
 .hc-combo.hc-off > :not(.hc-sub) { opacity: .55; }
 .hc-combo > .hc-sub { grid-column: 2; margin: 0; }
