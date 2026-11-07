@@ -116,9 +116,11 @@ export interface KeyIdentity {
     readonly variant: 'hold' | 'lock';
 }
 export type NamesOf = (keycode: string | undefined) => string[];
-// `times`: sent once per press of that many; `first`: the row's own first tap, not the key's.
-export type InheritedBranch = Branch & {times?: number; first?: boolean};
-export type ImpliedBranch = {meaning: 'continues'; hold: InheritedBranch} | {meaning: 'tapsBeforeLong'; tap: InheritedBranch};
+/** A branch an empty cell shows, as the grid reads it (keyface.mjs inheritedBranch): the cell's reference resolved to the branch, with its `times`, `separate`, `below` and `locks` (contracts/panel.d.ts CellRef). */
+export type InheritedBranch = Branch & {times?: number; separate?: boolean; below?: boolean; locks?: boolean};
+export type HoldTierImplied = {meaning: 'continues'; hold: InheritedBranch} | {meaning: 'tapsBeforeLong'; tap: InheritedBranch} | {meaning: 'tapsOnRelease'; tap: InheritedBranch};
+export type ImpliedBranch = HoldTierImplied | {meaning: 'afterTaps'; tap?: InheritedBranch; hold: InheritedBranch}
+    | {meaning: 'asSingle'; as: {kind: Tier; branch: InheritedBranch} | HoldTierImplied};
 
 export interface KeyFace {main: string; sub: string; kind: 'none' | 'transparent' | 'disabled' | 'layer' | 'key'}
 export type NamedAction =

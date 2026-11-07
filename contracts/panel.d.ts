@@ -1,4 +1,4 @@
-import type {BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PointingSlot, Scalar, TimingTerm} from './edits.js';
+import type {BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PointingSlot, Scalar, Tier, TimingTerm} from './edits.js';
 import type {ApplyView, Check, DemoView, HistoryStep, ShellPanel, LoadView, Participation, PhaseId, ProfileUsage, ReviewChange, SettingField, SettingsSection, TimingSource, Vocabulary} from './model.js';
 
 export interface Position {
@@ -23,12 +23,24 @@ export interface Layer {name: LayerReference; index: number; positions: Position
 export type {TimingSource} from './model.js';
 export interface KeyBehaviorDefaults {
     builtIn: BuiltIn;
+    /** Its empty cells, the set `behaviorEditing.cellPatterns` holds at this index: a key with no row shares them with every key of the same kind. */
+    cellPattern: number;
     timing: Record<string, Scalar | undefined>;
     timingSources?: Partial<Record<TimingTerm, TimingSource>>;
     timingAlone?: boolean;
 }
-export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean; fromPress?: boolean}
-export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean}
+/** `armsOnRelease`: a One-shot hold that, let go after Tap / hold, arms its layers. */
+export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean; fromPress?: boolean; armsOnRelease?: boolean}
+/** The standard key: what a key does where its row leaves a tier empty (core/model/built-in-behavior.js; firmware D-F64). `transparentTap`, the tap is the row's Transparent Single tap, the key below; `tapToggle`, with no row the key counts taps all the same; `cells`, what each empty grid cell does, by `${tapCount}-${tier}` (core/model/empty-cells.js). */
+export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean; transparentTap?: boolean; tapToggle?: boolean; cells?: Record<string, EmptyCell>}
+/** A branch an empty cell shows, named rather than copied (core/model/empty-cells.js): `own`, the key's built-in tap or hold; `step` and `tier`, a branch the row sets at that 0-based tap count. `times`: sent once per press of that many; `separate`: on a key that counts no taps, each press sent on its own as it is released; `below`: the row's Transparent Single tap, the key below; `locks`: a Tap-toggle key's quick tap that locks its layers. */
+export type CellRef = ({own: 'tap' | 'hold'} | {step: number; tier: Tier}) & {times?: number; separate?: boolean; below?: boolean; locks?: boolean};
+/** What an empty Hold or Long hold does because of the other tiers and the standard key. */
+export type HoldTierCell = {meaning: 'continues'; hold: CellRef} | {meaning: 'tapsBeforeLong'; tap: CellRef} | {meaning: 'tapsOnRelease'; tap: CellRef};
+/** `afterTaps`, a later tap count with nothing set: `tap` once per press before it, then the standard hold; `asSingle`, on a key that counts no taps: what a held Single tap does, its branch or what that tier implies. */
+export type ImpliedCell = HoldTierCell | {meaning: 'afterTaps'; tap?: CellRef; hold: CellRef}
+    | {meaning: 'asSingle'; as: {kind: Tier; branch: CellRef} | HoldTierCell};
+export type EmptyCell = {inherited: CellRef} | {implied: ImpliedCell};
 // A stored behaviour says whether it changes nothing (core/model/inert-behaviors.js).
 export interface BehaviorView extends Omit<Behavior, 'steps'> {
     builtIn?: BuiltIn;
@@ -150,7 +162,7 @@ export interface PublishedModel {
         /** The pointer layer, which names what covers a slot's `pointerCovers`. */
         pointerLayer: number | null};
     keyBehaviors: BehaviorView[];
-    behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, KeyBehaviorDefaults>};
+    behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, KeyBehaviorDefaults>; cellPatterns: Record<string, EmptyCell>[]};
     profileIdentity: Partial<BaseIdentity> | null;
     rgb: Partial<RgbView> & {maximumBrightness?: number; baseEffect: BaseRgbView};
     combos: ComboView[];

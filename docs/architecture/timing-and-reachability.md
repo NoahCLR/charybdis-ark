@@ -90,7 +90,21 @@ plus layers held on top; what each key does to the layers is
 active layer that is not transparent answers. A key moves the state by:
 
 - its own layer action, less what its row replaces (a row with steps drops
-  `TT()`'s fifth-tap lock);
+  `TT()`'s fifth-tap lock). Whatever the row leaves empty is the standard
+  key, what the key does with no row (firmware D-F64): its first press taps
+  it from an empty Single tap and holds it from an empty Hold. A row deeper
+  than its Single tap counts taps, so what the first press replaces is
+  offered at a later count: an empty Tap at count N, or a quick run of N
+  presses past the deepest count, taps the key N times, and a count with
+  nothing set, or a press held past the deepest count, taps it N-1 times and
+  then holds it. Review names the fewest presses that do it ("Triple-tap
+  TG(3)", "Tap MO(4) 2 times, then hold it"); a toggle needs an odd count,
+  since an even one leaves the layer as it was, and so does a one-shot,
+  whose second quick tap cancels it. A Single tap set to Transparent makes
+  the key below the standard tap: reach leaves that key's effects out, so
+  the later taps offer nothing of the key's own there, while its holds still
+  count, the taps before them sending the key below. A row no deeper than
+  its Single tap counts no taps and offers nothing more;
 - its row's branches (a hold branch holds a layer only when it presses and
   holds until release);
 - the combos its presses complete;
@@ -103,10 +117,12 @@ active layer that is not transparent answers. A key moves the state by:
   as `TO()` of several, held with a fifth-tap lock as `TT()`, or held as a
   one-shot as `OSL()`. That is the key itself, a behaviour hold that presses
   and holds it, or a combo output that sends it. On its own key with its own
-  row, the row sends the shortcut where it leaves a tier empty: tapped from an
-  empty first tap, held from the fallback hold, which only the first press has
-  and only while it authors neither a hold nor a long hold, so a lock or a
-  move happens from either and a held shortcut only from that hold; a
+  row, the row sends the shortcut where it leaves a tier empty, as the
+  standard key above: tapped from an empty Single tap, held from the fallback
+  hold, which the first press has while it authors neither a hold nor a long
+  hold, and, on a row that counts taps, from the later counts and past the
+  deepest one, so a lock or a move happens from any of those taps or holds
+  and a held shortcut only from a hold; a
   tap-toggle or one-shot shortcut's layers are on from every press, whatever
   the row, and a row with steps drops the tap-toggle's fifth-tap lock. A tap
   that sends it does what tapping that layer key does: a held or tap-toggle
@@ -192,7 +208,8 @@ and a backward pass from the states where a pointing mode's key answers
 (a key, a behaviour branch or a combo output that sends one) finds whether
 every lock set its lock key answers in gets there. Any held layer can be let
 go there, and a pointing key behind a row counts unless the row replaces
-both its tap and its hold, so a mode trap is never invented. Review names
+both its tap and its hold and counts no taps (past a counting row's deepest
+tap count every press is the standard key), so a mode trap is never invented. Review names
 each mode once, with the smallest lock set it is trapped with, the steps to
 its lock key and a fix. The bounded walk does the same over explicit states
 (`boundedModeTraps`); past its bound, escape stays unproved.
@@ -219,20 +236,30 @@ exactly when some lock set it is entered with cannot reach its end").
 
 ## Built-in branches
 
-An empty tier is not "nothing": the keyboard runs the key's own meaning
-there.
+An empty tier is not "nothing": the keyboard runs the standard key there,
+what the key does with no row (firmware D-F64). Nothing from one tap count
+reaches another, and every press past the deepest tap count is the standard
+key too.
 
 1. `builtInActions` (`core/model/built-in-behavior.js`) decides a key's
-   built-in tap and hold. Given a row's steps, it judges the hold with them:
-   a pointing-mode key whose row holds another mode on a later tap count
-   holds its own only from Tap / hold, not from the press.
+   built-in tap and hold. Given a row's steps, it judges them with them: a
+   pointing-mode key whose row holds another mode on a later tap count holds
+   its own only from Tap / hold, not from the press, and a Single tap set to
+   Transparent makes the key below the key's tap (`transparentTap`).
 2. `behaviorRowsForView` (`core/model/device-profile-view.js`) publishes them
    on each row, judged with its steps; `behaviorDefaults`
    (`core/model/profile-model.js`) publishes them for a key with no row, with
    the effective timing, its source setting and `timingAlone`. It does so for
    every keycode the profile holds and every custom key, placed or not.
-3. The editor draws them as dashed cells (`impliedBranch` in
-   `webview/view/keyface.mjs`).
+3. `emptyCells` (`core/model/empty-cells.js`) works out what each empty
+   grid cell does from them and the row's steps, published as
+   `builtIn.cells`; the editor draws those as dashed cells, reading them
+   through `inheritedBranch` and `impliedBranch` in
+   `webview/view/keyface.mjs`. They are what follows from the built-ins:
+   a Hold carrying on past Long hold, the tap a release sends on a count
+   with no hold of any kind, a later tap count with nothing set tapping the
+   key and then holding it, and, on a key that counts no taps, every later
+   press being a Single tap of its own.
 
 A dashed cell is display only; setting an action in it authors that tier. A
 key's grid stays in the interface until an edit stores a row. The built-in

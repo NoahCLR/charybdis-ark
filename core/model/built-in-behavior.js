@@ -4,19 +4,23 @@
 // What a key does where its behaviour row leaves a tier empty. The keyboard
 // fills that gap with the key's own meaning, so an empty cell is not "nothing".
 //
-// The key's own tap fills an empty first tap. An empty later tap repeats the
-// first tap, the row's own or else the key's, once per press: a double tap that
-// authors no tap sends it twice (firmware D-F33; the grid decides it,
-// webview/view/keyface.mjs). A plain key
+// Whatever a row leaves empty is the standard key, what the key does with no
+// row (firmware D-F64): its own tap fills an empty Tap, once per press, so a
+// double tap that sets no tap sends it twice, and nothing from one tap count
+// reaches another (the grid decides which cell, webview/view/keyface.mjs). A
+// Single tap set to Transparent is the exception: the key below becomes the
+// standard tap (`transparentTap`). A plain key
 // (a basic keycode, alone or with modifiers) taps itself; LT() taps its key,
 // MT() taps its key and OSM() arms its one-shot. A custom key with a shortcut
 // (firmware D-F26) is a plain key whose own action is that shortcut: it taps
 // it, and holds it as a fallback. One whose shortcut's layers are Tap-toggle
 // or One-shot is a momentary layer key instead, as TT() and OSL() are: it
 // holds its shortcut from every press (`fromPress`, no fallback), and its own
-// tap is left only what it does to the layers: One-shot's arms them, and
+// tap is left only what it does to the layers: One-shot's arms them, held or
+// let go after Tap / hold too (`armsOnRelease`), and
 // Tap-toggle's does nothing until its TAPPING_TOGGLE-th tap, which a row with
-// steps replaces, so it has no tap of its own. (Under an authored first-press
+// steps replaces, so it has no tap of its own. With no row it counts taps all
+// the same (`tapToggle`). (Under an authored first-press
 // hold the keyboard does tap a Tap-toggle shortcut's keys from an empty tap;
 // the grid, one built-in tap per row, leaves that cell empty.)
 //
@@ -28,7 +32,8 @@
 // A press that has a Long hold but no hold of its own stays in its tap window
 // until Long hold, so a release after Tap / hold and before Long hold still
 // sends that count's tap (`releaseTaps`). That holds for plain keys, custom
-// keys and macros. Layer keys send no tap once held past Tap / hold, pointing
+// keys and macros. A macro's tap plays it, and it has no hold of its own, so
+// held it plays on release. Layer keys send no tap once held past Tap / hold, pointing
 // keys hold their mode, and dual-role keys always have their own hold.
 //
 // Some keys hold from the press rather than at Tap / hold (`fromPress`): MO()
@@ -49,7 +54,7 @@ const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
 const {pdModeKeyOfCode} = require("../data/pd-mode-keys");
-const {QK, inBlock, BASIC_KEYS, MOD_MASK, keyOf, modsOf, layerFormLayer, layerTapLayer} = require("../../rules/qmk-keycodes.mjs");
+const {QK, inBlock, BASIC_KEYS, MOD_MASK, TRANSPARENT, keyOf, modsOf, layerFormLayer, layerTapLayer} = require("../../rules/qmk-keycodes.mjs");
 const {SHORTCUT_LAYER_KINDS, shortcutPresent} = require("../schema/settings-domain-v1");
 
 // A key a tap sends: a basic key past KC_NO and KC_TRNS, a bare modifier
@@ -66,11 +71,22 @@ const pointingSlotNamed = (action) => {
     if (action?.kind === ACTION.QMK_KEYCODE) return pdModeKeyOfCode(action.operand)?.slot ?? null;
     return null;
 };
-/** @typedef {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean}} BuiltIns */
+/** @typedef {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean, fromPress?: boolean, armsOnRelease?: boolean, transparentTap?: boolean, tapToggle?: boolean}} BuiltIns */
+// Whether a branch's action is Transparent: the key below answers.
+/** @param {import("../schema/types.js").SemanticAction | undefined} action */
+const transparent = (action) => action?.kind === ACTION.QMK_KEYCODE && action.operand === TRANSPARENT;
 // What a key does where its row, of `steps`, leaves a tier empty.
-/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [features] @param {readonly Pick<import("../schema/types.js").BehaviorStep, "tapIndex" | "hold" | "longHold">[]} [steps] @returns {BuiltIns} */
+/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [features] @param {readonly Pick<import("../schema/types.js").BehaviorStep, "tapIndex" | "tap" | "hold" | "longHold">[]} [steps] @returns {BuiltIns} */
 function builtInActions(target, features = {}, steps = []) {
-    const actions = keyActions(target, features);
+    const actions = pointingTiming(keyActions(target, features), steps);
+    const single = steps.find((step) => step.tapIndex === 0)?.tap;
+    return transparent(single) ? {...actions, tap: single, transparentTap: true} : actions;
+}
+
+// A pointing-mode key whose row holds another mode on a later tap count waits
+// for Tap / hold, so the two modes never overlap.
+/** @param {BuiltIns} actions @param {readonly Pick<import("../schema/types.js").BehaviorStep, "tapIndex" | "hold" | "longHold">[]} steps @returns {BuiltIns} */
+function pointingTiming(actions, steps) {
     const own = actions.fromPress ? pointingSlotNamed(actions.hold) : null;
     if (own === null) return actions;
     const foreign = steps.some((step) => step.tapIndex > 0 && [step.hold, step.longHold].some((branch) => {
@@ -89,16 +105,16 @@ function keyActions(target, {customKeyShortcuts = []} = {}) {
         const shortcut = customKeyShortcuts[slot];
         if (!shortcutPresent(shortcut)) return {releaseTaps: true};
         const own = {kind: ACTION.CUSTOM_KEY, operand: slot};
-        if (shortcut.layers && shortcut.layerKind === SHORTCUT_LAYER_KINDS.ONESHOT) return {tap: own, hold: own, fromPress: true};
-        if (shortcut.layers && shortcut.layerKind === SHORTCUT_LAYER_KINDS.TAP_TOGGLE) return {hold: own, fromPress: true};
+        if (shortcut.layers && shortcut.layerKind === SHORTCUT_LAYER_KINDS.ONESHOT) return {tap: own, hold: own, fromPress: true, armsOnRelease: true};
+        if (shortcut.layers && shortcut.layerKind === SHORTCUT_LAYER_KINDS.TAP_TOGGLE) return {hold: own, fromPress: true, tapToggle: true};
         return {tap: own, hold: own, fallback: true, releaseTaps: true};
     }
-    if (target?.kind === ACTION.MACRO) return {releaseTaps: true};
+    if (target?.kind === ACTION.MACRO) return {tap: target, releaseTaps: true};
     if (target?.kind === ACTION.LAYER_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind === ACTION.POINTING_MODE_MOMENTARY) return {hold: target, fromPress: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
-    if (inBlock(code, QK.MACRO)) return {releaseTaps: true};
+    if (inBlock(code, QK.MACRO)) return {tap: keycodeAction(code), releaseTaps: true};
     if (plainKey(code)) {
         return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true, releaseTaps: true};
     }
@@ -117,4 +133,4 @@ function keyActions(target, {customKeyShortcuts = []} = {}) {
     return {};
 }
 
-module.exports = {builtInActions};
+module.exports = {builtInActions, transparent};

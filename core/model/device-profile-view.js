@@ -11,6 +11,7 @@ const {ALL_LAYERS} = require("../data/charybdis-layout");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_STYLES} = require("../schema/key-behavior-domain-v1");
 const {builtInActions} = require("./built-in-behavior");
+const {emptyCells} = require("./empty-cells");
 const {changesNothing} = require("./inert-behaviors");
 const {
     RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_EVERY_OWNER, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
@@ -53,14 +54,26 @@ function builtInDisplay(action, names, features) {
 // the tiers its row leaves empty (model/built-in-behavior.js). A fallback hold
 // gives way to any authored first-press hold or long hold; `releaseTaps` says
 // a press with only a long hold still taps when released before it.
+// `transparentTap`: the tap is the row's Transparent Single tap, the key
+// below; `tapToggle`: with no row the key counts taps all the same; `cells`:
+// what each empty grid cell does, for the row's steps
+// (core/model/empty-cells.js).
 /** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @param {Parameters<typeof builtInActions>[2]} [steps] The row's steps, when it has one. @returns {import("../../contracts/panel.js").BuiltIn} */
 function builtInForView(target, features, names, steps) {
-    const {tap, hold, fallback, releaseTaps, fromPress} = builtInActions(target, features, steps);
+    const builtIn = builtInBranches(target, features, names, steps);
+    return {...builtIn, cells: emptyCells(builtIn, steps)};
+}
+
+/** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @param {Parameters<typeof builtInActions>[2]} [steps] @returns {import("../../contracts/panel.js").BuiltIn} */
+function builtInBranches(target, features, names, steps) {
+    const {tap, hold, fallback, releaseTaps, fromPress, armsOnRelease, transparentTap, tapToggle} = builtInActions(target, features, steps);
     return {
         ...(releaseTaps ? {releaseTaps: true} : {}),
+        ...(transparentTap ? {transparentTap: true} : {}),
+        ...(tapToggle ? {tapToggle: true} : {}),
         ...(tap ? {tap: {style: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names, features)}} : {}),
         ...(hold ? {hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names, features),
-            ...(fallback ? {fallback: true} : {}), ...(fromPress ? {fromPress: true} : {})}} : {}),
+            ...(fallback ? {fallback: true} : {}), ...(fromPress ? {fromPress: true} : {}), ...(armsOnRelease ? {armsOnRelease: true} : {})}} : {}),
     };
 }
 
@@ -73,24 +86,28 @@ function behaviorRowsForView(domain, features = {}, names) {
         repeatHz: String(branch.repeatHz),
         ...actionDisplay(branch.action, names),
     });
-    return domain.rows.map((row) => ({
-        keycode: actionName(row.target),
-        builtIn: builtInForView(row.target, features, names, row.steps),
-        tapHoldTerm: String(row.tapHoldTerm),
-        longHoldTerm: String(row.longHoldTerm),
-        multiTapTerm: String(row.multiTapTerm),
-        keepsAutoMouseAnchored: row.keepsAutoMouseAnchored,
-        enabled: row.enabled,
-        allowedLayers: row.allowedLayers,
-        changesNothing: changesNothing(row, features.customKeyShortcuts),
-        steps: row.steps.map((step) => ({
+    return domain.rows.map((row) => {
+        /** @type {import("../../contracts/panel.js").BehaviorView["steps"]} */
+        const steps = row.steps.map((step) => ({
             tapCount: step.tapIndex,
             tapCountName: branchName(step.tapIndex + 1),
             ...(step.tap ? {tap: {style: "TAP_SENDS", action: actionName(step.tap), ...actionDisplay(step.tap, names)}} : {}),
             ...(step.hold ? {hold: hold(step.hold)} : {}),
             ...(step.longHold ? {longHold: hold(step.longHold)} : {}),
-        })),
-    }));
+        }));
+        return {
+            keycode: actionName(row.target),
+            builtIn: builtInForView(row.target, features, names, row.steps),
+            tapHoldTerm: String(row.tapHoldTerm),
+            longHoldTerm: String(row.longHoldTerm),
+            multiTapTerm: String(row.multiTapTerm),
+            keepsAutoMouseAnchored: row.keepsAutoMouseAnchored,
+            enabled: row.enabled,
+            allowedLayers: row.allowedLayers,
+            changesNothing: changesNothing(row, features.customKeyShortcuts),
+            steps,
+        };
+    });
 }
 
 /** @param {import("../schema/types.js").Hsv} color */
@@ -177,4 +194,4 @@ function comboRowsForView(rows, labels) {
     }));
 }
 
-module.exports = {baseEffectForView, baseRgbForView, comboRowsForView, behaviorRowsForView, builtInForView, rgbForView};
+module.exports = {baseEffectForView, baseRgbForView, comboRowsForView, behaviorRowsForView, builtInForView, builtInBranches, rgbForView};

@@ -20,6 +20,8 @@ const {slotName} = require("./vocabulary");
 const {inertLinkLayers, linkStarts} = require("./pointing-links");
 const {PD_LINK_LAYERS} = require("../schema/pd-mode-domain-v1");
 const {lowest} = require("./layer-state-graph");
+const {tapDepth} = require("./tap-depth");
+const {transparent} = require("./built-in-behavior");
 
 /**
  * @typedef {import("./types.js").LayerEffect} LayerEffect
@@ -138,35 +140,77 @@ const holdPhrase = (index, name, longer) => `${index === 0 ? `Hold ${name}` : `T
 // row. A row with steps replaces TT()'s own taps; one without is no row
 // (firmware D-F27). A hold branch that presses and holds until release holds
 // the layer; any other hold, like a tap, sends the action once. A custom key's
-// row sends its shortcut where it leaves a tier empty (firmware D-F26): tapped
-// from an empty first tap, held from the fallback hold, which belongs to the
-// first press alone and only while it authors neither a hold nor a long hold
-// (built-in-behavior.js). A shortcut that locks or moves does so from either,
-// and one that holds from the fallback hold. `said` names what a branch
-// sends, as the screens name it (layer-walk.js), or as its action by default.
+// row sends its shortcut where it leaves a tier empty (firmware D-F26, D-F64).
+//
+// Whatever a row leaves empty is the standard key, what the key does with no
+// row (firmware D-F64, built-in-behavior.js). The first press taps it from an
+// empty first tap and holds it from the fallback hold, while the first press
+// authors neither a hold nor a long hold; a shortcut that locks or moves does
+// so from either, and one that holds from the fallback hold. A row that
+// counts taps offers what the first press does not at a later count: an
+// empty Tap at count N, or a quick run of N presses past the deepest count,
+// sends the standard tap N times, and a count with nothing set, or a press
+// held past the deepest count, sends the standard tap N-1 times and then
+// holds it. The fewest presses that do it are named. A toggle toggles once
+// per tap and a one-shot's second quick tap cancels it, so both need an odd
+// count; the taps before a hold do nothing to the layers, since a key whose
+// own effect is a hold taps none. A Single tap set to Transparent makes the
+// key below the standard tap, whose effects are left out, so later taps
+// reach nothing of the key's own there; its holds still do, the taps before
+// them sending the key below. `said` names what a branch sends, as the
+// screens name it (layer-walk.js), or as its action by default.
 /** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @param {LayerOwners} [links] @param {(action: Action) => string} [said] @returns {(LayerEffect & {how: string, note?: string})[]} */
 function keyEffects(code, row, values, links, said = actionName) {
     /** @type {(LayerEffect & {how: string, note?: string})[]} */
     const effects = [];
     const first = row?.steps.find((step) => step.tapIndex === 0);
+    const name = codeName(code);
     /** @param {LayerEffect} effect */
     const runs = (effect) => (effect.mode ? `which runs ${effect.mode}, whose key turns layers on` : effect.shortcut ? "whose shortcut turns layers on" : "");
     // The fallback hold: the first press's, while it authors no hold tier.
     const fallbackHold = !first?.hold && !first?.longHold;
+    // The later tap counts, on a row that counts taps: its holds always, its
+    // taps while the standard tap is the key's own.
+    const depth = tapDepth(row?.steps);
+    /** @param {LayerEffect} effect */
+    const holds = (effect) => effect.kind === "hold" && !effect.oneShot;
+    /** @param {LayerEffect} effect */
+    const later = (effect) => depth > 1 && (holds(effect) || !transparent(first?.tap));
+    /** @param {number} tapIndex */
+    const stepAt = (tapIndex) => row?.steps.find((step) => step.tapIndex === tapIndex);
+    // The fewest presses that send a later standard tap, an odd number for a
+    // toggle or a one-shot, and the fewest that end in a later standard hold.
+    /** @param {(count: number) => boolean} sends */
+    const fewest = (sends) => {
+        let count = 2;
+        while (!sends(count)) count++;
+        return count;
+    };
+    /** @param {number} count */
+    const tapsStandard = (count) => count > depth || !stepAt(count - 1)?.tap;
+    /** @param {number} count */
+    const holdsStandard = (count) => {const step = stepAt(count - 1); return count > depth || !(step?.tap || step?.hold || step?.longHold);};
+    /** @param {LayerEffect} effect */
+    const laterHow = (effect) => (holds(effect) ? holdPhrase(fewest(holdsStandard) - 1, name, false)
+        : effect.kind === "lock" || effect.kind === "modeLock" || effect.oneShot ? tapPhrase(fewest((count) => count % 2 === 1 && tapsStandard(count)) - 1, name)
+            : tapPhrase(fewest(tapsStandard) - 1, name));
     for (const effect of layerEffects(code, links)) {
         let how;
         if (effect.taps) {
             if (row?.steps.length) continue;
-            how = `Tap ${codeName(code)} ${effect.taps} times`;
+            how = `Tap ${name} ${effect.taps} times`;
         } else if (effect.fromPress) {
-            how = `Hold ${codeName(code)}`;
+            how = `Hold ${name}`;
         } else if (effect.shortcut) {
-            if (effect.kind !== "hold" && !first?.tap) how = `Tap ${codeName(code)}`;
-            else if (fallbackHold) how = holdPhrase(0, codeName(code), false);
+            if (effect.kind !== "hold" && !first?.tap) how = `Tap ${name}`;
+            else if (fallbackHold) how = holdPhrase(0, name, false);
+            else if (later(effect)) how = laterHow(effect);
             else continue;
+        } else if (effect.kind === "hold" && !effect.oneShot ? first?.hold : first?.tap) {
+            if (!later(effect)) continue;
+            how = laterHow(effect);
         } else {
-            if (effect.kind === "hold" && !effect.oneShot ? first?.hold : first?.tap) continue;
-            how = effect.kind === "hold" && !effect.oneShot ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`;
+            how = effect.kind === "hold" && !effect.oneShot ? `Hold ${name}` : `Tap ${name}`;
         }
         effects.push({...effect, how, ...(effect.mode || effect.shortcut ? {note: runs(effect)} : {})});
     }
@@ -193,9 +237,11 @@ function keyEffects(code, row, values, links, said = actionName) {
 
 // Whether a key that resolves to `code`, with its behaviour row if it runs
 // one, can press a pointing mode's key, held or locked, of a slot that holds
-// a mode: its own, unless its row replaces both its tap and its hold, or any
-// branch of the row. Any of them ends a locked mode (firmware D-F62), so a
-// press counted that cannot happen only hides a trap, never invents one.
+// a mode: its own, unless its row replaces both its tap and its hold and
+// counts no taps (past a counting row's deepest tap count every press is the
+// key itself, firmware D-F64), or any branch of the row. Any of them ends a
+// locked mode (firmware D-F62), so a press counted that cannot happen only
+// hides a trap, never invents one.
 /** @param {number | undefined} code @param {BehaviorRow | undefined} row @param {LayerOwners} owners */
 function pressesModeKey(code, row, owners) {
     /** @param {number | undefined} value */
@@ -204,7 +250,7 @@ function pressesModeKey(code, row, owners) {
     const sends = (action) => Boolean(action && ((action.kind === ACTION.POINTING_MODE_MOMENTARY || action.kind === ACTION.POINTING_MODE_LOCK) ? owners.modes.has(action.operand)
         : action.kind === ACTION.QMK_KEYCODE && own(action.operand)));
     const first = row?.steps.find((step) => step.tapIndex === 0);
-    if (own(code) && !(first?.tap && first?.hold)) return true;
+    if (own(code) && (!(first?.tap && first?.hold) || tapDepth(row?.steps) > 1)) return true;
     return (row?.steps || []).some((step) => [step.tap, step.hold?.action, step.longHold?.action].some(sends));
 }
 

@@ -44,16 +44,41 @@ neither has a colour of its own. The hover card names them the same way.
 
 ### What an empty cell does
 
-An empty cell isn't nothing. Where the key would do something on its own, the
-cell is dashed and shows it, marked **built in**:
+An empty cell isn't nothing: it's the **standard key**, what the key does
+with no behaviour. Nothing you set on one tap count reaches another. Where
+the key would do something on its own, the cell is dashed and shows it,
+marked **standard key**:
 
 - An empty Single tap sends the key's own keycode, and an empty Hold holds
-  it. A layer-tap key holds its layer; a mod-tap key holds its modifiers.
-- An empty Double tap or later repeats the Single tap once per press, so an
-  empty Double tap sends it twice.
+  it. A layer-tap key holds its layer; a mod-tap key holds its modifiers. A
+  macro plays. A custom key sends its shortcut; a Tap-toggle one does
+  nothing on a tap, a One-shot one arms its layers, and one with no shortcut
+  does nothing.
+- A hold that starts as the key goes down, such as a layer key's or a
+  pointing mode's, says **held from the press**. A One-shot custom key's
+  hold also says **arms on release**: let go after the tap / hold threshold
+  and its layers stay armed for the next key.
+- An empty Tap on a Double tap or later sends the key's own tap once per
+  press, so an empty Double tap sends it twice. It's never the Single tap
+  you set: a Right Option whose Single tap toggles a lock sends Right Option
+  twice on a quick double tap.
+- A Single tap set to Transparent is the exception: the key below is then
+  the key's tap wherever a Tap is empty, marked **key below**. A pointing
+  key on a layer types the key under it however many times you tap.
+- A Tap-toggle custom key with no behaviour counts taps by itself: its
+  Quintuple tap says **locks its layers**.
 - An empty Long hold beside a Hold shows the Hold carrying on.
 - An empty Hold beside a Long hold shows the tap a release sends before the
-  Long hold threshold.
+  long hold threshold, unless the key's own hold fills it: on the Single
+  tap a layer-tap, mod-tap, layer or pointing-mode key holds its own there.
+- With neither a Hold nor a Long hold, the empty Hold and Long hold show the
+  tap: however long you hold, letting go sends it. On the Single tap the
+  key's own hold comes first, so this shows only on a key with no hold of
+  its own, such as a macro; on a later tap count it shows on any key.
+- A Double tap or later with nothing set at all is the key pressed that many
+  times, the last one held: its Hold says how many taps go out first
+  (**after 1 tap** on a Double tap) and shows the key held. A key whose tap
+  sends nothing, such as a layer key, just holds.
 - A pointing-mode key holds its mode from the press, unless its row holds
   another mode on a later tap: then it waits for the Tap / hold threshold,
   so the two modes never overlap. That holds however the key is stored, by
@@ -63,9 +88,17 @@ Setting an action in a dashed cell replaces what it shows. A modifier key on
 its own, such as Left Command, is a key like any other: a quick Single tap
 sends it, and holding it holds it.
 
-Tapping faster than the deepest tap count you set is just typing: each press
-sends the Single tap again. So a Backspace whose Double tap types V sends
-Backspace for one tap, V for two and three Backspaces for three.
+Tapping faster than the deepest tap count you set is just typing the key:
+every press is the standard key. So a Backspace whose Double tap types V sends
+Backspace for one tap, V for two and three Backspaces for three, and three
+taps then a held fourth send three Backspaces and then hold Backspace. The
+rows past your deepest tap count show it the same way.
+
+A behaviour that sets only its Single tap never waits for another tap: each
+press is a Single tap of its own, sent as you let go, so five quick taps send
+five, each as you let go of it. Its later rows say **each press**, even
+after a Transparent Single tap, and their Hold and Long hold say **as Single
+tap**.
 
 ### Timing
 

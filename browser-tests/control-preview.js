@@ -2,6 +2,7 @@
 "use strict";
 const {expect} = require("@playwright/test");
 const {openPreview} = require("./shell-page");
+const {emptyCells} = require("../core/model/empty-cells");
 
 async function openControls(page, screen, state = {}, theme = "dark", search = "") {
     await openPreview(page, theme, search);
@@ -53,4 +54,38 @@ async function publishAccepted(page, path, value) {
     }, {path, value});
 }
 
-module.exports = {openControls, clearPosts, posted, expectPost, change, publishAccepted};
+// Publish a behaviour row with `steps` as the core would once it accepts them:
+// the key's built-ins with the empty cells those steps give
+// (core/model/empty-cells.js), worked out here in Node as core works them
+// out. Which tiers a step sets is all a cell reads of it. `row` adds or
+// replaces the row's other fields; a key with no row yet starts from its
+// published defaults. The built-ins stay the key's own, so a test that sets
+// a Transparent Single tap, or holds another pointing mode on a later tap
+// count, publishes them itself.
+async function publishBehaviour(page, keycode, steps, row = {}) {
+    const builtIn = await page.evaluate(async (keycode) => {
+        const {getModel} = await import("/webview/store.mjs");
+        const model = getModel();
+        const row = model.keyBehaviors.find((entry) => entry.keycode === keycode);
+        return row ? row.builtIn : model.behaviorEditing.keyDefaults[keycode]?.builtIn || {};
+    }, keycode);
+    const {cells: _, ...own} = builtIn;
+    await page.evaluate(async ({keycode, steps, row, builtIn}) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        const index = model.keyBehaviors.findIndex((entry) => entry.keycode === keycode);
+        const published = {...(index < 0 ? {} : model.keyBehaviors[index]), ...row, keycode, steps, builtIn};
+        if (index < 0) model.keyBehaviors.push(published);
+        else model.keyBehaviors[index] = published;
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    }, {keycode, steps, row, builtIn: {...own, cells: emptyCells(own, steps.map(({tapCount, tap, hold, longHold}) => ({tapIndex: tapCount, tap, hold, longHold})))}});
+}
+
+// A behaviour row's steps as the page has them.
+const behaviourSteps = (page, keycode) => page.evaluate(async (keycode) => {
+    const {getModel} = await import("/webview/store.mjs");
+    return getModel().keyBehaviors.find((entry) => entry.keycode === keycode)?.steps || [];
+}, keycode);
+
+module.exports = {openControls, clearPosts, posted, expectPost, change, publishAccepted, publishBehaviour, behaviourSteps};

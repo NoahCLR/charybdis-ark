@@ -1,13 +1,26 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openControls, clearPosts, posted, change, publishAccepted} = require("./control-preview");
+const {openControls, clearPosts, posted, change, publishAccepted, publishBehaviour} = require("./control-preview");
 
 // Custom keys shows the selected key's behaviour editor: the Keys screen's,
 // for a key on a layer or on none, posting the same draft edits.
 
 const editor = (page) => page.locator(".custom-key-behaviour");
 const pick = (page, slot) => page.locator(`.macro-grid [data-custom-key="CUSTOM_KEY_${slot}"]`).click();
+
+// What the core publishes once it accepts a tap and a Long hold on custom
+// key 5, which is then marked as having a behaviour.
+async function storeCustomKeyBehaviour(page) {
+    await publishBehaviour(page, "CUSTOM_KEY_5", [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}, longHold: {style: "HOLD_WHILE_HELD", action: "KC_B", repeatHz: "0"}}],
+        {tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 0xffff});
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.customKeys[5].hasBehavior = true;
+        store.setModel(model); store.render();
+    });
+}
 
 test("the custom key bank scrolls on its own and keeps its place, so the editor stays beside it", async ({page}) => {
     await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
@@ -60,7 +73,7 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
         const {behaviourEditorRow} = await import("/webview/view/behavior-editor.mjs");
         const {getModel} = await import("/webview/store.mjs");
         return behaviourEditorRow(getModel(), "CUSTOM_KEY_5")?.builtIn;
-    }), "the same defaults as a placed custom key").toEqual({releaseTaps: true});
+    }), "the same defaults as a placed custom key").toEqual({releaseTaps: true, cells: {}});
 
     // The first edit adds the row: a Long hold on the first press.
     await editor(page).locator('[data-cell="0-long"]').click();
@@ -107,19 +120,11 @@ test("once stored, the behaviour shows its dashed cells and can be removed from 
     await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
     await pick(page, 5);
     // What the core publishes once it accepts a tap and a Long hold.
-    await page.evaluate(async () => {
-        const store = await import("/webview/store.mjs");
-        const model = structuredClone(store.getModel());
-        model.keyBehaviors.push({keycode: "CUSTOM_KEY_5", tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false,
-            enabled: true, allowedLayers: 0xffff, builtIn: model.behaviorEditing.keyDefaults.CUSTOM_KEY_5.builtIn,
-            steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}, longHold: {style: "HOLD_WHILE_HELD", action: "KC_B", repeatHz: "0"}}]});
-        model.customKeys[5].hasBehavior = true;
-        store.setModel(model); store.render();
-    });
+    await storeCustomKeyBehaviour(page);
     await expect(editor(page).locator(".card-h .tag")).toHaveText("Behaviour");
     const dashed = editor(page).locator('[data-cell="0-hold"]');
     await expect(dashed).toHaveClass(/inherited/);
-    await expect(dashed).toContainText("released before Long hold threshold");
+    await expect(dashed).toContainText("released before long hold threshold");
     await clearPosts(page);
     await editor(page).locator('[data-act="remove"]').click();
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "deleteBehavior", keycode: "CUSTOM_KEY_5"})]);
@@ -273,15 +278,7 @@ test("Change key… on Custom keys to an ordinary key opens the behaviour on the
 test("Delete on Custom keys clears the open cell of the selected key's behaviour, and only that", async ({page}) => {
     await openControls(page, "customKeys", {allSlotsShown: ["customKeys"]});
     await pick(page, 5);
-    await page.evaluate(async () => {
-        const store = await import("/webview/store.mjs");
-        const model = structuredClone(store.getModel());
-        model.keyBehaviors.push({keycode: "CUSTOM_KEY_5", tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false,
-            enabled: true, allowedLayers: 0xffff, builtIn: model.behaviorEditing.keyDefaults.CUSTOM_KEY_5.builtIn,
-            steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}, longHold: {style: "HOLD_WHILE_HELD", action: "KC_B", repeatHz: "0"}}]});
-        model.customKeys[5].hasBehavior = true;
-        store.setModel(model); store.render();
-    });
+    await storeCustomKeyBehaviour(page);
     // No cell open: Delete does nothing here.
     await clearPosts(page);
     await page.locator("body").press("Delete");

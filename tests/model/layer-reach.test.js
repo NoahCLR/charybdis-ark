@@ -784,20 +784,24 @@ test("a custom key with its own row sends its shortcut where the row leaves a ti
     assert.equal(traps(profile({keys: covered, rows: [tapOnly], shortcuts: {9: {layers: 1 << 5, layerKind: MOVE}}})).length, 1, "moved from it too");
     // Both tiers authored at the first count: no way left but a later one.
     assert.deepEqual(traps(profile({keys: covered, rows: [both], shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}})), [], "both tiers its own");
-    // The fallback hold belongs to the first press alone (firmware
-    // handled_key_resolution_uses_fallback_hold_behavior): a later count's
-    // empty hold holds nothing.
+    // A row that counts taps is the standard key past its deepest count
+    // (firmware D-F64): three quick presses tap the shortcut three times,
+    // which leaves it locked.
     const later = {...both, steps: [...both.steps, {tapIndex: 1, tap: code(KC_ESC)}]};
-    assert.deepEqual(traps(profile({keys: covered, rows: [later], shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}})), [], "a later count's empty hold is no hold");
+    const [pastDepth, ...more] = traps(profile({keys: covered, rows: [later], shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}}));
+    assert.equal(more.length, 0);
+    assert.deepEqual(pastDepth?.path, ["Triple-tap CUSTOM_KEY_9 on Base (whose shortcut turns layers on)"], "locked past the deepest count");
     // A first press with a long hold but no hold has no fallback hold either.
     const longOnly = {target: custom, allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: code(KC_ESC), longHold: {action: code(KC_A), style: 1}}]};
     assert.deepEqual(traps(profile({keys: covered, rows: [longOnly], shortcuts: {9: {layers: 1 << 5, layerKind: LOCK}}})), [], "a long hold, no hold: no lock");
-    // A held shortcut is held from the empty hold tier, and from nowhere when
-    // the first press has a long hold: then its layer is unreachable.
+    // A held shortcut is held from the empty hold tier, from a press held past
+    // a counting row's deepest count, and from nowhere when the first press
+    // of a row that counts no taps has a long hold: then its layer is
+    // unreachable.
     const holdKeys = {"0:0": CUSTOM_KEY(9), "5:3": KC_B};
     /** @param {object} row */
     const holdReached = (row) => !kinds(profile({keys: holdKeys, rows: [row], shortcuts: {9: {layers: 1 << 5, layerKind: HOLD}}})).includes("unreachable");
-    assert.deepEqual([tapOnly, longOnly, later].map(holdReached), [true, false, false], "Hold: an empty first hold, a long hold, both tiers authored");
+    assert.deepEqual([tapOnly, longOnly, later].map(holdReached), [true, false, true], "Hold: an empty first hold, a long hold, held past the depth");
     // A tap-toggle or one-shot key holds its layers from every press, its
     // row's tiers authored or not; a held one does not.
     const keys = {"0:0": CUSTOM_KEY(9), "5:3": KC_B};
@@ -806,4 +810,37 @@ test("a custom key with its own row sends its shortcut where the row leaves a ti
     assert.deepEqual([HOLD, TAP_TOGGLE, ONESHOT].map(reached), [false, true, true]);
     // A row with steps replaces the tap-toggle's own taps: no lock, no trap.
     assert.deepEqual(traps(profile({keys: covered, rows: [both], shortcuts: {9: {layers: 1 << 5, layerKind: TAP_TOGGLE}}})), []);
+});
+
+test("past a counting row's deepest tap count the key is itself, so its own lock or mode key is a way out", () => {
+    // Numbers locks, its own TG(1) covered by B. On it, a custom key whose
+    // shortcut locks Numbers sets both tiers of its first press, so only
+    // presses past its double tap send the shortcut (firmware D-F64): three
+    // of them unlock Numbers.
+    const custom = {kind: 7, flags: 0, operand: 9};
+    const counting = {target: custom, allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: code(KC_ESC), hold: {action: code(KC_A), style: 1}}, {tapIndex: 1, tap: code(KC_ESC)}]};
+    const keys = {"0:0": TG(1), "1:0": KC_B, "1:5": CUSTOM_KEY(9)};
+    const shortcuts = {9: {layers: 1 << 1, layerKind: LOCK}};
+    assert.deepEqual(traps(profile({keys, rows: [counting], shortcuts})), [], "Triple-tap CUSTOM_KEY_9 unlocks Numbers");
+    const single = {...counting, steps: counting.steps.slice(0, 1)};
+    assert.deepEqual(traps(profile({keys, rows: [single], shortcuts})).map((trap) => trap.layers), [[1]], "a row that counts no taps leaves no way out");
+    // A pointing mode's own key on a counting row ends its locked mode from
+    // past the depth, both tiers of its first press set.
+    const pdModes = [turnsOn(5)];
+    const modeRow = (steps) => ({target: code(PD_MODE(1)), allowedLayers: 0xffff, steps});
+    const first = {tapIndex: 0, tap: code(KC_ESC), hold: {action: code(KC_A), style: 1}};
+    const modeKeys = {...lockAt, "5:0": KC_B, "5:1": PD_MODE(1)};
+    assert.equal(modeTraps(profile({keys: modeKeys, rows: [modeRow([first])], pdModes})).length, 1, "its tiers replaced, no later count");
+    assert.deepEqual(modeTraps(profile({keys: modeKeys, rows: [modeRow([first, {tapIndex: 1, tap: code(KC_ESC)}])], pdModes})), [], "pressed past the depth");
+});
+
+// A Single tap set to Transparent changes only the standard tap: a press held
+// past the deepest tap count still holds the key's own layer, so a layer it
+// opens is a way out (firmware D-F64; D-L49 never invents a trap).
+test("a held press past the deepest tap count escapes, after a Transparent Single tap too", () => {
+    const hold = {action: code(0x06), style: 1};
+    const locked = (first) => profile({keys: {"0:0": TG(1), "1:0": KC_B, "1:1": MO(2), "2:2": TO(0)},
+        rows: [{target: code(MO(2)), allowedLayers: 0xffff, steps: [{tapIndex: 0, tap: code(first), hold}, {tapIndex: 1, tap: code(KC_B)}]}]});
+    assert.deepEqual(traps(locked(KC_ESC)), [], "MO(2) held past the depth reaches TO(0)");
+    assert.deepEqual(traps(locked(TRNS)), [], "and still does after a Transparent Single tap");
 });

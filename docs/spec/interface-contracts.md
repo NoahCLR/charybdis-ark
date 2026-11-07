@@ -507,8 +507,32 @@ macro and a custom key, which have none:
   is its modifiers, as core words them (`qmkKeyLayerMods`: "Navigation +
   Shift" is tagged "+ Shift"), and a layer-tap names what it taps as core
   words it (`qmkKeyLayerTaps`), never by cutting its label. A built-in cell
-  draws it the same way, dim and dashed, and says "built in"
+  draws it the same way, dim and dashed, and says "standard key"
   (`browser-tests/behaviour-named-actions.spec.js`).
+- The behaviour grid draws what an empty cell does, dashed: the standard
+  key, what the key does with no row (firmware D-F64), never another tap
+  count's action. Core works out every cell and publishes it with the key's
+  built-ins (`builtIn.cells`, `core/model/empty-cells.js`, D-L73), each
+  naming the branch it shows, the key's own or one the row sets, rather than
+  copying it; a key with no row shares its set with every key of its kind
+  (`behaviorEditing.cellPatterns`, named by its `cellPattern`). The grid
+  reads it (`inheritedBranch`, `impliedBranch` in
+  `webview/view/keyface.mjs`) and only words it. An empty later Tap is the
+  key's own tap once per press ("standard key … ×N"), or the key below after
+  a Transparent Single tap ("key below"); a tap count with nothing set taps
+  it and then holds the key ("after N taps", the taps before the held one),
+  inside the deepest tap count and past it alike; a tap a release sends on a
+  tap count with no hold of any kind ("released after …"), on the Single tap
+  only for a key with no hold of its own; a hold that starts as the key goes
+  down says so ("held from the press"), and a One-shot custom key's that it
+  arms its layers on release; a Tap-toggle custom key with no row "locks
+  its layers" on its TAPPING_TOGGLE-th tap; and, on a key that counts no taps,
+  each later press as a Single tap of its own: its Tap once per press ("each
+  press") and its Hold and Long hold the Single tap's ("as Single tap")
+  (`tests/model/empty-cells.test.js`, `tests/view/keyface.test.mjs`,
+  `browser-tests/behaviour-named-actions.spec.js`; a browser test that
+  patches a row publishes its cells as core would, `publishBehaviour` in
+  `browser-tests/control-preview.js`).
 - A stage that is off draws its marks off; an icon loses its colour. A
   colour is the keyboard's own, so a dark one reads dark; a badge keeps its
   count in the text colour (no test).
