@@ -75,8 +75,17 @@ function cellAt(steps, cell) {
     return step ? {step, kind: /** @type {import("../../../contracts/edits.js").Tier} */ (tier)} : null;
 }
 
-/** @param {EditorBehavior} behaviour */
-export function behaviourEditor(behaviour) {
+// Drawn with its head (the key's name, Change key… and Remove behaviour) on
+// the Behaviours tab; the Custom keys screen titles its card with the key and
+// carries the actions itself, so it asks for the editor without one.
+/** @param {import("../../../contracts/panel.js").PublishedModel | null} model @param {boolean} canEdit */
+export const behaviourActions = (model, canEdit) => `<button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
+        data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
+    <button class="btn tiny ghost destructive" data-act="remove" ${canEdit ? "" : "disabled"}
+        data-tip="${esc(editWords(model?.draft).removeBehaviour)}. Its keys then send their plain keycode.">Remove behaviour</button>`;
+
+/** @param {EditorBehavior} behaviour @param {{head?: boolean}} [options] */
+export function behaviourEditor(behaviour, {head = true} = {}) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
     const canEdit = editGate(model, "behaviours").editable;
@@ -147,20 +156,16 @@ export function behaviourEditor(behaviour) {
             <span class="bl">${esc([sendsKind(model, branch.action), styleLabel(kind, branch.style)].filter(Boolean).join(" · "))}</span></button>`;
     };
 
+    const notes = storageNotes(behaviour).map((note) => `<p class="note">${esc(note)}</p>`).join("");
     const node = el(`<div>
-        <div class="beh-head">
+        ${head ? `<div class="beh-head">
             <div>
                 <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
                     ${keyIdentity(model, behaviour.keycode).label === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
-                ${storageNotes(behaviour).map((note) => `<p class="note">${esc(note)}</p>`).join("")}
+                ${notes}
             </div>
-            ${behaviour.stored ? `<div class="right row beh-actions">
-                <button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
-                    data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
-                <button class="btn tiny ghost destructive" data-act="remove" ${canEdit ? "" : "disabled"}
-                    data-tip="${esc(editWords(model?.draft).removeBehaviour)}. Its keys then send their plain keycode.">Remove behaviour</button>
-            </div>` : ""}
-        </div>
+            ${behaviour.stored ? `<div class="right row beh-actions">${behaviourActions(model, canEdit)}</div>` : ""}
+        </div>` : notes ? `<div class="beh-notes">${notes}</div>` : ""}
         <div class="beh-intro">
             <label class="sw" data-tip="Treat this key as part of using the trackball, so pressing it keeps the pointer layer on instead of letting auto-mouse turn it off.">
                 <input type="checkbox" data-f="behaviour:${esc(behaviour.keycode)}:anchor" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>

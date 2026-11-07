@@ -1037,6 +1037,7 @@ button.tier:hover { background: var(--surface-3); }
 .beh-head .note { margin-top: var(--sp-1); }
 .beh-actions { gap: var(--sp-2); margin-left: auto; }
 .beh-note { margin-bottom: var(--sp-3); }
+.beh-notes { display: grid; gap: var(--sp-1); padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
 .ce-actions { align-self: center; max-width: 24ch; }
 /* Moving a behaviour onto a key that has one asks first (ui/keys/retarget.mjs). */
 .sheet.retarget { width: min(520px, 100%); }
