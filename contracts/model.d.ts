@@ -134,6 +134,8 @@ export interface Vocabulary {
     /** What a threshold means, as its field's hover help says. */
     thresholdTips: Readonly<Record<TimingTerm, string>>;
     tiers: Readonly<Record<Tier, string>>;
+    /** What lands a press in each tier, as the grid's heading says on hover. */
+    tierTips: Readonly<Record<Tier, string>>;
     branches: readonly string[];
     localities: WordList<string>;
     paintModes: WordList<string>;

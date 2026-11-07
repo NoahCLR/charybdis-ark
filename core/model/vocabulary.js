@@ -452,6 +452,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         multiTapTerm: "The time allowed from releasing the key to pressing it again for another tap. A Double tap Hold is press, release, then press and keep holding.",
     },
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
+    // What lands a press in each tier, said on the grid's headings.
+    tierTips: {tap: "Let go before the Tap / hold threshold.", hold: "Held past the Tap / hold threshold.", long: "Held past the Long hold threshold."},
     // A behaviour's branch by how many taps start it.
     branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],
 

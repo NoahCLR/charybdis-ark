@@ -38,14 +38,6 @@ function timingFallbackNote(model, behaviour, term) {
     return String(value ?? "").trim() !== "" ? `Empty, it follows ${where} (${value} ms).` : `Empty, it follows ${where}.`;
 }
 
-// What lands a press in each tier, said on its heading.
-/** @type {Readonly<Record<import("../../../contracts/edits.js").Tier, string>>} */
-const TIER_TIPS = {
-    tap: "Let go before the Tap / hold threshold.",
-    hold: "Held past the Tap / hold threshold.",
-    long: "Held past the Long hold threshold.",
-};
-
 // The cell open in this behaviour's grid: one opened in another behaviour's
 // editor, on this screen or another, stays closed here.
 /** @param {EditorBehavior} behaviour */
@@ -174,7 +166,7 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>Timing ${esc(checkLevelWord(model, check.level).toLowerCase())}.</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="bgrid">
             <span></span>
-            ${TIERS.map((kind) => `<div class="btier" data-tip="${esc(TIER_TIPS[kind])}">${tierDot(model, kind)}${esc(tierName(model, kind))}</div>`).join("")}
+            ${TIERS.map((kind) => `<div class="btier" data-tip="${esc(vocabulary(model).tierTips[kind] || "")}">${tierDot(model, kind)}${esc(tierName(model, kind))}</div>`).join("")}
             ${timingControl("multiTapTerm")}
             <span class="bterm"></span>
             ${timingControl("tapHoldTerm")}
