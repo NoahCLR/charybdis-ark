@@ -12,6 +12,9 @@
 import {el, html} from "../lib/dom.mjs";
 import {behaviourCards, hoverCard} from "./hover-card.mjs";
 
+// A control with words to show: one drawn with an empty tip has none, and a
+// tipped control around it answers instead.
+const TIPPED = '[data-tip]:not([data-tip=""])';
 const tip = el(`<div class="tip" role="tooltip" hidden></div>`);
 const describe = el(`<div id="ark-focus-tip" hidden></div>`);
 // The control the focus tip describes.
@@ -44,7 +47,7 @@ export function mountHover(root) {
     root.addEventListener("mouseover", (event) => {
         pointer = {x: event.clientX, y: event.clientY};
         const key = /** @type {SVGElement | null} */ (/** @type {Element} */ (event.target).closest("[data-key][data-card]"));
-        const hinted = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-tip]"));
+        const hinted = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest(TIPPED));
         // Still on the control whose tip is open or on its way: nothing to redo.
         if (hinted && hinted === shown && !key) return;
         clearTimeout(timer);
@@ -81,7 +84,7 @@ export function mountHover(root) {
         tip.hidden = true; shown = null;
     }, true);
     root.addEventListener("pointerdown", (event) => {
-        const control = /** @type {Element} */ (event.target).closest("[data-tip]");
+        const control = /** @type {Element} */ (event.target).closest(TIPPED);
         pressed = control?.getBoundingClientRect() ?? null;
         if (pressed) { clearTimeout(timer); tip.hidden = true; shown = null; }
     }, true);
@@ -105,7 +108,7 @@ export function hideHover() { clearTimeout(timer); tip.hidden = true; delete tip
 /** @param {Element} control */
 function focusTip(control) {
     if (described && described.control !== control) undescribe();
-    const hinted = /** @type {HTMLElement | null} */ (control.closest("[data-tip]"));
+    const hinted = /** @type {HTMLElement | null} */ (control.closest(TIPPED));
     const words = hinted && !hinted.hasAttribute("data-tip-names") ? hinted.dataset.tip?.trim() ?? "" : "";
     if (!words || !hinted || words === control.getAttribute("aria-label")) return;
     describe.textContent = words;

@@ -367,7 +367,9 @@ The same kind of control looks and sits the same on every screen.
   `data-tip`, and every one is shown by `webview/ui/hover.mjs` at the pointer
   (D-L80): below and to the right of where it rested, kept inside the
   window, above it when the window's bottom is too near, and there it stays while the pointer stays on
-  the control, even as a render redraws the control under it. No interface
+  the control, even as a render redraws the control under it. An empty
+  `data-tip` is no tip: nothing opens over it, on hover or focus, and a
+  tipped control around it answers instead (`TIPPED`). No interface
   module writes a `title` attribute, the browser's own tip, or a tip of its
   own; the hover card is not a tip and opens beside its key, on the Keymap's
   board alone: Lighting's board, which shows light, opens none (`card: false`

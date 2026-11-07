@@ -100,3 +100,24 @@ test("a tip with no room below the pointer opens above it, and a focused control
     expect(Math.abs(over.x + over.width / 2 - (box.x + box.width / 2))).toBeLessThanOrEqual(1);
     expect(Math.abs(over.y + over.height - (box.y - 8))).toBeLessThanOrEqual(1);
 });
+
+// A control drawn with an empty tip has nothing to say: no empty box opens
+// over it, on hover or on focus, and a tipped control around it answers instead.
+test("an empty tip opens nothing: a behaviour's Layers it runs on switches show no box", async ({page}) => {
+    await page.setViewportSize({width: 1440, height: 900});
+    await openControls(page, "keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"});
+    await page.locator('.beh-main [data-act="definition-layers"]').click();
+    const layerSwitch = page.locator(".beh-main .def-pop .layer-grid label.sw").first();
+    await expect(layerSwitch).toHaveAttribute("data-tip", "");
+    const tip = page.locator(".tip");
+    await layerSwitch.hover();
+    await page.waitForTimeout(500);
+    await expect(tip).toBeHidden();
+    // Focused, it gains no empty description either.
+    await layerSwitch.locator("input").focus();
+    await expect(layerSwitch.locator("input")).not.toHaveAttribute("aria-describedby", /ark-focus-tip/);
+    // A control with words still shows them.
+    await page.locator('.beh-main [data-act="definition-layers"]').hover();
+    await expect(tip).toBeVisible();
+    await expect(tip).toContainText("The layers a key can come from");
+});
