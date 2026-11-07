@@ -946,12 +946,14 @@ button.tier:hover { background: var(--surface-3); }
 .reach-table { padding: var(--sp-0) 0; }
 
 .beh-head { display: flex; align-items: flex-start; gap: var(--sp-4); padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
-/* Whether the behaviour runs and where lead; the pointer-layer switch
-   follows under them. An editor's options read as every editor's do: the
-   switch, then its words, from the left edge. */
-.beh-intro { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) 0 var(--sp-4); }
-.beh-intro > .stack { align-self: stretch; min-width: 0; }
-.beh-intro .sw { flex: none; }
+/* The behaviour's switches read as one row: whether it runs, the pointer-layer
+   switch, then the layers it runs on, which unfold in the room left on the
+   row, or under it when there is none. Its controls bring no box of their own
+   (participation.mjs). */
+.beh-intro { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-3) var(--sp-6); padding: var(--sp-3) 0 var(--sp-4); }
+.def-controls { display: contents; }
+.beh-intro .sw { flex: none; min-height: var(--h-compact); }
+.beh-intro .def-layers { order: 1; flex: 1 1 360px; min-width: 0; }
 /* One row per tap count the keyboard allows, all shown; a column per tier.
    Each timing heads what it governs: Multi tap window the tap counts, Tap /
    hold and Long hold their tiers. */
@@ -1035,7 +1037,6 @@ button.tier:hover { background: var(--surface-3); }
 .beh-head .note { margin-top: var(--sp-1); }
 .beh-actions { gap: var(--sp-2); margin-left: auto; }
 .beh-note { margin-bottom: var(--sp-3); }
-.beh-foot { margin-top: var(--sp-3); }
 .ce-actions { align-self: center; max-width: 24ch; }
 /* Moving a behaviour onto a key that has one asks first (ui/keys/retarget.mjs). */
 .sheet.retarget { width: min(520px, 100%); }
