@@ -182,6 +182,11 @@ The card that opens when the pointer rests on a key on the board, listing
 everything the key reaches.
 _Avoid_: tooltip, key card, popover
 
+**Tip**:
+The words that open at the pointer when it rests on a control, saying what
+the control does or what it shows in full.
+_Avoid_: tooltip, title, hover text
+
 **Keycode picker**:
 The dialog that chooses what a key, branch, shortcut or output sends.
 _Avoid_: key picker, keycode chooser, selector

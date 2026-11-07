@@ -156,7 +156,7 @@ function recoveriesCard(recoveries) {
     const node = el(`<div class="card recoveries">
         <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
         ${recoveries.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
-            <span class="recovery-name" title="${esc(copy.name)}">${esc(copyTitle(model, copy))}</span>
+            <span class="recovery-name" data-tip="${esc(copy.name)}">${esc(copyTitle(model, copy))}</span>
             ${String(state.recoveryAsk) === String(copy.id)
                 ? `<span class="recovery-ask" role="group" aria-label="Delete this copy?">${dialogFoot(
                     `<button class="btn tiny destructive" data-act="confirm-delete">Delete</button>`,

@@ -614,3 +614,38 @@ test("the interface keeps no table of words of its own", () => {
     const found = new Set(sources("webview").map(posix).flatMap(file => wordTables(read(file)).map(name => `${file}#${name}`)));
     assert.deepEqual([...WORD_TABLES_ALLOWED].filter(table => !found.has(table)), [], "drop an allowed table the check no longer finds");
 });
+
+// A tip is one thing wherever it opens: a data-tip, shown by
+// webview/ui/hover.mjs at the pointer (D-L80), in one face at one delay. A
+// title attribute is the browser's own tip, opening where and when the browser
+// decides, so no interface module writes one, and no module but hover.mjs
+// makes a tip of its own.
+const tipOfItsOwn = [
+    /\stitle=["'`]/g,
+    /\.title\s*=[^=]/g,
+    /\b(?:setAttribute|dataset)\s*\(\s*["'`]title["'`]/g,
+    /\brole\s*=\s*["'`]tooltip["'`]/g,
+    /\bclass\s*=\s*["'`]tip["'`]/g,
+];
+const makesTipOfItsOwn = source => {
+    const code = uncommented(source);
+    return [...new Set(tipOfItsOwn.flatMap(pattern => Array.from(code.matchAll(pattern), match => lineAt(code, match.index))))];
+};
+
+test("the tip check catches a module making a tip of its own", () => {
+    for (const sample of ["`<span class=\"name\" title=\"${esc(copy.name)}\">`", "`<a href=\"${url}\" title='The commit'>`",
+        "node.title = words;", "button.setAttribute(\"title\", words);", "`<div role=\"tooltip\"></div>`", "`<div class=\"tip\" hidden></div>`"]) {
+        assert.equal(makesTipOfItsOwn(sample).length, 1, sample);
+    }
+    for (const sample of ["`<span data-tip=\"${esc(copy.name)}\">`", "const title = check.title;", "function groupHeader({id, title = \"\", tip = \"\"}) {", "if (a.title === b.title) return;",
+        "`<h3>${esc(section.title)}</h3>`", "// a title= attribute is the browser's tip", "Object.freeze({title: \"Ark needs Chrome or Edge\"})",
+        "`<div class=\"tips\">`", "`<div class=\"hc-tip\">`"]) {
+        assert.deepEqual(makesTipOfItsOwn(sample), [], sample);
+    }
+});
+
+test("every tip is a data-tip shown by hover.mjs, never the browser's title", () => {
+    const violations = ["webview", "web"].flatMap(sources).filter(file => file !== path.join("webview", "ui", "hover.mjs"))
+        .flatMap(file => makesTipOfItsOwn(read(file)).map(line => `${file}:${line}`));
+    assert.deepEqual(violations, [], "give the control a data-tip; webview/ui/hover.mjs shows it at the pointer");
+});

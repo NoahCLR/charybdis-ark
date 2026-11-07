@@ -135,6 +135,7 @@ decisions are cited as D-L<n> (`docs/adr/`) and firmware D-F<n>.
 | Only `core/model/draft-editor.js` runs an editor's edit (`editSettings`, `editMacro`, `editCustomKey`, `editKeyboardName`, `PROFILE_EDITS`), in tests too; only `core/model/device-profile-edits.js` and the behaviour editor's own test run `editKeyBehaviors` | `tests/scripts/conventions.test.js` |
 | Only `core/session/connection-state.js` writes what the device service holds of a connection, through the writer bound to it (`ConnectionState.of()`, a `Held`); the apply's steps (`liveApply`) and the live watch's missed looks (`missedLooks`) are its only plain fields | `tests/scripts/conventions.test.js`, `tests/session/connection-state.test.js`, `npm run typecheck` |
 | No webview module posts an object literal: `post()` and `postLeavingDemo()` take a builder's output or a message the store hands back | `tests/scripts/conventions.test.js` |
+| Every tip is a `data-tip`, shown by `webview/ui/hover.mjs` at the pointer (D-L80): no interface or web module writes a `title` attribute, sets `.title`, or makes a `role="tooltip"` or `.tip` of its own | `tests/scripts/conventions.test.js`, `browser-tests/tooltips.spec.js` |
 | Every stored enum value has a word | `tests/model/vocabulary.test.js` |
 | A draft edit type agrees across `core/model/draft-edits.js`, `contracts/edits.d.ts` and `webview/view/edits.mjs` | `tests/model/draft-edits.test.js` |
 | A webview number that is also a wire number equals the schema's | `tests/view/enum-drift.test.mjs` |

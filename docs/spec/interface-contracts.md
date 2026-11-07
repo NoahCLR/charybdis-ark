@@ -335,6 +335,14 @@ The same kind of control looks and sits the same on every screen.
   masks of a strip's faded edges (`tests/scripts/conventions.test.js`).
   Tips and hover cards sit over a dialog's scrim; a message floating over the
   screen sits under it, as the rail's own message does (no test).
+- A tip is the words that open when the pointer rests on a control, its
+  `data-tip`, and every one is shown by `webview/ui/hover.mjs` at the pointer
+  (D-L80): below and to the right of where it rested, kept inside the
+  window, above it when the window's bottom is too near, and there it stays while the pointer stays on
+  the control, even as a render redraws the control under it. No interface
+  module writes a `title` attribute, the browser's own tip, or a tip of its
+  own; the hover card is not a tip and opens beside its key
+  (`tests/scripts/conventions.test.js`, `browser-tests/tooltips.spec.js`).
 
 ## Accessibility
 
@@ -343,8 +351,8 @@ the screen shows. The browser tests in `browser-tests/accessibility.spec.js`
 hold what they name.
 
 - A control's tip (`data-tip`) shows when the keyboard focuses the control,
-  as when the pointer rests on it, and is its description while it has the
-  focus: `aria-describedby` names `#ark-focus-tip`, which holds the tip's
+  as when the pointer rests on it, over the control's middle since no pointer
+  is there, and is its description while it has the focus: `aria-describedby` names `#ark-focus-tip`, which holds the tip's
   words. Escape or leaving the control hides it, and a press hides it until
   the pointer has left the control's place and come back, however many
   times a render redraws the control under it

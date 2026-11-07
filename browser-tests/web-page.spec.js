@@ -185,7 +185,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     const copies = page.locator(".card.recoveries .recovery-row");
     await expect(copies).toHaveCount(1);
     await expect(copies.first().locator(".recovery-name")).toHaveText(/^Before saving a draft · .+ · \d{1,2} \w{3} \d{4}, \d\d:\d\d$/);
-    await expect(copies.first().locator(".recovery-name")).toHaveAttribute("title", /^recovery-.+\.charybdis\.json$/);
+    await expect(copies.first().locator(".recovery-name")).toHaveAttribute("data-tip", /^recovery-.+\.charybdis\.json$/);
     const [recovery] = await Promise.all([page.waitForEvent("download"), copies.first().locator("[data-recovery]").click()]);
     expect(recovery.suggestedFilename()).toMatch(/^recovery-.+\.charybdis\.json$/);
 
