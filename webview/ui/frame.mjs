@@ -107,7 +107,7 @@ function railBuild(build) {
     if (!build) return "";
     const url = commitUrl(build);
     return url
-        ? `<a class="rail-build" href="${esc(url)}" target="_blank" rel="noopener" title="This build's commit on GitHub">${githubMark("rail-build-mark")}<span>${esc(buildLine(build))}</span></a>`
+        ? `<a class="rail-build" href="${esc(url)}" target="_blank" rel="noopener" data-tip="This build's commit on GitHub">${githubMark("rail-build-mark")}<span>${esc(buildLine(build))}</span></a>`
         : `<div class="rail-build"><span>${esc(buildLine(build))}</span></div>`;
 }
 
@@ -137,7 +137,7 @@ function applySteps(apply) {
                <span class="ap-bytes" style="min-width:${`${apply.bytes.total} / ${apply.bytes.total} bytes`.length}ch">${esc(apply.bytes.completed)} / ${esc(apply.bytes.total)} bytes</span>` : "";
         return `<li class="${esc(step.state)}"${current ? ' aria-current="step"' : ""}><span class="mark">${step.state === "active" ? spinner() : ""}</span>
             <span class="lbl">${esc(step.label)}</span>
-            ${current && (apply.detail || counted) ? `<span class="ap-detail"><span class="ap-text" title="${esc(apply.detail)}">${esc(apply.detail)}</span>${counted}</span>` : ""}</li>`;
+            ${current && (apply.detail || counted) ? `<span class="ap-detail"><span class="ap-text" data-tip="${esc(apply.detail)}">${esc(apply.detail)}</span>${counted}</span>` : ""}</li>`;
     }).join("");
     return `<ol class="ap-steps">${rows}</ol>`;
 }

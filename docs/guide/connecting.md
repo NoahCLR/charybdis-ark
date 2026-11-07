@@ -83,6 +83,10 @@ The column on the left is the rail. From the top:
   box rather than hiding the screens above it.
 - **Draft history**, with undo and redo arrows and a count of the steps so far.
 
+Rest the pointer on a button, a setting or a figure and a tip opens beside
+the pointer, saying what it does or showing it in full. Reaching the control
+with the keyboard opens the tip too, over the control.
+
 In a window 1100 pixels wide or less, the rail keeps only its icons, so the
 screen gets the width: hover an icon for its screen's name, and the keyboard
 button is its dot. Messages then float over the screen's lower left corner.
