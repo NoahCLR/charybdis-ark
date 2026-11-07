@@ -57,6 +57,10 @@ test("participation controls post placements, shared definitions and master/sour
     await expect(layersPanel).toHaveAttribute("aria-expanded", "true");
     await page.locator('.def-layers [data-empty-layers]').click();
     await page.locator('.def-layers label').filter({has: page.locator('[data-switch-layer="15"]')}).click();
+    // Esc closes the panel, focus back on its button; a press outside would too.
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".def-pop")).toHaveCount(0);
+    await expect(layersPanel).toBeFocused();
     await page.locator('[data-output]').fill("KC_A");
     await page.locator('[data-act="pickboard"]').click();
     await page.locator('.board-card [data-key="1"]').click();

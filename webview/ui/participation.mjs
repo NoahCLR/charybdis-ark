@@ -43,16 +43,29 @@ export function definitionControls(layers, definition, editable, changed, identi
     button.addEventListener("click", () => { if (open) close(); else keepFold(PLACE, true); render(); });
     if (pop) {
         pop.appendChild(grid);
-        // Esc closes it with focus back on its button; a press outside takes
-        // it out in place, so the press still lands on what it was on.
+        // Esc closes it with focus back on its button. A press outside closes
+        // it in place rather than by a redraw, and only once the click has
+        // landed: the panel reaches below the editor, so taking it out on the
+        // press itself can scroll the page under the pointer and lose the
+        // click on what it was on.
         pop.addEventListener("keydown", (event) => {
             if (event.key !== "Escape") return;
             event.preventDefault(); event.stopPropagation();
             close(); render();
             /** @type {HTMLElement | null} */ (document.querySelector("[data-act=\"definition-layers\"]"))?.focus();
         });
+        // One watch for the page: a tab laid out for its height draws a
+        // second editor, with a panel of its own, so a press counts as
+        // inside by what it lands on, and the close takes out every panel.
         stopWatching?.();
-        stopWatching = watchPressOutside([pop, button], () => { close(); pop.remove(); button.setAttribute("aria-expanded", "false"); });
+        stopWatching = watchPressOutside([], (event) => {
+            if (/** @type {Element | null} */ (event.target instanceof Element ? event.target : null)?.closest(".def-layers")) return;
+            close();
+            document.addEventListener("click", () => {
+                document.querySelectorAll(".def-pop").forEach((panel) => panel.remove());
+                document.querySelectorAll('[data-act="definition-layers"]').forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
+            }, {capture: true, once: true});
+        });
     }
     const use = /** @type {HTMLInputElement} */ (node.querySelector("[data-definition-enabled]"));
     const report = () => changed({enabled: use.checked, allowedLayers: switchedLayers(grid)});
