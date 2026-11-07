@@ -227,6 +227,8 @@ export function pickerOverlay() {
         : {existing: undefined, withBehaviour: false, spare: undefined};
     /** @param {import("../../contracts/panel.js").CustomKey} key */
     const keyWords = (key) => `Custom key ${key.slot}${key.name ? ` · ${key.name}` : ""}`;
+    // The footer names every part picked, in the order it is held (modifiers,
+    // keys, layers), beside the pick in QMK's names (D-L83).
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
@@ -247,10 +249,10 @@ export function pickerOverlay() {
         <div class="sheet-f">
             <span class="label">Selected</span>
             ${picker.layerTap ? `<button class="chip" data-act="clearlt" aria-label="${esc(`Remove the tap-hold on ${layerTapName(picker.layerTap)}`)}">LT ${esc(layerTapName(picker.layerTap))} ✕</button>` : ""}
-            ${picker.keys.length ? picker.keys.map((key, index) => `<button class="chip" data-remove="${esc(index)}" aria-label="${esc(`Remove ${keyNameText(model, key)}`)}">${esc(key)} ✕</button>`).join("")
-                : picker.mods.length ? modifierControls(model).filter(({value: wrap}) => picker.mods.includes(wrap)).map(({value: wrap, label}) =>
-                    `<button class="chip" data-unmod="${esc(wrap)}" aria-label="${esc(`Remove ${label}`)}">${esc(label)} ✕</button>`).join("")
-                : picker.layers ? "" : `<span class="note">nothing picked yet</span>`}
+            ${modifierControls(model).filter(({value: wrap}) => picker.mods.includes(wrap)).map(({value: wrap, label}) =>
+                `<button class="chip" data-unmod="${esc(wrap)}" aria-label="${esc(`Remove ${label}`)}">${esc(label)} ✕</button>`).join("")}
+            ${picker.keys.map((key, index) => `<button class="chip" data-remove="${esc(index)}" data-tip="${esc(key)}" aria-label="${esc(`Remove ${keyNameText(model, key)}`)}">${esc(keyNameText(model, key))} ✕</button>`).join("")}
+            ${picker.keys.length || picker.mods.length || picker.layers || picker.layerTap ? "" : `<span class="note">nothing picked yet</span>`}
             ${picker.shortcut ? layers().filter((layer) => (picker.layers || 0) & 2 ** layer.index).map((layer) =>
                 `<button class="chip" data-unlayer="${esc(layer.index)}" aria-label="${esc(`Remove ${layerCalled(layer)}`)}">${esc(layerCalled(layer))} ✕</button>`).join("") : ""}
             <code class="mono pk-value">${esc(storable || "—")}</code>

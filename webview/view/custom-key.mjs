@@ -14,6 +14,7 @@ import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
 import {keycodeModifiers} from "./keyvalues.mjs";
 import {LAYERS} from "./layout.mjs";
 import {MODIFIER_KEY_SIDES, TAPPING_TOGGLE} from "../../rules/qmk-keycodes.mjs";
+import {SHORTCUT_JOIN, shortcutChord, shortcutWords} from "../../rules/shortcut-notation.mjs";
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {import("../../contracts/panel.js").CustomKey} CustomKey */
@@ -40,12 +41,12 @@ const layerKindOf = (key) => (key.shortcut?.layers ? key.shortcut.layerKind || L
 /** @param {CustomKey} key */
 const layersAlone = (key) => Boolean(key.shortcut?.layers) && !sendsKeys(key.shortcut);
 /** @param {CustomKey} key */
-const layerNames = (key) => (key.shortcutLayerNames || []).join(" + ") || key.shortcutLabel;
+const layerNames = (key) => (key.shortcutLayerNames || []).join(SHORTCUT_JOIN) || key.shortcutLabel;
 // What a shortcut of layers alone does with them, after "it".
 const LAYER_ACTS = [(/** @type {string} */ names) => `holds ${names} on`, (/** @type {string} */ names) => `locks ${names}`, (/** @type {string} */ names) => `moves to ${names}`,
     (/** @type {string} */ names) => `tap-toggles ${names}`, (/** @type {string} */ names) => `turns ${names} on as a one-shot`];
 // What the shortcut does, after "it": sends its modifiers and keys, its layers
-// named after them by their kind ("sends Left Cmd + Lock Navigation"), or, of
+// named after them by their kind ("sends Command+Lock Navigation"), or, of
 // layers alone, what it does with them (firmware D-F26).
 /** @param {CustomKey} key */
 export const shortcutAct = (key) => (layersAlone(key) ? (LAYER_ACTS[layerKindOf(key)] || LAYER_ACTS[0])(layerNames(key)) : `sends ${key.shortcutLabel}`);
@@ -220,11 +221,11 @@ export function shortcutKeyCode(model, expression) {
 
 // A catalogue key that is or carries modifiers is a shortcut too, though its
 // keycode is not a key the shortcut holds: a modifier key is its modifier in
-// the mask (Left Shift is Left Shift, with no key), and a key with its own
+// the mask (the Left Shift key is Shift, with no key), and a key with its own
 // modifiers, as QMK's shifted symbols are (KC_EXLM is S(KC_1)), is those
 // modifiers and its key, when the shortcut may hold that key. So the shortcut
 // picker offers every modifier and symbol the Keymap screen's picker does, and
-// `!` is Left Shift + 1. Null for any other key.
+// `!` is Shift+1. Null for any other key.
 /** @param {Model} model @param {string} name @returns {{key: string, mods: number} | null} */
 export function shortcutModifiers(model, name) {
     const code = keyIdentity(model, name).entry?.keycode;
@@ -324,18 +325,19 @@ export function shortcutPickKey(model, pick, name) {
 }
 
 
-// The picker's choice in words, for its footer: "Left Ctrl + Right Alt + K",
-// its keys in order ("Left Shift + A + S + Play"), then its layers by name, lowest first, led by their kind's verb unless held,
-// as core names a shortcut ("Left Cmd + Lock Navigation + Extra").
+// A shortcut being picked, in words ("Ctrl+Right Option+K",
+// "Command+Lock Navigation+Extra"), by the one rule core names a stored one by
+// (rules/shortcut-notation.mjs), and as the chord of QMK names the picker's
+// footer shows ("KC_LEFT_CTRL+KC_RIGHT_ALT+KC_K"). `modifiers` swaps the
+// modifiers' words, for a name written short.
+/** @param {Model} model @param {readonly (readonly [number, string])[]} [modifiers] @returns {import("../../rules/shortcut-notation.mjs").ShortcutTerms} */
+const shortcutTerms = (model, modifiers = vocabulary(model).modifiers || []) => ({
+    modifiers, keyLabel: (/** @type {number} */ code) => { const entry = catalogEntry(model, code); return entry ? entry.label || entry.value : ""; },
+    layerName: (/** @type {number} */ index) => layerCalledAt(model, index), layerCount: LAYERS, layerKinds: vocabulary(model).customKeys?.layerKinds || []});
 /** @param {Model} model @param {{mods: number, keys: readonly number[], layers?: number, layerKind?: number}} shortcut */
-export function shortcutPickLabel(model, shortcut) {
-    const mods = (vocabulary(model).modifiers || []).filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
-    const keys = shortcut.keys.map((code) => catalogEntry(model, code)).map((entry) => entry ? entry.label || entry.value : "");
-    const layers = (model?.layers || []).map((layer) => layer.index).filter((index) => (shortcut.layers ?? 0) & 2 ** index).sort((a, b) => a - b).map((index) => layerCalledAt(model, index));
-    const verb = shortcut.layerKind ? (vocabulary(model).customKeys?.layerKinds || []).find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
-    if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;
-    return [...mods, ...keys, ...layers].filter(Boolean).join(" + ");
-}
+export const shortcutPickLabel = (model, shortcut) => shortcutWords(shortcut, shortcutTerms(model));
+/** @param {Model} model @param {{mods: number, keys: readonly number[], layers?: number, layerKind?: number}} shortcut */
+export const shortcutPickChord = (model, shortcut) => shortcutChord(shortcut, {keyName: (code) => catalogEntry(model, code)?.value || "", layerCount: LAYERS});
 
 // The kinds a shortcut's layers can be turned on as, in the picker: each
 // kind's verb, as its layer key reads ("Lock"), and what it does, for its tip.
@@ -412,12 +414,12 @@ export function customKeyChoice(model, shortcut, {runsBehaviour = true} = {}) {
     return {existing: behaved, withBehaviour: Boolean(behaved), spare: unusedCustomKey(model)};
 }
 
-// The name it gets: the shortcut in words if that fits a name, else written
-// short ("LCtrl+LShift+RCtrl+RShift"), else none.
+// The name it gets: the shortcut in words if that fits a name, else with its
+// right modifiers written short ("Ctrl+Shift+RCtrl+RShift"), else none.
 /** @param {Model} model @param {{mods: number, keys: readonly number[]}} shortcut */
 export function offeredName(model, shortcut) {
     const label = shortcutPickLabel(model, shortcut);
     if (nameBytes(label) <= NAME_MAX_BYTES) return label;
-    const short = shortcutPickLabel(model, shortcut).split(" + ").map((part) => part.replace(/^Left /, "L").replace(/^Right /, "R")).join("+");
+    const short = shortcutWords(shortcut, shortcutTerms(model, (vocabulary(model).modifiers || []).map(([bit, word]) => [bit, word.replace(/^Right /, "R")])));
     return nameBytes(short) <= NAME_MAX_BYTES ? short : "";
 }

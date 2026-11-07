@@ -124,13 +124,15 @@ for (const [hostOs, alt, gui] of [[0, "Alt", "GUI"], [1, "Option", "Command"], [
     test(`host ${hostOs} shares all eight modifier names with basic keys, shortcuts and mod-taps`, () => {
         const names = profileKeyNames({hostOs});
         const {modifiers, pickerModifiers} = hostKeyVocabulary(hostOs);
-        assert.deepEqual(modifiers.map(([, label]) => label), ["Left Ctrl", "Left Shift", `Left ${alt}`, `Left ${gui}`, "Right Ctrl", "Right Shift", `Right ${alt}`, `Right ${gui}`]);
+        // Held together, the left one is unmarked (D-L83); a modifier key on
+        // its own keeps its side.
+        assert.deepEqual(modifiers.map(([, label]) => label), ["Ctrl", "Shift", alt, gui, "Right Ctrl", "Right Shift", `Right ${alt}`, `Right ${gui}`]);
         for (let i = 0; i < 8; i++) {
             const [bit, label] = modifiers[i];
-            assert.equal(keyLabel(names, 0xe0 + i), label);
+            assert.equal(keyLabel(names, 0xe0 + i), i < 4 ? `Left ${label}` : label);
             const control = pickerModifiers[i];
             assert.equal(control.bit, bit);
-            assert.equal(control.label, i < 4 ? label.replace(/^Left /, "") : label);
+            assert.equal(control.label, label);
             const encodedMods = i < 4 ? bit : 0x10 | (bit >> 4);
             const shortcut = keycodes.resolve((encodedMods << 8) | 4);
             assert.equal(keyLabel(names, shortcut.value), `${control.label}+A`);
@@ -224,4 +226,15 @@ test("what a keycode is, where the interface treats it apart: transparent, disab
     for (const value of [keycodes.encode("KC_A"), QK.MACRO.first - 1, QK.MACRO.last + 1, customKeyCode(CUSTOM_KEY_SLOTS), PD_MODE_KEYS[0].holdCode]) {
         assert.equal(keyKind(value), undefined, `0x${value.toString(16)}`);
     }
+});
+
+// The picker's footer spells a shortcut's layers as the layer key its kind
+// acts as (rules/shortcut-notation.mjs); that list follows core's stored
+// kinds and reads by the same verb as the layer key does.
+test("a shortcut's layer kinds and the layer keys its chord spells them as stay in step", () => {
+    const {SHORTCUT_LAYER_FUNCTIONS} = require("../../rules/shortcut-notation.mjs");
+    const {SHORTCUT_LAYER_KINDS} = require("../../core/schema/settings-domain-v1");
+    const {VOCABULARY} = require("../../core/model/vocabulary");
+    assert.deepEqual(Object.values(SHORTCUT_LAYER_KINDS), SHORTCUT_LAYER_FUNCTIONS.map((_, kind) => kind));
+    assert.deepEqual(SHORTCUT_LAYER_FUNCTIONS.map((form) => VOCABULARY.layerKeyVerbs[form]), VOCABULARY.customKeys.layerKinds.map(([, verb]) => verb));
 });

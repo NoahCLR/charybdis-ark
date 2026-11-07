@@ -68,14 +68,14 @@ test("modifiers alone or with a modifier key fold into the simplest keycode; any
     assert.equal(storedPick(model, unfolded), unfolded, "the pick itself when nothing folds");
 });
 
-test("a pick that cannot be used says why in the draft's words; a shortcut is named as core names it", () => {
+test("a pick that cannot be used says why in the draft's words; a shortcut shows as the chord of its QMK names", () => {
     const both = picker({mods: ["C", "S", "RCTL", "RSFT"]});
     assert.ok("shortcut" in /** @type {object} */ (foldedPick(model, both)), "two modifiers on each side are a custom key's shortcut");
     assert.match(pickProblem(model, both), /left modifiers or right modifiers/);
     assert.equal(pickProblem(model, picker({mods: ["S"], keys: ["KC_A"]})), "");
     const shortcut = picker({shortcut: true, mods: ["S"], keys: ["KC_1"]});
     assert.equal(pickProblem(model, shortcut), "");
-    assert.equal(pickedExpression(model, shortcut), "Left Shift + 1");
+    assert.equal(pickedExpression(model, shortcut), "KC_LEFT_SHIFT+KC_1");
 });
 
 test("a search finds the field's macros and offered keycodes, the first rows of them", () => {

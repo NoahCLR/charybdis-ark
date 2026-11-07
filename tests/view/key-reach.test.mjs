@@ -99,7 +99,7 @@ test("a custom key shows its shortcut only when it has one", () => {
 
 test("a key's combos say whether they fire here, run their output's behaviour, or send a custom key's shortcut", () => {
     const combos = reachOf(14).combos.map(({combo, use, runs, sendsInstead}) => [combo.badge, use.fires, runs, sendsInstead]);
-    assert.deepEqual(combos, [["C0", true, true, ""], ["C1", true, false, "sends its shortcut, Left Ctrl + Right Alt + K"], ["C2", false, false, ""]]);
+    assert.deepEqual(combos, [["C0", true, true, ""], ["C1", true, false, "sends its shortcut, Ctrl+Right Alt+K"], ["C2", false, false, ""]]);
     assert.ok(reachOf(14).combos[2].use.reasons.length, "a combo that does not fire says why");
     assert.deepEqual(keyReach(layerView(reaching, 0), reaching.layers[0], reaching.layers[0].positions[0], -1, []).combos, [], "the combos a caller passes are the ones shown");
 });

@@ -713,7 +713,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         fieldLabels: {name: "Pointing mode name", dpi: "Pointer speed", axis: "Reads", emptyDirection: "When a direction has no key",
             directionOutput: "How often it sends", scrollAxes: "Scrolls", invert: "Reverse scrolling", horizontal: "Horizontal", vertical: "Vertical"},
     },
-    modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
+    // The eight modifiers by their bits, as they read held together: the left
+    // one unmarked, the right one named so (D-L83). A modifier key on its own
+    // keeps its side ("Left Ctrl"), the catalogue's name for it.
+    modifiers: [[1, "Ctrl"], [2, "Shift"], [4, "Alt"], [8, "GUI"],
         [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"]],
     comboOptions: {useOutputBehavior: "use output behaviour", mustHold: "must be held", mustTap: "tap only", ordered: "keys in order"},
     // What a behaviour and a combo share, as both editors label it and the

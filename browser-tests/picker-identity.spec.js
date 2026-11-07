@@ -54,7 +54,7 @@ test("a custom key's shortcut kept as it opened posts when the key changed meanw
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
-        Object.assign(model.customKeys.find((row) => row.keycode === "CUSTOM_KEY_1"), {shortcut: {mods: 0x01, keys: [0x0e], layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + K"});
+        Object.assign(model.customKeys.find((row) => row.keycode === "CUSTOM_KEY_1"), {shortcut: {mods: 0x01, keys: [0x0e], layers: 0, layerKind: 0}, shortcutLabel: "Ctrl+K"});
         store.setModel(model); store.render();
     });
     await page.locator('[data-act="pick-shortcut"]').click();

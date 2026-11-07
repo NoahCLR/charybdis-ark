@@ -43,7 +43,10 @@ for(const theme of ["dark","light"]) {
             for(const {value,label} of model.vocabulary.pickerModifiers) await expect(page.locator(`[data-mod="${value}"]`)).toHaveText(label);
             await expect(page.locator('.picker .sheet-h')).toContainText(hostKeyLabel('Left GUI',host));
             await expect(page.locator('[data-mod="RGUI"]')).toHaveClass(/on/);
-            await expect(page.locator('.picker [data-remove="0"]')).toContainText('KC_A');
+            // Every part picked is a chip by name, the modifier beside the key, its keycode on hover.
+            await expect(page.locator('.picker [data-unmod="RGUI"]')).toContainText(hostKeyLabel('Right GUI',host));
+            await expect(page.locator('.picker [data-remove="0"]')).toContainText('A');
+            await expect(page.locator('.picker [data-remove="0"]')).toHaveAttribute('data-tip','KC_A');
             await expect(page.locator('.pkb-key[data-pick="KC_LGUI"]')).toHaveAttribute('aria-label',hostKeyLabel('Left GUI',host));
             await expect(page.locator('.pkb-key[data-pick="KC_RALT"]')).toContainText(hostKeyLabel('Alt',host));
             await page.locator('#pickerSearch').fill('SC_LAPO');
@@ -58,7 +61,7 @@ for(const theme of ["dark","light"]) {
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
             await expect(page.getByRole('checkbox',{name:hostKeyLabel('Right GUI',host),exact:true}).first()).toHaveAttribute('aria-label',hostKeyLabel('Right GUI',host));
-            await expect(page.locator('.pd-advanced')).toContainText(`${hostKeyLabel('Left Alt',host)}, ${hostKeyLabel('Right GUI',host)}`);
+            await expect(page.locator('.pd-advanced')).toContainText(`${hostKeyLabel('Alt',host)}, ${hostKeyLabel('Right GUI',host)}`);
         }
         await page.evaluate(async()=>{
             const s=await import('/webview/store.mjs');

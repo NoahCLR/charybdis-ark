@@ -83,14 +83,16 @@ as in a custom key's shortcut: clicking either lights both, and the key you
 picked stays. A modifier alone is that modifier's key. Opening the picker on
 a key that holds modifiers shows them lit in the row, with its key on the
 board.
-The footer shows the keycode you'll get, and **Use keycode** stores it.
+The footer lists what you picked by name, the modifiers first and then the
+key, each with a ✕ to take it out, beside the keycode you'll get; **Use
+keycode** stores it.
 
 Modifiers picked with no other key are stored with one of them as the key,
-wrapped in the rest: Left Ctrl + Left Shift stores `S(KC_LEFT_CTRL)`, and
-Left + Right Command `RGUI(KC_LEFT_GUI)`.
+wrapped in the rest: Ctrl+Shift stores `S(KC_LEFT_CTRL)`, and
+Command+Right Command `RGUI(KC_LEFT_GUI)`.
 
 A keycode can hold modifiers from one side only. For anything else, such as
-Left Ctrl + Right Ctrl + C, or two modifiers from each side with no key, the
+Ctrl+Right Ctrl+C, or two modifiers from each side with no key, the
 picker offers a custom key instead (on a board key, in a behaviour, or as a
 combo output):
 
@@ -134,18 +136,19 @@ keys, media and system keys (play/pause, volume, sleep) and mouse keys
 (buttons, the wheel, cursor movement). Click each key you want, in order;
 click one again to take it out. A symbol such as `!` is its key with Shift,
 and a shortcut has one set of modifiers, so that Shift is held for the whole
-shortcut: `!` then `a` sends Shift + 1 + A, which types "!A". Taking a symbol
+shortcut: `!` then `a` sends Shift+1+A, which types "!A". Taking a symbol
 out takes its Shift with it, unless another symbol still needs it or you
 turned Shift on yourself. A shortcut holds at most six keys, one media key and
 one system key, since the computer reads one of each at a time: the picker
 says so under the keys and keeps **Use shortcut** off until the choice fits. A
 media key in a shortcut plays wherever the shortcut is sent: behind a
 behaviour, from a bypassed key or as a combo's output. Here left and right
-modifiers mix freely, so Left Ctrl + Right Option + K is fine. Its **Layers**
+modifiers mix freely, so Ctrl+Right Option+K is fine: wherever Ark names
+modifiers together, a left one reads plainly and a right one says so. Its **Layers**
 section switches on the layers the shortcut turns on, as many as you like, and
 **Turns them on as** says how, all of them alike, as a layer key would:
 
-- **Hold**, as `MO()`: Left Cmd + Navigation + Extra holds Command and both
+- **Hold**, as `MO()`: Command+Navigation+Extra holds Command and both
   layers while you hold the key. They go off when you let go, unless a lock,
   another key or a pointing mode's key keeps them on, and a tap turns them on
   only for the tap.
@@ -168,7 +171,10 @@ behaviour would then wait as long as its long hold, or longer
 the key sends the shortcut where it leaves a tap or a hold empty, so a lock or
 a move happens from either. The base layer and the default layers are always
 on, so their rows are dimmed and say so. Modifiers alone, a key alone or
-layers alone are a shortcut too. **Clear** removes it.
+layers alone are a shortcut too. The picker's footer spells the shortcut in
+QMK's names, as it does a keycode: each modifier as its key, then the keys,
+then each layer as the layer key it acts as, so Command and Space holding
+Navigation read `KC_LEFT_GUI+KC_SPACE+MO(3)`. **Clear** removes it.
 
 **What it does** holds the same behaviour editor as the Keymap screen, with
 **Change key…** and **Remove behaviour** in its title bar. It works before the

@@ -53,8 +53,8 @@ export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ 
 // buttons, so Command + Right Command + the Left Command key is just Left and
 // Right Command. Folded into one set, it is stored as the simplest keycode
 // that holds it: one modifier as the key, wrapped in the others when those are
-// all on one side (Left Ctrl + Left Shift is S(KC_LEFT_CTRL), Left + Right
-// Command is RGUI(KC_LEFT_GUI)), a lone modifier as its own key. A set no
+// all on one side (Ctrl+Shift is S(KC_LEFT_CTRL), Command+Right Command is
+// RGUI(KC_LEFT_GUI)), a lone modifier as its own key. A set no
 // keycode can hold (two or more modifiers on each side) comes back as the
 // shortcut a custom key would take instead (D-L63).
 // Null when the selection has a key that is not a modifier, or nothing.

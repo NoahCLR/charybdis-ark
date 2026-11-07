@@ -79,7 +79,7 @@ const forms = [
         open: page => page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             const model = structuredClone(store.getModel());
-            Object.assign(model.customKeys[1], {shortcut: {mods: 0x01, keys: [0x0e], layers: 0, layerKind: 0}, shortcutLabel: "Left Ctrl + K"});
+            Object.assign(model.customKeys[1], {shortcut: {mods: 0x01, keys: [0x0e], layers: 0, layerKind: 0}, shortcutLabel: "Ctrl+K"});
             store.setModel(model); store.render();
         }),
         commit: page => page.locator('[data-act="clear-shortcut"]').click(), type: "updateCustomKeyShortcut", names: "fingerprint"},

@@ -9,7 +9,7 @@ import {keycodeModifiers, modifierPick, pickerModifierProblem} from "./keyvalues
 import {keycodeValue} from "./keycode-expression.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "./picker-sections.mjs";
 import {macroMatches} from "./macro.mjs";
-import {shortcutModifiers, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickLabel, shortcutPickModifier, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
+import {shortcutModifiers, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickChord, shortcutPickModifier, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
 import {catalogEntry, keyIdentity, sameKey} from "./key-identity.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 
@@ -157,11 +157,12 @@ export const storedPick = (model, picker) => {
 /** @param {Model} model @param {Picker} picker */
 export const pickProblem = (model, picker) => picker.shortcut ? shortcutPickProblem(model, picker) : pickerModifierProblem(model, storedPick(model, picker));
 
-// What Use would store: a shortcut as core names it, anything else as its
+// What Use would store, as the footer shows it in QMK's names: a shortcut as
+// the chord of its parts ("KC_LEFT_CTRL+KC_SPACE+TG(1)"), anything else as its
 // keycode expression.
 /** @param {Model} model @param {Picker | null} picker */
 export const pickedExpression = (model, picker) => !picker ? ""
-    : picker.shortcut ? shortcutPickLabel(model, shortcutPick(model, picker)) : pickerExpression(storedPick(model, picker));
+    : picker.shortcut ? shortcutPickChord(model, shortcutPick(model, picker)) : pickerExpression(storedPick(model, picker));
 
 // What a search finds across every section the field takes: the macros it
 // names and the offered keycodes whose name or words hold it, the first

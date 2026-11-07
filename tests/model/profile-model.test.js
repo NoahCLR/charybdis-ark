@@ -308,7 +308,7 @@ test("effective host names reach keycaps, picker search and modifier controls wi
     assert.equal(model.layers[0].positions[2].modifierLabel, undefined, "a modified key's hold is not a mod-tap's");
     assert.deepEqual(model.layers[0].positions.map(p => p.value), keys);
     assert.equal(model.vocabulary.pickerModifiers.find(({value}) => value === "G").label, "Command");
-    assert.equal(model.vocabulary.modifiers.find(([id]) => id === 4)[1], "Left Option");
+    assert.equal(model.vocabulary.modifiers.find(([id]) => id === 4)[1], "Option");
     assert.match(model.qmkKeycodes.find(e => e.keycode === 0xe3).search, /command/);
 });
 
