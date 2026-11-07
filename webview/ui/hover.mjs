@@ -1,5 +1,6 @@
 // @ts-check
-// Hovering: the hover card (webview/ui/hover-card.mjs) beside the key, with the
+// Hovering: the hover card (webview/ui/hover-card.mjs) beside a key of a board
+// that opens cards (data-card: the Keymap's, not Lighting's), with the
 // behaviours its combos run beside that, and any other control's data-tip at
 // the pointer (D-L80). A control reached by the keyboard shows its tip too,
 // above the control since no pointer is there, and a screen reader hears it
@@ -42,7 +43,7 @@ export function mountHover(root) {
     root.addEventListener("mousemove", (event) => { pointer = {x: event.clientX, y: event.clientY}; }, {capture: true, passive: true});
     root.addEventListener("mouseover", (event) => {
         pointer = {x: event.clientX, y: event.clientY};
-        const key = /** @type {SVGElement | null} */ (/** @type {Element} */ (event.target).closest("[data-key]"));
+        const key = /** @type {SVGElement | null} */ (/** @type {Element} */ (event.target).closest("[data-key][data-card]"));
         const hinted = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-tip]"));
         // Still on the control whose tip is open or on its way: nothing to redo.
         if (hinted && hinted === shown && !key) return;

@@ -50,7 +50,7 @@ const ledLabelAt = (cx, cy, led) => ledLabel(cx - ledLabelWidth(led) / 2 + LED_L
 
 /** @param {import("../view/keyface-types.js").LayerView} view @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(view, options = {}) {
-    const {selected, holding = [], reach = [], pdActive = null, comboActive = null, drafted = null, faces = true, ledIndex = false, accent = null,
+    const {selected, holding = [], reach = [], pdActive = null, comboActive = null, drafted = null, faces = true, ledIndex = false, accent = null, card = true,
         onKey, onOpen, onSwap, onLed} = options;
 
     const measure = pageTextMeasure() ?? estimateWidth;
@@ -129,7 +129,7 @@ export function board(view, options = {}) {
         // selected key is the current one, an LED picked for an accent is
         // pressed, and a key the draft changed says so after its name.
         const said = accent ? (picked ? ' aria-pressed="true"' : ' aria-pressed="false"') : selected === index ? ' aria-current="true"' : "";
-        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}"${led === undefined ? "" : ` data-led="${esc(led)}"`} tabindex="0" role="button"${said}
+        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${esc(index)}"${card ? " data-card" : ""}${led === undefined ? "" : ` data-led="${esc(led)}"`} tabindex="0" role="button"${said}
             aria-label="${esc(key.name)}${ledIndex && led !== undefined ? `, LED ${esc(led)}` : ""}${from ? `, from ${esc(layerCalled(from))}` : ""}${drafted?.keys?.has(index) ? `, ${esc(drafted.after)}` : ""}"${transform}>
             <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index || holding.includes(index) ? ring("kc-ring") : ""}
