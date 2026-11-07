@@ -20,7 +20,8 @@ const keycodeCatalog = require("../data/keycode-catalog");
 const {offered} = require("../data/offered-keycodes");
 const keycodes = require("../schema/keycodes");
 const keycodeLegacy = require("../data/keycode-legacy");
-const {behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("./device-profile-view");
+const {behaviorRowsForView, builtInBranches, comboRowsForView, rgbForView} = require("./device-profile-view");
+const {emptyCells} = require("./empty-cells");
 const {dualRole, effectiveTimings, holdTermSetting} = require("./gesture-timing");
 const {timingAlone} = require("./inert-behaviors");
 const {compactKeyLabels, heldModifierWords, hostKeyVocabulary, keyKind, keyLabel, keyLayer, keyLayerForm, layerModWords, layerTapWords, profileKeyNames, shortcutAct, shortcutKeys, shortcutLabel, shortcutLayerNames} = require("./key-names");
@@ -217,7 +218,7 @@ function profileModel(content, capabilities, editing) {
             busy: editing.busy,
             writable: editing.behaviors,
             maxTapStepsPerBehavior: capabilities?.maxTapStepsPerBehavior || 5,
-            keyDefaults: behaviorDefaults(content, capabilities, catalog.aliases, names),
+            ...behaviorDefaults(content, capabilities, catalog.aliases, names),
         },
         profileIdentity: content.identity,
         rgb: {...(content.domains.rgb ? rgbForView(content.domains.rgb) : {}),
@@ -410,24 +411,40 @@ function behaviorFeatures(content) {
 // saved rows. Publish presentation only; these are not profile behaviours.
 // Every keycode the profile holds has them, and so does every custom key,
 // placed or not: Custom keys edits the behaviour of a key on no layer yet.
-/** @param {Configuration} content @param {Capabilities} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {import("../../contracts/panel.js").PublishedModel["behaviorEditing"]["keyDefaults"]} */
+// What every key runs on with no row of its own, and, apart, its empty grid
+// cells (empty-cells.js). Keys of the same kind have the same cells, so each
+// set is published once in `cellPatterns` and a key names its own by index.
+/** @param {Configuration} content @param {Capabilities} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {Pick<import("../../contracts/panel.js").PublishedModel["behaviorEditing"], "keyDefaults" | "cellPatterns">} */
 function behaviorDefaults(content, capabilities, aliases, names) {
     const defaults = content.settingsView?.timing || {};
     const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longHoldTerm, defaults.multiTapTerm];
     const features = behaviorFeatures(content);
     const customKeys = (content.customKeyView?.keys || []).map(key => key.code);
-    return Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
+    /** @type {Record<string, import("../../contracts/panel.js").EmptyCell>[]} */
+    const cellPatterns = [];
+    /** @type {Map<string, number>} */
+    const patternAt = new Map();
+    /** @param {Record<string, import("../../contracts/panel.js").EmptyCell>} cells */
+    const pattern = (cells) => {
+        const key = JSON.stringify(cells);
+        if (!patternAt.has(key)) patternAt.set(key, cellPatterns.push(cells) - 1);
+        return /** @type {number} */ (patternAt.get(key));
+    };
+    /** @type {Record<string, import("../../contracts/panel.js").KeyBehaviorDefaults>} */
+    const keyDefaults = Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
         const target = keycodeAction(code);
         const name = keycodes.resolve(code).name;
         const timing = effectiveTimings({target}, values, features.customKeyShortcuts);
         // Where each default comes from, named for the editor's placeholders.
         // A key follows the same one with or without a row (firmware D-F27).
         const source = holdTermSetting(target, features.customKeyShortcuts) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
-        return [aliases[name] || name, {builtIn: builtInForView(target, features, names),
+        const builtIn = builtInBranches(target, features, names);
+        return [aliases[name] || name, {builtIn, cellPattern: pattern(emptyCells(builtIn)),
             timing: {tapHoldTerm: timing.hold, longHoldTerm: timing.long, multiTapTerm: timing.repeat},
             timingSources: {tapHoldTerm: source, longHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},
             timingAlone: timingAlone(target, features.customKeyShortcuts)}];
     }));
+    return {keyDefaults, cellPatterns};
 }
 
 // What every model of a build starts from, built once and frozen: the

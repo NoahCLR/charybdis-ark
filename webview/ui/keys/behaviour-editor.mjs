@@ -101,43 +101,91 @@ export function behaviourEditor(behaviour) {
     /** @param {string} label @param {string} action */
     const actionNamed = (label, action) => sends(model, action) || keyNameMarked(model, label, action);
 
+    // A dashed cell: what the keyboard does here though nothing is set (core
+    // publishes it, core/model/empty-cells.js). Each says why on hover.
+    /** @param {string} id @param {boolean} open @param {{tip: string, name: string, line: string[]}} shown */
+    const dashedCell = (id, open, {tip, name, line}) => `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${esc(id)}" data-tip="${esc(tip)}">
+                <span class="bk named">${name}</span>
+                <span class="bl">${esc(line.filter(Boolean).join(" · "))}</span></button>`;
+    const words = vocabulary(model);
+    const single = branchName(model, 1);
+    // What the standard key is called in the grid (firmware's word, D-F64).
+    const STANDARD = "standard key";
+    /** @param {import("../../view/keyface-types.js").InheritedBranch} branch */
+    const times = (branch) => branch.times ? ` ×${branch.times}` : "";
+    /** @param {import("../../view/keyface-types.js").InheritedBranch} branch */
+    const named = (branch) => actionNamed(cellLabel(model, branch), branch.action);
+    // How a standard hold runs: from the press, or as its style holds.
+    /** @param {import("../../view/keyface-types.js").InheritedBranch} hold */
+    const holdHow = (hold) => [hold.fromPress ? words.holdFromPress : styleLabel("hold", hold.style), hold.armsOnRelease ? "arms on release" : ""];
+    /** @param {import("../../../contracts/edits.js").Tier} kind */
+    const releasedAfter = (kind) => `released after ${kind === "hold" ? thresholdNames.tapHoldTerm : thresholdNames.longHoldTerm}`;
+    const nothingSet = behaviour.steps.length ? `Only the ${single} is set` : "Nothing is set";
+
+    // The standard key's own tap or hold.
+    /** @param {import("../../view/keyface-types.js").InheritedBranch} inherited @param {import("../../../contracts/edits.js").Tier} kind @param {number} tapCount */
+    const inheritedShown = (inherited, kind, tapCount) => {
+        if (inherited.locks) return {name: named(inherited), line: [STANDARD, "locks its layers"],
+            tip: `A Tap-toggle key tapped quickly ${tapCount + 1} times locks its layers. Set an action here to give the key a behaviour of its own.`};
+        const line = kind === "tap" ? [inherited.separate ? "each press" : inherited.below ? "key below" : STANDARD, `${styleLabel(kind, inherited.style)}${times(inherited)}`]
+            : [STANDARD, ...holdHow(inherited)];
+        const tip = inherited.separate
+            ? `${nothingSet}, so the key never waits for another tap: each of the ${inherited.times} presses is a ${single} of its own, sent as you let go. Set an action here to give the key a tap count of its own.`
+            : inherited.below
+                ? `The ${single} is Transparent, so the key below is this key's tap: once for each of the ${inherited.times} presses. Set an action here to replace it.`
+                : inherited.times
+                    ? `What this key does on its own: its tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
+                    : `What this key does on its own${inherited.armsOnRelease ? ": its layers are on while it is held, and let go after the " + thresholdNames.tapHoldTerm + " it arms them" : ""}. Set an action here to replace it.`;
+        return {name: named(inherited), line, tip};
+    };
+    // What an empty Hold or Long hold does because of the other tiers.
+    /** @param {import("../../view/keyface-types.js").HoldTierImplied} implied @param {import("../../../contracts/edits.js").Tier} kind */
+    const holdTierShown = (implied, kind) => {
+        if (implied.meaning === "continues") {
+            // Past Long hold the Hold carries on; one that fired at its own
+            // threshold has nothing left to do.
+            const {hold} = implied;
+            const nothing = hold.style === "TAP_AT_HOLD_THRESHOLD";
+            return {name: nothing ? esc("Nothing more") : named(hold), line: [tierName(model, "hold"), word(words.holdWithoutLongHold, hold.style)],
+                tip: `No Long hold is set, so nothing takes over at the ${thresholdNames.longHoldTerm}: the Hold carries on. Set an action here to add a Long hold.`};
+        }
+        const {tap} = implied;
+        if (implied.meaning === "tapsBeforeLong") return {name: named(tap), line: [`released before ${thresholdNames.longHoldTerm}`, `${styleLabel("tap", tap.style)}${times(tap)}`],
+            tip: `No Hold is set: let go after the ${thresholdNames.tapHoldTerm} but before the ${thresholdNames.longHoldTerm} and the key sends its tap. Set an action here to add a Hold.`};
+        return {name: named(tap), line: [releasedAfter(kind), `${styleLabel("tap", tap.style)}${times(tap)}`],
+            tip: `No Hold or Long hold is set: however long the key is held, letting go sends its tap. Set an action here to add a ${tierName(model, kind)}.`};
+    };
+    /** @param {import("../../view/keyface-types.js").ImpliedBranch} implied @param {import("../../../contracts/edits.js").Tier} kind */
+    const impliedShown = (implied, kind) => {
+        if (implied.meaning === "afterTaps") {
+            // Nothing set on this tap count: the standard key, pressed that
+            // many times with the last held.
+            const {tap, hold} = implied;
+            const before = tap ? `${tap.times === 1 ? "the press before this one sends" : `the ${tap.times} presses before this one each send`} ${tap.below ? "the key below" : "its tap"}, then ` : "";
+            return {name: named(hold), line: [tap ? `after ${tap.times} ${tap.times === 1 ? "tap" : "taps"}` : STANDARD, ...holdHow(hold)],
+                tip: `Nothing is set on this tap count, so the key does what it does on its own: ${before}this one, held, does what the key does held. Set an action here to give this tap count a ${tierName(model, kind)}.`};
+        }
+        if (implied.meaning === "asSingle") {
+            // A key that counts no taps: each press is a Single tap of its own,
+            // so a later press held does what a held Single tap does.
+            const tip = `${nothingSet}, so the key never waits for another tap: this press is a ${single} of its own, and held it does what a held ${single} does. Set an action here to give the key a tap count of its own.`;
+            const {as} = implied;
+            if ("branch" in as) return {name: named(as.branch), line: [`as ${single}`, tierName(model, as.kind), ...(as.branch.fromPress || as.branch.armsOnRelease ? holdHow(as.branch) : [styleLabel(as.kind, as.branch.style)])], tip};
+            const shown = holdTierShown(as, kind);
+            return {...shown, line: [`as ${single}`, ...shown.line], tip};
+        }
+        return holdTierShown(implied, kind);
+    };
+
     /** @param {import("../../../contracts/panel.js").BehaviorView["steps"][number]} step @param {import("../../../contracts/edits.js").Tier} kind */
     const cellFor = (step, kind) => {
         const branch = step[TIER_FIELDS[kind]];
         const id = `${step.tapCount}-${kind}`;
         const open = openCell(behaviour) === id;
-        const inherited = inheritedBranch(behaviour, step, kind);
-        if (!branch && inherited) {
-            const label = cellLabel(model, inherited);
-            const times = inherited.times ? ` ×${inherited.times}` : "";
-            const tip = inherited.first
-                ? `The first tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
-                : inherited.times
-                    ? `What this key does on its own: its tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
-                    : "What this key does on its own. Set an action here to replace it.";
-            return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${esc(id)}" data-tip="${esc(tip)}">
-                <span class="bk named">${actionNamed(label, inherited.action)}</span>
-                <span class="bl">${esc([inherited.first ? "first tap" : "built in", `${styleLabel(kind, inherited.style)}${times}`].join(" · "))}</span></button>`;
-        }
+        const inherited = branch ? null : inheritedBranch(behaviour, step, kind);
+        if (inherited) return dashedCell(id, open, inheritedShown(inherited, kind, step.tapCount));
         const implied = branch ? null : impliedBranch(behaviour, step, kind);
-        if (implied?.meaning === "continues") {
-            // Past Long hold the Hold carries on; one that fired at its own
-            // threshold has nothing left to do.
-            const {hold} = implied;
-            const label = hold.style === "TAP_AT_HOLD_THRESHOLD" ? "Nothing more" : cellLabel(model, hold);
-            return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${esc(id)}"
-                data-tip="No Long hold is set, so nothing takes over at the Long hold threshold: the Hold carries on. Set an action here to add a Long hold.">
-                <span class="bk named">${hold.style === "TAP_AT_HOLD_THRESHOLD" ? esc(label) : actionNamed(label, hold.action)}</span>
-                <span class="bl">${esc([tierName(model, "hold"), word(vocabulary(model).holdWithoutLongHold, hold.style)].join(" · "))}</span></button>`;
-        }
-        if (implied?.meaning === "tapsBeforeLong") {
-            const {tap} = implied;
-            const times = tap.times ? ` ×${tap.times}` : "";
-            return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${esc(id)}"
-                data-tip="No Hold is set: let go after the Tap / hold threshold but before the Long hold threshold and the key sends its tap. Set an action here to add a Hold.">
-                <span class="bk named">${actionNamed(cellLabel(model, tap), tap.action)}</span>
-                <span class="bl">${esc(["released before Long hold threshold", `${styleLabel("tap", tap.style)}${times}`].join(" · "))}</span></button>`;
-        }
+        if (implied) return dashedCell(id, open, impliedShown(implied, kind));
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${esc(id)}"><span class="plus">+</span></button>`;
         // The grid reads by name; the keycode is on hover and in the editor.
         const label = cellLabel(model, branch);

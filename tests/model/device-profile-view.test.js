@@ -19,8 +19,11 @@ test("a row carries its key's built-in first tap and hold, named as a person rea
     const row = (operand) => ({target: {kind: 1, operand}, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0,
         keepsAutoMouseAnchored: false, steps: [{tapIndex: 1, tap: {kind: 1, operand: 4}}]});
     const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows: [row(0x2a16), row(0x4338), row(0xe3)]}));
-    const byKey = (rows) => Object.fromEntries(rows.map((entry) => [entry.keycode, entry.builtIn]));
-    const rows = byKey(behaviorRowsForView(domain));
+    // Each row's empty cells come with them (tests/model/empty-cells.test.js).
+    const byKey = (rows) => Object.fromEntries(rows.map(({keycode, builtIn: {cells, ...builtIn}}) => [keycode, builtIn]));
+    const views = behaviorRowsForView(domain);
+    const rows = byKey(views);
+    assert.deepEqual(views[0].builtIn.cells["1-hold"], {implied: {meaning: "tapsOnRelease", tap: {step: 1, tier: "tap"}}}, "and what each empty cell does, naming the branch it shows");
     assert.deepEqual(rows["MT(MOD_LSFT|MOD_LGUI,KC_S)"], {
         tap: {style: "TAP_SENDS", action: "KC_S", label: "S"},
         hold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI"},

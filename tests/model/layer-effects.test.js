@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {actionEffects, bit, codeName, comboHeldShows, keyEffects, layerEffects, linkFacts, keycodeLayersOn} = require("../../core/model/layer-effects");
+const {actionEffects, bit, codeName, comboHeldShows, keyEffects, layerEffects, linkFacts, keycodeLayersOn, pressesModeKey} = require("../../core/model/layer-effects");
 const {PD_LINK_ENDS} = require("../../core/schema/pd-mode-domain-v1");
 const {SETTING, SHORTCUT_LAYER_KINDS} = require("../../core/schema/settings-domain-v1");
 const {LAYERS} = require("../../core/data/charybdis-layout");
@@ -110,4 +110,71 @@ test("a profile's links: the layers a mode's key turns on, the layers that start
     assert.equal(ends & (1 << pointer), 0, "the pointer layer never ends it");
     assert.deepEqual([...facts.modeLinks.shortcuts], [[1, {layers: 1 << 7, layerKind: SHORTCUT_LAYER_KINDS.HOLD}], [3, {layers: (1 << 8) | (1 << 9), layerKind: SHORTCUT_LAYER_KINDS.MOVE}]]);
     assert.deepEqual(linkFacts({settings: settings()}), {modeLinks: {modes: new Map(), shortcuts: new Map()}, layerStarted: 0, endedStarts: []}, "no slots, no shortcuts: no links");
+});
+
+// Past a counting row's deepest tap count, and at a later count it leaves
+// empty, every press is the standard key (firmware D-F64): N quick presses
+// tap it N times, and a held press after N-1 taps it then holds it.
+const TG = (n) => 0x5260 | n, TO = (n) => 0x5200 | n, KC_B = 0x05, KC_C = 0x06, TRNS = 0x01;
+const tapStep = (tapIndex, extra = {}) => ({tapIndex, tap: code(KC_B), ...extra});
+const holdStep = {style: 1, repeatHz: 0, action: code(KC_C)};
+const rowOf = (target, steps) => ({target: code(target), allowedLayers: 0xffff, steps});
+const hows = (effects) => effects.map((effect) => [effect.kind, effect.how]);
+
+test("a custom key whose first press sets both tiers locks or moves with its shortcut past the depth", () => {
+    const custom = {kind: 7, flags: 0, operand: 9};
+    /** @param {number} layerKind */
+    const links = (layerKind) => ({modes: new Map(), shortcuts: new Map([[9, {layers: 1 << 5, layerKind}]])});
+    const row = {target: custom, allowedLayers: 0xffff, steps: [tapStep(0, {hold: holdStep}), tapStep(1)]};
+    assert.deepEqual(hows(keyEffects(customKeyCode(9), row, undefined, links(SHORTCUT_LAYER_KINDS.LOCK))), [["lock", "Triple-tap CUSTOM_KEY_9"]],
+        "three quick presses tap the shortcut three times: locked");
+    assert.equal(keyEffects(customKeyCode(9), row, undefined, links(SHORTCUT_LAYER_KINDS.LOCK))[0].note, "whose shortcut turns layers on");
+    const holdLater = {...row, steps: [tapStep(0, {hold: holdStep}), {tapIndex: 1, hold: holdStep}]};
+    assert.deepEqual(hows(keyEffects(customKeyCode(9), holdLater, undefined, links(SHORTCUT_LAYER_KINDS.LOCK))), [["lock", "Triple-tap CUSTOM_KEY_9"]],
+        "a double tap with no Tap of its own locks and unlocks: still three");
+    assert.deepEqual(hows(keyEffects(customKeyCode(9), holdLater, undefined, links(SHORTCUT_LAYER_KINDS.MOVE))), [["move", "Double-tap CUSTOM_KEY_9"]],
+        "a move needs no odd count, so the empty double tap moves");
+    assert.deepEqual(hows(keyEffects(customKeyCode(9), row, undefined, links(SHORTCUT_LAYER_KINDS.HOLD))), [["hold", "Tap CUSTOM_KEY_9 2 times, then hold it"]],
+        "a held shortcut is held past the depth");
+});
+
+test("a toggle on a counting row toggles from an odd count of standard taps", () => {
+    assert.deepEqual(hows(keyEffects(TG(3), rowOf(TG(3), [tapStep(0), tapStep(1)]))), [["lock", "Triple-tap TG(3)"]]);
+    assert.deepEqual(hows(keyEffects(TG(3), rowOf(TG(3), [tapStep(0), tapStep(1), tapStep(2)]))), [["lock", "Tap TG(3) 5 times"]], "four toggles leave it off");
+    assert.deepEqual(hows(keyEffects(TG(3), rowOf(TG(3), [tapStep(0), tapStep(1), tapStep(3)]))), [["lock", "Triple-tap TG(3)"]], "an empty triple tap inside the depth");
+    assert.deepEqual(hows(keyEffects(TO(2), rowOf(TO(2), [tapStep(0), tapStep(2)]))), [["move", "Double-tap TO(2)"]], "an empty double tap moves");
+});
+
+test("a layer hold the first press replaces is held past the depth, or at an earlier count with nothing set", () => {
+    assert.deepEqual(hows(keyEffects(MO(4), rowOf(MO(4), [tapStep(0, {hold: holdStep}), tapStep(1)]))), [["hold", "Tap MO(4) 2 times, then hold it"]]);
+    assert.deepEqual(hows(keyEffects(MO(4), rowOf(MO(4), [tapStep(0, {hold: holdStep}), {tapIndex: 1, tap: undefined}, tapStep(2)]))), [["hold", "Tap MO(4), then hold it"]],
+        "a double tap with nothing set taps once, then holds");
+    assert.deepEqual(hows(keyEffects(MO(4), rowOf(MO(4), [tapStep(0, {hold: holdStep}), {tapIndex: 1, hold: holdStep}, tapStep(2)]))), [["hold", "Tap MO(4) 3 times, then hold it"]],
+        "a count with a hold of its own is not the standard hold");
+});
+
+test("a row no deeper than its Single tap, or whose Single tap is Transparent, offers no later count", () => {
+    assert.deepEqual(keyEffects(TG(3), rowOf(TG(3), [tapStep(0)])), [], "a depth-1 row counts no taps");
+    assert.deepEqual(keyEffects(MO(4), rowOf(MO(4), [tapStep(0, {hold: holdStep})])), []);
+    assert.deepEqual(keyEffects(TG(3), rowOf(TG(3), [{tapIndex: 0, tap: code(TRNS)}, tapStep(1)])), [], "the key below is the standard tap, left out");
+});
+
+test("a counting row presses its own pointing-mode key past the depth", () => {
+    const owners = {modes: new Map([[5, {layers: 0, name: "Zoom", keepsPointer: false}]]), shortcuts: new Map()};
+    const key = PD_MODE_KEYS[5].holdCode;
+    const both = tapStep(0, {hold: holdStep});
+    assert.equal(pressesModeKey(key, rowOf(key, [both]), owners), false, "both tiers replaced, no later count");
+    assert.equal(pressesModeKey(key, rowOf(key, [both, tapStep(1)]), owners), true);
+});
+
+// A one-shot layer's second quick tap cancels it, so past the deepest tap
+// count only an odd number of taps leaves it armed (firmware D-F64).
+test("a one-shot layer past the deepest tap count is armed only by an odd number of taps", () => {
+    const code = (operand) => ({kind: 1, flags: 0, operand});
+    const OSL = (n) => 0x5280 | n, KC_B = 0x05;
+    const row = (...steps) => ({target: code(OSL(2)), steps});
+    const how = (steps) => keyEffects(OSL(2), row(...steps)).map((effect) => effect.how);
+    assert.deepEqual(how([{tapIndex: 0, tap: code(KC_B)}, {tapIndex: 1, tap: code(KC_B)}]), ["Triple-tap OSL(2)"]);
+    assert.deepEqual(how([{tapIndex: 0, tap: code(KC_B)}, {tapIndex: 2, tap: code(KC_B)}]), ["Tap OSL(2) 5 times"], "never the empty Double tap, which arms and cancels");
+    assert.deepEqual(how([{tapIndex: 0, tap: code(KC_B)}, {tapIndex: 1, hold: {style: 1, repeatHz: 0, action: code(KC_B)}}]), ["Triple-tap OSL(2)"]);
 });

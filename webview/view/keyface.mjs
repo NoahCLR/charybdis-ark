@@ -7,6 +7,7 @@
 // The model already resolved each position to a display label; this adds the
 // layer-tap hint, the behaviour tiers and the combo badges, and nothing else.
 
+import {TIER_FIELDS} from "./edits.mjs";
 import {keyMeaning} from "../../rules/combo-inputs.mjs";
 import {vocabulary} from "./vocabulary.mjs";
 import {keyIdentity} from "./key-identity.mjs";
@@ -125,88 +126,74 @@ export function behaviourTiers(behaviour) {
 
 // The device stores only populated tap steps, but the editor is a matrix of
 // every step the firmware supports. Keep empty columns visible so a one-step
-// behaviour can grow without first inventing data for the other columns.
+// behaviour can grow without first inventing data for the other columns. Its
+// cap is the tap counts core publishes empty cells for
+// (core/model/empty-cells.js GRID_TAP_COUNTS, held by
+// tests/view/keyface.test.mjs).
+const GRID_TAP_COUNTS = 5;
 /** @param {BehaviorView | null | undefined} behaviour @param {number} [advertisedMaximum] */
-export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
+export function behaviourGridSteps(behaviour, advertisedMaximum = GRID_TAP_COUNTS) {
     const requested = Number(advertisedMaximum);
-    const maximum = Number.isInteger(requested) && requested > 0 ? Math.min(requested, 5) : 5;
+    const maximum = Number.isInteger(requested) && requested > 0 ? Math.min(requested, GRID_TAP_COUNTS) : GRID_TAP_COUNTS;
     const populated = new Map((behaviour?.steps || []).map((step) => [step.tapCount, step]));
     return Array.from({length: maximum}, (_, tapCount) => populated.get(tapCount) || {tapCount});
 }
 
-// How deep a behaviour's tap counts go: its deepest tap count with an action
-// set, or 0 with none. A quick run past it types (firmware D-F33): the taps so
-// far are sent as the first tap and every further press is a single tap of its
-// own, so deeper rows are never reached.
-/** @param {BehaviorView | null | undefined} behaviour */
-export const behaviourDepth = (behaviour) => Math.max(0, ...(behaviour?.steps || [])
-    .filter((step) => step.tap || step.hold || step.longHold).map((step) => step.tapCount + 1));
-
-// The grid's rows. Compact, it shows the tap counts in use and the next one,
-// to add (`add`); all, every tap count the keyboard allows. A row past the
-// next one is never reached, because the run types by then, so it says which
-// tap count answers instead (`like`, 0-based): the first. `typing` is how many
-// quick taps type the first tap once each, when the row is deeper than one.
-/** @param {BehaviorView | null | undefined} behaviour @param {number} [advertisedMaximum] @param {boolean} [all] */
-export function behaviourGridLayout(behaviour, advertisedMaximum = 5, all = false) {
-    const steps = behaviourGridSteps(behaviour, advertisedMaximum);
-    const depth = behaviourDepth(behaviour);
-    const shown = all ? steps.length : Math.min(steps.length, Math.max(depth, 1) + 1);
-    const rows = steps.slice(0, shown).map((step) => ({step,
-        add: step.tapCount >= Math.max(depth, 1),
-        like: depth > 1 && step.tapCount > depth ? 0 : null}));
-    return {rows, depth, typing: depth > 1 ? {taps: depth + 1} : null};
-}
-
-// What the keyboard does for a tier the row leaves empty (core/model/
-// built-in-behavior.js). An empty first tap is the key's own. An empty later
-// tap repeats the first tap, the row's own (`first`) or else the key's, once
-// per press, so it carries `times` (firmware D-F33). It fills every tap count
-// the row reaches, its deepest authored count; past that depth the keyboard
-// starts again at a single tap (behaviourDepth), so those cells stay empty.
-// The built-in hold belongs to the first press (`fromPress` when it
-// starts as the key goes down, as core judges it for the row), and a
-// fallback hold also gives way to an authored long hold there. An authored cell and a key with nothing built in
-// inherit nothing.
-/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").InheritedBranch | null} */
-export function inheritedBranch(behaviour, step, kind) {
-    const builtIn = behaviour?.builtIn || {};
-    if (!step || !Number.isInteger(step.tapCount)) return null;
-    if (kind === "tap") {
-        if (step.tap) return null;
-        if (!step.tapCount) return builtIn.tap || null;
-        const own = (behaviour?.steps || []).find((entry) => entry.tapCount === 0)?.tap;
-        const first = own ? {...own, first: true} : builtIn.tap;
-        if (!first) return null;
-        if (step.tapCount >= Math.max(1, behaviourDepth(behaviour))) return null;
-        return {...first, times: step.tapCount + 1};
+// What the keyboard does for a tier the row leaves empty: the standard key,
+// as core publishes it for each cell (`builtIn.cells`, core/model/
+// empty-cells.js; firmware D-F64). `inheritedBranch` is the standard key's own
+// tap or hold there, `impliedBranch` what follows from the other tiers. A cell
+// names the branch it shows, the key's own (`own`) or one the row sets
+// (`step`, `tier`), and these read it back. An authored cell has neither.
+/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind */
+const emptyCell = (behaviour, step, kind) => {
+    if (!step || !Number.isInteger(step.tapCount) || step[TIER_FIELDS[kind]]) return undefined;
+    return behaviour?.builtIn?.cells?.[`${step.tapCount}-${kind}`];
+};
+// The branch a cell names, with what the cell says of it.
+/** @param {BehaviorView | null | undefined} behaviour @param {import("../../contracts/panel.js").CellRef} ref @returns {import("./keyface-types.js").InheritedBranch | null} */
+function resolved(behaviour, ref) {
+    const {times, separate, below, locks} = ref;
+    const said = {...(times ? {times} : {}), ...(separate ? {separate} : {}), ...(below ? {below} : {}), ...(locks ? {locks} : {})};
+    if ("own" in ref) {
+        const branch = behaviour?.builtIn?.[ref.own];
+        return branch ? {...branch, ...said} : null;
     }
-    if (kind === "hold") {
-        if (!builtIn.hold || step.tapCount !== 0 || step.hold || (builtIn.hold.fallback && step.longHold)) return null;
-        return builtIn.hold;
-    }
-    return null;
+    const branch = (behaviour?.steps || []).find((entry) => entry.tapCount === ref.step)?.[TIER_FIELDS[ref.tier]];
+    return branch ? {...branch, ...said} : null;
 }
-
-// What an empty Hold or Long hold does because of the other hold tier
-// (core/model/built-in-behavior.js). With no Long hold, nothing takes over at
-// its threshold, so the press's Hold, set or built in, carries on the way it
-// runs: `continues`. With a Long hold and no Hold of any kind, the press stays
-// in its tap window until Long hold, so a release in between sends the tap
-// that count would send, set or built in, on keys whose tap survives a hold
-// (`releaseTaps`): `tapsBeforeLong`. Otherwise the cell is simply empty.
-/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").ImpliedBranch | null} */
-export function impliedBranch(behaviour, step, kind) {
-    if (!step || !Number.isInteger(step.tapCount)) return null;
-    if (kind === "long") {
-        if (step.longHold) return null;
-        const hold = step.hold || inheritedBranch(behaviour, step, "hold");
+/** @param {BehaviorView | null | undefined} behaviour @param {import("../../contracts/panel.js").HoldTierCell} cell @returns {import("./keyface-types.js").HoldTierImplied | null} */
+function holdTierResolved(behaviour, cell) {
+    if (cell.meaning === "continues") {
+        const hold = resolved(behaviour, cell.hold);
         return hold ? {meaning: "continues", hold} : null;
     }
-    if (kind === "hold") {
-        if (step.hold || !step.longHold || !behaviour?.builtIn?.releaseTaps || inheritedBranch(behaviour, step, "hold")) return null;
-        const tap = step.tap || inheritedBranch(behaviour, step, "tap");
-        return tap ? {meaning: "tapsBeforeLong", tap} : null;
+    const tap = resolved(behaviour, cell.tap);
+    return tap ? {meaning: cell.meaning, tap} : null;
+}
+/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").InheritedBranch | null} */
+export function inheritedBranch(behaviour, step, kind) {
+    const cell = emptyCell(behaviour, step, kind);
+    return cell && "inherited" in cell ? resolved(behaviour, cell.inherited) : null;
+}
+/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").ImpliedBranch | null} */
+export function impliedBranch(behaviour, step, kind) {
+    const cell = emptyCell(behaviour, step, kind);
+    if (!cell || !("implied" in cell)) return null;
+    const implied = cell.implied;
+    if (implied.meaning === "afterTaps") {
+        const hold = resolved(behaviour, implied.hold);
+        const tap = implied.tap ? resolved(behaviour, implied.tap) : null;
+        return hold ? {meaning: "afterTaps", ...(tap ? {tap} : {}), hold} : null;
     }
-    return null;
+    if (implied.meaning === "asSingle") {
+        const {as} = implied;
+        if ("branch" in as) {
+            const branch = resolved(behaviour, as.branch);
+            return branch ? {meaning: "asSingle", as: {kind: as.kind, branch}} : null;
+        }
+        const follows = holdTierResolved(behaviour, as);
+        return follows ? {meaning: "asSingle", as: follows} : null;
+    }
+    return holdTierResolved(behaviour, implied);
 }

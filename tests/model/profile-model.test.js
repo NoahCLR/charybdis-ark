@@ -149,6 +149,9 @@ test("every custom key has built-in behaviour defaults, placed or not", () => {
     });
     const defaults = model.behaviorEditing.keyDefaults;
     assert.deepEqual(defaults.CUSTOM_KEY_0.builtIn, {releaseTaps: true}, "a placed custom key");
+    assert.deepEqual(model.behaviorEditing.cellPatterns[defaults.CUSTOM_KEY_0.cellPattern], {}, "with no shortcut and no row, none of its cells does anything");
+    const patterns = new Set(Object.values(defaults).map((entry) => entry.cellPattern));
+    assert.equal(patterns.size, model.behaviorEditing.cellPatterns.length, "keys of one kind share one set of cells");
     assert.deepEqual(defaults.CUSTOM_KEY_5, defaults.CUSTOM_KEY_0, "an unplaced one has the same defaults");
     assert.deepEqual(defaults.CUSTOM_KEY_5.timing, {tapHoldTerm: "150", longHoldTerm: "400", multiTapTerm: "170"});
     assert.ok(!model.keyBehaviors.some(row => row.keycode === "CUSTOM_KEY_5"), "publishing defaults authors no behaviour");

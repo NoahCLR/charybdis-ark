@@ -24,8 +24,11 @@ test("a plain key taps itself and holds itself down as a fallback", () => {
 });
 
 test("custom keys and macros keep their tap when released before a long hold, and claim nothing else", () => {
-    for (const target of [{kind: ACTION.CUSTOM_KEY, operand: 0}, {kind: ACTION.MACRO, operand: 3}, key(0x7f00), key(0x7f7f), key(0x7700), key(0x777f)]) {
-        assert.deepEqual(builtInActions(target), {releaseTaps: true});
+    for (const target of [{kind: ACTION.CUSTOM_KEY, operand: 0}, key(0x7f00), key(0x7f7f)]) {
+        assert.deepEqual(builtInActions(target), {releaseTaps: true}, "a custom key without a shortcut does nothing of its own");
+    }
+    for (const target of [{kind: ACTION.MACRO, operand: 3}, key(0x7700), key(0x777f)]) {
+        assert.deepEqual(builtInActions(target), {tap: target, releaseTaps: true}, "a macro's tap plays it");
     }
     assert.equal(builtInActions(key(0x4338)).releaseTaps, undefined, "a dual-role key always has its own hold");
 });
@@ -53,9 +56,9 @@ test("a custom key with a shortcut taps it and holds it as a fallback, like a pl
     // Tap-toggle's does nothing until its fifth, which a row with steps
     // replaces, so it has no tap of its own.
     customKeyShortcuts[3] = {mods: 0x02, keys: [], layers: 1 << 3, layerKind: 4};
-    assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {tap: own(3), hold: own(3), fromPress: true});
+    assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {tap: own(3), hold: own(3), fromPress: true, armsOnRelease: true}, "held or let go after Tap / hold, it arms them");
     customKeyShortcuts[3] = {mods: 0, keys: [], layers: 1 << 3, layerKind: 3};
-    assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {hold: own(3), fromPress: true});
+    assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {hold: own(3), fromPress: true, tapToggle: true});
 });
 
 test("a bare modifier is a plain key: it taps itself and holds itself as a fallback", () => {

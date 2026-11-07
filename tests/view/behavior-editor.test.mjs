@@ -23,7 +23,9 @@ test("opening an unstored behaviour leaves the model unchanged and takes built-i
     assert.equal(row.keycode, "LT(3,KC_F)");
     assert.equal(row.stored, false);
     assert.deepEqual(row.steps, []);
-    assert.deepEqual(row.builtIn, builtIn);
+    const {cells, ...own} = row.builtIn;
+    assert.deepEqual(own, builtIn);
+    assert.deepEqual(cells, model.behaviorEditing.cellPatterns[model.behaviorEditing.keyDefaults["LT(3,KC_F)"].cellPattern], "its cells, shared with every key of its kind");
     assert.deepEqual(row.timingDefaults, timing);
     assert.deepEqual(model, before);
 });
@@ -35,8 +37,9 @@ test("an unstored custom key's grid shows the tap a release before Long hold sen
     const unplaced = behaviourEditorRow(model, "CUSTOM_KEY_9");
     assert.equal(unplaced.stored, false);
     assert.equal(unplaced.builtIn.releaseTaps, true);
-    const step = {tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}, longHold: {style: "HOLD_WHILE_HELD", action: "KC_B"}};
-    assert.equal(impliedBranch({...unplaced, steps: [step]}, step, "hold")?.meaning, "tapsBeforeLong");
+    const step = {tapCount: 0, tap: {style: "TAP_SENDS", action: "KC_A"}, longHold: {style: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_B"}};
+    const edited = behaviourEditorRow(onBase([], [edits.saveBehaviour({keycode: "CUSTOM_KEY_9", steps: [step]})]), "CUSTOM_KEY_9");
+    assert.equal(impliedBranch(edited, edited.steps[0], "hold")?.meaning, "tapsBeforeLong", "once an edit sets a tap and a Long hold");
 });
 
 test("an existing row is selected through its semantic alias without changing it", () => {

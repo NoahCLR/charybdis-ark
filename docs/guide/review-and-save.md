@@ -154,7 +154,11 @@ the draft fixes it.
 
 - A **Trap** is a layer that can lock on with no way back to the base layer,
   or a pointing mode that can lock with nothing left to turn it off. Review
-  shows the steps into it and a way out.
+  shows the steps into it and a way out. It counts a behaviour's later taps
+  too: past its deepest tap count every press is the standard key, so a
+  layer key there still locks, toggles or holds its layer, and Review names
+  the fewest taps that do it, such as "Triple-tap TG(3)". A toggle or a
+  one-shot layer takes an odd number of taps.
 - A **Blocker** keeps Save disabled until it is fixed, such as a lighting
   effect or brightness this keyboard can't show.
 - A **Warning** is something Ark asks about before saving: a layer nothing

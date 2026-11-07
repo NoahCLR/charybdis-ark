@@ -46,6 +46,8 @@ const macroOfName = name => {
 // The name Ark writes for a macro slot.
 /** @param {number} index */
 const macroName = index => `MACRO_${index}`;
+// KC_NO sends nothing; KC_TRNS lets the layer below answer.
+const NOTHING = 0x0000, TRANSPARENT = 0x0001;
 // Within QMK_BASIC: the keys a tap sends, from KC_A up (KC_NO and KC_TRNS
 // send nothing), and the eight modifier keys KC_LEFT_CTRL … KC_RIGHT_GUI.
 const BASIC_KEYS = block(0x0004, QK.BASIC.last), MODIFIER_KEYS = block(0x00e0, 0x00e7);
@@ -142,7 +144,7 @@ const withLayerModLayer = (code, layer) => (code & 0xfe1f) | (layer << 5);
 const oneShotMod = mods => QK.ONE_SHOT_MOD.first | mods;
 
 export {
-    QK, inBlock, macroOfName, macroName, BASIC_KEYS, MODIFIER_KEYS, LAYER_FORMS, LAYER_FORM_LAYERS, PACKED_LAYERS, layerFormBase, layerFormLayer, TAPPING_TOGGLE,
+    QK, inBlock, macroOfName, macroName, NOTHING, TRANSPARENT, BASIC_KEYS, MODIFIER_KEYS, LAYER_FORMS, LAYER_FORM_LAYERS, PACKED_LAYERS, layerFormBase, layerFormLayer, TAPPING_TOGGLE,
     MODS, MOD_RIGHT, MOD_MASK, MOD_NAMES, MOD_BITS, MODIFIER_KEY_SIDES, MODIFIER_WRAPPERS, wrapperOf, combineModifiers,
     keyOf, modsOf, modified, modTap, layerTap, layerTapLayer, withLayerTapLayer, layerMod, layerModLayer, withLayerModLayer, oneShotMod,
 };

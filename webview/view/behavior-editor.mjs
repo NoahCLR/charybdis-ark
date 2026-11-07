@@ -25,8 +25,10 @@ export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string
     const {listening: existing, canonical} = keyIdentity(model, keycode);
     const key = existing?.keycode || canonical;
     const defaults = model?.behaviorEditing?.keyDefaults?.[key];
+    // A key with no row shares its empty cells with every key of its kind.
+    const cells = defaults?.cellPattern === undefined ? undefined : model?.behaviorEditing?.cellPatterns?.[defaults.cellPattern];
     return {...(existing || {keycode: key, steps: [], tapHoldTerm: "0", longHoldTerm: "0", multiTapTerm: "0",
-        keepsAutoMouseAnchored: false, builtIn: defaults?.builtIn || {}}),
+        keepsAutoMouseAnchored: false, builtIn: {...defaults?.builtIn, ...(cells ? {cells} : {})}}),
         stored: Boolean(existing), timingDefaults: defaults?.timing || model?.behaviorTimingDefaults || {},
         timingWords: timingWords(model, defaults?.timingSources),
         // Unknown counts as yes, so nothing that might matter is dropped.

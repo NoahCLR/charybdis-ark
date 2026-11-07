@@ -48,6 +48,7 @@ const PASSES_ON_PURPOSE = [
     ["webview/ui/keys/custom-keys-tab.mjs", ["reachedBy"], "reachLabel(): marked key names and escaped layer names"],
     ["webview/ui/keys/pointing-tab.mjs", ["line"], "pointingReachLines(): keysReach(), branchReach(), comboReach() and layersNamed(), marked key names and escaped layer names"],
     ["webview/ui/keys/key-tab.mjs", ["stackRows(model, layer, position)"], "the layer stack's rows, markup templates joined"],
+    ["webview/ui/keys/behaviour-editor.mjs", ["name"], "a dashed cell's name, which inheritedShown(), holdTierShown() and impliedShown() build with actionNamed() or esc()"],
     ["webview/ui/layerbar.mjs", ["tint"], "a style attribute holding layerSwatch()'s css() colour"],
     ["webview/ui/pointing/empty-slot.mjs", ["listed(parts)"], "the ways still reaching an empty slot, joined in prose (view/vocabulary.mjs listed): each a template of counts, escaped layer names and marked actions"],
     ["webview/ui/review-items.mjs", ['head.map(row).join("")', 'rest.map(row).join("")', "show", "discard"], "field rows from field(), and the Show and Discard buttons the review overlay builds"],
