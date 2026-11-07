@@ -1592,6 +1592,14 @@ table.t tr.quiet > td { color: var(--text-3); }
   background: var(--inv-bg); color: var(--inv-text); font-size: var(--fs-xs); font-weight: var(--fw-bold); }
 .pd-step-b { display: grid; gap: var(--sp-3); padding-left: var(--sp-7); min-width: 0; }
 .pd-pair { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-7); align-items: start; }
+/* Steps 2 and 4 lay their fields in the same four columns, so a label under
+   one step sits over a label under the next; a wide field spans two. */
+.pd-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3) var(--sp-4); align-items: start; min-width: 0; }
+.pd-cols > * { min-width: 0; }
+.pd-cols > .span2 { grid-column: span 2; }
+.pd-cols > .pd-sub { margin: var(--sp-1) 0 calc(-1 * var(--sp-2)); }
+.pd-cols select.input { width: 100%; min-width: 0; }
+@container pd (max-width: 720px) { .pd-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* A menu in the editor is as wide as its words, as its number fields are. */
 .pd-editor select.input { width: auto; min-width: 140px; max-width: 100%; }
 .pd-sub { margin: var(--sp-2) 0 0; }
@@ -1618,13 +1626,13 @@ table.t tr.quiet > td { color: var(--text-3); }
 .pd-kind-art path { fill: var(--text-2); }
 .pd-kind-art rect { fill: var(--text-3); }
 /* Step 2: each direction a key placed where the ball sends it. */
-.pd-directions { display: grid; gap: var(--sp-4); }
-.pd-direction-fields { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-7); align-items: start; }
-.pd-direction-fields > .note { flex-basis: 100%; }
+/* The ball and its keys on the left, the choices stacked beside them. */
+.pd-directions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-4) var(--sp-8); align-items: start; }
+.pd-direction-fields { display: grid; gap: var(--sp-3); align-content: start; min-width: 0; }
 .pd-editor .seg { flex-wrap: wrap; max-width: 100%; }
 .pd-switches { display: flex; gap: var(--sp-2) var(--sp-5); flex-wrap: wrap; min-height: var(--h-control); align-items: center; }
 .pd-compass { display: grid; gap: var(--sp-3) var(--sp-4); align-items: center; justify-items: center; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  max-width: 560px; width: 100%; justify-self: center;
+  max-width: 560px; justify-self: start;
   grid-template-areas: ". up ." "left ball right" ". down ."; }
 .pd-compass.vertical { grid-template-columns: auto; grid-template-areas: "up" "ball" "down"; justify-content: center; }
 .pd-compass.horizontal { grid-template-areas: "left ball right"; }
@@ -1698,6 +1706,7 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .pd-taps .mods { grid-column: 2 / -1; padding-bottom: var(--sp-2); }
 @container pd (max-width: 720px) {
   .pd-directions { grid-template-columns: minmax(0, 1fr); }
+  .pd-compass { justify-self: center; width: 100%; }
   .pd-row { grid-template-columns: minmax(0, 1fr); gap: var(--sp-2); }
 }
 @container pd (max-width: 560px) {
