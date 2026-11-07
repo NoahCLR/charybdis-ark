@@ -542,7 +542,7 @@ test("a custom key's shortcut is posted as a mask, its keys and layers, reviewed
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x41, keys: [0x0e], layers: 0, layerKind: 0});
     assert.deepEqual(profileLayers(draft.document), layers, "a shortcut moves no key");
     const view = draft.view({selectedDeviceId: "test-device", connected: true});
-    assert.ok(view.changes.some((change) => change.unit === "customKey:2" && change.fields.some((field) => field.label === "Shortcut" && field.after === "Left Ctrl + Right Alt + K")));
+    assert.ok(view.changes.some((change) => change.unit === "customKey:2" && change.fields.some((field) => field.label === "Shortcut" && field.after === "Ctrl+Right Alt+K")));
     assert.equal(view.undoLabel, "Changed a custom key's shortcut");
     stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", {mods: 0x0f}));
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x0f, keys: [], layers: 0, layerKind: 0}, "modifiers alone");
@@ -552,7 +552,7 @@ test("a custom key's shortcut is posted as a mask, its keys and layers, reviewed
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x08, keys: [], layers: 0b101000, layerKind: 0}, "modifiers and two layers");
     const layered = draft.view({selectedDeviceId: "test-device", connected: true});
     const shortcutField = layered.changes.find((change) => change.unit === "customKey:2")?.fields.find((field) => field.label === "Shortcut");
-    assert.match(String(shortcutField?.after), /^Left (GUI|Command|Win|Super) \+ Navigation \+ Extra 1$/);
+    assert.match(String(shortcutField?.after), /^(GUI|Command|Windows|Super)\+Navigation\+Extra 1$/);
     assert.throws(() => stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", {layers: 1})), /base layer/, "the base layer is always on");
     stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", {layers: 1 << 3}));
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0, keys: [], layers: 1 << 3, layerKind: 0}, "layers alone");
@@ -577,13 +577,13 @@ test("a custom key's shortcut is posted as a mask, its keys and layers, reviewed
 test("a custom key made for a shortcut no keycode holds is named and placed in one draft step", () => {
     const draft = session();
     const before = draft.document;
-    const message = edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x88, keys: [], layers: 0, layerKind: 0}, " Left GUI + Right GUI ", edits.setKey("Layer 0", 27, "CUSTOM_KEY_9"), draft.current.fingerprint);
+    const message = edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x88, keys: [], layers: 0, layerKind: 0}, " GUI+Right GUI ", edits.setKey("Layer 0", 27, "CUSTOM_KEY_9"), draft.current.fingerprint);
     assert.deepEqual(message, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x88, keys: [], layers: 0, layerKind: 0}, expectedFingerprint: draft.current.fingerprint,
-        name: "Left GUI + Right GUI", then: {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 27, keycode: "CUSTOM_KEY_9"}]}});
+        name: "GUI+Right GUI", then: {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 27, keycode: "CUSTOM_KEY_9"}]}});
     stage(draft, message);
     const after = decoded(draft);
     assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x88, keys: [], layers: 0, layerKind: 0}, "both GUIs, no key");
-    assert.equal(after.settings.customKeyNames[9], "Left GUI + Right GUI");
+    assert.equal(after.settings.customKeyNames[9], "GUI+Right GUI");
     assert.equal(profileLayers(draft.document)[0][slotOf(27)], customKeyCode(9), "placed on the key the picker was for");
     assert.equal(draft.view({selectedDeviceId: "test-device", connected: true}).undoLabel, "Made a custom key for a shortcut");
     draft.undo(draft.revision);
@@ -597,7 +597,7 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
     const before = draft.document;
     const behaviour = {keycode: "KC_Q", steps: []};
     const then = edits.saveBehaviour(behaviour, {change: {tapCount: 0, kind: "hold", branch: edits.cellBranch("hold", {action: "CUSTOM_KEY_9", style: "PRESS_AND_HOLD_UNTIL_RELEASE"})}}, draft.identity());
-    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, "Left Ctrl + Right Ctrl", /** @type {any} */ (then)));
+    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, "Ctrl+Right Ctrl", /** @type {any} */ (then)));
     const after = decoded(draft);
     assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x11, keys: [], layers: 0, layerKind: 0});
     const row = after.behaviors.rows.find((entry) => entry.target.operand === 0x14);
@@ -605,7 +605,7 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before, "one undo takes back both");
     // Without a following edit the key is only named and given the shortcut.
-    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, "Left Ctrl + Right Ctrl"));
+    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, "Ctrl+Right Ctrl"));
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[9], {mods: 0x11, keys: [], layers: 0, layerKind: 0});
     assert.deepEqual(profileLayers(draft.document), profileLayers(before));
     assert.throws(() => stage(draft, {...edits.customKeyForShortcut("CUSTOM_KEY_8", {mods: 0x11, keys: [], layers: 0, layerKind: 0}, ""), then: /** @type {any} */ ({type: "renameKeyboard", name: "x"})}),
@@ -615,11 +615,11 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
 test("a combo kept with the custom key its output picker offered makes both in one draft step", () => {
     const draft = session();
     const before = draft.document;
-    const made = {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, keys: [], layers: 0, layerKind: 0}, name: "Left Ctrl + Right Ctrl"};
+    const made = {keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, keys: [], layers: 0, layerKind: 0}, name: "Ctrl+Right Ctrl"};
     const combo = edits.comboMessage(null, {output: "CUSTOM_KEY_9", inputs: ["KC_A", "KC_B"], termMs: "50", followsDefault: false, holdTermMs: "200"});
     const message = edits.comboKept(combo, made, draft.current.fingerprint);
     assert.deepEqual(message, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x11, keys: [], layers: 0, layerKind: 0},
-        expectedFingerprint: draft.current.fingerprint, name: "Left Ctrl + Right Ctrl", then: combo});
+        expectedFingerprint: draft.current.fingerprint, name: "Ctrl+Right Ctrl", then: combo});
     const combos = decoded(draft).combos.rows.length;
     stage(draft, message);
     const after = decoded(draft);

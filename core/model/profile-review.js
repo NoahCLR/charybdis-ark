@@ -17,6 +17,7 @@ const {PD_AXIS, PD_KIND} = require("../schema/pd-mode-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
 const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
+const {SHORTCUT_JOIN} = require("../../rules/shortcut-notation.mjs");
 const {customKeyName} = require("../data/user-keycodes");
 const {ORDER_UNITS, UNIT, parseUnit} = require("./review-units");
 const {movedBanks} = require("./draft-order");
@@ -106,7 +107,7 @@ function pointingFields(slot, names) {
     const result = new Map([[P.movementLabel, word(P.kinds, slot?.kind || 0)], [labels.name, slot?.name || "Empty"]]);
     if (!slot?.kind) return result;
     /** @param {number} mask */
-    const mods = mask => modifierNames(mask).map(label => hostKeyLabel(label, names.keys?.hostOs)).join(" + ") || "None";
+    const mods = mask => modifierNames(mask).map(label => hostKeyLabel(label, names.keys?.hostOs)).join(SHORTCUT_JOIN) || "None";
     /** @param {import("../schema/types.js").PdTap | undefined} output */
     const tap = output => !output?.keycode ? "None"
         : `${keyLabel(names.keys, output.keycode)} · ${output.modifierPolicy === 1 ? `${word(P.modifierPolicy, 1)} ${mods(output.mask)}` : word(P.modifierPolicy, output.modifierPolicy)}`;

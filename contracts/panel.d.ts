@@ -71,10 +71,10 @@ export interface ShortcutLayerTarget {layer: number; refusal: string; alwaysOn: 
 /** A layer that starts a slot's mode as the keyboard runs its link, and the layers whose being on ends a start from it, bit n layer n (0: nothing does; core/model/pointing-links.js linkStarts). */
 export interface PdLinkStart {layer: number; ends: number}
 export interface PdLinkTarget {layer: number; refusal: string; inert: 'default' | 'pointer' | ''; linkedBy: number | null; linkedByName: string}
-/** `shortcutLabel` names the shortcut in the host's words ("Left Ctrl + Right Alt + K"), empty for none. */
+/** `shortcutLabel` names the shortcut in the host's words ("Ctrl+Right Alt+K", the left modifiers unmarked, D-L83), empty for none. */
 export interface CustomKey {
     slot: number; keycode: string; code: number; name: string; hasBehavior: boolean; shortcut: CustomKeyShortcut;
-    /** The whole shortcut in words: modifiers, keys, then layers, joined by " + ", the layers led by their kind's verb unless held ("Lock Navigation"). */
+    /** The whole shortcut in words: modifiers, keys, then layers, joined by "+", the layers led by their kind's verb unless held ("Lock Navigation"). */
     shortcutLabel: string;
     /** What it sends, one part each: modifiers in the host's words, then each key in press order; empty for layers alone. */
     shortcutKeys: string[];

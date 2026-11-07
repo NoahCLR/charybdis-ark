@@ -112,7 +112,7 @@ test("one rule names an unnamed layer, slot, branch and modifier set", () => {
     assert.equal(slotName({id: 4, kind: 0, name: "Arrow"}), "Slot 4", "an empty slot is not called by the name it kept");
     assert.equal(slotName({id: 4, kind: 1, name: "Arrow"}), "Arrow");
     assert.equal(branchName(2), "Double tap");
-    assert.deepEqual(modifierNames(2 | 128), ["Left Shift", "Right GUI"]);
+    assert.deepEqual(modifierNames(2 | 128), ["Shift", "Right GUI"]);
 });
 
 

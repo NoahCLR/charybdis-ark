@@ -840,6 +840,12 @@ A name the catalog gives a key is what the key does wherever it is placed
   host layout names keys as it prints them (dead keys marked ◌); stored
   keycodes never change (`tests/model/key-names.test.js`,
   `browser-tests/host-layout.spec.js`).
+- Modifiers named together, in a modified key, a custom key's shortcut, the
+  picker's modifier row and Review, read the left one unmarked and the right
+  one named so, joined by "+": "Ctrl+Option+Spacebar", "Ctrl+Right
+  Option+K" (D-L83; the vocabulary's `modifiers`, host-worded by
+  `hostKeyVocabulary`). A modifier key on its own keeps its side ("Left
+  Ctrl"), so a board with both reads which is which.
 - The interface never names a keycode and has no modifier-name table: it
   looks up the published labels on every render
   (`tests/view/key-names-marked.test.mjs`,
@@ -938,7 +944,14 @@ than hold needs layers. Ark reads and writes settings version 11 only (D-L64;
   vocabulary's `customKeys.layerKinds`), nothing to choose until a layer is
   on; Clear goes back to Hold (`tests/model/custom-key-editor.test.js`,
   `tests/view/custom-key.test.mjs`,
-  `browser-tests/custom-key-shortcut.spec.js`).
+  `browser-tests/custom-key-shortcut.spec.js`). The footer's Selected chips
+  name every part picked, in every mode: modifiers, then keys, then layers,
+  each by its name and with its keycode on hover. Beside them it shows the pick in
+  QMK's names as every picker does: a shortcut as the chord of its parts, each
+  modifier as its key, then its keys, then each layer as the layer key its
+  kind acts as: `KC_LEFT_CTRL+KC_RIGHT_ALT+KC_K`, `KC_LEFT_GUI+TG(3)+TG(5)`
+  (`shortcutChord`, `rules/shortcut-notation.mjs`;
+  `tests/rules/shortcut-notation.test.mjs`).
 - The base layer and the default layers are always on, so a shortcut cannot
   name them. Core publishes the rule as `customKeyShortcutLayers`
   (`core/model/shortcut-layers.js`): such a layer is a dimmed row saying why
@@ -949,11 +962,13 @@ than hold needs layers. Ark reads and writes settings version 11 only (D-L64;
   `tests/model/shortcut-layers.test.js`).
 - Wherever a shortcut is named (the Custom keys list, key legends and tips,
   hover, Review, the behaviour grid) its layers follow its modifiers and keys
-  by name, lowest first, led by their kind's verb unless held: "Left Cmd +
-  Navigation + Extra", "Left Cmd + Lock Navigation + Extra" (`shortcutLabel`,
-  `core/model/key-names.js`). The hover card's Shortcut section tags each
+  by name, lowest first, led by their kind's verb unless held:
+  "Command+Navigation+Extra", "Command+Lock Navigation+Extra" (one rule,
+  `shortcutWords` in `rules/shortcut-notation.mjs`, which core's
+  `shortcutLabel`, `core/model/key-names.js`, and the picker's
+  `shortcutPickLabel` both read). The hover card's Shortcut section tags each
   layer with its kind and says what that does; the words that describe the
-  shortcut say what it does with its layers ("locks Navigation + Extra";
+  shortcut say what it does with its layers ("locks Navigation+Extra";
   `webview/view/custom-key.mjs`, `tests/view/custom-key.test.mjs`).
 - A tap-toggle or one-shot shortcut makes its key dual-role, as `TT()` and
   `OSL()` are: its tap / hold threshold follows the dual-role term

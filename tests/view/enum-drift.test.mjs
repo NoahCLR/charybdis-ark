@@ -50,7 +50,7 @@ test("the webview's name limit is the schema's", () => {
 test("the webview's modifier bits and names are the vocabulary's", () => {
     const model = {vocabulary: VOCABULARY};
     assert.equal(modifierBits(model), VOCABULARY.modifiers);
-    assert.deepEqual(modifierNames(model, 0x84), ["Left Alt", "Right GUI"]);
+    assert.deepEqual(modifierNames(model, 0x84), ["Alt", "Right GUI"]);
 });
 
 test("the webview's tiers are the vocabulary's", () => {

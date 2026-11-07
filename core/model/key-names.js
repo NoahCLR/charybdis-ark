@@ -27,6 +27,7 @@ const {LAYER_KEY_VERBS: LAYER_VERBS, layerName, macroDefaultName, slotName} = re
 const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 const {LAYERS} = require("../data/charybdis-layout");
 const {shortcutPresent, shortcutSends} = require("../schema/settings-domain-v1");
+const {SHORTCUT_JOIN, shortcutLayerWords, shortcutSendWords, shortcutWords} = require("../../rules/shortcut-notation.mjs");
 
 
 // A pointing key by its slot: "Dragscroll · hold", "Slot 6 · lock (empty)",
@@ -121,9 +122,8 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     const pointing = [];
     /** @type {import("../../contracts/model.js").NamedKey[]} */
     const custom = [];
-    const modifiers = hostKeyVocabulary(hostOs).modifiers;
     for (const entry of catalog.entries()) if (carriesModifiers(entry)) {
-        let label = entry.value >= 0xe0 && entry.value <= 0xe7 ? modifiers[entry.value - 0xe0][1] : hostKeyLabel(entry.label, hostOs);
+        let label = hostKeyLabel(entry.label, hostOs);
         const base = typed.labels[keycodes.resolve(entry.value & 0xff).name];
         if ("kind" in entry && entry.kind === "modified" && base !== undefined) label = label.replace(/\+[^+]+$/, () => `+${base}`);
         labels[entry.name] = label;
@@ -270,7 +270,8 @@ function compactKeyLabels(labels) {
     return short;
 }
 
-// Every modifier control uses these same names as keys and Review. Picker
+// Every modifier control uses these same names, as a modified key and a
+// custom key's shortcut read them (left unmarked, D-L83), and Review. Picker
 // identifiers are stable edit tokens, not display words; derive their labels
 // from the bit vocabulary rather than maintaining another naming table.
 // Built once per host OS and frozen: every model of that host shares them.
@@ -284,7 +285,7 @@ function hostKeyVocabulary(hostOs = 0) {
     const modifiers = VOCABULARY.modifiers.map(/** @returns {[number, string]} */ ([bit, label]) => [bit, hostKeyLabel(label, hostOs)]);
     // The modifiers' QMK bits, in the vocabulary's order: left, then right.
     const wrappers = Object.values(MODS).map(mods => /** @type {string} */ (wrapperOf(mods)));
-    const pickerModifiers = modifiers.map(([bit, label], i) => Object.freeze({bit, value: wrappers[i], label: i < 4 ? label.replace(/^Left /, "") : label}));
+    const pickerModifiers = modifiers.map(([bit, label], i) => Object.freeze({bit, value: wrappers[i], label}));
     // The key a layout's third level is typed with, as the host calls it.
     const thirdLevel = hostOs === MACOS ? "Option" : "AltGr";
     const words = /** @type {HostVocabulary} */ (Object.freeze({modifiers: Object.freeze(modifiers.map((pair) => Object.freeze(pair))), pickerModifiers: Object.freeze(pickerModifiers), thirdLevel}));
@@ -345,47 +346,39 @@ function layerTapWords(names, value) {
     const tap = catalog.lookup(/** @type {string} */ (resolved.tap));
     return tap ? keyLabel(names, tap.value) : resolved.tap;
 }
-// A custom key's shortcut (firmware D-F26) as it reads: its modifiers in the
-// host's words, left before right, then its keys in order, then the layers it turns on
-// by name, lowest first, joined by " + ": "Left Command + Navigation + Extra".
-// Held layers read by name alone; any other kind leads with its layer key's
-// verb: "Left Command + Lock Navigation + Extra". Empty for no shortcut.
+// The host's words for a shortcut's parts, for rules/shortcut-notation.mjs.
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @returns {import("../../rules/shortcut-notation.mjs").ShortcutTerms} */
+const shortcutTerms = (names) => ({modifiers: hostKeyVocabulary(names?.hostOs).modifiers, keyLabel: (/** @type {number} */ code) => keyLabel(names, code),
+    layerName: (/** @type {number} */ layer) => layerName(names?.layers, layer), layerCount: LAYERS, layerKinds: VOCABULARY.customKeys.layerKinds});
+// A custom key's shortcut (firmware D-F26) as it reads, by the one rule the
+// interface writes a shortcut it is picking with (rules/shortcut-notation.mjs):
+// "Command+Lock Navigation+Extra". Empty for no shortcut.
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {import("../schema/types.js").CustomKeyShortcut | null | undefined} shortcut */
 function shortcutLabel(names, shortcut) {
-    if (!shortcut) return "";
-    const parts = shortcutKeys(names, shortcut);
-    const layers = shortcutLayerNames(names, shortcut);
-    const verb = shortcut.layerKind ? VOCABULARY.customKeys.layerKinds.find(([kind]) => kind === shortcut.layerKind)?.[1] : "";
-    if (layers.length && verb) layers[0] = `${verb} ${layers[0]}`;
-    return [...parts, ...layers].join(" + ");
+    return shortcut ? shortcutWords(shortcut, shortcutTerms(names)) : "";
 }
 // The layers a shortcut turns on, by name, lowest first.
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {{layers?: number} | null | undefined} shortcut @returns {string[]} */
 function shortcutLayerNames(names, shortcut) {
-    const layers = [];
-    for (let layer = 0; layer < LAYERS; layer++) if ((shortcut?.layers ?? 0) & (1 << layer)) layers.push(layerName(names?.layers, layer));
-    return layers;
+    return shortcutLayerWords({layers: shortcut?.layers ?? 0}, shortcutTerms(names));
 }
 // What a shortcut does, after its key's name in a tip: sends its modifiers and
 // keys, its layers named after them by their kind, or, of layers alone, what
-// it does with them ("holds Navigation on", "locks Navigation + Extra"), as
+// it does with them ("holds Navigation on", "locks Navigation+Extra"), as
 // the Custom keys screen says it (webview/view/custom-key.mjs, shortcutAct).
 const LAYER_ACTS = ["holds %s on", "locks %s", "moves to %s", "tap-toggles %s", "turns %s on as a one-shot"];
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {import("../schema/types.js").CustomKeyShortcut | null | undefined} shortcut */
 function shortcutAct(names, shortcut) {
     if (!shortcut || !shortcutPresent(shortcut)) return "";
     if (shortcutSends(shortcut)) return `sends ${shortcutLabel(names, shortcut)}`;
-    return (LAYER_ACTS[shortcut.layerKind] || LAYER_ACTS[0]).replace("%s", shortcutLayerNames(names, shortcut).join(" + "));
+    return (LAYER_ACTS[shortcut.layerKind] || LAYER_ACTS[0]).replace("%s", shortcutLayerNames(names, shortcut).join(SHORTCUT_JOIN));
 }
 // What a shortcut sends, one part each: its modifiers in the host's words,
 // left before right, then each key in the order it is pressed. Empty for a
 // shortcut of layers alone.
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {import("../schema/types.js").CustomKeyShortcut | null | undefined} shortcut @returns {string[]} */
 function shortcutKeys(names, shortcut) {
-    if (!shortcut) return [];
-    const parts = hostKeyVocabulary(names?.hostOs).modifiers.filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
-    for (const key of shortcut.keys) parts.push(keyLabel(names, key));
-    return parts;
+    return shortcut ? shortcutSendWords(shortcut, shortcutTerms(names)) : [];
 }
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {number} value */
 function keyLabelWithName(names, value) {

@@ -119,7 +119,7 @@ or run on some layers only.
 </p>
 
 When a key needs a shortcut that no single keycode can send, such as one
-that mixes left and right modifiers (Left Ctrl+Right Option+K), Ark
+that mixes left and right modifiers (Ctrl+Right Option+K), Ark
 offers to make a custom key for it. A custom key has its own name and can
 have its own behaviour.
 
