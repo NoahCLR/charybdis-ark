@@ -64,6 +64,11 @@ export const STATE_FIELDS = {
     // before it sends anything. Historically kept across draft replacement;
     // it shows only while the matching behaviour cell is empty.
     cellHow: kept(null),
+    // {keycode, term, terms, problem}: timings the behaviour editor refused
+    // (D-L82), kept in their fields, marked, through the redraw core's refusal
+    // brings, until a timing mends them or Timings closes; a replaced draft
+    // drops them.
+    timingRefusal: resets(null),
     // The combo builder, opened and closed as one (openComboBuilder):
     //   inputs      the input names the combo stores, in stored order — never
     //               board positions, which mean another key on every layer
@@ -216,7 +221,7 @@ export function toggleLayerOn(index) {
     state.layersOn = next.on;
     const row = behaviourRowAfterPreview(state.behaviourRow, before, selectedKey());
     if (row === state.behaviourRow) return;
-    Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null});
+    Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null, timingRefusal: null});
 }
 /** @param {import("../contracts/panel.js").Layer | null | undefined} layer @param {number | undefined} index */
 export const positionAt = (layer, index) =>

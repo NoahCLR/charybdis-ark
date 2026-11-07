@@ -55,6 +55,77 @@ test("Timings opens the behaviour's timings in a panel that stays open while the
     expect(errors).toEqual([]);
 });
 
+test("a Tap / hold at or past the Long hold stays in its field, edged red with the reason, and the rail says core's refusal (D-L82)", async ({page}) => {
+    await openControls(page, "keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"});
+    await button(page).click();
+    const panel = timings(page).locator(".def-pop");
+    const field = (term) => panel.locator(`[data-f="behaviour:KC_LEFT_GUI:timing:${term}"]`);
+    const danger = () => page.evaluate(() => {
+        const probe = document.createElement("i"); probe.style.color = "var(--danger)"; document.body.append(probe);
+        const colour = getComputedStyle(probe).color; probe.remove(); return colour;
+    });
+    const refused = async () => {
+        await expect(field("tapHoldTerm")).toHaveValue("700");
+        await expect(field("tapHoldTerm")).toHaveAttribute("aria-invalid", "true");
+        await expect(field("tapHoldTerm")).toHaveCSS("border-top-color", await danger());
+        await expect(panel.locator("#timing-problem")).toHaveText("The Long hold threshold, 400 ms, must be later than the Tap / hold threshold, 700 ms.");
+        await expect(field("tapHoldTerm")).toHaveAttribute("aria-describedby", "timing-problem");
+    };
+    await clearPosts(page);
+    // The Long hold follows its 400 ms default. The edit still posts, for core
+    // to refuse.
+    await change(field("tapHoldTerm"), "700");
+    await refused();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior",
+        behavior: expect.objectContaining({keycode: "KC_LEFT_GUI", tapHoldTerm: "700", longHoldTerm: "0"})})]);
+    // Core's refusal redraws with its notice: the rail says it, and the field keeps its mark.
+    const notice = "Failed: The behaviour on KC_LEFT_GUI: its Long hold threshold, 400 ms, must be later than its Tap / hold threshold, 700 ms.";
+    await page.evaluate(async (notice) => {
+        const {getModel} = await import("/webview/store.mjs");
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: structuredClone(getModel()), notice, failed: true}}));
+    }, notice);
+    await expect(page.locator(".rail-message.err > span")).toHaveText(notice);
+    await refused();
+    // A later Long hold puts them in order: both post, and the marks go.
+    await clearPosts(page);
+    await change(field("longHoldTerm"), "900");
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior",
+        behavior: expect.objectContaining({keycode: "KC_LEFT_GUI", tapHoldTerm: "700", longHoldTerm: "900"})})]);
+    await expect(panel.locator("[aria-invalid]")).toHaveCount(0);
+    await expect(panel.locator("#timing-problem")).toHaveCount(0);
+    await expect(field("tapHoldTerm")).toHaveValue("700");
+    // Core's acceptance redraws, and the rail's refusal is gone.
+    await publishBehaviour(page, "KC_LEFT_GUI", [], {tapHoldTerm: "700", longHoldTerm: "900"});
+    await expect(page.locator(".rail-message")).toHaveCount(0);
+});
+
+test("closing Timings drops a refused timing: reopened, it shows what is kept (D-L82)", async ({page}) => {
+    await openControls(page, "keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"});
+    const panel = timings(page).locator(".def-pop");
+    const field = (term) => panel.locator(`[data-f="behaviour:KC_LEFT_GUI:timing:${term}"]`);
+    const reopened = async () => {
+        await expect(panel).toHaveCount(0);
+        await button(page).click();
+        await expect(field("tapHoldTerm")).toHaveValue("");
+        await expect(panel.locator("[aria-invalid]")).toHaveCount(0);
+        await expect(panel.locator("#timing-problem")).toHaveCount(0);
+    };
+    // Refused, then closed by Esc.
+    await button(page).click();
+    await change(field("tapHoldTerm"), "700");
+    await expect(field("tapHoldTerm")).toHaveAttribute("aria-invalid", "true");
+    await field("tapHoldTerm").press("Escape");
+    await reopened();
+    // Typed and left by a press outside, which closes Timings first: the edit
+    // posts for core to refuse, and nothing is kept.
+    await clearPosts(page);
+    await field("tapHoldTerm").fill("700");
+    await page.getByText("Use this behaviour", {exact: true}).click();
+    await expect.poll(() => posted(page)).toContainEqual(expect.objectContaining({type: "saveBehavior",
+        behavior: expect.objectContaining({tapHoldTerm: "700"})}));
+    await reopened();
+});
+
 test("closed, Timings wears the mark of each timing the behaviour sets, and says which on hover", async ({page}) => {
     await openControls(page, "keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"});
     await expect(button(page).locator(".own-timings")).toHaveCount(0);

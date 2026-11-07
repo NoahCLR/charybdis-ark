@@ -234,3 +234,17 @@ test("a shortcut's layers are staged, listed by name, moved by a reorder and kep
     const free = section.fields.map(field => field.macro === "startupLayer2" ? {macro: field.macro, enabled: true} : keep(field));
     assert.doesNotThrow(() => draftEdit(layered, {type: "updateConfigDefaults", sectionId: "startupLayers", fields: free}, capabilities));
 });
+
+test("a shortcut that makes a custom key's behaviour wait the dual-role default is refused when that reaches its Long hold (D-L82)", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    // CUSTOM_KEY_0's behaviour follows the 150 ms Tap / hold default and sets
+    // its own 180 ms Long hold; as TT() or OSL() it would wait 200 ms.
+    const document = editProfileDomains(pdDocument(), {capabilities}, open => Object.assign(open("behaviors").rows.find(row => row.target.kind === 7 && row.target.operand === 0), {tapHoldTerm: 0, longHoldTerm: 180}));
+    const current = snapshot(document);
+    const shortcut = layerKind => ({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 0, keys: [], layers: 1 << 3, layerKind}});
+    for (const layerKind of [3, 4]) {
+        assert.throws(() => draftEdit(current, shortcut(layerKind), capabilities), {code: "CUSTOM_KEY_SHORTCUT_INVALID",
+            message: "The behaviour on CUSTOM_KEY_0: its Long hold threshold, 180 ms, must be later than its Tap / hold threshold, 200 ms. Change that behaviour's own timings first."});
+    }
+    assert.equal(validateSnapshot(draftEdit(current, shortcut(1), capabilities), capabilities).settings.customKeyShortcuts[0].layerKind, 1, "a lock waits the behaviour default");
+});

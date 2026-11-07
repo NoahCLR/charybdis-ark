@@ -11,6 +11,7 @@ const {actionName, isOwnedLayerCode, knownActionAbi, momentaryCall} = require(".
 const {LAYERS} = require("../data/charybdis-layout");
 const {behaviorPlacementProblem} = require("./profile-placement");
 const {VOCABULARY} = require("./vocabulary");
+const {holdOrderRefusal} = require("./gesture-timing");
 
 /**
  * @typedef {import("../schema/types.js").SemanticAction} Action
@@ -40,11 +41,20 @@ function integer(value, max, label, optional = false) {
 const timingName = (term) => VOCABULARY.thresholdNames[term].charAt(0).toUpperCase() + VOCABULARY.thresholdNames[term].slice(1);
 
 // One behaviour edit, made in place on the opened behaviours domain
-// (portable-profile.js editProfileDomains encodes it).
-/** @param {{rows: Row[]}} behaviors @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
-function editKeyBehaviors(behaviors, message, capabilities = {}) {
+// (portable-profile.js editProfileDomains encodes it). The profile's settings
+// are the defaults a row's empty timings follow, read to keep its Long hold
+// after its Tap / hold (D-L82).
+/** @param {{rows: Row[]}} behaviors @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} capabilities @param {Pick<import("../schema/profile-domains-types.js").DomainModels["settings"], 'values' | 'customKeyShortcuts'>} settings */
+function editKeyBehaviors(behaviors, message, capabilities, settings) {
     if (!((capabilities.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS)) throw invalid("This firmware does not support saving key behaviours.");
     const {rows} = behaviors;
+    const timings = {values: settings.values, shortcuts: settings.customKeyShortcuts};
+    const before = {...timings, rows: rows.slice()};
+    /** @param {Action} [saved] */
+    const checkTimings = saved => {
+        const refusal = holdOrderRefusal(before, {...timings, rows}, {saved});
+        if (refusal) throw invalid(refusal);
+    };
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest ?? 0);
     /** @param {Action} action */
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
@@ -120,6 +130,7 @@ function editKeyBehaviors(behaviors, message, capabilities = {}) {
             rows[from.index] = {...rows[from.index], target: to.target};
         }
         checkPlacements();
+        checkTimings();
         return;
     }
 
@@ -186,6 +197,7 @@ function editKeyBehaviors(behaviors, message, capabilities = {}) {
         };
         if (previous) rows[index] = row;
         else rows.push(row);
+        checkTimings(row.target);
     }
     checkPlacements();
 }

@@ -119,6 +119,16 @@ value to give this behaviour its own; clear the field to follow the default
 again. The defaults are under **Tap & hold timing** on Behaviour settings
 (below); hover a timing field, or a tier's heading, to read what it means.
 
+The Long hold threshold must be later than the Tap / hold threshold, whether
+the behaviour sets them or follows the defaults, and even when it has no Long
+hold: the keyboard would never count a press as a Hold before a Long hold. A
+timing that would put it at or before is not saved: it stays in its field,
+edged red, with the values that clash under the fields, and the message
+beside the rail says why, starting with **Failed:**. Once a timing puts them
+in order, what you typed is saved together; closing **Timings** instead drops
+it, and the fields show what is saved again. A behaviour the keyboard already
+holds that way keeps it until you save it; Review warns about it meanwhile.
+
 Closed, **Timings** wears the mark of each timing this behaviour sets: the
 Hold or Long hold tier's dot for a threshold, and the "N×" badge for the
 Multi tap window, the marks their defaults wear on Behaviour settings. When
@@ -210,4 +220,7 @@ behaviour thresholds their tier's dot, and the Multi tap window an "N×" badge
 split between the tap-branch colours, Key feedback's colour for each tap count
 from 2× up, since it decides all of them.
 
-Changing a default moves every behaviour that follows it.
+Changing a default moves every behaviour that follows it. Ark refuses a
+change that would put a behaviour's Long hold threshold at or before its Tap /
+hold threshold, the two behaviour defaults included, and names the behaviours
+it would move; change their own timings first.

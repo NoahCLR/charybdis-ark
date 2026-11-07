@@ -59,3 +59,28 @@ test("every dual-role key follows the dual-role term, row or not; any other row 
     }
     for (const operand of [4, 0x5201, 0x5221, 0x5261, 0x52e0]) assert.equal(effectiveTimings({target: code(operand)}, values).hold, 150, operand.toString(16));
 });
+
+test("an edit may not leave a row it saved, made or retimed with its Long hold at or before its Tap / hold (D-L82)", () => {
+    const {holdOrderRefusal} = require("../../core/model/gesture-timing");
+    const values = [200, 150, 400, 150];
+    const keyA = {target: code(4), tapHoldTerm: 0, longHoldTerm: 0, steps: []};
+    const keyB = {target: code(5), tapHoldTerm: 500, longHoldTerm: 0, steps: []};
+    const at = (rows, settingValues = values) => ({rows, values: settingValues});
+    // Every row, with or without a Long hold; equal is refused as well.
+    for (const long of [100, 150]) assert.match(holdOrderRefusal(at([keyA]), at([{...keyA, longHoldTerm: long}]), {saved: keyA.target}),
+        new RegExp(`^The behaviour on KC_A: its Long hold threshold, ${long} ms, must be later than its Tap / hold threshold, 150 ms\\.$`));
+    assert.equal(holdOrderRefusal(at([keyA]), at([{...keyA, longHoldTerm: 151}]), {saved: keyA.target}), "");
+    // A row read from the keyboard reversed stays as it is until an edit
+    // saves it or moves its timings.
+    assert.equal(holdOrderRefusal(at([keyA, keyB]), at([{...keyA, longHoldTerm: 900}, keyB]), {saved: keyA.target}), "");
+    assert.match(holdOrderRefusal(at([keyA, keyB]), at([keyA, keyB]), {saved: keyB.target}), /KC_B: its Long hold threshold, 400 ms/);
+    // A new default that moves several rows names each.
+    const lowered = values.slice(); lowered[2] = 140;
+    assert.equal(holdOrderRefusal(at([keyA, keyB]), at([keyA, keyB], lowered), {viaDefault: true}),
+        "The behaviours on KC_A and KC_B: each Long hold threshold must be later than its Tap / hold threshold. Change those behaviours' own timings first.");
+    const many = Array.from({length: 6}, (_, at) => ({...keyA, target: code(4 + at)}));
+    assert.match(holdOrderRefusal(at(many), at(many, lowered)), /^The behaviours on KC_A, KC_B, KC_C and 3 more: /);
+    // A row the edit made (a new key, or a retarget onto a dual-role key) is checked.
+    const lt = {...keyA, target: code(0x4104), longHoldTerm: 180};
+    assert.match(holdOrderRefusal(at([{...keyA, longHoldTerm: 180}]), at([lt])), /LT\(1,KC_A\): its Long hold threshold, 180 ms, must be later than its Tap \/ hold threshold, 200 ms/);
+});

@@ -26,6 +26,7 @@ export interface PanelState {
     reachGroups: Record<string, boolean>; resetBenchHeight: boolean; reachRow: {macros: string | null; customKeys: string | null; combos: string | null; pointing: string | null};
     cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; flashPausesAsked: number | string | null; foldsOpen: string[]; emptyLayersShown: string[]; allSlotsShown: string[]; checkGroupsOpen: {revision: number; open: Record<string, boolean>} | null;
     cellHow: {cell: string; keycode: string; style?: BranchStyle; repeatHz?: Scalar} | null;
+    timingRefusal: {keycode: string; term: import('../contracts/edits.js').TimingTerm; terms: Partial<Record<import('../contracts/edits.js').TimingTerm, string>>; problem: string} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null;
         madeKey: {keycode: string; shortcut: import('../contracts/panel.js').CustomKeyShortcut; name: string} | null};
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;

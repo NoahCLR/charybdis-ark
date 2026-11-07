@@ -371,3 +371,25 @@ test("auto-sniping is its switch and one switch per layer, saved as one layer ma
     assert.deepEqual([off[8], off[9]], [0, (1 << 2) | (1 << 3)], "off keeps the layers chosen");
     assert.equal(values({snipingOnLayer3: false})[9], 0, "no layer at all is a set the keyboard stores");
 });
+
+test("a default that would put a behaviour's Long hold at or before its Tap / hold is refused, naming the behaviours it moves (D-L82)", () => {
+    const {editProfileDomains} = require("../../core/model/portable-profile");
+    const current = snapshot(), edit = (fields, from = current) => draftEdit(from, message(from, "keyTiming", fields));
+    // The defaults are 150 ms Tap / hold and 400 ms Long hold.
+    for (const [fields, long, hold] of [[{longHoldTerm: "150"}, 150, 150], [{tapHoldTerm: "400"}, 400, 400], [{tapHoldTerm: "300", longHoldTerm: "200"}, 200, 300]]) {
+        assert.throws(() => edit(fields), {message: `The long hold threshold, ${long} ms, must be later than the behaviour tap / hold threshold, ${hold} ms.`}, JSON.stringify(fields));
+    }
+    assert.equal(validateSnapshot(edit({longHoldTerm: "151"})).settings.values[2], 151);
+    // LGUI(KC_C) sets its own 300 ms Tap / hold: a Long hold default at or
+    // before it moves that behaviour, and is refused until its own timing changes.
+    const document = editProfileDomains(current.document, {}, open => { open("behaviors").rows[0].tapHoldTerm = 300; });
+    const own = {document, fingerprint: fingerprint(document), limits: current.limits};
+    assert.throws(() => edit({longHoldTerm: "250"}, own),
+        {message: "The behaviour on LGUI(KC_C): its Long hold threshold, 250 ms, must be later than its Tap / hold threshold, 300 ms. Change that behaviour's own timings first."});
+    assert.equal(validateSnapshot(edit({longHoldTerm: "301"}, own)).settings.values[2], 301);
+    // A profile the keyboard holds with the order reversed still takes other settings.
+    const reversed = editProfileDomains(current.document, {}, open => { open("behaviors").rows[0].tapHoldTerm = 500; });
+    const held = {document: reversed, fingerprint: fingerprint(reversed), limits: current.limits};
+    assert.equal(validateSnapshot(draftEdit(held, message(held, "autoMouse", {mouseTimeout: "900"}))).settings.values[6], 900);
+    assert.equal(validateSnapshot(edit({multiTapTerm: "200"}, held)).settings.values[3], 200);
+});

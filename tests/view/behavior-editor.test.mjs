@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behaviourThresholds, styleDetail, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
+import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behaviourThresholds, styleDetail, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, behaviourTimingProblem, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 import {impliedBranch} from "../../webview/view/keyface.mjs";
 import * as edits from "../../webview/view/edits.mjs";
 
@@ -156,4 +156,18 @@ test("the editor row carries whether a timing alone does something on its key", 
     assert.equal(behaviourEditorRow(model, "KC_DELETE")?.timingAlone, false);
     assert.equal(behaviourEditorRow(model, "LT(3,KC_F)")?.timingAlone, true);
     assert.equal(behaviourEditorRow(model, "KC_Q")?.timingAlone, true, "a key the core published nothing for keeps its timing");
+});
+
+test("the editor refuses timings with the Long hold at or before the Tap / hold, its own or the default, in core's sentence (D-L82)", () => {
+    const behaviour = {keycode: "KC_A", tapHoldTerm: "0", longHoldTerm: "0", timingDefaults: {tapHoldTerm: "150", longHoldTerm: "400"}};
+    const problem = (terms, row = behaviour) => behaviourTimingProblem(profile, row, terms);
+    assert.equal(problem({tapHoldTerm: "700"}), "The Long hold threshold, 400 ms, must be later than the Tap / hold threshold, 700 ms.");
+    assert.equal(problem({tapHoldTerm: "400"}), "The Long hold threshold, 400 ms, must be later than the Tap / hold threshold, 400 ms.", "equal is refused");
+    assert.equal(problem({longHoldTerm: "100"}), "The Long hold threshold, 100 ms, must be later than the Tap / hold threshold, 150 ms.");
+    assert.equal(problem({tapHoldTerm: "399"}), "");
+    assert.equal(problem({tapHoldTerm: "700", longHoldTerm: "900"}), "");
+    assert.equal(problem({tapHoldTerm: "0", longHoldTerm: "0"}), "", "both defaults");
+    // What the keyboard refuses anyway, or a default not known, is core's to say.
+    assert.equal(problem({tapHoldTerm: "abc"}), "");
+    assert.equal(problem({tapHoldTerm: "700"}, {...behaviour, timingDefaults: {}}), "");
 });
