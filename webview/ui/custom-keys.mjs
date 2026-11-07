@@ -124,7 +124,7 @@ export function screenCustomKeys() {
     pad.appendChild(grid);
     if (key) {
         const side = el(`<div class="stack"></div>`);
-        side.append(editor(model, key, canEdit), behaviourCard(model, key, canEdit));
+        side.append(editor(model, key, canEdit), behaviourCard(model, key));
         pad.appendChild(side);
     } else pad.appendChild(el(`<div class="empty-card"><p class="note">Pick a key.</p></div>`));
     main.appendChild(content);
@@ -165,9 +165,11 @@ function editor(model, key, canEdit) {
 // Keymap screen too, where the board shows the keys that reach it: on the
 // layer shown if it reaches the key there, otherwise on the first layer that
 // does. What the shortcut adds is said under the shortcut itself.
-/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
-function behaviourCard(model, key, canEdit) {
+/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
+function behaviourCard(model, key) {
     const behaviour = behaviourEditorRow(model, key.keycode);
+    // The actions are the behaviour's, so they follow the behaviours gate.
+    const canEdit = editGate(model, "behaviours").editable;
     const placements = placementsOf(model, "customKeys", key.keycode);
     const placed = placements.length > 0;
     const card = el(`<div class="card custom-key-behaviour">
