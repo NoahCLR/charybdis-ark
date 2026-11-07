@@ -155,11 +155,15 @@ The same kind of control looks and sits the same on every screen.
   `disclosureButton` or a `<summary class="disclose">`
   (`webview/ui/disclosure.mjs`), one look wherever it appears: the chevron,
   then its words at `--fs-md` in `--text-2`, 28 px tall. A card that does
-  not fold has none (no test). A behaviour's or combo's Layers it runs on
-  wears the same look but opens its layer switches in a panel under the
-  button (`aria-haspopup="dialog"`, `.def-pop`), two layers to a row, so the
-  editor keeps its height: it stays open across the redraws its switches
-  cause, and a press outside or Esc closes it
+  not fold has none (no test). A behaviour's or combo's Layers it runs on,
+  and a behaviour's Timings, wear the same look but open their controls in a
+  panel under the button (`aria-haspopup="dialog"`, `.def-pop`;
+  `panelDisclosure`, `webview/ui/disclosure.mjs`), two layers to a row and
+  the three timings one to a row, so the editor keeps its height: it stays
+  open across the redraws its controls cause, and a press outside or Esc
+  closes it (`browser-tests/behaviour-timings.spec.js`). Closed, Timings
+  wears the mark of each timing the behaviour sets, after its name
+  (**Marks**), and none when all follow the defaults
   (`browser-tests/participation.spec.js`).
 - A sheet (Review, the keycode picker, Draft history) closes with one ghost
   **Close** at the right of its header, and by Escape; its foot holds only
@@ -475,7 +479,10 @@ macro and a custom key, which have none:
   Otherwise a setting carries the mark of what it governs (`governs` in
   `core/model/settings-editor.js`) on the Settings screens, its per-layer
   switches and layer matching included, the editors and the review
-  (`tests/model/profile-review.test.js`).
+  (`tests/model/profile-review.test.js`); a behaviour's timing of its own
+  carries the mark of the default it replaces (`settingGoverns`,
+  `webview/view/settings-layout.mjs`), on the closed Timings disclosure
+  (`browser-tests/behaviour-timings.spec.js`).
 - A key or action is named through `actionMarked` or `keyNameMarked`; only
   attributes and plain-text messages carry the words alone
   (`tests/view/key-names-marked.test.mjs`). One that acts on a layer or runs a

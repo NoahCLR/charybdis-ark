@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn} from "../../webview/view/settings-layout.mjs";
+import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn, settingGoverns} from "../../webview/view/settings-layout.mjs";
 
 const require = createRequire(import.meta.url);
 const {publishedModel} = require("../fixtures/published-model");
@@ -29,6 +29,17 @@ test("every section the keyboard's model files under Settings or Pointer is on o
     assert.deepEqual(filed.filter((id) => !drawn.includes(id)), ["startupLayers"], "moving the base layer stands in for a Default layers editor");
     assert.ok(byId("startupLayers"), "the stored value is still published, for the review and checks");
     assert.ok(!drawn.some((id) => byId(id).area === "Lighting"), "lighting is set on Lighting");
+});
+
+test("a behaviour's own timing wears the mark of the default it replaces, as core marks that setting", () => {
+    // The two thresholds their tier's dot, the Multi tap window every tap
+    // count at once (D-L31); the behaviour editor reads them by the setting's
+    // name, which is also the timing's.
+    assert.deepEqual(settingGoverns(model, "tapHoldTerm"), {kind: "tier", tier: "hold"});
+    assert.deepEqual(settingGoverns(model, "longHoldTerm"), {kind: "tier", tier: "long"});
+    assert.deepEqual(settingGoverns(model, "multiTapTerm"), {kind: "branches"});
+    assert.equal(settingGoverns(model, "noSuchSetting"), null, "a setting the keyboard has not reported marks nothing");
+    assert.equal(settingGoverns(null, "tapHoldTerm"), null, "nor does one with no model yet");
 });
 
 test("Lighting draws the sections the model files under it, in the model's order", () => {

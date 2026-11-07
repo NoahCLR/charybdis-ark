@@ -112,7 +112,7 @@ const forms = [
         }), type: "updateConfigDefaults", names: "fingerprint"},
 
     // Behaviours.
-    {name: "behaviour timing", screen: "keys", state: {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"}, shown: '[data-f="behaviour:KC_LEFT_GUI:timing:tapHoldTerm"]',
+    {name: "behaviour timing", screen: "keys", state: {tab: "behaviours", behaviourRow: "KC_LEFT_GUI", foldsOpen: ["behaviour:timings"]}, shown: '[data-f="behaviour:KC_LEFT_GUI:timing:tapHoldTerm"]',
         commit: page => change(page.locator('[data-f="behaviour:KC_LEFT_GUI:timing:tapHoldTerm"]'), 177), type: "saveBehavior", names: "base"},
     {name: "behaviour on or off", screen: "keys", state: {tab: "behaviours", behaviourRow: "KC_LEFT_GUI"}, shown: '[data-f="behaviour:KC_LEFT_GUI:definition:enabled"]',
         commit: page => page.locator('label:has([data-f="behaviour:KC_LEFT_GUI:definition:enabled"])').click(), type: "saveBehavior", names: "base"},

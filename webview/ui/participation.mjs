@@ -1,8 +1,8 @@
 // @ts-check
 // Selector assertions refer to elements created by this module's authored markup.
-import {DISCLOSURE, el, esc, watchPressOutside} from "../lib/dom.mjs";
-import {foldOpen, keepFold} from "./disclosure.mjs";
-import {getModel, render} from "../store.mjs";
+import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
+import {foldOpen, panelDisclosure} from "./disclosure.mjs";
+import {getModel} from "../store.mjs";
 import {layerSwitchGrid, switchedLayers} from "./layer-switches.mjs";
 import {ALL_LAYERS} from "../view/layout.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
@@ -11,11 +11,10 @@ import {vocabulary} from "../view/vocabulary.mjs";
 // behaviour or a combo is named as itself, and the layers its keys may come
 // from open in a panel under Layers it runs on, drawn as Settings draws its
 // layer switches: each layer by its name and mark (layer-switches.mjs). The
-// panel stays open across renders (state.foldsOpen) until a press outside or
-// Esc closes it, so switching a layer, which redraws the editor, keeps it
-// open; the grid is built either way, so the mask reads the same closed.
-/** @type {(() => void) | null} */
-let stopWatching = null;   // stops the open panel's outside-press watch
+// panel opens and closes as every panel disclosure does (panelDisclosure),
+// staying open across renders, so switching a layer, which redraws the
+// editor, keeps it open; the grid is built either way, so the mask reads the
+// same closed.
 const PLACE = "definition:layers";
 /** @param {{index: number, label?: string, name: string}[]} layers @param {{enabled?: boolean, allowedLayers?: number}} definition @param {boolean} editable @param {(patch: {enabled: boolean, allowedLayers: number}) => void} changed @param {string} identity @param {"behaviour" | "combo"} noun */
 export function definitionControls(layers, definition, editable, changed, identity, noun) {
@@ -37,36 +36,8 @@ export function definitionControls(layers, definition, editable, changed, identi
         f: `${identity}:allowed-layer:${layer.index}`, checked: Boolean(allowed & 2 ** layer.index), disabled: !editable})),
     // An empty layer it does not run on differs from how it came, so shows.
     {place: `runs-on:${noun}`, keep: (layer) => !(allowed & 2 ** layer)});
-    const button = /** @type {HTMLButtonElement} */ (node.querySelector("[data-act=\"definition-layers\"]"));
-    const pop = /** @type {HTMLElement | null} */ (node.querySelector(".def-pop"));
-    const close = () => { keepFold(PLACE, false); stopWatching?.(); stopWatching = null; };
-    button.addEventListener("click", () => { if (open) close(); else keepFold(PLACE, true); render(); });
-    if (pop) {
-        pop.appendChild(grid);
-        // Esc closes it with focus back on its button. A press outside closes
-        // it in place rather than by a redraw, and only once the click has
-        // landed: the panel reaches below the editor, so taking it out on the
-        // press itself can scroll the page under the pointer and lose the
-        // click on what it was on.
-        pop.addEventListener("keydown", (event) => {
-            if (event.key !== "Escape") return;
-            event.preventDefault(); event.stopPropagation();
-            close(); render();
-            /** @type {HTMLElement | null} */ (document.querySelector("[data-act=\"definition-layers\"]"))?.focus();
-        });
-        // One watch for the page: a tab laid out for its height draws a
-        // second editor, with a panel of its own, so a press counts as
-        // inside by what it lands on, and the close takes out every panel.
-        stopWatching?.();
-        stopWatching = watchPressOutside([], (event) => {
-            if (/** @type {Element | null} */ (event.target instanceof Element ? event.target : null)?.closest(".def-layers")) return;
-            close();
-            document.addEventListener("click", () => {
-                document.querySelectorAll(".def-pop").forEach((panel) => panel.remove());
-                document.querySelectorAll('[data-act="definition-layers"]').forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
-            }, {capture: true, once: true});
-        });
-    }
+    /** @type {HTMLElement | null} */ (node.querySelector(".def-pop"))?.appendChild(grid);
+    panelDisclosure(node, {place: PLACE, act: "definition-layers", within: ".def-layers"});
     const use = /** @type {HTMLInputElement} */ (node.querySelector("[data-definition-enabled]"));
     const report = () => changed({enabled: use.checked, allowedLayers: switchedLayers(grid)});
     use.addEventListener("change", report);

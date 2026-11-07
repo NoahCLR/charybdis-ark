@@ -719,8 +719,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // What a behaviour and a combo share, as both editors label it and the
     // review names it: whether it runs, and on which layers.
     definitionFields: {use: {behaviour: "Use this behaviour", combo: "Use this combo"}, allowedLayers: "Layers it runs on"},
-    // A behaviour's own switch, as its editor labels it and the review names it.
-    behaviourFields: {anchor: "Keeps the pointer layer on"},
+    // A behaviour's own switch, as its editor labels it and the review names
+    // it, and the fold its timings open from.
+    behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},
     // A combo's fields, as the Combos table heads them and the review names them.
     comboFields: {inputs: "Inputs", sends: "Sends", window: "Window", conditions: "Conditions"},
 }));

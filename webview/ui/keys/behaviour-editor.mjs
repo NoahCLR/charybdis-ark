@@ -2,10 +2,12 @@
 /**
  * @typedef {NonNullable<ReturnType<typeof import("../../view/behavior-editor.mjs").behaviourEditorRow>>} EditorBehavior
  */
-// The open behaviour: its title and actions, its timings, and tap count ×
-// tier drawn as the grid it is, with the cell editor under it.
+// The open behaviour: its title and actions, its switches with its timings
+// folded beside them, and tap count × tier drawn as the grid it is, with the
+// cell editor under it.
 
-import {el, esc} from "../../lib/dom.mjs";
+import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
+import {foldOpen, panelDisclosure} from "../disclosure.mjs";
 import {behaviourGridSteps, cellLabel, impliedBranch, inheritedBranch} from "../../view/keyface.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {getModel, layers, post, render, state} from "../../store.mjs";
@@ -13,16 +15,25 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
-import {behaviourChangesNothing, behaviourHasTiming, behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
-import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot} from "../marks.mjs";
+import {behaviourChangesNothing, behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
+import {actionMarked, branchBadge, keyNameMarked, mark, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, sentence, styleWord, tierName, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
 import {cellEditor, cellEditorOf, pickCellAction} from "./cell-editor.mjs";
-import {sectionPath} from "../../view/settings-layout.mjs";
+import {sectionPath, settingGoverns} from "../../view/settings-layout.mjs";
 import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
 import {saveBehaviour} from "./save-behaviour.mjs";
 
 const {TIER_FIELDS, TIERS} = edits;
+// The timings in the order the panel lists them: the window between taps,
+// then the two thresholds.
+const TIMING_TERMS = /** @type {const} */ (["multiTapTerm", "tapHoldTerm", "longHoldTerm"]);
+// The fold the timings open from, kept across renders (disclosure.mjs).
+const TIMINGS_PLACE = "behaviour:timings";
+
+// Names as a sentence lists them: "a", "a and b", "a, b and c".
+/** @param {string[]} names */
+const listed = (names) => names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
 // How a tier runs, as the vocabulary words it.
 /** @param {import("../../../contracts/edits.js").Tier} kind @param {string | undefined} style */
@@ -42,20 +53,6 @@ function timingFallbackNote(model, behaviour, term) {
 // editor, on this screen or another, stays closed here.
 /** @param {EditorBehavior} behaviour */
 const openCell = (behaviour) => state.cellRow === behaviour.keycode ? state.cell : null;
-
-// What the head says about a behaviour that is not stored yet, or that changes
-// nothing (firmware D-F27 "Rows without steps"). On a plain key a timing does
-// nothing until the behaviour has a branch, so its fields wait for one.
-/** @param {EditorBehavior} behaviour */
-function storageNotes(behaviour) {
-    const timingIdle = !behaviour.steps.length && behaviour.timingAlone === false;
-    if (!behaviour.stored) return [timingIdle
-        ? "Using the key’s defaults until you set an action or Keeps the pointer layer on. A timing alone does nothing here."
-        : "Using the key’s defaults until you set an action, a timing or Keeps the pointer layer on."];
-    if (behaviourChangesNothing(behaviour)) return [`This behaviour changes nothing: ${behaviourHasTiming(behaviour)
-        ? "on this key a timing does nothing without a branch" : "it has no branches or timing of its own"}, so the key runs as if it had none. Set a grid action, or remove it.`];
-    return timingIdle ? ["On this key a timing does nothing until the behaviour has a branch."] : [];
-}
 
 // A cell by its id in the grid ("1-hold"): its tap count's step and its tier,
 // or null for none.
@@ -86,11 +83,10 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
     const timingIdle = !behaviour.steps.length && behaviour.timingAlone === false;
     const switchesIdle = behaviourChangesNothing(behaviour);
     // Each timing is named, and what it means said on hover, in the
-    // vocabulary's words.
-    const {thresholdNames, thresholdTips} = vocabulary(model);
-    // The timings are one row above the grid, each its name then its field:
-    // the window between taps, then the two thresholds. The grid's head is
-    // then the tier names alone, one over each column.
+    // vocabulary's words: its name then its field, one to a row of the
+    // Timings panel (below). The grid's head is the tier names alone, one
+    // over each column.
+    const {thresholdNames, thresholdTips, behaviourFields} = vocabulary(model);
     /** @param {import("../../../contracts/edits.js").TimingTerm} name */
     const timingControl = (name) => {
         const field = behaviourTimingField(behaviour, name);
@@ -199,23 +195,39 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
             <span class="bl">${esc([sendsKind(model, branch.action), styleLabel(kind, branch.style)].filter(Boolean).join(" · "))}</span></button>`;
     };
 
-    const notes = storageNotes(behaviour).map((note) => `<p class="note">${esc(note)}</p>`).join("");
+    // The timings fold into the switches row under Timings, as Layers it runs
+    // on folds its layers: a panel under the button, kept open across renders
+    // (panelDisclosure). Closed, Timings wears the mark of each timing this
+    // key sets, the mark its default wears on Settings (D-L31), and none when
+    // all three follow the defaults; which it sets is in its tip and the
+    // panel, never printed on the row.
+    const timingsOpen = foldOpen(TIMINGS_PLACE);
+    const ownTimings = TIMING_TERMS.filter((name) => !behaviourTimingField(behaviour, name).followsDefault);
+    const ownNote = ownTimings.length ? ` This key sets its own ${listed(ownTimings.map((name) => sentence(thresholdNames[name])))}.` : "";
+    const timingsFold = `<div class="beh-timings">
+            <button type="button" class="disclose" data-act="behaviour-timings" aria-haspopup="dialog" aria-expanded="${timingsOpen}"
+                data-tip="${esc(`This key's own timings: the window between taps and the two hold thresholds.${ownNote} An empty field follows ${sectionPath(model, "keyTiming")}.`)}">${DISCLOSURE}<span>${esc(behaviourFields.timings)}</span>${
+                ownTimings.length ? `<span class="own-timings" aria-hidden="true">${ownTimings.map((name) => mark(model, settingGoverns(model, name))).join("")}</span>` : ""}</button>
+            ${timingsOpen ? `<div class="def-pop timings" role="dialog" aria-label="${esc(behaviourFields.timings)}">${TIMING_TERMS.map((name) => timingControl(name)).join("")}</div>` : ""}
+        </div>`;
+
+    // The head says nothing about what the behaviour stores: a behaviour that
+    // changes nothing (firmware D-F27 "Rows without steps") is Review's and
+    // the Key tab's to note, and the head keeps one height from behaviour to
+    // behaviour (D-L32).
     const node = el(`<div>
         ${head ? `<div class="beh-head">
-            <div>
-                <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
-                    ${keyIdentity(model, behaviour.keycode).label === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
-                ${notes}
-            </div>
+            <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
+                ${keyIdentity(model, behaviour.keycode).label === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
             ${behaviour.stored ? `<div class="right row beh-actions">${behaviourActions(model, canEdit)}</div>` : ""}
-        </div>` : notes ? `<div class="beh-notes">${notes}</div>` : ""}
+        </div>` : ""}
         <div class="beh-intro">
             <label class="sw" data-tip="Treat this key as part of using the trackball, so pressing it keeps the pointer layer on instead of letting auto-mouse turn it off.">
                 <input type="checkbox" data-f="behaviour:${esc(behaviour.keycode)}:anchor" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
-                <span class="track"></span><span class="txt">${esc(vocabulary(model).behaviourFields.anchor)}</span></label>
+                <span class="track"></span><span class="txt">${esc(behaviourFields.anchor)}</span></label>
+            ${timingsFold}
         </div>
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>Timing ${esc(checkLevelWord(model, check.level).toLowerCase())}.</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
-        <div class="beh-timings">${["multiTapTerm", "tapHoldTerm", "longHoldTerm"].map((term) => timingControl(/** @type {import("../../../contracts/edits.js").TimingTerm} */ (term))).join("")}</div>
         <div class="bgrid">
             <span></span>
             ${TIERS.map((kind) => `<div class="btier" data-tip="${esc(vocabulary(model).tierTips[kind] || "")}">${tierDot(model, kind)}${esc(tierName(model, kind))}</div>`).join("")}
@@ -262,8 +274,9 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
         input.value = behaviourTimingField({...behaviour, [term]: input.dataset.stored}, term).value;
     }));
     /** @type {HTMLInputElement | null} */ (node.querySelector("[data-anchor]"))?.addEventListener("change", commit);
+    panelDisclosure(/** @type {HTMLElement} */ (node.querySelector(".beh-timings")), {place: TIMINGS_PLACE, act: "behaviour-timings", within: ".beh-timings"});
     // Whether the behaviour runs, and where, leads; the pointer-layer switch
-    // sits at the end of the row.
+    // and Timings follow.
     /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).prepend(definitionControls(layers().map(layer => ({...layer, label: layerCalled(layer)})), behaviour, canEdit && !switchesIdle, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
         const message = edits.saveBehaviour(behaviour, permissions, model?.profileIdentity);
         if (message) post(message);

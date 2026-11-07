@@ -102,8 +102,9 @@ tap**.
 
 ### Timing
 
-One row above the grid holds the behaviour's timings, each named beside
-its field:
+The behaviour's timings sit at the end of the switches row, under
+**Timings**, which opens them in a small panel over the grid, each named
+beside its field:
 
 - **Multi tap window**: how long after letting go the next press still counts
   as another tap.
@@ -117,6 +118,13 @@ setting it comes from: `200 · dual-role` for the tap / hold threshold of an
 value to give this behaviour its own; clear the field to follow the default
 again. The defaults are under **Tap & hold timing** on Behaviour settings
 (below); hover a timing field, or a tier's heading, to read what it means.
+
+Closed, **Timings** wears the mark of each timing this behaviour sets: the
+Hold or Long hold tier's dot for a threshold, and the "N×" badge for the
+Multi tap window, the marks their defaults wear on Behaviour settings. When
+all three follow the defaults it wears none. Hover **Timings** to read which
+it sets. The panel stays open while you edit, and closes with Esc or a click
+elsewhere.
 
 When Review's checks find a problem with the timing, a note above the grid
 says so, headed **Timing notice** or **Timing warning**.
@@ -139,8 +147,9 @@ key such as Tab, a timing does nothing until the behaviour has a branch.
 A behaviour joins your draft only when it changes something: a cell, a
 timing that matters for the key, or Keeps the pointer layer on. One that ends
 up changing nothing is removed again, and Undo brings it back. A behaviour
-already on the keyboard that changes nothing says so, so you can remove it or
-give it a branch.
+already on the keyboard that changes nothing is a Review notice, and the
+key's card says so, so you can remove it or give it a branch; the editor
+itself says nothing about it.
 
 **Change key…** moves the behaviour to another key. If that key has its own,
 you choose **Overwrite**, **Swap** or **Cancel**; either way it is one undo.
