@@ -1209,9 +1209,10 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* A layer's or pointing mode's icon takes the whole slot, ending where the dots do: the board is wider than a badge. */
 .mk-slot > .kind-icon { grid-column: 1 / -1; }
 .mk-slot.title { display: inline-flex; width: 34px; justify-content: flex-start; }
-/* A Settings row never pairs a badge with a dot, so its one mark sits in the
-   middle of the slot rather than at the tier track's edge. */
-.setrow .mk-slot > :only-child { grid-column: 1 / -1; justify-self: center; }
+/* A Settings row, or a timing in a behaviour's Timings panel, never pairs a
+   badge with a dot, so its one mark sits in the middle of the slot rather than
+   at the tier track's edge. */
+.setrow .mk-slot > :only-child, .def-pop.timings .mk-slot > :only-child { grid-column: 1 / -1; justify-self: center; }
 /* A branch that acts on a layer, or sends a pointing mode or a macro, reads as that thing: its kind's icon in its colour (its mark), its name and its tags (ui/marks.mjs sends). */
 .sends { display: inline-flex; align-items: center; gap: var(--sp-1); max-width: 100%; font-family: var(--sans); font-size: var(--fs-sm); color: var(--text); font-weight: var(--fw-strong); vertical-align: middle; }
 .sends-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

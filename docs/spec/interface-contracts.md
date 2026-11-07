@@ -159,8 +159,10 @@ The same kind of control looks and sits the same on every screen.
   and a behaviour's Timings, wear the same look but open their controls in a
   panel under the button (`aria-haspopup="dialog"`, `.def-pop`;
   `panelDisclosure`, `webview/ui/disclosure.mjs`), two layers to a row and
-  the three timings one to a row, so the editor keeps its height: it stays
-  open across the redraws its controls cause, and a press outside or Esc
+  the three timings one to a row, each name after its mark in one slot
+  (`marked`, the mark its default wears on Settings), so the editor keeps
+  its height: it stays open across the redraws its controls cause, and a
+  press outside or Esc
   closes it (`browser-tests/behaviour-timings.spec.js`). Closed, Timings
   wears the mark of each timing the behaviour sets, after its name
   (**Marks**), and none when all follow the defaults

@@ -16,7 +16,7 @@ import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
 import {behaviourChangesNothing, behaviourTimingEdit, behaviourTimingField, behaviourTimingProblem} from "../../view/behavior-editor.mjs";
-import {actionMarked, branchBadge, keyNameMarked, mark, sends, sendsKind, tierDot} from "../marks.mjs";
+import {actionMarked, branchBadge, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, sentence, styleWord, tierName, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
 import {cellEditor, cellEditorOf, pickCellAction} from "./cell-editor.mjs";
@@ -94,10 +94,10 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
     const timingControl = (name) => {
         const field = behaviourTimingField(refused ? {...behaviour, ...refused.terms} : behaviour, name);
         const placeholder = field.fallback === "" ? "default unavailable" : field.placeholder;
-        const marked = refused?.term === name ? ' aria-invalid="true" aria-describedby="timing-problem"' : "";
-        return `<label class="field inline bterm-field" data-term-field="${esc(name)}" data-tip="${esc(`${thresholdTips[name]} ${timingFallbackNote(model, behaviour, name)}`)}"><span>${esc(sentence(thresholdNames[name]))}</span>
+        const invalid = refused?.term === name ? ' aria-invalid="true" aria-describedby="timing-problem"' : "";
+        return `<label class="field inline bterm-field" data-term-field="${esc(name)}" data-tip="${esc(`${thresholdTips[name]} ${timingFallbackNote(model, behaviour, name)}`)}"><span>${marked(model, settingGoverns(model, name), sentence(thresholdNames[name]), {slot: true})}</span>
             <span class="affix unit"><input class="input mono num" style="--digits: ${esc(Math.max(5, placeholder.length))}" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
-                placeholder="${esc(placeholder)}"${marked} ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
+                placeholder="${esc(placeholder)}"${invalid} ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 
     // An action as the grid names it: a layer, pointing mode or macro as that

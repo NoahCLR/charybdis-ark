@@ -104,7 +104,8 @@ tap**.
 
 The behaviour's timings sit at the end of the switches row, under
 **Timings**, which opens them in a small panel over the grid, each named
-beside its field:
+beside its field after its mark, the mark **Timings** wears when the behaviour
+sets that timing (below):
 
 - **Multi tap window**: how long after letting go the next press still counts
   as another tap.

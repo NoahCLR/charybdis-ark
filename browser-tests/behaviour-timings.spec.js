@@ -29,7 +29,18 @@ test("Timings opens the behaviour's timings in a panel that stays open while the
     // The three timings, one to a row, each named beside its field, in the
     // grid's order: the window between taps, then the two thresholds.
     await expect(panel.locator("[data-term]")).toHaveText(["", "", ""]);
-    await expect(panel.locator(".bterm-field > span:first-child")).toHaveText(["Multi tap window", "Tap / hold threshold", "Long hold threshold"]);
+    await expect(panel.locator(".bterm-field > span:first-child .mk > span:last-child")).toHaveText(["Multi tap window", "Tap / hold threshold", "Long hold threshold"]);
+    // Each wears the mark Closed Timings shows when the behaviour sets it, and
+    // its default on Behaviour settings: the N× badge, then the Hold and Long
+    // hold tiers' dots, in one slot so the names start at one edge.
+    const fieldMarks = panel.locator(".bterm-field .mk-slot");
+    await expect(fieldMarks).toHaveCount(3);
+    await expect(fieldMarks.nth(0).locator(".bn")).toHaveText("N×");
+    for (const [at, tier] of [[1, "hold"], [2, "long"]]) {
+        const dot = fieldMarks.nth(at).locator(".fbdot");
+        await expect(dot).toHaveCount(1);
+        expect(await dot.evaluate((node) => node.outerHTML)).toBe(await page.locator(`.btier .fbdot`).nth(at).evaluate((node) => node.outerHTML));
+    }
     await expect(panel.locator('[data-f="behaviour:KC_LEFT_GUI:timing:tapHoldTerm"]')).toHaveAttribute("placeholder", /default/);
 
     // A timing typed posts the row, and the panel stays open across the redraw.
