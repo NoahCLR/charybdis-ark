@@ -10,7 +10,7 @@ import {sectionsIn} from "../../view/settings-layout.mjs";
 import {aboutStage, colourControl, section, stack} from "./common.mjs";
 
 // The background effect is QMK's own RGB Matrix effect: drawn first, under
-// every stage, on the LED classes it is given; a layer with no colour shows
+// every stage, on the LED classes it is given; a passthrough layer shows
 // it. The keyboard keeps it with its settings, so it saves as one settings
 // section, posted whole whichever control changed.
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
@@ -62,6 +62,6 @@ export function stageBase(model) {
 
     // That nothing is lit is news, so it stays in view, not behind the fold.
     if (lightingOff(model)) node.append(el(`<div class="callout span">All lighting is off, so nothing is lit. Its switch is at the top of this screen.</div>`));
-    node.append(colour, how, aboutStage("QMK's own effect, drawn first, under every stage: each one paints over it, and a layer with no colour shows it."));
+    node.append(colour, how, aboutStage("QMK's own effect, drawn first, under every stage: each one paints over it, and a passthrough layer shows it."));
     return node;
 }

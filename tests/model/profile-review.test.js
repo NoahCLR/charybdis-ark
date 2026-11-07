@@ -235,6 +235,18 @@ test("a colour travels as a colour, and an off one says what off means there", (
     assert.deepEqual(accent.afterColour,{h:0,s:0,v:0},"drawn as off, as Lighting draws it");
     assert.ok(!accents.fields.some(field=>/Group/.test(`${field.label} ${field.after} ${field.before}`)),"no group is named");
 });
+test("a layer colour that paints nothing reads passthrough, and one with only brightness at zero reads black", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const colours={0:{h:30,s:200,v:150},2:{h:30,s:0,v:0},3:{h:30,s:200,v:0}};
+    const after=snapshot(lighting(base,rgb=>({...rgb,
+        layerColors:rgb.layerColors.map(row=>colours[row.layerId]?{...row,color:colours[row.layerId]}:row),
+        pdModeColors:rgb.pdModeColors.map(row=>({...row,color:{h:0,s:0,v:0}}))})));
+    const items=profileReview(before,after), field=unit=>items.find(entry=>entry.unit===unit)?.fields[0];
+    assert.equal(field("rgb:layer:0").before,"passthrough","Base too, in the same word");
+    assert.equal(field("rgb:layer:2").after,"passthrough","any hue with no saturation or brightness");
+    assert.equal(field("rgb:layer:3").after,"black","saturation without brightness paints black");
+    assert.equal(field("rgb:pd:0").after,"off","outside a layer, black is no passthrough");
+});
 test("an accent for every layer, mode or feedback state, and the combo accents, read by who they light for", () => {
     const base=pdDocument(), before=snapshot(base);
     const after=snapshot(lighting(base,rgb=>({...rgb,

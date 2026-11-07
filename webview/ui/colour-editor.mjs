@@ -13,9 +13,11 @@ import {el, esc} from "../lib/dom.mjs";
 // `offTip` offers Turn off, storing HSV(0, 0, 0), and says what that does in
 // this stage (`offWording` in view/lighting.mjs); without it there is no Turn
 // off, as for the background effect. A colour turned off reads "Off", never
-// its stored numbers; the callout says what off means here.
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, maximumBrightness}) {
+// its stored numbers; the callout says what off means here. Where off has a
+// name of its own (a layer's passthrough), `offAction` and `offWord` replace
+// Turn off and Off.
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offTip?: string, offAction?: string, offWord?: string, maximumBrightness?: number}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offTip, offAction = "Turn off", offWord = "Off", maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12"></div>`);
@@ -24,7 +26,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
 
     if (inheritsStageColour(colour)) {
         node.append(el(`<div class="row colour-head"><span class="swatch-lg swatch-off"></span>
-            <div><div class="colour-title">${esc(title)}</div><div class="note">Off</div></div></div>`));
+            <div><div class="colour-title">${esc(title)}</div><div class="note">${esc(offWord)}</div></div></div>`));
         node.append(el(`<div class="callout">${esc(offNote || "This colour has zero brightness.")}</div>`));
         if (canEdit) {
             const give = el(`<button class="btn self-start">Give it a colour</button>`);
@@ -38,7 +40,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
         <span class="swatch-lg" style="background:${css(colour)}"></span>
         <div><div class="colour-title">${esc(title)}</div>
             <div class="note mono">${esc(hsvLabel(colour))} · rgb(${esc(rgb(colour).join(", "))})</div></div>
-        ${canEdit && offTip ? `<button class="btn tiny ghost" data-off data-tip="${esc(offTip)}">Turn off</button>` : ""}</div>`);
+        ${canEdit && offTip ? `<button class="btn tiny ghost" data-off data-tip="${esc(offTip)}">${esc(offAction)}</button>` : ""}</div>`);
     node.append(head);
     if (v === 0) node.append(el(`<p class="note">Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.</p>`));
     /** @type {HTMLElement | null} */ (head.querySelector("[data-off]"))?.addEventListener("click", () => commit([0, 0, 0]));

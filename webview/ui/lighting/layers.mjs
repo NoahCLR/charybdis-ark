@@ -34,7 +34,7 @@ export function stageLayers(model) {
         const lit = row && !isOff(row.color);
         return pickableRow(`${index}`, index === state.layer, [
             pickButton(`lighting-layers:${index}`, index === state.layer, `<span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerCalled(layer))}${marks.lightingLayers.has(index) ? draftDot(model?.draft) : ""}`),
-            `<span class="muted">${esc(!row ? "not reported" : !layerPaints(row.color) ? "no colour" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModesBrief, row.mode)}`)}</span>`,
+            `<span class="muted">${esc(!row ? "not reported" : !layerPaints(row.color) ? "passthrough" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModesBrief, row.mode)}`)}</span>`,
         ], {data: {layer: index}});
     };
     const list = groupedTable({scroll: "layers", draft: model?.draft, columns: [["Layer", "52%"], ["Paints", "48%"]], groups: [

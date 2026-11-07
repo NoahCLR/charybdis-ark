@@ -37,7 +37,7 @@ export function stagePointing(model) {
         const on = slot.id === state.pointingSlot;
         return pickableRow(`${slot.id}`, on, [
             pickButton(`lighting-pointing:${slot.id}`, on, `<span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slotNamed(slot))}${marks.lightingSlots.has(slot.id) ? draftDot(model?.draft) : ""}`),
-            `<span class="muted">${esc(!row ? "not reported" : lit ? localityLabel(row.locality).toLowerCase() : "no colour")}</span>`,
+            `<span class="muted">${esc(!row ? "not reported" : `${lit ? "" : "black · "}${localityLabel(row.locality).toLowerCase()}`)}</span>`,
         ], {data: {slot: slot.id}, quiet: !slot.kind});
     };
     const list = groupedTable({scroll: "pd", draft: model?.draft, columns: [["Pointing mode", "52%"], ["Paints", "48%"]], groups: [

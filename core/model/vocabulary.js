@@ -477,11 +477,14 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // Turn off and the note shown once it is stored. Outside a layer colour
     // and a group row black is literal black (firmware RGB domain spec,
     // "Black"), so there only the Stage on switch paints nothing. The
-    // background effect offers no Turn off.
+    // background effect offers no Turn off. A layer colour that paints
+    // nothing is passthrough, so its button and its reading say so in place
+    // of Turn off and Off.
     colourOff: {
         layers: {
             offTip: "Store HSV(0, 0, 0): this layer then paints nothing, and what is beneath shows through.",
-            offNote: "No colour is stored for this layer, so the background effect shows through wherever it would paint.",
+            offNote: "This layer is passthrough: it paints nothing, so what is beneath shows through wherever it would paint.",
+            offAction: "Make passthrough", offWord: "Passthrough",
         },
         auto: {
             offTip: "Store HSV(0, 0, 0): the fade then ends on black.",

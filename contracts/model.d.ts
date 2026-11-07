@@ -144,8 +144,8 @@ export interface Vocabulary {
     tapCommit: WordList<string>;
     /** Lighting's fields, as its tabs label them and the review names them. */
     lightingFields: Readonly<Record<LightingField, string>>;
-    /** What storing HSV(0, 0, 0) does, by lighting stage: Turn off's tip and the note once stored. */
-    colourOff: Readonly<Record<string, {offTip: string; offNote?: string}>>;
+    /** What storing HSV(0, 0, 0) does, by lighting stage: Turn off's tip and the note once stored, and, where off has a name of its own (a layer's passthrough), the button's words and what the colour then reads. */
+    colourOff: Readonly<Record<string, {offTip: string; offNote?: string; offAction?: string; offWord?: string}>>;
     feedbackOwners: WordList<string>;
     /** The behaviour tier each key feedback state flashes for, by its RGB_KEY_SEMANTICS name; the others have none. */
     feedbackTiers: Readonly<Partial<Record<string, Tier>>>;

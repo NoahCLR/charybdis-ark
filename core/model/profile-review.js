@@ -18,6 +18,7 @@ const {effectiveTimings} = require("./gesture-timing");
 const {REVIEW_AREAS: AREA, VOCABULARY, word, layerName: layerCalled, macroDefaultName, slotName, ledsCalled, modifierNames, protectionWords, settingsPath} = require("./vocabulary");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 const {SHORTCUT_JOIN} = require("../../rules/shortcut-notation.mjs");
+const {layerPaints} = require("../../rules/led-light.mjs");
 const {customKeyName} = require("../data/user-keycodes");
 const {ORDER_UNITS, UNIT, parseUnit} = require("./review-units");
 const {movedBanks} = require("./draft-order");
@@ -307,7 +308,7 @@ function lightingRecords(value) {
         return [stage.label, {text: on ? "on" : "off", key: on, mark: {kind: "stage", on}}];
     }));
     for (const row of r.layerColors) record(UNIT.rgbLayer(row.layerId), `${layerName(row.layerId)} colour`, "layers",
-        [[F.colour, colour(row.color, row.layerId === 0 ? "off · the background effect shows" : "off")], [F.paintMode, nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
+        [[F.colour, layerPaints(row.color) ? colour(row.color, "black") : {...colour(row.color), text: "passthrough"}], [F.paintMode, nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
     for (const row of r.pdModeColors) record(UNIT.rgbPd(row.pdModeId), `Pointing mode colour · ${slotCalled(row.pdModeId)}`, "pd",
         [[F.colour, colour(row.color)], [F.locality, nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
     record(UNIT.rgb("automouse"), "Auto-mouse fade", "auto", [[F.fadeMode, nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], [F.endColour, colour(r.automouseFade.endColor)]]);
