@@ -55,10 +55,11 @@ export function screenCustomKeys() {
         return main;
     }
 
-    const named = keys.filter((row) => row.name).length;
+    // Counted as Macros and Pointing modes count theirs: how many are in use.
+    const used = keys.filter(customKeyInUse).length;
     const grid = el(`<div class="card"><div class="card-h"><h3>Keys</h3>
         <input class="input search card-search" id="customKeySearch" data-f="custom-keys:search" type="search" aria-label="Search custom keys by name" placeholder="Search by name" value="${esc(state.customKeySearch || "")}">
-        <span class="tag">${named} of ${keys.length} named</span></div>
+        <span class="tag">${used} of ${keys.length} used</span></div>
         <div class="card-b"><div class="macro-grid"></div></div></div>`);
     /** @type {HTMLInputElement} */ (grid.querySelector("#customKeySearch")).addEventListener("input", (event) => { state.customKeySearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
     const cells = /** @type {HTMLElement} */ (grid.querySelector(".macro-grid"));

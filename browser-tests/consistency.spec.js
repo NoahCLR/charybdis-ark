@@ -62,6 +62,8 @@ test("a slot bank opens on the slots in use, makes a new one in the first free s
     // The preview's keys 0 to 3 hold behaviours; the other 124 fold.
     await expect(bank.locator("[data-custom-key]")).toHaveCount(4);
     await expect(bank.locator("[data-custom-key]").first()).toContainText("behaviour");
+    // The heading counts the keys in use, as Macros and Pointing modes count theirs.
+    await expect(page.locator(".card:has(#customKeySearch) .card-h .tag")).toHaveText("4 of 128 used");
     const all = bank.locator('[data-all-slots="customKeys"]');
     await expect(all).toHaveText("Show all 128 slots");
     await expect(all).toHaveAttribute("aria-expanded", "false");

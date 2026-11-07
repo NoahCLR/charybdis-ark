@@ -35,7 +35,7 @@ export function emptySlot(model, slot, slots) {
     const sources = slots.filter((row) => row.kind);
     const node = el(`<div class="pd-editor stack" data-pd-editor="${esc(slot.id)}"><div class="card">
         <div class="card-h name-titlebar"><span class="mark-lg">${mark(model, {kind: "pointing", slot: slot.id})}</span>${titleText("New pointing mode")}
-            <span class="tag">Slot ${esc(slot.id)}</span><span class="right row actions"></span></div>
+            <span class="tag">Mode ${esc(slot.id)}</span><span class="right row actions"></span></div>
         <div class="card-b pd-steps"><div class="slot-context">${placedOnMarkup(model, "pointing", String(slot.id),
             "No key, behaviour or combo is bound to this slot.")}</div></div></div></div>`);
     // Step 1 of a mode, where a mode has it, so the choice stays put once made.

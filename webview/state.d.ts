@@ -29,7 +29,7 @@ export interface PanelState {
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null;
         madeKey: {keycode: string; shortcut: import('../contracts/panel.js').CustomKeyShortcut; name: string} | null};
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
-    railMenu: boolean; boardShortcuts: boolean; stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pointingSlot: number; pdKind: {slot: number; kind: number} | null;
+    railMenu: boolean; boardShortcuts: boolean; stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pointingSlot: number; pointingSearch: string; pdKind: {slot: number; kind: number} | null;
     pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
     pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; feedbackRow: string | undefined; comboPreview: {id: number; keys: number[]} | null; lightingGroupsShut: string[];
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;

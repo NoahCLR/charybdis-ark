@@ -45,14 +45,16 @@ Sniping slows directional pointing modes too; scrolling modes ignore it.
 There are 32 pointing slots. The screen works like Macros: the modes you have
 are listed on the left by name and slot number, with their colour. **+ New
 mode** opens the first empty slot, and **Show all 32 slots** shows the empty
-ones too. An empty slot in amber still has keys pointing at it.
+ones too. **Search by name** finds a mode by its name or slot number, through
+every slot. An empty slot in amber still has keys pointing at it.
 
 Each slot has two keys: one that runs the mode while it is held, and one that
 locks it on until pressed again. The picker shows them as **Hold** and
 **Lock** under Pointing modes.
 
 The mode's name is the editor's title: click it to rename, up to 32 bytes
-(an accented letter takes two). **Place on a key →** beside it puts the
+(an accented letter takes two); its slot number follows it, such as
+**Mode 0**. **Place on a key →** beside it puts the
 mode's hold key on a key you pick on the board. **Duplicate** copies the mode
 into the first empty slot, and **Clear mode** empties the slot.
 
