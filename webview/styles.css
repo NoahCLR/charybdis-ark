@@ -504,8 +504,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 /* A row or stack spaced off its default; declared after them so it wins. */
 .gap-4 { gap: var(--sp-1); }
 /* Pointer: the sniping keys under Auto-sniping, each with where it is placed. */
-.sniping-keys { display: grid; gap: var(--sp-2); border-top: 1px solid var(--line); }
-.sniping-key .sniping-name { min-width: 140px; color: var(--text); }
+.sniping-keys { border-top: 1px solid var(--line); }
 .gap-8 { gap: var(--sp-2); }
 .gap-12 { gap: var(--sp-3); }
 .gap-16 { gap: var(--sp-4); }
@@ -946,44 +945,60 @@ button.tier:hover { background: var(--surface-3); }
 .reach-table { padding: var(--sp-0) 0; }
 
 .beh-head { display: flex; align-items: flex-start; gap: var(--sp-4); padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
-/* Whether the behaviour runs and where lead; the pointer-layer switch
-   follows under them. An editor's options read as every editor's do: the
-   switch, then its words, from the left edge. */
-.beh-intro { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) 0 var(--sp-4); }
-.beh-intro > .stack { align-self: stretch; min-width: 0; }
+/* The behaviour's switches read as one row: whether it runs, the pointer-layer
+   switch, then the layers it runs on, which unfold in the room left on the
+   row, or under it when there is none. Its controls bring no box of their own
+   (participation.mjs). */
+.beh-intro { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-6); padding: var(--sp-3) 0 var(--sp-4); }
+.def-controls { display: contents; }
 .beh-intro .sw { flex: none; }
+.beh-intro .def-layers { order: 1; }
+/* Layers it runs on opens its layers in a panel under the button, over the
+   grid, so the editor keeps its height; two layers to a row. */
+.def-layers { position: relative; }
+.def-pop { position: absolute; z-index: var(--z-popover); top: calc(100% + 4px); left: 0; width: min(460px, calc(100vw - 2 * var(--sp-6))); padding: var(--sp-3);
+  border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-3); box-shadow: var(--shadow); }
+.def-pop .layer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-4); }
 /* One row per tap count the keyboard allows, all shown; a column per tier.
    Each timing heads what it governs: Multi tap window the tap counts, Tap /
    hold and Long hold their tiers. */
+/* The timings are one row over the grid, each its name then its field,
+   wrapping only when the editor is too narrow for all three. */
+.beh-timings { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-6); padding-bottom: var(--sp-4); }
+.beh-timings .bterm-field > span:not(.sr) { white-space: nowrap; }
 .bgrid { display: grid; grid-template-columns: 150px repeat(3, minmax(110px, 1fr)); gap: var(--sp-2); align-items: stretch; overflow-x: auto; padding-bottom: var(--sp-0); }
-.bgrid .bterm-field { gap: var(--sp-1); align-self: end; min-width: 0; margin-bottom: var(--sp-2); }
-.bterm { display: flex; align-items: center; align-self: end; height: var(--h-control); margin-bottom: var(--sp-2); padding: 0 var(--sp-0); font-size: var(--fs-sm); color: var(--text-3); }
+/* The head is the tier names alone, one centred over each column. */
+.bgrid .btier { display: flex; align-items: center; justify-content: center; gap: var(--sp-2); margin-bottom: var(--sp-1); }
 .bhead { display: flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-0); font-size: var(--fs-sm); color: var(--text-2); }
 .bhead .bn { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); border: 1px solid var(--line); border-radius: var(--r-chip); padding: var(--sp-hair) var(--sp-1); }
 .bhead .bx { margin-left: auto; color: var(--text-3); font-size: var(--fs-sm); }
 .bhead .bx:hover { color: var(--text); }
 .bhead.add { justify-content: flex-start; }
-.btier { display: flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-0); font-size: var(--fs-sm); color: var(--text-3); }
+.btier { padding: 0 var(--sp-0); font-size: var(--fs-sm); color: var(--text-3); }
 .fbdot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); flex: none; display: inline-block; }
 .reach .fbdot { margin-right: var(--sp-1); }
+/* A placed cell is a solid object: a filled, raised box with its action in
+   strong type. A cell nothing is set in (empty, or the standard key the
+   keyboard runs there) is a placeholder: no fill, a faint dashed edge, dim
+   words, so the two read apart at a glance. */
 .bcell {
   display: grid; align-content: center; justify-items: center; gap: var(--sp-1); min-height: 68px; padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--line); border-radius: var(--r-control); background: var(--surface-2); text-align: center; width: 100%;
+  border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-2); box-shadow: var(--shadow-raised); text-align: center; width: 100%;
 }
 .bcell:hover { border-color: var(--line-3); background: var(--surface-3); }
 .bcell.on { border-color: var(--text); background: var(--surface-3); }
-.bcell .bk { max-width: 100%; font-family: var(--mono); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcell .bk { max-width: 100%; font-family: var(--mono); font-size: var(--fs-sm); font-weight: var(--fw-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bcell .bk.named { font-family: inherit; font-size: var(--fs-md); }
 /* Every cell is one size: room for its action and two lines of how it runs,
    whatever the grid's width, so a row never grows past the others. */
 .bcell .bl { font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-3);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
-.bcell.empty { border-style: dashed; background: none; }
+.bcell.empty, .bcell.inherited { border: 1px dashed var(--line); background: none; box-shadow: none; }
+.bcell.empty:hover, .bcell.inherited:hover { border-color: var(--line-2); background: var(--surface-2); }
+.bcell.empty.on, .bcell.inherited.on { border-color: var(--text); background: var(--surface-2); }
 .bcell.empty .plus { color: var(--text-3); font-size: var(--fs-base); }
-/* The key's own action where the row leaves a first-press tier empty: present,
-   but not stored in the row, so it keeps the empty cell's dashed edge. */
-.bcell.inherited { border-style: dashed; background: none; }
-.bcell.inherited .bk { color: var(--text-2); }
+.bcell.inherited .bk { color: var(--text-3); font-weight: var(--fw-regular); }
+.bcell.inherited .bl { opacity: .75; }
 .cell-editor { margin-top: var(--sp-4); border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface-2); overflow: hidden; }
 .ce-head { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-3); border-bottom: 1px solid var(--line); }
 .ce-head h4 { font-size: var(--fs-base); }
@@ -1026,7 +1041,6 @@ button.tier:hover { background: var(--surface-3); }
 .key-reaches { gap: var(--sp-2); }
 .key-participation { gap: var(--sp-2); margin-top: var(--sp-4); }
 .key-participation > .sect-h { margin: var(--sp-2) 0 var(--sp-0); }
-.def-layers > .layer-grid { margin-top: var(--sp-3); }
 /* The Behaviours tab: nothing to open, and the open behaviour's title, its
    keycode, the notes under them and its actions (ui/keys/behaviour-editor.mjs). */
 .beh-empty { padding: var(--sp-4); }
@@ -1035,7 +1049,7 @@ button.tier:hover { background: var(--surface-3); }
 .beh-head .note { margin-top: var(--sp-1); }
 .beh-actions { gap: var(--sp-2); margin-left: auto; }
 .beh-note { margin-bottom: var(--sp-3); }
-.beh-foot { margin-top: var(--sp-3); }
+.beh-notes { display: grid; gap: var(--sp-1); padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
 .ce-actions { align-self: center; max-width: 24ch; }
 /* Moving a behaviour onto a key that has one asks first (ui/keys/retarget.mjs). */
 .sheet.retarget { width: min(520px, 100%); }
@@ -1203,7 +1217,7 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .kind-icon.off { color: var(--text-3); }
 .kind-icon.plain svg, .kind-icon.plain:not(.off) svg { fill: none; fill-opacity: 1; filter: none; }
 /* A built-in cell keeps its dim words when they name a thing. */
-.bcell.inherited .sends { color: var(--text-2); font-weight: var(--fw-regular); }
+.bcell.inherited .sends { color: var(--text-3); font-weight: var(--fw-regular); }
 /* Named inline, in a sentence, a table or the review (ui/marks.mjs keyNameMarked), an action keeps
    the words' own type and colour and their baseline; a name too long for its column wraps between words. */
 .sends.inline { font: inherit; color: inherit; vertical-align: baseline; align-items: baseline; }
@@ -1590,13 +1604,18 @@ table.t tr.quiet > td { color: var(--text-3); }
   background: var(--inv-bg); color: var(--inv-text); font-size: var(--fs-xs); font-weight: var(--fw-bold); }
 .pd-step-b { display: grid; gap: var(--sp-3); padding-left: var(--sp-7); min-width: 0; }
 .pd-pair { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-7); align-items: start; }
+/* Steps 2 and 4 lay their fields in the same four columns, so a label under
+   one step sits over a label under the next; a wide field spans two. */
+.pd-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3) var(--sp-4); align-items: start; min-width: 0; }
+.pd-cols > * { min-width: 0; }
+.pd-cols > .span2 { grid-column: span 2; }
+.pd-cols > .pd-sub { margin: var(--sp-1) 0 calc(-1 * var(--sp-2)); }
+.pd-cols select.input { width: 100%; min-width: 0; }
+@container pd (max-width: 720px) { .pd-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* A menu in the editor is as wide as its words, as its number fields are. */
 .pd-editor select.input { width: auto; min-width: 140px; max-width: 100%; }
 .pd-sub { margin: var(--sp-2) 0 0; }
 /* Speed and Feel side by side, each its heading, its fields and its note. */
-.pd-groups { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-8); align-items: start; }
-.pd-group { display: grid; gap: var(--sp-3); align-content: start; }
-.pd-group > .note { max-width: 36ch; }
 .pd-sub h5 { margin: 0; }
 
 /* Step 1: the two movements as large radio choices. */
@@ -1618,7 +1637,6 @@ table.t tr.quiet > td { color: var(--text-3); }
 /* Step 2: each direction a key placed where the ball sends it. */
 .pd-directions { display: grid; gap: var(--sp-4); }
 .pd-direction-fields { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-7); align-items: start; }
-.pd-direction-fields > .note { flex-basis: 100%; }
 .pd-editor .seg { flex-wrap: wrap; max-width: 100%; }
 .pd-switches { display: flex; gap: var(--sp-2) var(--sp-5); flex-wrap: wrap; min-height: var(--h-control); align-items: center; }
 .pd-compass { display: grid; gap: var(--sp-3) var(--sp-4); align-items: center; justify-items: center; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -1959,12 +1977,18 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .import-fits.warn { color: var(--warning); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: var(--sp-4); align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
+/* Every control ends at the same right edge, whatever its width: a switch
+   and its word, a number, a menu, a choice on show. */
+.setrow > .control { display: flex; justify-content: flex-end; align-items: center; min-width: 0; }
+.setrow > .control > .field:not(.segmented) { flex: 1; min-width: 0; }
+.setrow > .control select.input { width: 100%; }
 /* A choice on show (ui/segmented.mjs) takes the width its options need, and
    wraps under the name when the row cannot give it. */
 .setrow:has(> .control > .segmented) { grid-template-columns: minmax(0,1fr) auto; }
 .setrow > .control > .segmented { justify-items: end; }
 @container content (max-width: 788px) {
   .setrow:has(> .control > .segmented) { grid-template-columns: minmax(0,1fr); }
+  .setrow > .control { justify-content: flex-start; }
   .setrow > .control > .segmented { justify-items: start; }
 }
 .setrow.ro .nm { color: var(--text-2); }

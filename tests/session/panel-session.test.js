@@ -609,7 +609,7 @@ test("every model the panel publishes carries the vocabulary the screens read th
         "a draft": buildPanelModel(panelWithDraft(), connected()),
     };
     for (const [when, model] of Object.entries(models)) {
-        for (const part of ["settingsSections", "fileSections", "keyCapLayerVerbs", "checkLevels", "checkStatuses", "thresholds", "thresholdNames", "thresholdTips", "usageCounts", "stages"]) {
+        for (const part of ["settingsSections", "fileSections", "keyCapLayerVerbs", "checkLevels", "checkStatuses", "thresholds", "thresholdNames", "thresholdTips", "tierTips", "usageCounts", "stages"]) {
             assert.deepEqual(model.vocabulary?.[part], VOCABULARY[part], `${when}: ${part}`);
         }
         assert.deepEqual(model.vocabulary.pointing.directions, VOCABULARY.pointing.directions, `${when}: the shortcut places`);
