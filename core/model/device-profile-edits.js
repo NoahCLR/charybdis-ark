@@ -166,7 +166,7 @@ const PROFILE_EDITS = Object.freeze(/** @satisfies {{[D in import("./draft-edits
         if (!((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.PD_MODES)) throw invalid("Pointing mode editing needs firmware with configurable pointing slots.");
         return editProfileDomains(document, context, open => editPointing(open, message));
     },
-    behaviours: (document, message, context) => editProfileDomains(document, {...context, checkActions: true}, open => editKeyBehaviors(open("behaviors"), message, context.capabilities)),
+    behaviours: (document, message, context) => editProfileDomains(document, {...context, checkActions: true}, (open, read) => editKeyBehaviors(open("behaviors"), message, context.capabilities ?? {}, read().settings)),
     lighting: (document, message, context) => editProfileDomains(document, context, open => editLighting(open("rgb"), message, brightnessCeiling(context.limits))),
     combos: editCombos,
 }));

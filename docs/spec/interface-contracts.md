@@ -435,8 +435,10 @@ hold what they name.
   changed, picked by Enter or Space as by a press (tested).
 - A trap and a warning a question asks about differ in words, not only in
   their dot's colour (no test). A field whose entry is refused
-  (`aria-invalid`) is described by the reason under it (the Key tab's
-  keycode; no test). Review's group Discard lights what it takes back on
+  (`aria-invalid`) keeps it, edged in `--danger`, and is described by the
+  reason under it, which a focused control's tip leaves in place (the Key
+  tab's keycode, no test; a behaviour's timings,
+  `browser-tests/behaviour-timings.spec.js`). Review's group Discard lights what it takes back on
   focus as on hover (no test). No button sits inside a `<summary>`:
   Diagnostics' Read keyboard is drawn over its title, outside it (tested).
 - Every control shows the one focus ring (2px of `--focus`) when the
@@ -953,6 +955,24 @@ than hold needs layers. Ark reads and writes settings version 11 only (D-L64;
   `OSL()` are: its tap / hold threshold follows the dual-role term
   (`holdTermSetting`, `core/model/gesture-timing.js`;
   `tests/model/gesture-timing.test.js`).
+- A behaviour's Long hold threshold is later than its Tap / hold threshold,
+  its own or the default it follows, on every behaviour (D-L82). The behaviour
+  editor, Behaviour settings and the custom key editor each refuse, in words
+  naming the behaviours, an edit that saves, makes or moves one out of that
+  order; a profile that already holds one opens and takes other edits. The
+  behaviour editor also marks it as the person types: a timing that breaks
+  the order stays in its field (`aria-invalid`, edged in `--danger`) with the
+  reason under the fields, kept through redraws (`state.timingRefusal`) until
+  a timing mends it or Timings closes (`panelDisclosure`'s `onClose`), and
+  still posts, so core refuses it and the rail says
+  why in core's words; the mending timing posts the three together
+  (`behaviourTimingProblem`,
+  `webview/view/behavior-editor.mjs`; `tests/view/behavior-editor.test.mjs`,
+  `browser-tests/behaviour-timings.spec.js`). Both read the rule and its
+  sentence from `rules/hold-order.mjs`
+  (`holdOrderRefusal`, `core/model/gesture-timing.js`;
+  `tests/model/gesture-timing.test.js`, `tests/model/key-behavior-edits.test.js`,
+  `tests/model/settings-editor.test.js`, `tests/model/custom-key-editor.test.js`).
 - A field that needs a mixed-side set offers a custom key (`shortcutOffer`).
   One with exactly that shortcut and no behaviour is used. A layout key or
   combo output also runs the key's behaviour, so a match with one is offered

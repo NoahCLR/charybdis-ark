@@ -10,6 +10,8 @@ const {SETTING, SHORTCUT_LAYER_KINDS} = require("../schema/settings-domain-v1");
 const {nativeCode, actionName} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
 const {QK} = require("../../rules/qmk-keycodes.mjs");
+const {holdOrderReason, holdsOutOfOrder} = require("../../rules/hold-order.mjs");
+const {VOCABULARY, listed} = require("./vocabulary");
 
 /**
  * @typedef {import("../schema/types.js").BehaviorStep} BehaviorStep
@@ -102,4 +104,38 @@ function gestureTimingFindings(decoded) {
     });
     return results;
 }
-module.exports = {dualRole, holdTermSetting, effectiveTimings, releaseHoldUnreachable, gestureTimingFindings};
+// Why an edit cannot be made: it leaves a behaviour's Long hold threshold at
+// or before its Tap / hold threshold; "" when it does not. The keyboard
+// accepts that order, but no press then counts as a Hold before it counts as
+// a Long hold, so Ark's editors refuse it on every row (D-L82). A row is
+// checked when the edit saved it (`saved`), made it, or moved what it waits,
+// its own timings or a default it follows; a profile read from the keyboard
+// with the order reversed opens, and edits elsewhere, as it stands, and
+// Review still warns about it. An edit of a default (`viaDefault`) says to
+// change the behaviours' own timings first.
+/** @typedef {{rows: readonly import("../schema/types.js").BehaviorRow[], values: readonly number[], shortcuts?: KindedShortcuts}} TimingSide */
+/** @param {TimingSide} before @param {TimingSide} after @param {{saved?: import("../schema/types.js").SemanticAction, viaDefault?: boolean}} [edit] */
+function holdOrderRefusal(before, after, {saved, viaDefault = false} = {}) {
+    /** @param {import("../schema/types.js").SemanticAction} target */
+    const identity = target => `${target.kind}:${target.operand}`;
+    /** @param {import("../schema/types.js").BehaviorRow} row @param {TimingSide} side */
+    const waits = (row, side) => { const terms = effectiveTimings(row, side.values, side.shortcuts); return `${terms.hold}:${terms.long}`; };
+    const was = new Map(before.rows.map(row => [identity(row.target), waits(row, before)]));
+    const reversed = after.rows.flatMap(row => {
+        const terms = effectiveTimings(row, after.values, after.shortcuts);
+        const checked = (saved && identity(saved) === identity(row.target)) || was.get(identity(row.target)) !== waits(row, after);
+        return checked && holdsOutOfOrder(terms.hold, terms.long) ? [{name: actionName(row.target), terms}] : [];
+    });
+    if (!reversed.length) return "";
+    /** @param {"tapHoldTerm" | "longHoldTerm"} term */
+    const named = term => VOCABULARY.thresholdNames[term].charAt(0).toUpperCase() + VOCABULARY.thresholdNames[term].slice(1);
+    if (reversed.length === 1) {
+        const [{name, terms}] = reversed;
+        return `The behaviour on ${name}: ${holdOrderReason(terms, VOCABULARY.thresholdNames, "its")}${viaDefault ? " Change that behaviour's own timings first." : ""}`;
+    }
+    // A default many rows follow names the first few.
+    const names = reversed.length > 4 ? [...reversed.slice(0, 3).map(found => found.name), `${reversed.length - 3} more`] : reversed.map(found => found.name);
+    return `The behaviours on ${listed(names)}: each ${named("longHoldTerm")} must be later than its ${named("tapHoldTerm")}.${viaDefault ? " Change those behaviours' own timings first." : ""}`;
+}
+
+module.exports = {dualRole, holdTermSetting, effectiveTimings, releaseHoldUnreachable, holdOrderRefusal, gestureTimingFindings};

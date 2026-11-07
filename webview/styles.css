@@ -421,6 +421,9 @@ a.rail-build:hover { color: var(--text-2); }
   appearance: none;
 }
 .input:focus { border-color: var(--line-3); background: var(--surface-3); }
+/* A field whose entry is refused keeps it, edged in the danger colour, with
+   the reason under it (aria-describedby). */
+.input[aria-invalid="true"], .input[aria-invalid="true"]:focus { border-color: var(--danger); }
 .input.mono { font-family: var(--mono); font-size: var(--fs-md); }
 select.input { background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%); background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: var(--select-room); }
 .input-row { display: flex; align-items: center; gap: var(--sp-2); }
@@ -969,6 +972,8 @@ button.tier:hover { background: var(--surface-3); }
 .def-pop.timings { width: auto; min-width: 300px; display: grid; gap: var(--sp-2); }
 .def-pop.timings .bterm-field { justify-content: space-between; }
 .def-pop.timings .bterm-field > span:not(.sr) { white-space: nowrap; }
+/* A refused timing's reason wraps within the fields' width, never widening the panel. */
+.def-pop.timings .timing-problem { width: 0; min-width: 100%; margin: 0; color: var(--text-2); }
 /* Closed, Timings wears the mark of each timing the behaviour sets, after
    its name (D-L31). */
 .beh-timings .own-timings { display: inline-flex; align-items: center; gap: var(--sp-1); margin-left: var(--sp-1); }

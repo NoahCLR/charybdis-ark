@@ -185,7 +185,10 @@ it and the change is highlighted.
 ### Timing checks
 
 The checks also read your timings. They warn about holds that overlap or can
-never happen, and give advice on very short combo windows. The keyboard
+never happen, and give advice on very short combo windows. The editors refuse
+a Long hold threshold at or before the Tap / hold threshold
+([Behaviours](behaviours.md#timing)), so a warning about the order of those
+two comes only from a profile read from the keyboard or imported. The keyboard
 decides every tap or hold itself, from the presses, so these checks only ever
 rule out what can't happen. They don't promise every gesture is comfortable to
 press.

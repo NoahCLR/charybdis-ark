@@ -37,7 +37,11 @@ Core enforces each level, not only the interface:
 - **Notice.** It only informs.
 
 Data the keyboard would refuse outright is refused by its editor, the decoder
-or Apply's preflight, never offered as a check. Held by
+or Apply's preflight, never offered as a check. So is one thing the keyboard
+accepts: a Long hold threshold at or before the Tap / hold threshold
+(`holdOrderRefusal`, D-L82), which the editors refuse on any behaviour an edit
+saves, makes or moves. The timing findings below still read it in a profile
+read from the keyboard or imported. Held by
 `tests/session/panel-controls.test.js` ("a destination blocker refuses Apply
 before recovery or HID") and `tests/session/live-edits.test.js` ("an edit that
 adds a trap waits for the person; cancelling sends nothing, confirming sends

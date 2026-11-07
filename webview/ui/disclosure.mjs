@@ -42,16 +42,17 @@ const watching = new Map();
  * watch for the page per place: a tab laid out for its height draws a second
  * editor, with a panel of its own, so a press counts as inside by what it
  * lands on (`within`, the control's own selector), and the close takes out
- * every panel of the place.
+ * every panel of the place. `onClose` runs however it closes, before any
+ * redraw: what the panel held unkept goes with it.
  * @param {HTMLElement} root the control: its button and, when open, its panel
- * @param {{place: string, act: string, within: string}} options the fold's
+ * @param {{place: string, act: string, within: string, onClose?: () => void}} options the fold's
  *   id, the button's `data-act` and the control's selector, all authored
  */
-export function panelDisclosure(root, {place, act, within}) {
+export function panelDisclosure(root, {place, act, within, onClose}) {
     const open = foldOpen(place);
     const button = /** @type {HTMLButtonElement} */ (root.querySelector(`[data-act="${act}"]`));
     const pop = /** @type {HTMLElement | null} */ (root.querySelector(".def-pop"));
-    const close = () => { keepFold(place, false); watching.get(place)?.(); watching.delete(place); };
+    const close = () => { keepFold(place, false); watching.get(place)?.(); watching.delete(place); onClose?.(); };
     button.addEventListener("click", () => { if (open) close(); else keepFold(place, true); render(); });
     if (!pop) return;
     pop.addEventListener("keydown", (event) => {

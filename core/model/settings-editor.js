@@ -2,7 +2,7 @@
 "use strict";
 
 const {layerOfRef} = require("../schema/actions");
-const {effectiveTimings} = require("./gesture-timing");
+const {effectiveTimings, holdOrderRefusal} = require("./gesture-timing");
 const {decodedOf, editProfileDomains} = require("./portable-profile");
 const {LED_FLAGS, SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, validSetting} = require("../schema/settings-domain-v1");
 const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS, MACOS_ISO, OS_OF} = require("../schema/host-settings");
@@ -380,13 +380,24 @@ function editSettings(document, message, draft) {
         // profile's explicit value equal to it. Adopt inheritance only for changed
         // defaults; unrelated settings edits never rewrite behaviour rows, so
         // the behaviours are read as they stand and opened only when one changes.
-        value.behaviors.rows.forEach((row, index) => {
+        const rows = value.behaviors.rows.map((row, index) => {
             const old = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, before, settings.customKeyShortcuts);
             const next = effectiveTimings({...row, tapHoldTerm: 0, longHoldTerm: 0, multiTapTerm: 0}, settings.values, settings.customKeyShortcuts);
+            const after = {...row};
             for (const [field, term] of /** @type {const} */ ([["tapHoldTerm", "hold"], ["longHoldTerm", "long"], ["multiTapTerm", "repeat"]])) {
-                if (old[term] !== next[term] && row[field] !== 0 && row[field] === old[term]) open("behaviors").rows[index][field] = 0;
+                if (old[term] !== next[term] && row[field] !== 0 && row[field] === old[term]) open("behaviors").rows[index][field] = after[field] = 0;
             }
+            return after;
         });
+        // A behaviour's Long hold stays after its Tap / hold (D-L82): the two
+        // defaults, and every behaviour a changed default moves.
+        const [hold, long] = [settings.values[SETTING.TAP_HOLD_TERM], settings.values[SETTING.LONG_HOLD_TERM]];
+        if ((hold !== before[SETTING.TAP_HOLD_TERM] || long !== before[SETTING.LONG_HOLD_TERM]) && long <= hold) {
+            throw fail(`The ${THRESHOLD.longHoldTerm}, ${long} ms, must be later than the behaviour ${THRESHOLD.tapHoldTerm}, ${hold} ms.`);
+        }
+        const moved = holdOrderRefusal({rows: value.behaviors.rows, values: before, shortcuts: value.settings.customKeyShortcuts},
+            {rows, values: settings.values, shortcuts: settings.customKeyShortcuts}, {viaDefault: true});
+        if (moved) throw fail(moved);
     });
 }
 

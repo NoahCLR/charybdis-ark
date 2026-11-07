@@ -15,7 +15,7 @@ import {editGate} from "../../view/edit-gate.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
-import {behaviourChangesNothing, behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
+import {behaviourChangesNothing, behaviourTimingEdit, behaviourTimingField, behaviourTimingProblem} from "../../view/behavior-editor.mjs";
 import {actionMarked, branchBadge, keyNameMarked, mark, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, sentence, styleWord, tierName, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
@@ -87,13 +87,17 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
     // Timings panel (below). The grid's head is the tier names alone, one
     // over each column.
     const {thresholdNames, thresholdTips, behaviourFields} = vocabulary(model);
+    // Timings the editor refused stay in their fields, the one that broke the
+    // order marked, until a timing mends them (D-L82).
+    const refused = state.timingRefusal?.keycode === behaviour.keycode ? state.timingRefusal : null;
     /** @param {import("../../../contracts/edits.js").TimingTerm} name */
     const timingControl = (name) => {
-        const field = behaviourTimingField(behaviour, name);
+        const field = behaviourTimingField(refused ? {...behaviour, ...refused.terms} : behaviour, name);
         const placeholder = field.fallback === "" ? "default unavailable" : field.placeholder;
+        const marked = refused?.term === name ? ' aria-invalid="true" aria-describedby="timing-problem"' : "";
         return `<label class="field inline bterm-field" data-term-field="${esc(name)}" data-tip="${esc(`${thresholdTips[name]} ${timingFallbackNote(model, behaviour, name)}`)}"><span>${esc(sentence(thresholdNames[name]))}</span>
             <span class="affix unit"><input class="input mono num" style="--digits: ${esc(Math.max(5, placeholder.length))}" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
-                placeholder="${esc(placeholder)}" ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
+                placeholder="${esc(placeholder)}"${marked} ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 
     // An action as the grid names it: a layer, pointing mode or macro as that
@@ -208,7 +212,8 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
             <button type="button" class="disclose" data-act="behaviour-timings" aria-haspopup="dialog" aria-expanded="${timingsOpen}"
                 data-tip="${esc(`This key's own timings: the window between taps and the two hold thresholds.${ownNote} An empty field follows ${sectionPath(model, "keyTiming")}.`)}">${DISCLOSURE}<span>${esc(behaviourFields.timings)}</span>${
                 ownTimings.length ? `<span class="own-timings" aria-hidden="true">${ownTimings.map((name) => mark(model, settingGoverns(model, name))).join("")}</span>` : ""}</button>
-            ${timingsOpen ? `<div class="def-pop timings" role="dialog" aria-label="${esc(behaviourFields.timings)}">${TIMING_TERMS.map((name) => timingControl(name)).join("")}</div>` : ""}
+            ${timingsOpen ? `<div class="def-pop timings" role="dialog" aria-label="${esc(behaviourFields.timings)}">${TIMING_TERMS.map((name) => timingControl(name)).join("")}${
+                refused ? `<p class="note timing-problem" id="timing-problem" role="status">${esc(refused.problem)}</p>` : ""}</div>` : ""}
         </div>`;
 
     // The head says nothing about what the behaviour stores: a behaviour that
@@ -267,14 +272,35 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="remove"]'))?.addEventListener("click", () =>
         post(edits.deleteBehaviour(behaviour.keycode, model?.profileIdentity)));
     const commit = () => saveBehaviour(node, behaviour, model?.profileIdentity);
-    /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-term]")).forEach((input) => input.addEventListener("change", () => {
-        const term = /** @type {import("../../../contracts/edits.js").TimingTerm} */ (input.dataset.term);
-        input.dataset.stored = behaviourTimingEdit(input.value, behaviourTimingField(behaviour, term));
+    // The timing fields post together. Timings with the Long hold at or
+    // before the Tap / hold stay in their fields, the one that made them
+    // marked with the reason under the fields, and still post: core refuses
+    // them, and the rail says so in its words. A timing that mends the order
+    // posts what was typed meanwhile with it (D-L82).
+    const termInputs = /** @type {HTMLInputElement[]} */ ([...node.querySelectorAll("[data-term]")]);
+    const termOf = (/** @type {HTMLInputElement} */ input) => /** @type {import("../../../contracts/edits.js").TimingTerm} */ (input.dataset.term);
+    termInputs.forEach((input) => input.addEventListener("change", () => {
+        const terms = Object.fromEntries(termInputs.map((field) => [termOf(field), behaviourTimingEdit(field.value, behaviourTimingField(behaviour, termOf(field)))]));
+        const problem = behaviourTimingProblem(model, behaviour, terms);
+        // A field left by a press that closes Timings still posts, but keeps nothing.
+        state.timingRefusal = problem && foldOpen(TIMINGS_PLACE) ? {keycode: behaviour.keycode, term: termOf(input), terms, problem} : null;
+        termInputs.forEach((field) => { field.dataset.stored = terms[termOf(field)]; });
         commit();
-        input.value = behaviourTimingField({...behaviour, [term]: input.dataset.stored}, term).value;
+        if (problem) { render(); return; }
+        // Mended: the marks go at once, and the rail's refusal with them when
+        // core's acceptance redraws.
+        if (refused) state.error = "";
+        node.querySelector("#timing-problem")?.remove();
+        termInputs.forEach((field) => {
+            field.removeAttribute("aria-invalid");
+            field.removeAttribute("aria-describedby");
+            field.value = behaviourTimingField({...behaviour, ...terms}, termOf(field)).value;
+        });
     }));
     /** @type {HTMLInputElement | null} */ (node.querySelector("[data-anchor]"))?.addEventListener("change", commit);
-    panelDisclosure(/** @type {HTMLElement} */ (node.querySelector(".beh-timings")), {place: TIMINGS_PLACE, act: "behaviour-timings", within: ".beh-timings"});
+    // Closing Timings drops timings it refused: reopened, it shows what is kept.
+    panelDisclosure(/** @type {HTMLElement} */ (node.querySelector(".beh-timings")), {place: TIMINGS_PLACE, act: "behaviour-timings", within: ".beh-timings",
+        onClose: () => { state.timingRefusal = null; }});
     // Whether the behaviour runs, and where, leads; the pointer-layer switch
     // and Timings follow.
     /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).prepend(definitionControls(layers().map(layer => ({...layer, label: layerCalled(layer)})), behaviour, canEdit && !switchesIdle, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {

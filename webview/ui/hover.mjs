@@ -14,8 +14,8 @@ import {behaviourCards, hoverCard} from "./hover-card.mjs";
 
 const tip = el(`<div class="tip" role="tooltip" hidden></div>`);
 const describe = el(`<div id="ark-focus-tip" hidden></div>`);
-// The control the focus tip describes, and the description it had before.
-/** @type {{control: Element, before: string | null} | null} */
+// The control the focus tip describes.
+/** @type {{control: Element} | null} */
 let described = null;
 const card = el(`<div class="hovercard" hidden></div>`);
 // Where the pointer is, so a tip opens there and not at its control: a wide
@@ -110,9 +110,8 @@ function focusTip(control) {
     if (!words || !hinted || words === control.getAttribute("aria-label")) return;
     describe.textContent = words;
     if (described?.control !== control) {
-        const before = control.getAttribute("aria-describedby");
-        described = {control, before};
-        control.setAttribute("aria-describedby", [before, describe.id].filter(Boolean).join(" "));
+        described = {control};
+        control.setAttribute("aria-describedby", [...describedIds(control), describe.id].join(" "));
     }
     if (!control.matches(":focus-visible")) return;
     clearTimeout(timer);
@@ -126,13 +125,19 @@ function focusTip(control) {
     }, 260);
 }
 
+// Only the tip's own description goes: what the control was given while
+// focused (a refused field's reason) stays.
 function undescribe() {
     if (!described) return;
-    const {control, before} = described;
+    const {control} = described;
     described = null;
-    if (before) control.setAttribute("aria-describedby", before);
+    const ids = describedIds(control);
+    if (ids.length) control.setAttribute("aria-describedby", ids.join(" "));
     else control.removeAttribute("aria-describedby");
 }
+// The descriptions a control has besides the tip's.
+/** @param {Element} control */
+const describedIds = (control) => (control.getAttribute("aria-describedby") || "").split(/\s+/).filter((id) => id && id !== describe.id);
 
 // Beside the key's card, on its far side from the key, or across the key when
 // there is no room there.

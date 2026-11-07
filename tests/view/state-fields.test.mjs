@@ -41,7 +41,7 @@ test("a draft change resets forms, applies each field's rule to the state before
 
 // Every field of the panel's state, by what a draft change does to it. A new
 // field joins one of these lists, so its decision is made in review.
-const RESETS = ["retarget", "pdKind", "pdTaps", "lastTake", "accent", "heldSlot"];
+const RESETS = ["retarget", "timingRefusal", "pdKind", "pdTaps", "lastTake", "accent", "heldSlot"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",

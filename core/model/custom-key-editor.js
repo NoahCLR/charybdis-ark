@@ -16,6 +16,7 @@ const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {SETTINGS, SHORTCUT_KEY_LIMITS, validShortcutKey, shortcutStoreRefusal, shortcutIdentity} = require("../schema/settings-domain-v1");
 const {validName} = require("../schema/profile-name");
 const {shortcutLayerTargets, shortcutRefusal} = require("./shortcut-layers");
+const {holdOrderRefusal} = require("./gesture-timing");
 const keycodes = require("../data/keycode-catalog");
 const {knownActionAbi} = require("../schema/actions");
 const {CUSTOM_KEY_SLOTS, customKeyCode, customKeyName, customKeyOfName} = require("../data/user-keycodes");
@@ -82,6 +83,13 @@ function editCustomKey(document, message, draft) {
         const settings = open("settings");
         if (renaming) settings.customKeyNames[slot] = name;
         if (given) settings.customKeyShortcuts[slot] = now;
+        // A shortcut that turns its layers on as TT() or OSL() does makes the
+        // key's behaviour wait the dual-role default (gesture-timing.js), which
+        // must still come before its Long hold (D-L82).
+        const {rows} = read().behaviors;
+        const timingRefusal = holdOrderRefusal({rows, values: stored.values, shortcuts: stored.customKeyShortcuts},
+            {rows, values: settings.values, shortcuts: settings.customKeyShortcuts}, {viaDefault: true});
+        if (timingRefusal) throw fail(timingRefusal, "CUSTOM_KEY_SHORTCUT_INVALID");
     });
 }
 

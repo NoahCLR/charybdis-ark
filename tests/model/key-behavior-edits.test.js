@@ -8,6 +8,7 @@ const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 const {ACTION_ABI, actionName} = require("../../core/schema/actions");
 const {applyDraftEdit} = require("../../core/model/draft-editor");
 const {editKeyBehaviors} = require("../../core/model/key-behavior-edits");
+const {validateSnapshot} = require("../../core/model/portable-profile");
 
 const payload = decodeProfileBlob(bytes).domains[1].payload;
 const original = decodeKeyBehaviorDomain(payload);
@@ -16,10 +17,12 @@ const disabled = () => ({style: "", action: "", repeatHz: ""});
 const form = () => ({keycode: "KC_A", tapHoldTerm: "", longHoldTerm: "0", multiTapTerm: "250", keepsAutoMouseAnchored: true,
     steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "G(KC_N)"}, hold: disabled(), longHold: disabled()},
         {tapCount: 4, tap: disabled(), hold: {style: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: "25"}, longHold: disabled()}]});
+// The device's settings: Tap / hold 150 ms (dual-role 200 ms), Long hold 400 ms.
+const settings = validateSnapshot(deviceDocument(), capabilities).settings;
 // One edit on the behaviours `input` holds, and the domain it leaves them as.
 const edit = (message, caps = capabilities, input = payload) => {
     const behaviors = decodeKeyBehaviorDomain(input);
-    editKeyBehaviors(behaviors, message, caps);
+    editKeyBehaviors(behaviors, message, caps, settings);
     return encodeKeyBehaviorDomain(behaviors);
 };
 const payloads = document => decodeProfileBlob(Buffer.from(document.profile, "base64")).domains;
@@ -211,4 +214,25 @@ test("behaviours take TG, TO, TT and OSL where they can run, through the keyboar
     for (const target of ["TG(2)", "TT(1)", "OSL(2)"]) {
         assert.doesNotThrow(() => edit({type: "retargetBehavior", keycode: first.keycode, target}, owning), target);
     }
+});
+
+test("a saved or retargeted behaviour keeps its Long hold after its Tap / hold, its own or the default it follows (D-L82)", () => {
+    const save = (behavior, input) => edit({type: "saveBehavior", behavior}, capabilities, input);
+    // Its own Long hold at or before the 150 ms default; its own Tap / hold at
+    // or past the 400 ms default, though it sets no Long hold.
+    for (const [tapHoldTerm, longHoldTerm, hold, long] of [["", "150", 150, 150], ["", "100", 150, 100], ["400", "", 400, 400], ["500", "0", 500, 400], ["300", "250", 300, 250]]) {
+        assert.throws(() => save({...form(), tapHoldTerm, longHoldTerm}),
+            {code: "INVALID_BEHAVIOR_EDIT", message: `The behaviour on KC_A: its Long hold threshold, ${long} ms, must be later than its Tap / hold threshold, ${hold} ms.`}, `${tapHoldTerm}/${longHoldTerm}`);
+    }
+    assert.equal(rowFor(save({...form(), tapHoldTerm: "399", longHoldTerm: ""}), "KC_A").tapHoldTerm, 399);
+    // A row read reversed stays so while another row is edited, and is
+    // refused once it is saved itself.
+    const reversed = encodeKeyBehaviorDomain({...original, rows: [...original.rows, {target: {kind: 1, flags: 0, operand: 5}, tapHoldTerm: 500, longHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 0xffff, steps: []}]});
+    assert.equal(rowFor(save(form(), reversed), "KC_A").multiTapTerm, 250);
+    assert.throws(() => save({...form(), keycode: "KC_B", tapHoldTerm: "500"}, reversed), /KC_B: its Long hold threshold, 400 ms/);
+    // A move onto a dual-role key starts waiting the 200 ms dual-role term.
+    const own = save({...form(), longHoldTerm: "180"});
+    assert.throws(() => edit({type: "retargetBehavior", keycode: "KC_A", target: "LT(1,KC_A)"}, capabilities, own),
+        /LT\(1,KC_A\): its Long hold threshold, 180 ms, must be later than its Tap \/ hold threshold, 200 ms\./);
+    assert.ok(rowFor(edit({type: "retargetBehavior", keycode: "KC_A", target: "KC_C"}, capabilities, own), "KC_C"));
 });

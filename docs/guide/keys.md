@@ -162,7 +162,9 @@ section switches on the layers the shortcut turns on, as many as you like, and
 
 Tap-toggle and one-shot keys are layer keys like `TT()` and `OSL()`: their
 layers are on from every press, even with a behaviour on the key, and they
-wait the dual-role tap / hold threshold. With the other kinds, a behaviour on
+wait the dual-role tap / hold threshold. Ark refuses that kind when the key's
+behaviour would then wait as long as its long hold, or longer
+([Behaviours](behaviours.md#timing)). With the other kinds, a behaviour on
 the key sends the shortcut where it leaves a tap or a hold empty, so a lock or
 a move happens from either. The base layer and the default layers are always
 on, so their rows are dimmed and say so. Modifiers alone, a key alone or
