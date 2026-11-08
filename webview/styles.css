@@ -17,7 +17,7 @@
  *   --h-*   control heights, meter 6 · tiny 18 · switch 20 · chip 24 · compact 28 · control 32 · tab 34
  *   --z-*   layers, raised · sticky · popover · bar · toast · sheet · tip
  *   --sp-*  spacing, hair 1 · 0 2 · 1 4 · 2 8 · 3 12 · 4 16 · 5 20 · 6 24 · 7 32 · 8 48
- *   --*-room, --check-indent, --commit-pad  room kept for an affix, a select's arrow, the check body's indent, the commit bar
+ *   --*-room, --check-indent, --commit-pad  room kept for an affix, a select's arrow, a panel at the window's edge, the check body's indent, the commit bar
  *   --shadow, --shadow-*  per theme: overlays, the layer panel, a dragged row,
  *           a pressed segment
  */
@@ -37,8 +37,8 @@
   --z-raised: 1; --z-sticky: 2; --z-popover: 30; --z-bar: 40; --z-toast: 45; --z-sheet: 60; --z-tip: 90;
   /* Spacing: a 4-point ladder. */
   --sp-hair: 1px; --sp-0: 2px; --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 48px;
-  /* Room kept inside a field for its unit, a select's arrow or a name's byte count, the check body's indent, and the page's room above the commit bar. */
-  --unit-room: 30px; --unit-room-wide: 78px; --select-room: 26px; --count-room: 64px; --check-indent: 162px; --commit-pad: 120px;
+  /* Room kept inside a field for its unit, a select's arrow or a name's byte count, between a panel and the window's edge (ui/disclosure.mjs reads it too), the check body's indent, and the page's room above the commit bar. */
+  --unit-room: 30px; --unit-room-wide: 78px; --select-room: 26px; --count-room: 64px; --window-room: 24px; --check-indent: 162px; --commit-pad: 120px;
   --bg: #08080a;
   --bg-deep: #050506;
   --surface: #0f0f12;
@@ -383,8 +383,11 @@ a.rail-build:hover { color: var(--text-2); }
 /* A segmented choice may be a radio group: each label's hidden radio beside
    the words it shows, so the choice posts as any field's change does. */
 .seg label { position: relative; display: inline-flex; }
-.field > .seg { justify-self: start; }
 .seg label > span { display: inline-flex; align-items: center; cursor: pointer; white-space: nowrap; }
+/* A choice in a field is never wider than its column: its options wrap, and
+   an option too wide alone wraps its words, at least a chip tall. */
+.field > .seg { justify-self: start; flex-wrap: wrap; max-width: 100%; }
+.field > .seg label > span { white-space: normal; height: auto; min-height: var(--h-chip); padding-block: var(--sp-0); }
 .seg label input { position: absolute; opacity: 0; pointer-events: none; }
 .seg input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 1px; }
 .seg input:disabled + span { cursor: default; color: var(--text-disabled); }
@@ -825,7 +828,9 @@ button.tier:hover { background: var(--surface-3); }
    minimum is its content, so without minmax(0, …) a strip of nowrap tabs
    would set the width of the page and push it sideways. */
 .keys-pad { grid-template-columns: minmax(0, 1fr); }
-.bench { overflow: hidden; }
+/* A workbench clips nothing, so a panel opened in it (Layers it runs on,
+   Timings) may reach below its foot; its tab bar keeps the card's corners. */
+.bench > .bench-tabs { border-radius: calc(var(--r-card) - 1px) calc(var(--r-card) - 1px) 0 0; }
 .keys-pad .bench { min-height: 580px; }
 /* A workbench (the Keymap's and Lighting's) is as tall as its editor, or that
    shared floor: a list never stretches it. Each grouped table fills the body
@@ -976,13 +981,15 @@ button.tier:hover { background: var(--surface-3); }
 .beh-intro .beh-timings { order: 2; }
 /* Layers it runs on and Timings open their controls in a panel under the
    button, over the grid, so the editor keeps its height (panelDisclosure,
-   ui/disclosure.mjs): two layers to a row; the three timings one to a row,
-   each its name then its field. */
+   ui/disclosure.mjs): one layer, or one timing (its name then its field), to
+   a row. Every panel is as wide as its rows, at least 300 px, and never wider
+   than the window less --window-room each side; panelDisclosure keeps it
+   inside the window. */
 .def-layers, .beh-timings { position: relative; }
-.def-pop { position: absolute; z-index: var(--z-popover); top: calc(100% + 4px); left: 0; width: min(460px, calc(100vw - 2 * var(--sp-6))); padding: var(--sp-3);
+.def-pop { position: absolute; z-index: var(--z-popover); top: calc(100% + 4px); left: 0; width: max-content; min-width: 300px; max-width: calc(100vw - 2 * var(--window-room)); padding: var(--sp-3);
   border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-3); box-shadow: var(--shadow); }
-.def-pop .layer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-4); }
-.def-pop.timings { width: auto; min-width: 300px; display: grid; gap: var(--sp-2); }
+.def-pop .layer-grid { grid-template-columns: minmax(0, 1fr); gap: var(--sp-2); }
+.def-pop.timings { display: grid; gap: var(--sp-2); }
 .def-pop.timings .bterm-field { justify-content: space-between; }
 .def-pop.timings .bterm-field > span:not(.sr) { white-space: nowrap; }
 /* A refused timing's reason wraps within the fields' width, never widening the panel. */
@@ -1670,7 +1677,6 @@ table.t tr.quiet > td { color: var(--text-3); }
 /* Step 2: each direction a key placed where the ball sends it. */
 .pd-directions { display: grid; gap: var(--sp-4); }
 .pd-direction-fields { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-7); align-items: start; }
-.pd-editor .seg { flex-wrap: wrap; max-width: 100%; }
 .pd-switches { display: flex; gap: var(--sp-2) var(--sp-5); flex-wrap: wrap; min-height: var(--h-control); align-items: center; }
 .pd-compass { display: grid; gap: var(--sp-3) var(--sp-4); align-items: center; justify-items: center; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   max-width: 560px; width: 100%; justify-self: center;

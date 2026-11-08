@@ -55,6 +55,11 @@ export function panelDisclosure(root, {place, act, within, onClose}) {
     const close = () => { keepFold(place, false); watching.get(place)?.(); watching.delete(place); onClose?.(); };
     button.addEventListener("click", () => { if (open) close(); else keepFold(place, true); render(); });
     if (!pop) return;
+    // Once drawn, and before it is painted, the panel moves left as far as it
+    // must to end inside the window, never past its left edge; a resize moves
+    // every open panel again.
+    requestAnimationFrame(() => keepInWindow(pop));
+    if (!replacing) { replacing = true; addEventListener("resize", () => document.querySelectorAll(".def-pop").forEach((panel) => keepInWindow(/** @type {HTMLElement} */ (panel)))); }
     pop.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
         event.preventDefault(); event.stopPropagation();
@@ -70,4 +75,22 @@ export function panelDisclosure(root, {place, act, within, onClose}) {
             document.querySelectorAll(`[data-act="${act}"]`).forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
         }, {capture: true, once: true});
     }));
+}
+
+// A panel opens at its button's left edge, and is never wider than the window
+// less --window-room each side (styles.css, .def-pop; the stylesheet's 100vw
+// counts a scrollbar, so the width is capped here too). Where the button sits
+// too far right for that, the panel moves left until it ends --window-room
+// inside the window, as far as the room on the left allows.
+let replacing = false;
+/** @param {HTMLElement} pop */
+function keepInWindow(pop) {
+    if (!pop.isConnected) return;
+    const room = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--window-room")) || 0;
+    const width = document.documentElement.clientWidth;
+    pop.style.left = "";
+    pop.style.maxWidth = `${width - 2 * room}px`;
+    const box = pop.getBoundingClientRect();
+    const over = box.right - (width - room);
+    if (over > 0) pop.style.left = `${-Math.min(over, Math.max(0, box.left - room))}px`;
 }

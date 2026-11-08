@@ -158,11 +158,15 @@ The same kind of control looks and sits the same on every screen.
   not fold has none (no test). A behaviour's or combo's Layers it runs on,
   and a behaviour's Timings, wear the same look but open their controls in a
   panel under the button (`aria-haspopup="dialog"`, `.def-pop`;
-  `panelDisclosure`, `webview/ui/disclosure.mjs`), two layers to a row and
-  the three timings one to a row, each name after its mark in one slot
-  (`marked`, the mark its default wears on Settings), so the editor keeps
-  its height: it stays open across the redraws its controls cause, and a
-  press outside or Esc
+  `panelDisclosure`, `webview/ui/disclosure.mjs`), one layer or one timing
+  to a row, each name after its mark in one slot (`marked`, the mark its
+  default wears on Settings), so the editor keeps its height. Every panel
+  is as wide as its rows, the same on a combo, a behaviour and a custom
+  key, each name whole, and stays inside the window, moving left when its
+  button sits too far right or the window narrows. A workbench clips
+  nothing, so the panel may reach below its foot, and nothing else in it
+  reaches past its edges (`browser-tests/consistency.spec.js`). It stays
+  open across the redraws its controls cause, and a press outside or Esc
   closes it (`browser-tests/behaviour-timings.spec.js`). Closed, Timings
   wears the mark of each timing the behaviour sets, after its name
   (**Marks**), and none when all follow the defaults
@@ -207,7 +211,10 @@ The same kind of control looks and sits the same on every screen.
   `browser-tests/consistency.spec.js`). A stored value that is none of a
   choice's options, a setting's or a pointing mode's, shows as one more option,
   "as stored", so a form read back whole sends it unchanged
-  (`storedChoices`, `webview/view/choices.mjs`). A pair that are two
+  (`storedChoices`, `webview/view/choices.mjs`). A choice on show is never
+  wider than its column: in a narrow one its options wrap, and an option too
+  wide alone wraps its words (`browser-tests/consistency.spec.js`, nothing
+  in a workbench reaches past its edges). A pair that are two
   independent switches (Reverse scrolling's two axes) is two switches, not
   four options naming their combinations.
 - A slot bank and its editor (Macros, Custom keys, Pointing modes) stop at
