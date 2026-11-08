@@ -17,7 +17,8 @@ Click a row to see its keys ringed on the board and open it for editing, with
 
 ## Making a combo
 
-**New combo** opens the builder for a new combo.
+**New combo**, at the top of the column beside the list, opens the builder for a
+new combo. It stays off while that builder is open.
 
 1. **Sends**: what the combo sends, with **Pick…**. A combo can't send a
    layer's **Tap-hold**, which decides tap or hold on a key of its own, so

@@ -70,6 +70,36 @@ test("rows scrolling under the header and the group's band never show through", 
     }
 });
 
+// A tab's own New sits with what it opens, not in the tab bar: New combo
+// heads the builder's column, centred on the table's first group band, and
+// stays put when the builder opens under it. What the tab bar does carry, a
+// tab's way to its screen, centres on the bar.
+test("New combo heads the builder's column centred on the first group, and the tab bar's links centre on it", async ({page}) => {
+    await openPreview(page);
+    await tab(page, "combos").click();
+    await expect(page.locator("#benchRight")).toBeEmpty();
+    const add = page.locator('#comboSide > [data-act="new-combo"]');
+    for (const open of [false, true]) {
+        if (open) await add.click();
+        const at = await page.evaluate(() => {
+            const box = (selector) => /** @type {HTMLElement} */ (document.querySelector(selector)).getBoundingClientRect();
+            return {band: box(".bench-pane td.t-group"), add: box("#comboSide > [data-act=\"new-combo\"]"), next: box("#comboSide > :nth-child(2)")};
+        });
+        expect(at.add.top + at.add.height / 2, "New combo is centred on the first group's band").toBeCloseTo(at.band.top + at.band.height / 2, 1);
+        expect(at.next.top, `the ${open ? "builder" : "hint"} starts a gap under it`).toBe(at.add.bottom + 8);
+    }
+    await expect(add, "New combo never doubles as the builder's close").toBeDisabled();
+
+    await tab(page, "pointing").click();
+    const gaps = await page.evaluate(() => {
+        const bar = /** @type {HTMLElement} */ (document.querySelector(".bench-tabs"));
+        const link = /** @type {HTMLElement} */ (document.querySelector("#benchRight button")).getBoundingClientRect();
+        const rule = parseFloat(getComputedStyle(bar).borderBottomWidth);
+        return {above: link.top - bar.getBoundingClientRect().top, below: bar.getBoundingClientRect().bottom - rule - link.bottom};
+    });
+    expect(gaps.above, "the tab's link sits in the middle of the bar").toBe(gaps.below);
+});
+
 // Each tab is opened first in a page of its own, so no height carried over
 // from another tab can stand in for the Behaviours tab's.
 test("every tab is as tall as the Behaviours tab, before it is ever opened", async ({context}) => {

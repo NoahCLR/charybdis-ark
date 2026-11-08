@@ -918,7 +918,9 @@ button.tier:hover { background: var(--surface-3); }
 .bench-tabs [data-ltab="accents"] { width: 96px; }
 .bench-tabs .c { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
 .bench-tabs button[role="tab"][aria-selected="true"] .c { color: var(--text-2); }
-.bench-right { flex: none; margin: 0 0 var(--sp-1) var(--sp-3); display: flex; align-items: center; gap: var(--sp-2); padding-right: var(--sp-1); white-space: nowrap; }
+/* The tab strip sits on the bar's floor, but its buttons centre on the whole
+   bar: the negative top margin takes back the bar's top padding. */
+.bench-right { flex: none; align-self: center; margin: calc(-1 * var(--sp-1)) 0 0 var(--sp-3); display: flex; align-items: center; gap: var(--sp-2); padding-right: var(--sp-1); white-space: nowrap; }
 .bench-right:empty { display: none; }
 .bench-body { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
 .tab-grid { display: grid; gap: var(--sp-6); }
@@ -934,6 +936,16 @@ button.tier:hover { background: var(--surface-3); }
 .tab-split.wide { grid-template-columns: minmax(0, 1fr) 330px; }
 .tab-split > * { min-width: 0; }
 .empty-card { border: 1px dashed var(--line-2); border-radius: var(--r-card); padding: var(--sp-4); }
+/* New combo heads the column beside the combo table, centred on the table's
+   first group band (the top group, below the 24px heading row the sticky band
+   names): as tall as the band (its count's line, 8px above and below, and its
+   rule) with 8px more above and below it. */
+.new-tile { flex: none; display: flex; align-items: center; justify-content: center; gap: var(--sp-1); width: 100%;
+  height: calc(var(--h-tiny) + 4 * var(--sp-2) + 1px); margin: calc(24px - var(--sp-2)) 0 var(--sp-2);
+  border: 1px dashed var(--line-2); border-radius: var(--r-control); background: none; color: var(--text-2); font-size: var(--fs-sm); }
+.new-tile:hover:not(:disabled) { color: var(--text); border-color: var(--line-3); }
+.new-tile:disabled { color: var(--text-disabled); cursor: not-allowed; }
+#comboSide { display: flex; flex-direction: column; }
 
 /* ── reach groups ────────────────────────────────────────────────────────
    Every tab that answers "what does this layer reach" heads its groups the
