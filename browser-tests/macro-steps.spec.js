@@ -146,6 +146,24 @@ test("a chord takes six keys besides modifiers, and a step holding more is marke
     expect(await updates(page)).toHaveLength(1);
 });
 
+test("a stored macro holding more than six keys says the macro, not the host settings, must change", async ({page}) => {
+    await page.goto("/preview/index.html");
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = store.getModel();
+        const playbackError = model.vocabulary.macroProblems.reportFull;
+        const macros = model.macros.map(slot => slot.keycode !== "MACRO_17" ? slot : {...slot, payload: "{KC_A,KC_B,KC_C,KC_D,KC_E,KC_F,KC_G}",
+            empty: false, playable: false, playbackError, playbackCode: "MACRO_TOO_MANY_KEYS", tooManyKeys: true});
+        store.setModel({...model, macros});
+        store.state.screen = "macros"; store.state.macroSlot = "MACRO_17"; store.render();
+    });
+    const feedback = page.locator("[data-macro-feedback]");
+    await expect(feedback).toContainText("keys still held, a chord's keys and a key typing text all count");
+    await expect(feedback).toContainText("This stored macro cannot play.");
+    await expect(feedback).toContainText("Fix the macro before playing it.");
+    await expect(feedback).not.toContainText("Your computer");
+});
+
 test("recording appends keys to literal text and Clear take restores the exact text", async ({page}) => {
     await editor(page);
     const text = ' {"key": "{KC_A}"}\nhello ';

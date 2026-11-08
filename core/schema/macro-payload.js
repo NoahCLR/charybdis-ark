@@ -39,12 +39,12 @@ let sendableNames;
 /** @param {string} name */
 const sendable = name => (sendableNames ??= new Set(macroKeycodes())).has(name);
 /** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] @returns {import("./types.js").MacroStep[]} */
-function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT, reportSlots = false} = {}) {
+function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT, heldToReport = false} = {}) {
     if (typeof payload !== "string") throw fail("Enter a macro as text.");
     const {steps, error} = readMacroPayload(payload, {
         identity: name => sendable(name) ? keycodes.encode(name) : name, sendable,
         textEntry, needsEntry: character => !layoutTypes(layout, character), ordinary: key => /** @type {number} */ (key) < 0xE0,
-        skipEmptyNames: true, stopAtTextHold: true, releaseAll: true, reportSlots,
+        skipEmptyNames: true, stopAtTextHold: true, releaseAll: true, heldToReport,
     });
     if (error) throw Object.assign(fail(`This macro does not read (${error.code}).`), {problem: error});
     return steps.map(step => step.kind === "text" || step.kind === "delay" ? step
@@ -60,7 +60,7 @@ function encodeMacroPayload(payload, options) {
     const protection = options?.protection ?? "auto";
     if (!Object.values(MACRO_PROTECTION).includes(protection)) throw fail("Choose Automatic, On or Off for uninterruptible playback.");
     if (protection !== "auto") chunks.push(Buffer.from([1, 5, protection === "on" ? 1 : 2]));
-    for (const step of parsePayload(payload, {...options, reportSlots: true})) {
+    for (const step of parsePayload(payload, {...options, heldToReport: true})) {
         if (step.kind === "text") {
             chunks.push(Buffer.from(step.text, "utf8"));
         } else if (step.kind === "delay") {

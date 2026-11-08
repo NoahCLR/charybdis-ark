@@ -150,7 +150,7 @@ test("canonical names and aliases are one key for holds, releases and chord limi
     assert.equal(parsed.error, "");
     assert.deepEqual(unreleased(parsed.steps, model), []);
     assert.equal(serializeMacro(parsed.steps), source, "alias identity checking preserves raw spelling");
-    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {model, keys}).error, /each key once/);
+    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {model, keys}).error, /each key only once/);
     assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {model, keys}).error, /already held/);
 });
 

@@ -9,7 +9,7 @@ import {keycodeModifiers, modifierPick, pickerModifierProblem} from "./keyvalues
 import {keycodeValue} from "./keycode-expression.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "./picker-sections.mjs";
 import {macroMatches, ordinaryKey} from "./macro.mjs";
-import {overfillsReport} from "../../rules/macro-payload.mjs";
+import {chordOverfills} from "../../rules/macro-payload.mjs";
 import {shortcutModifiers, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickChord, shortcutPickModifier, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
 import {catalogEntry, keyIdentity, sameKey} from "./key-identity.mjs";
 import {vocabulary} from "./vocabulary.mjs";
@@ -79,7 +79,7 @@ export function pickKey(model, picker, chosen) {
     if (picker.mode !== "list") return {keys: [chosen]};
     if (picker.keys.includes(chosen)) return {keys: picker.keys.filter((key) => key !== chosen)};
     if (picker.maxKeys === 1) return {keys: [chosen]};
-    const reportFull = Boolean(picker.reportSlots) && overfillsReport([], {kind: "tap", ids: [...picker.keys, chosen]}, ordinaryKey(model?.macroPayloadModifierKeycodes));
+    const reportFull = Boolean(picker.heldToReport) && chordOverfills([...picker.keys, chosen], ordinaryKey(model?.macroPayloadModifierKeycodes));
     return picker.keys.length >= picker.maxKeys || reportFull ? null : {keys: [...picker.keys, chosen]};
 }
 

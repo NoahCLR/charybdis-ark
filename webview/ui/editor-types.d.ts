@@ -13,7 +13,7 @@ export interface PickerOptions {
     shortcut?: {mods: number; layers?: number; layerKind?: number} | null;
     maxKeys?: number;
     /** Whether a list is held to the report's key slots, as a macro's chord is: six keys besides its modifiers (firmware D-F65). */
-    reportSlots?: boolean;
+    heldToReport?: boolean;
     onPick?: (expression: string) => void;
     onShortcut?: (shortcut: import('../../contracts/panel.js').CustomKeyShortcut) => void;
     /** Takes modifiers no keycode can hold as an unused custom key's shortcut: its keycode, the shortcut and a name. */

@@ -350,5 +350,6 @@ test("a stored macro holding more than six keys besides modifiers loads, unplaya
     assert.equal(slot.payload, "{KC_E,KC_Y,KC_K,KC_SEMICOLON,KC_P,KC_0,KC_U}");
     assert.equal(slot.playable, false);
     assert.equal(slot.playbackError, VOCABULARY.macroProblems.reportFull);
+    assert.equal(slot.tooManyKeys, true, "no host setting would let it play");
     assert.doesNotThrow(() => validateMacro(chord), "a backup holding it is restored, as the keyboard applies it");
 });

@@ -80,7 +80,7 @@ export function parseMacro(payload, options = {}) {
         textEntry: options.textEntry,
         needsEntry: (character) => options.layoutChars ? !options.layoutChars.includes(character) : /[^\x00-\x7F]/u.test(character),
         ordinary: ordinaryKey(options.modifierKeys),
-        skipEmptyNames: true, reportSlots: true,
+        skipEmptyNames: true, heldToReport: true,
     });
     /** @type {MacroStep[]} */
     const read = steps.map((step) => step.kind === "text" || step.kind === "delay" ? step : {kind: step.kind, keys: step.keys});

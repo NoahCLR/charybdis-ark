@@ -20,6 +20,17 @@ test("whole-profile checks report inert actions and destination blockers", () =>
     assert.deepEqual(checks.filter(row => row.level === "blocker").map(row => row.kind), ["brightnessBlocker", "effectBlocker"]);
 });
 
+// More keys at once than the report holds (firmware D-F65) is the macro's own
+// fault, so its check names no host setting.
+test("a stored macro holding more than six keys besides modifiers is checked as the macro's own fault", () => {
+    const decoded = validateSnapshot(document());
+    const keys = [0x08, 0x1c, 0x0e, 0x33, 0x13, 0x27, 0x18];
+    decoded.macroSlots[0] = Buffer.from([...keys.slice(0, -1).flatMap(key => [1, 2, key]), 1, 1, keys.at(-1), ...keys.slice(0, -1).reverse().flatMap(key => [1, 3, key])]);
+    const unplayable = profileFindings(decoded, {brightnessMax: 100, effects: [{id: 2}]}).find(row => row.kind === "unplayableMacro");
+    assert.equal(unplayable?.title, "Macro 0 holds more keys at once than the keyboard can send");
+    assert.equal(unplayable?.fix, "Fix the macro before playing it.");
+});
+
 test("whole-profile findings retain new and fixed status beside the keyboard", () => {
     const keyboard = validateSnapshot(document());
     const draft = validateSnapshot(document());

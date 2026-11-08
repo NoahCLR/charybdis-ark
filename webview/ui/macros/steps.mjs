@@ -60,6 +60,12 @@ export function focusSteps(slot, steps) {
     return identified;
 }
 
+// How many keys a key step's picker takes: a chord up to the keys the
+// keyboard tracks and the report's six besides its modifiers (firmware
+// D-F65), a press or release one.
+/** @param {MacroStep['kind']} kind */
+const pickLimits = kind => kind === "tap" ? {maxKeys: MAX_KEYS, heldToReport: true} : {maxKeys: 1};
+
 /** @param {import('../../../contracts/panel.js').PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps @param {MacroStep['kind']} kind */
 export function insertStep(model, slot, steps, kind) {
     /** @param {MacroStep} step */
@@ -73,7 +79,7 @@ export function insertStep(model, slot, steps, kind) {
     if (kind === "text") insert({kind, text: ""});
     else if (kind === "delay") insert({kind, delay: 120});
     else openPicker({title: stepKindName(model, kind), contextKeycode: slot.keycode,
-        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? MAX_KEYS : 1, reportSlots: kind === "tap",
+        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, ...pickLimits(kind),
         onPick: expression => insert({kind, keys: expression.split(",").map(key => key.trim()).filter(Boolean)}),
     });
 }
@@ -227,7 +233,7 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
         /** @type {HTMLElement | null} */ (document.querySelector(`[data-step-id="${CSS.escape(step.focusId || "")}"]`))?.focus();
     });
     /** @type {HTMLElement | null} */ (node.querySelector("[data-pick-step]"))?.addEventListener("click", () => openPicker({
-        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? MAX_KEYS : 1, reportSlots: step.kind === "tap",
+        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, ...pickLimits(step.kind),
         onPick: expression => {
             const next = macroForm(slot.keycode).steps ?? steps;
             saveSteps(slot, next.map((item, at) => at === index ? {...item, keys: expression.split(",").map(key => key.trim()).filter(Boolean)} : item), true); render();

@@ -94,11 +94,13 @@ export function paintFeedback(card, model, slot) {
     /** @type {import("../../../contracts/messages.js").MacroValidation | null | undefined} */
     const inspection = matchingValidation(form, model, slot) ? form.validation?.validation : null;
     const error = form.stepError || parsed.error || (held.length ? `Release ${listed(held.map(key => keyIdentity(model, key).label))} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
-    const note = error ? (local ? editWords(model?.draft).macroFixFirst : `Change ${sectionPath(model, "host")} or fix the macro before playing it.`) : local && !inspection ? "Checking this edit…" : "";
+    // Too many keys at once is the stored macro's own fault: no host setting helps.
+    const own = !local && slot.tooManyKeys;
+    const note = error ? (local ? editWords(model?.draft).macroFixFirst : own ? "Fix the macro before playing it." : `Change ${sectionPath(model, "host")} or fix the macro before playing it.`) : local && !inspection ? "Checking this edit…" : "";
     const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
     feedback.hidden = !error && !note;
     feedback.replaceChildren(el(`<div class="stack">
-        ${error ? `<div class="unavailable">${esc(error)} ${local ? esc(editWords(model?.draft).macroNotIn) : `This stored macro cannot play with the current settings in ${esc(vocabulary(model).settingsSections.host)}.`}</div>` : ""}
+        ${error ? `<div class="unavailable">${esc(error)} ${local ? esc(editWords(model?.draft).macroNotIn) : own ? "This stored macro cannot play." : `This stored macro cannot play with the current settings in ${esc(vocabulary(model).settingsSections.host)}.`}</div>` : ""}
         ${note ? `<p class="note">${esc(note)}</p>` : ""}
     </div>`));
 }

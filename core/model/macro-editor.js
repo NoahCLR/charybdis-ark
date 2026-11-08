@@ -9,7 +9,7 @@ const {validName} = require("../schema/profile-name");
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, macroProtectionOf} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
-const {inspectMacroInput, inspectMacroPlayback, readStoredMacro} = require("./macro-input");
+const {TOO_MANY_KEYS, inspectMacroInput, inspectMacroPlayback, readStoredMacro} = require("./macro-input");
 const {PROFILE_FULL_WORDS, VOCABULARY, macroDefaultName, word} = require("./vocabulary");
 const {macroName, macroOfName} = require("../../rules/qmk-keycodes.mjs");
 /** @param {string} message @param {string} [code] */
@@ -49,7 +49,8 @@ function macroEditorView(snapshot, capabilities) {
         const needsUnicodeSetup = playback.code === "UNICODE_SETUP_REQUIRED";
         return {keycode: macroName(index), name: names[index], defaultName: macroDefaultName(index),
             payload, protection, uninterruptible: protection === "on" || (protection === "auto" && needsUnicodeEntry),
-            needsUnicodeEntry, needsUnicodeSetup, playbackError: playback.error, playbackCode: playback.code, empty: !payload, bytes: bytes.length,
+            needsUnicodeEntry, needsUnicodeSetup, playbackError: playback.error, playbackCode: playback.code,
+            tooManyKeys: playback.code === TOO_MANY_KEYS, empty: !payload, bytes: bytes.length,
             playable: !playback.error, available: !budget.outOfRoom.has(index),
             // How many more key taps this macro can take: what the bank has free.
             roomTaps: Math.floor(budget.free / KEY_TAP_BYTES)};

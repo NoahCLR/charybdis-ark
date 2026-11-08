@@ -11,7 +11,7 @@ const {compareFindings} = require("./compare-findings");
 const {baseLighting} = require("./settings-editor");
 const {shortcutPresent} = require("../schema/settings-domain-v1");
 const {hostSettings} = require("../schema/host-settings");
-const {inspectMacroPlayback, readStoredMacro} = require("./macro-input");
+const {TOO_MANY_KEYS, inspectMacroPlayback, readStoredMacro} = require("./macro-input");
 const {pointingMacros} = require("./pointing-taps");
 const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
@@ -77,10 +77,14 @@ function profileFindings(decoded, destination = {}) {
         if (!payload) emptyMacros.add(index);
         const playback = inspectMacroPlayback(payload, host);
         if (!playback.error) return;
+        // Too many keys at once is the macro's own fault: no host setting helps.
+        const own = playback.code === TOO_MANY_KEYS;
         findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${playback.code}:${playback.error}`,
-            title: `${macroDefaultName(index)} cannot play with the settings in ${VOCABULARY.settingsSections.host}`,
+            title: own ? `${macroDefaultName(index)} holds more keys at once than the keyboard can send`
+                : `${macroDefaultName(index)} cannot play with the settings in ${VOCABULARY.settingsSections.host}`,
             detail: `${playback.error} The keyboard stores this macro, but pressing it does nothing.`,
-            fix: `Fix the macro or change ${settingsPath("host", "host")} before playing it.`, place: {kind: "macro", index, keycode: macroName(index)}});
+            fix: own ? "Fix the macro before playing it." : `Fix the macro or change ${settingsPath("host", "host")} before playing it.`,
+            place: {kind: "macro", index, keycode: macroName(index)}});
     });
     for (const output of pointingMacros(decoded.pdModes || [])) {
         const where = {kind: /** @type {const} */ ("pointing"), slot: output.slot};

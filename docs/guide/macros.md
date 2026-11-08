@@ -62,10 +62,10 @@ A step that can't work, such as a key let go before it was pressed or still
 held at the end, is marked ! and explained. So is one that would hold more
 than six keys at once besides modifiers: that's all the keyboard can send
 together. Keys still held count with a chord's keys, and text needs one of
-the six free. A macro saved before this limit still loads, and says why it
-can't play. Ark keeps such an edit out of
-your draft until it is fixed, and never loses the last good version: ⌘Z
-takes the edit back. A macro your draft changes has a dot on its slot. In the
+the six free. Ark keeps an edit with such a step out of your draft until it
+is fixed, and never loses the last good version: ⌘Z takes the edit back. A
+macro saved before the six-key limit still loads, and says why it can't
+play. A macro your draft changes has a dot on its slot. In the
 live modes an edit reaches the keyboard once Ark has checked it, and the dot
 marks a change the keyboard hasn't saved.
 

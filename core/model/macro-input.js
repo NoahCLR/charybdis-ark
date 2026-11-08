@@ -5,6 +5,7 @@ const {parsePayload, encodeMacroPayload, decodeMacroPayload} = require("../schem
 const {hostLayout, layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
 const {settingsPath, wordedMacroError} = require("./vocabulary");
 
+const TOO_MANY_KEYS = "MACRO_TOO_MANY_KEYS";
 // What to do when the host layout cannot type a character, by effective OS.
 const HOST = settingsPath("host", "host");
 const ENTRY_SETUP = [
@@ -47,6 +48,9 @@ function inspectMacroInput(payload, {mode = 0, enabled = false, layout = US_HOST
         const worded = wordedMacroError(error);
         result.error = worded instanceof Error ? worded.message : String(worded);
         result.code = worded instanceof Error && "code" in worded && typeof worded.code === "string" ? worded.code : "INVALID_MACRO";
+        // More keys at once than the report holds (firmware D-F65): the one
+        // reason a macro cannot play that no host setting can change.
+        if (worded instanceof Error && "problem" in worded && /** @type {{code?: string}} */ (worded.problem)?.code === "reportFull") result.code = TOO_MANY_KEYS;
     }
     return result;
 }
@@ -71,4 +75,4 @@ function readStoredMacro(bytes, options) {
     }
 }
 
-module.exports = {inspectMacroInput, inspectMacroPlayback, readStoredMacro};
+module.exports = {TOO_MANY_KEYS, inspectMacroInput, inspectMacroPlayback, readStoredMacro};

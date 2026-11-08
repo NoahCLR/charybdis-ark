@@ -31,14 +31,14 @@ export function sequenceIssues(steps, model, label = key => key) {
         const ids = "keys" in step ? step.keys.map(key => keyIdentity(model, key).name) : [];
         if (overfillsReport(held.keys(), {...step, ids}, ordinary)) issues[index] ||= full;
         if (!("keys" in step)) return;
-        for (const key of step.keys) {
-            const id = keyIdentity(model, key).name;
+        step.keys.forEach((key, at) => {
+            const id = ids[at];
             if (step.kind === "release") {
                 if (!held.delete(id)) issues[index] ||= `${label(key)} is released before it is pressed. Move its release after its press.`;
             } else if (held.has(id)) {
                 issues[index] ||= `${label(key)} is already held. Release it before pressing or tapping it again.`;
             } else if (step.kind === "press") held.set(id, {index, key});
-        }
+        });
     });
     for (const {index, key} of held.values()) issues[index] ||= `Release ${label(key)} before the macro ends.`;
     return issues;

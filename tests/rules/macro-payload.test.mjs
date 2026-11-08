@@ -53,7 +53,7 @@ test("every reason has its words in core and in the step editor's vocabulary", (
 
 test("held to the report, a macro holds at most six keys at once besides modifiers: held keys, a chord's and a typed key's together (firmware D-F65)", () => {
     const MODS = new Set(["KC_LGUI", "KC_LALT", "KC_LCTL", "KC_LSFT"]);
-    const slots = {sendable: (name) => /^KC_\w+$/.test(name), ordinary: (name) => !MODS.has(name), reportSlots: true};
+    const slots = {sendable: (name) => /^KC_\w+$/.test(name), ordinary: (name) => !MODS.has(name), heldToReport: true};
     const code = (source, more = slots) => read(source, more).error?.code;
     assert.equal(code("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}"), "reportFull");
     assert.equal(code("{KC_LGUI,KC_LALT,KC_LCTL,KC_LSFT,KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0}"), undefined);
@@ -62,5 +62,8 @@ test("held to the report, a macro holds at most six keys at once besides modifie
     assert.equal(code("{+KC_A}{+KC_B}{+KC_C}{+KC_D}{+KC_E}{+KC_F}{+KC_G}"), "reportFull");
     assert.equal(code("{+KC_A}{+KC_B}{+KC_C}{+KC_D}{+KC_E}{+KC_F}z{-KC_F}{-KC_E}{-KC_D}{-KC_C}{-KC_B}{-KC_A}"), "reportFull", "text needs a slot of its own");
     assert.equal(code("{+KC_A}{+KC_B}{+KC_C}{+KC_D}{+KC_E}z{-KC_E}{-KC_D}{-KC_C}{-KC_B}{-KC_A}"), undefined);
-    assert.equal(code("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}", {...slots, reportSlots: false}), undefined, "a stored macro is read as it is");
+    assert.equal(code("{KC_E,KC_Y,KC_K,KC_SCLN,KC_P,KC_0,KC_U}", {...slots, heldToReport: false}), undefined, "a stored macro is read as it is");
+    const seventeen = Array.from({length: 17}, (_, at) => `KC_K${at}`);
+    assert.equal(code(`{${seventeen.join(",")}}`, {...slots, heldToReport: false}), "reportFull", "past the 16 keys the keyboard tracks is past the six too");
+    assert.equal(code(`${seventeen.slice(0, 9).map((key) => `{+${key}}`).join("")}{${seventeen.slice(9).join(",")}}`, {...slots, heldToReport: false}), "reportFull");
 });

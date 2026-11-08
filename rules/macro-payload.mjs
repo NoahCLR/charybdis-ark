@@ -19,7 +19,7 @@ export const MACRO_LIMITS = Object.freeze({maxHeldKeys: 16, reportKeys: 6, maxDe
 
 // Why a macro does not read, as a reason code; each reader words it.
 export const MACRO_PROBLEM_CODES = Object.freeze(/** @type {const} */ (["unexpectedClose", "unprintable", "missingClose", "delay", "empty", "noKeys", "pressOne", "chord",
-    "unknown", "notHeld", "heldAgain", "tooManyHeld", "reportFull", "textHold", "stillHeld"]));
+    "unknown", "notHeld", "heldAgain", "reportFull", "textHold", "stillHeld"]));
 /**
  * @typedef {(typeof MACRO_PROBLEM_CODES)[number]} MacroProblem
  * @typedef {{code: MacroProblem, key?: string}} MacroError
@@ -33,7 +33,7 @@ export const MACRO_PROBLEM_CODES = Object.freeze(/** @type {const} */ (["unexpec
  * @property {boolean} [skipEmptyNames] Whether an empty name between commas is skipped, as the step editor does, rather than refused.
  * @property {boolean} [stopAtTextHold] Whether text a held ordinary key would corrupt stops the reading there, as core does, or is said only once the rest reads.
  * @property {boolean} [releaseAll] Whether every held key must be released by the end, as the keyboard needs of a stored macro.
- * @property {boolean} [reportSlots] Whether held ordinary keys are held to the report's key slots, as the keyboard plays a macro, rather than read as they are, as a stored macro is shown.
+ * @property {boolean} [heldToReport] Whether held ordinary keys are held to the report's six key slots, as the keyboard plays a macro, rather than read as they are, as a stored macro is shown.
  */
 
 /**
@@ -50,6 +50,10 @@ export function overfillsReport(held, step, ordinary) {
         : 0;
     return adds > 0 && [...holding].filter(ordinary).length + adds > MACRO_LIMITS.reportKeys;
 }
+
+// Whether a chord's keys alone overfill the report, as the chord picker asks.
+/** @param {readonly unknown[]} ids @param {(id: unknown) => boolean} ordinary */
+export const chordOverfills = (ids, ordinary) => overfillsReport([], {kind: "tap", ids}, ordinary);
 
 /**
  * Why a macro does not read, in a reader's words for each reason (core's
@@ -89,7 +93,7 @@ export function readMacroPayload(source, reading) {
     /** @param {unknown} id */
     const ordinary = (id) => Boolean(reading.ordinary?.(id));
     /** @param {Parameters<typeof overfillsReport>[1]} step */
-    const overfills = (step) => Boolean(reading.reportSlots) && overfillsReport(held, step, ordinary);
+    const overfills = (step) => Boolean(reading.heldToReport) && overfillsReport(held, step, ordinary);
     for (let index = 0; index < source.length;) {
         const code = /** @type {number} */ (source.codePointAt(index));
         const character = String.fromCodePoint(code);
@@ -118,14 +122,17 @@ export function readMacroPayload(source, reading) {
         if (!keys.length) return fail("noKeys");
         if (kind !== "tap" && keys.length !== 1) return fail("pressOne");
         const ids = keys.map(reading.identity);
-        if (keys.length > MACRO_LIMITS.maxHeldKeys || new Set(ids).size !== keys.length) return fail("chord");
+        if (new Set(ids).size !== keys.length) return fail("chord");
+        // Past the 16 keys the keyboard tracks is past the report's six too:
+        // there are eight modifiers.
+        if (keys.length > MACRO_LIMITS.maxHeldKeys) return fail("reportFull");
         const unknown = keys.find((name) => !reading.sendable(name));
         if (unknown !== undefined) return fail("unknown", unknown);
         if (kind === "release") {
             if (!held.delete(ids[0])) return fail("notHeld", keys[0]);
         } else {
             if (ids.some((id) => held.has(id))) return fail("heldAgain");
-            if (held.size + keys.length > MACRO_LIMITS.maxHeldKeys) return fail("tooManyHeld");
+            if (held.size + keys.length > MACRO_LIMITS.maxHeldKeys) return fail("reportFull");
             if (overfills({kind, ids})) return fail("reportFull");
             if (kind === "press") held.add(ids[0]);
         }
