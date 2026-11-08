@@ -178,3 +178,37 @@ test("keys pressed together are one chip in two sizes, each + kept with the key 
     await openControls(page, "lighting", {stage: "combo"}, "dark", "shell=demo");
     expect(await chips(page.locator('tr[data-combo="0"] .key-chips').first())).toEqual(hover);
 });
+
+test("a combo's badge in the hover card sits on its arrow's line, as a branch's tap count sits on its Tap row, and the arrow on what it sends", async ({page}) => {
+    // The demo's combo 0 is D + F / Navigation, and key 27 is its D. Sending a
+    // layer, its line holds the layer's tag, taller than the words around it.
+    await openControls(page, "keys", {}, "dark", "shell=demo");
+    await page.evaluate(async () => {
+        const {getModel} = await import("/webview/store.mjs");
+        const model = structuredClone(getModel());
+        Object.assign(model.combos[0], {output: "MO(3)", outputDisplay: "Hold Navigation"});
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    });
+    await page.locator('.board [data-key="27"]').first().hover();
+    const combo = page.locator(".hovercard:visible .hc-combo").first();
+    await expect(combo.locator(".sends-tag")).toHaveText("Hold");
+    // What it sends runs to a second line, as a custom key's shortcut does.
+    await combo.locator(".hc-sends").evaluate((sends) => {
+        const words = document.createElement("span");
+        words.className = "hc-life hc-runs";
+        words.textContent = "sends its shortcut, Left Ctrl + Left Option + Spacebar, and then some more words";
+        sends.append(words);
+    });
+    const at = await combo.evaluate((node) => {
+        const box = (el) => el.getBoundingClientRect();
+        const badge = box(node.querySelector(":scope > .mk-badge"));
+        const arrow = box(node.querySelector(".hc-sends > .hc-life"));
+        const name = box(node.querySelector(".hc-sends .sends-name"));
+        const sends = box(node.querySelector(".hc-sends"));
+        return {badge: badge.top + badge.height / 2, arrow: arrow.top + arrow.height / 2, name: name.top + name.height / 2, wraps: sends.height > 2 * arrow.height};
+    });
+    expect(at.wraps).toBe(true);
+    // The arrow keeps to the layer's name, not its icon's foot.
+    expect(Math.abs(at.arrow - at.name)).toBeLessThanOrEqual(1);
+    expect(Math.abs(at.badge - at.arrow)).toBeLessThanOrEqual(1);
+});
