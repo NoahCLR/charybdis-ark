@@ -130,16 +130,33 @@ test("every behaviour cell is one size, on Custom keys and in the Keymap's Behav
         const heights = await page.locator(".bgrid .bcell").evaluateAll(cells => [...new Set(cells.map(cell => Math.round(cell.getBoundingClientRect().height)))]);
         expect(heights, `${screen} at ${width}`).toHaveLength(1);
         // A timing field shows its whole placeholder ("150 · default").
-        for (const fits of await page.locator(".bgrid input.num").evaluateAll(inputs => inputs.map(input => {
-            const probe = document.createElement("span");
-            probe.style.font = getComputedStyle(input).font;
-            probe.textContent = input.placeholder;
-            document.body.append(probe);
-            const fits = probe.getBoundingClientRect().width <= input.clientWidth;
-            probe.remove();
-            return fits;
-        }))) expect(fits, `${screen} timing placeholder`).toBe(true);
+        for (const fits of await placeholdersFit(page.locator(".bgrid input.num"))) expect(fits, `${screen} timing placeholder`).toBe(true);
     }
+});
+
+// Whether each field is wide enough for its whole placeholder, in the room
+// its padding leaves (the unit rides in the right padding).
+/** @param {import("@playwright/test").Locator} inputs */
+const placeholdersFit = (inputs) => inputs.evaluateAll(nodes => nodes.map(node => {
+    const input = /** @type {HTMLInputElement} */ (node);
+    const style = getComputedStyle(input);
+    const probe = document.createElement("span");
+    probe.style.font = style.font;
+    probe.style.whiteSpace = "pre";
+    probe.textContent = input.placeholder;
+    document.body.append(probe);
+    const room = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const fits = probe.getBoundingClientRect().width <= room;
+    probe.remove();
+    return fits;
+}));
+
+test("a combo's window shows its whole placeholder, as a behaviour's timings do", async ({page}) => {
+    await openControls(page, "keys", {tab: "combos"});
+    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    const field = page.locator(".combo-builder input[data-window]");
+    await expect(field).toHaveAttribute("placeholder", /· default$/);
+    expect(await placeholdersFit(field)).toEqual([true]);
 });
 
 test("a choice shows a few short options on screen and keeps a longer list in a menu, by one rule", async ({page}) => {

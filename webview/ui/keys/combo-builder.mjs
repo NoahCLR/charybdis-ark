@@ -15,7 +15,7 @@ import {customKeyOf, customKeySendsNote, customKeyShortcutOnly, hasShortcut, sho
 import {closeComboBuilder, currentView, getModel, layers, post, render, state} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
-import {timingInput} from "../../view/timing-input.mjs";
+import {timingDigits, timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
 import {keyNameMarked, keyNameText} from "../marks.mjs";
 import {sentence, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
@@ -73,7 +73,7 @@ export function comboBuilder(canEdit, holdTerm) {
                 </div>
             </div>
             <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window</span>
-                <div class="input-row"><span class="affix unit"><input class="input mono num" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-window inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
+                <div class="input-row"><span class="affix unit"><input class="input mono num" style="--digits: ${esc(timingDigits(windowField.placeholder))}" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-window inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
                     data-tip="${esc(`Follow the default combo window (${vocabulary(model).settingsScreens.combos}) again, so this combo changes with it.`)}">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="field">
