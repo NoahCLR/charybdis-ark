@@ -334,3 +334,21 @@ test("unused macro tails survive names and layer edits, while stream edits recla
     assert.deepEqual(macros(reorderLayers(source, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])), macros(source));
     assert.deepEqual(Buffer.from(JSON.parse(JSON.stringify(source)).profile, "base64"), bytes, "portable JSON retains the exact complete blob");
 });
+
+// A macro stored before the six-slot rule (firmware D-F65) reads as it is and
+// says why it cannot play; the keyboard keeps it and plays nothing.
+test("a stored macro holding more than six keys besides modifiers loads, unplayable, with the reason", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {editMacros} = require("../fixtures/profile-document");
+    const {validateMacro} = require("../../core/model/portable-profile");
+    const keys = [0x08, 0x1c, 0x0e, 0x33, 0x13, 0x27, 0x18]; // E Y K ; P 0 U
+    const chord = Buffer.from([...keys.slice(0, -1).flatMap(key => [1, 2, key]), 1, 1, keys.at(-1), ...keys.slice(0, -1).reverse().flatMap(key => [1, 3, key])]);
+    const {snapshot: base, capabilities} = hostMacros(1, []);
+    const document = structuredClone(base.document);
+    editMacros(document, macros => {macros[0] = chord.toString("base64");});
+    const slot = macroEditorView(snapshot(document), capabilities).macros[0];
+    assert.equal(slot.payload, "{KC_E,KC_Y,KC_K,KC_SEMICOLON,KC_P,KC_0,KC_U}");
+    assert.equal(slot.playable, false);
+    assert.equal(slot.playbackError, VOCABULARY.macroProblems.reportFull);
+    assert.doesNotThrow(() => validateMacro(chord), "a backup holding it is restored, as the keyboard applies it");
+});

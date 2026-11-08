@@ -127,6 +127,25 @@ test("press and release pick one basic key; incomplete steps never stage", async
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("{+KC_LEFT_GUI}{-KC_LEFT_GUI}");
 });
 
+// The keyboard report has six key slots whatever the build (firmware D-F65).
+test("a chord takes six keys besides modifiers, and a step holding more is marked and never staged", async ({page}) => {
+    await editor(page);
+    await add(page, "tap");
+    for (const key of ["KC_A", "KC_B", "KC_C", "KC_D", "KC_E", "KC_F", "KC_G"]) await page.locator(`.pkb-key[data-pick="${key}"]`).click();
+    await expect(page.locator(".picker [data-remove]")).toHaveCount(6);
+    await expect(page.locator(".picker")).toContainText("Choose up to 6 keys to send together, and any modifiers.");
+    await page.locator('.pkb-key[data-pick="KC_LGUI"]').click();
+    await expect(page.locator(".picker [data-remove]")).toHaveCount(7);
+    await page.locator('.picker [data-act="use"]').click();
+    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("{KC_A,KC_B,KC_C,KC_D,KC_E,KC_F,KC_LEFT_GUI}");
+    await page.locator("[data-raw-toggle]").click();
+    await page.locator("[data-raw-payload]").fill("{+KC_H}{KC_A,KC_B,KC_C,KC_D,KC_E,KC_F}{-KC_H}");
+    await page.locator("[data-raw-payload]").dispatchEvent("change");
+    await expect(page.locator(".macro-token.invalid")).toHaveCount(1);
+    await expect(page.locator("[data-macro-feedback]")).toContainText("keys still held, a chord's keys and a key typing text all count");
+    expect(await updates(page)).toHaveLength(1);
+});
+
 test("recording appends keys to literal text and Clear take restores the exact text", async ({page}) => {
     await editor(page);
     const text = ' {"key": "{KC_A}"}\nhello ';

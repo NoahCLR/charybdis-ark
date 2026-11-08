@@ -50,15 +50,18 @@ export const macroShortName = (slot) => `M${macroNumber(slot?.keycode) ?? ""}`;
 export const macroUnit = (index) => `macro:${index}`;
 
 // A macro's limits (rules/macro-payload.mjs): its longest delay in
-// milliseconds, and the keys it holds at once, a chord's included.
-export const MAX_DELAY = MACRO_LIMITS.maxDelayMs, MAX_KEYS = MACRO_LIMITS.maxHeldKeys;
+// milliseconds, the keys it holds at once, a chord's included, and of those
+// the keys besides modifiers, which fill the report's key slots (firmware
+// D-F65).
+export const MAX_DELAY = MACRO_LIMITS.maxDelayMs, MAX_KEYS = MACRO_LIMITS.maxHeldKeys, REPORT_KEYS = MACRO_LIMITS.reportKeys;
 
 // A macro's steps, as far as they read, and what is wrong in words: the shared
 // grammar read by key name, a key known by its alias's name, and only the keys
 // a macro can send when the model lists them. Text that needs Unicode entry
 // with an ordinary key held is said once the rest reads; without a host
 // layout, that text is anything past ASCII, and without the model's modifier
-// keys no held key counts as ordinary, so core alone says it. A key left
+// keys no held key counts as ordinary, so core alone says it, as it does a
+// step holding more than six ordinary keys at once (firmware D-F65). A key left
 // held is not an error here: the editor names each one (unreleased), as core
 // refuses it.
 /** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] */
@@ -70,7 +73,7 @@ export function parseMacro(payload, options = {}) {
         textEntry: options.textEntry,
         needsEntry: (character) => options.layoutChars ? !options.layoutChars.includes(character) : /[^\x00-\x7F]/u.test(character),
         ordinary: (key) => Boolean(options.modifierKeys) && !options.modifierKeys?.includes(/** @type {string} */ (key)),
-        skipEmptyNames: true,
+        skipEmptyNames: true, reportSlots: true,
     });
     /** @type {MacroStep[]} */
     const read = steps.map((step) => step.kind === "text" || step.kind === "delay" ? step : {kind: step.kind, keys: step.keys});

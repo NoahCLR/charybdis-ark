@@ -12,12 +12,14 @@
 // Unicode entry, which an ordinary key held across it would corrupt.
 
 // What one macro may ask of the keyboard: keys held at once, a chord's keys
-// included, and a delay in milliseconds.
-export const MACRO_LIMITS = Object.freeze({maxHeldKeys: 16, maxDelayMs: 65535});
+// included; of those, the ordinary keys, which fill the keyboard report's six
+// key slots whatever the build, with a key typing text among them (firmware
+// D-F65); and a delay in milliseconds.
+export const MACRO_LIMITS = Object.freeze({maxHeldKeys: 16, reportKeys: 6, maxDelayMs: 65535});
 
 // Why a macro does not read, as a reason code; each reader words it.
 export const MACRO_PROBLEM_CODES = Object.freeze(/** @type {const} */ (["unexpectedClose", "unprintable", "missingClose", "delay", "empty", "noKeys", "pressOne", "chord",
-    "unknown", "notHeld", "heldAgain", "tooManyHeld", "textHold", "stillHeld"]));
+    "unknown", "notHeld", "heldAgain", "tooManyHeld", "reportFull", "textHold", "stillHeld"]));
 /**
  * @typedef {(typeof MACRO_PROBLEM_CODES)[number]} MacroProblem
  * @typedef {{code: MacroProblem, key?: string}} MacroError
@@ -31,7 +33,16 @@ export const MACRO_PROBLEM_CODES = Object.freeze(/** @type {const} */ (["unexpec
  * @property {boolean} [skipEmptyNames] Whether an empty name between commas is skipped, as the step editor does, rather than refused.
  * @property {boolean} [stopAtTextHold] Whether text a held ordinary key would corrupt stops the reading there, as core does, or is said only once the rest reads.
  * @property {boolean} [releaseAll] Whether every held key must be released by the end, as the keyboard needs of a stored macro.
+ * @property {boolean} [reportSlots] Whether held ordinary keys are held to the report's key slots, as the keyboard plays a macro, rather than read as they are, as a stored macro is shown.
  */
+
+/**
+ * Whether `more` ordinary keys on top of the held ones overfill the report's
+ * key slots: a modifier has the report's own byte. Every reader of a macro's
+ * steps counts them here.
+ * @param {Iterable<unknown>} held @param {number} more @param {(id: unknown) => boolean} ordinary
+ */
+export const overfillsReport = (held, more, ordinary) => [...held].filter(ordinary).length + more > MACRO_LIMITS.reportKeys;
 
 /**
  * Why a macro does not read, in a reader's words for each reason (core's
@@ -68,6 +79,10 @@ export function readMacroPayload(source, reading) {
     };
     /** @param {MacroProblem} code @param {string} [key] */
     const fail = (code, key) => ({steps, error: key === undefined ? {code} : {code, key}});
+    /** @param {unknown} id */
+    const ordinary = (id) => Boolean(reading.ordinary?.(id));
+    /** @param {number} more */
+    const overfills = (more) => Boolean(reading.reportSlots) && overfillsReport(held, more, ordinary);
     for (let index = 0; index < source.length;) {
         const code = /** @type {number} */ (source.codePointAt(index));
         const character = String.fromCodePoint(code);
@@ -79,6 +94,7 @@ export function readMacroPayload(source, reading) {
             text += character;
             continue;
         }
+        if (text && overfills(1)) return fail("reportFull");
         if (flush()) return fail("textHold");
         const end = source.indexOf("}", index);
         if (end < 0) return fail("missingClose");
@@ -103,10 +119,12 @@ export function readMacroPayload(source, reading) {
         } else {
             if (ids.some((id) => held.has(id))) return fail("heldAgain");
             if (held.size + keys.length > MACRO_LIMITS.maxHeldKeys) return fail("tooManyHeld");
+            if (overfills(ids.filter(ordinary).length)) return fail("reportFull");
             if (kind === "press") held.add(ids[0]);
         }
         steps.push({kind, keys, ids});
     }
+    if (text && overfills(1)) return fail("reportFull");
     if (flush() || textHold) return {steps, error: {code: "textHold"}};
     if (reading.releaseAll && held.size) return {steps, error: {code: "stillHeld"}};
     return {steps, error: null};

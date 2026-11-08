@@ -1363,6 +1363,15 @@ escaped payload (D-L26), in `webview/ui/macros/`.
 - `webview/view/macro-sequence.mjs` marks orphan releases, repeated holds and
   unfinished holds without repairing them
   (`tests/view/macro-sequence.test.mjs`).
+- A macro holds at most six keys at once besides modifiers, the report's key
+  slots (firmware D-F65): held keys, a chord's and a key typing text count
+  together (`MACRO_LIMITS.reportKeys`, `overfillsReport` in
+  `rules/macro-payload.mjs`; `tests/rules/macro-payload.test.mjs`). The
+  sequence marks the step that overfills it, the chord picker takes six keys
+  besides its modifiers (`tests/view/picker.test.mjs`,
+  `browser-tests/macro-steps.spec.js`), and core refuses such an edit. A stored macro reads as it is: one stored over the limit loads,
+  restores from a backup, and is unplayable with the reason
+  (`tests/model/macro-editor.test.js`).
 - Clear macro empties the slot in one `updateMacro`: no steps, no name and
   automatic protection, so it stores no bytes. It is one step of the macro's
   history, whose undo posts the steps, name and protection it had

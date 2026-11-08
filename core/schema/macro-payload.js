@@ -31,18 +31,20 @@ function macroModifierKeycodes() {
 // name, as the step editor refuses it. A macro that does not read is refused
 // with the grammar's reason (`problem`), which the model words from the
 // vocabulary (wordedMacroError); a macro that leaves a key held is refused
-// too.
+// too. Only an edit is held to the report's six key slots (firmware D-F65):
+// a stored macro reads as it is, so one stored before the rule still shows,
+// and the keyboard plays nothing of it.
 /** @type {Set<string> | undefined} */
 let sendableNames;
 /** @param {string} name */
 const sendable = name => (sendableNames ??= new Set(macroKeycodes())).has(name);
-/** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] @returns {import("./types.js").MacroStep[]} */
-function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT} = {}) {
+/** @param {unknown} payload @param {import("./types.js").MacroOptions & {reportSlots?: boolean}} [options] @returns {import("./types.js").MacroStep[]} */
+function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT, reportSlots = false} = {}) {
     if (typeof payload !== "string") throw fail("Enter a macro as text.");
     const {steps, error} = readMacroPayload(payload, {
         identity: name => sendable(name) ? keycodes.encode(name) : name, sendable,
         textEntry, needsEntry: character => !layoutTypes(layout, character), ordinary: key => /** @type {number} */ (key) < 0xE0,
-        skipEmptyNames: true, stopAtTextHold: true, releaseAll: true,
+        skipEmptyNames: true, stopAtTextHold: true, releaseAll: true, reportSlots,
     });
     if (error) throw Object.assign(fail(`This macro does not read (${error.code}).`), {problem: error});
     return steps.map(step => step.kind === "text" || step.kind === "delay" ? step
@@ -58,7 +60,7 @@ function encodeMacroPayload(payload, options) {
     const protection = options?.protection ?? "auto";
     if (!Object.values(MACRO_PROTECTION).includes(protection)) throw fail("Choose Automatic, On or Off for uninterruptible playback.");
     if (protection !== "auto") chunks.push(Buffer.from([1, 5, protection === "on" ? 1 : 2]));
-    for (const step of parsePayload(payload, options)) {
+    for (const step of parsePayload(payload, {...options, reportSlots: true})) {
         if (step.kind === "text") {
             chunks.push(Buffer.from(step.text, "utf8"));
         } else if (step.kind === "delay") {

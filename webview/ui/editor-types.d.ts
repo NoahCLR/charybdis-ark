@@ -12,6 +12,8 @@ export interface PickerOptions {
     /** A custom key's shortcut: modifiers from either side, mixed, an optional key and any layers (firmware D-F26), handed to `onShortcut`. */
     shortcut?: {mods: number; layers?: number; layerKind?: number} | null;
     maxKeys?: number;
+    /** A list's limit on keys besides modifiers: the report's key slots a macro's chord fills (firmware D-F65). */
+    reportKeys?: number;
     onPick?: (expression: string) => void;
     onShortcut?: (shortcut: import('../../contracts/panel.js').CustomKeyShortcut) => void;
     /** Takes modifiers no keycode can hold as an unused custom key's shortcut: its keycode, the shortcut and a name. */

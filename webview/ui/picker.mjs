@@ -38,12 +38,12 @@ const modifierControls = model => vocabulary(model).pickerModifiers || [];
 // field does with a custom key: runs its behaviour too (a layout key, a combo
 // output), or sends only its shortcut (a behaviour step). `comboOutput` holds
 // the pick to what a combo can send: no Tap-hold, which needs a key of its own.
-export function openPicker({title, context, contextKeycode, onLayer, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false, comboOutput = false}) {
+export function openPicker({title, context, contextKeycode, onLayer, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, reportKeys, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false, comboOutput = false}) {
     const named = allowedKeys ? seed.map(key => keyIdentity(getModel(), key).name) : seed.slice();
     const opening = openingPick(getModel(), {mode, shortcut: Boolean(shortcut)}, named);
     const keys = opening.keys;
     const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : opening.mods;
-    state.picker = {title, context, contextKeycode, onLayer, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), own: mods.slice(), symbols: {}, layers: shortcut?.layers || 0, layerKind: shortcut?.layers ? shortcut.layerKind || 0 : 0, maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
+    state.picker = {title, context, contextKeycode, onLayer, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), own: mods.slice(), symbols: {}, layers: shortcut?.layers || 0, layerKind: shortcut?.layers ? shortcut.layerKind || 0 : 0, maxKeys, reportKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey, comboOutput};
     render();
 }
 
@@ -232,7 +232,7 @@ export function pickerOverlay() {
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
-                <p class="note">${picker.shortcut ? `For <b>${esc(picker.title)}</b> · ${esc(picker.context || "")}${shortcutLimitWords(model) ? ` · ${esc(shortcutLimitWords(model))}` : ""}` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${esc(picker.maxKeys)} keys to send together.` : "Choose one or more keys." : picker.onLayer ? `For ${picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "a key"} on <b>${esc(picker.onLayer)}</b>`
+                <p class="note">${picker.shortcut ? `For <b>${esc(picker.title)}</b> · ${esc(picker.context || "")}${shortcutLimitWords(model) ? ` · ${esc(shortcutLimitWords(model))}` : ""}` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : picker.reportKeys !== undefined ? `Choose up to ${esc(picker.reportKeys)} keys to send together, and any modifiers.` : Number.isFinite(picker.maxKeys) ? `Choose up to ${esc(picker.maxKeys)} keys to send together.` : "Choose one or more keys." : picker.onLayer ? `For ${picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "a key"} on <b>${esc(picker.onLayer)}</b>`
                 : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
             <input class="input pk-search" id="pickerSearch" data-f="picker:search" aria-label="Search keycodes" placeholder="Search every section" value="${esc(picker.search)}">
             <span class="right"><button class="btn ghost" data-act="cancel">Close</button></span>

@@ -3,6 +3,8 @@
 // encoding. Focus IDs belong to the editor; moves preserve every step object.
 import {describeStep} from "./macro.mjs";
 import {keyIdentity} from "./key-identity.mjs";
+import {vocabulary} from "./vocabulary.mjs";
+import {macroProblemWords, overfillsReport} from "../../rules/macro-payload.mjs";
 /** @typedef {import('./types.js').MacroStep} Step */
 /** @typedef {Partial<import('../../contracts/panel.js').PublishedModel> | null} Model */
 
@@ -21,8 +23,21 @@ export function sequenceIssues(steps, model, label = key => key) {
     const issues = steps.map(() => "");
     /** @type {Map<string, {index: number, key: string}>} */
     const held = new Map();
+    // The report's six key slots (firmware D-F65): known only once the model
+    // names the modifiers, as the step editor's reading is.
+    const modifiers = model?.macroPayloadModifierKeycodes;
+    /** @param {unknown} id */
+    const ordinary = id => Boolean(modifiers) && !modifiers?.includes(/** @type {string} */ (id));
+    const full = macroProblemWords({code: "reportFull"}, vocabulary(model).macroProblems);
     steps.forEach((step, index) => {
-        if (!("keys" in step)) return;
+        if (!("keys" in step)) {
+            if (step.kind === "text" && overfillsReport(held.keys(), 1, ordinary)) issues[index] ||= full;
+            return;
+        }
+        if (step.kind !== "release") {
+            const added = new Set(step.keys.map(key => keyIdentity(model, key).name).filter(id => !held.has(id)));
+            if (overfillsReport(held.keys(), [...added].filter(ordinary).length, ordinary)) issues[index] ||= full;
+        }
         for (const key of step.keys) {
             const id = keyIdentity(model, key).name;
             if (step.kind === "release") {

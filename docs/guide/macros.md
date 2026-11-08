@@ -37,7 +37,8 @@ Add steps with the buttons above the sequence:
 
 - **+ Text** types what you type or paste, exactly: code, braces, line
   breaks, accents and emoji included.
-- **+ Key or chord** taps a key, or up to 16 keys together, such as ⌘C.
+- **+ Key or chord** taps a key, or up to six keys together plus any
+  modifiers, such as ⌘C.
 - **+ Delay** waits, a number of milliseconds (ms).
 - **+ Press** holds a key down, and **+ Release** lets it go.
 
@@ -58,7 +59,11 @@ While you work in the macro editor, ⌘Z and ⇧⌘Z undo and redo whole steps.
 Text fields keep their own typing undo.
 
 A step that can't work, such as a key let go before it was pressed or still
-held at the end, is marked ! and explained. Ark keeps such an edit out of
+held at the end, is marked ! and explained. So is one that would hold more
+than six keys at once besides modifiers: that's all the keyboard can send
+together. Keys still held count with a chord's keys, and text needs one of
+the six free. A macro saved before this limit still loads, and says why it
+can't play. Ark keeps such an edit out of
 your draft until it is fixed, and never loses the last good version: ⌘Z
 takes the edit back. A macro your draft changes has a dot on its slot. In the
 live modes an edit reaches the keyboard once Ark has checked it, and the dot
