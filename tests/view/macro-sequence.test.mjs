@@ -71,5 +71,6 @@ test("a step that would hold more than six keys at once besides modifiers is mar
     assert.equal(sequenceIssues([...six.map(press), press("KC_G")], model)[6], words);
     assert.equal(sequenceIssues([...six.map(press), {kind: "text", text: "z"}, ...six.map(release)], model)[6], words, "text needs a slot of its own");
     assert.equal(sequenceIssues([...six.slice(1).map(press), {kind: "text", text: "z"}, ...six.slice(1).map(release)], model)[5], "");
+    assert.equal(sequenceIssues([...six.map(press), {kind: "text", text: ""}, ...six.map(release)], model)[6], "", "an empty text types nothing, as core reads it");
     assert.deepEqual(sequenceIssues([tap("KC_E", "KC_Y", "KC_K", "KC_SCLN", "KC_P", "KC_0", "KC_U")], null), [""], "without the modifiers, core alone says it");
 });

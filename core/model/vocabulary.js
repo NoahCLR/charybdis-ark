@@ -379,9 +379,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         empty: "An empty {} is not a macro command.",
         noKeys: "A macro command needs at least one key.",
         pressOne: "A press or release names one key; use a tap for a chord.",
-        // A chord past the 16 the keyboard tracks has more than six ordinary
-        // keys too, since there are eight modifiers, so its words say the
-        // six.
+        // A chord, or keys held, past the 16 the keyboard tracks has more
+        // than six ordinary keys too, since there are eight modifiers, so
+        // chord and tooManyHeld say the six.
         chord: `A chord names each key once, and at most ${MACRO_LIMITS.reportKeys} keys besides modifiers.`,
         unknown: "is not a key a macro can send.",
         notHeld: "is released but was never pressed.",

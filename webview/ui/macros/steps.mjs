@@ -3,7 +3,7 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {MAX_KEYS, REPORT_KEYS, describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
+import {MAX_KEYS, describeStep, macroStepsInput, stepKindName} from "../../view/macro.mjs";
 import {withStepFocus} from "../../view/macro-focus.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {appendSequenceStep, moveSequenceStep, sequenceFace, sequenceInsertionAt, sequenceIssues} from "../../view/macro-sequence.mjs";
@@ -73,7 +73,7 @@ export function insertStep(model, slot, steps, kind) {
     if (kind === "text") insert({kind, text: ""});
     else if (kind === "delay") insert({kind, delay: 120});
     else openPicker({title: stepKindName(model, kind), contextKeycode: slot.keycode,
-        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? MAX_KEYS : 1, reportKeys: kind === "tap" ? REPORT_KEYS : undefined,
+        mode: "list", seed: [], allowedKeys: model.macroPayloadKeycodes, maxKeys: kind === "tap" ? MAX_KEYS : 1, reportSlots: kind === "tap",
         onPick: expression => insert({kind, keys: expression.split(",").map(key => key.trim()).filter(Boolean)}),
     });
 }
@@ -227,7 +227,7 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
         /** @type {HTMLElement | null} */ (document.querySelector(`[data-step-id="${CSS.escape(step.focusId || "")}"]`))?.focus();
     });
     /** @type {HTMLElement | null} */ (node.querySelector("[data-pick-step]"))?.addEventListener("click", () => openPicker({
-        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? MAX_KEYS : 1, reportKeys: step.kind === "tap" ? REPORT_KEYS : undefined,
+        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? MAX_KEYS : 1, reportSlots: step.kind === "tap",
         onPick: expression => {
             const next = macroForm(slot.keycode).steps ?? steps;
             saveSteps(slot, next.map((item, at) => at === index ? {...item, keys: expression.split(",").map(key => key.trim()).filter(Boolean)} : item), true); render();

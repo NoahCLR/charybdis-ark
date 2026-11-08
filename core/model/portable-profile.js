@@ -84,7 +84,7 @@ function validateMacro(bytes, {textEntry = false, layout} = {}) {
             const k = bytes[index++];
             if (![1, 2, 3].includes(type) || !key(k)) throw fail("A macro in this profile presses a key the keyboard cannot play.");
             if (type === 1 && held.has(k)) throw fail("A macro in this profile taps a key it is already holding.");
-            if (type === 2) {if (held.has(k) || held.size >= MACRO_LIMITS.maxHeldKeys) throw fail(`A macro in this profile holds a key it is already holding, or more than ${MACRO_LIMITS.maxHeldKeys} keys at once.`); held.add(k);}
+            if (type === 2) {if (held.has(k) || held.size >= MACRO_LIMITS.maxHeldKeys) throw fail("A macro in this profile holds a key it is already holding, or more keys at once than the keyboard can track."); held.add(k);}
             if (type === 3 && !held.delete(k)) throw fail("A macro in this profile releases a key it is not holding.");
         }
     }

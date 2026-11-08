@@ -38,7 +38,7 @@ function macroModifierKeycodes() {
 let sendableNames;
 /** @param {string} name */
 const sendable = name => (sendableNames ??= new Set(macroKeycodes())).has(name);
-/** @param {unknown} payload @param {import("./types.js").MacroOptions & {reportSlots?: boolean}} [options] @returns {import("./types.js").MacroStep[]} */
+/** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] @returns {import("./types.js").MacroStep[]} */
 function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT, reportSlots = false} = {}) {
     if (typeof payload !== "string") throw fail("Enter a macro as text.");
     const {steps, error} = readMacroPayload(payload, {

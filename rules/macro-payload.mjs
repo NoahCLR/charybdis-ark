@@ -37,12 +37,19 @@ export const MACRO_PROBLEM_CODES = Object.freeze(/** @type {const} */ (["unexpec
  */
 
 /**
- * Whether `more` ordinary keys on top of the held ones overfill the report's
- * key slots: a modifier has the report's own byte. Every reader of a macro's
- * steps counts them here.
- * @param {Iterable<unknown>} held @param {number} more @param {(id: unknown) => boolean} ordinary
+ * Whether a step overfills the report's key slots with the keys held before
+ * it: a modifier has the report's own byte, a key already held takes no
+ * second slot, and text needs a slot of its own for the key typing it. Every
+ * reader of a macro's steps, and the chord picker, counts them here.
+ * @param {Iterable<unknown>} held @param {{kind: string, ids?: readonly unknown[], text?: string}} step @param {(id: unknown) => boolean} ordinary
  */
-export const overfillsReport = (held, more, ordinary) => [...held].filter(ordinary).length + more > MACRO_LIMITS.reportKeys;
+export function overfillsReport(held, step, ordinary) {
+    const holding = new Set(held);
+    const adds = step.kind === "text" ? (step.text ? 1 : 0)
+        : step.kind === "tap" || step.kind === "press" ? new Set((step.ids || []).filter((id) => ordinary(id) && !holding.has(id))).size
+        : 0;
+    return adds > 0 && [...holding].filter(ordinary).length + adds > MACRO_LIMITS.reportKeys;
+}
 
 /**
  * Why a macro does not read, in a reader's words for each reason (core's
@@ -81,8 +88,8 @@ export function readMacroPayload(source, reading) {
     const fail = (code, key) => ({steps, error: key === undefined ? {code} : {code, key}});
     /** @param {unknown} id */
     const ordinary = (id) => Boolean(reading.ordinary?.(id));
-    /** @param {number} more */
-    const overfills = (more) => Boolean(reading.reportSlots) && overfillsReport(held, more, ordinary);
+    /** @param {Parameters<typeof overfillsReport>[1]} step */
+    const overfills = (step) => Boolean(reading.reportSlots) && overfillsReport(held, step, ordinary);
     for (let index = 0; index < source.length;) {
         const code = /** @type {number} */ (source.codePointAt(index));
         const character = String.fromCodePoint(code);
@@ -94,7 +101,7 @@ export function readMacroPayload(source, reading) {
             text += character;
             continue;
         }
-        if (text && overfills(1)) return fail("reportFull");
+        if (overfills({kind: "text", text})) return fail("reportFull");
         if (flush()) return fail("textHold");
         const end = source.indexOf("}", index);
         if (end < 0) return fail("missingClose");
@@ -119,12 +126,12 @@ export function readMacroPayload(source, reading) {
         } else {
             if (ids.some((id) => held.has(id))) return fail("heldAgain");
             if (held.size + keys.length > MACRO_LIMITS.maxHeldKeys) return fail("tooManyHeld");
-            if (overfills(ids.filter(ordinary).length)) return fail("reportFull");
+            if (overfills({kind, ids})) return fail("reportFull");
             if (kind === "press") held.add(ids[0]);
         }
         steps.push({kind, keys, ids});
     }
-    if (text && overfills(1)) return fail("reportFull");
+    if (overfills({kind: "text", text})) return fail("reportFull");
     if (flush() || textHold) return {steps, error: {code: "textHold"}};
     if (reading.releaseAll && held.size) return {steps, error: {code: "stillHeld"}};
     return {steps, error: null};

@@ -55,6 +55,13 @@ export const macroUnit = (index) => `macro:${index}`;
 // D-F65).
 export const MAX_DELAY = MACRO_LIMITS.maxDelayMs, MAX_KEYS = MACRO_LIMITS.maxHeldKeys, REPORT_KEYS = MACRO_LIMITS.reportKeys;
 
+// Whether a key is an ordinary key, not a modifier, by the modifier names the
+// model publishes (macroPayloadModifierKeycodes, every alias included). Without
+// them no key is ordinary, and core alone says what an ordinary key may not
+// do. Every interface reader of a macro asks here.
+/** @param {readonly string[] | null | undefined} modifierKeys @returns {(key: unknown) => boolean} */
+export const ordinaryKey = (modifierKeys) => (key) => Boolean(modifierKeys) && !modifierKeys?.includes(/** @type {string} */ (key));
+
 // A macro's steps, as far as they read, and what is wrong in words: the shared
 // grammar read by key name, a key known by its alias's name, and only the keys
 // a macro can send when the model lists them. Text that needs Unicode entry
@@ -72,7 +79,7 @@ export function parseMacro(payload, options = {}) {
         sendable: (key) => !allowed || allowed.has(key),
         textEntry: options.textEntry,
         needsEntry: (character) => options.layoutChars ? !options.layoutChars.includes(character) : /[^\x00-\x7F]/u.test(character),
-        ordinary: (key) => Boolean(options.modifierKeys) && !options.modifierKeys?.includes(/** @type {string} */ (key)),
+        ordinary: ordinaryKey(options.modifierKeys),
         skipEmptyNames: true, reportSlots: true,
     });
     /** @type {MacroStep[]} */
