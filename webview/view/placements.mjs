@@ -3,10 +3,11 @@
 // as a combo's output, and that said in one line. Pure, from #156's Trackball
 // rules; Pointer uses it for the sniping keys.
 
-import {layerCalled} from "./vocabulary.mjs";
+import {layerCalled, phrasesJoined} from "./vocabulary.mjs";
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {import("../../contracts/panel.js").PublishedModel} PublishedModel */
+/** @typedef {import("./vocabulary.mjs").Phrase} Phrase */
 /** @typedef {{keys: {layer: PublishedModel["layers"][number], position: import("../../contracts/panel.js").Position}[], behaviours: PublishedModel["keyBehaviors"], combos: PublishedModel["combos"], layers: string[]}} Placements */
 
 // A name is matched by the value the keyboard stores too, as a position keeps
@@ -35,23 +36,21 @@ export function keycodePlacements(model, names) {
 /** @param {number} count @param {string} one */
 const plural = (count, one) => `${count} ${one}${count === 1 ? "" : "s"}`;
 // The layers keys are on, each with how many: "Base · 2 keys".
-/** @param {Placements["keys"]} keys */
+/** @param {Placements["keys"]} keys @returns {Phrase[]} */
 function keysByLayer(keys) {
-    /** @type {Map<string, number>} */
+    /** @type {Map<number, {layer: Placements["keys"][number]["layer"], count: number}>} */
     const counts = new Map();
-    for (const {layer} of keys) {
-        const name = layerCalled(layer);
-        counts.set(name, (counts.get(name) || 0) + 1);
-    }
-    return [...counts].map(([name, count]) => `${name} · ${plural(count, "key")}`);
+    for (const {layer} of keys) counts.set(layer.index, {layer, count: (counts.get(layer.index)?.count || 0) + 1});
+    return [...counts.values()].map(({layer, count}) => [{layer}, ` · ${plural(count, "key")}`]);
 }
 
 // The layers its keys are on and how many, then the behaviours and combos
-// that send it. Nothing at all reads as "Not placed".
-/** @param {Placements} placements */
+// that send it, as a phrase (Settings marks the layers). Nothing at all reads
+// as "Not placed".
+/** @param {Placements} placements @returns {Phrase} */
 export function reachLine({keys, behaviours, combos}) {
     const parts = keysByLayer(keys);
-    if (behaviours.length) parts.push(`${plural(behaviours.length, "behaviour")}`);
-    if (combos.length) parts.push(`${plural(combos.length, "combo")}`);
-    return parts.length ? parts.join(", ") : "Not placed";
+    if (behaviours.length) parts.push([plural(behaviours.length, "behaviour")]);
+    if (combos.length) parts.push([plural(combos.length, "combo")]);
+    return parts.length ? phrasesJoined(parts, ", ") : ["Not placed"];
 }

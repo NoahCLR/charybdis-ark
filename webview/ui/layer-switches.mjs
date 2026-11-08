@@ -11,9 +11,8 @@
 import {el, esc} from "../lib/dom.mjs";
 import {layers} from "../store.mjs";
 import {foldEmptyLayers} from "../view/empty-layers.mjs";
-import {layerCalled} from "../view/vocabulary.mjs";
 import {emptyLayersShown, emptyLayersToggle, wireEmptyLayers} from "./empty-layers.mjs";
-import {marked} from "./marks.mjs";
+import {layerMarked, marked} from "./marks.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel} Model
@@ -27,7 +26,7 @@ import {marked} from "./marks.mjs";
 /** @param {Model | null} model @param {number} index @param {string} label */
 function layerNamed(model, index, label) {
     const layer = layers().find((candidate) => candidate.index === index);
-    return layer ? marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer))
+    return layer ? layerMarked(model, layer)
         : marked(model, index >= 0 ? {kind: "layer", layer: index} : undefined, label);
 }
 

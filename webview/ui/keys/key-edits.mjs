@@ -20,7 +20,7 @@ export function pickKeycodeFor(layoutIndex) {
         // Named as the board names the key, never by its layout index.
         title: `Key on ${layerCalled(layer)}`,
         contextKeycode: position ? keyMeaning(position) : undefined,
-        onLayer: layerCalled(layer),
+        onLayer: layer.index,
         seed: position ? [keyMeaning(position)] : [],
         layoutKey: true,
         onPick: (expression) => {

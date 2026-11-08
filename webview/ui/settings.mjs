@@ -17,7 +17,7 @@ import {editGate} from "../view/edit-gate.mjs";
 import {layerCalled} from "../view/vocabulary.mjs";
 import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {marked} from "./marks.mjs";
+import {layerMarked, marked, phraseMarked} from "./marks.mjs";
 import {githubMark} from "../view/shell-panel.mjs";
 import {keyIdentity} from "../view/key-identity.mjs";
 import {keycodePlacements, reachLine} from "../view/placements.mjs";
@@ -213,7 +213,7 @@ function sectionCard(model, section, canEdit, {extra} = {}) {
 // mark, as everywhere a layer is named (D-L31).
 /** @param {Model | null} model @param {Field} field @param {import("../../contracts/panel.js").Layer | undefined} layer */
 const layerCell = (model, field, layer) => layer
-    ? marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer))
+    ? layerMarked(model, layer)
     : marked(model, field.governs, field.label);
 
 // A section's one-per-layer switches as one row of layers (layer-switches.mjs).
@@ -297,7 +297,7 @@ function snipingKeys(model, canEdit) {
     for (const [keycode, how] of [["SNIPING", "Sniping is on while this key is held."], ["SNP_TOG", "One press turns sniping on, the next turns it off."]]) {
         const words = keyIdentity(model, keycode).label;
         const row = el(`<div class="setrow sniping-key" data-tip="${esc(`${how} ${SNIPING_SLOWS}`)}">
-            <div><div class="nm">${esc(words)}</div><div class="hint">${esc(reachLine(keycodePlacements(model, [keycode])))}</div></div>
+            <div><div class="nm">${esc(words)}</div><div class="hint">${phraseMarked(model, reachLine(keycodePlacements(model, [keycode])))}</div></div>
             <div class="control"><button class="btn tiny link" data-place="${esc(keycode)}" ${canEdit ? "" : "disabled"}>Place on a key →</button></div></div>`);
         /** @type {HTMLButtonElement} */ (row.querySelector("[data-place]")).addEventListener("click", () => {
             state.placement = {keycode};

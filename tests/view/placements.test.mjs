@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {said} from "../../webview/view/vocabulary.mjs";
 import {createRequire} from "node:module";
 import {keycodePlacements, reachLine} from "../../webview/view/placements.mjs";
 import {deleteBehaviour, saveBehaviour} from "../../webview/view/edits.mjs";
@@ -18,16 +19,18 @@ test("a key is found on layers, behaviours and combos, by its name or the value 
     assert.equal(found.keys.length, 2);
     assert.equal(found.behaviours.length, 1);
     assert.equal(found.combos.length, 1);
-    assert.equal(reachLine(found), "Base · 1 key, Navigation · 1 key, 1 behaviour, 1 combo");
+    assert.equal(said(reachLine(found)), "Base · 1 key, Navigation · 1 key, 1 behaviour, 1 combo");
     // A keyboard may name the value by another of its catalogue names.
     const toggle = model.layers[3].positions[0];
     assert.ok(model.qmkKeycodes.find((/** @type {{value: string}} */ entry) => entry.value === "SNP_TOG").aliases.includes("QK_KB_5"));
     const renamed = {...model, layers: model.layers.map((/** @type {any} */ layer) => layer.index === 3 ? {...layer, positions: [{...toggle, keycode: "QK_KB_5", semantic: undefined}]} : layer)};
     assert.equal(keycodePlacements(renamed, ["SNIPING", "SNP_TOG"]).keys.length, 2, "QK_KB_5 is SNP_TOG by value");
-    assert.equal(reachLine({keys: [], behaviours: [], combos: [], layers: []}), "Not placed");
+    assert.equal(said(reachLine({keys: [], behaviours: [], combos: [], layers: []})), "Not placed");
 });
 
 test("keys are counted layer by layer", () => {
     const found = keycodePlacements(model, ["SNIPING", "SNP_TOG", "PD_MODE_4"]);
-    assert.equal(reachLine({...found, behaviours: [], combos: []}), "Base · 1 key, Navigation · 2 keys");
+    assert.equal(said(reachLine({...found, behaviours: [], combos: []})), "Base · 1 key, Navigation · 2 keys");
+    const say = {layer: (/** @type {any} */ layer) => `[${layer?.displayName}]`, text: (/** @type {string} */ words) => words};
+    assert.equal(said(reachLine({...found, behaviours: [], combos: []}), say), "[Base] · 1 key, [Navigation] · 2 keys", "each layer as the screen names it");
 });

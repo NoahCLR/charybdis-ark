@@ -18,7 +18,7 @@ import {inheritsStageColour} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 import {pickButton} from "../groups.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
-import {marked} from "../marks.mjs";
+import {marked, phraseMarked} from "../marks.mjs";
 
 /** @typedef {import("../../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {import("../../../contracts/panel.js").Accent} Accent */
@@ -149,9 +149,9 @@ export function accentsSection(model, stage) {
     const editing = editingOn(model, stage);
     const name = ownerCalled(model, target, owner);
     const node = el(`<section class="span accents" data-accents="${esc(target)}">
-        <div class="sect-h"><h4>${name ? `Accents · ${esc(name)}` : "Accents"}</h4>
+        <div class="sect-h"><h4>${name ? `Accents · ${marked(model, ownerMark(model, target, owner), name)}` : "Accents"}</h4>
         <span class="right"><button class="btn tiny" data-act="add" ${canEdit && !editing ? "" : "disabled"}>Add accent</button></span></div>
-        <p class="note">${esc(accentsWhen(model, target, owner))}</p></section>`);
+        <p class="note">${phraseMarked(model, accentsWhen(model, target, owner))}</p></section>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="add"]')).addEventListener("click", () => {
         state.accent = {stage, target, every: false, index: null, leds: [], colour: standingOut(model, stageShade(model, target, owner, picked())), stageColour: false, adding: true};
         render();

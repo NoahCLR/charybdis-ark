@@ -7,7 +7,7 @@ import {whatReachesSlot} from "../../view/pointing-reach.mjs";
 import {post} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
 import * as edits from "../../view/edits.mjs";
-import {actionMarked, mark} from "../marks.mjs";
+import {actionMarked, layerMarked, mark} from "../marks.mjs";
 import {listed} from "../../view/vocabulary.mjs";
 import {movementChoice} from "./movement-choice.mjs";
 import {placeButton} from "./keys-and-light.mjs";
@@ -22,11 +22,12 @@ function inertNote(model, slot) {
     const {keys, behaviours, combos, layers} = whatReachesSlot(model, slot);
     if (!keys.length && !behaviours.length && !combos.length) return "";
     const parts = [];
-    if (keys.length) parts.push(`${keys.length} key${keys.length === 1 ? "" : "s"} on ${esc(layers.join(", "))}`);
+    if (keys.length) parts.push(`${keys.length} key${keys.length === 1 ? "" : "s"} on ${layers.map((layer) => layerMarked(model, layer)).join(", ")}`);
     if (behaviours.length) parts.push(`${behaviours.length} behaviour${behaviours.length === 1 ? "" : "s"} (${behaviours.map((row) => actionMarked(model, row.keycode)).join(", ")})`);
     if (combos.length) parts.push(`${combos.length} combo output${combos.length === 1 ? "" : "s"} (${esc(combos.map((row) => row.badge).join(", "))})`);
     const one = keys.length + behaviours.length + combos.length === 1;
-    return `<div class="unavailable">${listed(parts)} still ${one ? "reaches" : "reach"} this slot. The keyboard refuses to activate an empty slot, so ${one ? "it does" : "they do"} nothing until it holds a mode — ${one ? "it does" : "they do"} not need to be removed first.</div>`;
+    // One span, so the layers' marks run in the sentence, not as rows of the box's grid.
+    return `<div class="unavailable"><span>${listed(parts)} still ${one ? "reaches" : "reach"} this slot. The keyboard refuses to activate an empty slot, so ${one ? "it does" : "they do"} nothing until it holds a mode — ${one ? "it does" : "they do"} not need to be removed first.</span></div>`;
 }
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {import("../surface-types.js").PresentedSlot[]} slots */

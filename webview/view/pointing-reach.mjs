@@ -7,7 +7,6 @@ import {keyIdentity, slotKeycodeNames, slotKeycodes} from "./key-identity.mjs";
 import {viewLayers} from "./layer-resolution.mjs";
 import {placementsBy, reachGroups, reachInView} from "./reach.mjs";
 import {comboOutput} from "./combo-reach.mjs";
-import {layerCalled} from "./vocabulary.mjs";
 import {linkStartHolds} from "../../rules/pointing-link-starts.mjs";
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("./keyface-types.js").PointingSlot} PointingSlot */
@@ -139,13 +138,13 @@ export function whatReachesSlot(model, slot) {
         if (values.has(entry.keycode)) [entry.value, ...(entry.aliases || [])].forEach((name) => names.add(name));
     }
     const keys = [];
-    /** @type {Set<string>} */
+    /** @type {Set<import("../../contracts/panel.js").Layer>} */
     const layers = new Set();
     for (const layer of model?.layers || []) {
         for (const position of layer.positions || []) {
             if (!names.has(position.keycode) && !(position.value !== undefined && values.has(position.value))) continue;
             keys.push({layer, position});
-            layers.add(layerCalled(layer));
+            layers.add(layer);
         }
     }
     const behaviours = (model?.keyBehaviors || []).filter((row) => (row.steps || []).some((step) =>

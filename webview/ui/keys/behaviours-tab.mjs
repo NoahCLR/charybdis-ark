@@ -9,30 +9,28 @@ import {el, esc} from "../../lib/dom.mjs";
 import {behaviourTiers} from "../../view/keyface.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {currentLayer, currentView, getModel, render, selectedPosition, state} from "../../store.mjs";
-import {layerCalled} from "../../view/vocabulary.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {reachTable} from "../groups.mjs";
 import {setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {tabReach} from "../../view/tab-reach.mjs";
-import {actionMarked, comboInputsMarked, tierDot} from "../marks.mjs";
+import {actionMarked, comboInputsMarked, layerMarked, tierDot} from "../marks.mjs";
 import {behaviourEditor} from "./behaviour-editor.mjs";
 import {behaviourKey, behaviourRoute, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {sourceLabel} from "./reach.mjs";
 
 // The combos that send a behaviour, by badge and chord; one that needs a
 // transparent key names the layer answering for it. Markup, as every row's
-// note is, so the chord's keys carry their layer marks.
+// note is, so the chord's keys and the answering layers carry their marks.
 /** @param {Pick<import("../../view/keyface-types.js").BehaviourInView, "combos">} entry */
 const comboNote = (entry) => entry.combos.map(({combo, keys}) => {
-    const sources = [...new Set(keys.filter((key) => key.fellThrough)
-        .map((key) => esc(layerCalled(key.layer)) + (key.whileHeld ? " when held" : "")))];
+    const sources = [...new Set(keys.filter((key) => key.fellThrough).map(sourceLabel))];
     return `combo ${esc(combo.badge)} · ${comboInputsMarked(getModel(), combo)}${sources.length ? ` · on ${sources.join(", ")}` : ""}`;
 }).join(", ");
 /** @param {Pick<import("../../view/keyface-types.js").BehaviourInView, "keys" | "combos">} entry */
 const viewBehaviourNote = (entry) => {
     const indexes = [...new Set(entry.keys.map((key) => key.position.layoutIndex))];
-    const sources = [...new Set(entry.keys.filter((key) => key.fellThrough).map((key) => esc(layerCalled(key.layer))))];
+    const sources = [...new Set(entry.keys.filter((key) => key.fellThrough).map((key) => layerMarked(getModel(), key.layer)))];
     // The row is titled with its key; more than one position is counted, and
     // the board rings them all when the row is picked.
     return [indexes.length > 1 ? `${indexes.length} keys` : "", sources.length ? `on ${sources.join(", ")}` : "",
@@ -49,8 +47,8 @@ function followedBelow(behaviour) {
     if (!followed.from || followed.keycode !== state.behaviourRow) return "";
     const model = getModel();
     const name = actionMarked(model, behaviour.keycode);
-    return `<p class="note beh-note">Shown through from <b>${esc(layerCalled(followed.from))}</b>${currentView().previewing ? " in this preview" : ""}:
-        the selected key on <b>${esc(layerCalled(currentLayer()))}</b> is transparent. A change here applies wherever ${name} is pressed.</p>`;
+    return `<p class="note beh-note">Shown through from <b>${layerMarked(model, followed.from)}</b>${currentView().previewing ? " in this preview" : ""}:
+        the selected key on <b>${layerMarked(model, currentLayer())}</b> is transparent. A change here applies wherever ${name} is pressed.</p>`;
 }
 
 /** @param {HTMLElement} body @param {HTMLElement} right */

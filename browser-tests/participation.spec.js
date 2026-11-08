@@ -151,11 +151,18 @@ test("a key whose behaviour is switched off for it on this layer shows no dots t
     await expect(card).toContainText("Key behaviour not used");
     await expect(card).toContainText(why);
     await expect(card.locator(".hc-branch")).toHaveCount(0);
+    expect(await card.locator(".hc-off .hc-sub").first().evaluate((node) => node.querySelectorAll(".kind-icon.layer").length), "the reason marks its layer").toBe(1);
+    // Its brackets keep to the mark's line, so a wrap leaves no "(" behind.
+    await expect(card.locator(".hc-off .hc-sub .mk-glued").first()).toHaveText(`(${found.name})`);
 
     const body = page.locator(".bench-body");
     await expect(body.locator("h4").first()).toHaveText(`This key on this layer (${found.name})`);
     await expect(body.locator('.key-reaches [data-goto="behaviours"]')).toContainText(`not used: ${why}`);
     await expect(body.locator(".key-participation")).toContainText(`Behaviour and combos for this key on this layer (${found.name})`);
     await expect(body.locator(".key-participation")).toContainText("For every key, use the behaviour's or combo's own switch; for a whole layer, Settings.");
+    // Each reason names its layer by its icon, as the heading above it does.
+    const layerIcons = (/** @type {Element} */ node) => node.querySelectorAll(".kind-icon.layer").length;
+    expect(await body.locator('.key-reaches [data-goto="behaviours"] .dim').evaluate(layerIcons)).toBe(1);
+    expect(await body.locator(".key-participation .note", {hasText: "Behaviour: "}).evaluate(layerIcons)).toBe(1);
     expect(errors).toEqual([]);
 });

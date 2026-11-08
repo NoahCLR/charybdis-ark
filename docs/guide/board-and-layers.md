@@ -127,8 +127,10 @@ every layer as before.
 A key's name that doesn't fit its cap on one line takes two, such as
 **Slot 6** over **hold (empty)**, rather than shrinking out of reading.
 
-Where Ark names a layer in passing (a key's name, a combo, the review), a
-small drawing of the board in the layer's colour sits before its name. A
+Wherever Ark names a layer in its words (a key's name, a combo, the review,
+what reaches a key, a note, a heading, why a behaviour or combo is not used,
+or the caption under the board), a small drawing of the board in the layer's
+colour sits before its name. A
 pointing mode has the Pointing modes icon in its light. A grey icon means
 that colour, or its lighting, is off. A macro has the robot and a custom key
 the square with a plus, in the colour of the words. Lists of layers alone, such as these

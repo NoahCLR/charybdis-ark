@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {said} from "../../webview/view/vocabulary.mjs";
 import {createRequire} from "node:module";
 import {keyBehaviour, keyReach, keyReachAt} from "../../webview/view/key-reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
@@ -47,16 +48,16 @@ test("a row that changes nothing says so, and why, in place of its details", () 
 test("a dual-role key leads with its tap / hold, waiting the row's threshold only while the row runs", () => {
     const plain = card(4);
     assert.deepEqual(plain.role, {tap: "F", hold: {layer: 2, name: "Symbols"}});
-    assert.deepEqual(plain.lead, {kind: "tapHold", term: defaultTerm, holdAction: "MO(2)", note: ""}, "a layer-tap holds its layer as the grid's Hold does");
-    assert.deepEqual(card(5).lead, {kind: "tapHold", term: defaultTerm, holdAction: "", note: ""}, "a mod-tap holds its modifier");
+    assert.deepEqual(plain.lead, {kind: "tapHold", term: defaultTerm, holdAction: "MO(2)", note: []}, "a layer-tap holds its layer as the grid's Hold does");
+    assert.deepEqual(card(5).lead, {kind: "tapHold", term: defaultTerm, holdAction: "", note: []}, "a mod-tap holds its modifier");
 
     const timed = card(6);
     assert.equal(timed.lead?.kind === "tapHold" && timed.lead.term.ms, "250", "a row with no branches still waits its own threshold");
     assert.equal(timed.branches, false, "and shows no branch section");
 
     const off = card(7);
-    assert.deepEqual(off.lead, {kind: "tapHold", term: defaultTerm, holdAction: "",
-        note: `Its behaviour is not used: ${off.use.reasons.join("; ")}. The key keeps this tap and hold.`}, "a row that does not run is ignored, its threshold with it");
+    assert.deepEqual(off.lead?.kind === "tapHold" && {...off.lead, note: said(off.lead.note)}, {kind: "tapHold", term: defaultTerm, holdAction: "",
+        note: `Its behaviour is not used: ${off.use.reasons.map((reason) => said(reason)).join("; ")}. The key keeps this tap and hold.`}, "a row that does not run is ignored, its threshold with it");
     assert.equal(off.branches, false);
 
     const branched = card(8);

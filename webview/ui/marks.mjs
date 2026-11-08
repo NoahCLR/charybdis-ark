@@ -23,7 +23,7 @@ import {layerTapAction, namedAction} from "../view/named-action.mjs";
 import {keyIdentity, reachKind, slotKeycodeNames} from "../view/key-identity.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {REACH_ICONS} from "../view/screens.mjs";
-import {layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
+import {layerAt, layerCalled, layerCalledAt, vocabulary} from "../view/vocabulary.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 
@@ -272,6 +272,33 @@ export const marked = (model, value, text, {slot = false} = {}) => {
     if (slot) return `<span class="mk"><span class="mk-slot">${shown}</span><span>${esc(text)}</span></span>`;
     return shown ? `<span class="mk">${shown}<span>${esc(text)}</span></span>` : esc(text);
 };
+
+// A layer named in the words around it: its mark, then its name, wherever a
+// sentence, note or heading refers to it (D-L31). No layer reads as nothing.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {{index: number, displayName?: string, name?: string} | null | undefined} layer */
+export const layerMarked = (model, layer) => layer ? marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer)) : "";
+// The same for the layer with this index.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} index */
+export const layerMarkedAt = (model, index) => layerMarked(model, layerAt(model, index));
+// Words the view writes (a Phrase, view/vocabulary.mjs) as markup: each layer
+// by its mark, every other word escaped. A bracket opening on a layer and the
+// punctuation closing after it stay on its line ("(▦ Base).", .mk-glued), or
+// a wrap leaves the bracket alone at a line's end.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../view/vocabulary.mjs").Phrase} phrase */
+export function phraseMarked(model, phrase) {
+    let html = "", taken = 0;
+    phrase.forEach((part, at) => {
+        if (typeof part === "string") { html += esc(part.slice(taken)); taken = 0; return; }
+        const opens = html.endsWith("(") ? "(" : "";
+        if (opens) html = html.slice(0, -1);
+        const next = phrase[at + 1];
+        const closes = typeof next === "string" ? /^[).,;:]*/.exec(next)?.[0] ?? "" : "";
+        taken = closes.length;
+        const mark = layerMarked(model, part.layer);
+        html += opens || closes ? `<span class="mk-glued">${opens}${mark}${esc(closes)}</span>` : mark;
+    });
+    return html;
+}
 
 // A macro step's mark: ↓ held, ↑ let go, a dot tapped, a quote typed and a
 // clock waited. The macro editor's tiles and every chip of steps share it.

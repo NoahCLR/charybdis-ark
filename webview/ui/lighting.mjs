@@ -7,7 +7,7 @@
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
-import {stageOrder} from "../view/vocabulary.mjs";
+import {said, stageOrder} from "../view/vocabulary.mjs";
 import {currentLayer, currentView, getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import * as edits from "../view/edits.mjs";
@@ -22,6 +22,7 @@ import {accentPicks, editingOn, glowShown, pickLed} from "./lighting/accents.mjs
 import {holdComboFrom} from "../view/combo-held.mjs";
 import {lightingBoard} from "../view/lighting-board.mjs";
 import {durationControl} from "./duration.mjs";
+import {phraseMarked} from "./marks.mjs";
 import {sectionsIn} from "../view/settings-layout.mjs";
 
 export function screenLighting() {
@@ -78,9 +79,9 @@ export function screenLighting() {
     // instructions take a row under the board instead, so none of them is cut.
     const foot = el(`<div class="board-foot">
         <b>${editing ? "Picking LEDs" : "Preview"}</b>
-        <span class="board-foot-text"${editing ? ` data-tip="${esc(shows.caption)}"` : ""}>${editing
+        <span class="board-foot-text"${editing ? ` data-tip="${esc(said(shows.caption))}"` : ""}>${editing
             ? `Click or drag across keys to pick the accent's LEDs, or take them back · ${esc(editing.leds.length)} picked`
-            : esc(shows.caption)}</span>
+            : phraseMarked(model, shows.caption)}</span>
     </div>`);
     if (editing) card.appendChild(foot); else drawn.appendChild(foot);
     // The same strip as Keys, Rename & Reorder included: a layer is renamed
