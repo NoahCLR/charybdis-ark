@@ -21,7 +21,8 @@ export function definitionControls(layers, definition, editable, changed, identi
     const words = vocabulary(getModel()).definitionFields;
     const open = foldOpen(PLACE);
     // Two controls, no box of their own: they sit in the row their editor
-    // lays them in (display: contents).
+    // lays them in (display: contents). The combo builder, a grid of fields,
+    // gives them a row of their own instead (styles.css, .combo-builder).
     const node = el(`<div class="def-controls">
         <label class="sw" data-tip="Off, this ${noun} keeps its actions and timing but does nothing until it is on again."><input type="checkbox" data-f="${esc(identity)}:enabled" data-definition-enabled ${definition.enabled !== false ? "checked" : ""} ${editable ? "" : "disabled"}>
             <span class="track"></span><span class="txt">${esc(words.use[noun])}</span></label>

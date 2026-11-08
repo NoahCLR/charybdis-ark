@@ -271,6 +271,26 @@ test("Layers it runs on is one list on every editor: a layer to a row, one width
     expect(new Set(panels.map(([, panelWidth]) => panelWidth)).size, JSON.stringify(panels)).toBe(1);
 });
 
+test("a combo's Layers it runs on sits on the Use this combo row, kept to the builder's right edge, its panel opening from there", async ({page}) => {
+    for (const width of [1024, 1280, 1920]) {
+        await page.setViewportSize({width, height: 1000});
+        const row = PANEL_EDITORS[0];
+        const panel = await openPanel(page, row);
+        const at = await page.locator(row.editor).evaluate(builder => {
+            const middle = (/** @type {Element} */ node) => { const box = node.getBoundingClientRect(); return box.top + box.height / 2; };
+            const body = /** @type {HTMLElement} */ (builder.querySelector(".card-b"));
+            const inner = body.getBoundingClientRect().right - parseFloat(getComputedStyle(body).paddingRight);
+            const use = /** @type {Element} */ (builder.querySelector("[data-definition-enabled]")).closest(".sw");
+            const layers = /** @type {Element} */ (builder.querySelector('[data-act="definition-layers"]'));
+            return {use: middle(/** @type {Element} */ (use)), layers: middle(layers), right: layers.getBoundingClientRect().right, inner};
+        });
+        expect(Math.abs(at.use - at.layers), `one row at ${width}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(at.right - at.inner), `right edge at ${width}`).toBeLessThanOrEqual(1);
+        const {right} = await panelEdges(panel);
+        expect(Math.abs(right - at.right), `panel from the button's right at ${width}`).toBeLessThanOrEqual(1);
+    }
+});
+
 test("Layers it runs on shows whole with its empty layers unfolded, never cut off by the workbench", async ({page}) => {
     await page.setViewportSize({width: 1920, height: 1000});
     for (const row of PANEL_EDITORS) {
