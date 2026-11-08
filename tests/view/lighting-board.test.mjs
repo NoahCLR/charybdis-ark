@@ -15,6 +15,9 @@ test("off Pointing modes and Combo feedback the board shows the view as it is, r
     const board = shows(view);
     assert.deepEqual([board.shown, board.held, board.pdActive, board.comboActive], [view, null, null, null]);
     assert.equal(board.caption, "Base over the background effect");
+    // A layer above the base is said as the Keymap's preview says it, base included.
+    assert.equal(shows(layerView(model, 5, [])).caption, "Function on top of Base, over the background effect");
+    assert.equal(shows(layerView(model, 5, [1, 4])).caption, "Function on top of Pointing, Number and Base, over the background effect");
 });
 
 test("on Pointing modes the board runs the picked mode from its trigger key, and an empty slot runs nothing", () => {

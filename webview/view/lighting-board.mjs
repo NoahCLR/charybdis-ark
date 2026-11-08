@@ -8,7 +8,7 @@
 
 import {comboHeld, viewWhileHeld} from "./combo-held.mjs";
 import {pdColourRow, pdTrigger, stageEnabled} from "./lighting.mjs";
-import {layerCalled, layerCalledAt, listed, slotCalled, vocabulary, word} from "./vocabulary.mjs";
+import {layerCalledAt, layersOnTop, listed, slotCalled, vocabulary, word} from "./vocabulary.mjs";
 
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
 /** @typedef {import("./types.js").LightOptions} LightOptions */
@@ -41,8 +41,9 @@ export function lightingBoard(view, {stage, pointingSlot, comboPreview}) {
     const comboActive = held?.active ?? null;
     /** @param {string | undefined} locality */
     const area = (locality) => word(vocabulary(model).localities, locality).toLowerCase();
-    const on = shown.held.filter((at) => at > 0).reverse().map((at) => layerCalled(shown.stack[at]));
-    const parts = [`${layerCalled(shown.layer)}${on.length ? ` with ${listed(on)} on` : ""} over the background effect`];
+    // The base alone sits right on the background effect; a list of layers
+    // ends before it with a comma.
+    const parts = [`${layersOnTop(shown)}${shown.layer === shown.stack[0] ? "" : ","} over the background effect`];
     if (stage === "pd" && pdActive) parts.push(`${slotCalled(model, pointingSlot)} held, painting ${area(pdActive.locality)}`);
     if (held) {
         const badge = held.combo.badge || "C";

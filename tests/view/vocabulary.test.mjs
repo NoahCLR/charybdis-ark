@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {layerCalled, layerCalledAt, listed, macroNamed, slotCalled, slotNamed} from "../../webview/view/vocabulary.mjs";
+import {layerCalled, layerCalledAt, layersOnTop, listed, macroNamed, slotCalled, slotNamed} from "../../webview/view/vocabulary.mjs";
+import {layerView} from "../../webview/view/layer-view.mjs";
 
 const require = createRequire(import.meta.url);
 const {openDraft, panelModel, profileDocument, publishedModel} = require("../fixtures/published-model.js");
@@ -45,4 +46,14 @@ test("a macro slot reads by its own name, core's name for it, or its keycode whe
     assert.equal(macroNamed({...second, name: ""}), second.defaultName, "core names one with none");
     assert.match(second.defaultName, /^Macro \d+$/);
     assert.equal(macroNamed(undefined, "MACRO_9"), "MACRO_9");
+});
+
+// The layers a board shows are said the same way on Keymap and Lighting: the
+// top one, then the ones under it down to the base, which a layer of its own
+// still sits on.
+test("the layers a view shows read top first, down to the base", () => {
+    const model = publishedModel();
+    assert.equal(layersOnTop(layerView(model, 0, [])), "Base", "the base alone sits on nothing");
+    assert.equal(layersOnTop(layerView(model, 5, [])), "Function on top of Base");
+    assert.equal(layersOnTop(layerView(model, 5, [1, 4])), "Function on top of Pointing, Number and Base");
 });
