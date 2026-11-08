@@ -8,10 +8,11 @@
 
 import {comboHeld, viewWhileHeld} from "./combo-held.mjs";
 import {pdColourRow, pdTrigger, stageEnabled} from "./lighting.mjs";
-import {layerCalledAt, layersOnTop, listed, slotCalled, vocabulary, word} from "./vocabulary.mjs";
+import {layerAt, layersOnTop, phrasesJoined, phrasesListed, slotCalled, vocabulary, word} from "./vocabulary.mjs";
 
 /** @typedef {import("./keyface-types.js").LayerView} LayerView */
 /** @typedef {import("./types.js").LightOptions} LightOptions */
+/** @typedef {import("./vocabulary.mjs").Phrase} Phrase */
 
 /** @param {LayerView["model"]} model @param {number} slot */
 const runs = (model, slot) => Boolean((model?.pdModes || []).find((row) => row.id === slot)?.kind) && stageEnabled(model, "pd");
@@ -28,7 +29,7 @@ function modeRunning(model, slot, trigger) {
  *   held      the combo held (comboHeld), null off Combo feedback
  *   pdActive  the pointing mode running, null when none
  *   comboActive the held combo's feedback, null when it paints none
- *   caption   what the board shows, in words
+ *   caption   what the board shows, in words (a Phrase: its layers by their marks on screen)
  * @param {LayerView} view
  * @param {{stage: string, pointingSlot: number, comboPreview: {id: number, keys: number[]} | null}} picked
  */
@@ -43,16 +44,17 @@ export function lightingBoard(view, {stage, pointingSlot, comboPreview}) {
     const area = (locality) => word(vocabulary(model).localities, locality).toLowerCase();
     // The base alone sits right on the background effect; a list of layers
     // ends before it with a comma.
-    const parts = [`${layersOnTop(shown)}${shown.layer === shown.stack[0] ? "" : ","} over the background effect`];
-    if (stage === "pd" && pdActive) parts.push(`${slotCalled(model, pointingSlot)} held, painting ${area(pdActive.locality)}`);
+    /** @type {Phrase[]} */
+    const parts = [[...layersOnTop(shown), `${shown.layer === shown.stack[0] ? "" : ","} over the background effect`]];
+    if (stage === "pd" && pdActive) parts.push([`${slotCalled(model, pointingSlot)} held, painting ${area(pdActive.locality)}`]);
     if (held) {
         const badge = held.combo.badge || "C";
         const mode = held.pointing !== null ? slotCalled(model, held.pointing) : "";
-        parts.push(held.holds.length ? `${badge} held, holding ${listed(held.holds.map((at) => layerCalledAt(model, at)))}, whose own light shows the hold`
-            : comboActive && pdActive ? `${badge} held, painting ${area(comboActive.locality)} beneath ${mode}, which it runs`
-            : comboActive ? `${badge} held, painting ${area(comboActive.locality)}`
-            : `${badge} held`);
-        if (held.choice) parts.push("click a ringed key to hold it from that key");
-    } else if (stage === "combo" && stageEnabled(model, "combo")) parts.push("no combo fires in this view");
-    return {shown, held, pdActive, comboActive, caption: parts.join(" · ")};
+        parts.push(held.holds.length ? [`${badge} held, holding `, ...phrasesListed(held.holds.map((at) => [{layer: layerAt(model, at)}])), ", whose own light shows the hold"]
+            : comboActive && pdActive ? [`${badge} held, painting ${area(comboActive.locality)} beneath ${mode}, which it runs`]
+            : comboActive ? [`${badge} held, painting ${area(comboActive.locality)}`]
+            : [`${badge} held`]);
+        if (held.choice) parts.push(["click a ringed key to hold it from that key"]);
+    } else if (stage === "combo" && stageEnabled(model, "combo")) parts.push(["no combo fires in this view"]);
+    return {shown, held, pdActive, comboActive, caption: phrasesJoined(parts, " · ")};
 }

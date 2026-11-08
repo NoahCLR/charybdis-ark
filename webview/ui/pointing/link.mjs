@@ -11,7 +11,7 @@ import {LINK_ENDS} from "../../view/pointing-config.mjs";
 import {listed} from "../../view/vocabulary.mjs";
 import {linkIgnored, linkRows, pointerLayerCovers, withLayer} from "../../view/pointing-link.mjs";
 import {EMPTY_LAYERS_TITLE, emptyLayers} from "../../view/empty-layers.mjs";
-import {marked} from "../marks.mjs";
+import {layerMarked, marked} from "../marks.mjs";
 import {tipFor, words} from "./common.mjs";
 import {keysRow} from "./keys-and-light.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
@@ -50,10 +50,11 @@ export function startStep(model, slot, {form, disabled}, stage) {
 
     const ignored = linkIgnored(model, slot);
     if (ignored) node.append(el(`<div class="callout warn" role="note">${esc(ignored)} Remove it.</div>`));
+    // The layers are named by their marks; the words around them are the app's own.
     const covers = pointerLayerCovers(model, slot);
     if (covers) {
-        const names = listed(covers.covered);
-        node.append(el(`<div class="callout warn" role="note">${esc(`${covers.pointer}, the pointer layer, sits above ${names}. This mode keeps the pointer layer on while its key runs it, so the pointer layer's keys cover ${names}'s wherever they are not transparent. Have its key turn on a layer above ${covers.pointer}, or choose Return to the typing layer under While it runs.`)}</div>`));
+        const pointer = layerMarked(model, covers.pointer), names = listed(covers.covered.map((layer) => layerMarked(model, layer)));
+        node.append(el(`<div class="callout warn" role="note">${pointer}, the pointer layer, sits above ${names}. This mode keeps the pointer layer on while its key runs it, so the pointer layer's keys cover ${names}'s wherever they are not transparent. Have its key turn on a layer above ${pointer}, or choose Return to the typing layer under While it runs.</div>`));
     }
     return node;
 }

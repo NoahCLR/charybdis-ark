@@ -16,7 +16,7 @@ import {customKeyOf, shortcutLayerList, shortcutLayerTag} from "../../view/custo
 import {getModel, layers, render, state} from "../../store.mjs";
 import {placementChips, placementOpening, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {layerSwatch} from "../layerbar.mjs";
-import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked, layerTagged, marked} from "../marks.mjs";
+import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked, layerMarked, layerTagged, marked} from "../marks.mjs";
 import {tierName, layerCalled} from "../../view/vocabulary.mjs";
 import {behaviourRowId} from "./behaviour-selection.mjs";
 
@@ -78,11 +78,12 @@ function openPlacement(tab, keycode, at) {
 }
 
 // Where a reach came from, in the words of the thing that reaches it. A
-// transparent key can be answered by more than one layer, so each is named —
-// the default layer always answers, any other only while it is held too.
+// transparent key can be answered by more than one layer, so each is named,
+// by its mark — the default layer always answers, any other only while it is
+// held too.
 /** @param {{layer: import("../../../contracts/panel.js").Layer | null, whileHeld?: boolean}} entry */
 export const sourceLabel = (entry) =>
-    esc(layerCalled(entry.layer)) + (entry.whileHeld ? " when held" : "");
+    layerMarked(getModel(), entry.layer) + (entry.whileHeld ? " when held" : "");
 
 // The keys are named as the board names them; a combo's row already names
 // its inputs, so it says only where they come from (reachText).
@@ -94,7 +95,7 @@ export const keysReach = (keys, {names = true, branches} = {}) => {
     const named = names ? [...new Set(keys.map((entry) => keyNameMarked(model, keyName(entry.position, model), keyMeaning(entry.position))
         + (branches?.(keyMeaning(entry.position)) || "")))] : [];
     const sources = [...new Set(keys.filter((entry) => entry.fellThrough).map(sourceLabel))];
-    const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => esc(layerCalled(entry.layer))))];
+    const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => layerMarked(model, entry.layer)))];
     return reachText({named, sources, matched}, {names});
 };
 // A behaviour that only answers through a transparent key still fires its
@@ -219,4 +220,4 @@ export const layersOfMask = (mask) => layers().filter((layer) => mask & 2 ** lay
 // Layers by their marks, as the Pointing modes tab names a link's layers.
 /** @param {Model} model @param {import("../../../contracts/panel.js").Layer[]} list */
 export const layersNamed = (model, list) =>
-    list.map((layer) => marked(model, {kind: "layer", layer: layer.index}, layerCalled(layer))).join(", ");
+    list.map((layer) => layerMarked(model, layer)).join(", ");

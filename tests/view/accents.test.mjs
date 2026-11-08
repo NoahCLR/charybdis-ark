@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
+import {said} from "../../webview/view/vocabulary.mjs";
 import {ACCENT_STAGES, accentBudget, accentOwner, accentRows, accentsFor, accentsWhen, allAccents, everyOwner, feedbackOwner, feedbackRowOf, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../webview/view/accents.mjs";
 
 const require = createRequire(import.meta.url);
@@ -94,9 +95,9 @@ test("owners and when their accents light read in the vocabulary's words", () =>
     assert.equal(ownerCalled(published, "layer", "RGB_LAYER_GROUP_ALL"), "Every layer");
     assert.equal(ownerCalled(published, "pdMode", "POINTING_MODE_DRAGSCROLL"), "Dragscroll");
     assert.equal(ownerCalled(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), "Hold active");
-    assert.match(accentsWhen(published, "layer", "Layer 2"), /while Symbol is on, with those for every layer\..*lower layer stays lit/);
-    assert.match(accentsWhen(published, "combo", ""), /same LEDs for every combo/);
-    assert.doesNotMatch(accentsWhen(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"), /\{owner\}/);
+    assert.match(said(accentsWhen(published, "layer", "Layer 2")), /while Symbol is on, with those for every layer\..*lower layer stays lit/);
+    assert.match(said(accentsWhen(published, "combo", "")), /same LEDs for every combo/);
+    assert.doesNotMatch(said(accentsWhen(published, "keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE")), /\{owner\}/);
 });
 
 test("an accent that takes its stage's colour takes the layer's where it paints, and the mode's or feedback's", () => {

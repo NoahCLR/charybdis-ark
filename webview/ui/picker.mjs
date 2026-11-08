@@ -11,7 +11,7 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, render, state} from "../store.mjs";
-import {actionMarked, keyNameText} from "./marks.mjs";
+import {actionMarked, keyNameText, layerMarked, layerMarkedAt} from "./marks.mjs";
 import {PICKER_BOARD, legendFits, pickerBoardKey} from "../view/picker-board.mjs";
 import {comboOutputProblem, keyProblem} from "../view/keycode-expression.mjs";
 import {dropKey, foldedPick, isLayerKeyPicked, isPicked, offeredEntries, offeredMacros, offeredSections, openingPick, pickAllowed, pickKey, pickModifier, pickProblem, pickValue, pickedExpression, pickerMatches, shownSection} from "../view/picker.mjs";
@@ -144,7 +144,7 @@ function sectionBody(model) {
             `<button class="pk wide ${on ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${esc(label)}</span><span class="c">${esc(value)}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers">${layers().map((layer) => `
             <div class="pk-layer">
-                <span class="ix">${esc(layer.index)}</span><span class="nm">${esc(layerCalled(layer))}</span>
+                <span class="ix">${esc(layer.index)}</span><span class="nm">${layerMarked(model, layer)}</span>
                 ${button(`MO(${layer.index})`, verbs.MO ?? "", "On while the key is down.")}
                 ${button(`LOCK_LAYER(${layer.index})`, verbs.LOCK_LAYER ?? "", "Turns the layer on until pressed again. QMK's TG() is the same lock.")}
                 ${picker.comboOutput ? "" : `<button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${esc(layer.index)}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${esc(layer.index)}, …)</span></button>`}
@@ -153,7 +153,7 @@ function sectionBody(model) {
                 ${button(`TO(${layer.index})`, verbs.TO ?? "", "Locks this layer alone and releases every other lock. TO(0) returns to the base layer.")}
             </div>`).join("")}</div>
             <p class="note pk-note">${picker.layerTap
-                ? `Tap-hold on <b>${esc(layerTapName(picker.layerTap))}</b> is armed — now pick the tap key from any section.`
+                ? `Tap-hold on <b>${layerMarkedAt(model, Number(picker.layerTap))}</b> is armed — now pick the tap key from any section.`
                 : `Hold reaches the layer while the key is down. Lock toggles it. ${picker.comboOutput ? "" : "Tap-hold asks for a tap key next. "}Tap-toggle and One-shot hold like Hold; Move to switches to the layer alone.${picker.comboOutput ? " A combo can't send Tap-hold, which needs a key of its own." : ""}`}</p></div>`;
     }
     if (section.kind === "modes") {
@@ -232,7 +232,7 @@ export function pickerOverlay() {
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
-                <p class="note">${picker.shortcut ? `For <b>${esc(picker.title)}</b> · ${esc(picker.context || "")}${shortcutLimitWords(model) ? ` · ${esc(shortcutLimitWords(model))}` : ""}` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${esc(picker.maxKeys)} keys to send together.` : "Choose one or more keys." : picker.onLayer ? `For ${picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "a key"} on <b>${esc(picker.onLayer)}</b>`
+                <p class="note">${picker.shortcut ? `For <b>${esc(picker.title)}</b> · ${esc(picker.context || "")}${shortcutLimitWords(model) ? ` · ${esc(shortcutLimitWords(model))}` : ""}` : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${esc(picker.maxKeys)} keys to send together.` : "Choose one or more keys." : picker.onLayer !== undefined ? `For ${picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "a key"} on <b>${layerMarkedAt(model, picker.onLayer)}</b>`
                 : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
             <input class="input pk-search" id="pickerSearch" data-f="picker:search" aria-label="Search keycodes" placeholder="Search every section" value="${esc(picker.search)}">
             <span class="right"><button class="btn ghost" data-act="cancel">Close</button></span>

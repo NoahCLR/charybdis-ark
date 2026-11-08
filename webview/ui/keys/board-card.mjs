@@ -12,10 +12,10 @@ import {el, esc, watchPressOutside} from "../../lib/dom.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {getModel, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {layerCalled, layersOnTop} from "../../view/vocabulary.mjs";
+import {layersOnTop} from "../../view/vocabulary.mjs";
 import {draftDot} from "../../view/review.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
-import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
+import {actionMarked, comboBadge, keyNameMarked, layerMarked, phraseMarked} from "../marks.mjs";
 import {comboInputLabel} from "./combo-builder.mjs";
 import {modifierKey, shortcut} from "../../view/shortcuts.mjs";
 import {REACH_ICONS} from "../../view/screens.mjs";
@@ -26,8 +26,9 @@ import {REACH_ICONS} from "../../view/screens.mjs";
 // there, so it is read whole, with no tip to repeat it.
 /** @param {import("../../view/keyface-types.js").LayerView} view */
 export function previewFoot(view) {
+    const model = getModel();
     return el(`<div class="board-foot"><b>Preview</b>
-        <span class="board-foot-text">${esc(layersOnTop(view))} · keys seen through from below are frosted · edits go to ${esc(layerCalled(view.layer))}</span></div>`);
+        <span class="board-foot-text">${phraseMarked(model, layersOnTop(view))} · keys seen through from below are frosted · edits go to ${layerMarked(model, view.layer)}</span></div>`);
 }
 
 export function placementBar() {

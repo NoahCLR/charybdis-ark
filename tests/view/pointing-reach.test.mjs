@@ -7,6 +7,7 @@ import {holdKeyName, pointingPlacements, whatReachesSlot} from "../../webview/vi
 import {placementChips} from "../../webview/view/reach-groups.mjs";
 import {customKeyShortcutMessage} from "../../webview/view/edits.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
+import {layerCalled} from "../../webview/view/vocabulary.mjs";
 import {published} from "../fixtures/published-behaviours.mjs";
 
 const require = createRequire(import.meta.url);
@@ -40,7 +41,7 @@ test("what still reaches a pointing slot is listed, so an inert key can be named
         ]});
     const found = whatReachesSlot(model, model.pdModes[0]);
     assert.equal(found.keys.length, 2, "both the hold and the lock keycode count");
-    assert.deepEqual(found.layers, ["Base", "Navigation"]);
+    assert.deepEqual(found.layers.map(layerCalled), ["Base", "Navigation"], "the layers it is on, each once");
     assert.deepEqual(found.behaviours.map((row) => row.keycode), ["CUSTOM_KEY_0"]);
     assert.equal(holdKeyName(model.pdModes[6]), "PD_MODE_6", "slots past the named six use their number");
     assert.deepEqual(whatReachesSlot(model, undefined).keys, []);

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {said} from "../../webview/view/vocabulary.mjs";
 import {createRequire} from "node:module";
 import {comboBehaviours, comboInputIsKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
@@ -311,9 +312,9 @@ test("a key wears a combo's badge only where every switch lets the combo fire", 
     const excluded = modelOf({keys, combos, exclude: {0: [2]}});
     const [excludedCombo] = excluded.combos;
     assert.deepEqual(badges(excluded, 0, [], 2), [], "the excluded key wears no badge");
-    assert.deepEqual(layerView(excluded, 0).combos.useAt(2, excludedCombo).reasons, ["Join combos is off for this key on this layer (Base)"]);
+    assert.deepEqual(layerView(excluded, 0).combos.useAt(2, excludedCombo).reasons.map((reason) => said(reason)), ["Join combos is off for this key on this layer (Base)"]);
     assert.deepEqual(badges(excluded, 0, [], 1), [], "nor does its partner, since the chord cannot form");
-    assert.deepEqual(layerView(excluded, 0).combos.useAt(1, excludedCombo).reasons, ["its other key F on Base cannot join it, so it never forms"]);
+    assert.deepEqual(layerView(excluded, 0).combos.useAt(1, excludedCombo).reasons.map((reason) => said(reason)), ["its other key F on Base cannot join it, so it never forms"]);
     assert.deepEqual(layerView(excluded, 0).combos.shownAt(1).map((row) => row.badge), ["C0"], "the key still takes part in it, switched off");
     assert.deepEqual(badges(excluded, 1, [0], 1), [], "a key seen through a preview is judged on the layer that supplies it");
 
@@ -324,19 +325,19 @@ test("a key wears a combo's badge only where every switch lets the combo fire", 
     const matchedBadges = (held, key) => layerView(matched, 2, held).combos.badgesAt(key).map((row) => row.badge);
     assert.deepEqual(matchedBadges([], 1), ["C0"], "Base supplies both keys, and Base lets them join");
     assert.deepEqual(matchedBadges([1], 1), [], "with Symbols held under Numbers, Symbols supplies the key, and excludes it");
-    assert.deepEqual(layerView(matched, 2, [1]).combos.useAt(1, matched.combos[0]).reasons, ["Join combos is off for this key on this layer (Symbols)"]);
+    assert.deepEqual(layerView(matched, 2, [1]).combos.useAt(1, matched.combos[0]).reasons.map((reason) => said(reason)), ["Join combos is off for this key on this layer (Symbols)"]);
 
     // An input on two keys needs only one of them: a key that cannot join
     // but whose input another key covers is not why the chord fails.
     const doubled = {0: {1: "KC_D", 2: "KC_F", 3: "KC_D"}};
     const both = modelOf({keys: doubled, combos, exclude: {0: [1, 2]}});
-    assert.deepEqual(layerView(both, 0).combos.useAt(3, both.combos[0]).reasons, ["its other key F on Base cannot join it, so it never forms"]);
+    assert.deepEqual(layerView(both, 0).combos.useAt(3, both.combos[0]).reasons.map((reason) => said(reason)), ["its other key F on Base cannot join it, so it never forms"]);
     const fine = modelOf({keys: doubled, combos, exclude: {0: [1]}});
     assert.deepEqual(layerView(fine, 0).combos.badgesAt(3).map((row) => row.badge), ["C0"], "the other KC_D still covers its input");
 
     const disabled = modelOf({keys, combos: [{...combos[0], enabled: false}]});
     assert.deepEqual(badges(disabled, 0, [], 1), []);
-    assert.deepEqual(layerView(disabled, 0).combos.useAt(1, disabled.combos[0]).reasons, ["Use this combo is off"]);
+    assert.deepEqual(layerView(disabled, 0).combos.useAt(1, disabled.combos[0]).reasons.map((reason) => said(reason)), ["Use this combo is off"]);
     const layerOff = modelOf({keys, combos, settings: (settings) => {settings.values[SETTING.LAYER_COMBOS] = ALL_LAYERS ^ 1;}});
     assert.deepEqual(badges(layerOff, 0, [], 1), []);
     const notHere = modelOf({keys, combos: [{...combos[0], allowedLayers: 2}]});

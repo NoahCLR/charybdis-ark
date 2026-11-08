@@ -8,7 +8,7 @@
 // the lists are tested without a screen.
 
 import {layerColourRow, layerPaints, pdColourRow, POINTING_MODE_IDS} from "./lighting.mjs";
-import {layerCalled, slotCalled, vocabulary, word} from "./vocabulary.mjs";
+import {layerAt, layerCalled, slotCalled, vocabulary, word} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/model.js").AccentTable} AccentTable
@@ -132,10 +132,14 @@ export function ownerCalled(model, target, owner) {
     return "";
 }
 
-/** When an owner's accents light, in the vocabulary's words. @param {Model} model @param {AccentTable} target @param {string} owner */
+/** When an owner's accents light, in the vocabulary's words: a phrase, so a layer owner is marked. @param {Model} model @param {AccentTable} target @param {string} owner @returns {import("./vocabulary.mjs").Phrase} */
 export function accentsWhen(model, target, owner) {
     const words = vocabulary(model).accents[target];
-    return words ? words.when.replace("{owner}", ownerCalled(model, target, owner)) : "";
+    if (!words) return [];
+    const place = ownerPlace(model, target, owner);
+    const layer = !place.every && place.layer !== undefined ? layerAt(model, place.layer) : undefined;
+    const [before, after = ""] = words.when.split("{owner}");
+    return words.when.includes("{owner}") ? [before, layer ? {layer} : ownerCalled(model, target, owner), after] : [words.when];
 }
 
 /**

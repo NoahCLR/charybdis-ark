@@ -58,9 +58,34 @@ export const macroNamed = (slot, keycode = "") => slot?.name || slot?.defaultNam
 // the one place a name is made up for it here.
 /** @param {{displayName?: string, name?: string} | null | undefined} layer */
 export const layerCalled = (layer) => layer?.displayName || layer?.name || "";
-// The same for the layer with this index.
-/** @param {{layers?: readonly {index: number, displayName?: string, name?: string}[]} | null | undefined} model @param {number} index */
-export const layerCalledAt = (model, index) => layerCalled((model?.layers || []).find((layer) => layer.index === index));
+/** @typedef {{index: number, displayName?: string, name?: string}} NamedLayer */
+// The layer with this index, or undefined.
+/** @template {NamedLayer} L @param {{layers?: readonly L[]} | null | undefined} model @param {number} index @returns {L | undefined} */
+export const layerAt = (model, index) => (model?.layers || []).find((layer) => layer.index === index);
+// The same layer's name.
+/** @param {{layers?: readonly NamedLayer[]} | null | undefined} model @param {number} index */
+export const layerCalledAt = (model, index) => layerCalled(layerAt(model, index));
+
+// Words that name layers: text, with each layer kept in its place, so a screen
+// draws each by its mark (ui/marks.mjs, phraseMarked) while a tip, a cached
+// word or a test reads the phrase as plain words (said). Marks are the
+// interface's, so the view writes phrases and never markup.
+/** @typedef {(string | {layer: NamedLayer | null | undefined})[]} Phrase */
+// How a phrase is said: its layers and its other words.
+/** @typedef {{layer: (layer: NamedLayer | null | undefined) => string, text: (words: string) => string}} Saying */
+/** @type {Saying} */
+export const PLAIN = {layer: layerCalled, text: (words) => words};
+/** @param {Phrase} phrase @param {Saying} [say] */
+export const said = (phrase, say = PLAIN) => phrase.map((part) => typeof part === "string" ? say.text(part) : say.layer(part.layer)).join("");
+// Phrases one after another, `between` each.
+/** @param {readonly Phrase[]} phrases @param {string} between @returns {Phrase} */
+export const phrasesJoined = (phrases, between) => phrases.flatMap((phrase, at) => at ? [between, ...phrase] : phrase);
+// Phrases in a run of prose, as listed() runs names: "A, B and C".
+/** @param {readonly Phrase[]} phrases @returns {Phrase} */
+export const phrasesListed = (phrases) => phrases.flatMap((phrase, at) => at ? [at === phrases.length - 1 ? " and " : ", ", ...phrase] : phrase);
+// A phrase starting a sentence: its first word capitalised.
+/** @param {Phrase} phrase @returns {Phrase} */
+export const phraseSentence = (phrase) => typeof phrase[0] === "string" ? [sentence(phrase[0]), ...phrase.slice(1)] : phrase;
 
 // How a tier runs, in the editor's words: a tap tier only sends, and a hold
 // style names its own tier's threshold.
@@ -112,12 +137,13 @@ export const listed = (names) => names.length < 3 ? names.join(" and ") : `${nam
 // The layers a board shows, top first, as Keymap and Lighting both caption
 // them: the layer on top, then those previewed under it, down to the base:
 // "Function on top of Pointing, Number and Base", or "Base" alone.
-/** @param {Pick<import("./keyface-types.js").LayerView, "layer" | "held" | "stack">} view */
+/** @param {Pick<import("./keyface-types.js").LayerView, "layer" | "held" | "stack">} view @returns {Phrase} */
 export function layersOnTop({layer, held, stack}) {
     const base = stack[0];
-    const under = held.filter((at) => at > 0).reverse().map((at) => layerCalled(stack[at]));
-    if (base && layer !== base) under.push(layerCalled(base));
-    return `${layerCalled(layer)}${under.length ? ` on top of ${listed(under)}` : ""}`;
+    /** @type {Phrase[]} */
+    const under = held.filter((at) => at > 0).reverse().map((at) => [{layer: stack[at]}]);
+    if (base && layer !== base) under.push([{layer: base}]);
+    return [{layer}, ...(under.length ? [" on top of ", ...phrasesListed(under)] : [])];
 }
 
 // Words written mid-sentence, starting one: the first letter capitalised.

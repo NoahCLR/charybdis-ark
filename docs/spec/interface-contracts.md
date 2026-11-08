@@ -501,6 +501,22 @@ macro and a custom key, which have none:
   carries the mark of the default it replaces (`settingGoverns`,
   `webview/view/settings-layout.mjs`), on the closed Timings disclosure
   (`browser-tests/behaviour-timings.spec.js`).
+- A layer named in words carries its mark before its name (`layerMarked`):
+  a reach's source ("on ▦ Base, ▦ Numbers when held"), on every Keymap tab
+  and the Behaviours tab's notes; the Key tab's headings and notes; why a
+  behaviour or combo is not used, there and in the hover card; the board's
+  preview caption on Keymap and Lighting; a layer's colour heading and an
+  accent list's heading and note on Lighting; the keycode picker's header,
+  its Layers list and its armed Tap-hold; Settings' sniping keys; and a
+  pointing mode's notes. Words the view writes that name layers are a
+  `Phrase` (`webview/view/vocabulary.mjs`): text with each layer kept in its
+  place, which the screen draws with `phraseMarked` and a tip, a cached word
+  or a test reads with `said`, since marks are the interface's. A layer is
+  named by its words alone only in an attribute, a menu option, a button's
+  or tag's words, the keycode picker's Selected chips, a custom key's
+  shortcut written as its chord ("Navigation+Extra", as its label is), and
+  the layer stack's folded run, which spans its layers under one grey icon
+  (`browser-tests/marks.spec.js`).
 - A key or action is named through `actionMarked` or `keyNameMarked`; only
   attributes and plain-text messages carry the words alone
   (`tests/view/key-names-marked.test.mjs`). One that acts on a layer or runs a

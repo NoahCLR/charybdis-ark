@@ -4,6 +4,7 @@ export type ViewModel = Partial<PublishedModel> | null | undefined;
 export type PointingSlot = PublishedModel['pdModes'][number];
 export type BehaviorStep = BehaviorView['steps'][number];
 import type {Tier} from '../../contracts/edits.js';
+import type {Phrase} from './vocabulary.mjs';
 export type {Tier};
 export type BehaviorRoute = 'view' | 'here' | 'through' | 'combos' | 'belowCombos';
 export interface ResolvedKey {position: Position; layer: Layer; fellThrough: boolean; whileHeld: boolean; reference?: boolean}
@@ -32,7 +33,7 @@ export type ReachRoute =
     | {how: 'behaviour'; below: true; row: BehaviorView; key?: ResolvedKey; layer: Layer; whileHeld: boolean; sends: BranchSend[]}
     | {how: 'combo'; below: boolean; combo: ComboView; keys: ResolvedKey[]; action: string; row: BehaviorView | undefined; sends: BranchSend[]};
 // Whether a combo fires from a key in one view, and the words for why not.
-export interface ComboUse {fires: boolean; reasons: string[]}
+export interface ComboUse {fires: boolean; reasons: Phrase[]}
 // The combos the board marks on each key in one view, by layout index, and whether each fires from it there.
 export interface ComboMarks {keys: Map<number, ComboView[]>; uses: Map<number, Map<ComboView, ComboUse>>}
 export interface BehaviourGroups {here: BehaviorView[]; through: {row: BehaviorView; layer: Layer; whileHeld: boolean}[]; combos: BehaviorCombo[]; combosBelow: BehaviorCombo[]; elsewhere: BehaviorView[]}

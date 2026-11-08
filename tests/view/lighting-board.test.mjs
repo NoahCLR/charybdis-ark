@@ -4,7 +4,7 @@ import {createRequire} from "node:module";
 import {layerView} from "../../webview/view/layer-view.mjs";
 import {lightingBoard} from "../../webview/view/lighting-board.mjs";
 import {comboHeld} from "../../webview/view/combo-held.mjs";
-import {slotCalled} from "../../webview/view/vocabulary.mjs";
+import {said, slotCalled} from "../../webview/view/vocabulary.mjs";
 
 const {profileDocument, publishedModel} = createRequire(import.meta.url)("../fixtures/published-model.js");
 const model = publishedModel();
@@ -14,10 +14,10 @@ test("off Pointing modes and Combo feedback the board shows the view as it is, r
     const view = layerView(model, 0, []);
     const board = shows(view);
     assert.deepEqual([board.shown, board.held, board.pdActive, board.comboActive], [view, null, null, null]);
-    assert.equal(board.caption, "Base over the background effect");
+    assert.equal(said(board.caption), "Base over the background effect");
     // A layer above the base is said as the Keymap's preview says it, base included.
-    assert.equal(shows(layerView(model, 5, [])).caption, "Function on top of Base, over the background effect");
-    assert.equal(shows(layerView(model, 5, [1, 4])).caption, "Function on top of Pointing, Number and Base, over the background effect");
+    assert.equal(said(shows(layerView(model, 5, [])).caption), "Function on top of Base, over the background effect");
+    assert.equal(said(shows(layerView(model, 5, [1, 4])).caption), "Function on top of Pointing, Number and Base, over the background effect");
 });
 
 test("on Pointing modes the board runs the picked mode from its trigger key, and an empty slot runs nothing", () => {
@@ -25,7 +25,7 @@ test("on Pointing modes the board runs the picked mode from its trigger key, and
     const running = (model.pdModes || []).find((slot) => slot.kind);
     const board = shows(view, {stage: "pd", pointingSlot: running.id});
     assert.ok(board.pdActive, "the picked mode runs");
-    assert.match(board.caption, new RegExp(`· ${slotCalled(model, running.id)} held, painting `));
+    assert.match(said(board.caption), new RegExp(`· ${slotCalled(model, running.id)} held, painting `));
     const empty = (model.pdModes || []).find((slot) => !slot.kind);
     assert.equal(shows(view, {stage: "pd", pointingSlot: empty.id}).pdActive, null);
 });
@@ -35,10 +35,14 @@ test("on Combo feedback the board holds a combo of this view, turning on the lay
     const c13 = shows(view, {stage: "combo", comboPreview: {id: 13, keys: []}});
     assert.equal(c13.held?.combo.badge, "C13");
     assert.deepEqual([c13.shown.at, c13.comboActive], [5, null], "C13 holds Function, whose own light shows the hold");
-    assert.match(c13.caption, /C13 held, holding .+, whose own light shows the hold/);
+    assert.match(said(c13.caption), /C13 held, holding .+, whose own light shows the hold/);
+    // Its layers stay layers, for the screen to mark.
+    const say = {layer: (/** @type {any} */ layer) => `[${layer?.displayName}]`, text: (/** @type {string} */ words) => words};
+    assert.equal(said(c13.caption, say), "[Function] on top of [Base], over the background effect · C13 held, holding [Function], whose own light shows the hold"
+        + " · click a ringed key to hold it from that key");
     const c3 = shows(view, {stage: "combo", comboPreview: {id: 3, keys: []}});
     assert.deepEqual(c3.comboActive, comboHeld(view, {id: 3, keys: []})?.active);
-    assert.match(c3.caption, /· C3 held, painting /);
+    assert.match(said(c3.caption), /· C3 held, painting /);
 });
 
 test("a combo running a pointing mode runs it from the combo's keys, its feedback painting beneath", () => {
@@ -47,12 +51,12 @@ test("a combo running a pointing mode runs it from the combo's keys, its feedbac
     const board = lightingBoard(layerView(published, 0, []), {stage: "combo", pointingSlot: 0, comboPreview: null});
     assert.deepEqual(board.pdActive?.triggerIndex, board.held?.held, "the mode starts from the keys holding the combo");
     assert.equal(board.comboActive?.beneath, true);
-    assert.match(board.caption, new RegExp(`C0 held, painting .+ beneath ${slotCalled(published, 1)}, which it runs`));
+    assert.match(said(board.caption), new RegExp(`C0 held, painting .+ beneath ${slotCalled(published, 1)}, which it runs`));
 });
 
 test("a view where no combo fires says so", () => {
     const doc = profileDocument({keys: {0: {0: "KC_A"}}});
     const board = lightingBoard(layerView(publishedModel(doc), 0, []), {stage: "combo", pointingSlot: 0, comboPreview: null});
     assert.equal(board.held, null);
-    assert.match(board.caption, /· no combo fires in this view$/);
+    assert.match(said(board.caption), /· no combo fires in this view$/);
 });

@@ -9,7 +9,10 @@ import * as edits from "../../view/edits.mjs";
 import {colourEditor} from "../colour-editor.mjs";
 
 /** @param {string} title @param {string} [extra] */
-export const section = (title, extra = "") => el(`<section><div class="sect-h"><h4>${esc(title)}</h4>${extra}</div></section>`);
+export const section = (title, extra = "") => sectionMarked(esc(title), extra);
+// The same with its title already markup, a layer in it by its mark.
+/** @param {string} title @param {string} [extra] */
+export const sectionMarked = (title, extra = "") => el(`<section><div class="sect-h"><h4>${title}</h4>${extra}</div></section>`);
 
 // A stage's on/off switch rides on the header line of the section that says
 // where or when the stage paints (Where it paints, When and where, Timing),

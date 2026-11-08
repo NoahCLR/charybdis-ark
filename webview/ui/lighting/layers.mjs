@@ -8,8 +8,9 @@ import {layerColourRow, layerPaints, offWording} from "../../view/lighting.mjs";
 import {vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
-import {aboutStage, colourControl, lightingGroup, paintsSection, section, stack} from "./common.mjs";
+import {aboutStage, colourControl, lightingGroup, paintsSection, section, sectionMarked, stack} from "./common.mjs";
 import {accentsSection} from "./accents.mjs";
+import {layerMarked} from "../marks.mjs";
 import {foldEmptyLayers} from "../../view/empty-layers.mjs";
 import {emptyLayersShown, toggleEmptyLayers} from "../empty-layers.mjs";
 import {EMPTY_LAYERS_TIP, EMPTY_LAYERS_TITLE} from "../../view/empty-layers.mjs";
@@ -45,7 +46,7 @@ export function stageLayers(model) {
     const layer = currentLayer();
     const row = layerColourRow(model, layer?.index);
     const main = el(`<div class="tab-grid two stage-detail"></div>`);
-    const colour = section(`${layerCalled(layer)} colour`);
+    const colour = sectionMarked(`${layerMarked(model, layer)} colour`);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${layerCalled(layer)} layer`,
         ...offWording(model, "layers"),

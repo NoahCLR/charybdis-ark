@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {layerCalled, layerCalledAt, layersOnTop, listed, macroNamed, slotCalled, slotNamed} from "../../webview/view/vocabulary.mjs";
+import {layerCalled, layerCalledAt, layersOnTop, listed, macroNamed, phraseSentence, phrasesJoined, phrasesListed, said, slotCalled, slotNamed} from "../../webview/view/vocabulary.mjs";
 import {layerView} from "../../webview/view/layer-view.mjs";
 
 const require = createRequire(import.meta.url);
@@ -53,7 +53,21 @@ test("a macro slot reads by its own name, core's name for it, or its keycode whe
 // still sits on.
 test("the layers a view shows read top first, down to the base", () => {
     const model = publishedModel();
-    assert.equal(layersOnTop(layerView(model, 0, [])), "Base", "the base alone sits on nothing");
-    assert.equal(layersOnTop(layerView(model, 5, [])), "Function on top of Base");
-    assert.equal(layersOnTop(layerView(model, 5, [1, 4])), "Function on top of Pointing, Number and Base");
+    assert.equal(said(layersOnTop(layerView(model, 0, []))), "Base", "the base alone sits on nothing");
+    assert.equal(said(layersOnTop(layerView(model, 5, []))), "Function on top of Base");
+    assert.equal(said(layersOnTop(layerView(model, 5, [1, 4]))), "Function on top of Pointing, Number and Base");
+    // Where a screen marks them, each layer is written its way.
+    const marked = {layer: (/** @type {any} */ layer) => `[${layer?.displayName}]`, text: (/** @type {string} */ words) => words};
+    assert.equal(said(layersOnTop(layerView(model, 5, [1, 4])), marked), "[Function] on top of [Pointing], [Number] and [Base]");
+});
+
+test("a phrase is said with each layer its way and every other word its own", () => {
+    const say = {layer: (/** @type {any} */ layer) => `[${layer?.displayName}]`, text: (/** @type {string} */ words) => `«${words}»`};
+    const base = {index: 0, displayName: "Base"};
+    assert.equal(said(["on ", {layer: base}, " & up"], say), "«on »[Base]« & up»");
+    assert.equal(said(["on ", {layer: base}]), "on Base", "plainly by default");
+    assert.equal(said([{layer: undefined}]), "", "a layer the board lacks reads as nothing");
+    assert.deepEqual(phrasesListed([["a"], ["b"], ["c"]]), ["a", ", ", "b", " and ", "c"]);
+    assert.deepEqual(phrasesJoined([["a"], ["b"]], "; "), ["a", "; ", "b"]);
+    assert.deepEqual(phraseSentence(["on ", {layer: base}]), ["On ", {layer: base}]);
 });

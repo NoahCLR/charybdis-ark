@@ -5,11 +5,12 @@
 // a switch cannot be used. The core publishes the rule
 // (model.pdModeEditing.linkTargets, core/model/pointing-links.js); this only
 // turns it into rows for one slot.
-import {layerCalled, layerCalledAt} from "./vocabulary.mjs";
+import {layerAt, layerCalled} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel} Model
  * @typedef {import("../../contracts/edits.js").PointingSlot} PointingSlot
+ * @typedef {import("../../contracts/panel.js").Layer} Layer
  * @typedef {{layer: number, name: string, starts: boolean, key: boolean, unusable: boolean, why: string, tip: string,
  *   startLocked: boolean, keyLocked: boolean, startsOther: string, startTip: string}} LinkRow
  */
@@ -45,15 +46,15 @@ export function linkIgnored(model, slot) {
     return (model?.pdModeEditing?.linkTargets || []).filter((entry) => named & 2 ** entry.layer && entry.refusal).map((entry) => entry.refusal).join(" ");
 }
 
-// The pointer layer's name and the names of the layers it covers among those
-// the mode's key turns on, as the core publishes them (slot.pointerCovers,
+// The pointer layer and the layers it covers among those the mode's key turns
+// on, as the core publishes them (slot.pointerCovers,
 // core/model/pointing-links.js); null when it covers none.
-/** @param {Model | null} model @param {{pointerCovers?: number}} slot @returns {{pointer: string, covered: string[]} | null} */
+/** @param {Model | null} model @param {{pointerCovers?: number}} slot @returns {{pointer: Layer | undefined, covered: (Layer | undefined)[]} | null} */
 export function pointerLayerCovers(model, slot) {
     const pointer = model?.pdModeEditing?.pointerLayer, covers = slot.pointerCovers ?? 0;
     if (pointer === null || pointer === undefined || !covers) return null;
-    const covered = Array.from({length: pointer}, (_, index) => index).filter((index) => covers & 2 ** index).map((index) => layerCalledAt(model, index));
-    return {pointer: layerCalledAt(model, pointer), covered};
+    const covered = Array.from({length: pointer}, (_, index) => index).filter((index) => covers & 2 ** index).map((index) => layerAt(model, index));
+    return {pointer: layerAt(model, pointer), covered};
 }
 
 // A link's layer set with one layer put in or taken out: bit n is layer n.

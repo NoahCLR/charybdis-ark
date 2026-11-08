@@ -13,8 +13,8 @@ import {behaviourThresholds, styleDetail} from "../view/behavior-editor.mjs";
 import {keyReach, keyReachAt} from "../view/key-reach.mjs";
 import {stageEnabled} from "../view/lighting.mjs";
 import {currentView, getModel, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, comboInputChips, comboOutputMarked, comboTint, keyChips, keyNameMarked, layerTagged, macroSteps, marked, sends, sendsKind, tierDot} from "./marks.mjs";
-import {sentence, styleWord, tierName, vocabulary, layerCalled, macroNamed} from "../view/vocabulary.mjs";
+import {branchBadge, comboBadge, comboInputChips, comboOutputMarked, comboTint, keyChips, keyNameMarked, layerMarked, layerTagged, macroSteps, marked, phraseMarked, sends, sendsKind, tierDot} from "./marks.mjs";
+import {phraseSentence, phrasesJoined, sentence, styleWord, tierName, vocabulary, layerCalled, macroNamed} from "../view/vocabulary.mjs";
 import {modifierKey} from "../view/shortcuts.mjs";
 
 // The card for the key at layout `index` on the layer the screen shows, "" for
@@ -64,7 +64,7 @@ function seenThrough(view, {answer, through}) {
     const from = answer.layer, position = answer.position;
     const sections = reachSections(through, position);
     return `<div class="hc-through"><div class="hc-sect">
-            <div class="hc-h">Falls through to ${marked(model, {kind: "layer", layer: from.index}, layerCalled(from))}</div>
+            <div class="hc-h">Falls through to ${layerMarked(model, from)}</div>
             <div class="hc-flow"><span class="hc-name">${keyNameMarked(model, keyName(position, model), keyMeaning(position))}</span>
             <code class="hc-stored">${esc(visibleKeycode(model, position.keycode))}</code></div>${headline(model, keyMeaning(position))}
             ${view.previewing ? "" : `<div class="hc-sub hc-foot">With no layer previewed. ${modifierKey()}-click a layer tab to see what answers while it is held.</div>`}</div>
@@ -89,12 +89,12 @@ function reachSections(reach, position, {foot = true} = {}) {
             <div class="hc-sub">tap / hold ${esc(threshold(lead.term))}</div>
             <div class="hc-act"><span class="hc-stage">Tap</span><span><span class="hc-name">${esc(role.tap)}</span></span></div>
             <div class="hc-act"><span class="hc-stage">Hold</span><span>${hold}</span></div>
-            ${lead.note ? `<div class="hc-sub hc-foot hc-quiet">${esc(lead.note)}</div>` : ""}</div>`);
+            ${lead.note.length ? `<div class="hc-sub hc-foot hc-quiet">${phraseMarked(model, lead.note)}</div>` : ""}</div>`);
     } else if (lead?.kind === "off") {
         // A behaviour a switch keeps off is not there for this key: no
         // branches, no timing, no dots, only what the key sends instead.
         sections.push(`<div class="hc-sect hc-off"><div class="hc-h">Key behaviour not used</div>
-            <div class="hc-sub">${esc(sentence(use.reasons.join("; ")))}.</div>
+            <div class="hc-sub">${phraseMarked(model, phraseSentence(phrasesJoined(use.reasons, "; ")))}.</div>
             <div class="hc-sub hc-foot hc-quiet">${custom ? esc(sentence(customKeyShortcutOnly(custom))) : `Sends ${keyNameMarked(model, keyName(position, model), keyMeaning(position))} directly`}.</div></div>`);
     } else if (lead?.kind === "inert") {
         sections.push(`<div class="hc-sect"><div class="hc-sub hc-quiet">${esc(inertNote)}</div></div>`);
@@ -150,7 +150,7 @@ function reachSections(reach, position, {foot = true} = {}) {
             <span class="hc-sends"><span class="hc-life">→</span>${sent}<span class="hc-life hc-count">${inputs.length} key${inputs.length === 1 ? "" : "s"}</span>${runs ? `<span class="hc-life hc-runs">runs its behaviour</span>`
                 : sendsInstead ? `<span class="hc-life hc-runs">${esc(sendsInstead)}</span>` : ""}</span>
             <span class="hc-keys">${comboInputChips(model, combo, {small: true, here: (at) => comboInputIsKey(combo, at, position)})}</span>
-            ${use.fires ? "" : `<span class="hc-sub hc-quiet">Not used: ${esc(use.reasons.join("; "))}.</span>`}</div>`;
+            ${use.fires ? "" : `<span class="hc-sub hc-quiet">Not used: ${phraseMarked(model, phrasesJoined(use.reasons, "; "))}.</span>`}</div>`;
         }).join("")}</div>`);
     }
     return sections;

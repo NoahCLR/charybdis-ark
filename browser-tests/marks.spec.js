@@ -168,6 +168,87 @@ test("the hover card's title and the Combos table mark a layer by its icon", asy
     expect(await output.evaluate(marksIn)).toEqual({icons: ["layer"], swatches: 0});
 });
 
+// A transparent key on Symbols over Macro 0, which Base and Numbers both
+// hold: Base answers it, and Numbers too while it is held.
+async function withMacroThroughTransparentKey(page) {
+    return page.evaluate(async () => {
+        const {getModel} = await import("/webview/store.mjs");
+        const model = structuredClone(getModel());
+        const at = model.layers[0].positions.findIndex((position) => position.keycode === "QK_MACRO_0");
+        const layoutIndex = model.layers[0].positions[at].layoutIndex;
+        model.layers[1].positions[at] = {...model.layers[0].positions[at]};
+        Object.assign(model.layers[2].positions[at], {keycode: "KC_TRNS", semantic: "KC_TRNS", display: "", editLabel: "", value: 1});
+        model.layers[2].answers[layoutIndex] = [{layer: 0, active: 0b101, blocked: 0}, {layer: 1, active: 0b111, blocked: 0}];
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+        return model.layers.slice(0, 2).map((layer) => layer.displayName || layer.name);
+    });
+}
+
+// The layer marks inside a node, lit or off alike: one per layer named.
+const layerIcons = (node) => node.querySelectorAll(".kind-icon.layer").length;
+
+test("a reach names each layer a transparent key falls through to by its icon, one answering when held too", async ({page}) => {
+    await openControls(page, "keys");
+    const [base, held] = await withMacroThroughTransparentKey(page);
+    await page.locator('[data-tab="macros"]').click();
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        store.showLayer(2);
+        store.state.reachGroups = {...store.state.reachGroups, through: true};
+        store.render();
+    });
+    const reached = page.locator('tr[data-reach="through:MACRO_0"] td.muted');
+    await expect(reached).toContainText(`on ${base}, ${held} when held`);
+    expect(await reached.evaluate(layerIcons)).toBe(2);
+});
+
+test("the Key tab and the preview's caption name their layers by their icons", async ({page}) => {
+    await openControls(page, "keys");
+    const heading = page.locator(".tab-grid h4").first();
+    await expect(heading).toContainText("Base");
+    expect(await heading.evaluate(layerIcons)).toBe(1);
+    expect(await page.locator(".stack-note").evaluate(layerIcons)).toBe(1);
+
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        store.showLayer(2);
+        store.toggleLayerOn(1);
+        store.render();
+    });
+    const caption = page.locator(".board-foot-text").first();
+    await expect(caption).toContainText("on top of");
+    expect(await caption.evaluate(layerIcons)).toBe(4);
+});
+
+test("an empty slot's note names the layer still reaching it by its icon, in its sentence", async ({page}) => {
+    await openControls(page, "pointing", {pointingSlot: 6});
+    const note = page.locator(".pd-editor .unavailable").first();
+    await expect(note).toContainText("still reaches this slot");
+    expect(await note.evaluate(layerIcons)).toBe(1);
+    // The box lays its children out as rows; the sentence is one of them, whole.
+    expect(await note.evaluate((node) => [node.children.length, node.children[0]?.textContent?.includes("still reaches this slot")])).toEqual([1, true]);
+});
+
+test("the keycode picker names the layer its Tap-hold is armed on by its icon", async ({page}) => {
+    await openControls(page, "keys");
+    await page.locator('.tab-grid [data-act="pick"]').first().click();
+    await page.locator('.picker [data-sec="layers"]').click();
+    await page.locator('.picker [data-lt="1"]').click();
+    const note = page.locator(".picker .pk-note");
+    await expect(note).toContainText("is armed");
+    expect(await note.evaluate(layerIcons)).toBe(1);
+});
+
+test("Lighting names the layer whose colour and accents it edits by its icon", async ({page}) => {
+    await openControls(page, "lighting", {stage: "layers", layer: 1});
+    expect(await page.locator("h4", {hasText: / colour$/}).first().evaluate(layerIcons)).toBe(1);
+    const accents = page.locator('[data-accents="layer"]');
+    const when = accents.locator(".note", {hasText: "is on, with those for every layer"});
+    expect(await accents.locator("h4").evaluate(layerIcons)).toBe(1);
+    expect(await when.evaluate(layerIcons)).toBe(1);
+});
+
 test("the layer bar keeps its swatches, Settings' per-layer switches mark their layers, and a layer's icon goes grey with its stage", async ({page}) => {
     await openControls(page, "keys");
     const bar = await page.locator(".layer-tabs").first().evaluate(marksIn);

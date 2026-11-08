@@ -1229,6 +1229,8 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .mk > span { overflow-wrap: break-word; }
 /* The words carry the baseline, so they line up with the words around them however tall the mark. */
 .mk > span:last-child { align-self: baseline; }
+/* A bracket or stop beside a mark in a sentence stays on its line (phraseMarked). */
+.mk-glued { white-space: nowrap; }
 /* Reserve separate branch and tier tracks even when one mark is absent. */
 .mk-slot { display: inline-grid; grid-template-columns: 24px 7px; justify-items: end; align-items: center; gap: var(--sp-1); width: 35px; flex: none; }
 .mk-slot > .fbdot { grid-column: 2; }

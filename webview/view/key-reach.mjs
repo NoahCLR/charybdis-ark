@@ -12,11 +12,11 @@ import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds} from "./beh
 import {comboBehaviours} from "./combo-reach.mjs";
 import {customKeyOf, customKeyShortcutOnly, hasShortcut} from "./custom-key.mjs";
 import {pdColourRow} from "./lighting.mjs";
-import {vocabulary, word} from "./vocabulary.mjs";
+import {phrasesJoined, vocabulary, word} from "./vocabulary.mjs";
 
 /**
  * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
- * @typedef {{kind: "tapHold", term: {ms: string}, holdAction: string, note: string} | {kind: "off"} | {kind: "inert"} | null} BehaviourLead
+ * @typedef {{kind: "tapHold", term: {ms: string}, holdAction: string, note: import("./vocabulary.mjs").Phrase} | {kind: "off"} | {kind: "inert"} | null} BehaviourLead
  * @typedef {import("../../contracts/panel.js").ComboView} ComboView
  */
 
@@ -109,12 +109,12 @@ export function keyBehaviour(model, layer, position) {
 // threshold with it: the key waits its default, the dual-role threshold. A
 // layer-tap's hold reads as the grid's built-in Hold does: the layer action
 // the core says it holds (`holdAction`), else the layer or modifier itself.
-/** @param {Model} model @param {import("../../contracts/panel.js").Position} position @param {NonNullable<ReturnType<typeof dualRole>>} role @param {import("./keyface-types.js").KeyIdentity["behaviour"]} behaviour @param {{runs: boolean, reasons: string[]}} use @param {string} inertNote @returns {BehaviourLead} */
+/** @param {Model} model @param {import("../../contracts/panel.js").Position} position @param {NonNullable<ReturnType<typeof dualRole>>} role @param {import("./keyface-types.js").KeyIdentity["behaviour"]} behaviour @param {{runs: boolean, reasons: import("./vocabulary.mjs").Phrase[]}} use @param {string} inertNote @returns {BehaviourLead} */
 function tapHold(model, position, role, behaviour, use, inertNote) {
     const row = behaviourEditorRow(model, keyMeaning(position));
     const fallback = row?.timingDefaults?.tapHoldTerm ?? model?.behaviorTimingDefaults?.tappingTerm;
     const term = use.runs && behaviour ? behaviourThresholds(model, behaviour).tapHoldTerm : {ms: fallback === undefined ? "" : String(fallback)};
     const holdAction = "layer" in role.hold && row?.builtIn?.hold ? row.builtIn.hold.action : "";
-    const note = behaviour && !use.runs ? `Its behaviour is not used: ${use.reasons.join("; ")}. The key keeps this tap and hold.` : inertNote;
+    const note = behaviour && !use.runs ? ["Its behaviour is not used: ", ...phrasesJoined(use.reasons, "; "), ". The key keeps this tap and hold."] : inertNote ? [inertNote] : [];
     return {kind: "tapHold", term, holdAction, note};
 }

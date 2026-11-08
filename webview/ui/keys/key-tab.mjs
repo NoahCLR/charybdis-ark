@@ -5,7 +5,7 @@
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {foldOpen, keepFold} from "../disclosure.mjs";
 import {keyLed} from "../../view/lighting.mjs";
-import {sentence, slotNamed, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
+import {phraseSentence, phrasesJoined, slotNamed, vocabulary, layerCalled} from "../../view/vocabulary.mjs";
 import {keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
 import {keyIdentity} from "../../view/key-identity.mjs";
 import {keyReachAt} from "../../view/key-reach.mjs";
@@ -15,7 +15,8 @@ import {participationAt, thisKeyOnThisLayer} from "../../view/participation.mjs"
 import * as edits from "../../view/edits.mjs";
 import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
 import {keyProblem} from "../../view/keycode-expression.mjs";
-import {actionMarked, comboBadge, comboOutputMarked, keyNameMarked, layerIconOff, mark, marked} from "../marks.mjs";
+import {actionMarked, comboBadge, comboOutputMarked, keyNameMarked, layerIconOff, layerMarked, mark, marked, phraseMarked} from "../marks.mjs";
+/** @typedef {import("../../view/vocabulary.mjs").Phrase} Phrase */
 import {customKeyBypassText, customKeyOf} from "../../view/custom-key.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {pickKeycodeFor} from "./key-edits.mjs";
@@ -40,12 +41,12 @@ export function tabKey(body) {
     const {behaviour, use: behaviourUse} = reach?.pressed ?? {behaviour: undefined, use: {runs: false, reasons: []}};
     const combos = reach?.own.combos ?? [];
     const slot = reach?.own.pointing?.slot;
-    /** @param {string[]} reasons */
-    const notUsed = (reasons) => ` · <span class="dim">not used: ${esc(reasons.join("; "))}</span>`;
+    /** @param {Phrase[]} reasons */
+    const notUsed = (reasons) => ` · <span class="dim">not used: ${phraseMarked(model, phrasesJoined(reasons, "; "))}</span>`;
 
     const node = el(`<div class="tab-grid three">
         <section>
-            <div class="sect-h"><h4>${esc(sentence(thisKeyOnThisLayer(model, layerCalled(layer))))}</h4></div>
+            <div class="sect-h"><h4>${phraseMarked(model, phraseSentence(thisKeyOnThisLayer(model, layer)))}</h4></div>
             <div class="field"><span>Keycode</span>
                 <div class="input-row"><input class="input mono" id="keycodeField" data-f="key:${esc(layer.index)}:${esc(position?.layoutIndex)}:keycode" value="${esc(keyMeaning(position))}" ${gate.editable ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${gate.editable ? "" : "disabled"}>Pick…</button></div></div>
@@ -65,14 +66,14 @@ export function tabKey(body) {
         <section>
             <div class="sect-h"><h4>This key on every layer</h4></div>
             <div class="stacklist">${stackRows(model, layer, position)}</div>
-            <p class="note stack-note">The highest layer on wins; a transparent key takes the next one down. ${esc(layerCalled(layers()[0]))} is always on.</p>
+            <p class="note stack-note">The highest layer on wins; a transparent key takes the next one down. ${layerMarked(model, layers()[0])} is always on.</p>
         </section>
         <section>
             <div class="sect-h"><h4>What this key reaches</h4></div>
             <div class="stack key-reaches">
                 <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours" ${behaviourOpen ? "" : "disabled"}>
                     <span class="rl">Behaviour</span>
-                    <span class="rv">${behaviour ? `${actionMarked(model, behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}${behaviourOpen && followed.from ? ` · from ${esc(layerCalled(followed.from))}` : ""}${behaviour && !behaviourUse.runs ? notUsed(behaviourUse.reasons) : ""}</span>
+                    <span class="rv">${behaviour ? `${actionMarked(model, behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}${behaviourOpen && followed.from ? ` · from ${layerMarked(model, followed.from)}` : ""}${behaviour && !behaviourUse.runs ? notUsed(behaviourUse.reasons) : ""}</span>
                     <span class="ra">${behaviour ? "Edit" : "Open"}</span></button>
                 <button class="reach ${combos.length ? "" : "empty"}" data-goto="combos">
                     <span class="rl">Combos</span>
@@ -127,12 +128,12 @@ export function tabKey(body) {
         // These switches are one key's on one layer; say so, and where the
         // wider ones are, or they read as the layer's.
         const controls = el(`<div class="stack key-participation">
-            <div class="sect-h"><h4>Behaviour and combos for ${esc(inherited ? `${vocabulary(model).participationPlaces.keyOn} ${layerCalled(source)}` : thisKeyOnThisLayer(model, layerCalled(source)))}</h4></div>
-            ${inherited ? `<p class="note">This key is transparent on this layer (${esc(layerCalled(layer))}), so its switches on ${esc(layerCalled(source))} decide.</p><button class="btn tiny" data-source-layer>Open this key on ${esc(layerCalled(source))}</button>` : `
+            <div class="sect-h"><h4>Behaviour and combos for ${inherited ? `${esc(vocabulary(model).participationPlaces.keyOn)} ${layerMarked(model, source)}` : phraseMarked(model, thisKeyOnThisLayer(model, source))}</h4></div>
+            ${inherited ? `<p class="note">${phraseMarked(model, ["This key is transparent on this layer (", {layer}, "), so its switches on ", {layer: source}, " decide."])}</p><button class="btn tiny" data-source-layer>Open this key on ${esc(layerCalled(source))}</button>` : `
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${gate.editable ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
             <label class="sw"><input type="checkbox" data-f="key:${esc(source.index)}:${esc(key.layoutIndex)}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${gate.editable ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
             ${inherited ? "" : `<p class="note">For every key, use the behaviour's or combo's own switch; for a whole layer, Settings.</p>`}
-            <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behaviour ? "runs here" : "none on this key")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "can take part")}.</p>
+            <p class="note">Behaviour: ${bp.reasons.length ? phraseMarked(model, phrasesJoined(bp.reasons, "; ")) : behaviour ? "runs here" : "none on this key"}. Combos: ${cp.reasons.length ? phraseMarked(model, phrasesJoined(cp.reasons, "; ")) : "can take part"}.</p>
             ${customKeyBypassText(customKeyOf(model, keyIdentity(model, keyMeaning(key)).canonical)) ? `<p class="note">${esc(customKeyBypassText(customKeyOf(model, keyIdentity(model, keyMeaning(key)).canonical)))}</p>` : ""}
         </div>`);
         /** @type {HTMLElement | null} */ (controls.querySelector("[data-source-layer]"))?.addEventListener("click", () => {showLayer(layers().indexOf(source)); render();});
@@ -166,6 +167,8 @@ function stackRows(model, layer, position) {
             <code class="dim">${face.kind === "transparent" ? "" : esc(visibleKeycode(model, there?.keycode || ""))}</code></button>`;
     };
     let html = "", run = /** @type {typeof rows} */ ([]);
+    // A folded run has one grey icon for all its layers (layerIconOff), so the
+    // two it names read as words: a mark each would cut the line short.
     const flush = () => {
         if (run.length >= 3 && !foldOpen("key:stack")) html += `<button class="stackrow folded" data-stack-open data-tip="Show each of these layers">
             <span class="mk-slot">${layerIconOff()}</span><span class="nm">${run.length} layers</span>
@@ -192,7 +195,8 @@ function answeredBelow({previewing, answerAt, layer}, position) {
     if (!previewing || !position) return "";
     const answer = answerAt(position.layoutIndex);
     if (!answer?.fellThrough) return "";
-    return `<p class="note answered-below">In this preview <b>${esc(layerCalled(answer.layer))}</b> answers here
-        with ${keyNameMarked(getModel(), keyName(answer.position, getModel()), keyMeaning(answer.position))}, through a transparent key. A keycode set here
-        is stored on ${esc(layerCalled(layer))} and wins over it.</p>`;
+    const model = getModel();
+    return `<p class="note answered-below">In this preview <b>${layerMarked(model, answer.layer)}</b> answers here
+        with ${keyNameMarked(model, keyName(answer.position, model), keyMeaning(answer.position))}, through a transparent key. A keycode set here
+        is stored on ${layerMarked(model, layer)} and wins over it.</p>`;
 }
