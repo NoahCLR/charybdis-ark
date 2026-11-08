@@ -16,6 +16,7 @@ import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks, checkLevelWord} from "../../view/checks.mjs";
 import {behaviourChangesNothing, behaviourTimingEdit, behaviourTimingField, behaviourTimingProblem} from "../../view/behavior-editor.mjs";
+import {timingDigits} from "../../view/timing-input.mjs";
 import {actionMarked, branchBadge, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, sentence, styleWord, tierName, vocabulary, word, layerCalled} from "../../view/vocabulary.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
@@ -96,7 +97,7 @@ export function behaviourEditor(behaviour, {head = true} = {}) {
         const placeholder = field.fallback === "" ? "default unavailable" : field.placeholder;
         const invalid = refused?.term === name ? ' aria-invalid="true" aria-describedby="timing-problem"' : "";
         return `<label class="field inline bterm-field" data-term-field="${esc(name)}" data-tip="${esc(`${thresholdTips[name]} ${timingFallbackNote(model, behaviour, name)}`)}"><span>${marked(model, settingGoverns(model, name), sentence(thresholdNames[name]), {slot: true})}</span>
-            <span class="affix unit"><input class="input mono num" style="--digits: ${esc(Math.max(5, placeholder.length))}" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
+            <span class="affix unit"><input class="input mono num" style="--digits: ${esc(timingDigits(placeholder))}" data-f="behaviour:${esc(behaviour.keycode)}:timing:${esc(name)}" data-term="${esc(name)}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
                 placeholder="${esc(placeholder)}"${invalid} ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 
