@@ -23,15 +23,6 @@ export function tabCombos(body, right) {
     const canEdit = editGate(model, "combos").editable;
 
     right.replaceChildren();
-    // New combo opens the builder on a new combo; the builder closes itself
-    // (Cancel, Escape), so this never doubles as its close.
-    const building = state.combo.open && state.combo.editId === null;
-    const toggle = el(`<button class="btn tiny" data-act="new-combo" ${canEdit && !building ? "" : "disabled"}>New combo</button>`);
-    toggle.addEventListener("click", () => {
-        openComboBuilder(null, edits.comboDefaultWindowValue(model));
-        render();
-    });
-    right.appendChild(toggle);
 
     const node = el(`<div class="tab-split wide">
         <div id="comboTable"></div>
@@ -103,8 +94,18 @@ export function tabCombos(body, right) {
         }
         render();
     }));
+    // New combo heads the column the builder opens in, centred on the
+    // table's first group band. It stays put while the builder is open, off
+    // while that builder is a new combo's: it never doubles as its close
+    // (Cancel, Escape).
     const side = /** @type {HTMLElement} */ (node.querySelector("#comboSide"));
-    side.appendChild(state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model, undefined)) : el(`<div class="empty-card">
-        <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board.</p></div>`));
+    const building = state.combo.open && state.combo.editId === null;
+    const add = el(`<button type="button" class="new-tile" data-act="new-combo" ${canEdit && !building ? "" : "disabled"}><span aria-hidden="true">+</span>New combo</button>`);
+    add.addEventListener("click", () => {
+        openComboBuilder(null, edits.comboDefaultWindowValue(model));
+        render();
+    });
+    side.append(add, state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model, undefined)) : el(`<div class="empty-card">
+        <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board. Pick a combo in the list to edit it.</p></div>`));
     body.replaceChildren(node);
 }

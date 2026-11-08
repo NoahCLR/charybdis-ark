@@ -305,6 +305,11 @@ The same kind of control looks and sits the same on every screen.
   not fit an arrow at each end, outside what scrolls, moves it a page; Rename &
   reorder stays outside it (`keepInView`, `webview/ui/layerbar.mjs`).
   Lighting's stage tabs and All accents fit a 1440px window (no test).
+- A Keymap workbench tab's own actions sit in its body, by what they open:
+  New combo heads the combo builder's column, centred on the table's first
+  group band, and stays put when the builder opens under it. The tab bar carries only a tab's way to its screen, centred on the bar
+  (`tabCombos`, `webview/ui/keys/combos-tab.mjs`;
+  `browser-tests/keys-workbench.spec.js`).
 - A stage's on/off switch rides at the far end of the header line of the
   section that says where or when the stage paints (Where it paints, When and
   where, Timing), the body's last column, never in the tab strip or on a row
