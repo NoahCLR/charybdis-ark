@@ -18,7 +18,7 @@ import {attachLayersControl} from "./layers.mjs";
 import {topbar} from "./frame.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {stageBody} from "./lighting/stage-body.mjs";
-import {accentPicks, editingOn, pickLed} from "./lighting/accents.mjs";
+import {accentPicks, editingOn, glowShown, pickLed} from "./lighting/accents.mjs";
 import {holdComboFrom} from "../view/combo-held.mjs";
 import {lightingBoard} from "../view/lighting-board.mjs";
 import {durationControl} from "./duration.mjs";
@@ -69,6 +69,9 @@ export function screenLighting() {
         onLed: editing ? (led, starting) => pickLed(model, stage, led, starting) : undefined,
     }));
     if (editing) drawn.classList.add("picking-leds");
+    // The accent clicked in a list keeps its LEDs glowing, however far the
+    // list is scrolled.
+    glowShown(model, drawn);
     // The caption lies over the board's bottom-left corner, which the drawing
     // leaves empty, and wraps there, so the card stays as tall as the
     // Keymap's and the caption is read whole; while LEDs are picked, the

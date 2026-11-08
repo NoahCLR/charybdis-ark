@@ -124,6 +124,11 @@ export const STATE_FIELDS = {
     // its stage's instead. It names a row by its place, so a draft replaced
     // under it drops it unkept.
     accent: resets(null),
+    // The accent clicked in a Lighting list, its LEDs glowing on the board
+    // until it is clicked again: {stage, key}, a stage's tab naming it by its
+    // table and place, All accents an owner's by its table and name. A place
+    // a replaced draft may move, it starts again.
+    accentShown: resets(null),
     overlay: kept(null),
     leaveDemo: kept(null),     // {ask, message}: leaving the demo (or replacing its file) waiting on its question
     modeAsk: kept(null),       // {mode, question}: a switch of edit mode waiting on Save/Revert or Send/Discard

@@ -1342,7 +1342,15 @@ which shows them in its colour, the stage's when it takes the stage's
 (`stageShade`); nothing posts until it is kept, and a changed accent keeps its
 place in its table (`browser-tests/lighting-controls.spec.js`). An unkept
 accent names its row by place, so a draft replaced under it drops it
-(`tests/view/state-fields.test.mjs`).
+(`tests/view/state-fields.test.mjs`). Pointing at an accent in a list, or at
+an owner's line on All accents, glows its LEDs on the board; a click on the
+row, or Enter or Space on the button naming it (`aria-pressed`), keeps them
+glowing across redraws and scrolling until it is clicked again or another
+is, and pointing at another shows that one only while pointed at
+(`shownLeds`, `webview/ui/lighting/accents.mjs`;
+`browser-tests/lighting-controls.spec.js`). The accent shown names its row by
+place, so a replaced draft lets it go, and none is shown while an accent is
+added or changed.
 
 Brightness is absolute HSV; the reported limit constrains editing and never
 rescales a read (`tests/session/base-rgb.test.js`). Pass-through is zero
