@@ -83,3 +83,22 @@ test("a key a macro cannot send is refused by name, never mistaken for another k
     }
     assert.throws(() => read("{KC_A,KC_A}"), (error) => error.problem?.code === "chord", "the same key twice is still one chord key twice");
 });
+
+// The keyboard report has six key slots whatever the build (firmware D-F65).
+test("encoding holds a macro to six keys at once besides modifiers; decoding reads a stored one as it is", () => {
+    const seven = "{KC_E,KC_Y,KC_K,KC_SEMICOLON,KC_P,KC_0,KC_U}";
+    assert.throws(() => encodeMacroPayload(seven), error => error.code === "INVALID_MACRO" && error.problem?.code === "reportFull");
+    assert.doesNotThrow(() => encodeMacroPayload("{KC_LGUI,KC_LALT,KC_LCTL,KC_LSFT,KC_E,KC_Y,KC_K,KC_SEMICOLON,KC_P,KC_0}"));
+    const keys = [0x08, 0x1c, 0x0e, 0x33, 0x13, 0x27, 0x18];
+    const stored = Buffer.from([...keys.slice(0, -1).flatMap(key => [1, 2, key]), 1, 1, keys.at(-1), ...keys.slice(0, -1).reverse().flatMap(key => [1, 3, key])]);
+    assert.equal(decodeMacroPayload(stored), seven);
+});
+
+// Core counts every key but a modifier as taking a report slot. That is the
+// firmware's set (keyboard keys, IS_BASIC_KEYCODE) only because a macro sends
+// nothing else: no system, consumer (media) or mouse key.
+test("a macro sends keyboard keys and modifiers only, so every key but a modifier takes a report slot", () => {
+    const {encode} = require("../../core/schema/keycodes");
+    const values = macroKeycodes().map(name => encode(name));
+    assert.ok(values.every(value => (value >= 0x04 && value <= 0xa4) || (value >= 0xe0 && value <= 0xe7)));
+});

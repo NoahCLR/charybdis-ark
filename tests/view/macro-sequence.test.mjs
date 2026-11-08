@@ -57,3 +57,20 @@ test("choosing a first step replaces only a sole empty text step and preserves w
     assert.deepEqual(appendSequenceStep([written], delay), [written, delay], "literal whitespace is content");
     assert.deepEqual(appendSequenceStep([written, blank], delay), [written, blank, delay]);
 });
+
+test("a step that would hold more than six keys at once besides modifiers is marked, held keys and text counting with it (firmware D-F65)", () => {
+    const words = "A macro holds at most 6 keys at once besides modifiers.";
+    const model = {macroPayloadModifierKeycodes: ["KC_LEFT_GUI", "KC_LGUI", "KC_LEFT_SHIFT", "KC_LSFT"], vocabulary: {macroProblems: {reportFull: words}}};
+    const tap = (...keys) => ({kind: "tap", keys}), press = key => ({kind: "press", keys: [key]}), release = key => ({kind: "release", keys: [key]});
+    assert.deepEqual(sequenceIssues([tap("KC_E", "KC_Y", "KC_K", "KC_SCLN", "KC_P", "KC_0", "KC_U")], model), [words]);
+    assert.deepEqual(sequenceIssues([tap("KC_LGUI", "KC_LSFT", "KC_E", "KC_Y", "KC_K", "KC_SCLN", "KC_P", "KC_0")], model), [""]);
+    const held = ["KC_A", "KC_B"];
+    assert.deepEqual(sequenceIssues([...held.map(press), tap("KC_C", "KC_D", "KC_E", "KC_F", "KC_G"), ...held.map(release)], model), ["", "", words, "", ""]);
+    assert.deepEqual(sequenceIssues([...held.map(press), tap("KC_C", "KC_D", "KC_E", "KC_F"), ...held.map(release)], model), ["", "", "", "", ""]);
+    const six = ["KC_A", "KC_B", "KC_C", "KC_D", "KC_E", "KC_F"];
+    assert.equal(sequenceIssues([...six.map(press), press("KC_G")], model)[6], words);
+    assert.equal(sequenceIssues([...six.map(press), {kind: "text", text: "z"}, ...six.map(release)], model)[6], words, "text needs a slot of its own");
+    assert.equal(sequenceIssues([...six.slice(1).map(press), {kind: "text", text: "z"}, ...six.slice(1).map(release)], model)[5], "");
+    assert.equal(sequenceIssues([...six.map(press), {kind: "text", text: ""}, ...six.map(release)], model)[6], "", "an empty text types nothing, as core reads it");
+    assert.deepEqual(sequenceIssues([tap("KC_E", "KC_Y", "KC_K", "KC_SCLN", "KC_P", "KC_0", "KC_U")], null), [""], "without the modifiers, core alone says it");
+});

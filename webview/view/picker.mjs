@@ -8,7 +8,8 @@ import {pickerExpression} from "./edits.mjs";
 import {keycodeModifiers, modifierPick, pickerModifierProblem} from "./keyvalues.mjs";
 import {keycodeValue} from "./keycode-expression.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "./picker-sections.mjs";
-import {macroMatches} from "./macro.mjs";
+import {macroMatches, ordinaryKey} from "./macro.mjs";
+import {chordOverfills} from "../../rules/macro-payload.mjs";
 import {shortcutModifiers, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickChord, shortcutPickModifier, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
 import {catalogEntry, keyIdentity, sameKey} from "./key-identity.mjs";
 import {vocabulary} from "./vocabulary.mjs";
@@ -70,14 +71,16 @@ export function openingPick(model, picker, keys) {
 // them on (shortcutPickKey). In a picker for one key a modifier key is its
 // button in the row: it lights or unlights the modifier and leaves the key
 // picked. Otherwise a list adds or takes out the key, and a picker for one
-// key picks it alone.
+// key picks it alone. A list held to the report's key slots (a macro's chord,
+// firmware D-F65) takes six keys besides its modifiers.
 /** @param {Model} model @param {Picker} picker @param {string} chosen @returns {Partial<Picker> | null} */
 export function pickKey(model, picker, chosen) {
     if (picker.shortcut || heldModifiers(model, picker, chosen)) return shortcutPickKey(model, picker, chosen);
     if (picker.mode !== "list") return {keys: [chosen]};
     if (picker.keys.includes(chosen)) return {keys: picker.keys.filter((key) => key !== chosen)};
     if (picker.maxKeys === 1) return {keys: [chosen]};
-    return picker.keys.length >= picker.maxKeys ? null : {keys: [...picker.keys, chosen]};
+    const reportFull = Boolean(picker.heldToReport) && chordOverfills([...picker.keys, chosen], ordinaryKey(model?.macroPayloadModifierKeycodes));
+    return picker.keys.length >= picker.maxKeys || reportFull ? null : {keys: [...picker.keys, chosen]};
 }
 
 // A modifier lit or unlit in the row, or by its chip's ×.

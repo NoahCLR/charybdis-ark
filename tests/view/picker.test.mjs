@@ -143,6 +143,9 @@ test("a click picks by the picker's kind: one key alone, a list in order up to i
     assert.deepEqual(pickKey(model, picker({mode: "list", keys: ["KC_A", "KC_B"]}), "KC_A"), {keys: ["KC_B"]}, "a second click takes it out");
     assert.equal(pickKey(model, picker({mode: "list", maxKeys: 2, keys: ["KC_A", "KC_B"]}), "KC_C"), null, "a full list picks nothing");
     assert.deepEqual(pickKey(model, picker({mode: "list", maxKeys: 1, keys: ["KC_A"]}), "KC_C"), {keys: ["KC_C"]}, "a list of one swaps");
+    const six = ["KC_A", "KC_B", "KC_C", "KC_D", "KC_E", "KC_F"];
+    assert.equal(pickKey(model, picker({mode: "list", maxKeys: 16, heldToReport: true, keys: six}), "KC_G"), null, "a chord takes six keys besides modifiers (firmware D-F65)");
+    assert.deepEqual(pickKey(model, picker({mode: "list", maxKeys: 16, heldToReport: true, keys: six}), "KC_LGUI"), {keys: [...six, "KC_LGUI"]}, "and modifiers beside them");
     assert.deepEqual(pickModifier(picker({mods: ["G"]}), "G").mods, [], "the row's button unlights");
     assert.deepEqual(dropKey(picker({mode: "list", keys: ["KC_A", "KC_B"]}), 0), {keys: ["KC_B"]});
 });

@@ -134,6 +134,8 @@ export interface MacroOptions {
     textEntry?: boolean;
     layout?: number;
     protection?: 'auto' | 'on' | 'off';
+    /** Whether held ordinary keys are held to the report's six key slots (firmware D-F65): an edit is, a stored macro is read as it is. */
+    heldToReport?: boolean;
 }
 
 export interface PdTap {keycode: number; modifierPolicy: number; mask: number}
