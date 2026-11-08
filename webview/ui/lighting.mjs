@@ -70,12 +70,12 @@ export function screenLighting() {
     }));
     if (editing) drawn.classList.add("picking-leds");
     // The caption lies over the board's bottom-left corner, which the drawing
-    // leaves empty, so the card stays as tall as the Keymap's; while LEDs
-    // are picked, the instructions take a row under the board instead, as
-    // the Keymap's layer preview does, so none of them is cut.
+    // leaves empty, and wraps there, so the card stays as tall as the
+    // Keymap's and the caption is read whole; while LEDs are picked, the
+    // instructions take a row under the board instead, so none of them is cut.
     const foot = el(`<div class="board-foot">
         <b>${editing ? "Picking LEDs" : "Preview"}</b>
-        <span class="board-foot-text" data-tip="${esc(shows.caption)}">${editing
+        <span class="board-foot-text"${editing ? ` data-tip="${esc(shows.caption)}"` : ""}>${editing
             ? `Click or drag across keys to pick the accent's LEDs, or take them back · ${esc(editing.leds.length)} picked`
             : esc(shows.caption)}</span>
     </div>`);

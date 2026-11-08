@@ -179,8 +179,9 @@ behind, such as a layer nothing reaches any more.
 
 ⌘-click more tabs to see layers on together, the way the keyboard resolves
 them. The highest one is where your edits go. Keys answered from a lower layer
-are frosted, with that layer's light and legend. The line under the board
-says which layers are on.
+are frosted, with that layer's light and legend. The line in the board's
+bottom-left corner says which layers are on, wrapping onto more lines when it
+is long. The board keeps its size either way.
 
 ⌘-click a layer again to take it out, or click any tab to go back to one
 layer. The preview carries over to the Lighting screen.

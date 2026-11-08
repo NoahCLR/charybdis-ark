@@ -573,11 +573,12 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .board-foot > * { flex: none; }
 .board-foot > .board-foot-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .board-foot b { color: var(--text); font-weight: var(--fw-strong); }
-/* Lighting's caption lies over the board's bottom-left corner, which the
-   drawing leaves empty to a third of its width at any window, so its card
-   is as tall as the Keymap's; a longer caption ends in an ellipsis and says
-   the rest on hover. */
-.board > .board-foot { position: absolute; left: 0; bottom: 0; max-width: 34%; }
+/* A caption on the board (Lighting's, the Keymap's layer preview) lies over
+   its bottom-left corner, which the drawing leaves empty to a third of its
+   width and well above its foot at any window, so the card is as tall with
+   it as without. A longer caption wraps upward into that corner, whole. */
+.board > .board-foot { position: absolute; left: 0; bottom: 0; max-width: 34%; height: auto; min-height: 34px; align-items: baseline; white-space: normal; }
+.board > .board-foot > .board-foot-text { overflow: visible; }
 .board-foot .right { margin-left: auto; display: flex; gap: var(--sp-2); }
 /* A layer named elsewhere as a link to it (Macros) is a chip. */
 .layer-chip {

@@ -12,7 +12,7 @@ import {el, esc, watchPressOutside} from "../../lib/dom.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {getModel, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
-import {layerCalled} from "../../view/vocabulary.mjs";
+import {layerCalled, layersOnTop} from "../../view/vocabulary.mjs";
 import {draftDot} from "../../view/review.mjs";
 import {editWords} from "../../view/edit-mode.mjs";
 import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
@@ -21,15 +21,13 @@ import {modifierKey, shortcut} from "../../view/shortcuts.mjs";
 import {REACH_ICONS} from "../../view/screens.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
-// order they win. Clicking any tab goes back to one layer.
+// order they win, in the words Lighting's preview uses (layersOnTop).
+// Clicking any tab goes back to one layer. It lies on the board and wraps
+// there, so it is read whole, with no tip to repeat it.
 /** @param {import("../../view/keyface-types.js").LayerView} view */
-export function previewFoot({layer, held, stack}, lead = "") {
-    const under = held.filter((at) => at > 0).reverse().map((at) => layerCalled(stack[at]));
-    const text = `${layerCalled(layer)} on top of ${[...under, layerCalled(stack[0])].join(", ")}`
-        + ` · keys seen through from below are frosted · edits go to ${layerCalled(layer)}`;
-    return el(`<div class="board-foot">${lead}
-        <span class="board-foot-text" data-tip="${esc(text)}"><b>${esc(layerCalled(layer))}</b> on top of ${esc([...under, layerCalled(stack[0])].join(", "))}
-            · keys seen through from below are frosted · edits go to ${esc(layerCalled(layer))}</span></div>`);
+export function previewFoot(view) {
+    return el(`<div class="board-foot"><b>Preview</b>
+        <span class="board-foot-text">${esc(layersOnTop(view))} · keys seen through from below are frosted · edits go to ${esc(layerCalled(view.layer))}</span></div>`);
 }
 
 export function placementBar() {

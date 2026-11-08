@@ -109,6 +109,17 @@ export const editModeWords = (model, mode) => /** @type {Readonly<Partial<Record
 /** @param {readonly string[]} names */
 export const listed = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 
+// The layers a board shows, top first, as Keymap and Lighting both caption
+// them: the layer on top, then those previewed under it, down to the base:
+// "Function on top of Pointing, Number and Base", or "Base" alone.
+/** @param {Pick<import("./keyface-types.js").LayerView, "layer" | "held" | "stack">} view */
+export function layersOnTop({layer, held, stack}) {
+    const base = stack[0];
+    const under = held.filter((at) => at > 0).reverse().map((at) => layerCalled(stack[at]));
+    if (base && layer !== base) under.push(layerCalled(base));
+    return `${layerCalled(layer)}${under.length ? ` on top of ${listed(under)}` : ""}`;
+}
+
 // Words written mid-sentence, starting one: the first letter capitalised.
 /** @param {string} text */
 export const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);

@@ -86,8 +86,10 @@ export function screenKeys() {
         onSwap: gate.editable ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
     }));
     // How the layer is lit belongs to Lighting; the foot here only says
-    // which layers a held preview stacks.
-    if (view.previewing) card.appendChild(previewFoot(view));
+    // which layers a held preview stacks. It lies over the board's
+    // bottom-left corner, as Lighting's does, so the card keeps its height
+    // whether one layer is shown or several.
+    if (view.previewing) drawn.appendChild(previewFoot(view));
     card.append(bar);
     linkTabPanel(/** @type {HTMLElement | null} */ (bar.querySelector(".layer-tabs")), drawn);
     stage.append(card, legend(model));

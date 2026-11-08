@@ -1292,7 +1292,12 @@ it for (`ownerLayer`), following the firmware's membership, pass-through and
 inheritance rules. The order the stages paint in, and the
 two "no colour" rules, are the shared compositor (`rules/led-light.mjs`,
 D-L73); `webview/view/lighting.mjs` gathers what each stage paints from the
-model (`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`).
+model (`tests/rules/led-light.test.mjs`, `tests/view/lighting.test.mjs`). The caption
+on the board names those layers as the Keymap's layer preview does, top
+first down to the base ("Function on top of Pointing and Base, over the
+background effect"; `layersOnTop` in `webview/view/vocabulary.mjs`,
+`tests/view/vocabulary.test.mjs`), each screen adding only its own words:
+the Keymap where edits go, Lighting what the stage holds.
 
 On Pointing modes the board always shows the picked mode running, as it
 paints with no layer it is linked to on, and on Combo feedback one combo held,
