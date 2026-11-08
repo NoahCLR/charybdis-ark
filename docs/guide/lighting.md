@@ -172,7 +172,9 @@ Every key on the board carries its LED's number on a small label over its
 top-left corner, and the trackball in its middle; the keys' legends stay as
 they are on the Keymap. Accents name their LEDs by those numbers: **LEDs
 24–28, 53–55**.
-Point at an accent in a list and its LEDs glow on the board.
+Point at an accent in a list and its LEDs glow on the board. Click it to keep
+them glowing while you scroll the list or point at others; click it again to
+let go.
 
 1. **Add accent**, then click keys on the board to pick their LEDs, or drag
    across keys to pick each one the drag crosses. Clicking a picked key takes
@@ -198,7 +200,8 @@ An accent of a combo or a feedback state lights the same LEDs whichever combo
 or key caused it.
 
 **All accents**, after the stages, lists every accent by the stage that paints
-it and who it lights for; **Open** goes to it on its stage's tab.
+it and who it lights for; click a line to keep its LEDs glowing on the board,
+and **Open** goes to it on its stage's tab.
 
 The keyboard holds at most 640 accents, 255 on any one stage, and 128
 different LED sets across every stage (older firmware holds 32 accents and 16

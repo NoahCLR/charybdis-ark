@@ -369,6 +369,42 @@ test("All accents lists every accent by stage and owner, and Open shows it on it
     expect(await posted(page)).toEqual([]);
 });
 
+test("A clicked accent keeps its LEDs glowing on the board until it is clicked again", async ({page}) => {
+    const glowing = () => page.locator(".board [data-led].led-hover").evaluateAll((groups) =>
+        groups.map((group) => Number(/** @type {HTMLElement} */ (group).dataset.led)).sort((a, b) => a - b));
+    const leds = [24, 25, 26, 27, 28, 53, 54, 55];
+    await openStage(page, "accents");
+    const line = body(page).locator(".accents-overview .accent-row").nth(0);
+    const name = line.getByRole("button", {name: "Every pointing mode"});
+    // Pointing glows them only while pointed at.
+    await line.hover();
+    expect(await glowing()).toEqual(leds);
+    await page.mouse.move(0, 0);
+    expect(await glowing()).toEqual([]);
+    // A click anywhere on the line keeps them, across a redraw.
+    await line.locator(".accent-colours").click();
+    await page.mouse.move(0, 0);
+    await expect(name).toHaveAttribute("aria-pressed", "true");
+    await expect(line).toHaveAttribute("data-picked", "true");
+    expect(await glowing()).toEqual(leds);
+    await page.evaluate(async () => (await import("/webview/store.mjs")).render());
+    expect(await glowing()).toEqual(leds);
+    // Enter on the name lets go of it.
+    await name.focus();
+    await page.keyboard.press("Enter");
+    await expect(name).toHaveAttribute("aria-pressed", "false");
+    expect(await glowing()).toEqual([]);
+    // On a stage's tab an accent is shown the same way, and not while one is changed.
+    await openStage(page, "pd");
+    const row = body(page).locator('[data-accents="pdMode"] .accent-row').first();
+    await row.locator(".accent-leds").click();
+    await page.mouse.move(0, 0);
+    expect(await glowing()).toEqual(leds);
+    await row.getByRole("button", {name: "Change", exact: true}).click();
+    expect(await glowing()).toEqual([]);
+    expect(await posted(page)).toEqual([]);
+});
+
 test("Pointing modes and Combo feedback always preview what they picked, and screen links navigate without posting edits", async ({page}) => {
     await openStage(page, "pd");
     await expect(page.locator(".board-foot-text")).toContainText("Dragscroll held, painting right half");

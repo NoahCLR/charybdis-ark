@@ -2085,6 +2085,12 @@ select.input.pd-add { height: var(--h-chip); width: 124px; min-width: 0; padding
 .accent-row:hover { border-color: var(--line-3); }
 .accent-row.from { border-style: dashed; color: var(--text-2); }
 .accent-row .right { margin-left: auto; }
+/* A click shows an accent on the board until clicked again (ui/lighting/
+   accents.mjs showsOnBoard), shaded with the bar a picked table row has; its
+   name is the row-pick button the keyboard reaches. */
+.accent-row[data-accent], .accent-row[data-owner] { cursor: pointer; }
+.accent-row[data-picked] { background: var(--surface-3); box-shadow: inset 2px 0 0 var(--text); }
+.accent-row .row-pick { text-align: left; }
 .accent-leds { font-size: var(--fs-md); color: var(--text); }
 .accent-colour { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .accent-colours { display: inline-flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }

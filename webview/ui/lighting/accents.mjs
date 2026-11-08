@@ -16,6 +16,7 @@ import {vocabulary} from "../../view/vocabulary.mjs";
 import {accentBudget, accentOwner, accentsFor, accentsWhen, allAccents, everyOwner, ownerCalled, ownerMark, ownerPlace, stageShade} from "../../view/accents.mjs";
 import {inheritsStageColour} from "../../view/lighting.mjs";
 import {colourEditor} from "../colour-editor.mjs";
+import {pickButton} from "../groups.mjs";
 import {choiceField, choiceValue} from "../segmented.mjs";
 import {marked} from "../marks.mjs";
 
@@ -71,10 +72,54 @@ export function pickLed(model, stage, led, starting) {
     render();
 }
 
-// The LEDs of the accent under the pointer glow on the board.
-/** @param {readonly number[]} leds */
-const pointAt = (leds) => document.querySelectorAll(".board [data-led]").forEach((group) =>
+// The LEDs of an accent glow on the board (`root`'s) while it is pointed at
+// or, once clicked, while it is shown.
+/** @param {ParentNode} root @param {readonly number[]} leds */
+const glow = (root, leds) => root.querySelectorAll("[data-led]").forEach((group) =>
     group.classList.toggle("led-hover", leds.includes(Number(/** @type {HTMLElement} */ (group).dataset.led))));
+/** @param {readonly number[]} leds */
+const pointAt = (leds) => document.querySelectorAll(".board").forEach((board) => glow(board, leds));
+
+// An accent clicked in a list stays shown, its LEDs glowing on the board
+// while the list is scrolled away from it, until it is clicked again or
+// another is; pointing at one shows it instead for as long. On a stage's tab
+// it is an accent, by its place in its table; on All accents an owner's, by
+// its name. While an accent is added or changed, the board shows that one.
+/** @param {Model} model @returns {number[]} */
+export function shownLeds(model) {
+    const shown = state.accentShown;
+    if (!shown || shown.stage !== state.stage || editingOn(model, state.stage)) return [];
+    if (shown.stage === "accents") {
+        return allAccents(model).flatMap(({target, owners}) => owners.filter(({owner}) => `${target}:${owner}` === shown.key))
+            .flatMap(({rows}) => rows.flatMap((row) => row.ledIndices));
+    }
+    const whose = accentOwner(model, shown.stage, picked());
+    if (!whose) return [];
+    const {here, beneath} = accentsFor(model, whose.target, whose.owner);
+    return [...here, ...beneath].find((row) => `${whose.target}:${row.index}` === shown.key)?.ledIndices || [];
+}
+/** @param {Model} model @param {ParentNode} board */
+export const glowShown = (model, board) => glow(board, shownLeds(model));
+
+// Whether `key` is the one shown on this stage, and a click showing it or
+// letting it go.
+/** @param {string} key */
+const isShown = (key) => state.accentShown?.stage === state.stage && state.accentShown.key === key;
+/** @param {string} key */
+const toggleShown = (key) => { state.accentShown = isShown(key) ? null : {stage: state.stage, key}; render(); };
+
+// A row shows its accent by a click anywhere on it, or by Enter or Space on
+// the button naming it (pickButton); its other buttons are their own.
+/** @param {Model} model @param {HTMLElement} node @param {string} key @param {readonly number[]} leds */
+function showsOnBoard(model, node, key, leds) {
+    if (isShown(key)) node.dataset.picked = "true";
+    node.addEventListener("click", (event) => {
+        if (/** @type {Element} */ (event.target).closest("button:not(.row-pick)")) return;
+        toggleShown(key);
+    });
+    node.addEventListener("mouseenter", () => pointAt(leds));
+    node.addEventListener("mouseleave", () => pointAt(shownLeds(model)));
+}
 
 // A new accent starts in a colour that stands out from its stage's.
 /** @param {Model} model @param {import("../../../contracts/edits.js").Colour | null} shade */
@@ -148,16 +193,16 @@ function budgetNote(model) {
 // layer above) says where, with a way there instead.
 /** @param {Model} model @param {string} stage @param {AccentTable} target @param {Accent} row @param {{editable?: boolean, tag?: string, go?: {label: string, then: () => void}}} options */
 function accentRow(model, stage, target, row, {editable = false, tag, go}) {
-    const node = el(`<div class="accent-row${go ? " from" : ""}" data-accent="${esc(target)}:${esc(row.index)}">
-        <span class="accent-leds mono">${esc(row.leds)}</span>
+    const key = `${target}:${row.index}`;
+    const node = el(`<div class="accent-row${go ? " from" : ""}" data-accent="${esc(key)}">
+        ${pickButton(`accent:${key}`, isShown(key), `<span class="accent-leds mono">${esc(row.leds)}</span>`)}
         <span class="accent-colour">${colourCell(model, target, row)}</span>
         ${tag ? `<span class="tag">${esc(tag)}</span>` : ""}
         <span class="right row gap-8">${go
             ? `<button class="btn tiny ghost" data-act="go">${esc(go.label)}</button>`
             : `<button class="btn tiny ghost" data-act="change" ${editable ? "" : "disabled"}>Change</button>
                <button class="btn tiny ghost destructive" data-act="remove" ${editable ? "" : "disabled"}>Remove</button>`}</span></div>`);
-    node.addEventListener("mouseenter", () => pointAt(row.ledIndices));
-    node.addEventListener("mouseleave", () => pointAt([]));
+    showsOnBoard(model, node, key, row.ledIndices);
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="go"]'))?.addEventListener("click", () => go?.then());
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="change"]'))?.addEventListener("click", () => {
         const stageColour = inheritsStageColour(row.color);
@@ -215,7 +260,8 @@ function accentEditor(model, editing, mine) {
 
 /**
  * All accents: every one, by the stage that paints it and its owner. They
- * are changed on their stage's tab, which Open shows.
+ * are changed on their stage's tab, which Open shows; clicking an owner's
+ * keeps its accents' LEDs glowing on the board.
  * @param {Model} model
  */
 export function accentsOverview(model) {
@@ -228,13 +274,14 @@ export function accentsOverview(model) {
         const box = el(`<section><div class="sect-h"><h4>${esc(label)}</h4></div><div class="accent-list"></div></section>`);
         const list = /** @type {HTMLElement} */ (box.querySelector(".accent-list"));
         for (const {owner, rows} of owners) {
-            const line = el(`<div class="accent-row" data-owner="${esc(target)}:${esc(owner)}">
-                <b>${marked(model, ownerMark(model, target, owner), ownerCalled(model, target, owner) || label)}</b>
+            const key = `${target}:${owner}`;
+            const called = ownerCalled(model, target, owner) || label;
+            const line = el(`<div class="accent-row" data-owner="${esc(key)}">
+                ${pickButton(`accent-owner:${key}`, isShown(key), `<b>${marked(model, ownerMark(model, target, owner), called)}</b>`)}
                 <span class="accent-colours">${rows.map((row) => `<span class="accent-colour">${inheritsStageColour(row.color)
                     ? `<span class="led-swatch swatch-off"></span>` : `<span class="led-swatch" style="background:${css(row.color)}"></span>`}<span class="accent-leds mono">${esc(row.leds)}</span></span>`).join("")}</span>
                 <span class="right"><button class="btn tiny ghost" data-act="open">Open</button></span></div>`);
-            line.addEventListener("mouseenter", () => pointAt(rows.flatMap((row) => row.ledIndices)));
-            line.addEventListener("mouseleave", () => pointAt([]));
+            showsOnBoard(model, line, key, rows.flatMap((row) => row.ledIndices));
             /** @type {HTMLButtonElement} */ (line.querySelector('[data-act="open"]')).addEventListener("click", () => {
                 // An accent for every layer, mode or state lights on each,
                 // so it opens on the one already picked.

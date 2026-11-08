@@ -41,7 +41,7 @@ test("a draft change resets forms, applies each field's rule to the state before
 
 // Every field of the panel's state, by what a draft change does to it. A new
 // field joins one of these lists, so its decision is made in review.
-const RESETS = ["retarget", "timingRefusal", "pdKind", "pdTaps", "lastTake", "accent", "heldSlot"];
+const RESETS = ["retarget", "timingRefusal", "pdKind", "pdTaps", "lastTake", "accent", "accentShown", "heldSlot"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
@@ -78,6 +78,7 @@ test("a draft change resets the existing forms and preserves historically kept p
         heldSlot: {bank: "macros", key: "MACRO_0"},
         // An unkept accent names its row by place, which a replaced draft may move.
         accent: {stage: "layers", target: "layer", every: false, index: 0, leds: [1, 4], adding: true, colour: {h: 10, s: 20, v: 30}, stageColour: false},
+        accentShown: {stage: "layers", key: "layer:0"},
         macroForms: {MACRO_0: {draft: "unstaged", stepError: "bad"}},
     });
     openComboBuilder({id: 4, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: 40, followsDefault: false, enabled: true, allowedLayers: 1});
