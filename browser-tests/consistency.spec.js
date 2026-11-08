@@ -229,3 +229,120 @@ test("a combo's badge in the hover card sits on its arrow's line, as a branch's 
     expect(Math.abs(at.arrow - at.name)).toBeLessThanOrEqual(1);
     expect(Math.abs(at.badge - at.arrow)).toBeLessThanOrEqual(1);
 });
+
+// The editors that open Layers it runs on, and how each is reached; a
+// behaviour's editor opens Timings too.
+const PANEL_EDITORS = [
+    {where: "combo builder", screen: "keys", state: {tab: "combos"}, editor: ".combo-builder", opensWith: "New combo"},
+    {where: "Behaviours tab", screen: "keys", state: {tab: "behaviours"}, editor: ".beh-main", timings: true},
+    {where: "Custom keys", screen: "customKeys", state: {}, editor: ".custom-key-behaviour", timings: true},
+];
+/** @param {import("@playwright/test").Page} page @param {typeof PANEL_EDITORS[number]} row @param {string} [act] */
+async function openPanel(page, row, act = "definition-layers") {
+    await openControls(page, row.screen, row.state);
+    if (row.opensWith) await page.getByRole("button", {name: row.opensWith, exact: true}).click();
+    await page.locator(`${row.editor} [data-act="${act}"]:visible`).first().click();
+    return page.locator(`${row.editor} .def-pop:visible`).first();
+}
+/** @param {import("@playwright/test").Locator} panel */
+const panelEdges = (panel) => panel.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    return {left: box.left, right: box.right, window: document.documentElement.clientWidth,
+        cut: [...node.querySelectorAll(".sw .txt")].filter(name => name.checkVisibility() && name.scrollWidth > name.clientWidth).map(name => name.textContent)};
+});
+
+test("Layers it runs on is one list on every editor: a layer to a row, one width, each name whole", async ({page}) => {
+    const panels = [];
+    for (const width of [1280, 1920]) for (const row of PANEL_EDITORS) {
+        await page.setViewportSize({width, height: 1000});
+        const panel = await openPanel(page, row);
+        const columns = await panel.evaluate(node => new Set([...node.querySelectorAll(".layer-grid .sw")].filter(sw => sw.checkVisibility())
+            .map(sw => Math.round(sw.getBoundingClientRect().left))).size);
+        const {left, right, cut} = await panelEdges(panel);
+        expect(columns, `${row.where} at ${width}`).toBe(1);
+        expect(cut, `${row.where} at ${width}`).toEqual([]);
+        panels.push([`${row.where} at ${width}`, Math.round(right - left)]);
+        // Names that fit the builder keep the panel inside it.
+        if (row.opensWith) {
+            const builder = await page.locator(row.editor).boundingBox();
+            expect(right, `inside the combo builder at ${width}`).toBeLessThanOrEqual(builder.x + builder.width);
+        }
+    }
+    expect(new Set(panels.map(([, panelWidth]) => panelWidth)).size, JSON.stringify(panels)).toBe(1);
+});
+
+test("Layers it runs on shows whole with its empty layers unfolded, never cut off by the workbench", async ({page}) => {
+    await page.setViewportSize({width: 1920, height: 1000});
+    for (const row of PANEL_EDITORS) {
+        const panel = await openPanel(page, row);
+        await panel.locator(".disclose").first().click();
+        // Nothing around the panel but the scrolling page clips it.
+        const clipped = await panel.evaluate(node => {
+            const bottom = node.getBoundingClientRect().bottom;
+            const content = node.closest(".content");
+            const clips = [];
+            for (let around = node.parentElement; around && around !== content; around = around.parentElement) {
+                const style = getComputedStyle(around);
+                if (style.overflowY !== "visible" && around.getBoundingClientRect().bottom < bottom) clips.push(around.className);
+            }
+            return clips;
+        });
+        expect(clipped, row.where).toEqual([]);
+    }
+});
+
+test("nothing in a workbench reaches past its edges, as nothing clips it", async ({page}) => {
+    for (const width of [1024, 1280, 1920]) for (const [screen, state] of [
+        ["keys", {tab: "key"}], ["keys", {tab: "behaviours"}], ["keys", {tab: "combos"}], ["keys", {tab: "macros"}],
+        ["keys", {tab: "customKeys"}], ["keys", {tab: "pointing"}], ["lighting", {}], ["lighting", {stage: "key"}]]) {
+        await page.setViewportSize({width, height: 1000});
+        await openControls(page, screen, state);
+        // What a scrolling pane or tab strip inside the workbench holds is
+        // clipped there, so only what sits outside one counts.
+        const outside = await page.locator(".bench").evaluateAll(benches => benches.flatMap(bench => {
+            const edge = bench.getBoundingClientRect();
+            const inPane = (/** @type {Element} */ node) => {
+                for (let around = node.parentElement; around && around !== bench; around = around.parentElement) {
+                    if (getComputedStyle(around).overflowX !== "visible") return true;
+                }
+                return false;
+            };
+            return [...bench.querySelectorAll("*")].filter(node => node.checkVisibility() && !node.closest(".bench-sizer") && !inPane(node))
+                .filter(node => {
+                    const box = node.getBoundingClientRect();
+                    return box.width && box.height && (box.left < edge.left - 1 || box.right > edge.right + 1 || box.top < edge.top - 1 || box.bottom > edge.bottom + 1);
+                }).map(node => `${node.tagName}.${node.className}`);
+        }));
+        expect(outside, `${screen} ${JSON.stringify(state)} at ${width}`).toEqual([]);
+    }
+});
+
+test("a panel a disclosure opens stays inside the window, however far right its button sits", async ({page}) => {
+    for (const width of [1024, 1280]) for (const row of PANEL_EDITORS) for (const act of ["definition-layers", ...row.timings ? ["behaviour-timings"] : []]) {
+        await page.setViewportSize({width, height: 1000});
+        const {left, right, window} = await panelEdges(await openPanel(page, row, act));
+        expect(left, `${row.where} ${act} at ${width}`).toBeGreaterThanOrEqual(0);
+        expect(right, `${row.where} ${act} at ${width}`).toBeLessThanOrEqual(window);
+    }
+});
+
+test("a panel stays inside the window when the window narrows under it, and with a layer's longest name", async ({page}) => {
+    const [, behaviours, customKeys] = PANEL_EDITORS;
+    await page.setViewportSize({width: 1920, height: 1000});
+    const panel = await openPanel(page, customKeys);
+    await page.setViewportSize({width: 1024, height: 1000});
+    await expect.poll(async () => { const {right, window} = await panelEdges(panel); return right <= window; }).toBe(true);
+    // A name of 32 characters, the most a layer's name holds, shows whole.
+    await openPanel(page, behaviours);
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        Object.assign(store.layers()[0], {name: "W".repeat(32), displayName: "W".repeat(32)});
+        store.render();
+    });
+    const named = page.locator(`${behaviours.editor} .def-pop:visible`).first();
+    const {left, right, window, cut} = await panelEdges(named);
+    await expect(named).toContainText("W".repeat(32));
+    expect(cut).toEqual([]);
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(right).toBeLessThanOrEqual(window);
+});
