@@ -1093,6 +1093,12 @@ button.tier:hover { background: var(--surface-3); }
 .combo-builder { background: var(--surface-2); }
 .combo-builder > .card-h { padding: var(--sp-3) var(--sp-3); }
 .combo-builder > .card-b { padding: var(--sp-3); display: grid; gap: var(--sp-3); }
+/* Use this combo heads the form with Layers it runs on on its row, kept to
+   the builder's right edge; its panel opens from that edge, so it stays
+   inside the builder (participation.mjs). */
+.combo-builder .def-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3) var(--sp-6); }
+.combo-builder .def-layers { margin-left: auto; }
+.combo-builder .def-pop { left: auto; right: 0; }
 .combo-inputs { gap: var(--sp-2); flex-wrap: wrap; }
 .combo-inputs button { color: var(--text-3); }
 .combo-pick { gap: var(--sp-2); margin-top: var(--sp-1); }
