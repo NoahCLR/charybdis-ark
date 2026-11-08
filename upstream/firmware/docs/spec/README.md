@@ -3,7 +3,7 @@
 The contracts the firmware keeps with clients, with itself across the two
 halves, and with its own flash. Each section states the contract and names the
 test or fixture that holds it; a change to a contract changes its spec in the
-same pass, and the decisions behind them are in [`docs/adr/`](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/).
+same pass, and the decisions behind them are in [`docs/adr/`](https://github.com/NoahCLR/charybdis-4x6/blob/12b1a49bd6a2709a89870a8c2b2d5f1d34d0e10b/docs/adr/).
 Words are the [glossary](../../GLOSSARY.md)'s.
 
 Read them in layers, from the report a client sends up to the save both halves
