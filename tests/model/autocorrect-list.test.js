@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {addTypos, changeTypo, findTypo, firingTypo, listUsage, listWarnings, removeEntry, removeTypo, respellCorrection, wordsOf, WARNING} = require("../../core/model/autocorrect-list");
+const {addTypos, changeTypo, findTypo, listUsage, listWarnings, removeEntry, removeTypo, respellCorrection, WARNING} = require("../../core/model/autocorrect-list");
 const {AUTOCORRECT_MATCH: MATCH, encodeAutocorrectDomain, autocorrectDomainSize} = require("../../core/schema/autocorrect-domain-v1");
 const {hostLayouts, US_HOST_LAYOUT} = require("../../core/data/host-layouts");
 
@@ -101,26 +101,6 @@ test("usage counts what the keyboard stores: corrections, typos, text and the do
     assert.deepEqual(listUsage(value), {corrections: 3, typos: 4, textBytes: 3 + 5 + 5 + 3 + 3 + 5 + 4, bytes: autocorrectDomainSize(value)});
     assert.equal(listUsage(value).bytes, encodeAutocorrectDomain(value).length);
     assert.deepEqual(listUsage(list()), {corrections: 0, typos: 0, textBytes: 0, bytes: 8});
-});
-
-test("a text's words are its letters and digits with apostrophes between them, folded", () => {
-    assert.deepEqual(wordsOf("Don't do 'that' a-lot, OK?"), ["don't", "do", "that", "a", "lot", "ok"]);
-    assert.deepEqual(wordsOf("iPhone 15"), ["iphone", "15"]);
-    assert.deepEqual(wordsOf(" - "), []);
-});
-
-test("the typo that fires on a word: the whole word first, then the longest part of it", () => {
-    const value = list(["the", "teh"], ["thing", ["tihng", MATCH.ANYWHERE]], ["un", ["nu", MATCH.START]], ["ment", ["mnet", MATCH.END]], ["tehx", ["tehs", MATCH.START]], ["long", ["tihngs", MATCH.END]]);
-    assert.equal(firingTypo(value, "teh")?.typo.typo, "teh");
-    assert.equal(firingTypo(value, "tehs")?.typo.typo, "tehs", "a part-of-word typo matches a whole word too");
-    assert.deepEqual(firingTypo(value, "sometihng"), {entry: value.entries[1], typo: value.entries[1].typos[0], start: 4, end: 9});
-    assert.equal(firingTypo(value, "tihngs")?.typo.typo, "tihngs", "the longest typo wins");
-    assert.equal(firingTypo(value, "nuclear")?.typo.typo, "nu");
-    assert.equal(firingTypo(value, "menu"), null, "a start-of-word typo does not match the end");
-    assert.equal(firingTypo(value, "paymnet")?.typo.typo, "mnet");
-    assert.equal(firingTypo(value, "mnets"), null, "an end-of-word typo does not match the start");
-    assert.equal(firingTypo(value, "tehe"), null, "a whole-word typo matches nothing longer");
-    assert.equal(firingTypo(value, "the"), null);
 });
 
 test("warnings are found on the list and never refuse it", () => {

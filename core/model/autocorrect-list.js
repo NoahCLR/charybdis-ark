@@ -15,6 +15,7 @@
 
 const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH, autocorrectDomainSize, correctionProblem, foldTypo, typoProblem} = require("../schema/autocorrect-domain-v1");
 const {AUTOCORRECT_APOSTROPHE, foldWordCharacter} = require("../data/autocorrect-words");
+const {firingTypo, wordsOf} = require("./autocorrect-matcher");
 const {layoutTypes} = require("../data/host-layouts");
 
 /**
@@ -196,48 +197,6 @@ function listUsage(list) {
     return {corrections: list.entries.length, typos, textBytes, bytes: autocorrectDomainSize(list)};
 }
 
-// The words of a text, folded: letters and digits with apostrophes between
-// them. Apostrophes at a word's start or end are not part of it.
-/** @param {string} text @returns {string[]} */
-function wordsOf(text) {
-    /** @type {string[]} */
-    const words = [];
-    let word = "";
-    const end = () => {
-        const trimmed = word.replace(/^'+|'+$/g, "");
-        if (trimmed) words.push(trimmed);
-        word = "";
-    };
-    for (const character of text) {
-        const folded = character === AUTOCORRECT_APOSTROPHE ? character : foldWordCharacter(character);
-        if (folded === undefined) end(); else word += folded;
-    }
-    end();
-    return words;
-}
-
-// The typo that fires on a finished, folded word and where in the word it
-// matches: the typo that is the whole word, else the longest part-of-word
-// typo that matches it where it says, the earlier in stored order of two as
-// long.
-/** @param {AutocorrectList} list @param {string} word @returns {{entry: Entry, typo: Typo, start: number, end: number} | null} */
-function firingTypo(list, word) {
-    /** @type {{entry: Entry, typo: Typo, start: number, end: number} | null} */
-    let best = null;
-    for (const entry of list.entries) for (const typo of entry.typos) {
-        const text = typo.typo;
-        if (text === word) return {entry, typo, start: 0, end: word.length};
-        if (typo.match === AUTOCORRECT_MATCH.WHOLE_WORD || text.length >= word.length) continue;
-        const start = typo.match === AUTOCORRECT_MATCH.START ? (word.startsWith(text) ? 0 : -1)
-            : typo.match === AUTOCORRECT_MATCH.END ? (word.endsWith(text) ? word.length - text.length : -1) : word.indexOf(text);
-        if (start < 0) continue;
-        const longer = !best || Buffer.byteLength(text) > Buffer.byteLength(best.typo.typo)
-            || (Buffer.byteLength(text) === Buffer.byteLength(best.typo.typo) && Buffer.compare(Buffer.from(text), Buffer.from(best.typo.typo)) < 0);
-        if (longer) best = {entry, typo, start, end: start + text.length};
-    }
-    return best;
-}
-
 // What will misbehave in this list on this host layout, entry by entry in
 // the list's order. None of it stops a save.
 /** @param {AutocorrectList} list @param {Host} host @returns {Warning[]} */
@@ -254,7 +213,7 @@ function listWarnings(list, host) {
         if (!fired) continue;
         // A typo that is its own correction in other capitals (iphone for
         // iPhone) leaves the word as it is typed.
-        if (fired.end - fired.start === word.length) {if (fired.entry !== entry && !corrected.has(entry)) corrected.set(entry, fired.entry);}
+        if (fired.end - fired.start === [...word].length) {if (fired.entry !== entry && !corrected.has(entry)) corrected.set(entry, fired.entry);}
         else if (!inside.has(fired.typo)) inside.set(fired.typo, entry.correction);
     }
     /** @type {Warning[]} */
@@ -321,4 +280,4 @@ function restoreEntry(mine, theirs, correction, respelled) {
     }
 }
 
-module.exports = {WARNING, addTypos, changeTypo, correctionOf, findEntry, findTypo, firingTypo, listUsage, listWarnings, pairEntries, removeEntry, removeTypo, respellCorrection, restoreEntry, typoOf, wordsOf};
+module.exports = {WARNING, addTypos, changeTypo, correctionOf, findEntry, findTypo, listUsage, listWarnings, pairEntries, removeEntry, removeTypo, respellCorrection, restoreEntry, typoOf};
