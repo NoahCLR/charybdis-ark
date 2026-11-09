@@ -257,7 +257,7 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
     // line says only where it comes from; the others started it.
     const viewRow = pane(page).locator('tr[data-reach="view:4"]');
     await expect(cell(viewRow, 5).locator(".reach-line"))
-        .toHaveText([/^Navigation ?Hold$/, /^Custom key 0 · sends Navigation ?lock$/, /^from Right Option KC_RIGHT_ALT · 1× ?tap$/]);
+        .toHaveText([/^Navigation ?Hold$/, /^Custom key 0 · sends Navigation ?lock$/, /^from Right Option · 1× ?tap$/]);
     await expect(cell(viewRow, 0).locator(".sends-tag")).toHaveText(["lock", "started"]);
     if (process.env.ARK_SHOT) {
         await page.locator(".board").first().screenshot({path: `${process.env.ARK_SHOT}/pointing-tab-board.png`});
@@ -285,6 +285,57 @@ test("the Pointing modes tab says a mode's link, and the layer that starts it re
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
     });
     await expect(cell(pane(page).locator('tr[data-reach="here:4"]'), 5).locator(".reach-line")).toHaveText([/^Navigation ?Hold$/]);
+});
+
+// A slot's name holds its mark on its line, and each keycode stays whole beside
+// its hold or lock tag: a column too narrow for them wraps between them, never
+// through a keycode. A column narrower than a keycode breaks it, and still holds it.
+test("a slot's row wraps between its keycodes, never through one", async ({page}) => {
+    await openPreview(page);
+    await page.setViewportSize({width: 1500, height: 1100});
+    // Dragscroll changed in the draft, so its row carries the draft's dot.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.draft.changes = [...(model.draft.changes || []), {place: {kind: "pointing", slot: 0}, status: "changed", title: "Dragscroll", fields: []}];
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    });
+    await tab(page, "pointing").click();
+    const row = pane(page).locator("tbody tr:has(td:first-child code:text-is('PD_MODE_0_LOCK'))").first();
+    await expect(row).toBeVisible();
+    const slotCell = () => row.locator("td").first().evaluate((cell) => {
+        const box = (node) => node.getBoundingClientRect();
+        const lineHeight = (node) => parseFloat(getComputedStyle(node).lineHeight);
+        const named = /** @type {HTMLElement} */ (cell.querySelector(".slot-named"));
+        const icon = box(/** @type {HTMLElement} */ (named.querySelector(".kind-icon")));
+        const name = box(/** @type {HTMLElement} */ (named.querySelector(".sends-name")));
+        const dot = box(/** @type {HTMLElement} */ (named.querySelector(".draft-dot")));
+        return {
+            codes: [...named.querySelectorAll("code")].map((code) => ({text: code.textContent, whole: box(code).height <= lineHeight(code) * 1.5})),
+            tagged: [...named.querySelectorAll("code")].map((code) => {
+                const tag = /** @type {HTMLElement} */ (code.previousElementSibling);
+                return Math.abs(box(tag).top + box(tag).height / 2 - box(code).top - box(code).height / 2);
+            }),
+            iconOffName: Math.abs(icon.top + icon.height / 2 - name.top - name.height / 2),
+            iconBeforeName: icon.left < name.left,
+            dotOffName: Math.abs(dot.top + dot.height / 2 - name.top - name.height / 2),
+            nameOffCell: Math.abs(name.top - box(cell).top - parseFloat(getComputedStyle(cell).paddingTop)),
+            contained: named.scrollWidth <= cell.clientWidth,
+        };
+    });
+    const wide = await slotCell();
+    expect(wide.codes).toEqual([{text: "PD_MODE_0", whole: true}, {text: "PD_MODE_0_LOCK", whole: true}]);
+    for (const offset of wide.tagged) expect(offset, "a tag stays on its keycode's line").toBeLessThan(6);
+    expect(wide.iconBeforeName, "the mark stays before the name").toBe(true);
+    expect(wide.iconOffName, "the mark is centred on the name's line").toBeLessThan(2);
+    expect(wide.dotOffName, "the draft's dot is centred on the name's line").toBeLessThan(2);
+    expect(wide.nameOffCell, "the name starts at the top of the cell, level with the row's other cells").toBeLessThan(2);
+    expect(wide.contained).toBe(true);
+
+    await page.setViewportSize({width: 700, height: 1100});
+    await expect(row).toBeVisible();
+    expect((await slotCell()).contained, "a column narrower than a keycode still holds it").toBe(true);
 });
 
 // The Key tab says why a key cannot be edited in a box under the key, and

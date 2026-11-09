@@ -30,7 +30,7 @@
      two looks, not one step apart. */
   --fw-regular: 400; --fw-strong: 560; --fw-label: 600; --fw-bold: 700;
   --r-mark: 2px; --r-chip: 4px; --r-control: 7px; --r-card: 10px; --r-sheet: 14px; --r-pill: 999px;
-  --h-tiny: 18px; --h-switch: 20px; --h-meter: 6px; --h-chip: 24px; --h-compact: 28px; --h-control: 32px; --h-tab: 34px;
+  --h-tiny: 18px; --h-switch: 20px; --h-meter: 6px; --h-dot: 6px; --h-chip: 24px; --h-compact: 28px; --h-control: 32px; --h-tab: 34px;
   /* Layers, lowest first: lifted in its own flow, stuck to a scroll's top,
      opened over the screen, the commit bar, a message floating over the
      screen, a dialog's scrim, and the tips and hover cards over everything. */
@@ -1182,7 +1182,7 @@ table.t td.t-act { text-align: right; }
 table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* What the draft changed, marked where it is edited: the draft's own dot. */
-.draft-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--draft); margin-left: var(--sp-1); vertical-align: middle; flex: none; }
+.draft-dot { display: inline-block; width: var(--h-dot); height: var(--h-dot); border-radius: 50%; background: var(--draft); margin-left: var(--sp-1); vertical-align: middle; flex: none; }
 .kc-draft { fill: var(--draft); stroke: var(--light-shade); stroke-width: .8; pointer-events: none; }
 .draft-dot.corner { position: absolute; top: 6px; right: 6px; margin: 0; }
 .draft-dot.lead { margin: 0 var(--sp-1) 0 0; }
@@ -1276,7 +1276,7 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
    the words' own type and colour and their baseline; a name too long for its column wraps between words. */
 .sends.inline { font: inherit; color: inherit; vertical-align: baseline; align-items: baseline; }
 /* In a table cell too narrow for it, its tag drops below the name rather than past the column. */
-td > .sends.inline { flex-wrap: wrap; row-gap: 0; }
+td > .sends.inline, .slot-named > .sends.inline { flex-wrap: wrap; row-gap: 0; }
 /* A named thing reads in the interface's own face wherever it is named, in a
    monospace keycode cell or key box included, so it looks the same everywhere. */
 .sends, .sends.inline { font-family: var(--sans); letter-spacing: normal; }
@@ -1673,9 +1673,15 @@ table.t tr.quiet > td { color: var(--text-3); }
 .pd-tile.warn .v { color: var(--draft); }
 .pd-swatch { width: 12px; height: 12px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; display: inline-block; }
 .pd-swatch.lg { width: 16px; height: 16px; border-radius: var(--r-chip); }
-/* A slot named in a table: its mark on the line of its name and keycodes. */
-.slot-named { display: inline-flex; align-items: center; gap: var(--sp-1); flex-wrap: wrap; }
-.slot-named > span:first-child { display: inline-flex; }
+/* A slot named in a table: its mark beside its name, centred on the first line. A column too
+   narrow for the rest wraps between a tag-and-keycode pair, and breaks a keycode only where one
+   alone is wider than it. */
+.slot-named { display: inline-flex; align-items: flex-start; gap: var(--sp-1); max-width: 100%; }
+.slot-named > .sends.inline { min-width: 0; }
+.slot-keycode { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1); min-width: 0; }
+.slot-keycode code { min-width: 0; overflow-wrap: break-word; }
+.slot-named > span:first-child { display: inline-flex; align-items: center; height: 1lh; }
+.slot-named > .draft-dot { margin-block: calc(0.5lh - var(--h-dot) / 2); }
 /* A slot's own header marks it larger, as its title. */
 .mark-lg { display: inline-flex; }
 .mark-lg .kind-icon svg, .mark-lg .kind-icon:not(.off) svg { width: 18px; height: 18px; }

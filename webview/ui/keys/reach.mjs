@@ -85,8 +85,11 @@ function openPlacement(tab, keycode, at) {
 export const sourceLabel = (entry) =>
     layerMarked(getModel(), entry.layer) + (entry.whileHeld ? " when held" : "");
 
-// The keys are named as the board names them; a combo's row already names
-// its inputs, so it says only where they come from (reachText).
+// Reached by says where to press, so a key reads by its name and marks on
+// every route, never its keycode: the row's first column carries that, and
+// the hover card has any key's. The keys are named as the board names them; a
+// combo's row already names its inputs, so it says only where they come from
+// (reachText).
 // A key whose own behaviour also reaches the row says which of its cells
 // does, after its name (`branches`), rather than naming the key twice.
 /** @param {import("../../view/keyface-types.js").ResolvedKey[]} keys @param {{names?: boolean, branches?: (keycode: string) => string}} [options] */
@@ -98,6 +101,12 @@ export const keysReach = (keys, {names = true, branches} = {}) => {
     const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => layerMarked(model, entry.layer)))];
     return reachText({named, sources, matched}, {names});
 };
+// The cells a branch sits in, as Review and the grid head them: the branch's
+// badge, the tier's dot and the tier's name, "2× ● hold". Any of them sends it, so
+// several read "1× ● long hold or 2× ● hold".
+/** @param {Model} model @param {import("../../view/keyface-types.js").BranchCell[]} cells */
+const cellsMarked = (model, cells) => cells
+    .map((cell) => marked(model, {kind: "tier", ...cell}, tierName(model, cell.tier).toLowerCase())).join(" or ");
 // A behaviour that only answers through a transparent key still fires its
 // branches, so it belongs here — named with the layer that holds it, because
 // that is the part this layer does not store.
@@ -105,27 +114,14 @@ export const keysReach = (keys, {names = true, branches} = {}) => {
 // cell, as a key's own behaviour reads), and what it sends — but only when that
 // differs from what the row is already titled with. A macro row is
 // its own macro, so repeating it would be noise; a pointing mode is a slot, and
-// which of its two keycodes a branch sends is the whole point.
-// A key named in a reach reads as it does in the table's first column: its
-// name, with the keycode beside it when the two differ.
-/** @param {Model} model @param {string} keycode */
-const namedKey = (model, keycode) => {
-    const label = keyIdentity(model, keycode).label;
-    return label === String(keycode) ? esc(label) : `${actionMarked(model, keycode, label)} <code class="dim">${esc(keycode)}</code>`;
-};
-// The cells a branch sits in, as Review and the grid head them: the branch's
-// badge, the tier's dot and the tier's name, "2× ● hold". Any of them sends it, so
-// several read "1× ● long hold or 2× ● hold".
-/** @param {Model} model @param {import("../../view/keyface-types.js").BranchCell[]} cells */
-const cellsMarked = (model, cells) => cells
-    .map((cell) => marked(model, {kind: "tier", ...cell}, tierName(model, cell.tier).toLowerCase())).join(" or ");
+// whether a branch holds it or locks it on is the whole point.
 /** @param {Model} model @param {ReachEntry} entry @param {{action: string}} route @param {boolean} showSends */
 const sendsOf = (model, entry, route, showSends) => showSends && route.action && String(entry.name) !== String(route.action)
-    ? `sends ${namedKey(model, route.action)}` : "";
+    ? `sends ${actionMarked(model, route.action)}` : "";
 /** @param {Model} model @param {ReachEntry} entry */
 const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
     const sent = sendsOf(model, entry, row, showSends);
-    return `from ${namedKey(model, row.keycode)} · ${cellsMarked(model, row.cells)}${sent ? ` ${sent}` : ""}`
+    return `from ${actionMarked(model, row.keycode)} · ${cellsMarked(model, row.cells)}${sent ? ` ${sent}` : ""}`
         + (row.layer ? ` · on ${sourceLabel(row)}` : "");
 }).join(", ");
 
@@ -137,7 +133,7 @@ export const comboReach = (model, entry, showSends = true) => entry.combos.map((
     const sources = [...new Set(keys.filter((key) => key.fellThrough).map(sourceLabel))];
     const sent = sendsOf(model, entry, {action}, showSends);
     return `${comboBadge(model, combo.badge)} ${comboInputsMarked(model, combo)}`
-        + (via ? ` · through ${namedKey(model, via)} · ${cellsMarked(model, cells)}${sent ? ` ${sent}` : ""}` : sent ? ` · ${sent}` : "")
+        + (via ? ` · through ${actionMarked(model, via)} · ${cellsMarked(model, cells)}${sent ? ` ${sent}` : ""}` : sent ? ` · ${sent}` : "")
         + (sources.length ? ` · on ${sources.join(", ")}` : "");
 }).join(", ");
 
