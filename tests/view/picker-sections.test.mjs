@@ -90,9 +90,10 @@ test("arrows and navigation keys read in the order a person says them, not the c
     assert.deepEqual(keysOf("Navigation"), ["KC_HOME", "KC_END", "KC_PAGE_UP", "KC_PAGE_DOWN", "KC_INSERT", "KC_DELETE"]);
 });
 
-// The keyboard's switch keys for behaviours (firmware D-F66) sit right after
-// QMK's for combos, in Other QMK's Switch keys, by their words.
-test("the switch keys for behaviours are offered beside those for combos", () => {
+// The keyboard's switch keys for behaviours and then for auto-mouse (firmware
+// D-F66) sit right after QMK's for combos, in Other QMK's Switch keys, by
+// their words.
+test("the switch keys for behaviours and auto-mouse are offered beside those for combos", () => {
     const published = publishedModel(profileDocument());
     const other = pickerSections().find((section) => section.id === "other");
     const groups = groupedEntries(other, entriesForPickerSection(published.qmkKeycodes, other), published);
@@ -100,8 +101,9 @@ test("the switch keys for behaviours are offered beside those for combos", () =>
     assert.deepEqual(switches?.entries.map((entry) => [entry.value, entry.label]), [
         ["QK_COMBO_ON", "Combo On"], ["QK_COMBO_OFF", "Combo Off"], ["QK_COMBO_TOGGLE", "Toggle Combo"],
         ["BH_ON", "Behaviours On"], ["BH_OFF", "Behaviours Off"], ["BH_TOGG", "Toggle Behaviours"],
+        ["AM_ON", "Auto-mouse On"], ["AM_OFF", "Auto-mouse Off"], ["AM_TOGG", "Toggle Auto-mouse"],
     ]);
-    assert.deepEqual(switches.entries.slice(3).map((entry) => entry.keycode), [0x7ee0, 0x7ee1, 0x7ee2]);
+    assert.deepEqual(switches.entries.slice(3).map((entry) => entry.keycode), [0x7ee0, 0x7ee1, 0x7ee2, 0x7ef0, 0x7ef1, 0x7ef2]);
     assert.ok(switches.entries.every(pickable));
 });
 

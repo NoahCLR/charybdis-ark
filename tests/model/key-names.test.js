@@ -96,6 +96,15 @@ test("the switch keys for behaviours read by their words, as those for combos do
     assert.equal(keyLabel(profileKeyNames({actionsKnown: false}), 0x7ee2), "0x7EE2", "an unknown ABI numbers its keys otherwise");
 });
 
+test("the switch keys for auto-mouse read by their words too, on the vocabulary that has them", () => {
+    const names = profileKeyNames({actionsKnown: true});
+    assert.deepEqual([0x7ef0, 0x7ef1, 0x7ef2].map(code => keyLabel(names, code)), ["Auto-mouse On", "Auto-mouse Off", "Toggle Auto-mouse"]);
+    assert.equal(names.labels.AM_TOGG, "Toggle Auto-mouse");
+    assert.equal(names.aliases[keycodes.resolve(0x7ef2).name], "AM_TOGG");
+    assert.equal(keyLabel(names, 0x7ef3), "0x7EF3", "the rest of the block names nothing");
+    assert.equal(keyLabel(profileKeyNames({actionsKnown: false}), 0x7ef2), "0x7EF2", "an unknown ABI numbers its keys otherwise");
+});
+
 test("a key's name is added only where it tells two alike labels apart", () => {
     assert.equal(keyLabelWithName({}, 0x1e), "1 (KC_1)");
     assert.equal(keyLabelWithName({}, 0x59), "1 (KC_KP_1)");
@@ -221,9 +230,9 @@ test("macOS ISO labels swap the same positions as playback, including modified k
 
 test("the layout read counts only keys the app cannot name", () => {
     const {unnamedKeyCount} = require("../../core/model/key-names");
-    const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee2, 0x7ef0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
+    const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee2, 0x7ef2, 0x7ef3].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
     assert.equal(unnamedKeyCount(layers, {actionAbiDigest: ACTION_ABI}), 1, "configured or empty pointing slots and the switch keys are named; a code past the blocks is not");
-    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732, 0x67df11b3]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 6, "older firmware's user keys are not read as blocks");
+    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732, 0x67df11b3, 0xb2205fc3]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 7, "older firmware's user keys are not read as blocks");
 });
 
 test("what a keycode is, where the interface treats it apart: transparent, disabled, a macro's or a custom key's", () => {

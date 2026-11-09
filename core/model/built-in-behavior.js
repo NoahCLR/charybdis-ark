@@ -49,7 +49,7 @@
 // itself, a lone tap included, and holds itself as a fallback.
 //
 // A pointing mode's lock key (PD_MODE_n_LOCK) and a switch key (CM_ON …
-// BH_TOGG, firmware D-F66) tap themselves too, so an empty Tap locks the mode
+// AM_TOGG, firmware D-F66) tap themselves too, so an empty Tap locks the mode
 // or switches, and hold nothing of their own, so held they act on release, as
 // a macro plays (action_kind_registry_list.h, DEFAULT_TAP_USES_ACTION_KEYCODE).
 //

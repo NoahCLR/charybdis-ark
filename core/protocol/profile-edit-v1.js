@@ -320,14 +320,16 @@ async function readEditMode(connection, options) {
 }
 
 // The toggles' stored masters and runtime overrides, then QMK's live values
-// in the settings scalars' encodings.
+// in the settings scalars' encodings, then the auto-mouse override (firmware
+// D-F66), whose stored setting is settings readback's, not this page's.
 /** @param {Buffer} page @returns {import("./types.js").RuntimeRead} */
 function decodeRuntimePage(page) {
-    if (page.length !== 24) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "The runtime page has 24 bytes.");
-    if (page.subarray(0, 4).some(byte => byte > 1)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Toggle bytes are 0 or 1.");
+    if (page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "The runtime page has 25 bytes.");
+    if (page.subarray(0, 4).some(byte => byte > 1) || page[24] > 1) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Toggle bytes are 0 or 1.");
     return {
         combos: {master: page[0] === 1, override: page[1] === 1},
         behaviours: {master: page[2] === 1, override: page[3] === 1},
+        autoMouse: {override: page[24] === 1},
         live: {defaultDpi: page.readUInt16LE(4), snipingDpi: page.readUInt16LE(6), rgbMode: page.readUInt32LE(8), rgbColor: page.readUInt32LE(12),
             defaultLayers: page.readUInt32LE(16), keymapOptions: page.readUInt32LE(20)},
     };

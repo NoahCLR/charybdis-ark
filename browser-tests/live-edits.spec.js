@@ -140,9 +140,23 @@ test("behaviours turned off by a key show beside their switch, which says keyboa
     await openLive(page, "behaviours");
     const row = page.locator('.setrow:has([data-macro="behaviorsEnabled"])');
     await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
-    await withModel(page, model => {model.runtime = {combosOffByKey: false, behavioursOffByKey: true};});
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: true, autoMouse: false};});
     await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
     await expect(page.locator(".off-by-key")).toHaveCount(1);
+});
+
+// AM_OFF and AM_TOGG (firmware D-F66) switch auto-mouse the same way, and
+// Pointer settings says so beside its Auto-mouse switch, still on.
+test("auto-mouse turned off by a key shows beside its switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "pointer");
+    const row = page.locator('.setrow:has([data-macro="autoMouse"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await expect(row.locator(".off-by-key")).toHaveCount(0);
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: false, autoMouse: true};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
+    await expect(row.locator('[data-macro="autoMouse"]')).toBeChecked();
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+    await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });
 
 // In the live modes a builder's Keep sends its edit to the keyboard at once,

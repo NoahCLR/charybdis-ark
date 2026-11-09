@@ -26,13 +26,13 @@ The blob carries no length of its own. The carrier supplies it as a 32-bit
 field: a candidate's BEGIN, a profile slot's record header, payload readback's
 metadata page. A blob is `8..130,048` bytes: the upper bound is one 128 KiB
 profile slot less the first kilobyte its header and commit marker take
-(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/55cf97a1df4ac205837f705d36b2581c805f62ac/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
+(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
 The empty profile is the eight bytes `4e 4c 50 31 04 00 00 01`.
 
 A header is refused, in this order: shorter than 8 bytes `TRUNCATED`; longer
 than 130,048 `CAPACITY_EXCEEDED`; wrong magic `INVALID_MAGIC`; any other
 schema `INCOMPATIBLE_SCHEMA` (no earlier schema is read, D-F10,
-[`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/55cf97a1df4ac205837f705d36b2581c805f62ac/docs/adr/0010-firmware-accepts-only-current-formats.md)); a
+[`0010`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0010-firmware-accepts-only-current-formats.md)); a
 reserved flag bit set `RESERVED_FLAGS`; flag bit 0 clear `NONCANONICAL`; more
 than seven domains `CAPACITY_EXCEEDED`.
 
@@ -93,10 +93,10 @@ A registry row names its domain module. The whole-profile validator and the
 compiled-defaults writer reach each domain only through a switch generated
 from the rows, calling `validate_<module>` and
 `noah_profile_<module>_compiled_v1_write`, so a row added without both does
-not compile (D-F11, [`0011`](https://github.com/NoahCLR/charybdis-4x6/blob/55cf97a1df4ac205837f705d36b2581c805f62ac/docs/adr/0011-one-definition-per-profile-domain.md);
-D-F13, [`0013`](https://github.com/NoahCLR/charybdis-4x6/blob/55cf97a1df4ac205837f705d36b2581c805f62ac/docs/adr/0013-registry-row-names-its-domain-module.md)). A
+not compile (D-F11, [`0011`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0011-one-definition-per-profile-domain.md);
+D-F13, [`0013`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0013-registry-row-names-its-domain-module.md)). A
 domain whose compiled encoder writes nothing is absent from the build's
-compiled defaults (D-F12, [`0012`](https://github.com/NoahCLR/charybdis-4x6/blob/55cf97a1df4ac205837f705d36b2581c805f62ac/docs/adr/0012-one-complete-compiled-profile.md)).
+compiled defaults (D-F12, [`0012`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0012-one-complete-compiled-profile.md)).
 
 One envelope walker checks magic, schema, flags, domain count, versions,
 order, payload extents and completion. It takes one already-read blob or
@@ -138,14 +138,14 @@ operand at or above its kind's count or a nonzero operand on kind 0; any of
 them refuses the whole candidate or edit. The validator also refuses a layer
 at or above the build's layer count and a pointing slot the build does not
 have. The userspace keycode blocks are fixed (D-F51,
-[`0051`](https://github.com/NoahCLR/charybdis-4x6/blob/55cf97a1df4ac205837f705d36b2581c805f62ac/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)).
+[`0051`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0051-userspace-keycodes-in-fixed-blocks.md)).
 
 The firmware writes the semantic kind for every native keycode that has one:
 `KC_NO` as kind 0, a custom key as 7, a macro as 6, a layer lock as 3, `MO()`
 as 2, a pointing hold or lock as 4 or 5, and anything else as kind 1. Kind 1
 decodes for any value; what a QMK keycode may do is decided by the action-ABI
 digest and the placement rules below. A custom key as a behaviour step sends
-its shortcut only (D-F26, [`0026`](https://github.com/NoahCLR/charybdis-4x6/blob/55cf97a1df4ac205837f705d36b2581c805f62ac/docs/adr/0026-custom-key-carries-a-shortcut.md);
+its shortcut only (D-F26, [`0026`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0026-custom-key-carries-a-shortcut.md);
 [key-behavior-domain.md](key-behavior-domain.md)).
 
 Held by: `tests/host/run_profile_blob_v1_tests.sh` (`profile_blob_v1_test.c`), `tests/fixtures/profile_blob_v1.fixture`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, native mapping and keycode blocks), `tests/host/run_action_dispatch_tests.sh` (`action_dispatch_test.c`, native round trips).
@@ -165,9 +165,9 @@ output. A combo holds its output while it is held.
 | `LM()` | yes | no | no | no | yes |
 | `LT()` | yes | no | no | no | no |
 | `TG()`, `TO()`, `LOCK_LAYER()` | yes | yes | yes | yes | yes |
-| The switch keys: `CM_ON`, `CM_OFF`, `CM_TOGG`, `BH_ON`, `BH_OFF`, `BH_TOGG` (D-F66) | yes | yes | yes | yes | yes |
+| The switch keys: `CM_ON`, `CM_OFF`, `CM_TOGG`, `BH_ON`, `BH_OFF`, `BH_TOGG`, `AM_ON`, `AM_OFF`, `AM_TOGG` (D-F66) | yes | yes | yes | yes | yes |
 | `DF()`, `PDF()`, and any layer keycode naming a layer at or above the layer count | no | no | no | no | no |
-| Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee3..0x7eff`, and `0x7f80..0x7fff`, which only the runtime sends (`CUSTOM_KEY_LAYER_TAP(n)`, D-F26) | no | no | no | no | no |
+| Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee3..0x7eef`, `0x7ef3..0x7eff`, and `0x7f80..0x7fff`, which only the runtime sends (`CUSTOM_KEY_LAYER_TAP(n)`, D-F26) | no | no | no | no | no |
 
 A refused behaviour action is `INVALID_REFERENCE` at its row, tap index and
 field; a refused combo output refuses the combo domain at its row; a refused
@@ -222,7 +222,7 @@ The FNV-1a digest of this byte stream, integers little-endian:
 | 9 | 2 each | `KC_NO`, `KC_TRNS`, `MO(0)`, `LT(0, KC_NO)`, `OSM(0)`, `MT(0, KC_NO)`, `QK_MACRO_0`, `CUSTOM_KEY_0`, the first layer lock |
 | 10 | 1 + 2 + 2 per layer | layer id, `MO(n)`, `LOCK_LAYER(n)` |
 | 11 | 1 + 4 + 2 + 2 per slot | slot id, its 32-bit mode flag, its hold keycode, its lock keycode |
-| 12 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7ef0`), then `0xFFFF` |
+| 12 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7f00`), then `0xFFFF` |
 
 It depends on no authored row, so an empty profile and a populated one share
 it. Because it includes the firmware version and the layer count, a new

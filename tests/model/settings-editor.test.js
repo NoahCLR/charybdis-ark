@@ -354,15 +354,19 @@ test("settings presentation owns combo timing words and explicit duration units"
     }
 });
 
-// Switch keys override both masters until the keyboard restarts, combos'
-// with QMK's CM_* and behaviours' with the keyboard's BH_* (firmware D-F66),
-// so both say so; no key changes their layer switches.
-test("the behaviour and combo masters say keyboard keys change them too, and their layers do not", () => {
+// Switch keys override the three global switches until the keyboard restarts,
+// combos' with QMK's CM_*, behaviours' with the keyboard's BH_* and
+// auto-mouse's with its AM_* (firmware D-F66), so each says so and names the
+// switch whose "turned off by key" it shows; no key changes their layer
+// switches or the rest of auto-mouse.
+test("the behaviour, combo and auto-mouse switches say keyboard keys change them too, and name their switch", () => {
     const sections = settingsEditorView(snapshot()).sections;
-    for (const [id, macro] of [["behaviorSettings", "behaviorsEnabled"], ["comboSettings", "combosEnabled"]]) {
+    for (const [id, macro, offSwitch] of [["behaviorSettings", "behaviorsEnabled", "behaviour"], ["comboSettings", "combosEnabled", "combo"], ["autoMouse", "autoMouse", "autoMouse"]]) {
         const fields = sections.find(section => section.id === id).fields;
         assert.deepEqual(fields.filter(field => field.keyboardKeys).map(field => field.macro), [macro], id);
+        assert.deepEqual(fields.filter(field => field.offSwitch).map(field => [field.macro, field.offSwitch]), [[macro, offSwitch]], id);
     }
+    assert.equal(sections.flatMap(section => section.fields).filter(field => field.offSwitch).length, 3, "no other field is a global switch");
 });
 
 // Settings v9: auto-sniping follows a set of layers beside its master switch,

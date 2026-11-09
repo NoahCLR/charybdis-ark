@@ -123,11 +123,17 @@ test("the mode, runtime and active-profile pages decode, refusing what they neve
     const mode = Buffer.from([2, 5, 0, 0, 0, 2, 5, 0, 0, 0, 5]);
     assert.deepEqual(decodeEditModePage(mode), {mode: 2, counter: 5, slaveMode: 2, slaveCounter: 5, slaveKnown: true, conflict: false, agreed: true});
     assert.throws(() => decodeEditModePage(Buffer.from([...mode.subarray(0, 10), 8])), {code: "INCOMPATIBLE_RESPONSE"});
-    const runtime = Buffer.alloc(24); runtime.set([1, 0, 1, 1]); runtime.writeUInt16LE(1200, 4); runtime.writeUInt32LE(0xc8ff00, 12);
+    // 25 bytes: byte 24 is the auto-mouse override (firmware D-F66), whose
+    // stored setting is settings readback's.
+    const runtime = Buffer.alloc(25); runtime.set([1, 0, 1, 1]); runtime.writeUInt16LE(1200, 4); runtime.writeUInt32LE(0xc8ff00, 12); runtime[24] = 1;
     const decoded = decodeRuntimePage(runtime);
     assert.deepEqual(decoded.combos, {master: true, override: false});
     assert.deepEqual(decoded.behaviours, {master: true, override: true});
+    assert.deepEqual(decoded.autoMouse, {override: true});
     assert.equal(decoded.live.defaultDpi, 1200); assert.equal(decoded.live.rgbColor, 0xc8ff00);
+    assert.deepEqual(decodeRuntimePage(Buffer.from([...runtime.subarray(0, 24), 0])).autoMouse, {override: false});
+    assert.throws(() => decodeRuntimePage(runtime.subarray(0, 24)), {code: "MALFORMED_RESPONSE"}, "the page before the auto-mouse override");
+    assert.throws(() => decodeRuntimePage(Buffer.from([...runtime.subarray(0, 24), 2])), {code: "NONCANONICAL_RESPONSE"});
     runtime[1] = 2;
     assert.throws(() => decodeRuntimePage(runtime), {code: "NONCANONICAL_RESPONSE"});
     const metadata = Buffer.alloc(25); metadata.set([1, 25]); metadata.writeUInt32LE(30, 2); metadata.writeUInt32LE(7, 6); metadata.writeUInt32LE(3, 10);

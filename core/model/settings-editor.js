@@ -28,6 +28,13 @@ function number(macro, id, label, hint, extra = {}) {
 }
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
+// A global switch whose switch keys override it until the keyboard restarts
+// (firmware D-F66): combos' QMK's CM_ON, CM_OFF and CM_TOGG, behaviours' BH_ON,
+// BH_OFF and BH_TOGG, auto-mouse's AM_ON, AM_OFF and AM_TOGG. It says keyboard
+// keys change it, and names the switch whose "turned off by key" the session
+// publishes (offByKey).
+/** @param {import("../../contracts/model.js").StoredSettingField} field @param {import("../../contracts/model.js").SettingOffSwitch} offSwitch @returns {import("../../contracts/model.js").StoredSettingField} */
+const switchedByKeys = (field, offSwitch) => ({...field, keyboardKeys: true, offSwitch});
 /** @overload @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
 /** @overload @param {string} macro @param {undefined} id @param {string} label @param {string} [hint] @returns {Omit<import("../../contracts/model.js").LayerSettingField, 'record' | 'layer'>} */
 /** @param {string} macro @param {number | undefined} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").SettingFieldBase & {id: number | undefined, kind: 'layer', validate: string}} */
@@ -90,7 +97,7 @@ const sections = [
         toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while any of the layers below is on."),
     ]},
     {id: "autoMouse", label: SECTION.autoMouse, area: AREA.pointer, fields: [
-        toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
+        switchedByKeys(toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."), "autoMouse"),
         layer("pointerLayer", SETTING.AUTO_MOUSE_LAYER, "Pointer layer", "The layer that moving the trackball turns on when Auto-mouse is on."),
         number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", `How long the layer stays active after movement. The lighting fade keeps its share of it (${PROFILE_AREAS.lighting} → ${SECTION.automouseFade}).`, {min: 1}),
         number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update auto-mouse. Higher values ignore closely spaced movement events."}),
@@ -233,18 +240,17 @@ function settingsSections(snapshot, settings) {
     // applies is on, judged by the layer its key came from. Each behaviour and
     // combo has its own switch and layers in Keymap, and each key position its
     // own in the key's editor. Each master has switch keys that override it
-    // until the keyboard restarts: QMK's CM_ON, CM_OFF and CM_TOGG, and the
-    // keyboard's BH_ON, BH_OFF and BH_TOGG (firmware D-F66).
+    // until the keyboard restarts (switchedByKeys).
     result.push({id: "behaviorSettings", area: AREA.settings, label: SECTION.behaviorSettings,
         layerGroup: {label: "On these layers", hint: "A key uses its behaviour only when the layer it comes from is on here."}, fields:
-        [{...toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Off, every key does what it would without its behaviour."), keyboardKeys: true},
+        [switchedByKeys(toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Off, every key does what it would without its behaviour."), "behaviour"),
             ...everyLayer(i => ({...toggle(`behaviorsOnLayer${i}`, SETTING.LAYER_BEHAVIORS, `On ${name(i)}`, "Keys that come from this layer use their behaviours."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // Combos get a section of their own beside their layer matching. The
     // Interface adds the default window and hold threshold to it, which
     // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: AREA.settings, label: SECTION.comboSettings,
         layerGroup: {label: "On these layers", hint: "A key can be part of a combo only when the layer it comes from is on here."}, fields:
-        [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Each combo's own window and conditions are in Keymap → Combos."), keyboardKeys: true},
+        [switchedByKeys(toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Each combo's own window and conditions are in Keymap → Combos."), "combo"),
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
                 hint: "Off, combos still fire but send their output without its behaviour; a custom key sends only its shortcut."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});

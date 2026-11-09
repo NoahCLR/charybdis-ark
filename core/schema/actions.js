@@ -13,7 +13,7 @@ const keycodes = require("./keycodes");
 const {LAYER_FORMS, layerFormBase, layerFormLayer, macroName} = require("../../rules/qmk-keycodes.mjs");
 const {layerRuleOf} = require("../../rules/layer-placement.mjs");
 const {callParts} = require("../../rules/keycode-expression.mjs");
-const {LAYER_LOCK_BLOCK, behaviorSwitchKeyName, customKeyName} = require("../data/user-keycodes");
+const {LAYER_LOCK_BLOCK, autoMouseSwitchKeyName, behaviorSwitchKeyName, customKeyName} = require("../data/user-keycodes");
 // The keyboard's layer-lock block, LOCK_LAYER(n).
 const {PD_MODE_KEYS, pdModeKeyOfCode} = require("../data/pd-mode-keys");
 const {LAYERS} = require("../data/charybdis-layout");
@@ -29,16 +29,19 @@ const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 // 0xb4a15f12 (firmware D-F26), with no keycode changed. The switch keys for
 // behaviours, BH_ON, BH_OFF and BH_TOGG (firmware D-F66, Profile Wire 2.1) added
 // keycodes: their block moved the vocabulary's end, and the digest from
-// 0x67df11b3. A keyboard advertising another vocabulary numbers its keys
-// differently, so Ark reads it but neither names its keys nor edits it.
-const ACTION_ABI = 0xb2205fc3;
+// 0x67df11b3; the switch keys for auto-mouse, AM_ON, AM_OFF and AM_TOGG
+// (firmware D-F66, still Profile Wire 2.1), moved it again, from 0xb2205fc3.
+// A keyboard advertising another vocabulary numbers its keys differently, so
+// Ark reads it but neither names its keys nor edits it.
+const ACTION_ABI = 0x91fcd248;
 const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 /** @param {number} value */
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
 
 // An action's name, the one every edit message and row lookup uses. A switch
-// key for behaviours is a plain keycode QMK's catalogue does not name, so it
-// goes by the keyboard's name for it, BH_TOGG, as a position does. That name
+// key for behaviours or auto-mouse is a plain keycode QMK's catalogue does not
+// name, so it goes by the keyboard's name for it, BH_TOGG or AM_TOGG, as a
+// position does. That name
 // is not gated on the action vocabulary, as a custom key's or a pointing
 // key's is not: Ark reads a profile only on the current base (D-L64), whose
 // vocabulary has these keys, and a backup only under the vocabulary it
@@ -48,7 +51,7 @@ const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
 function actionName(action) {
     switch (action.kind) {
         case ACTION.NONE: return "KC_NO";
-        case ACTION.QMK_KEYCODE: return behaviorSwitchKeyName(action.operand) ?? keycodes.resolve(action.operand).name;
+        case ACTION.QMK_KEYCODE: return behaviorSwitchKeyName(action.operand) ?? autoMouseSwitchKeyName(action.operand) ?? keycodes.resolve(action.operand).name;
         case ACTION.LAYER_MOMENTARY: return `MO(${action.operand})`;
         case ACTION.LAYER_LOCK: return `LOCK_LAYER(${action.operand})`;
         case ACTION.MACRO: return macroName(action.operand);
@@ -84,11 +87,12 @@ const layerOfRef = text => {
 };
 
 // The switch keys (firmware D-F66): QMK's CM_ON, CM_OFF and CM_TOGG for
-// combos and the keyboard's BH_ON, BH_OFF and BH_TOGG for behaviours. The
-// firmware runs all six, wherever they are sent.
+// combos and the keyboard's BH_ON, BH_OFF and BH_TOGG for behaviours and
+// AM_ON, AM_OFF and AM_TOGG for auto-mouse. The firmware runs all nine,
+// wherever they are sent.
 const COMBO_SWITCH_KEYS = Object.freeze(["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE"].map(name => /** @type {number} */ (keycodes.encode(name))));
 /** @param {number} code */
-const isSwitchKey = code => COMBO_SWITCH_KEYS.includes(code) || behaviorSwitchKeyName(code) !== undefined;
+const isSwitchKey = code => COMBO_SWITCH_KEYS.includes(code) || behaviorSwitchKeyName(code) !== undefined || autoMouseSwitchKeyName(code) !== undefined;
 
 // TG(n), TO(n), TT(n) and OSL(n) on a layer the keyboard has: the QMK layer
 // keycodes the keyboard runs through its own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold

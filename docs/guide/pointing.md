@@ -34,7 +34,13 @@ Sniping slows directional pointing modes too; scrolling modes ignore it.
 **Auto-mouse**
 
 - **Auto-mouse** turns the **Pointer layer** on when you move the ball. A
-  layer a pointing mode's link uses can't be the pointer layer.
+  layer a pointing mode's link uses can't be the pointer layer. A
+  [switch key](behaviours.md#switch-keys) on the keyboard can change it too:
+  **Auto-mouse Off** (`AM_OFF`) or **Toggle Auto-mouse** (`AM_TOGG`) turn it
+  off until the keyboard restarts, and **Auto-mouse On** (`AM_ON`) turns it
+  back on, but not when it's off here. The switch then stays on and is marked
+  **turned off by key**. Switching auto-mouse off turns off a pointer layer
+  the ball turned on; one you hold or lock stays.
 - **Timeout**: how long the layer stays on after the ball stops. The lighting
   fade keeps its share of it (see [Lighting](lighting.md#auto-mouse-fade)).
 - **Movement debounce**, **Delay after typing** and **Movement threshold**

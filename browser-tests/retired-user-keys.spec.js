@@ -67,3 +67,22 @@ test("a switch key for behaviours is picked beside those for combos and posts by
     expect(await posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys",
         changes: [expect.objectContaining({layoutIndex: 0, keycode: "BH_TOGG"})]})]);
 });
+
+// And its switch keys for auto-mouse (firmware D-F66), right after them in the
+// same group.
+test("a switch key for auto-mouse is picked after those for behaviours and posts by name", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('[data-act="pick"]').click();
+    const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+    await picker.locator('[data-sec="other"]').click();
+    const switches = ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "BH_ON", "BH_OFF", "BH_TOGG", "AM_ON", "AM_OFF", "AM_TOGG"];
+    const shown = await picker.locator("[data-pick]").evaluateAll(tiles => tiles.map(tile => tile.getAttribute("data-pick")));
+    const at = shown.indexOf("QK_COMBO_ON");
+    expect(shown.slice(at, at + switches.length)).toEqual(switches);
+    await expect(picker.locator('[data-pick="AM_TOGG"]')).toContainText("Toggle Auto-mouse");
+    await clearPosts(page);
+    await picker.locator('[data-pick="AM_TOGG"]').click();
+    await picker.locator('[data-act="use"]').click();
+    expect(await posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys",
+        changes: [expect.objectContaining({layoutIndex: 0, keycode: "AM_TOGG"})]})]);
+});

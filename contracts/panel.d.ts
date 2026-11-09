@@ -239,6 +239,6 @@ export interface PublishedModel {
     liveProposal: {id: number; label: string | null; checks: import('./model.js').Check[]} | null;
     /** Ark's own live edit or Revert, held by the keyboard until no key is held: what to do, what holds it, and whether Cancel edit is offered (never for a Revert). */
     liveWait: {title: string; detail: string; cancellable: boolean} | null;
-    /** Toggles a key turned off over a stored "on": shown as turned off by key, never as a change. */
-    runtime: {combosOffByKey: boolean; behavioursOffByKey: boolean} | null;
+    /** Each global switch a switch key turned off over a stored "on": shown as turned off by key, never as a change. Null without a keyboard's runtime read. */
+    offByKey: Readonly<Record<import('./model.js').SettingOffSwitch, boolean>> | null;
 }

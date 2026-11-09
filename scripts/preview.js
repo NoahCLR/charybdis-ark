@@ -209,7 +209,7 @@ function buildModel(shell = WEB_SHELL, {live = false, mode = 2, stopped = false,
         // How edits reach it, stored on the keyboard: Review and save here,
         // Live preview + save with `live`.
         editMode: {mode: live ? mode : 0, counter: 1, slaveMode: live ? mode : 0, slaveCounter: 1, slaveKnown: true, conflict: false, agreed: true},
-        runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true},
+        runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true}, autoMouse: {override: true},
             live: {defaultDpi: 1200, snipingDpi: 400, rgbMode: 1, rgbColor: 0, defaultLayers: 1, keymapOptions: 0}} : null,
         liveApply: apply || null,
     };

@@ -577,10 +577,13 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // (key-names.js), and a branch or combo action that acts on a layer is
     // tagged with them. TG is a lock on this firmware (firmware D-F46).
     layerKeyVerbs: {MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"},
-    // The switch keys for behaviours, by their names' home
-    // (data/user-keycodes.js BEHAVIOR_SWITCH_KEYS), worded as QMK's catalogue
-    // words the switch keys for combos: Combo On, Combo Off, Toggle Combo.
-    switchKeys: /** @satisfies {Readonly<Record<import("../data/user-keycodes.js").BehaviorSwitchKey, string>>} */ ({BH_ON: "Behaviours On", BH_OFF: "Behaviours Off", BH_TOGG: "Toggle Behaviours"}),
+    // The switch keys for behaviours and for auto-mouse, by their names' homes
+    // (data/user-keycodes.js BEHAVIOR_SWITCH_KEYS, AUTO_MOUSE_SWITCH_KEYS),
+    // worded as QMK's catalogue words the switch keys for combos: Combo On,
+    // Combo Off, Toggle Combo.
+    switchKeys: /** @satisfies {Readonly<Record<import("../data/user-keycodes.js").BehaviorSwitchKey | import("../data/user-keycodes.js").AutoMouseSwitchKey, string>>} */ ({
+        BH_ON: "Behaviours On", BH_OFF: "Behaviours Off", BH_TOGG: "Toggle Behaviours",
+        AM_ON: "Auto-mouse On", AM_OFF: "Auto-mouse Off", AM_TOGG: "Toggle Auto-mouse"}),
     // Review's checks: each level's word, and where a check that is not new
     // in the draft comes from.
     checkLevels: {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"},

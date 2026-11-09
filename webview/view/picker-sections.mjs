@@ -29,8 +29,8 @@ export const pickable = (entry) => entry.offered !== false;
 const isKeyboardKey = inGroups("kb");
 // The keyboard's 128 custom keys, by the names the model gives them.
 const isCustom = inGroups("Custom keys");
-// The keyboard's switch keys for behaviours, in core's group for them, and
-// QMK's for combos, by their catalogue names.
+// The keyboard's switch keys for behaviours and auto-mouse, in core's group
+// for them, and QMK's for combos, by their catalogue names.
 const isSwitchKey = (/** @type {Entry} */ entry) => entry.group === "Switch keys" || /^QK_COMBO_(?:ON|OFF|TOGGLE)$/.test(valueOf(entry));
 /** @param {Entry} entry */
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
@@ -112,7 +112,8 @@ export function pickerSections() {
             group("Magic switches", from("magic")),
             group("System", from("system")), group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)),
             // The switch keys: QMK's for combos, then the keyboard's for
-            // behaviours, each in the order its catalogue gives them.
+            // behaviours and for auto-mouse, each in the order its catalogue
+            // gives them.
             group("Switch keys", isSwitchKey),
             group("Features", rest),
         ]},

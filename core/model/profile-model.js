@@ -13,7 +13,7 @@
 // be a lie about what the keyboard is running.
 
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfCode} = require("../data/pd-mode-keys");
-const {BEHAVIOR_SWITCH_KEYS, behaviorSwitchKeyCode} = require("../data/user-keycodes");
+const {AUTO_MOUSE_SWITCH_KEYS, BEHAVIOR_SWITCH_KEYS, autoMouseSwitchKeyCode, behaviorSwitchKeyCode} = require("../data/user-keycodes");
 const {VOCABULARY, layerName, slotName} = require("./vocabulary");
 const {comboOutputBehaviorLayers, participation} = require("./participation");
 const {comboReferenceLayers, publishedComboReach} = require("./combo-reach");
@@ -132,11 +132,12 @@ function profileModel(content, capabilities, editing) {
         present(code, {value: name, key: name, label, group: "Custom keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase(),
             tip: does ? `${label} · ${does}` : `${label} · no shortcut`});
     }
-    // So is each switch key for behaviours, in a group of its own, on firmware
-    // whose vocabulary has them; the picker puts them beside QMK's switch keys
-    // for combos.
-    if (knownActionAbi(capabilities?.actionAbiDigest ?? 0)) for (const name of BEHAVIOR_SWITCH_KEYS) {
-        const code = /** @type {number} */ (behaviorSwitchKeyCode(name)), native = keycodes.resolve(code).name, label = names.labels[name];
+    // So is each switch key for behaviours and for auto-mouse, in a group of
+    // its own, on firmware whose vocabulary has them; the picker puts them
+    // beside QMK's switch keys for combos.
+    const switchKeyFamilies = /** @type {const} */ ([[BEHAVIOR_SWITCH_KEYS, behaviorSwitchKeyCode], [AUTO_MOUSE_SWITCH_KEYS, autoMouseSwitchKeyCode]]);
+    if (knownActionAbi(capabilities?.actionAbiDigest ?? 0)) for (const [family, codeOf] of switchKeyFamilies) for (const name of family) {
+        const code = /** @type {number} */ (codeOf(name)), native = keycodes.resolve(code).name, label = names.labels[name];
         present(code, {value: name, key: name, label, group: "Switch keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()});
     }
     // Every keycode the profile holds is in the table by its name here, so the

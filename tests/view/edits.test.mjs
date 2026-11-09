@@ -180,6 +180,31 @@ test("the switch keys for behaviours go where those for combos go, and come back
     assert.ok(model.qmkKeycodes.some((entry) => entry.value === "BH_TOGG" && entry.keycode === 0x7ee2));
 });
 
+// The switch keys for auto-mouse (firmware D-F66) go the same places, and come
+// back the same way.
+test("the switch keys for auto-mouse go where those for combos go, and come back by name from a backup", () => {
+    const draft = session();
+    stage(draft, edits.setKey("Layer 0", 5, "AM_TOGG"));
+    stage(draft, edits.comboMessage(null, {inputs: ["KC_D", "KC_F"], output: "AM_OFF", termMs: ""}));
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch: {style: "TAP_SENDS", action: "AM_ON"}}}, draft.identity()));
+    stage(draft, edits.saveBehaviour({keycode: "AM_TOGG", stored: false, steps: []}, {change: {tapCount: 1, kind: "tap", branch: {style: "TAP_SENDS", action: "BH_TOGG"}}}, draft.identity()));
+    assert.equal(profileLayers(draft.document)[0][slotOf(5)], 0x7ef2);
+    const output = decoded(draft).combos.rows.at(-1).output;
+    assert.deepEqual([output.kind, output.operand], [1, 0x7ef1]);
+    const rows = decoded(draft).behaviors.rows;
+    const tap = rows.find((row) => row.target.operand === 0x14).steps[0].tap;
+    assert.deepEqual([tap.kind, tap.operand], [1, 0x7ef0]);
+    assert.ok(rows.some((row) => row.target.kind === 1 && row.target.operand === 0x7ef2), "a switch key for auto-mouse may have a behaviour of its own");
+    const backup = portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document))).document;
+    const model = publishedModel(backup);
+    const key = model.layers[0].positions.find((position) => position.layoutIndex === 5);
+    assert.deepEqual([key.keycode, key.semantic, key.display], ["0x7EF2", "AM_TOGG", "Toggle Auto-mouse"]);
+    assert.ok(model.keyBehaviors.some((row) => row.keycode === "AM_TOGG"), "its row is keyed as the key means it");
+    assert.equal(model.qmkKeyLabels["0x7EF1"], "Auto-mouse Off");
+    assert.equal(model.qmkKeycodeAliases["0x7EF0"], "AM_ON");
+    assert.ok(model.qmkKeycodes.some((entry) => entry.value === "AM_TOGG" && entry.keycode === 0x7ef2));
+});
+
 // ── keyboard shortcuts ──────────────────────────────────────────────────
 
 test("undo and redo belong to the draft except inside text, a recording or a prompt", () => {

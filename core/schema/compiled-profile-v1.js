@@ -10,7 +10,7 @@ const keycodes = require("./keycodes");
 const legacy = require("../data/keycode-legacy");
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfName} = require("../data/pd-mode-keys");
 const {macroOfName} = require("../../rules/qmk-keycodes.mjs");
-const {behaviorSwitchKeyCode, customKeyCode, customKeyOfName, LAYER_LOCK_BLOCK} = require("../data/user-keycodes");
+const {autoMouseSwitchKeyCode, behaviorSwitchKeyCode, customKeyCode, customKeyOfName, LAYER_LOCK_BLOCK} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 const {DIALECTS, callParts, encodeExpression, normalizeExpression, splitArguments} = require("../../rules/keycode-expression.mjs");
 
@@ -75,9 +75,9 @@ const SPELLINGS = Object.freeze({names: legacy.NAMES, modTaps: legacy.MOD_TAP_SH
 // What the draft knows by name: the model's keycode values, the Charybdis's
 // own pointer keys, QMK's blank names and other spellings, then (after a
 // macro's name) custom keys, pointing keys and the switch keys for
-// behaviours, and the profile's layers by name. A switch key's name reads as
-// a plain keycode, which every edit takes by name only once it has checked
-// the action vocabulary (draft-editor, key-behavior-edits,
+// behaviours and auto-mouse, and the profile's layers by name. A switch key's
+// name reads as a plain keycode, which every edit takes by name only once it
+// has checked the action vocabulary (draft-editor, key-behavior-edits,
 // device-profile-edits).
 /** @param {ExpressionModel} model @returns {import("../../rules/keycode-expression.mjs").ExpressionTables} */
 function tablesOf(model) {
@@ -94,7 +94,7 @@ function tablesOf(model) {
             const custom = customKeyOfName(name);
             if (custom !== undefined) return customKeyCode(custom);
             const pd = pdModeKeyOfName(name);
-            return pd ? (pd.locked ? PD_MODE_KEYS[pd.slot].lockCode : PD_MODE_KEYS[pd.slot].holdCode) : behaviorSwitchKeyCode(name);
+            return pd ? (pd.locked ? PD_MODE_KEYS[pd.slot].lockCode : PD_MODE_KEYS[pd.slot].holdCode) : behaviorSwitchKeyCode(name) ?? autoMouseSwitchKeyCode(name);
         },
         spellings: SPELLINGS,
         layers: model?.layers || [],

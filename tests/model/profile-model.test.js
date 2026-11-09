@@ -188,6 +188,24 @@ test("the switch keys for behaviours are named and offered only on the vocabular
     assert.equal(older.layers[0].positions[2].display, "0x7EE2", "and names no such key");
 });
 
+test("the switch keys for auto-mouse are named and offered only on the vocabulary that has them", () => {
+    const values = [0x7ef0, 0x7ef1, 0x7ef2, 0x7ef3];
+    const state = {
+        layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: ACTION_ABI},
+    };
+    const model = readback(state);
+    assert.deepEqual(model.layers[0].positions.map(key => [key.keycode, key.semantic, key.display]), [
+        ["0x7EF0", "AM_ON", "Auto-mouse On"], ["0x7EF1", "AM_OFF", "Auto-mouse Off"], ["0x7EF2", "AM_TOGG", "Toggle Auto-mouse"], ["0x7EF3", "0x7EF3", "0x7EF3"]]);
+    assert.deepEqual(model.qmkKeycodes.filter(key => /^AM_/.test(key.value)).map(key => [key.value, key.keycode, key.group, key.offered]),
+        [["AM_ON", 0x7ef0, "Switch keys", undefined], ["AM_OFF", 0x7ef1, "Switch keys", undefined], ["AM_TOGG", 0x7ef2, "Switch keys", undefined]]);
+    // The vocabulary with the switch keys for behaviours but before these
+    // (firmware D-F66 before auto-mouse joined it).
+    const older = readback({...state, capabilities: {actionAbiDigest: 0xb2205fc3}});
+    assert.ok(!older.qmkKeycodes.some(key => /^(?:AM|BH)_/.test(key.value)), "firmware without them is not offered them");
+    assert.equal(older.layers[0].positions[2].display, "0x7EF2", "and names no such key");
+});
+
 test("a position carries what its value means, not only what the keyboard calls it", () => {
     // A pointing mode, a macro and a behaviour target are all stored as plain
     // user keycodes, while every other domain names them semantically. The

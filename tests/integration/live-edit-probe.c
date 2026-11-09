@@ -13,6 +13,7 @@
 #include "users/noah/lib/compat/qmk_profile_edit_channel.h"
 #include "users/noah/lib/compat/qmk_portable_profile.h"
 #include "users/noah/lib/key/behavior/participation.h"
+#include "users/noah/lib/pointing/policy/auto_mouse_switch.h"
 #include "users/noah/lib/profile/runtime/profile_working_copy.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
@@ -25,7 +26,7 @@ static noah_active_profile_snapshot_t            snapshot;
 static noah_profile_working_copy_t               copy;
 // What the owner adds to the working copy's own status.
 static noah_profile_owner_working_status_t owner;
-static uint32_t                            values[8];
+static uint32_t                            values[9];
 static struct {
     uint16_t transaction;
     uint32_t session, revision;
@@ -96,6 +97,9 @@ bool noah_participation_behaviors_override(void) {
 bool is_combo_enabled(void) {
     return values[1] != 0u;
 }
+bool auto_mouse_switch_override(void) {
+    return values[8] != 0u;
+}
 uint32_t noah_qmk_portable_live_setting(uint8_t id) {
     return id == NOAH_SETTING_DEFAULT_DPI ? values[4] : id == NOAH_SETTING_RGB_COLOR ? values[5] : id == NOAH_SETTING_DEFAULT_LAYERS ? values[6] : id == NOAH_SETTING_KEYMAP_OPTIONS ? values[7] : 0u;
 }
@@ -145,6 +149,7 @@ static bool set(const char *name, unsigned long value) {
     FIELD("rgb_color", values[5])
     FIELD("default_layers", values[6])
     FIELD("keymap_options", values[7])
+    FIELD("auto_mouse_override", values[8])
 #undef FIELD
     return false;
 }

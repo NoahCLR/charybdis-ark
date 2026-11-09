@@ -1,5 +1,6 @@
 import type {AccentTable, Scalar, Tier, TimingTerm} from './edits.js';
-// A global switch a banner names (vocabulary.settingOff).
+// A global switch: one a banner names (vocabulary.settingOff), and whose
+// runtime override a switch key turns off for now (offByKey).
 export type SettingOffSwitch = 'behaviour' | 'combo' | 'autoMouse';
 export type {AccentTable};
 
@@ -165,7 +166,7 @@ export interface Vocabulary {
     keyCapLayerVerbs: Readonly<Record<string, string>>;
     /** What each layer key does to its layer, in the words its name reads by ("Hold", "Lock"), by its form; LT and LM have none. */
     layerKeyVerbs: Readonly<Partial<Record<LayerForm, string>>>;
-    /** The keyboard's switch keys for behaviours (BH_ON, BH_OFF, BH_TOGG), in words, by name; QMK's for combos are worded by its catalogue. */
+    /** The keyboard's switch keys for behaviours (BH_ON, BH_OFF, BH_TOGG) and auto-mouse (AM_ON, AM_OFF, AM_TOGG), in words, by name; QMK's for combos are worded by its catalogue. */
     switchKeys: Readonly<Record<string, string>>;
     checkLevels: Readonly<Record<FindingLevel, string>>;
     checkStatuses: Readonly<Record<Check['status'], string>>;
@@ -359,6 +360,8 @@ export interface SettingFieldBase extends SettingBits {
     notBuilt?: boolean;
     /** QMK owns the live value, so keys on the keyboard (or VIA) change it too. */
     keyboardKeys?: boolean;
+    /** The global switch this field is, whose runtime override a switch key turns off for now (the published `offByKey`). */
+    offSwitch?: SettingOffSwitch;
     governs?: {kind: 'tier'; tier: string} | {kind: 'branches'} | {kind: 'layer'; layer: number};
     /** The heading a field is listed under within its section. */
     part?: string;
