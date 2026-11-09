@@ -57,7 +57,8 @@ Shift+Space on the other; Escape lets go. Review lists the swaps as one
 
 Each slot has two keys: one that runs the mode while it is held, and one that
 locks it on until pressed again. The picker shows them as **Hold** and
-**Lock** under Pointing modes.
+**Lock** under Pointing modes. A lock key with a behaviour of its own still
+locks from an empty Tap.
 
 The mode's name is the editor's title: click it to rename, up to 32 bytes
 (an accented letter takes two); its slot number follows it, such as

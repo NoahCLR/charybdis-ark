@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_BASE} = require("../fixtures/portable-profile");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {applyDraftEdit} = require("../../core/model/draft-editor");
 const {DRAFT_EDIT_TYPES} = require("../../core/model/draft-edits");
@@ -6,7 +7,7 @@ const portable = require("../../core/model/portable-profile");
 const {matrixPosition} = require("../../core/data/charybdis-layout");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 
-const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3};
+const capabilities = CURRENT_BASE;
 // The draft as it stands, and the identity a profile form is read with.
 function draft() {
     const document = pdDocument();

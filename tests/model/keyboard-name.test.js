@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_BASE} = require("../fixtures/portable-profile");
 const {profileLayers, profileMacros} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -9,7 +10,7 @@ const {draftEdit} = require("../fixtures/draft-edit");
 const {profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3};
+const capabilities = CURRENT_BASE;
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 
 test("a profile stores no keyboard name until one is given, and the view says what stands in", () => {

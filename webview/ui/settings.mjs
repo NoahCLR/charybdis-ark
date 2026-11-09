@@ -312,13 +312,14 @@ function snipingKeys(model, canEdit) {
 
 // QMK keeps the live value of these, so a key on the keyboard (a Magic, DF()
 // or DPI key) changes it too, until the keyboard restarts: the profile is
-// their only saved owner (firmware D-F32), and a combos or behaviours key is a
-// toggle over it, shown beside the switch rather than as a change.
+// their only saved owner (firmware D-F32), and a switch key (CM_*, BH_*,
+// firmware D-F66) sets the keyboard's override over it, shown beside the
+// switch rather than as a change.
 const KEYBOARD_KEYS_TIP = "Keys on the keyboard can change this too, until the keyboard restarts; it then comes back to the value set here.";
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
 const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark" data-tip="${esc(KEYBOARD_KEYS_TIP)}">↺ keyboard keys change this too</span>` : "";
 
-// A toggle key turned this off over a stored "on" (plan answer 10): said
+// A switch key turned this off over a stored "on" (plan answer 10): said
 // beside the switch, never a change in the review.
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
 function offByKeyMark(field) {

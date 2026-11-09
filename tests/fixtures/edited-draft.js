@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_BASE} = require("./portable-profile");
 // A draft of the PD profile (./pd-profile) with one edit in every area the
 // review describes: keys, a key's participation, a layer's name, macros (steps
 // and name), the key timing settings section, a behaviour, a combo
@@ -11,7 +12,7 @@ const {LAYER_IDENTITY} = require("../../core/data/charybdis-layout");
 const {RGB_LOCALITIES, RGB_TAP_COMMIT_MODES} = require("../../core/schema/rgb-domain-v1");
 const {document: pdDocument} = require("./pd-profile");
 
-const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3};
+const capabilities = CURRENT_BASE;
 /** @param {import("../../core/model/types.js").PortableDocument} document */
 const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
 

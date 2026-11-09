@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_BASE} = require("../fixtures/portable-profile");
 const {profileMacros, editMacros} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -12,7 +13,7 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const schema2 = {maxProfilePayload: 130048, maxBehaviorRows: 64, maxPopulatedBehaviorSteps: 128, maxCombos: 32, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32};
-const customKeyCapabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3};
+const customKeyCapabilities = CURRENT_BASE;
 const count = (usage, id) => usage.counts.find(entry => entry.id === id);
 
 // The fixture with no behaviours and no combos.

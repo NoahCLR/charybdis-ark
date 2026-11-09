@@ -12,17 +12,22 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {createSnapshot, materializeProfile, comboTableOf} = require("../../core/model/portable-profile");
 const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
-const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {PROFILE_BLOB_V1, decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {encodeMacroDomain} = require("../../core/schema/macro-domain-v1");
 const {encodeSettings, defaultLayerRecord} = require("../../core/schema/settings-domain-v1");
 const {ACTION_ABI} = require("../../core/schema/actions");
 const {LAYER_LOCK_BASE} = require("../../core/data/user-keycodes");
-const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
+const {PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
 
 const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/populated_profile_v4.fixture");
-const CURRENT_CAPABILITIES = Object.freeze({protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI,
-    featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
+// Current firmware as Ark requires it (D-L64): its versions, sixteen layers,
+// every domain and the action vocabulary Ark knows. CURRENT_BASE leaves out
+// the feature word, for a test whose keyboard reports none; the
+// capabilities are a build that saves on both halves.
+const CURRENT_BASE = Object.freeze({protocol: {major: PROFILE_WIRE_V1.PROTOCOL_MAJOR, minor: PROFILE_WIRE_V1.PROTOCOL_MINOR},
+    schema: {major: PROFILE_BLOB_V1.SCHEMA_MAJOR, minor: PROFILE_BLOB_V1.SCHEMA_MINOR}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI});
+const CURRENT_CAPABILITIES = Object.freeze({...CURRENT_BASE, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
 
 // Settings v10: values 10..14 are the retired pointing DPI and 27 the retired
 // combo references, all zero; auto-sniping follows Navigation (layer 3)
@@ -69,4 +74,4 @@ function document() {
     return compiled({layers, combos: [{id: 0, inputs: [4, 5], output: 8, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false}]});
 }
 
-module.exports = {settings, compiled, document, CURRENT_CAPABILITIES};
+module.exports = {settings, compiled, document, CURRENT_BASE, CURRENT_CAPABILITIES};

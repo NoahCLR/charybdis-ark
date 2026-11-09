@@ -49,9 +49,9 @@ for (const theme of ["dark", "light"]) {
     });
 }
 
-// The keyboard's keys that switch behaviours (firmware D-F66) are picked
-// beside QMK's combo keys, in Other QMK, and post by the keyboard's name.
-test("a key that switches behaviours is picked beside the combo keys and posts by name", async ({page}) => {
+// The keyboard's switch keys for behaviours (firmware D-F66) are picked beside
+// QMK's for combos, in Other QMK, and post by the keyboard's name.
+test("a switch key for behaviours is picked beside those for combos and posts by name", async ({page}) => {
     await openControls(page, "keys", {tab: "key", selected: 0});
     await page.locator('[data-act="pick"]').click();
     const picker = page.getByRole("dialog", {name: "Pick a keycode"});

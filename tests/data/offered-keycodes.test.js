@@ -9,8 +9,8 @@ test("keycodes for QMK features this firmware does not build are offered nowhere
         {name: "QK_BOOTLOADER", group: "quantum"}, {name: "QK_GRAVE_ESCAPE", group: "quantum"},
         {name: "QK_COMBO_TOGGLE", group: "quantum"}, {name: "QK_SPACE_CADET_LEFT_SHIFT_PARENTHESIS_OPEN", group: "quantum"},
         {name: "KC_SYSTEM_SLEEP", group: "system"}, {name: "KC_AUDIO_MUTE", group: "media"}, {name: "DPI_MOD", group: "kb"},
-        // The keyboard's own twins of the combo keys, presented beside them.
-        {name: "BH_ON", group: "quantum"}, {name: "BH_OFF", group: "quantum"}, {name: "BH_TOGG", group: "quantum"},
+        // The keyboard's switch keys for behaviours, in core's group for them.
+        {name: "BH_ON", group: "Switch keys"}, {name: "BH_OFF", group: "Switch keys"}, {name: "BH_TOGG", group: "Switch keys"},
     ];
     const unbuilt = [
         {name: "QK_MIDI_ON", group: "midi"}, {name: "QK_JOYSTICK_BUTTON_0", group: "joystick"},

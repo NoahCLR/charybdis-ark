@@ -51,7 +51,8 @@ marked **standard key**:
 
 - An empty Single tap sends the key's own keycode, and an empty Hold holds
   it. A layer-tap key holds its layer; a mod-tap key holds its modifiers. A
-  macro plays. A custom key sends its shortcut; a Tap-toggle one does
+  macro plays. A pointing mode's lock key locks the mode, and a switch key
+  turns combos or behaviours on or off (below). A custom key sends its shortcut; a Tap-toggle one does
   nothing on a tap, a One-shot one arms its layers, and one with no shortcut
   does nothing.
 - A hold that starts as the key goes down, such as a layer key's or a
@@ -200,23 +201,32 @@ The switches per layer fold the [empty layers](board-and-layers.md#empty-layers)
 at their end; **Layers it runs on** shows any it is off on.
 
 The layer that counts is the one the key comes from: a transparent key takes
-the switches of the layer it falls through to. When a behaviour is off for a
-key, the key does what it would without one: the board shows no dots on it,
-and the Key tab and the hover card say which switch is keeping it off, with
-no branches or timing, since none of them run.
+the switches of the layer it falls through to. When one of these switches
+keeps a behaviour off for a key, the key does what it would without one: the
+board shows no dots on it, and the Key tab and the hover card say which
+switch is keeping it off, with no branches or timing, since none of them run.
 
-A key on the keyboard can turn behaviours or combos off for now:
-**Behaviours Off** (`BH_OFF`) or **Toggle Behaviours** (`BH_TOGG`) for
-behaviours, and QMK's **Combo Off** (`CM_OFF`) or **Toggle Combo**
-(`CM_TOGG`) for combos. **Behaviours On** (`BH_ON`) and **Combo On**
-(`CM_ON`) turn them back on. Each **Enabled** says **↺ keyboard keys change
-this too**, and Behaviour settings or Combo settings then marks it **turned
-off by key**. That isn't a change and isn't in Review: the key, or unplugging,
-turns it back on. The behaviours keys still work while behaviours are off,
-even with a behaviour of their own, and a key already holding something when
-behaviours go off keeps it until you let go. The picker lists all six in
-**Other QMK**, under **Combos and behaviours**; they go on a key, in a
-behaviour or as a combo's output, but not in a macro.
+### Switch keys
+
+A **switch key** on the keyboard turns behaviours or combos on or off for the
+whole keyboard until it restarts: **Behaviours On**, **Behaviours Off** and
+**Toggle Behaviours** (`BH_ON`, `BH_OFF`, `BH_TOGG`), and QMK's **Combo On**,
+**Combo Off** and **Toggle Combo** (`CM_ON`, `CM_OFF`, `CM_TOGG`). Nothing is
+saved, and the switches above stay as they are. That is why each
+**Enabled** says **↺ keyboard keys change this too**. When a switch key has
+turned one off while Ark has it on, Behaviour settings or Combo settings
+marks its **Enabled** **turned off by key**. Nothing else says so: the board,
+the Key tab and the hover card show what the switches above allow. It isn't a
+change and isn't in Review; the key, or unplugging, turns it back on.
+
+A switch key goes on a key, in a behaviour's tap or hold, or as a combo's
+output, but not in a macro. With a behaviour of its own it does what the
+behaviour decides: held for its Hold it switches nothing, and where the
+behaviour leaves the Tap empty, a tap switches. While behaviours are off a
+key does what it would without one, so `BH_ON` and `BH_TOGG` turn them back
+on even with a behaviour of their own. A behaviour already holding something
+when behaviours go off keeps it until you let go. The picker lists all six
+under **Other QMK**, in **Switch keys**.
 
 ## Behaviour settings
 

@@ -14,7 +14,7 @@ const MUTATION = MASKS.CURRENT_MUTATION_FEATURES;
 const complete = {...capabilities, supportedDomainMask: PROFILE_DOMAIN_MASK, featureFlags: MASKS.CURRENT_PAIR_FEATURES};
 const read = {...complete, featureFlags: 0, supportedDomainMask: DOMAINS.RGB | DOMAINS.KEY_BEHAVIORS};
 // Earlier and later bases: Profile Wire 1 with schema 3, the released 2.0
-// without the behaviours keys (firmware D-F66), and either version off by one
+// without the switch keys for behaviours (firmware D-F66), and either version off by one
 // in its major or its minor (D-L64).
 const otherBases = [
     {protocol: {major: 1, minor: 0}, schema: {major: 3, minor: 0}},

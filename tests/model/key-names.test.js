@@ -6,6 +6,7 @@ const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const catalog = require("../../core/data/keycode-catalog");
 const keycodes = require("../../core/schema/keycodes");
 const {PD_MODE_KEYS} = require("../../core/data/pd-mode-keys");
+const {ACTION_ABI} = require("../../core/schema/actions");
 
 const PD_MODE_0 = PD_MODE_KEYS[0].holdCode;
 
@@ -85,7 +86,7 @@ test("every custom key reads by its name, or by its number without one", () => {
     assert.deepEqual(profileKeyNames({actionsKnown: false}).custom, [], "an unknown ABI numbers its keys otherwise");
 });
 
-test("the keys that switch behaviours read as their combo twins do, on the vocabulary that has them", () => {
+test("the switch keys for behaviours read by their words, as those for combos do, on the vocabulary that has them", () => {
     const names = profileKeyNames({actionsKnown: true});
     assert.deepEqual([0x7ee0, 0x7ee1, 0x7ee2].map(code => keyLabel(names, code)), ["Behaviours On", "Behaviours Off", "Toggle Behaviours"]);
     assert.deepEqual(["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE"].map(name => keyLabel(names, /** @type {number} */ (keycodes.encode(name)))), ["Combo On", "Combo Off", "Toggle Combo"]);
@@ -221,7 +222,7 @@ test("macOS ISO labels swap the same positions as playback, including modified k
 test("the layout read counts only keys the app cannot name", () => {
     const {unnamedKeyCount} = require("../../core/model/key-names");
     const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee2, 0x7ef0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
-    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0xb2205fc3}), 1, "configured or empty pointing slots and the behaviours keys are named; a code past the blocks is not");
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: ACTION_ABI}), 1, "configured or empty pointing slots and the switch keys are named; a code past the blocks is not");
     for (const actionAbiDigest of [0x1d3fcacc, 0x61072732, 0x67df11b3]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 6, "older firmware's user keys are not read as blocks");
 });
 

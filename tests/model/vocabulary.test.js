@@ -32,6 +32,7 @@ test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.pointing.scrollAxes, pd.PD_SCROLL_AXES, "scroll axes");
     coversNumbers(VOCABULARY.pointing.modifierPolicy, pd.PD_MODIFIERS, "modifier policy");
     coversNumbers(VOCABULARY.customKeys.layerKinds, require("../../core/schema/settings-domain-v1").SHORTCUT_LAYER_KINDS, "how a custom key's shortcut turns its layers on");
+    assert.deepEqual(Object.keys(VOCABULARY.switchKeys), [...require("../../core/data/user-keycodes").BEHAVIOR_SWITCH_KEYS], "each switch key for behaviours, in its block's order");
     assert.deepEqual(VOCABULARY.pointing.directions.map(([id]) => id), pd.DIRECTIONS, "directions, in the record's order");
     assert.deepEqual(VOCABULARY.pointing.diagonals.map(([id]) => id), pd.DIAGONALS, "diagonals, in the record's order");
     coversNumbers(VOCABULARY.physicalHalves, require("../../core/protocol/flash-pauses-v1").FLASH_PAUSES_V1.PHYSICAL_HALVES, "physical halves");

@@ -134,8 +134,8 @@ test("combos turned off by a key show beside the switch, not as a change", async
     await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });
 
-// BH_OFF and BH_TOGG (firmware D-F66) switch behaviours as CM_OFF and CM_TOGG
-// switch combos, and Behaviour settings says so the same way.
+// The switch keys BH_OFF and BH_TOGG (firmware D-F66) turn behaviours off as
+// CM_OFF and CM_TOGG do combos, and Behaviour settings says so the same way.
 test("behaviours turned off by a key show beside their switch, which says keyboard keys change it", async ({page}) => {
     await openLive(page, "behaviours");
     const row = page.locator('.setrow:has([data-macro="behaviorsEnabled"])');

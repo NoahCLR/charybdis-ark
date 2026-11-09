@@ -33,8 +33,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core"
 const {RGB_LOCALITIES} = require(path.join(here, "..", "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "..", "fixtures", "pd-profile"));
 
-const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3,
-    featureFlags: require(path.join(here, "..", "..", "core", "protocol", "profile-wire-v1")).PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const {CURRENT_CAPABILITIES: capabilities} = require("../fixtures/portable-profile.js");
 
 test("the playback protection control stages a portable policy and Review/discard/undo preserve text", () => {
     const {hostMacros} = require("../fixtures/host-macros");
@@ -154,11 +153,11 @@ test("the picker posts layer keys by index, and wraps the key in modifiers and L
     assert.equal(profileLayers(draft.document)[0][slotOf(5)], 0x0304, "C(S(KC_A))");
 });
 
-// The keyboard's keys that switch behaviours (firmware D-F66) are plain
+// The keyboard's switch keys for behaviours (firmware D-F66) are plain
 // keycodes it names: picked by name, they go on a key, as a combo's output and
 // in a behaviour, a behaviour of their own included, and read back by name
 // from a backup of the draft.
-test("the keys that switch behaviours go where the combo keys go, and come back by name from a backup", () => {
+test("the switch keys for behaviours go where those for combos go, and come back by name from a backup", () => {
     const draft = session();
     stage(draft, edits.setKey("Layer 0", 5, "BH_TOGG"));
     stage(draft, edits.comboMessage(null, {inputs: ["KC_D", "KC_F"], output: "BH_OFF", termMs: ""}));
@@ -170,7 +169,7 @@ test("the keys that switch behaviours go where the combo keys go, and come back 
     const rows = decoded(draft).behaviors.rows;
     const tap = rows.find((row) => row.target.operand === 0x14).steps[0].tap;
     assert.deepEqual([tap.kind, tap.operand], [1, 0x7ee0]);
-    assert.ok(rows.some((row) => row.target.kind === 1 && row.target.operand === 0x7ee2), "a behaviours key may have a row of its own");
+    assert.ok(rows.some((row) => row.target.kind === 1 && row.target.operand === 0x7ee2), "a switch key may have a behaviour of its own");
     const backup = portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document))).document;
     const model = publishedModel(backup);
     const key = model.layers[0].positions.find((position) => position.layoutIndex === 5);

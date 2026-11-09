@@ -26,7 +26,7 @@ test("an action has one name and one native keycode", () => {
     assert.equal(actionName({kind: ACTION.POINTING_MODE_LOCK, operand: 31}), "PD_MODE_31_LOCK");
     assert.equal(nativeCode({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 31}), 0x7e9f);
     assert.throws(() => actionName({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 32}), /pointing slot/);
-    // The keys that switch behaviours are plain keycodes the keyboard names
+    // The switch keys for behaviours are plain keycodes the keyboard names
     // (firmware D-F66); the rest of their block names nothing.
     assert.deepEqual([0x7ee0, 0x7ee1, 0x7ee2].map(operand => actionName({kind: ACTION.QMK_KEYCODE, operand})), ["BH_ON", "BH_OFF", "BH_TOGG"]);
     assert.equal(nativeCode({kind: ACTION.QMK_KEYCODE, operand: 0x7ee2}), 0x7ee2);
@@ -60,7 +60,7 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
     for (const unowned of [0x5241, 0x52e1, 0x5102, 0x5268]) assert.equal(places(code(unowned)), "- - - - -", `0x${unowned.toString(16)} goes nowhere`);
     assert.equal(places({kind: ACTION.CUSTOM_KEY, operand: 2}), "ok ok ok ok ok", "a custom key goes anywhere: a step sends its shortcut (firmware D-F26)");
     assert.equal(places({kind: ACTION.CUSTOM_KEY, operand: 127}), "ok ok ok ok ok", "custom key 127 too");
-    // The keys that switch behaviours go wherever QMK's combo keys go
+    // The switch keys for behaviours go wherever QMK's for combos go
     // (firmware D-F66, blob-and-digests.md).
     const keycodes = require("../../core/schema/keycodes");
     for (const [combo, behaviours] of [["QK_COMBO_ON", 0x7ee0], ["QK_COMBO_OFF", 0x7ee1], ["QK_COMBO_TOGGLE", 0x7ee2]]) {

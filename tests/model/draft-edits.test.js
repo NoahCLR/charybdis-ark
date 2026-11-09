@@ -1,4 +1,5 @@
 "use strict";
+const {CURRENT_BASE} = require("../fixtures/portable-profile");
 const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
@@ -59,7 +60,7 @@ test("every registered edit names its editor, its words and, on the profile, its
 function draft() {
     const doc = pdDocument();
     const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
-    return new ProfileDraftSession(snapshot, "test-device", {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3});
+    return new ProfileDraftSession(snapshot, "test-device", CURRENT_BASE);
 }
 
 test("each edit is recorded in its own words", () => {

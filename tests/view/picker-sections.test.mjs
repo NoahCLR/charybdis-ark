@@ -90,13 +90,13 @@ test("arrows and navigation keys read in the order a person says them, not the c
     assert.deepEqual(keysOf("Navigation"), ["KC_HOME", "KC_END", "KC_PAGE_UP", "KC_PAGE_DOWN", "KC_INSERT", "KC_DELETE"]);
 });
 
-// The keyboard's keys that switch behaviours (firmware D-F66) sit right after
-// QMK's that switch combos, in Other QMK, by their words.
-test("the keys that switch behaviours are offered beside the combo keys", () => {
+// The keyboard's switch keys for behaviours (firmware D-F66) sit right after
+// QMK's for combos, in Other QMK's Switch keys, by their words.
+test("the switch keys for behaviours are offered beside those for combos", () => {
     const published = publishedModel(profileDocument());
     const other = pickerSections().find((section) => section.id === "other");
     const groups = groupedEntries(other, entriesForPickerSection(published.qmkKeycodes, other), published);
-    const switches = groups.find((group) => group.name === "Combos and behaviours");
+    const switches = groups.find((group) => group.name === "Switch keys");
     assert.deepEqual(switches?.entries.map((entry) => [entry.value, entry.label]), [
         ["QK_COMBO_ON", "Combo On"], ["QK_COMBO_OFF", "Combo Off"], ["QK_COMBO_TOGGLE", "Toggle Combo"],
         ["BH_ON", "Behaviours On"], ["BH_OFF", "Behaviours Off"], ["BH_TOGG", "Toggle Behaviours"],

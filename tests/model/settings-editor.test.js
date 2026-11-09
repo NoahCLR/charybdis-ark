@@ -354,9 +354,9 @@ test("settings presentation owns combo timing words and explicit duration units"
     }
 });
 
-// Keys on the keyboard switch both masters for now, combos' with QMK's CM_*
-// and behaviours' with the keyboard's BH_* (firmware D-F66), so both say so;
-// their layer switches no key changes.
+// Switch keys override both masters until the keyboard restarts, combos'
+// with QMK's CM_* and behaviours' with the keyboard's BH_* (firmware D-F66),
+// so both say so; no key changes their layer switches.
 test("the behaviour and combo masters say keyboard keys change them too, and their layers do not", () => {
     const sections = settingsEditorView(snapshot()).sections;
     for (const [id, macro] of [["behaviorSettings", "behaviorsEnabled"], ["comboSettings", "combosEnabled"]]) {

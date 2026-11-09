@@ -94,6 +94,17 @@ test("stable semantic actions and standard shortcuts do not require a known cust
     assert.equal(rowFor(edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action: "DPI_MOD"}}]}}, unknown), "KC_A").steps[0].tap.operand, 0x7e00);
 });
 
+// The expression tables name the switch keys BH_ON, BH_OFF and BH_TOGG
+// (firmware D-F66) as they name custom keys and pointing keys; the editor
+// takes such a name only on the vocabulary that has them.
+test("a switch key's name is taken only on the vocabulary that has it", () => {
+    const step = action => ({...form(), steps: [{tapCount: 0, tap: {style: "TAP_SENDS", action}}]});
+    assert.equal(rowFor(edit({type: "saveBehavior", behavior: step("BH_TOGG")}), "KC_A").steps[0].tap.operand, 0x7ee2);
+    assert.equal(rowFor(edit({type: "saveBehavior", behavior: {...form(), keycode: "BH_OFF"}}), "BH_OFF").target.operand, 0x7ee1);
+    const unknown = {...capabilities, actionAbiDigest: 0};
+    assert.throws(() => edit({type: "saveBehavior", behavior: step("BH_TOGG")}, unknown), /matching keyboard action vocabulary/);
+});
+
 test("invalid edits and references are rejected before upload", () => {
     const save = behavior => edit({type: "saveBehavior", behavior});
     for (const value of [-1, 65536, "abc", "1.5", true]) assert.throws(() => save({...form(), tapHoldTerm: value}));

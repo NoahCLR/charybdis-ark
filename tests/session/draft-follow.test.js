@@ -11,10 +11,10 @@ const {document} = require("../fixtures/pd-profile");
 const {editMacros, withPayload} = require("../fixtures/profile-document");
 const {lastMessage, openLoop} = require("../fixtures/panel-loop");
 const {liveKeyboard} = require("../fixtures/live-keyboard");
-const {document: liveDocument} = require("../fixtures/portable-profile");
+const {document: liveDocument, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
 const {EDIT_MODE} = require("../../core/protocol/profile-edit-v1");
 
-const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = CURRENT_CAPABILITIES;
 /** @param {(doc: object) => void} [change] */
 const snapshot = (change) => {
     const doc = document();

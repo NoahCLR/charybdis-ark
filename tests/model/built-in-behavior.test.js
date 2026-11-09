@@ -68,8 +68,19 @@ test("a bare modifier is a plain key: it taps itself and holds itself as a fallb
 });
 
 test("other key families and non-keycode targets inherit nothing", () => {
-    const others = [key(0x00), key(0x01), key(0x03), key(0x5310), key(0x7e00), key(0x7ea0), key(0x7ec0), undefined];
+    const others = [key(0x00), key(0x01), key(0x03), key(0x5310), key(0x7e00), key(0x7ec0), key(0x7ee3), undefined];
     for (const target of others) assert.deepEqual(builtInActions(target), {});
+});
+
+// The firmware taps them itself (firmware D-F66): an empty Tap locks the mode
+// or switches, and with no hold of their own they act on release.
+test("a pointing mode's lock key and a switch key tap themselves, with no hold of their own", () => {
+    const keycodes = require("../../core/schema/keycodes");
+    for (const code of [0x7ea0, 0x7ebf, 0x7ee0, 0x7ee1, 0x7ee2, ...["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE"].map(keycodes.encode)]) {
+        assert.deepEqual(builtInActions(key(code)), {tap: key(code), releaseTaps: true}, `0x${code.toString(16)}`);
+    }
+    const lock = {kind: ACTION.POINTING_MODE_LOCK, operand: 3};
+    assert.deepEqual(builtInActions(lock), {tap: lock, releaseTaps: true});
 });
 
 test("layer holds and pointing-mode keys hold from the press, with no tap of their own", () => {

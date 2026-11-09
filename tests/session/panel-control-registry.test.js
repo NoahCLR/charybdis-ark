@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
 const test = require("node:test"), assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
 const {CONTROLS, controlsOn, panelControl, writingProfile} = require("../../core/session/panel-control-registry");
@@ -11,7 +12,7 @@ const {ProfileDraftSession} = require("../../core/session/profile-draft-session"
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = CURRENT_CAPABILITIES;
 const state = (extra = {}) => ({connected: true, busy: false, selectedDeviceId: "kb", connectionToken: 1, devices: [{id: "kb"}], capabilities, ...extra});
 function session() {
     const doc = document(), snapshot = {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};

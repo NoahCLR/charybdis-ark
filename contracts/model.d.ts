@@ -165,6 +165,8 @@ export interface Vocabulary {
     keyCapLayerVerbs: Readonly<Record<string, string>>;
     /** What each layer key does to its layer, in the words its name reads by ("Hold", "Lock"), by its form; LT and LM have none. */
     layerKeyVerbs: Readonly<Partial<Record<LayerForm, string>>>;
+    /** The keyboard's switch keys for behaviours (BH_ON, BH_OFF, BH_TOGG), in words, by name; QMK's for combos are worded by its catalogue. */
+    switchKeys: Readonly<Record<string, string>>;
     checkLevels: Readonly<Record<FindingLevel, string>>;
     checkStatuses: Readonly<Record<Check['status'], string>>;
     recoveryCauses: Readonly<Record<RecoveryCause, string>>;
