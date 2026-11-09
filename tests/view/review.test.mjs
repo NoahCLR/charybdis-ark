@@ -3,6 +3,7 @@ import test from "node:test";
 import {createRequire} from "node:module";
 import {SECTION_ROWS, activeBlockers, categorySummary, changesKept, discardLabel, draftDot, draftMarks, groupNote, placeState, reviewBlocks, saveOffReason, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
 import {LIVE, LIVE_REVIEW} from "../../webview/view/edit-mode.mjs";
+import {SETTINGS_SCREENS} from "../../webview/view/settings-layout.mjs";
 
 const {VOCABULARY} = createRequire(import.meta.url)("../../core/model/vocabulary");
 const words = {vocabulary: VOCABULARY};
@@ -167,6 +168,13 @@ test("a profile file's settings sections are counted under the vocabulary's word
         "Key swaps & typing": "Keys", "All lighting": "Lighting", "Background effect": "Lighting", "Key feedback": "Lighting",
         "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer",
     });
+});
+
+test("a Settings screen's sections are counted in the order the screen draws them", () => {
+    for (const [screen, sections] of Object.entries(SETTINGS_SCREENS)) {
+        const places = sections.filter((id) => Object.hasOwn(SECTION_ROWS, id)).map((id) => SECTION_ROWS[id][1]);
+        assert.deepEqual(places, places.toSorted((a, b) => a - b), screen);
+    }
 });
 
 test("a stale draft says how many changes it keeps, in agreement", () => {

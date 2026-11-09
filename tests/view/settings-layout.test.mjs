@@ -15,7 +15,7 @@ const ids = (screen) => sectionsOn(sections, screen).map((section) => section.id
 
 test("each Settings screen draws its sections in the order a person reads them", () => {
     assert.deepEqual(Object.keys(SETTINGS_SCREENS), ["behaviours", "combos", "pointer", "host"]);
-    assert.deepEqual(ids("behaviours"), ["keyTiming", "behaviorSettings"], "Tap & hold timing, then where behaviours run");
+    assert.deepEqual(ids("behaviours"), ["behaviorSettings", "keyTiming"], "where behaviours run, then Tap & hold timing");
     assert.deepEqual(ids("combos"), ["comboSettings", "comboReferences"], "Combos, then Combo layer matching");
     assert.deepEqual(ids("pointer"), ["normalPointerSpeed", "sniping", "autoMouse"], "everything filed under Pointer");
     assert.deepEqual(ids("host"), ["host", "keyboardOptions"], "Your computer, then Key swaps & typing");

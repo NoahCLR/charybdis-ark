@@ -34,7 +34,7 @@ import {emptyLayersButton, emptyLayersShown} from "./empty-layers.mjs";
 /** @typedef {import("../../contracts/panel.js").PresentedField} Field */
 
 export const screenBehaviours = () => settingsScreen("behaviours", "Behaviours",
-    "How a key tells a tap from a hold, and where behaviours run.");
+    "Where behaviours run, and how a key tells a tap from a hold.");
 export const screenCombos = () => settingsScreen("combos", "Combos",
     "Where combos run, how they are timed and how they match.");
 export const screenPointer = () => settingsScreen("pointer", "Pointer",
