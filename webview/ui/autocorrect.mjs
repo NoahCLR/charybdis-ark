@@ -16,6 +16,12 @@
 // reads it and says what it would do; nothing changes until Add to my list
 // or Replace my list is chosen. Export saves the list in any of the three.
 //
+// The switch heads the screen: the stored key option, drawn as its settings
+// section is (ui/settings.mjs), with the keyboard keys that change it too.
+// Try it is a box typed in as on the keyboard: the core runs what was typed
+// through the draft's list by the keyboard's rules (firmware autocorrect-v1.md)
+// and the box shows what the computer would end with.
+//
 // What is typed is checked by the core against the draft as it stands, which
 // answers with the refusal the edit would meet or what it would newly warn
 // about; the edit itself is posted when it is kept, and the core has the
@@ -29,7 +35,9 @@ import {getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
-import {AUTOCORRECT_SORTS, LIST_FILE_FORMATS, LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE, WHOLE_WORD, autocorrectRows, countWords, importLines, matchWords, usageShare} from "../view/autocorrect.mjs";
+import {AUTOCORRECT_SECTION} from "../view/settings-layout.mjs";
+import {sectionCard} from "./settings.mjs";
+import {AUTOCORRECT_SORTS, LIST_FILE_FORMATS, LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE, WHOLE_WORD, autocorrectRows, countWords, importLines, matchWords, triedAfter, triedWords, usageShare} from "../view/autocorrect.mjs";
 import * as edits from "../view/edits.mjs";
 import * as controls from "../view/controls.mjs";
 
@@ -104,10 +112,99 @@ export function screenAutocorrect() {
 
     if (state.autocorrectImport) pad.appendChild(importCard(model, list, canEdit));
     for (const notice of list.notices) pad.appendChild(el(`<div class="unavailable ac-notice" data-ac-notice>${esc(notice)} Change the host layout back, or edit the marked entries.</div>`));
-    pad.append(addCard(model, canEdit, gate), filesCard(list, canEdit), listCard(model, list, canEdit));
+    // The switch is a setting, edited as the Settings screens' are.
+    const onOff = (model?.configDefaults || []).find((section) => section.id === AUTOCORRECT_SECTION);
+    if (onOff?.fields.length) pad.appendChild(sectionCard(model, onOff, editGate(model, "settings").editable));
+    pad.append(addCard(model, canEdit, gate), tryCard(model, list), filesCard(list, canEdit), listCard(model, list, canEdit));
     takesDrops(pad);
     paintFeedbackLater();
+    queueMicrotask(paintTry);
     return main;
+}
+
+// ── try it ──────────────────────────────────────────────────────────────
+
+let nextTry = 0;
+/** @param {Model} model */
+const draftOf = (model) => `${model?.draft?.id ?? ""}:${model?.draft?.revision ?? ""}`;
+
+// Asks the core what the keyboard would leave on screen for what the box
+// holds: the text that was there, then what was typed after it.
+function askTry() {
+    const tried = state.autocorrectTry;
+    if (!tried.before && !tried.typed) { state.autocorrectTry = {...tried, text: "", fired: [], undone: false, error: "", requestId: 0}; paintTry(); return; }
+    const requestId = ++nextTry;
+    state.autocorrectTry = {...tried, requestId};
+    post(controls.tryAutocorrect(tried, requestId));
+}
+
+/** @param {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectTry"}>} message */
+export function receiveAutocorrectTry(message) {
+    const tried = state.autocorrectTry, model = getModel();
+    if (tried.requestId !== message.requestId || message.draftId !== model?.draft?.id || message.draftRevision !== model?.draft?.revision) return;
+    state.autocorrectTry = {...tried, draft: draftOf(model), error: message.error || "",
+        ...(message.result ? {text: message.result.text, fired: message.result.fired, undone: message.result.undone} : {})};
+    paintTry();
+}
+
+// The box shows what the keyboard would leave, the line under it says what
+// fired last, and that entry and its typo are marked in the table.
+function paintTry() {
+    const tried = state.autocorrectTry;
+    const box = /** @type {HTMLTextAreaElement | null} */ (document.querySelector('[data-f="autocorrect:try:text"]'));
+    if (!box) return;
+    if (box.value !== tried.text) {
+        box.value = tried.text;
+        box.setSelectionRange(tried.text.length, tried.text.length);
+    }
+    const last = tried.fired.at(-1);
+    const said = /** @type {HTMLElement} */ (document.querySelector("[data-ac-try-said]"));
+    said.textContent = tried.error || triedWords(tried);
+    said.classList.toggle("ac-warning", Boolean(tried.error));
+    for (const row of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("[data-ac-entry]"))) {
+        const fired = Boolean(last) && row.dataset.acEntry === last?.correction;
+        row.classList.toggle("fired", fired);
+        for (const chip of /** @type {NodeListOf<HTMLElement>} */ (row.querySelectorAll("[data-ac-chip], [data-ac-typo]"))) {
+            chip.classList.toggle("fired", fired && (chip.dataset.acChip ?? chip.dataset.acTypo) === last?.typo);
+        }
+    }
+}
+
+/** @param {Model} model @param {NonNullable<NonNullable<Model>["autocorrect"]>} list */
+function tryCard(model, list) {
+    const tried = state.autocorrectTry;
+    const card = el(`<div class="card ac-try"><div class="card-h"><h3>Try it</h3>
+        <div class="right">
+            <label class="sw" data-tip="Whether Caps Lock is on at the computer. It follows your own Caps Lock as you type here."><input type="checkbox" data-f="autocorrect:try:caps" ${tried.capsLock ? "checked" : ""}><span class="track"></span><span class="txt">Caps Lock is on</span></label>
+            <button class="btn ghost" data-act="ac-try-clear">Clear</button>
+        </div></div>
+        <div class="card-b stack">
+            <textarea class="input ac-try-box" data-f="autocorrect:try:text" rows="3" aria-label="Type here to try the list" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type here as you would on the keyboard: a typo, then a space.">${esc(tried.text)}</textarea>
+            <p class="note" data-ac-try-said aria-live="polite"></p>
+            <p class="note">This is what the keyboard would leave on screen with the list as it stands in this draft, typing through ${esc(list.layoutName)}. A word is corrected when you end it, and Backspace straight after puts it back. Shortcuts, cursor keys, a held key and macros are the keyboard's alone and are not tried here.</p>
+        </div></div>`);
+    const box = /** @type {HTMLTextAreaElement} */ (card.querySelector("textarea"));
+    const caps = /** @type {HTMLInputElement} */ (card.querySelector('[data-f="autocorrect:try:caps"]'));
+    box.addEventListener("input", () => {
+        state.autocorrectTry = {...state.autocorrectTry, ...triedAfter(state.autocorrectTry, box.value), text: box.value};
+        askTry();
+    });
+    // The computer's own Caps Lock, as the key press reports it.
+    box.addEventListener("keydown", (event) => {
+        const on = event.getModifierState("CapsLock");
+        if (on === state.autocorrectTry.capsLock) return;
+        caps.checked = on;
+        state.autocorrectTry = {...state.autocorrectTry, capsLock: on};
+    });
+    caps.addEventListener("change", () => { state.autocorrectTry = {...state.autocorrectTry, capsLock: caps.checked}; askTry(); });
+    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="ac-try-clear"]')).addEventListener("click", () => {
+        state.autocorrectTry = {...state.autocorrectTry, before: "", typed: ""};
+        askTry();
+        box.focus();
+    });
+    // The list or the host layout changed under what was tried: try it again.
+    if ((tried.before || tried.typed) && tried.draft !== draftOf(model)) queueMicrotask(askTry);
+    return card;
 }
 
 // ── files ───────────────────────────────────────────────────────────────
@@ -335,7 +432,7 @@ function listCard(model, list, canEdit) {
 /** @param {Model} model @param {Entry["typos"][number]} typo @param {boolean} found */
 function chip(model, typo, found) {
     const where = matchWords(model, typo.match);
-    return `<span class="chip ac-chip ${typo.warnings.length ? "warn" : ""} ${found ? "found" : ""}" ${typo.warnings.length ? `data-tip="${esc(typo.warnings.join(" "))}"` : ""}>
+    return `<span class="chip ac-chip ${typo.warnings.length ? "warn" : ""} ${found ? "found" : ""}" data-ac-chip="${esc(typo.typo)}" ${typo.warnings.length ? `data-tip="${esc(typo.warnings.join(" "))}"` : ""}>
         <span class="mono">${esc(typo.typo)}</span>${where ? `<span class="ac-where">${esc(where)}</span>` : ""}</span>`;
 }
 

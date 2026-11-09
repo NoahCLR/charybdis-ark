@@ -78,6 +78,8 @@ export interface ControlPayloads {
     inspect: {
         validateMacro: Omit<Extract<PanelEdit, {type: 'validateMacro'}>, 'type'>;
         validateAutocorrect: Omit<Extract<PanelEdit, {type: 'validateAutocorrect'}>, 'type'>;
+        /** Try it: what the keyboard would leave on screen for `typed` (the characters a computer would show, `\b` for Backspace) after `before`, text already there; answered with `autocorrectTry`. */
+        tryAutocorrect: {requestId: number; before: string; typed: string; capsLock: boolean};
         /** What a list file, dropped (`text`, `name`) or the starter list (`starter`), would do to the draft's list; answered with `autocorrectImportPreview`. */
         previewAutocorrectImport: {requestId: number} & ({text: string; name: string; starter?: undefined} | {starter: true; text?: undefined; name?: undefined});
         /** The same for a file the shell's chooser picks. */
@@ -105,6 +107,8 @@ export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProg
 export type MacroValidation = MacroInspection | {error: string; code: string};
 /** What an autocorrect edit would be refused for (`error`, '' when it would be taken) and what it would newly warn about. */
 export interface AutocorrectValidation {error: string; code: string; warnings: string[]}
+/** What the keyboard would leave on screen for a try: the text, the corrections that fired and still stand, in order, and whether the last key undid one. */
+export interface AutocorrectTryResult {text: string; fired: {correction: string; typo: string}[]; undone: boolean}
 export type AutocorrectFileFormat = 'txt' | 'csv' | 'json';
 /** A line a list file or the list refused, and why; `line` is the file's line, row or entry number. */
 export interface AutocorrectImportRefused {line: number | null; text: string; reason: string}
@@ -129,6 +133,8 @@ export type PanelResponse<M = import('./panel.js').PostedModel> =
     | ({type: 'readProgress'; read: ReadProgress} & Partial<DraftIdentity>)
     | ({type: 'macroValidation'; keycode: string; payload: string; requestId: number; validation: MacroValidation} & Partial<DraftIdentity>)
     | ({type: 'autocorrectValidation'; requestId: number; validation: AutocorrectValidation} & Partial<DraftIdentity>)
+    /** `result` is absent with `error`, why the text could not be tried. */
+    | ({type: 'autocorrectTry'; requestId: number; result?: AutocorrectTryResult; error?: string} & Partial<DraftIdentity>)
     /** `preview` is absent when no file was chosen, or with `error`, why the file could not be read. */
     | ({type: 'autocorrectImportPreview'; requestId: number; name: string; preview?: AutocorrectImportPreview; error?: string} & Partial<DraftIdentity>);
 /** A file a shell saves: `mime` is its media type when it is not JSON. */

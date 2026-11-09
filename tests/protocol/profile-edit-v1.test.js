@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_MODE, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest,
     buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, decodeEditReply, decodeEditStatusPages, decodeEditModePage,
-    decodeRuntimePage, decodeActiveMetadata, readActiveProfile, sendEditRequest, decodeAutoSavePage, decodeSafeBoundaryPage} = require("../../core/protocol/profile-edit-v1");
+    decodeRuntimePage, decodeRuntimeOverridesPage, decodeActiveMetadata, readActiveProfile, sendEditRequest, decodeAutoSavePage, decodeSafeBoundaryPage} = require("../../core/protocol/profile-edit-v1");
 const {crc32} = require("../../core/schema/profile-blob-v1");
 const {contractUnion} = require("../fixtures/contract-unions");
 
@@ -136,6 +136,13 @@ test("the mode, runtime and active-profile pages decode, refusing what they neve
     assert.throws(() => decodeRuntimePage(Buffer.from([...runtime.subarray(0, 24), 2])), {code: "NONCANONICAL_RESPONSE"});
     runtime[1] = 2;
     assert.throws(() => decodeRuntimePage(runtime), {code: "NONCANONICAL_RESPONSE"});
+    // Page 1: the overrides that came after page 0 was full, the
+    // autocorrect override first (firmware live-edits.md).
+    assert.deepEqual(decodeRuntimeOverridesPage(Buffer.from([1])), {autocorrect: {override: true}});
+    assert.deepEqual(decodeRuntimeOverridesPage(Buffer.from([0])), {autocorrect: {override: false}});
+    assert.throws(() => decodeRuntimeOverridesPage(Buffer.alloc(0)), {code: "MALFORMED_RESPONSE"});
+    assert.throws(() => decodeRuntimeOverridesPage(Buffer.from([1, 0])), {code: "MALFORMED_RESPONSE"});
+    assert.throws(() => decodeRuntimeOverridesPage(Buffer.from([2])), {code: "NONCANONICAL_RESPONSE"});
     const metadata = Buffer.alloc(25); metadata.set([1, 25]); metadata.writeUInt32LE(30, 2); metadata.writeUInt32LE(7, 6); metadata.writeUInt32LE(3, 10);
     metadata.writeUInt32LE(42, 14); metadata[18] = 1; metadata[19] = 0x7f; metadata[20] = 1;
     assert.deepEqual(decodeActiveMetadata(metadata), {length: 30, session: 7, revision: 3, savedGeneration: 42, savedOrigin: 1, domainMask: 0x7f, unsaved: true});

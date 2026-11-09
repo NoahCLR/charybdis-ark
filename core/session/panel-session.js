@@ -83,13 +83,17 @@ function shellModel(shell) {
 // (live-edits.md, "Toggles and the settings QMK holds"; firmware D-F66):
 // combos' and behaviours' masters are on the runtime page beside their
 // overrides; auto-mouse's is its stored setting (scalar 4), which settings
-// readback reports, read here from what the keyboard runs.
+// readback reports, read here from what the keyboard runs; autocorrect's is
+// its key option as the keyboard's settings were read (its mask is the
+// keyboard's own), and its override the runtime page 1's.
 /** @param {{master: boolean, override: boolean}} toggle */
 const turnedOffByKey = ({master, override}) => master && !override;
-/** @param {import("../protocol/types.js").RuntimeRead} runtime @param {State["committed"]} committed @returns {Readonly<Record<import("../../contracts/model.js").SettingOffSwitch, boolean>>} */
-function switchesOffByKey(runtime, committed) {
+/** @param {import("../protocol/types.js").RuntimeRead} runtime @param {State["committed"]} committed @param {State["settingsView"]} settings @returns {Readonly<Record<import("../../contracts/model.js").SettingOffSwitch, boolean>>} */
+function switchesOffByKey(runtime, committed, settings) {
     const autoMouse = {master: Boolean(committed?.domains?.settings?.values?.[SETTING.AUTO_MOUSE_ENABLED]), override: runtime.autoMouse.override};
-    return {combo: turnedOffByKey(runtime.combos), behaviour: turnedOffByKey(runtime.behaviours), autoMouse: turnedOffByKey(autoMouse)};
+    const stored = settings?.sections.flatMap(section => section.fields).find(field => field.offSwitch === "autocorrect");
+    const autocorrect = {master: Boolean(stored && "enabled" in stored && stored.enabled), override: runtime.autocorrect.override};
+    return {combo: turnedOffByKey(runtime.combos), behaviour: turnedOffByKey(runtime.behaviours), autoMouse: turnedOffByKey(autoMouse), autocorrect: turnedOffByKey(autocorrect)};
 }
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
@@ -151,7 +155,7 @@ function buildPanelModel(session, state) {
     const liveWait = waiting && words ? {title: words.title, detail: words.detail, cancellable: waiting.kind === "edit" && !waiting.cancelling} : null;
     const proposal = session.liveProposal && session.draft && session.liveProposal.draftId === session.draft.id && session.liveProposal.revision === session.draft.revision
         ? {id: session.liveProposal.id, label: session.liveProposal.target.label, checks: session.liveProposal.checks} : null;
-    const offByKey = state.connected && state.runtime ? switchesOffByKey(state.runtime, state.committed) : null;
+    const offByKey = state.connected && state.runtime ? switchesOffByKey(state.runtime, state.committed, state.settingsView) : null;
     // The last Apply's steps: live while it runs, kept when it failed. A
     // successful one lasts only until its readback ends, so a later busy
     // operation is not drawn as reading back an Apply.

@@ -82,6 +82,10 @@ test("Show goes to where each kind of item is edited", () => {
     assert.deepEqual(placeState({kind: "slots", bank: "pdModes", slots: [1, 6]}), {screen: "pointing", pointingSlot: 1, pdKind: null, pdTaps: null});
     assert.equal(placeState({kind: "lighting", stage: "pd"}).stage, "pd");
     assert.equal(placeState(null), null, "the profile fallback has nowhere to go");
+    // Autocorrect's switch is a setting its own screen draws, above the list.
+    assert.deepEqual(placeState({kind: "settings", section: "autocorrect", area: "Autocorrect"}), {screen: "autocorrect", reveal: '.settings-group[data-section="autocorrect"]'});
+    assert.deepEqual(categorySummary(words, [{place: {kind: "settings", section: "autocorrect"}, status: "changed"}, {place: {kind: "autocorrect", correction: "the"}, status: "added"}, {place: {kind: "macro", index: 0, keycode: "MACRO_0"}, status: "changed"}])
+        .map(({category, rows}) => [category, rows]), [["Macros", []], ["Autocorrect", [{label: "Autocorrect", count: 1}, {label: "On or off", count: 1}]]], "counted with the list, after Macros");
     const combo = placeState({kind: "combo", index: 3});
     assert.equal(combo.pickCombo, 3, "a combo is asked for by id, since its group depends on the layer");
     assert.equal(combo.reveal, '[data-reach][data-picked="true"]');
@@ -166,7 +170,7 @@ test("a profile file's settings sections are counted under the vocabulary's word
     assert.deepEqual(labels, {
         "Tap & hold timing": "Keys", "Default layers": "Keys", "Behaviour settings": "Keys", "Combo settings": "Keys", "Combo layer matching": "Keys",
         "Key swaps & typing": "Keys", "All lighting": "Lighting", "Background effect": "Lighting", "Key feedback": "Lighting",
-        "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer",
+        "Pointer speed": "Pointer", "Auto-sniping": "Pointer", "Auto-mouse": "Pointer", "On or off": "Autocorrect",
     });
 });
 

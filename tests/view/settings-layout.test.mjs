@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {SETTINGS_SCREENS, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn, settingGoverns} from "../../webview/view/settings-layout.mjs";
+import {AUTOCORRECT_SECTION, SETTINGS_SCREENS, editorScreenOf, fieldParts, screenOfSection, sectionPath, sectionsIn, sectionsOn, settingGoverns} from "../../webview/view/settings-layout.mjs";
 
 const require = createRequire(import.meta.url);
 const {publishedModel} = require("../fixtures/published-model");
@@ -58,10 +58,16 @@ test("a section is edited on the screen that draws it", () => {
     assert.equal(screenOfSection("startupLayers"), null, "Default layers has no editor");
     assert.equal(screenOfSection("lightingPower"), null, "Lighting draws its own");
     assert.equal(screenOfSection(undefined), null);
+    // Autocorrect's switch is on no Settings screen: its own screen draws it.
+    assert.equal(screenOfSection(AUTOCORRECT_SECTION), null);
+    assert.equal(editorScreenOf(AUTOCORRECT_SECTION), "autocorrect");
+    assert.equal(editorScreenOf("autoMouse"), "pointer");
+    assert.equal(editorScreenOf("startupLayers"), null);
+    assert.equal(byId(AUTOCORRECT_SECTION).area, "Autocorrect", "core files it under Autocorrect by the same id");
 });
 
 test("Key swaps & typing lists its fields under what they change", () => {
-    assert.deepEqual(fieldParts(byId("keyboardOptions").fields).map(({part, fields}) => [part, fields.length]), [["Modifiers", 7], ["Keys", 3], ["Typing", 3]]);
+    assert.deepEqual(fieldParts(byId("keyboardOptions").fields).map(({part, fields}) => [part, fields.length]), [["Modifiers", 7], ["Keys", 3], ["Typing", 2]]);
     assert.deepEqual(fieldParts(byId("keyTiming").fields).map(({part}) => part), [""], "a section without parts is one");
 });
 

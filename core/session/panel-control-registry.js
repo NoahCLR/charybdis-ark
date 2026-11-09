@@ -58,6 +58,9 @@ const CONTROLS = Object.freeze({
     deleteRecovery: Object.freeze({route: "shell", action: "deleteRecovery", binding: "none", demo: "allow", phase: "shell", identity: false}),
     validateMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
     validateAutocorrect: Object.freeze({route: "inspect", action: "validateAutocorrect", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    // Try it: text run through the draft's list as the keyboard would
+    // (autocorrect-matcher.js), nothing staged.
+    tryAutocorrect: Object.freeze({route: "inspect", action: "tryAutocorrect", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
     // An autocorrect list file (D-L85): read and judged against the draft
     // without staging anything, dropped or chosen in the shell's chooser;
     // and the draft's list saved as a file.

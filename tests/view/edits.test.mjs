@@ -587,6 +587,7 @@ test("an import is one staged edit of a preview's entries, and the list's file c
     assert.deepEqual(corrections(), ["then", "thing"]);
     assert.deepEqual(controls.previewAutocorrectFile(":teh: -> the", "a.txt", 3), {type: "previewAutocorrectImport", text: ":teh: -> the", name: "a.txt", requestId: 3});
     assert.deepEqual(controls.previewAutocorrectStarter(4), {type: "previewAutocorrectImport", starter: true, requestId: 4});
+    assert.deepEqual(controls.tryAutocorrect({before: "a ", typed: "teh \b", capsLock: true}, 6), {type: "tryAutocorrect", before: "a ", typed: "teh \b", capsLock: true, requestId: 6});
     assert.deepEqual(controls.chooseAutocorrectFile(5), {type: "chooseAutocorrectFile", requestId: 5});
     assert.deepEqual(controls.exportAutocorrect("csv"), {type: "exportAutocorrect", format: "csv"});
 });

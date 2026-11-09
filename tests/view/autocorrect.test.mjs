@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {AUTOCORRECT_SORTS, autocorrectRows, countWords, importLines, matchWords, usageShare} from "../../webview/view/autocorrect.mjs";
+import {AUTOCORRECT_SORTS, autocorrectRows, countWords, importLines, matchWords, triedAfter, triedWords, usageShare} from "../../webview/view/autocorrect.mjs";
 
 const entry = (correction, ...typos) => ({correction, warnings: [], typos: typos.map((typo) => ({typo: Array.isArray(typo) ? typo[0] : typo, match: Array.isArray(typo) ? typo[1] : 0, warnings: []}))});
 const view = {entries: [entry("the", "teh", "hte"), entry("because", "becuase", "becasue", "beacuse"), entry("iPhone", "iphone"), entry("Äpfel", "aepfel"), entry("thing", ["tihng", 3])]};
@@ -51,4 +51,29 @@ test("an import's preview says what it would do in sentences, with the names eac
     assert.deepEqual(replace.map((line) => line.text), ["1 entry in your list now is removed.", "2 new corrections, with 3 typos.", "1 typo is already in the list, and skipped.",
         "1 typo does not fit: the keyboard holds 1,024 corrections and 1,024 typos.", "1 line is refused:"]);
     assert.deepEqual(importLines({...outcome, newCorrections: [], addedTypos: [], unfit: 0, refused: []}, holds).map((line) => line.kind), ["nothing", "duplicates"]);
+});
+
+// Try it reads the box as the keyboard would have seen it typed: text added
+// at the end is typing, one character gone from the end a Backspace, and any
+// other edit what a click is to the keyboard.
+test("what the Try it box holds is read as typing, a Backspace, or text that stands", () => {
+    const held = {before: "", typed: "teh", text: "teh"};
+    assert.deepEqual(triedAfter(held, "teh "), {before: "", typed: "teh "});
+    assert.deepEqual(triedAfter(held, "teh and"), {before: "", typed: "teh and"}, "a paste at the end is typing too");
+    assert.deepEqual(triedAfter(held, "te"), {before: "", typed: "teh\b"});
+    // The box shows the correction, so the next key is read against that.
+    const corrected = {before: "", typed: "teh ", text: "the "};
+    assert.deepEqual(triedAfter(corrected, "the"), {before: "", typed: "teh \b"});
+    assert.deepEqual(triedAfter(corrected, "the x"), {before: "", typed: "teh x"});
+    assert.deepEqual(triedAfter(corrected, "t"), {before: "t", typed: ""}, "a word deleted at once starts afresh");
+    assert.deepEqual(triedAfter(corrected, "then the "), {before: "then the ", typed: ""}, "an edit in the middle starts afresh");
+    assert.deepEqual(triedAfter({before: "ab", typed: "", text: "ab"}, "a"), {before: "ab", typed: "\b"}, "Backspace into what stood is still a Backspace");
+    assert.deepEqual(triedAfter({before: "", typed: "é😀", text: "é😀"}, "é"), {before: "", typed: "é😀\b"}, "one character, whatever its length in code units");
+    assert.deepEqual(triedAfter({before: "x", typed: "y", text: "xy"}, ""), {before: "", typed: ""});
+});
+
+test("the line under Try it says what fired last, or that Backspace put the word back", () => {
+    assert.equal(triedWords({fired: [], undone: false}), "");
+    assert.equal(triedWords({fired: [{correction: "the", typo: "hte"}, {correction: "thing", typo: "tihng"}], undone: false}), "“tihng” was corrected to “thing”.");
+    assert.match(triedWords({fired: [{correction: "the", typo: "hte"}], undone: true}), /^Backspace put the word back/);
 });

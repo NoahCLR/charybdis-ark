@@ -5,7 +5,7 @@ const {compiled, settings, CURRENT_CAPABILITIES} = require("../fixtures/portable
 const {editDomain} = require("../fixtures/profile-document");
 const {draftEdit} = require("../fixtures/draft-edit");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {autocorrectEditorView, newWarnings} = require("../../core/model/autocorrect-editor");
+const {autocorrectEditorView, newWarnings, tryText, TRY_TEXT_MAX} = require("../../core/model/autocorrect-editor");
 const {AUTOCORRECT_DOMAIN_V1, AUTOCORRECT_MATCH: MATCH, autocorrectDomainSize} = require("../../core/schema/autocorrect-domain-v1");
 const {hostLayouts} = require("../../core/data/host-layouts");
 const {draftEditLabel} = require("../../core/model/draft-edits");
@@ -20,6 +20,8 @@ function fixture(entries, layout = 0) {
     return snapshot(document);
 }
 const snapshot = document => ({document, fingerprint: fingerprint(document), hostOs: {detected: 1}});
+// The same document with its host's system left to detection (Auto) on `layout`.
+const fixtureWith = (document, layout) => editDomain(document, "settings", policy => {policy.values[27] = layout << 16;});
 const listOf = current => validateSnapshot(current.document).autocorrect.entries.map(entry => [entry.correction, ...entry.typos.map(typo => typo.match ? [typo.typo, typo.match] : typo.typo)]);
 const edit = (current, message, capabilities = CURRENT_CAPABILITIES) => snapshot(draftEdit(current, message, capabilities));
 const says = (fn, pattern, code) => assert.throws(fn, error => (code === undefined || error.code === code) && pattern.test(error.message), String(pattern));
@@ -217,4 +219,27 @@ test("Review warns once of the entries the host layout cannot type, and a list i
     assert.match(finding.detail, /US cannot type a character in “a”, “straße”, “über”\. The keyboard stores them and skips them\./);
     assert.deepEqual(profileFindings(validateSnapshot(fixture([["über", "ueber"]], GERMAN).document)).filter(row => row.kind === "untypableAutocorrect"), []);
     assert.equal(untypable([["über", "ueber"]])[0].title, "1 autocorrect entry will not fire on US");
+});
+
+// Try it (firmware autocorrect-v1.md): the draft's list and host layout run
+// over text as the keyboard would, with the Caps Lock the box is given.
+test("text is tried against the snapshot's list on its host layout, after text already there", () => {
+    const current = fixture([["the", "teh", "hte"], ["straße", "strasse"], ["iPhone", "iphone"]]);
+    assert.deepEqual(tryText(current, {before: "", typed: "teh Hte ", capsLock: false}), {text: "the The ", fired: [{correction: "the", typo: "teh"}, {correction: "the", typo: "hte"}], undone: false});
+    assert.deepEqual(tryText(current, {before: "teh ", typed: "teh \b", capsLock: false}), {text: "teh teh", fired: [], undone: true}, "what was there is not typing; Backspace undoes");
+    assert.equal(tryText(current, {before: "ab", typed: "\b\bteh ", capsLock: false}).text, "teh ", "Backspace into text the keyboard did not see suspends the word");
+    assert.equal(tryText(current, {before: "", typed: "strasse ", capsLock: false}).text, "strasse ", "US cannot type ß");
+    assert.equal(tryText(fixture([["straße", "strasse"]], GERMAN), {before: "", typed: "strasse ", capsLock: false}).text, "straße ");
+    // The host's system is macOS here (hostOs detected 1): Caps Lock types no small letter.
+    assert.equal(tryText(current, {before: "", typed: "IPHONe ", capsLock: true}).text, "IPHONe ");
+    const windows = {...current, hostOs: {detected: 2}};
+    windows.document = fixtureWith(current.document, 0);
+    assert.equal(tryText(windows, {before: "", typed: "IPHONe ", capsLock: true}).text, "iPhone ");
+});
+
+test("a try is bounded and refuses what is not text", () => {
+    const current = fixture([["the", "teh"]]);
+    says(() => tryText(current, {before: "", typed: "x".repeat(TRY_TEXT_MAX + 1), capsLock: false}), /too long to try/, "AUTOCORRECT_TRY_REFUSED");
+    says(() => tryText(current, {before: 4, typed: "teh ", capsLock: false}), /text/, "AUTOCORRECT_TRY_REFUSED");
+    says(() => tryText(current, {before: "", typed: "teh ", capsLock: "yes"}), /Caps Lock/, "AUTOCORRECT_TRY_REFUSED");
 });

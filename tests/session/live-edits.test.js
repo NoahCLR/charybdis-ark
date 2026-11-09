@@ -426,7 +426,7 @@ test("going from Review and save to Live preview + save with a draft asks to sen
 
 test("a toggle a key turned off is published beside the stored master, not as a change", async t => {
     const {shell, session} = await open(t, {combosOverride: false});
-    assert.deepEqual(lastModel(shell).offByKey, {combo: true, behaviour: false, autoMouse: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: true, behaviour: false, autoMouse: false, autocorrect: false});
     assert.equal(session.draft.dirty, false);
 });
 
@@ -434,7 +434,7 @@ test("a toggle a key turned off is published beside the stored master, not as a 
 // runtime page 0 byte 3 reads off while byte 2 reads on.
 test("behaviours a key turned off are published beside the stored master, not as a change", async t => {
     const {shell, session} = await open(t, {behavioursOverride: false});
-    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: true, autoMouse: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: true, autoMouse: false, autocorrect: false});
     assert.equal(session.draft.dirty, false);
 });
 
@@ -443,11 +443,11 @@ test("behaviours a key turned off are published beside the stored master, not as
 // keyboard runs, reads on. With the stored setting off, no key turned it off.
 test("auto-mouse a key turned off is published beside its stored setting, not as a change", async t => {
     const {shell, session} = await open(t, {autoMouseOverride: false});
-    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: false, autoMouse: true});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: false, autoMouse: true, autocorrect: false});
     assert.equal(session.draft.dirty, false);
     const stored = editDomain(document(), "settings", settings => {settings.values[SETTING.AUTO_MOUSE_ENABLED] = 0;});
     const off = await openLoop(t, {keyboard: liveKeyboard({document: stored, autoMouseOverride: false})});
-    assert.deepEqual(lastModel(off.shell).offByKey, {combo: false, behaviour: false, autoMouse: false}, "a key cannot turn off what is stored off");
+    assert.deepEqual(lastModel(off.shell).offByKey, {combo: false, behaviour: false, autoMouse: false, autocorrect: false}, "a key cannot turn off what is stored off");
 });
 
 test("a live draft out of step with the keyboard is read again, not rebased", async t => {
@@ -675,19 +675,34 @@ test("choosing the same mode again settles halves that stored different modes", 
     assert.match(lastMessage(shell).notice, /same edit mode/);
 });
 
+// AC_OFF or AC_TOGG (firmware D-F66) turned autocorrect off over a stored on:
+// runtime page 1 byte 0 reads off while key option 12, as the keyboard's
+// settings were read, is on. With the stored switch off, no key turned it off.
+test("autocorrect a key turned off is published beside its stored switch, not as a change", async t => {
+    const on = editDomain(document(), "settings", settings => {settings.values[SETTING.KEYMAP_OPTIONS] |= 0x1000;});
+    const {shell, session} = await openLoop(t, {keyboard: liveKeyboard({document: on, autocorrectOverride: false})});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: false, autoMouse: false, autocorrect: true});
+    assert.equal(session.draft.dirty, false);
+    const allowed = await openLoop(t, {keyboard: liveKeyboard({document: on})});
+    assert.equal(lastModel(allowed.shell).offByKey.autocorrect, false);
+    const stored = editDomain(document(), "settings", settings => {settings.values[SETTING.KEYMAP_OPTIONS] &= ~0x1000;});
+    const off = await openLoop(t, {keyboard: liveKeyboard({document: stored, autocorrectOverride: false})});
+    assert.equal(lastModel(off.shell).offByKey.autocorrect, false, "a key cannot turn off what is stored off");
+});
+
 test("in Apply a toggle a key turned off is shown too", async t => {
     const {shell} = await open(t, {mode: EDIT_MODE.APPLY, combosOverride: false});
-    assert.deepEqual(lastModel(shell).offByKey, {combo: true, behaviour: false, autoMouse: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: true, behaviour: false, autoMouse: false, autocorrect: false});
 });
 
 test("in Apply behaviours a key turned off are shown too", async t => {
     const {shell} = await open(t, {mode: EDIT_MODE.APPLY, behavioursOverride: false});
-    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: true, autoMouse: false});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: true, autoMouse: false, autocorrect: false});
 });
 
 test("in Apply auto-mouse a key turned off is shown too", async t => {
     const {shell} = await open(t, {mode: EDIT_MODE.APPLY, autoMouseOverride: false});
-    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: false, autoMouse: true});
+    assert.deepEqual(lastModel(shell).offByKey, {combo: false, behaviour: false, autoMouse: true, autocorrect: false});
 });
 
 test("Live preview + save into Live edit with unsaved edits asks Save or Revert first, as the keyboard refuses the change otherwise", async t => {

@@ -76,7 +76,7 @@ const {watchLive} = require("./live-watch");
 const {readFlashFigures} = require("./flash-pauses");
 const {demoControl, demoExport, demoUnsaved, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
-const {importPreview, newWarnings} = require("../model/autocorrect-editor");
+const {importPreview, newWarnings, tryText} = require("../model/autocorrect-editor");
 const {parseAutocorrectFile, starterFile} = require("../model/autocorrect-import");
 const {applyDraftEdit} = require("../model/draft-editor");
 const {draftEditEntry} = require("../model/draft-edits");
@@ -271,6 +271,19 @@ async function handleMessage(session, message, shell) {
             reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "AUTOCORRECT_EDIT_REFUSED", warnings: []};
         }
         // As a macro's inspection: nothing staged, no toast, no HID.
+        await shell.post(reply);
+        return;
+    }
+    if (message && panelControl(message.type)?.action === "tryAutocorrect") {
+        const tried = /** @type {Extract<Message, {type: "tryAutocorrect"}>} */ (message);
+        /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectTry"}>} */
+        const reply = {type: "autocorrectTry", requestId: tried.requestId, draftId: message.draftId, draftRevision: message.draftRevision};
+        try {
+            reply.result = tryText(boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before trying the autocorrect list.").current, tried);
+        } catch (error) {
+            reply.error = failureSentence(error);
+        }
+        // As an edit's inspection: nothing staged, no toast, no HID.
         await shell.post(reply);
         return;
     }

@@ -86,3 +86,30 @@ export function importLines(outcome, holds) {
     if (!outcome.newCorrections.length && !outcome.addedTypos.length && !outcome.removed) lines.unshift({kind: "nothing", text: "Nothing in it would change your list."});
     return lines;
 }
+
+// ── try it ──────────────────────────────────────────────────────────────
+
+// Backspace in what was typed into the Try it box, as the core reads it.
+const BACKSPACE = "\b";
+
+// What the Try it box holds after an edit, as the keyboard would have seen
+// it: `before`, text that was there, and `typed`, the keys since. Text added
+// at the end was typed; one character gone from the end was a Backspace.
+// Anything else (an edit in the middle, a word deleted, a paste over a
+// selection) is what a cursor key or a click is to the keyboard: the text
+// stands as it is and the next key starts a word afresh.
+/** @param {{before: string, typed: string, text: string}} tried what the box held and how it came to @param {string} value what it holds now @returns {{before: string, typed: string}} */
+export function triedAfter(tried, value) {
+    const {before, typed, text} = tried;
+    if (value.startsWith(text)) return {before, typed: typed + value.slice(text.length)};
+    if (text.startsWith(value) && [...text.slice(value.length)].length === 1) return {before, typed: typed + BACKSPACE};
+    return {before: value, typed: ""};
+}
+
+// What the line under the Try it box says of the last thing that happened.
+/** @param {{fired: readonly {correction: string, typo: string}[], undone: boolean}} tried */
+export function triedWords(tried) {
+    if (tried.undone) return "Backspace put the word back as you typed it. Ending it again leaves it alone.";
+    const last = tried.fired.at(-1);
+    return last ? `“${last.typo}” was corrected to “${last.correction}”.` : "";
+}

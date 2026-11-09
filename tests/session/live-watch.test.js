@@ -223,6 +223,11 @@ test("an automatic save racing a reread is read again at once, and the draft syn
     assert.equal(session.draft.live.savedGeneration, keyboard.generation);
 });
 
+// A read of the runtime toggles, by its first page (the overrides that did not
+// fit follow on page 1): once for each try of a read.
+/** @param {Buffer} report */
+const runtimeToggles = report => report[0] === 0x08 && report[2] === 0x22 && report[4] === 0 && report[5] === 0;
+
 test("a read that keeps racing stays eligible and synchronizes on the next poll", async t => {
     const {keyboard, session, look} = await open(t);
     keyboard.externalEdit(keyboard.saved);
@@ -230,7 +235,7 @@ test("a read that keeps racing stays eligible and synchronizes on the next poll"
     let races = 3;
     keyboard.answer = report => {
         // Each of the read's three tries moves under it.
-        if (races > 0 && report[0] === 0x08 && report[2] === 0x22) {races--; keyboard.externalEdit(keyboard.saved);}
+        if (races > 0 && runtimeToggles(report)) {races--; keyboard.externalEdit(keyboard.saved);}
         return answer(report);
     };
     await look();
@@ -248,7 +253,7 @@ test("what the watch's own read again tells is said with it, and not again", asy
     let races = 3;
     keyboard.answer = report => {
         // The first look's read is moved under three times, so the draft waits, stale.
-        if (races > 0 && report[0] === 0x08 && report[2] === 0x22) {races--; keyboard.externalEdit(keyboard.saved);}
+        if (races > 0 && runtimeToggles(report)) {races--; keyboard.externalEdit(keyboard.saved);}
         return answer(report);
     };
     await look();
@@ -266,7 +271,7 @@ test("persistent coherence failures exhaust a bounded automatic reread budget", 
     const answer = keyboard.answer;
     let reads = 0;
     keyboard.answer = report => {
-        if (report[0] === 0x08 && report[2] === 0x22) {
+        if (runtimeToggles(report)) {
             reads++;
             keyboard.externalEdit(keyboard.saved);
         }

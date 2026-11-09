@@ -73,6 +73,14 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
             assert.equal(places(code(switches)), "ok ok ok ok ok");
         }
     }
+    // So do QMK's for autocorrect, which the firmware runs as switch keys too.
+    const {isSwitchKey} = require("../../core/schema/actions");
+    for (const name of ["QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE"]) {
+        const value = /** @type {number} */ (keycodes.encode(name));
+        assert.equal(places(code(value)), "ok ok ok ok ok", name);
+        assert.equal(isSwitchKey(value), true, name);
+    }
+    assert.equal(isSwitchKey(/** @type {number} */ (keycodes.encode("KC_A"))), false);
 });
 
 test("placement covers all sixteen layers and refuses a layer past the bank", () => {

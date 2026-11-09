@@ -8,7 +8,7 @@
 // sits under its own area, groups become blocks with one Discard, and every
 // item knows how to go to its editor.
 
-import {screenOfSection} from "./settings-layout.mjs";
+import {editorScreenOf} from "./settings-layout.mjs";
 import {draftBlockWords, listed, stageOrder, vocabulary} from "./vocabulary.mjs";
 import {editWords} from "./edit-mode.mjs";
 
@@ -80,7 +80,7 @@ export const statusBesideCount = (changes) => changes.every((change) => change.s
 // the lighting stages, in paint order, and the settings sections are named as
 // the vocabulary words them (`stages`, `fileSections`). Core words an
 // unnamed layer's name (ProfileSummary.names).
-const CATEGORIES = ["Keys", "Lighting", "Macros", "Pointer", "Pointing modes", "Other"];
+const CATEGORIES = ["Keys", "Lighting", "Macros", "Autocorrect", "Pointer", "Pointing modes", "Other"];
 // A custom key's name is counted with the keys, where its behaviour is too.
 // Each settings section's category and its row's place there; its words are
 // the vocabulary's (tests/view/review.test.mjs holds the two to one set).
@@ -88,7 +88,7 @@ const CATEGORIES = ["Keys", "Lighting", "Macros", "Pointer", "Pointing modes", "
 export const SECTION_ROWS = {
     keyTiming: ["Keys", 32], startupLayers: ["Keys", 22], behaviorSettings: ["Keys", 31], comboSettings: ["Keys", 40], comboReferences: ["Keys", 41],
     keyboardOptions: ["Keys", 50], lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15],
-    normalPointerSpeed: ["Pointer", 1], sniping: ["Pointer", 2], autoMouse: ["Pointer", 3],
+    normalPointerSpeed: ["Pointer", 1], sniping: ["Pointer", 2], autoMouse: ["Pointer", 3], autocorrect: ["Autocorrect", 1],
 };
 /** @param {string} id @param {Readonly<Record<string, string>>} sections @returns {[string, string, number] | undefined} */
 function sectionRow(id, sections) {
@@ -183,13 +183,14 @@ export function placeState(place, layers = []) {
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
         // A section is edited on the screen that draws it: a lighting stage
         // for a Lighting one, the top of Lighting for one above every stage,
-        // or the Settings screen that holds it. Default layers has no editor.
+        // the Settings screen that holds it, or Autocorrect for its switch.
+        // Default layers has no editor.
         case "settings": {
             if (place.stage) return {screen: "lighting", stage: place.stage};
             if (place.area === "Lighting") return {screen: "lighting", reveal: place.section ? `.settings-group[data-section="${place.section}"]` : null};
             // The keyboard's name is the Keyboard screen's title.
             if (place.section === "keyboard") return {screen: "device"};
-            const screen = screenOfSection(place.section);
+            const screen = editorScreenOf(place.section);
             return screen ? {screen, reveal: `.settings-group[data-section="${place.section}"]`} : null;
         }
         case "layers": return {screen: "keys", layersOpen: true};

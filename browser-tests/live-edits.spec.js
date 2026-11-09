@@ -140,7 +140,7 @@ test("behaviours turned off by a key show beside their switch, which says keyboa
     await openLive(page, "behaviours");
     const row = page.locator('.setrow:has([data-macro="behaviorsEnabled"])');
     await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
-    await withModel(page, model => {model.offByKey = {combo: false, behaviour: true, autoMouse: false};});
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: true, autoMouse: false, autocorrect: false};});
     await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
     await expect(page.locator(".off-by-key")).toHaveCount(1);
 });
@@ -152,9 +152,22 @@ test("auto-mouse turned off by a key shows beside its switch, which says keyboar
     const row = page.locator('.setrow:has([data-macro="autoMouse"])');
     await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
     await expect(row.locator(".off-by-key")).toHaveCount(0);
-    await withModel(page, model => {model.offByKey = {combo: false, behaviour: false, autoMouse: true};});
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: false, autoMouse: true, autocorrect: false};});
     await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
     await expect(row.locator('[data-macro="autoMouse"]')).toBeChecked();
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+    await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
+});
+
+// AC_OFF and AC_TOGG (firmware D-F66) switch autocorrect the same way, and
+// its switch, at the top of the Autocorrect screen, says so.
+test("autocorrect turned off by a key shows beside its switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "autocorrect");
+    const row = page.locator('.settings-group[data-section="autocorrect"] .setrow:has([data-macro="autocorrect"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await expect(row.locator(".off-by-key")).toHaveCount(0);
+    await withModel(page, model => {model.offByKey = {combo: false, behaviour: false, autoMouse: false, autocorrect: true};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
     await expect(page.locator(".off-by-key")).toHaveCount(1);
     await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });

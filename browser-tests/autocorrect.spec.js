@@ -197,6 +197,112 @@ test("in the demo the core keeps an Add, checks what is typed, refuses in words 
     await expect(review).toContainText("seprate · start of word");
 });
 
+// ── the switch and Try it ───────────────────────────────────────────────
+
+test("the switch heads the screen, says keyboard keys change it, and posts its key option alone", async ({page}) => {
+    await openControls(page, "autocorrect");
+    const card = page.locator('.settings-group[data-section="autocorrect"]');
+    await expect(card.locator("h3")).toHaveText("On or off");
+    // Above Add and the list it turns on.
+    expect(await page.locator(".pad.autocorrect > *").first().getAttribute("data-section")).toBe("autocorrect");
+    const row = card.locator(".setrow");
+    await expect(row.locator(".nm")).toContainText("Correct typos as I type");
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    const toggle = card.locator('[data-macro="autocorrect"]');
+    await expect(toggle).not.toBeChecked();
+    await clearPosts(page);
+    await toggle.check({force: true});
+    await expectPost(page, {type: "updateConfigDefaults", sectionId: "autocorrect", fields: [{macro: "autocorrect", enabled: true}], expectedFingerprint: identity});
+    // Key swaps & typing no longer lists it.
+    await page.locator('[data-screen="host"]').click();
+    await expect(page.locator('.settings-group[data-section="keyboardOptions"]')).toBeVisible();
+    await expect(page.locator('[data-macro="autocorrect"]')).toHaveCount(0);
+});
+
+test("Try it posts what was typed, Backspace and Caps Lock included, and shows what the core answers", async ({page}) => {
+    await openControls(page, "autocorrect");
+    const box = page.locator('[data-f="autocorrect:try:text"]');
+    await clearPosts(page);
+    await box.pressSequentially("teh ");
+    const last = async () => (await posted(page)).at(-1);
+    await expect.poll(last).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "", typed: "teh ", capsLock: false, requestId: expect.any(Number)}));
+    // The core's answer is the text in the box, the line under it and the mark on the entry.
+    const answer = (result) => page.evaluate(async (result) => {
+        const {getModel} = await import("/webview/store.mjs");
+        const {draft} = getModel();
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "autocorrectTry", requestId: window.__posted.at(-1).requestId, draftId: draft.id, draftRevision: draft.revision, result}}));
+    }, result);
+    await answer({text: "the ", fired: [{correction: "the", typo: "teh"}], undone: false});
+    await expect(box).toHaveValue("the ");
+    await expect(page.locator("[data-ac-try-said]")).toHaveText("“teh” was corrected to “the”.");
+    await expect(page.locator(".ac-row.fired")).toHaveAttribute("data-ac-entry", "the");
+    await expect(page.locator('.ac-chip.fired')).toHaveText("teh");
+    // One character gone from the end is a Backspace.
+    await box.press("Backspace");
+    await expect.poll(last).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "", typed: "teh \b"}));
+    await answer({text: "teh", fired: [], undone: true});
+    await expect(box).toHaveValue("teh");
+    await expect(page.locator("[data-ac-try-said]")).toContainText("Backspace put the word back");
+    await expect(page.locator(".ac-row.fired")).toHaveCount(0);
+    // An edit in the middle is what a click is to the keyboard: the text stands, and typing starts afresh.
+    await box.fill("tex");
+    await expect.poll(last).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "tex", typed: ""}));
+    // Caps Lock is posted with what is typed.
+    await page.locator('[data-f="autocorrect:try:caps"]').check({force: true});
+    await expect.poll(last).toEqual(expect.objectContaining({type: "tryAutocorrect", before: "tex", typed: "", capsLock: true}));
+    // Clear empties the box and asks nothing.
+    await answer({text: "tex", fired: [], undone: false});
+    await clearPosts(page);
+    await page.locator('[data-act="ac-try-clear"]').click();
+    await expect(box).toHaveValue("");
+    expect(await posted(page)).toEqual([]);
+});
+
+test("in the demo Try it corrects as the keyboard would, keeps case, undoes on Backspace, and the switch is reviewed under Autocorrect", async ({page}) => {
+    await page.goto("/dist/web/index.html");
+    await page.locator('.read-placeholder [data-act="explore-demo"]').click();
+    await page.locator('[data-screen="autocorrect"]').click();
+    const box = page.locator('[data-f="autocorrect:try:text"]'), said = page.locator("[data-ac-try-said]");
+    await box.pressSequentially("Teh");
+    await expect(box).toHaveValue("Teh");
+    await box.pressSequentially(" ");
+    await expect(box).toHaveValue("The ");
+    await expect(said).toHaveText("“teh” was corrected to “the”.");
+    await expect(page.locator(".ac-row.fired")).toHaveAttribute("data-ac-entry", "the");
+    await expect(page.locator(".ac-chip.fired")).toHaveText("teh");
+    // Backspace right after puts the word back, and ending it again leaves it.
+    await box.press("Backspace");
+    await expect(box).toHaveValue("Teh");
+    await expect(said).toContainText("Backspace put the word back");
+    await box.pressSequentially(" ");
+    await expect(box).toHaveValue("Teh ");
+    // A part-of-word typo in capitals, and Enter, after which Backspace is only Backspace.
+    await box.pressSequentially("SOMETIHNG");
+    await box.press("Enter");
+    await expect(box).toHaveValue("Teh SOMETHING\n");
+    await expect(page.locator(".ac-row.fired")).toHaveAttribute("data-ac-entry", "thing");
+    await box.press("Backspace");
+    await expect(box).toHaveValue("Teh SOMETHING");
+    // An edit to the list is tried at once: with the entry gone the word stays.
+    await page.locator('[data-act="ac-try-clear"]').click();
+    await box.pressSequentially("hte ");
+    await expect(box).toHaveValue("the ");
+    await page.locator('[data-ac-entry="the"]').click();
+    await page.locator('[data-ac-typo="hte"] [data-act="ac-delete-typo"]').click();
+    await expect(box).toHaveValue("hte ");
+
+    // The switch: on in the demo, turned off as a setting of Autocorrect's own.
+    const toggle = page.locator('.settings-group[data-section="autocorrect"] [data-macro="autocorrect"]');
+    await expect(toggle).toBeChecked();
+    await toggle.uncheck({force: true});
+    await expect(page.locator('.settings-group[data-section="autocorrect"] [data-macro="autocorrect"]')).not.toBeChecked();
+    await page.locator('.commit [data-act="review"]').click();
+    const review = page.locator('.sheet[aria-label="Review changes"]');
+    await expect(review.locator(".rv-sect")).toContainText(["Autocorrect"]);
+    await expect(review).toContainText("On or off");
+    await expect(review).toContainText("Correct typos as I type");
+});
+
 // ── files (D-L85) ───────────────────────────────────────────────────────
 
 test("Import, the starter list and Export each post their control from the preview", async ({page}) => {

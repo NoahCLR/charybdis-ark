@@ -85,7 +85,7 @@ test("a key a macro cannot send is refused by name, never mistaken for another k
     // A macro step takes basic keycodes only, so no switch key: neither QMK's
     // for combos nor the keyboard's for behaviours and auto-mouse (firmware
     // D-F66).
-    for (const key of ["CM_TOGG", "QK_COMBO_ON", "BH_ON", "BH_TOGG", "AM_ON", "AM_TOGG"]) {
+    for (const key of ["CM_TOGG", "QK_COMBO_ON", "AC_TOGG", "QK_AUTOCORRECT_OFF", "BH_ON", "BH_TOGG", "AM_ON", "AM_TOGG"]) {
         assert.throws(() => read(`{${key}}`), (error) => error.problem?.code === "unknown" && error.problem.key === key, key);
         assert.ok(!macroKeycodes().includes(key), key);
     }

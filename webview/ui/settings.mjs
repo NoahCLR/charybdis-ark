@@ -7,7 +7,8 @@
 // app decided on. A field the firmware cannot report stays visible and
 // read-only with its reason. Which sections each screen draws is
 // view/settings-layout.mjs's; every one is drawn open. Lighting draws its own
-// sections with the same rows.
+// sections with the same rows, and Autocorrect its switch with this module's
+// card (sectionCard).
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
@@ -159,7 +160,7 @@ function comboTimingRow(model, entry) {
  * @param {Model | null} model @param {Section} section @param {boolean} canEdit
  * @param {{extra?: {after: string, nodes: HTMLElement[]}}} [options]
  */
-function sectionCard(model, section, canEdit, {extra} = {}) {
+export function sectionCard(model, section, canEdit, {extra} = {}) {
     const node = el(`<section class="card settings-group" data-section="${esc(section.id)}">
         <div class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot(model?.draft) : ""}</h3></div>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}

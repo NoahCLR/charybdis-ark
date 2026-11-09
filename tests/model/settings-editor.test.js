@@ -58,7 +58,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     const current = snapshot(), view = settingsEditorView(current);
     assert.equal(view.brightnessMax, 200);
     const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}});
-    assert.equal(model.configDefaults.length, 14, "Combos, behaviours, the read-only macro host setup and All lighting each have a section");
+    assert.equal(model.configDefaults.length, 15, "Combos, behaviours, the read-only macro host setup, All lighting and the autocorrect switch each have a section");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
     assert.equal(fields.find(field => field.macro === "pointerLayer").value, "Layer 4");
@@ -79,7 +79,8 @@ test("every section names the screen it is edited on, and the pointer's own sett
     const stages = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.stage]));
     assert.deepEqual([stages.automouseFade, stages.rgbAppearance, stages.lightingFeedback, stages.lightingPower], ["auto", "base", "key", undefined],
         "a section is edited on its stage; All lighting darkens every stage, so it has none");
-    assert.ok(Object.values(areas).every(area => ["Pointer", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Autocorrect"), ["autocorrect"], "its switch heads the Autocorrect screen");
+    assert.ok(Object.values(areas).every(area => ["Pointer", "Lighting", "Autocorrect", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
 });
 
 test("every field edits a stored value the schema names, within what the keyboard accepts", () => {
@@ -223,12 +224,12 @@ test("all native controls preserve a complete profile unchanged, including unkno
     for (const section of settingsEditorView(current).sections) assert.deepEqual(draftEdit(current, message(current, section.id)), current.document);
     const fields = settingsEditorView(current).sections.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "swapLeftAltGui").enabled, true);
-    assert.equal(fields.find(field => field.macro === "autocorrect").readOnly, true);
+    assert.equal(fields.find(field => field.macro === "nkro").readOnly, true);
     assert.equal(fields.find(field => field.macro === "effectMode").choices[1].label, "Breathing");
     assert.equal(fields.find(field => field.macro === "effectMode").choices[0].label, "Solid colour", "spelled as the rest of the app spells colour");
     const next = draftEdit(current, message(current, "keyboardOptions", {swapLeftAltGui:false, swapControlCaps:true}));
     assert.equal(validateSnapshot(next).settings.values[24], 0x8001);
-    assert.throws(() => draftEdit(current, message(current, "keyboardOptions", {autocorrect:true})), /Not in this firmware/);
+    assert.throws(() => draftEdit(current, message(current, "keyboardOptions", {nkro:true})), /Not in this firmware/);
 });
 test("startup layers validate the final mask, and combo references edit only their layer's record", () => {
     const current = withSettings(() => {});
@@ -366,7 +367,29 @@ test("the behaviour, combo and auto-mouse switches say keyboard keys change them
         assert.deepEqual(fields.filter(field => field.keyboardKeys).map(field => field.macro), [macro], id);
         assert.deepEqual(fields.filter(field => field.offSwitch).map(field => [field.macro, field.offSwitch]), [[macro, offSwitch]], id);
     }
-    assert.equal(sections.flatMap(section => section.fields).filter(field => field.offSwitch).length, 3, "no other field is a global switch");
+    assert.equal(sections.flatMap(section => section.fields).filter(field => field.offSwitch).length, 3, "no other field is a global switch before the key options are read");
+});
+
+// Autocorrect's switch is key option 12, stored with the swaps (firmware
+// settings-domain.md) and drawn on the Autocorrect screen: a section of its
+// own under Autocorrect, edited through the keyboard's own mask.
+test("the autocorrect switch is its own section under Autocorrect, and edits only its key option", () => {
+    const current = withSettings(settings => {settings.values[24] = 0x0004;});
+    const sections = settingsEditorView(current).sections;
+    const section = sections.find(({id}) => id === "autocorrect");
+    assert.equal(section.area, "Autocorrect");
+    assert.deepEqual(section.fields.map(field => [field.macro, field.kind, field.enabled, Boolean(field.readOnly)]), [["autocorrect", "toggle", false, false]]);
+    // AC_ON, AC_OFF and AC_TOGG override it until the keyboard restarts
+    // (firmware D-F66), so it says so and names its switch.
+    assert.deepEqual([section.fields[0].keyboardKeys, section.fields[0].offSwitch], [true, "autocorrect"]);
+    assert.equal(sections.flatMap(entry => entry.fields).filter(field => field.offSwitch).length, 4);
+    assert.equal(sections.find(({id}) => id === "keyboardOptions").fields.some(field => field.macro === "autocorrect"), false, "Key swaps & typing no longer lists it");
+    const on = draftEdit(current, message(current, "autocorrect", {autocorrect: true}));
+    assert.equal(validateSnapshot(on).settings.values[24], 0x1004, "the other options stay");
+    current.options.keymapMasks[12] = 0x4000;
+    assert.equal(validateSnapshot(draftEdit(current, message(current, "autocorrect", {autocorrect: true}))).settings.values[24], 0x4004, "the keyboard's mask, not an assumed bit");
+    delete current.options;
+    assert.deepEqual(settingsEditorView(current).sections.find(({id}) => id === "autocorrect").fields, [], "nothing to switch before the keyboard's options are read");
 });
 
 // Settings v9: auto-sniping follows a set of layers beside its master switch,

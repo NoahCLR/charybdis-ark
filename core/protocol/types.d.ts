@@ -100,6 +100,8 @@ export interface RuntimeRead {
     combos: RuntimeToggle; behaviours: RuntimeToggle;
     /** Its stored master is settings readback's (scalar 4), not the runtime page's. */
     autoMouse: Pick<RuntimeToggle, 'override'>;
+    /** Its stored master is key option 12 of settings readback; the override is the runtime page 1's. */
+    autocorrect: Pick<RuntimeToggle, 'override'>;
     live: {defaultDpi: number; snipingDpi: number; rgbMode: number; rgbColor: number; defaultLayers: number; keymapOptions: number};
 }
 export interface ActiveProfileMetadata {length: number; session: number; revision: number; savedGeneration: number; savedOrigin: number; domainMask: number; unsaved: boolean}

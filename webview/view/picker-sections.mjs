@@ -30,8 +30,8 @@ const isKeyboardKey = inGroups("kb");
 // The keyboard's 128 custom keys, by the names the model gives them.
 const isCustom = inGroups("Custom keys");
 // The keyboard's switch keys for behaviours and auto-mouse, in core's group
-// for them, and QMK's for combos, by their catalogue names.
-const isSwitchKey = (/** @type {Entry} */ entry) => entry.group === "Switch keys" || /^QK_COMBO_(?:ON|OFF|TOGGLE)$/.test(valueOf(entry));
+// for them, and QMK's for combos and autocorrect, by their catalogue names.
+const isSwitchKey = (/** @type {Entry} */ entry) => entry.group === "Switch keys" || /^QK_(?:COMBO|AUTOCORRECT)_(?:ON|OFF|TOGGLE)$/.test(valueOf(entry));
 /** @param {Entry} entry */
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
 /** @param {Entry} entry */
@@ -111,9 +111,9 @@ export function pickerSections() {
             group("Magic swaps", (entry) => entry.group === "magic" && /SWAP|TOGGLE_(?:CONTROL|BACKSLASH|ALT_GUI|CTL_GUI|ESCAPE)/.test(valueOf(entry))),
             group("Magic switches", from("magic")),
             group("System", from("system")), group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)),
-            // The switch keys: QMK's for combos, then the keyboard's for
-            // behaviours and for auto-mouse, each in the order its catalogue
-            // gives them.
+            // The switch keys: QMK's for combos and for autocorrect, then the
+            // keyboard's for behaviours and for auto-mouse, each in the order
+            // its catalogue gives them.
             group("Switch keys", isSwitchKey),
             group("Features", rest),
         ]},

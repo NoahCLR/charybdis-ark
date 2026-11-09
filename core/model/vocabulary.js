@@ -320,7 +320,7 @@ const SETTINGS_SECTIONS = Object.freeze({
     keyTiming: "Tap & hold timing", normalPointerSpeed: "Pointer speed", sniping: "Auto-sniping", autoMouse: "Auto-mouse",
     automouseFade: "Auto-mouse fade", lightingPower: "All lighting", rgbAppearance: "Background effect", lightingFeedback: "Key feedback flash",
     startupLayers: "Default layers", behaviorSettings: "Where behaviours run", comboSettings: "How combos run", comboReferences: "Combo layer matching",
-    keyboardOptions: "Key swaps & typing", host: "Your computer",
+    keyboardOptions: "Key swaps & typing", host: "Your computer", autocorrect: "On or off",
 });
 
 // A Settings screen as anything but the rail names it. The rail lists
@@ -611,6 +611,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         keyTiming: SETTINGS_SECTIONS.keyTiming, startupLayers: SETTINGS_SECTIONS.startupLayers, behaviorSettings: "Behaviour settings", comboSettings: "Combo settings",
         comboReferences: SETTINGS_SECTIONS.comboReferences, keyboardOptions: SETTINGS_SECTIONS.keyboardOptions, lightingPower: SETTINGS_SECTIONS.lightingPower, rgbAppearance: SETTINGS_SECTIONS.rgbAppearance,
         lightingFeedback: "Key feedback", normalPointerSpeed: SETTINGS_SECTIONS.normalPointerSpeed, sniping: SETTINGS_SECTIONS.sniping, autoMouse: SETTINGS_SECTIONS.autoMouse,
+        autocorrect: SETTINGS_SECTIONS.autocorrect,
     },
     // Why a behaviour, or a key toward a combo, does not take part
     // (participation.js), in the words of the switch that says no, and of the
@@ -747,7 +748,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // switch, and what a lighting stage adds when it is the thing kept off.
     settingOff: {switches: {behaviour: {off: "Behaviours are off.", fix: `Turn them on in ${SETTINGS_SCREENS.behaviours} →`},
         combo: {off: "Combos are off.", fix: `Turn them on in ${SETTINGS_SCREENS.combos} →`},
-        autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`}}, stage: "This stage paints nothing."},
+        autoMouse: {off: "Auto-mouse is off.", fix: `Turn it on in ${SETTINGS_SCREENS.pointer} →`},
+        autocorrect: {off: "Autocorrect is off.", fix: "Turn it on in Autocorrect →"}}, stage: "This stage paints nothing."},
     // A behaviour's own switch, as its editor labels it and the review names
     // it, and the fold its timings open from.
     behaviourFields: {anchor: "Keeps the pointer layer on", timings: "Timings"},

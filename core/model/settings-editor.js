@@ -30,7 +30,8 @@ function number(macro, id, label, hint, extra = {}) {
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
 // A global switch whose switch keys override it until the keyboard restarts
 // (firmware D-F66): combos' QMK's CM_ON, CM_OFF and CM_TOGG, behaviours' BH_ON,
-// BH_OFF and BH_TOGG, auto-mouse's AM_ON, AM_OFF and AM_TOGG. It says keyboard
+// BH_OFF and BH_TOGG, auto-mouse's AM_ON, AM_OFF and AM_TOGG, autocorrect's
+// QMK's AC_ON, AC_OFF and AC_TOGG. It says keyboard
 // keys change it, and names the switch whose "turned off by key" the session
 // publishes (offByKey).
 /** @param {import("../../contracts/model.js").StoredSettingField} field @param {import("../../contracts/model.js").SettingOffSwitch} offSwitch @returns {import("../../contracts/model.js").StoredSettingField} */
@@ -149,8 +150,12 @@ const optionLabels = [
     ["swapRightControlGui", "Swap right Control and GUI", "Exchange the right Control and GUI modifier actions across all layers.", "Modifiers"],
     ["oneshot", "One-shot modifiers and layers", "Allow one-shot modifier and layer keys to affect the next key after they are released.", "Typing"],
     ["swapEscapeCaps", "Swap Escape and Caps Lock", "Exchange the Escape and Caps Lock key actions across all layers.", "Keys"],
-    ["autocorrect", "Autocorrect", "Enable the running firmware's autocorrection of recognized typing mistakes.", "Typing"],
+    ["autocorrect", "Correct typos as I type", "The keyboard fixes the typos on the list below when a word ends. Off, it types every word as you typed it and keeps the list.", "Typing"],
 ];
+// Autocorrect's switch is a key option the keyboard stores with the others
+// (option 12, firmware settings-domain.md). It is drawn on the Autocorrect
+// screen, as a section of its own, beside the list it turns on.
+const AUTOCORRECT_SWITCH = "autocorrect";
 // Which bits of its settings word a field owns: one flag, a shifted byte or
 // nibble, or the whole word. Reading, writing and putting a field back to the
 // keyboard's value all go through this.
@@ -257,8 +262,14 @@ function settingsSections(snapshot, settings) {
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: AREA.settings, label: SECTION.comboReferences, description: "Each layer matches its combos against the keys of the layer chosen here.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
+    /** @type {import("../../contracts/model.js").StoredSettingField[]} */
+    const keyOptions = options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : [];
     result.push({id: "keyboardOptions", area: AREA.settings, label: SECTION.keyboardOptions, ...(options ? {} : {description: "Read the keyboard to see the key options it supports."}), fields:
-        options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : []});
+        keyOptions.filter(field => field.macro !== AUTOCORRECT_SWITCH)});
+    // Its switch keys override it until the keyboard restarts (switchedByKeys),
+    // so it is no longer a "Typing" option among the swaps.
+    result.push({id: "autocorrect", area: AREA.autocorrect, label: SECTION.autocorrect, fields:
+        keyOptions.filter(field => field.macro === AUTOCORRECT_SWITCH).map(({part, tooltip, ...field}) => switchedByKeys({...field, hint: field.hint || tooltip}, "autocorrect"))});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const macos = host.effective === MACOS;

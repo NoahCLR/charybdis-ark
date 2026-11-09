@@ -1,7 +1,7 @@
 import type {AccentTable, Scalar, Tier, TimingTerm} from './edits.js';
 // A global switch: one a banner names (vocabulary.settingOff), and whose
 // runtime override a switch key turns off for now (offByKey).
-export type SettingOffSwitch = 'behaviour' | 'combo' | 'autoMouse';
+export type SettingOffSwitch = 'behaviour' | 'combo' | 'autoMouse' | 'autocorrect';
 export type {AccentTable};
 
 /** The setting a behaviour timing's default comes from: the dual-role tapping term or a behaviour default. */

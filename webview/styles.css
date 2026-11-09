@@ -2317,6 +2317,10 @@ details > summary { list-style: none; }
 .ac-typo { display: grid; grid-template-columns: minmax(0, 170px) auto minmax(0, 150px) auto; gap: var(--sp-2); align-items: center; }
 .ac-typo > .note { grid-column: 1 / -1; }
 .ac-warning { color: var(--warning); }
+.ac-try .card-h .right { display: flex; align-items: center; gap: var(--sp-3); }
+.ac-try-box.input { height: auto; min-height: 76px; padding: var(--sp-3); resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ac-row.fired { border-color: var(--line-3); background: var(--surface-2); }
+.ac-chip.fired, .ac-typo.fired .input.mono { border-color: var(--text); color: var(--text); }
 .ac-notice { color: var(--warning); }
 @media (max-width: 760px) {
   .ac-add-row, .ac-typo { grid-template-columns: minmax(0, 1fr); }

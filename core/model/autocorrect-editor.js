@@ -9,7 +9,9 @@
 const {decodedOf, editProfileDomains, autocorrectCeilings} = require("./portable-profile");
 const {AUTOCORRECT_DOMAIN_V1} = require("../schema/autocorrect-domain-v1");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
-const {hostSettings} = require("../schema/host-settings");
+const {MACOS, hostSettings} = require("../schema/host-settings");
+const {hostLayout} = require("../data/host-layouts");
+const {typedText} = require("./autocorrect-matcher");
 const {WARNING, addTypos, changeTypo, findEntry, listUsage, listWarnings, removeEntry, removeTypo, respellCorrection} = require("./autocorrect-list");
 const {exportAutocorrect, planImport, previewImport, rowsOf} = require("./autocorrect-import");
 const {VOCABULARY, word} = require("./vocabulary");
@@ -21,10 +23,12 @@ const {VOCABULARY, word} = require("./vocabulary");
  */
 
 // The host layout the keyboard types corrections through, with its name.
-/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").SnapshotFacts["hostOs"]} [hostOs] @returns {Required<Host>} */
+/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").SnapshotFacts["hostOs"]} [hostOs] @returns {Required<Host> & {macos: boolean}} */
 function hostOf(decoded, hostOs) {
     const host = hostSettings(decoded.settings.values, hostOs?.detected);
-    return {layout: host.layout, layoutName: word(VOCABULARY.hostLayouts, host.layout)};
+    // The keyboard takes the host for a Mac by its layout or by its system
+    // (firmware autocorrect-v1.md, "What counts as typing").
+    return {layout: host.layout, layoutName: word(VOCABULARY.hostLayouts, host.layout), macos: hostLayout(host.layout)?.os === "macos" || host.effective === MACOS};
 }
 
 // How many entries and typos the chosen layout leaves unable to fire, said
@@ -112,6 +116,23 @@ function importPreview(snapshot, file, capabilities) {
     return /** @type {import("../../contracts/messages.js").AutocorrectImportPreview} */ (previewImport(decoded.autocorrect, file, hostOf(decoded, snapshot.hostOs), autocorrectCeilings(capabilities)));
 }
 
+// The most text a try runs: what was there and what was typed, each.
+const TRY_TEXT_MAX = 4096;
+// Try it: what the keyboard would leave on screen for text typed against a
+// snapshot's list, on its host layout and under the Caps Lock given
+// (autocorrect-matcher.js), after text that was already there.
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {{before?: unknown, typed?: unknown, capsLock?: unknown}} tried */
+function tryText(snapshot, tried) {
+    /** @param {string} message */
+    const refuse = message => Object.assign(new Error(message), {code: "AUTOCORRECT_TRY_REFUSED"});
+    const {before, typed, capsLock} = tried;
+    if (typeof before !== "string" || typeof typed !== "string") throw refuse("Try it takes text.");
+    if (typeof capsLock !== "boolean") throw refuse("Try it needs Caps Lock on or off.");
+    if (before.length > TRY_TEXT_MAX || typed.length > TRY_TEXT_MAX) throw refuse("This text is too long to try. Clear the box and type again.");
+    const decoded = decodedOf(snapshot);
+    return typedText(decoded.autocorrect, hostOf(decoded, snapshot.hostOs), capsLock, typed, before);
+}
+
 // A snapshot's list as a file in one of the three formats, and the name a
 // shell may suggest for it.
 /** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("./autocorrect-import.js").Format} format @param {Date} [now] */
@@ -128,4 +149,4 @@ function addLabel(message, document) {
     return findEntry(decodedOf({document}).autocorrect, correction) ? "Added an autocorrect typo" : "Added an autocorrect entry";
 }
 
-module.exports = {addLabel, autocorrectEditorView, editAutocorrect, exportedList, importPreview, newWarnings};
+module.exports = {TRY_TEXT_MAX, addLabel, autocorrectEditorView, editAutocorrect, exportedList, importPreview, newWarnings, tryText};

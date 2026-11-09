@@ -89,12 +89,13 @@ const layerOfRef = text => {
 };
 
 // The switch keys (firmware D-F66): QMK's CM_ON, CM_OFF and CM_TOGG for
-// combos and the keyboard's BH_ON, BH_OFF and BH_TOGG for behaviours and
-// AM_ON, AM_OFF and AM_TOGG for auto-mouse. The firmware runs all nine,
-// wherever they are sent.
-const COMBO_SWITCH_KEYS = Object.freeze(["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE"].map(name => /** @type {number} */ (keycodes.encode(name))));
+// combos and AC_ON, AC_OFF and AC_TOGG for autocorrect, and the keyboard's
+// BH_ON, BH_OFF and BH_TOGG for behaviours and AM_ON, AM_OFF and AM_TOGG for
+// auto-mouse. The firmware runs all twelve, wherever they are sent.
+const QMK_SWITCH_KEYS = Object.freeze(["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "QK_AUTOCORRECT_ON", "QK_AUTOCORRECT_OFF", "QK_AUTOCORRECT_TOGGLE"]
+    .map(name => /** @type {number} */ (keycodes.encode(name))));
 /** @param {number} code */
-const isSwitchKey = code => COMBO_SWITCH_KEYS.includes(code) || behaviorSwitchKeyName(code) !== undefined || autoMouseSwitchKeyName(code) !== undefined;
+const isSwitchKey = code => QMK_SWITCH_KEYS.includes(code) || behaviorSwitchKeyName(code) !== undefined || autoMouseSwitchKeyName(code) !== undefined;
 
 // TG(n), TO(n), TT(n) and OSL(n) on a layer the keyboard has: the QMK layer
 // keycodes the keyboard runs through its own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold

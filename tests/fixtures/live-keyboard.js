@@ -45,7 +45,7 @@ const {PROFILE_EDIT_V1: E, EDIT_RESULT: R, EDIT_FLAGS: F, EDIT_PHASE} = require(
 /** @typedef {{loseReply?: number, busy?: number, refuse?: number, slaveLag?: number, stale?: boolean, saveFails?: number, slaveRefuses?: number, slaveCatchUp?: number, savePauses?: number, modeWriteFails?: boolean, modeReadFails?: number, lengthSkew?: number, checking?: boolean, autoSaveFails?: number, restartUnacknowledged?: boolean, noRestart?: boolean, stopsAgain?: boolean, workingReadFails?: boolean, slaveAbsent?: boolean}} LiveFaults */
 const LEASE_MS = 15000;
 
-/** @param {import('./types.js').FakeKeyboardOptions & {mode?: number, session?: number, combosOverride?: boolean, behavioursOverride?: boolean, autoMouseOverride?: boolean, autoSaveAfterReads?: number, quietMs?: number}} options */
+/** @param {import('./types.js').FakeKeyboardOptions & {mode?: number, session?: number, combosOverride?: boolean, behavioursOverride?: boolean, autoMouseOverride?: boolean, autocorrectOverride?: boolean, autoSaveAfterReads?: number, quietMs?: number}} options */
 function liveKeyboard(options) {
     const actionAbiDigest = options.document.actionAbiDigest;
     const compiled = options.compiled || validateSnapshot(options.document).candidate;
@@ -66,7 +66,7 @@ function liveKeyboard(options) {
     // unstored (beside the faults that bring them about).
     const auto = {inProgress: false, lastWasAutomatic: false, count: 0, revision: 0, generation: 0, quietReads: 0, transaction: 0x8000};
     const raised = {slaveRefused: false, slaveStoragePaused: false, modeNotStored: false, adjustmentPending: false, stopped: false, slaveStopped: false};
-    const overrides = {combos: options.combosOverride ?? true, behaviours: options.behavioursOverride ?? true, autoMouse: options.autoMouseOverride ?? true};
+    const overrides = {combos: options.combosOverride ?? true, behaviours: options.behavioursOverride ?? true, autoMouse: options.autoMouseOverride ?? true, autocorrect: options.autocorrectOverride ?? true};
     /** @type {LiveFaults} */
     const faults = {};
     /** @type {Buffer[]} */
@@ -106,7 +106,7 @@ function liveKeyboard(options) {
         // The halves stored different modes (equal counters that disagree).
         get modeConflict() {return modeConflict;}, set modeConflict(value) {modeConflict = value;},
         // A replug: a new session, the saved profile running again.
-        replug() {working = null; revision = 0; session = (session + 1) >>> 0; pending = null; waiting = null; slaveBehind = 0; slaveRefused = false; overrides.combos = true; overrides.behaviours = true; overrides.autoMouse = true; refreshReader(); events.push("replug");},
+        replug() {working = null; revision = 0; session = (session + 1) >>> 0; pending = null; waiting = null; slaveBehind = 0; slaveRefused = false; overrides.combos = true; overrides.behaviours = true; overrides.autoMouse = true; overrides.autocorrect = true; refreshReader(); events.push("replug");},
         // Time passing on the keyboard's clock (the edit lease).
         elapse(/** @type {number} */ ms) {clock += ms;},
         // Keys held on the keyboard, and their release, which publishes what
@@ -188,7 +188,7 @@ function liveKeyboard(options) {
         const stops = Boolean(faults.stopsAgain);
         delete faults.restartUnacknowledged; delete faults.stopsAgain;
         working = null; revision = 0; session = (session + 1) >>> 0; pending = null; waiting = null; slaveBehind = 0; slaveRefused = false;
-        overrides.combos = true; overrides.behaviours = true; overrides.autoMouse = true; raised.stopped = stops; raised.slaveStopped = false;
+        overrides.combos = true; overrides.behaviours = true; overrides.autoMouse = true; overrides.autocorrect = true; raised.stopped = stops; raised.slaveStopped = false;
         restarting.restarts++; refreshReader(); events.push("restart");
         setTimeout(() => restarting.onRestart?.(), 1);
         return response;
@@ -225,6 +225,8 @@ function liveKeyboard(options) {
                 p[10] = 1 | (modeConflict ? 2 : 4); return page(r, p);
             }
             if (r[2] === E.VALUE_RUNTIME) {
+                // Page 1 holds the overrides that came after page 0 was full.
+                if (at === 1) return page(r, Buffer.from([overrides.autocorrect ? 1 : 0]));
                 const values = validateSnapshot(createSnapshot({profile: active(), actionAbiDigest})).settings.values;
                 const p = Buffer.alloc(25); p.set([values[SETTING.COMBOS_ENABLED] ? 1 : 0, overrides.combos ? 1 : 0, values[SETTING.BEHAVIORS_ENABLED] ? 1 : 0, overrides.behaviours ? 1 : 0]);
                 p[24] = overrides.autoMouse ? 1 : 0;

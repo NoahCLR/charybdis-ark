@@ -70,6 +70,15 @@ export function sectionPath(model, id) {
     return [screen && words.settingsScreens[screen], words.settingsSections[id]].filter(Boolean).join(" → ");
 }
 
+// Autocorrect's switch is a settings section no Settings screen draws: it
+// heads the Autocorrect screen, above the list it turns on.
+export const AUTOCORRECT_SECTION = "autocorrect";
+
+// The screen a section is edited on: a Settings screen, or Autocorrect for
+// its switch; null for one with no editor of its own.
+/** @param {string | null | undefined} id @returns {SettingsScreen | "autocorrect" | null} */
+export const editorScreenOf = (id) => id === AUTOCORRECT_SECTION ? "autocorrect" : screenOfSection(id);
+
 // A section's one-per-layer switches are one setting to a person, drawn as
 // one row of layers.
 /** @param {Field} field */

@@ -42,6 +42,8 @@ export interface PanelState {
     autocorrectCheck: {form: string; requestId: number; error: string; warnings: string[]} | null;
     /** A list file being read, or read and waiting on Add or Replace: the request it answers, the file's name ('' for the starter list), and core's preview or why it could not be read. */
     autocorrectImport: {requestId: number; pending: boolean; name: string; starter: boolean; preview?: import('../contracts/messages.js').AutocorrectImportPreview; error?: string} | null;
+    /** The Try it box: the text that was there (`before`) and the keys typed since (`typed`, `\b` for Backspace), the Caps Lock it is tried under, and the core's last answer: the text the keyboard would leave, what fired, whether the last key undid a correction, the draft it was tried against and why it could not be. */
+    autocorrectTry: {before: string; typed: string; capsLock: boolean; text: string; fired: {correction: string; typo: string}[]; undone: boolean; error: string; requestId: number; draft: string};
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
     /** The slot tile held for a keyboard swap (D-L81): its bank and the key its screen picks it by. */
     heldSlot: {bank: string; key: string} | null;

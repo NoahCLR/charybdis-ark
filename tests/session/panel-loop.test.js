@@ -475,6 +475,24 @@ test("an autocorrect edit is checked against the draft without staging it: its r
     assert.deepEqual(service.calls, []);
 });
 
+test("text is tried against the draft's autocorrect list without staging anything", async () => {
+    const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});
+    loop.serviceChanged(); shell.posted.length = 0;
+    const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
+    const bound = {draftId: draft.id, draftRevision: revision};
+    await loop.handleMessage({type: "tryAutocorrect", requestId: 9, before: "", typed: "Teh ", capsLock: false, ...bound});
+    assert.deepEqual(last(shell), {type: "autocorrectTry", requestId: 9, ...bound, result: {text: "The ", fired: [{correction: "the", typo: "teh"}], undone: false}});
+    await loop.handleMessage({type: "tryAutocorrect", requestId: 10, before: "", typed: "Teh \b", capsLock: false, ...bound});
+    assert.deepEqual(last(shell).result, {text: "Teh", fired: [], undone: true});
+    await loop.handleMessage({type: "tryAutocorrect", requestId: 11, before: "", typed: 7, capsLock: false, ...bound});
+    assert.deepEqual([last(shell).requestId, last(shell).result, typeof last(shell).error], [11, undefined, "string"]);
+    await loop.handleMessage({type: "tryAutocorrect", requestId: 12, before: "", typed: "teh ", capsLock: false, draftId: "old", draftRevision: revision});
+    assert.ok(last(shell).error, "a try belongs to the draft it was typed against");
+    assert.deepEqual(draft.document, before);
+    assert.equal(draft.revision, revision);
+    assert.deepEqual(service.calls, []);
+});
+
 test("an autocorrect list file is read and judged against the draft without staging it, dropped, chosen or the starter list", async () => {
     let chosen;
     const service = fakeService(), shell = fakeShell({chooseProfile: async () => chosen}), loop = openPanelLoop(shell, {service});

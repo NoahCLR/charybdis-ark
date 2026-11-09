@@ -97,7 +97,7 @@ const DEMO_CAPABILITIES = Object.freeze({
 // is never read from a firmware checkout): its brightness limit, and the
 // keyboard options page — the RGB Matrix effects the Charybdis build enables,
 // in QMK's order, the QMK key options it supports (Magic and one-shot keys; no
-// NKRO or Autocorrect) and the LED classes it has (modifier and key lights).
+// NKRO) and the LED classes it has (modifier and key lights).
 const DEMO_LIMITS = Object.freeze({brightnessMax: 200});
 const DEMO_EFFECTS = [
     "SOLID_COLOR", "ALPHAS_MODS", "GRADIENT_UP_DOWN", "GRADIENT_LEFT_RIGHT", "BREATHING", "BAND_SAT", "BAND_VAL",
@@ -111,7 +111,7 @@ const DEMO_EFFECTS = [
 const DEMO_OPTIONS = Object.freeze({
     effects: DEMO_EFFECTS.map((name, index) => Object.freeze({id: index + 1, name})),
     keymapMasks: Object.freeze(Array.from({length: 13}, (_, bit) => 1 << bit)),
-    supportedKeymapOptions: 0x0f7f,
+    supportedKeymapOptions: 0x1f7f,
     ledFlags: 5,
 });
 
