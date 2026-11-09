@@ -152,7 +152,9 @@ matches the whole word unless it is set to match the start, the end or any
 part of one. Ark checks each entry as it is typed, refuses one the computer's
 layout can't type, and marks the ones that would misfire. A starter list of
 common English typos is one click away, and a list comes in from, and goes
-out to, QMK's text format, a spreadsheet's CSV or JSON.
+out to, QMK's text format, a spreadsheet's CSV or JSON. **Try it** shows what
+the keyboard would do with a sentence before anything is saved, and a key on
+the keyboard switches autocorrect off for a password or a terminal.
 
 ### Pointing modes
 

@@ -6,15 +6,38 @@ edits it, both halves store it, and a backup holds it.
 
 Everything here is on the **Autocorrect** screen.
 
+## Turning it on and off
+
+**Correct typos as I type**, at the top of the screen, turns autocorrect on
+or off for the whole keyboard. It is saved with the profile like any other
+setting. Off, the keyboard types every word as you typed it and keeps the
+list.
+
+The keyboard can't see where you are typing. In a password field or a
+terminal a correction is wrong, so put a key on the keyboard to switch it off
+there: **Autocorrect Off** (`AC_OFF`) or **Toggle Autocorrect** (`AC_TOGG`),
+with **Autocorrect On** (`AC_ON`) to switch it back. They are
+[switch keys](behaviours.md#switch-keys): they work until the keyboard
+restarts, save nothing, and can't turn on what is off here. That is why the
+switch says **↺ keyboard keys change this too**, and **turned off by key**
+while a key has it off. The picker lists them under **Other QMK**, in
+**Switch keys**.
+
 ## How the keyboard uses the list
 
 An **entry** is one **correction**, the right word, and every **typo** that
 should become it: `because` ← `becuase` `becasue` `beacuse`. The correction
 is written once, and each typo belongs to one correction.
 
-The keyboard corrects a typo when you finish the word, with a space, Enter or
-punctuation. It erases only the part that differs and types the rest. A word
-you are still typing is never touched.
+The keyboard corrects a typo when you finish the word, with a space, Enter,
+Tab or punctuation. It erases only the part that differs and types the rest,
+then sends the key that ended the word, so Enter in a chat box sends the
+corrected text. A word you are still typing is never touched.
+
+A word is letters and digits, with apostrophes between them. Apostrophes
+before or after it stay as typed and aren't part of the typo: `'teh'` is
+fixed as "teh". The keyboard follows a word up to 32 characters and leaves a
+longer one alone.
 
 Each typo says where it has to be in a word:
 
@@ -25,11 +48,49 @@ Each typo says where it has to be in a word:
   anywhere, also fixes "something" and "things".
 
 Only the matched part is replaced. When more than one typo matches, a typo
-that is the whole word wins, then the longest.
+that is the whole word wins, then the longest; of two as long, the first in
+alphabetical order.
 
 Typos match whatever their case, so a typo is stored in small letters. The
-correction keeps your capitals: "Teh" becomes "The", "TEH" becomes "THE", and
-a correction written with capitals, such as `iPhone`, keeps them.
+correction takes the case of the part it replaces, as the computer shows it,
+Caps Lock included: "Teh" becomes "The", "TEH" becomes "THE", and anything
+else, such as "tEh", gives the correction as written. A correction written
+with capitals keeps them: "iphone" and "Iphone" both become `iPhone`. When
+your layout can't type the capitals, the keyboard types the correction as
+written.
+
+### Undoing a correction
+
+Press Backspace straight after a correction that a space or punctuation
+ended, and the keyboard puts the word back as you typed it. Ending the word
+again then leaves it alone. After Enter or Tab there is no undo, since the
+text may already be sent: Backspace is just Backspace.
+
+### What it leaves alone
+
+Only what you type counts. After a shortcut, an arrow or another cursor key,
+Delete, a mouse click or a macro, the keyboard starts on a new word, so it
+never corrects text it didn't see you type. After Backspace past the start of
+the word, or a key held until it repeats, it waits for the next word.
+
+While a correction is typed, the keys you press meanwhile wait and come out
+after it in order, and modifiers you hold stay out of it.
+
+## Try it
+
+**Try it** is a box to type in as you would on the keyboard. It shows what
+the computer would end with, using the list as it stands in the draft and
+your host layout: type `teh` and a space, and the box reads "the ". The line
+under it names the typo that fired, and its entry is marked in the list.
+Backspace straight after puts the word back, as on the keyboard. **Caps Lock
+is on** follows your own Caps Lock while you type there, and can be set by
+hand.
+
+Try it reads text, so it can't show what depends on keys and time: a
+shortcut, a cursor key, a held key, a macro, or keys pressed while a
+correction is typed. An edit in the middle of the box counts as a click
+would: the text stays and the next key starts a new word. Try it works
+whether autocorrect is on or off.
 
 ## Adding an entry
 

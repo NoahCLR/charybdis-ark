@@ -54,8 +54,8 @@ Option or AltGr on the right. Below it are sections by task: **Letters and
 digits**, **Symbols**, **Numpad**, **Common keys**, then the things you own,
 **Layers**, **Macros**, **Custom keys** and **Pointing modes**, then **Mouse**,
 **Media**, **More keys**, **Lighting** and **Other QMK**, which holds Magic
-and the [switch keys](behaviours.md#switch-keys) for combos, behaviours and
-auto-mouse, in **Switch keys**.
+and the [switch keys](behaviours.md#switch-keys) for combos, autocorrect,
+behaviours and auto-mouse, in **Switch keys**.
 Keys sit in named groups, such as Arrows, Function and Modifiers, and **No key**
 in Common keys holds N/A and Transparent. **All keycodes** lists every key the
 picker offers, section by section, in the same groups.
@@ -231,8 +231,10 @@ keyboard-wide options that apply on every layer:
   and Command on either side.
 - **Keys**: swap backtick and Escape, backslash and Backspace, or Escape and
   Caps Lock.
-- **Typing**: one-shot modifiers and layers, more than six keys at once, and
-  autocorrect.
+- **Typing**: one-shot modifiers and layers, and more than six keys at once.
+
+Autocorrect's switch is on the
+[Autocorrect](autocorrect.md#turning-it-on-and-off) screen, with its list.
 
 An option this firmware was built without says **Not in this firmware** and
 does nothing. These options are marked **↺ keyboard keys change this too**:

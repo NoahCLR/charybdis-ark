@@ -1,0 +1,13 @@
+# Try it runs the keyboard's rules, held to its fixture
+
+Cited as D-L86.
+
+Ark has one matcher for the autocorrect list, `core/model/autocorrect-matcher.js`. It reads the characters a computer would show, with `\b` for Backspace, and answers with what the keyboard would leave on screen: which typo fires when a word ends, the case its correction takes, what the host layout can type under Caps Lock, the undo, and the limits of a word and of a correction. The rules are the firmware's (`upstream/firmware/docs/spec/autocorrect-v1.md`, firmware D-F69), and every case of the firmware's behaviour fixture that has a text form (`screen`) is run through the matcher in `tests/model/autocorrect-matcher.test.js`. A case that needs a key, a timing or a setting (`keyboardOnly`) is listed as skipped with its reason, and a reason the test does not know fails it. A disagreement is settled in the firmware's spec and fixture first, never by changing the imported bytes.
+
+Two things ask the matcher. **Try it**, a box on the Autocorrect screen, shows what the keyboard would do with a sentence under the draft's list and host layout. The interface runs no rule: it reads its box as typing (text added at the end, one character gone as a Backspace, any other edit as text that stands, which is what a click is to the keyboard) and posts that to core (`tryAutocorrect`), which answers without staging anything. The list's warnings (D-L84) ask the same matcher which typo fires on a correction's own words, so a warning and the keyboard cannot disagree either.
+
+Autocorrect's stored switch is key option 12 of the settings (firmware `settings-domain.md`), read and written through the keyboard's own mask like the other key options. It is published as a settings section of its own under Autocorrect and drawn at the top of that screen, not among Host settings' Key swaps & typing: it turns on the list beside it, and its switch keys (`AC_ON`, `AC_OFF`, `AC_TOGG`, firmware D-F66) override it as they do combos, behaviours and auto-mouse, shown the same way (`offByKey`, from runtime page 1). Ark offers those keys wherever the other switch keys go, with no capability question (D-L64).
+
+## Considered
+
+Running the matcher in the interface, as a shared rule (`rules/`, D-L73): the matcher needs the list, the word table and the host layouts' strokes, which core holds and the interface does not; a box typed in is quick enough over the panel boundary. A second, simpler matcher for the warnings: two homes for "which typo fires". Leaving the switch among the key options with a line pointing to it: the switch would be a screen away from the only thing it controls.

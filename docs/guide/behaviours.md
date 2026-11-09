@@ -208,15 +208,19 @@ switch is keeping it off, with no branches or timing, since none of them run.
 
 ### Switch keys
 
-A **switch key** on the keyboard turns behaviours, combos or
-[auto-mouse](pointing.md#pointer-settings) on or off for the whole keyboard
-until it restarts: **Behaviours On**, **Behaviours Off** and **Toggle
+A **switch key** on the keyboard turns behaviours, combos,
+[auto-mouse](pointing.md#pointer-settings) or
+[autocorrect](autocorrect.md#turning-it-on-and-off) on or off for the whole
+keyboard until it restarts: **Behaviours On**, **Behaviours Off** and **Toggle
 Behaviours** (`BH_ON`, `BH_OFF`, `BH_TOGG`), QMK's **Combo On**, **Combo Off**
-and **Toggle Combo** (`CM_ON`, `CM_OFF`, `CM_TOGG`), and **Auto-mouse On**,
-**Auto-mouse Off** and **Toggle Auto-mouse** (`AM_ON`, `AM_OFF`, `AM_TOGG`).
+and **Toggle Combo** (`CM_ON`, `CM_OFF`, `CM_TOGG`), **Auto-mouse On**,
+**Auto-mouse Off** and **Toggle Auto-mouse** (`AM_ON`, `AM_OFF`, `AM_TOGG`),
+and QMK's **Autocorrect On**, **Autocorrect Off** and **Toggle Autocorrect**
+(`AC_ON`, `AC_OFF`, `AC_TOGG`).
 Nothing is saved, and the switches in Ark stay as they are. That is why each
-switch, the **Enabled** of Behaviour settings and Combo settings and Pointer
-settings' **Auto-mouse**, says **↺ keyboard keys change this too**. When a
+switch, the **Enabled** of Behaviour settings and Combo settings, Pointer
+settings' **Auto-mouse** and Autocorrect's **Correct typos as I type**, says
+**↺ keyboard keys change this too**. When a
 switch key has turned one off while Ark has it on, its settings mark it
 **turned off by key**. Nothing else says so: the board, the Key tab, the hover
 card and Lighting's auto-mouse fade show what the switches in Ark allow. It
@@ -229,7 +233,7 @@ behaviour decides: held for its Hold it switches nothing, and where the
 behaviour leaves the Tap empty, a tap switches. While behaviours are off a
 key does what it would without one, so `BH_ON` and `BH_TOGG` turn them back
 on even with a behaviour of their own. A behaviour already holding something
-when behaviours go off keeps it until you let go. The picker lists all nine
+when behaviours go off keeps it until you let go. The picker lists all twelve
 under **Other QMK**, in **Switch keys**.
 
 ## Behaviour settings

@@ -144,6 +144,14 @@ it (Behaviour settings, Combo settings, Pointer settings, Host settings),
 since nothing around a link or a tip says it is one.
 _Avoid_: page, tab, area (for this), surface, panel
 
+**Try it**:
+The box on the Autocorrect screen that is typed in as on the keyboard and
+shows what the computer would end with, under the draft's list and host
+layout. It runs the keyboard's own rules over text (D-L86), so it shows the
+corrections and the undo, and nothing that needs a key or a timing: a
+shortcut, a cursor key, a held key, a macro.
+_Avoid_: preview (for this), simulator, test box
+
 **Area**:
 The part of the profile Review groups its changes under, mostly one screen's,
 and named as that screen is: Pointer is what Pointer settings edits. Settings
