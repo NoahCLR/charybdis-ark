@@ -535,6 +535,12 @@ macro and a custom key, which have none:
   shortcut written as its chord ("Navigation+Extra", as its label is), and
   the layer stack's folded run, which spans its layers under one grey icon
   (`browser-tests/marks.spec.js`).
+- A reach table's **Reached by** says where to press: every route, and what
+  it sends, names a key by its name and marks, never its keycode, which the
+  row's first column carries (`browser-tests/marks.spec.js`). A pointing
+  slot's keycodes in that column wrap between tag-and-keycode pairs, and break
+  a keycode only where one alone is wider than the column
+  (`browser-tests/keys-workbench.spec.js`).
 - The keycode picker marks what it offers as it marks a layer's row: a pointing
   slot's row and a macro's tile by the thing's mark, and a catalogue tile
   through `keyNameMarked`, in its section and in a search alike

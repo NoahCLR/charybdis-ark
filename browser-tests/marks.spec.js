@@ -430,13 +430,31 @@ test("the hover card's title, the Combos table and the Key and Pointing modes ta
     // the key rather than naming the key a second time.
     const reached = (keycode) => page.locator(`.reach-table tbody tr:has(td:first-child code:text-is('${keycode}'))`).first().locator("td").nth(5);
     const arrow = await reached("PD_MODE_4_LOCK").evaluate(namedIn);
-    expect(arrow.text).toMatch(/^from Right Option KC_RIGHT_ALT · 1× ?tap$/);
+    expect(arrow.text).toMatch(/^from Right Option · 1× ?tap$/);
     const dragscroll = reached("PD_MODE_0_LOCK");
     await expect(dragscroll.locator(".bn")).toHaveText(["2×"]);
     await expect(dragscroll.locator(".fbdot")).toHaveCount(1);
     expect(await dragscroll.evaluate(namedIn)).toMatchObject({named: [{icon: "pointing", name: "Dragscroll", tags: ["hold"]}, {icon: "pointing", name: "Dragscroll", tags: ["lock"]}]});
-    expect((await dragscroll.evaluate(namedIn)).text).toMatch(/· 2× ?hold sends Dragscroll ?lock ?PD_MODE_0_LOCK$/);
+    expect((await dragscroll.evaluate(namedIn)).text).toMatch(/· 2× ?hold sends Dragscroll ?lock$/);
     expect((await dragscroll.evaluate(namedIn)).text).not.toContain("from");
+
+    // A key reads by its name however it reaches the row: the row's own first
+    // column carries the keycodes. Every route says so, the ones this fixture
+    // does not reach too: a behaviour's key, what it sends, a combo through one.
+    const routes = await page.evaluate(async () => {
+        const {getModel} = await import("/webview/store.mjs");
+        const {reachLabel} = await import("/webview/ui/keys/reach.mjs");
+        const {el} = await import("/webview/lib/dom.mjs");
+        const cells = [{branch: 1, tier: "tap"}];
+        const box = el(`<div>${reachLabel(getModel(), {name: "PD_MODE_0", keys: [],
+            behaviours: [{keycode: "KC_RIGHT_ALT", action: "PD_MODE_0_LOCK", layer: null, whileHeld: false, cells}],
+            combos: [{combo: {badge: "C0", inputs: ["KC_D", "KC_F"]}, via: "KC_RIGHT_ALT", action: "PD_MODE_0_LOCK", keys: [], cells}]})}</div>`);
+        return {text: box.textContent.replace(/\s+/g, " ").trim(), codes: box.querySelectorAll("code").length};
+    });
+    expect(routes.text).toContain("from Right Option");
+    expect(routes.text).toContain("through Right Option");
+    expect(routes.text).toContain("sends Dragscroll");
+    expect(routes.codes, "no keycode in Reached by").toBe(0);
 });
 
 // The Multi tap window governs every tap count past the first, so its mark is

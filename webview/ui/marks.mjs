@@ -137,10 +137,11 @@ export const layerTagged = (model, layer, name, tags, {inline = false} = {}) =>
     `<span class="sends${inline ? " inline" : ""}">${mark(model, {kind: "layer", layer})}${tagged(name, tags)}</span>`;
 // A pointing slot by name, then each keycode that reaches it after its hold or
 // lock tag: "Dragscroll `HOLD` PD_MODE_0 `LOCK` PD_MODE_0_LOCK". A tag with no
-// keycode (null) stands alone: a mode its link starts, "Arrow `STARTED`".
+// keycode (null) stands alone: a mode its link starts, "Arrow `STARTED`". A tag
+// and its keycode wrap as one.
 /** @param {string} name @param {[string, string | null][]} keycodes */
 export const slotNamedWithKeycodes = (name, keycodes) => `<span class="sends inline"><span class="sends-name">${esc(name)}</span>${keycodes
-    .map(([how, code]) => `<span class="sends-tag">${esc(how)}</span>${code ? `<code class="dim">${esc(code)}</code>` : ""}`).join("")}</span>`;
+    .map(([how, code]) => `<span class="slot-keycode"><span class="sends-tag">${esc(how)}</span>${code ? `<code class="dim">${esc(code)}</code>` : ""}</span>`).join("")}</span>`;
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} action */
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
