@@ -8,9 +8,11 @@ const {judge, markdown} = require("../../scripts/check-agreement");
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
 // Capability pages as firmware's contract probe states them (Profile Wire 2.1,
-// schema 4.3, action-ABI digest 0x91fcd248, sixteen layers, all seven domains, a
+// schema 4.4, action-ABI digest 0x3c9e17ff, sixteen layers, all eight domains,
+// the autocorrect list's ceilings, a
 // split build that saves and has pointing).
-const PAGES = ["0303020104032014020700000048d2fc9100000100c0a24491", "10108005801010203a0880807f202040000000000000000000", "800200d00000e0cf0000e0cf00005788000000000000000000"];
+const PAGES = ["03040201040420140207000000ff179e3c00000100c0a24491", "10108005801010203a088080ff202040000000000000000000", "800200d00000e0cf0000e0cf00005788000000000000000000",
+    "0004000400500888000020" + "00".repeat(14)];
 const sha = text => createHash("sha256").update(text).digest("hex");
 
 function setup() {
@@ -46,24 +48,24 @@ test("each contract check can fail on its own", () => {
         const failing = changed => judge({...contract, ...changed}, manifest, qmk).checks.filter(check => !check.ok).map(check => check.name);
         // An action-ABI digest Ark does not know (bytes 13..16 of page 0).
         const unknown = Buffer.from(PAGES[0], "hex"); unknown.writeUInt32LE(0x12345678, 13);
-        assert.deepEqual(failing({capabilityPages: [unknown.toString("hex"), PAGES[1], PAGES[2]]}), ["action-ABI digest is known to Ark"]);
+        assert.deepEqual(failing({capabilityPages: [unknown.toString("hex"), PAGES[1], PAGES[2], PAGES[3]]}), ["action-ABI digest is known to Ark"]);
         // Pages Ark's decoder rejects: more layers than the logical capacity.
         const inconsistent = Buffer.from(PAGES[1], "hex"); inconsistent[0] = 17;
-        assert.deepEqual(failing({capabilityPages: [PAGES[0], inconsistent.toString("hex"), PAGES[2]]}), ["Profile Wire capability pages decode with Ark's decoder"]);
+        assert.deepEqual(failing({capabilityPages: [PAGES[0], inconsistent.toString("hex"), PAGES[2], PAGES[3]]}), ["Profile Wire capability pages decode with Ark's decoder"]);
         // A build that cannot save (no feature bit 1, no chunk capacity).
         const readOnly = Buffer.from(PAGES[0], "hex"); readOnly.writeUInt32LE(0x05, 9); readOnly[7] = 0;
-        assert.deepEqual(failing({capabilityPages: [readOnly.toString("hex"), PAGES[1], PAGES[2]]}), ["firmware is a split build that saves"]);
+        assert.deepEqual(failing({capabilityPages: [readOnly.toString("hex"), PAGES[1], PAGES[2], PAGES[3]]}), ["firmware is a split build that saves"]);
         // A build without pointing is only reported.
         const noPointing = Buffer.from(PAGES[0], "hex"); noPointing.writeUInt32LE(0x03, 9);
-        assert.deepEqual(failing({capabilityPages: [noPointing.toString("hex"), PAGES[1], PAGES[2]]}), []);
+        assert.deepEqual(failing({capabilityPages: [noPointing.toString("hex"), PAGES[1], PAGES[2], PAGES[3]]}), []);
         // A domain Ark registers that the firmware lacks (page 1 byte 12).
         const domains = Buffer.from(PAGES[1], "hex"); domains[12] = 0x0f;
-        assert.deepEqual(failing({capabilityPages: [PAGES[0], domains.toString("hex"), PAGES[2]]}), ["firmware supports every profile domain Ark registers"]);
+        assert.deepEqual(failing({capabilityPages: [PAGES[0], domains.toString("hex"), PAGES[2], PAGES[3]]}), ["firmware supports every profile domain Ark registers"]);
         // A schema or Profile Wire version that is not exactly Ark's, minor included.
         const schema = Buffer.from(PAGES[0], "hex"); schema[5] = 0;
-        assert.deepEqual(failing({capabilityPages: [schema.toString("hex"), PAGES[1], PAGES[2]]}), ["profile schema is the one Ark reads"]);
+        assert.deepEqual(failing({capabilityPages: [schema.toString("hex"), PAGES[1], PAGES[2], PAGES[3]]}), ["profile schema is the one Ark reads"]);
         const protocol = Buffer.from(PAGES[0], "hex"); protocol[3] = 0;
-        assert.deepEqual(failing({capabilityPages: [protocol.toString("hex"), PAGES[1], PAGES[2]]}), ["Profile Wire version is the one Ark requires"]);
+        assert.deepEqual(failing({capabilityPages: [protocol.toString("hex"), PAGES[1], PAGES[2], PAGES[3]]}), ["Profile Wire version is the one Ark requires"]);
         // Firmware's golden bytes moved past what Ark pinned.
         assert.deepEqual(failing({fixtures: {"tests/fixtures/a.fixture": sha("b")}}), ["Ark's pinned fixtures equal the firmware's"]);
         // Firmware builds with a BK whose keycodes differ from Ark's inputs.

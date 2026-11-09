@@ -10,7 +10,7 @@ const {fakeKeyboard} = require("./fake-keyboard");
 const {testClock} = require("./panel-loop");
 const {buildProfileGetRequest, decodeProfileResponse, decodeCapabilityPages} = require("../../core/protocol/profile-wire-v1");
 const capabilityKeyboard = fakeKeyboard({document: document()});
-const capabilities = {...decodeCapabilityPages([0, 1, 2].map(page => {
+const capabilities = {...decodeCapabilityPages([0, 1, 2, 3].map(page => {
     const request = buildProfileGetRequest(1, page, page + 1);
     return decodeProfileResponse(capabilityKeyboard.answer(request)[0], request);
 }))};

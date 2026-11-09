@@ -16,6 +16,7 @@ const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-doma
 // Each domain's own codec, which must write back exactly what it read.
 const {decodeKeymapDomain, encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {decodeMacroDomain, encodeMacroDomain} = require("../../core/schema/macro-domain-v1");
+const {decodeAutocorrectDomain, encodeAutocorrectDomain} = require("../../core/schema/autocorrect-domain-v1");
 const CODECS = new Map([
     [0x10, payload => encodeRgbDomainV1(decodeRgbDomainV1(payload))],
     [0x20, payload => encodeKeyBehaviorDomain(decodeKeyBehaviorDomain(payload))],
@@ -30,6 +31,7 @@ const CODECS = new Map([
         assert.deepEqual(canonical, payload.subarray(0, canonical.length));
         return Buffer.concat([canonical, payload.subarray(canonical.length)]);
     }],
+    [0x80, payload => encodeAutocorrectDomain(decodeAutocorrectDomain(payload))],
 ]);
 
 /** @param {string} name */

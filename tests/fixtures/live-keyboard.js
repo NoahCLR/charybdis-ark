@@ -235,7 +235,7 @@ function liveKeyboard(options) {
                 const bytes = active();
                 if (at === 0) {
                     const p = Buffer.alloc(25); p.set([E.ACTIVE_LAYOUT, 25]); p.writeUInt32LE(bytes.length, 2); p.writeUInt32LE(session, 6); p.writeUInt32LE(revision, 10);
-                    p.writeUInt32LE(generation, 14); p[18] = generation ? 0 : 255; p[19] = 0x7f; p[20] = working ? 1 : 0; return page(r, p);
+                    p.writeUInt32LE(generation, 14); p[18] = generation ? 0 : 255; p[19] = 0xff; p[20] = working ? 1 : 0; return page(r, p);
                 }
                 return page(r, bytes.subarray((at - 1) * 25, at * 25));
             }

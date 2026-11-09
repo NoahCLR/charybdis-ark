@@ -183,6 +183,9 @@ const PROFILE_FULL_WORDS = Object.freeze({
         lightingTableGroupRows: (most) => `The keyboard holds at most ${most} accents on any one of layers, pointing modes, combo feedback and key feedback. Remove one there before adding another.`,
         behaviours: (most) => `The keyboard holds at most ${most} behaviours. Remove one before adding another.`,
         behaviourSteps: (most) => `The keyboard holds at most ${most} behaviour tap counts, added up across all behaviours. Remove a tap count or a behaviour first.`,
+        autocorrectCorrections: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} autocorrect corrections. Remove an entry before adding another.`,
+        autocorrectTypos: (most) => `The keyboard holds at most ${most.toLocaleString("en-US")} autocorrect typos. Remove a typo before adding another.`,
+        autocorrectText: (most) => `The autocorrect list holds at most ${most.toLocaleString("en-US")} bytes of text across its corrections and typos. Remove an entry first.`,
     }),
     profile: "This change does not fit: the keyboard's profile is full. Remove an accent, a behaviour, a combo or a macro first.",
     name: "The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo.",
@@ -798,14 +801,14 @@ const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bi
 // that screen is (the pointer's settings are Pointer's); Settings is the
 // other Settings screens'. The interface keeps a copy of the order
 // (webview/view/review.mjs AREAS, pinned by tests/view/enum-drift.test.mjs).
-const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros",
+const REVIEW_AREAS = Object.freeze({keys: "Keys", layers: "Layers", behaviours: "Behaviours", combos: "Combos", customKeys: "Custom keys", macros: "Macros", autocorrect: "Autocorrect",
     pointer: "Pointer", pointing: "Pointing modes", lighting: "Lighting", settings: "Settings", profile: "Profile", recovery: "Recovery"});
 // Each part of the profile as the area Review groups its changes under, by
 // the area core/schema/profile-domains.js gives it: where a refusal says the
 // keyboard found a problem.
 /** @type {Readonly<Record<import("../schema/profile-domains.js").ProfileDomain["area"], string>>} */
 const PROFILE_AREAS = Object.freeze({lighting: REVIEW_AREAS.lighting, behaviours: REVIEW_AREAS.behaviours, combos: REVIEW_AREAS.combos, settings: REVIEW_AREAS.settings,
-    pointing: REVIEW_AREAS.pointing, keys: REVIEW_AREAS.keys, macros: REVIEW_AREAS.macros});
+    pointing: REVIEW_AREAS.pointing, keys: REVIEW_AREAS.keys, macros: REVIEW_AREAS.macros, autocorrect: REVIEW_AREAS.autocorrect});
 
 // What a failure says to a person (interface contracts: no code or developer
 // word reaches one). Ark's own failures are sentences written for a person: a

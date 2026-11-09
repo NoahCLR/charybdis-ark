@@ -255,7 +255,7 @@ test("a keyboard storing a domain in another version than current firmware's is 
     v7[0] = 7; v7[6] = 0;
     const blob = decodeProfileBlob(source.profile);
     const live = encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x40 ? {...domain, version: 7, payload: v7} : domain)},
-        {domainVersions: {0x10: 4, 0x20: 2, 0x30: 3, 0x40: 7, 0x50: 4, 0x60: 1, 0x70: 1}});
+        {domainVersions: {0x10: 4, 0x20: 2, 0x30: 3, 0x40: 7, 0x50: 4, 0x60: 1, 0x70: 1, 0x80: 1}});
     const combos = {defaultTermMs: 50, holdTermMs: 200, rows: []};
     assert.throws(() => materializeProfile(live, live, combos, current), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
     assert.throws(() => materializeProfile(source.candidate, source.candidate, combos, Buffer.from([12, ...current.subarray(1)])), /settings/i, "settings in another version are refused");
@@ -369,7 +369,7 @@ test("a refused profile says what is wrong with it in plain words, under its sta
         said(() => reorderLayers(beyond, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])),
         said(() => validateSnapshot({...document(), profile: "!"})),
         said(() => validateSnapshot({...document(), extra: 1})),
-        said(() => validateSnapshot(document(), {compiledLayerCount: 8, supportedDomainMask: 127, actionAbiDigest: document().actionAbiDigest})),
+        said(() => validateSnapshot(document(), {compiledLayerCount: 8, supportedDomainMask: 255, actionAbiDigest: document().actionAbiDigest})),
     ];
     assert.equal(words[0], "A key in this profile reaches a layer the keyboard does not have.");
     for (const sentence of words) assert.doesNotMatch(sentence, /layer bank|layer-mod|portable profile|action vocabulary|domain|RGB|Invalid|Unbalanced|Unsupported/, sentence);

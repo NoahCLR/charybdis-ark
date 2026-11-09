@@ -22,7 +22,7 @@ const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 
 // The native action ABI whose semantic actions map onto VIA keycodes: the
 // 32-slot firmware's, with the userspace keycode blocks and pointing slots
-// 0..31 (firmware D-F09), under schema 4.3. The firmware folds the schema's
+// 0..31 (firmware D-F09), under schema 4.4. The firmware folds the schema's
 // major and minor into the digest, so schema 4 moved it from schema 3's
 // 0x837cf479 (firmware D-F28), schema 4.1 from 4.0's 0x6fd70b90 (firmware
 // D-F62), schema 4.2 from 4.1's 0x7fecec81 and schema 4.3 from 4.2's
@@ -31,9 +31,11 @@ const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 // keycodes: their block moved the vocabulary's end, and the digest from
 // 0x67df11b3; the switch keys for auto-mouse, AM_ON, AM_OFF and AM_TOGG
 // (firmware D-F66, still Profile Wire 2.1), moved it again, from 0xb2205fc3.
+// Schema 4.4, the autocorrect list's (firmware D-F68), moved it from 4.3's
+// 0x91fcd248, with no keycode changed.
 // A keyboard advertising another vocabulary numbers its keys differently, so
 // Ark reads it but neither names its keys nor edits it.
-const ACTION_ABI = 0x91fcd248;
+const ACTION_ABI = 0x3c9e17ff;
 const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 /** @param {number} value */
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);

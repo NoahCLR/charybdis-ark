@@ -19,8 +19,9 @@ test("one canonical registry pins every current domain's identity, version, wire
         {name: "PD_MODES", id: 80, key: "pdModes", readKey: "pdModes", version: 4, wireBit: 16, area: "pointing"},
         {name: "KEYMAP", id: 96, key: "keymap", readKey: undefined, version: 1, wireBit: 32, area: "keys"},
         {name: "MACROS", id: 112, key: "macros", readKey: undefined, version: 1, wireBit: 64, area: "macros"},
+        {name: "AUTOCORRECT", id: 128, key: "autocorrect", readKey: undefined, version: 1, wireBit: 128, area: "autocorrect"},
     ]);
-    assert.equal(PROFILE_DOMAIN_MASK, 127);
+    assert.equal(PROFILE_DOMAIN_MASK, 255);
     assert.ok(Object.isFrozen(PROFILE_DOMAINS));
     for (const domain of PROFILE_DOMAINS) {
         assert.ok(Object.isFrozen(domain));
@@ -44,7 +45,8 @@ test("registered codecs round-trip every fixture domain without changing canonic
         require("../../core/schema/settings-domain-v1").SETTINGS.VERSION,
         require("../../core/schema/pd-mode-domain-v1").PD_DOMAIN.VERSION,
         require("../../core/schema/keymap-domain-v1").KEYMAP_DOMAIN_V1.VERSION,
-        require("../../core/schema/macro-domain-v1").MACRO_DOMAIN_V1.VERSION];
+        require("../../core/schema/macro-domain-v1").MACRO_DOMAIN_V1.VERSION,
+        require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_DOMAIN_V1.VERSION];
     assert.deepEqual(versions, PROFILE_DOMAINS.map(domain => domain.version));
     for (const domain of blob.domains) {
         const codec = profileDomain(domain.id), value = codec.decode(domain.payload, snapshot.codecOptions);
@@ -55,10 +57,17 @@ test("registered codecs round-trip every fixture domain without changing canonic
 
 // Each domain's error identity as it stands: the codecs share the canonical
 // check, not an error class, so these are pinned rather than unified.
-const ERROR_NAMES = {rgb: ["RgbDomainProtocolError"], behaviors: ["ProfileBlobProtocolError"], combos: ["Error", "ProfileBlobProtocolError"], settings: ["Error"], pdModes: ["Error"], keymap: ["KeymapDomainError"], macros: ["MacroDomainError"]};
+const ERROR_NAMES = {rgb: ["RgbDomainProtocolError"], behaviors: ["ProfileBlobProtocolError"], combos: ["Error", "ProfileBlobProtocolError"], settings: ["Error"], pdModes: ["Error"], keymap: ["KeymapDomainError"], macros: ["MacroDomainError"], autocorrect: ["AutocorrectDomainError"]};
 // One encoding of each domain that its encoder would never write, made from
 // the fixture's own payload, and the refusal it meets.
 const NONCANONICAL = {
+    // The first two typo rows' links swapped: the texts still ascend, but a
+    // correction's first typo no longer names it.
+    autocorrect: payload => {
+        const bytes = Buffer.from(payload), rows = 8 + 6 * payload.readUInt16LE(0);
+        payload.copy(bytes, rows + 4, rows + 10, rows + 12); payload.copy(bytes, rows + 10, rows + 4, rows + 6);
+        return {bytes, refusal: {name: "AutocorrectDomainError", code: "FIRST_TYPO"}};
+    },
     keymap: payload => ({bytes: payload.subarray(0, -1), refusal: {name: "KeymapDomainError", code: "INVALID_LENGTH"}}),
     macros: payload => ({bytes: Buffer.concat([Buffer.from([0xc0, 0xaf]), payload]), refusal: {name: "MacroDomainError", code: "INVALID_MACRO"}}),
     // The two LED groups swapped: ids still count from zero, but the

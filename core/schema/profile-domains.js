@@ -44,6 +44,13 @@ const PROFILE_DOMAINS = Object.freeze([
         encode: value => require("./macro-domain-v1").encodeMacroDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["macros"]} */
         decode: (bytes, _options = {}) => require("./macro-domain-v1").decodeMacroDomain(bytes)}),
+    // The autocorrect list is read from the document like the keymap and the
+    // macros: the keyboard read has no readback of its own for it.
+    Object.freeze({name: "AUTOCORRECT", id: 0x80, key: "autocorrect", readKey: undefined, version: 1, wireBit: 1 << 7, area: "autocorrect", document: "profile",
+        /** @param {import("./autocorrect-domain-v1.js").AutocorrectList} value @param {DomainOptions} [options] @returns {Buffer} */
+        encode: (value, options = {}) => require("./autocorrect-domain-v1").encodeAutocorrectDomain(value, options.autocorrect),
+        /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["autocorrect"]} */
+        decode: (bytes, _options = {}) => require("./autocorrect-domain-v1").decodeAutocorrectDomain(bytes)}),
 ]);
 /** @typedef {typeof PROFILE_DOMAINS[number]} ProfileDomain */
 /** @typedef {ProfileDomain['name']} DomainName */

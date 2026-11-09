@@ -40,11 +40,12 @@ function response(request, payload, status = 0) {
 }
 
 // Capability layout 3 (firmware D-F28): page 1 the ceilings that fit a byte,
-// page 2 the wider ones, every byte count 32 bits. A split build that saves
-// and has a pointing device, profiles past 64 KiB.
+// page 2 the wider ones, every byte count 32 bits, page 3 the autocorrect
+// list's (firmware D-F68). A split build that saves and has a pointing
+// device, profiles past 64 KiB.
 function compiledOnlyPages() {
     const identity = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
-    identity.set([3, 3, 2, 0, 4, 0, 32, 20, 2, 0x07], 0);
+    identity.set([3, 4, 2, 0, 4, 0, 32, 20, 2, 0x07], 0);
     const capacity = Buffer.from([
         16, 16, 128, 5, 128, 16, 16, 32, 58, 8, 128, 128, 31, 32, 32, 60,
         0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -55,7 +56,13 @@ function compiledOnlyPages() {
     wide.writeUInt32LE(100000, 6);
     wide.writeUInt32LE(131040, 10);
     wide.writeUInt32LE(70000, 14);
-    return [identity, capacity, wide];
+    const autocorrect = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
+    autocorrect.writeUInt16LE(1000, 0);
+    autocorrect.writeUInt16LE(2000, 2);
+    autocorrect.writeUInt16LE(30000, 4);
+    autocorrect.writeUInt32LE(40000, 6);
+    autocorrect[10] = 32;
+    return [identity, capacity, wide, autocorrect];
 }
 
 test("the feature word holds only what a build varies by: split, saves and pointing", () => {
@@ -101,13 +108,13 @@ test("Profile Wire get requests are canonical 32-byte frames", () => {
 test("JavaScript consumes the same golden reports as the C firmware codec", () => {
     const fixtures = goldenFixtures();
     const pages = {};
-    for (const prefix of ["capabilities-page-0", "capabilities-page-1", "capabilities-page-2", "status-page-0", "status-page-1"]) {
+    for (const prefix of ["capabilities-page-0", "capabilities-page-1", "capabilities-page-2", "capabilities-page-3", "status-page-0", "status-page-1"]) {
         const request = fixtures[`${prefix}-request`];
         const actualRequest = buildProfileGetRequest(request[2], request[4], request[3]);
         assert.deepEqual(actualRequest, request);
         pages[prefix] = decodeProfileResponse(fixtures[`${prefix}-response`], request);
     }
-    assert.deepEqual(decodeCapabilityPages([pages["capabilities-page-0"], pages["capabilities-page-1"], pages["capabilities-page-2"]]), {
+    assert.deepEqual(decodeCapabilityPages([pages["capabilities-page-0"], pages["capabilities-page-1"], pages["capabilities-page-2"], pages["capabilities-page-3"]]), {
         responseVersion: 3,
         protocol: {major: 2, minor: 0},
         schema: {major: 4, minor: 0},
@@ -138,6 +145,12 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         profileSlotPayload: 130048,
         profileSlotSize: 131072,
         macroBytes: 70000,
+        // The golden autocorrect ceilings (firmware D-F68).
+        maxAutocorrectCorrections: 1024,
+        maxAutocorrectTypos: 1025,
+        autocorrectTextBytes: 20480,
+        autocorrectBytes: 70001,
+        autocorrectTextMax: 32,
         supportedDomainMask: 3,
         nameMaxBytes: 32,
         layerMaskBits: 32,
@@ -194,6 +207,7 @@ test("capability pages decode the bigger profile's capacities", () => {
     assert.equal(decoded.profileSlotPayload, 131040);
     assert.equal(decoded.profileSlotSize, 131072);
     assert.equal(decoded.macroBytes, 70000);
+    assert.deepEqual([decoded.maxAutocorrectCorrections, decoded.maxAutocorrectTypos, decoded.autocorrectTextBytes, decoded.autocorrectBytes, decoded.autocorrectTextMax], [1000, 2000, 30000, 40000, 32]);
     assert.equal(decoded.nameMaxBytes, 32);
     assert.equal(decoded.placementPositions, 60);
     // Profile Wire 1's layouts 1 and 2 are refused, so is any later one.
@@ -203,7 +217,7 @@ test("capability pages decode the bigger profile's capacities", () => {
         assert.throws(() => decodeCapabilityPages(older), (error) => error.code === "INCOMPATIBLE_RESPONSE" && /Update both halves/.test(error.message));
     }
     // The bytes past each page's fields stay zero.
-    for (const [page, offset] of [[1, 16], [1, 24], [2, 20], [2, 24]]) {
+    for (const [page, offset] of [[1, 16], [1, 24], [2, 20], [2, 24], [3, 11], [3, 24]]) {
         const bytes = compiledOnlyPages().map((value) => Buffer.from(value));
         bytes[page][offset] = 1;
         assert.throws(() => decodeCapabilityPages(bytes), (error) => error.code === "NONCANONICAL_RESPONSE", `page ${page} byte ${offset}`);
@@ -215,7 +229,7 @@ test("capability pages decode the bigger profile's capacities", () => {
 
 test("patterned capability vectors decode every semantic field exactly", () => {
     const identity = Buffer.alloc(25);
-    identity.set([3, 3, 2, 7, 4, 9, 32, 20, 2], 0);
+    identity.set([3, 4, 2, 7, 4, 9, 32, 20, 2], 0);
     identity.writeUInt32LE(0x00000003, 9);
     identity.writeUInt32LE(0x12345678, 13);
     identity.writeUInt32LE(0x89abcdef, 17);
@@ -228,7 +242,9 @@ test("patterned capability vectors decode every semantic field exactly", () => {
     wide.writeUInt32LE(0x00012345, 6);
     wide.writeUInt32LE(0x0002fff0, 10);
     wide.writeUInt32LE(0x00010203, 14);
-    assert.deepEqual(decodeCapabilityPages([identity, capacity, wide]), {
+    const autocorrect = Buffer.alloc(25);
+    autocorrect.set([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b], 0);
+    assert.deepEqual(decodeCapabilityPages([identity, capacity, wide, autocorrect]), {
         responseVersion: 3,
         protocol: {major: 2, minor: 7},
         schema: {major: 4, minor: 9},
@@ -262,12 +278,17 @@ test("patterned capability vectors decode every semantic field exactly", () => {
         maxProfilePayload: 0x00012345,
         profileSlotPayload: 0x0002fff0,
         macroBytes: 0x00010203,
+        maxAutocorrectCorrections: 0x0201,
+        maxAutocorrectTypos: 0x0403,
+        autocorrectTextBytes: 0x0605,
+        autocorrectBytes: 0x0a090807,
+        autocorrectTextMax: 0x0b,
     });
     // Firmware D-F63 reports the total on page 2 bytes 18-19; page 1 byte 7
     // is then one table's.
     wide.writeUInt16LE(600, 18);
     capacity[7] = 200;
-    const split = decodeCapabilityPages([identity, capacity, wide]);
+    const split = decodeCapabilityPages([identity, capacity, wide, autocorrect]);
     assert.equal(split.maxRgbTableGroupRows, 200);
     assert.equal(split.maxRgbStageGroupRows, 600);
 });
@@ -361,8 +382,9 @@ test("status reports a cancelled save the slave half never confirmed", () => {
 test("decoders reject unknown masks, active kinds, and invalid ranges", () => {
     const capabilities = compiledOnlyPages();
     const unknownDomain = capabilities.map((page) => Buffer.from(page));
-    unknownDomain[1][12] = 0x80;
-    assert.throws(() => decodeCapabilityPages(unknownDomain), (error) => error.code === "INCOMPATIBLE_RESPONSE");
+    // Every bit of the one-byte mask is a domain now (firmware D-F68).
+    unknownDomain[1][12] = 0xff;
+    assert.equal(decodeCapabilityPages(unknownDomain).supportedDomainMask, 0xff);
     const invalidChunk = capabilities.map((page) => Buffer.from(page));
     invalidChunk[0][7] = 21;
     assert.throws(() => decodeCapabilityPages(invalidChunk), /chunk capacity/);
@@ -396,7 +418,7 @@ test("capability read alone reports the firmware identity, with no VIA command",
     let id = 0;
     const caps = await readProfileCapabilities({request: async report => keyboard.answer(report)[0]}, {nextRequestId: () => ++id});
     assert.equal(caps.firmwareVersion, 0x89abcdef);
-    assert.deepEqual(keyboard.requests.map(r => [r[0], r[1], r[2]]), [[8, 0, 1], [8, 0, 1], [8, 0, 1]]);
+    assert.deepEqual(keyboard.requests.map(r => [r[0], r[1], r[2]]), [[8, 0, 1], [8, 0, 1], [8, 0, 1], [8, 0, 1]]);
 });
 
 test("decoder rejects error, noncanonical, and mismatched responses", () => {
@@ -423,8 +445,8 @@ test("capability reads serialize through the transport connection", async () => 
         },
     };
     const decoded = await readProfileCapabilities(connection, {requestId: 0xfe});
-    assert.deepEqual(requests.map((request) => request[4]), [0, 1, 2]);
-    assert.equal(new Set(requests.map((request) => request[3])).size, 3, "each page has its own request id");
+    assert.deepEqual(requests.map((request) => request[4]), [0, 1, 2, 3]);
+    assert.equal(new Set(requests.map((request) => request[3])).size, 4, "each page has its own request id");
     assert.equal(decoded.maxProfilePayload, 100000);
 });
 

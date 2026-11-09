@@ -41,7 +41,7 @@ test("one action vocabulary is known, and a layer reference reads back", () => {
     assert.equal(layerRef(3), "Layer 3");
     assert.equal(layerOfRef("Layer 3"), 3);
     assert.equal(layerOfRef("Numbers"), undefined);
-    assert.equal(knownActionAbi(0x91fcd248), true, "the vocabulary with the keycode blocks and 32 pointing slots");
+    assert.equal(knownActionAbi(0x3c9e17ff), true, "the vocabulary with the keycode blocks and 32 pointing slots");
     for (const retired of [0x837cf479, 0xf79c6151, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0x67df11b3, 0xb2205fc3]) assert.equal(knownActionAbi(retired), false, `0x${retired.toString(16)} is retired`);
     assert.equal(knownActionAbi(1), false);
 });
@@ -98,7 +98,7 @@ test("the keyboard has the 32 pointing slots of the keycode blocks", () => {
     const {ACTION_ABI, KNOWN_ACTION_ABIS} = require("../../core/schema/actions");
     const {POINTING_SLOT_COUNT} = require("../../core/data/pd-mode-keys");
     assert.deepEqual(KNOWN_ACTION_ABIS, [ACTION_ABI]);
-    assert.equal(ACTION_ABI, 0x91fcd248);
+    assert.equal(ACTION_ABI, 0x3c9e17ff);
     assert.equal(POINTING_SLOT_COUNT, 32);
     assert.equal(pointingSlotOfCode(0x7e94), 20);
     assert.equal(pointingSlotOfCode(0x7ebf), 31);

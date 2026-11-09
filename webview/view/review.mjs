@@ -21,7 +21,7 @@ export const LAYER_ORDER_UNIT = "layerOrder", OTHER_KEY_OPTIONS_UNIT = "settings
 // each named as its screen is: core's REVIEW_AREAS (core/model/vocabulary.js),
 // copied since the interface may not import core and pinned by
 // tests/view/enum-drift.test.mjs.
-export const AREAS = Object.freeze(["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Pointer", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"]);
+export const AREAS = Object.freeze(["Keys", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Autocorrect", "Pointer", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"]);
 // An area's place in that order; one the rail does not list comes last.
 /** @param {string} area */
 export const areaRank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);

@@ -37,6 +37,7 @@ const {KEY_BEHAVIOR_LIMITS} = require("../schema/key-behavior-domain-v1");
 const {COMBO_LIMITS} = require("../schema/combo-domain-v1");
 const {RGB_DOMAIN_V1} = require("../schema/rgb-domain-v1");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1} = require("../schema/autocorrect-domain-v1");
 const {NAME_MAX_BYTES} = require("../schema/profile-name");
 const {CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
@@ -81,6 +82,11 @@ const DEMO_CAPABILITIES = Object.freeze({
     profileSlotPayload: PROFILE_BLOB_V1.MAX_SIZE,
     profileSlotSize: 131072,
     macroBytes: MACRO_DOMAIN_V1.MAX_SIZE,
+    maxAutocorrectCorrections: AUTOCORRECT_DOMAIN_V1.MAX_CORRECTIONS,
+    maxAutocorrectTypos: AUTOCORRECT_DOMAIN_V1.MAX_TYPOS,
+    autocorrectTextBytes: AUTOCORRECT_DOMAIN_V1.MAX_TEXT_BYTES,
+    autocorrectBytes: AUTOCORRECT_DOMAIN_V1.MAX_SIZE,
+    autocorrectTextMax: AUTOCORRECT_DOMAIN_V1.TEXT_MAX,
     supportedDomainMask: PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS,
     nameMaxBytes: NAME_MAX_BYTES,
     layerMaskBits: 32,

@@ -131,7 +131,7 @@ function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
     const featureFlags = (PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.POINTING
         | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0)) >>> 0;
-    capabilityIdentity.set([options.capabilityLayout ?? 3, 3, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, options.schemaMajor || 4, options.schemaMajor ? 0 : 3, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.set([options.capabilityLayout ?? 3, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, options.schemaMajor || 4, options.schemaMajor ? 0 : 4, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
@@ -141,6 +141,8 @@ function readPages(options = {}) {
     const wide = Buffer.alloc(25);
     wide.writeUInt16LE(640, 0); wide.writeUInt32LE(65536, 2);
     wide.writeUInt32LE(65504, 6); wide.writeUInt32LE(65504, 10); wide.writeUInt32LE(10327, 14);
+    const autocorrect = Buffer.alloc(25);
+    autocorrect.writeUInt16LE(1024, 0); autocorrect.writeUInt16LE(1024, 2); autocorrect.writeUInt16LE(20480, 4); autocorrect.writeUInt32LE(34824, 6); autocorrect[10] = 32;
     const statusIdentity = Buffer.alloc(25);
     statusIdentity.set([1, 2], 0);
     const stateFlags = options.stateFlags ?? (options.mutation ? 0x31 : 0x81);
@@ -152,6 +154,7 @@ function readPages(options = {}) {
         [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:0`]: capabilityIdentity,
         [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:1`]: capacity,
         [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:2`]: wide,
+        [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:3`]: autocorrect,
         [`${PROFILE_WIRE_V1.VALUE_STATUS}:0`]: statusIdentity,
         [`${PROFILE_WIRE_V1.VALUE_STATUS}:1`]: Buffer.alloc(25),
     };
@@ -264,10 +267,10 @@ test("service exposes opaque descriptors and performs only capability/status rea
     assert.equal(connected.status.activeKind, 0);
     assert.equal(connected.compatibility.compatible, true);
     assert.ok(connected.diagnostics.includes("Profile Wire capabilities identify compatible current firmware."));
-    assert.equal(adapter.lastConnection().writes.length, 5);
-    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[0]), [8, 8, 8, 8, 8]);
-    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[2]), [1, 1, 1, 2, 2]);
-    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[3]), [1, 2, 3, 4, 5]);
+    assert.equal(adapter.lastConnection().writes.length, 6);
+    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[0]), [8, 8, 8, 8, 8, 8]);
+    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[2]), [1, 1, 1, 1, 2, 2]);
+    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[3]), [1, 2, 3, 4, 5, 6]);
 
     const disconnected = await service.disconnect();
     assert.equal(disconnected.connected, false);
@@ -348,7 +351,7 @@ test("compatibility reports a schema blocker, and the diagnostic says what was c
     const scanned = await service.enumerate();
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.compatibility.compatible, false);
-    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.3/);
+    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.4/);
     assert.match(connected.diagnostics.join("\n"), /found \d+ blocking issue/);
 });
 
@@ -442,7 +445,7 @@ test("request ids advance across refreshes and reject a delayed duplicate", asyn
     assert.equal(refreshed.connected, true);
     assert.equal(refreshed.error, null);
     const customWrites = adapter.lastConnection().writes.filter((report) => report[0] === PROFILE_WIRE_V1.COMMAND_GET);
-    assert.deepEqual(customWrites.map((report) => report[3]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    assert.deepEqual(customWrites.map((report) => report[3]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     assert.ok(refreshed.diagnostics.some((entry) => entry.includes("unexpected Raw HID report")));
 });
 
@@ -498,11 +501,11 @@ test("an incompatible base is read only through capabilities, even for direct di
     const state = await service.connect(scanned.devices[0].id);
     assert.equal(state.compatibility.compatible, false);
     const connection = adapter.lastConnection();
-    assert.deepEqual(connection.writes.map(report => [report[0], report[2]]), [[8, 1], [8, 1], [8, 1]]);
+    assert.deepEqual(connection.writes.map(report => [report[0], report[2]]), [[8, 1], [8, 1], [8, 1], [8, 1]]);
     await assert.rejects(service.readLayout(), {code: "FIRMWARE_UPDATE_REQUIRED"});
     await assert.rejects(service.readCommittedProfile(), {code: "FIRMWARE_UPDATE_REQUIRED"});
     await service.readBaseRgb(); await service.readCombos();
-    assert.equal(connection.writes.length, 3, "no data is read past the unsupported identity");
+    assert.equal(connection.writes.length, 4, "no data is read past the unsupported identity");
 });
 
 test("a retired capability layout gets the update notice without any profile read", async t => {

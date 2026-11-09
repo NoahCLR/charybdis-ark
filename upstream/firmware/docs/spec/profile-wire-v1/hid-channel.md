@@ -12,7 +12,7 @@ pages carry are [blob-and-digests.md](blob-and-digests.md).
 ## Raw HID reports
 
 The firmware answers Raw HID itself (D-F31,
-[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
+[`0031`](https://github.com/NoahCLR/charybdis-4x6/blob/c4c5c407ec6d23614570878db577bf1e8c3983fd/docs/adr/0031-via-is-not-supported.md)): QMK's Raw HID interface,
 usage page `0xFF60`, 32-byte reports both ways. Every report goes to the
 Profile Wire handlers and is sent back exactly once, in place, as the reply,
 with the same length.
@@ -69,7 +69,7 @@ Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, th
 
 ## Capability pages — GET `0x01`
 
-A client reads these before anything else. Three byte pages, `0..2`; page 3
+A client reads these before anything else. Four byte pages, `0..3`; page 4
 and above answer status `2`.
 
 Page 0, the identity (see [README.md](README.md#version-identity)):
@@ -77,9 +77,9 @@ Page 0, the identity (see [README.md](README.md#version-identity)):
 | Byte | Field |
 | ---: | --- |
 | 0 | capability layout, `3` |
-| 1 | capability page count, `3` |
+| 1 | capability page count, `4` |
 | 2–3 | Profile Wire major `2`, minor `1` |
-| 4–5 | schema major `4`, minor `3` |
+| 4–5 | schema major `4`, minor `4` |
 | 6 | report size, `32` |
 | 7 | candidate chunk capacity: `20` when feature bit 1 is set, otherwise `0` |
 | 8 | profile status page count, `2` |
@@ -122,6 +122,18 @@ Page 2, the wider ceilings; every byte count is 32 bits:
 | 18–19 | maximum lighting group rows in all four stage tables (D-F63) | 640 |
 | 20–24 | zero | |
 
+Page 3, the [autocorrect list](autocorrect-domain.md#ceilings)'s ceilings
+(D-F68):
+
+| Byte | Field | This firmware |
+| ---: | --- | --- |
+| 0–1 | maximum corrections | 1,024 |
+| 2–3 | maximum typos | 1,024 |
+| 4–5 | text capacity in bytes, corrections and typos together | 20,480 |
+| 6–9 | autocorrect domain capacity in bytes | 34,824 |
+| 10 | maximum bytes in one correction or typo | 32 |
+| 11–24 | zero | |
+
 The values come from one header, `users/noah/lib/compat/qmk_profile_capabilities.h`,
 which the Raw HID channel and the contract probe (`tests/host/run_contract_probe.sh`)
 both build from.
@@ -132,7 +144,7 @@ Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, th
 
 Capability page 0 bytes 9–12. It holds only what a build varies by; no
 firmware behaviour depends on a bit, the word only describes the build (D-F28,
-[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
+[`0028`](https://github.com/NoahCLR/charybdis-4x6/blob/c4c5c407ec6d23614570878db577bf1e8c3983fd/docs/adr/0028-new-base-32-bit-profile-lengths.md)).
 
 | Bit | Meaning |
 | ---: | --- |
@@ -285,7 +297,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 ## Flash pauses — GET `0x0D`
 
 Each half measures how long its profile-slot flash work stops the keyboard
-(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/7f4394a46af7c2aa9a82d736ed0d3b5d986fc8d7/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
+(D-F29, [`0029`](https://github.com/NoahCLR/charybdis-4x6/blob/c4c5c407ec6d23614570878db577bf1e8c3983fd/docs/adr/0029-profile-slots-in-their-own-flash-region.md)).
 Byte page `0` is the master half's figures; page `1` the slave half's, as the
 master half last pulled them over the split link; page 2 and above answer
 status `2`. Page 1 answers status `3` until a pull has succeeded.
@@ -342,7 +354,7 @@ not route, and every value not listed, is answered unhandled (`0xFF`).
 
 | Command | Value | Operation | Builds | Specified in |
 | --- | ---: | --- | --- | --- |
-| get | `0x01` | capability pages 0–2 | all | [this file](#capability-pages--get-0x01) |
+| get | `0x01` | capability pages 0–3 | all | [this file](#capability-pages--get-0x01) |
 | get | `0x02` | profile status pages 0–1 | all | [this file](#profile-status--get-0x02) |
 | get | `0x03` | cadence recorder | diagnostic | [this file](#diagnostic-values) |
 | get | `0x04` | saved payload | all | [this file](#payload-readback--get-0x04-and-0x05) |

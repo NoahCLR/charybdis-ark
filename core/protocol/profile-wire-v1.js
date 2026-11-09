@@ -14,9 +14,10 @@ const PROFILE_WIRE_V1 = Object.freeze({
     PROTOCOL_MAJOR: 2,
     PROTOCOL_MINOR: 1,
     // Response layout 3 (firmware D-F28): page 1 the ceilings that fit a byte,
-    // page 2 the wider ones. Any other layout is refused.
+    // page 2 the wider ones, page 3 the autocorrect list's (firmware D-F68).
+    // Any other layout is refused.
     CAPABILITY_LAYOUT: 3,
-    CAPABILITY_PAGE_COUNT: 3,
+    CAPABILITY_PAGE_COUNT: 4,
     CHANNEL: 0x00,
     COMMAND_GET: 0x08,
     PAYLOAD_OFFSET: 7,
@@ -201,11 +202,13 @@ function decodeCapabilityPages(pages) {
     const identity = pages[0];
     const capacity = pages[1];
     const wide = pages[2];
+    const autocorrect = pages[3];
     if (identity[0] !== PROFILE_WIRE_V1.CAPABILITY_LAYOUT || identity[1] !== PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT) {
         throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout: Ark supports only current firmware. Update both halves.");
     }
     assertZeroRange(capacity, 16, 25, "capability page 1");
     assertZeroRange(wide, 20, 25, "capability page 2");
+    assertZeroRange(autocorrect, 11, 25, "capability page 3");
     const decoded = {
         responseVersion: identity[0],
         protocol: {major: identity[2], minor: identity[3]},
@@ -242,6 +245,11 @@ function decodeCapabilityPages(pages) {
         maxProfilePayload: readU32(wide, 6),
         profileSlotPayload: readU32(wide, 10),
         macroBytes: readU32(wide, 14),
+        maxAutocorrectCorrections: readU16(autocorrect, 0),
+        maxAutocorrectTypos: readU16(autocorrect, 2),
+        autocorrectTextBytes: readU16(autocorrect, 4),
+        autocorrectBytes: readU32(autocorrect, 6),
+        autocorrectTextMax: autocorrect[10],
     };
     assertKnownMask(decoded.featureFlags, PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS, "capability feature flags");
     assertKnownMask(decoded.supportedDomainMask, PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS, "supported domain mask");

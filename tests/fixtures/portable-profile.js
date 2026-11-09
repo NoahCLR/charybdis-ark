@@ -26,7 +26,7 @@ const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/
 // the feature word, for a test whose keyboard reports none; the
 // capabilities are a build that saves on both halves.
 const CURRENT_BASE = Object.freeze({protocol: {major: PROFILE_WIRE_V1.PROTOCOL_MAJOR, minor: PROFILE_WIRE_V1.PROTOCOL_MINOR},
-    schema: {major: PROFILE_BLOB_V1.SCHEMA_MAJOR, minor: PROFILE_BLOB_V1.SCHEMA_MINOR}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI});
+    schema: {major: PROFILE_BLOB_V1.SCHEMA_MAJOR, minor: PROFILE_BLOB_V1.SCHEMA_MINOR}, compiledLayerCount: 16, supportedDomainMask: 255, actionAbiDigest: ACTION_ABI});
 const CURRENT_CAPABILITIES = Object.freeze({...CURRENT_BASE, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
 
 // Settings v10: values 10..14 are the retired pointing DPI and 27 the retired

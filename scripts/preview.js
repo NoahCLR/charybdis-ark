@@ -58,9 +58,9 @@ function fillPreviewLayer(document) {
 /** @type {Partial<import("../core/session/types.js").DeviceCapabilities> & {brightnessMax: number}} */
 const capabilities = {
     protocol: {major: 2, minor: 1},
-    schema: {major: 4, minor: 3},
+    schema: {major: 4, minor: 4},
     compiledLayerCount: 16,
-    supportedDomainMask: 127,
+    supportedDomainMask: 255,
     actionAbiDigest: ACTION_ABI,
     // Current firmware: everything the flashable pair reports.
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES,
@@ -78,6 +78,11 @@ const capabilities = {
     maxRgbTableGroupRows: 255,
     maxRgbStageGroupRows: 640,
     macroBytes: 34903,
+    maxAutocorrectCorrections: 1024,
+    maxAutocorrectTypos: 1024,
+    autocorrectTextBytes: 20480,
+    autocorrectBytes: 34824,
+    autocorrectTextMax: 32,
 };
 
 // The web page's shell as the preview stands in for it: what the page offers

@@ -26,6 +26,7 @@ const {reorderShortcutRefusal} = require("./shortcut-layers");
 const {readStoredMacro} = require("./macro-input");
 const {MACRO_LIMITS} = require("../../rules/macro-payload.mjs");
 const {MACRO_DOMAIN_V1} = require("../schema/macro-domain-v1");
+const {AUTOCORRECT_DOMAIN_V1} = require("../schema/autocorrect-domain-v1");
 const {hostSettings} = require("../schema/host-settings");
 const {answered} = require("../schema/bytes");
 const {profileDepthOptions} = require("../schema/profile-depth");
@@ -92,7 +93,8 @@ function validateMacro(bytes, {textEntry = false, layout} = {}) {
 }
 // The whole profile the keyboard runs, every domain: each domain its active
 // profile holds, otherwise the compiled default the firmware falls back to
-// (a profile saved without the keymap or macros types the authored ones), and
+// (a profile saved without the keymap, the macros or the autocorrect list
+// uses the authored ones), and
 // the settings as the keyboard reports them. Combos are the profile's like
 // any other domain, and it is their only durable owner (firmware D-F32), so
 // they are taken as stored: rebuilt from the table the keyboard runs, a combo
@@ -107,7 +109,7 @@ function materializeProfile(active, defaults, combos, settings) {
     /** @param {number} id */
     const stored = id => live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
     /** @type {import("../schema/types.js").ProfileDomain[]} */
-    const domains = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES, PROFILE_DOMAIN_IDS.KEYMAP, PROFILE_DOMAIN_IDS.MACROS].map(id => {
+    const domains = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES, PROFILE_DOMAIN_IDS.KEYMAP, PROFILE_DOMAIN_IDS.MACROS, PROFILE_DOMAIN_IDS.AUTOCORRECT].map(id => {
         const found = stored(id);
         if (!found) throw fail("The keyboard did not report every part of its profile. Read it again.");
         return found;
@@ -179,6 +181,7 @@ function validateSnapshot(value, capabilities) {
     const layers = decoded("keymap");
     const macros = decoded("macros");
     macros.forEach(slot => validateMacro(slot));
+    const autocorrect = decoded("autocorrect");
     const pdModes = decoded("pdModes");
     const depthOptions = profileDepthOptions(capabilities, payload("rgb"));
     // A backup past the keyboard's LED sets or accents is refused here, in
@@ -220,10 +223,13 @@ function validateSnapshot(value, capabilities) {
     const stored = payload("macros").length;
     const macroCapacity = capabilities?.macroBytes ?? MACRO_DOMAIN_V1.MAX_SIZE;
     if (stored > macroCapacity) throw fail(`Macros need ${stored} bytes; this keyboard holds ${macroCapacity}.`);
+    // The autocorrect list against the keyboard's own ceilings, in words.
+    const listRefusal = autocorrectRefusal(autocorrect, capabilities);
+    if (listRefusal) throw fail(listRefusal);
     // This same complete blob is both the portable profile and the candidate.
     const candidateBytes = profile;
     if (capabilities?.maxProfilePayload !== undefined && candidateBytes.length > capabilities.maxProfilePayload) throw fail(`The profile needs ${candidateBytes.length} bytes with its keymap and macros; this keyboard holds ${capabilities.maxProfilePayload}.`);
-    return {document: /** @type {PortableDocument} */ (candidate), profile, candidate: candidateBytes, layers, macroSlots: macros, settings, rgb, behaviors, combos, pdModes, codecOptions, danglingPointingKeys: Object.fromEntries(danglingPointingKeys)};
+    return {document: /** @type {PortableDocument} */ (candidate), profile, candidate: candidateBytes, layers, macroSlots: macros, autocorrect, settings, rgb, behaviors, combos, pdModes, codecOptions, danglingPointingKeys: Object.fromEntries(danglingPointingKeys)};
 }
 
 // An edit a byte format refused as too large for the keyboard: the person's
@@ -252,6 +258,25 @@ function lightingCeilings(capabilities) {
         ...(Number.isInteger(capabilities?.maxRgbStageGroupRows) ? {maxGroupRows: capabilities?.maxRgbStageGroupRows} : {}),
     };
 }
+// The autocorrect list's ceilings as the keyboard reports them; the format's
+// own where none was read.
+/** @param {DomainsContext["capabilities"]} capabilities @returns {Required<import("../schema/autocorrect-domain-v1.js").Ceilings>} */
+function autocorrectCeilings(capabilities) {
+    return {maxCorrections: capabilities?.maxAutocorrectCorrections ?? AUTOCORRECT_DOMAIN_V1.MAX_CORRECTIONS,
+        maxTypos: capabilities?.maxAutocorrectTypos ?? AUTOCORRECT_DOMAIN_V1.MAX_TYPOS,
+        maxTextBytes: capabilities?.autocorrectTextBytes ?? AUTOCORRECT_DOMAIN_V1.MAX_TEXT_BYTES};
+}
+// What a list past the keyboard's ceilings is told, or nothing.
+/** @param {import("../schema/autocorrect-domain-v1.js").AutocorrectList} list @param {DomainsContext["capabilities"]} capabilities */
+function autocorrectRefusal(list, capabilities) {
+    const ceilings = autocorrectCeilings(capabilities);
+    const typos = list.entries.reduce((total, entry) => total + entry.typos.length, 0);
+    const text = list.entries.reduce((total, entry) => total + Buffer.byteLength(entry.correction) + entry.typos.reduce((sum, typo) => sum + Buffer.byteLength(typo.typo), 0), 0);
+    if (list.entries.length > ceilings.maxCorrections) return PROFILE_FULL_WORDS.counts.autocorrectCorrections(ceilings.maxCorrections);
+    if (typos > ceilings.maxTypos) return PROFILE_FULL_WORDS.counts.autocorrectTypos(ceilings.maxTypos);
+    if (text > ceilings.maxTextBytes) return PROFILE_FULL_WORDS.counts.autocorrectText(ceilings.maxTextBytes);
+    return undefined;
+}
 // The codec options a document's domains are read and written with: the tap
 // depth the keyboard reports, or the one the document's RGB palette counts;
 // the brightness the keyboard allows; and the LED sets and accents it holds. A behaviour edit also checks every
@@ -264,7 +289,8 @@ function domainOptions(rgbPayload, {capabilities, limits, checkActions}) {
     const actionLimits = {maxPdModes: POINTING_SLOT_COUNT, maxLogicalLayers: capabilities?.compiledLayerCount,
         maxMacroSlots: capabilities?.macroSlots, maxCustomKeys: capabilities?.customKeySlots};
     return {rgb: {maximumBrightness: brightnessCeiling(limits), ...lightingCeilings(capabilities), ...depth.rgb},
-        behaviors: {...depth.behaviors, ...(checkActions ? {actionLimits} : {})}};
+        behaviors: {...depth.behaviors, ...(checkActions ? {actionLimits} : {})},
+        autocorrect: autocorrectCeilings(capabilities)};
 }
 // Opens a profile blob's domains as models: each decoded the first time it
 // is opened, with the document's codec options, and the same model handed
@@ -468,4 +494,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, brightnessCeiling, editProfileDomains, readProfileDomains, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf, walkActions};
+module.exports = {FILE_MAX_BYTES, FILE_TOO_LARGE, DOCUMENT_VERSION, autocorrectCeilings, brightnessCeiling, editProfileDomains, readProfileDomains, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf, walkActions};
