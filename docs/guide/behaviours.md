@@ -212,8 +212,8 @@ isn't a change and isn't in Review: the key, or unplugging, turns it back on.
 ## Behaviour settings
 
 **Behaviour settings** (**Behaviours** under Settings in the rail) shows two
-cards, both open: **Tap & hold timing** and **Where behaviours run**, the
-switches in the table above.
+cards, both open: **Where behaviours run**, the switches in the table above,
+and **Tap & hold timing**.
 
 **Tap & hold timing** holds the keyboard's default timings, used wherever a
 behaviour leaves its own empty:

@@ -13,7 +13,7 @@ const {connectedState, panelModel} = require("../tests/fixtures/published-model"
 test("each Settings screen draws its own sections open, with nothing to fold and no search", async ({page}) => {
     await openControls(page, "keys");
     for (const [screen, title, sections] of [
-        ["behaviours", "Behaviours", ["keyTiming", "behaviorSettings"]],
+        ["behaviours", "Behaviours", ["behaviorSettings", "keyTiming"]],
         ["combos", "Combos", ["comboSettings", "comboReferences"]],
         ["pointer", "Pointer", ["normalPointerSpeed", "sniping", "autoMouse"]],
         ["host", "Host", ["host", "keyboardOptions"]],

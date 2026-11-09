@@ -86,7 +86,7 @@ const CATEGORIES = ["Keys", "Lighting", "Macros", "Pointer", "Pointing modes", "
 // the vocabulary's (tests/view/review.test.mjs holds the two to one set).
 /** @type {Readonly<Record<string, [string, number]>>} */
 export const SECTION_ROWS = {
-    keyTiming: ["Keys", 31], startupLayers: ["Keys", 22], behaviorSettings: ["Keys", 32], comboSettings: ["Keys", 40], comboReferences: ["Keys", 41],
+    keyTiming: ["Keys", 32], startupLayers: ["Keys", 22], behaviorSettings: ["Keys", 31], comboSettings: ["Keys", 40], comboReferences: ["Keys", 41],
     keyboardOptions: ["Keys", 50], lightingPower: ["Lighting", -1], rgbAppearance: ["Lighting", 1], lightingFeedback: ["Lighting", 15],
     normalPointerSpeed: ["Pointer", 1], sniping: ["Pointer", 2], autoMouse: ["Pointer", 3],
 };
