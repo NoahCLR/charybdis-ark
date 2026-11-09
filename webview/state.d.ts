@@ -39,7 +39,7 @@ export interface PanelState {
     /** The Add form as typed; `sent` once it is posted: the list it was posted against, and the correction it names. */
     autocorrectAdd: {correction: string; typos: string; match: number; sent?: {identity: string; correction: string}};
     /** The core's answer to the autocorrect edit being typed, for the form it is in ("add" or "entry"). */
-    autocorrectCheck: {form: string; requestId: number; pending: boolean; error: string; warnings: string[]} | null;
+    autocorrectCheck: {form: string; requestId: number; error: string; warnings: string[]} | null;
     /** A list file being read, or read and waiting on Add or Replace: the request it answers, the file's name ('' for the starter list), and core's preview or why it could not be read. */
     autocorrectImport: {requestId: number; pending: boolean; name: string; starter: boolean; preview?: import('../contracts/messages.js').AutocorrectImportPreview; error?: string} | null;
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;

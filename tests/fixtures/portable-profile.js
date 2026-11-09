@@ -5,7 +5,8 @@
 // behaviours 2, combos 3, settings 11, sparse PD 4, slots 0-5 configured,
 // keymap 1 and macros 1), materialized the way a keyboard read does, with
 // these settings and a combo table standing in for the live readbacks, and
-// the given layers and empty macros in place of the fixture's. It is a format
+// the given layers, empty macros and the autocorrect entries US types in
+// place of the fixture's. It is a format
 // sample, never the firmware's authored defaults, so editing the keymap
 // changes nothing here.
 const fs = require("node:fs");
@@ -15,6 +16,7 @@ const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {PROFILE_BLOB_V1, decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {encodeMacroDomain} = require("../../core/schema/macro-domain-v1");
+const {decodeAutocorrectDomain, encodeAutocorrectDomain} = require("../../core/schema/autocorrect-domain-v1");
 const {encodeSettings, defaultLayerRecord} = require("../../core/schema/settings-domain-v1");
 const {ACTION_ABI} = require("../../core/schema/actions");
 const {LAYER_LOCK_BASE} = require("../../core/data/user-keycodes");
@@ -42,6 +44,11 @@ function settings() {
     return {values, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")], layers,
         macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, keys: [], layers: 0, layerKind: 0})), keyboardName: "", formatVersion: 11};
 }
+// The fixture's autocorrect list without the entries its US host layout
+// cannot type (café, über), so a draft of this profile starts with no check
+// to confirm; a test of those entries puts its own list in.
+/** @param {import("../../core/schema/autocorrect-domain-v1.js").AutocorrectList} list */
+const typable = list => ({entries: list.entries.filter(entry => /^[\x20-\x7e]+$/.test(entry.correction + entry.typos.map(typo => typo.typo).join("")))});
 const profileBytes = () => {
     const match = fs.readFileSync(FIXTURE, "utf8").match(/^profile\.hex=(.+)$/m);
     if (!match) throw new Error("The populated profile fixture has no profile.hex.");
@@ -60,7 +67,8 @@ function compiled({combos = [], layers = emptyLayers(), policy = settings()} = {
     const bytes = encodeProfileBlob({domains: fixture.domains.map(domain =>
         domain.id === 0x60 ? {...domain, payload: encodeKeymapDomain(layers)}
             : domain.id === 0x70 ? {...domain, payload: encodeMacroDomain(Array.from({length: 128}, () => Buffer.alloc(0)))}
-                : domain.id === 0x30 ? {...domain, payload: encodeComboDomain(comboTableOf(table))} : domain)});
+                : domain.id === 0x80 ? {...domain, payload: encodeAutocorrectDomain(typable(decodeAutocorrectDomain(domain.payload)))}
+                    : domain.id === 0x30 ? {...domain, payload: encodeComboDomain(comboTableOf(table))} : domain)});
     const profile = materializeProfile(bytes, bytes, table, encodeSettings(policy));
     return createSnapshot({profile, actionAbiDigest: ACTION_ABI});
 }

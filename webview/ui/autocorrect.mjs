@@ -46,7 +46,7 @@ function check(form, edit) {
     // What the last answer said stands until this one comes, so the line
     // does not blink as each letter is typed; another form's is dropped.
     const last = state.autocorrectCheck?.form === form ? state.autocorrectCheck : null;
-    state.autocorrectCheck = {form, requestId, pending: true, error: "", warnings: last?.warnings || []};
+    state.autocorrectCheck = {form, requestId, error: "", warnings: last?.warnings || []};
     post(edits.autocorrectValidationMessage(edit, requestId));
     paintFeedback();
 }
@@ -55,7 +55,7 @@ function check(form, edit) {
 export function receiveAutocorrectValidation(message) {
     const asked = state.autocorrectCheck, draft = getModel()?.draft;
     if (!asked || asked.requestId !== message.requestId || message.draftId !== draft?.id || message.draftRevision !== draft?.revision) return;
-    state.autocorrectCheck = {...asked, pending: false, error: message.validation.error, warnings: message.validation.warnings};
+    state.autocorrectCheck = {...asked, error: message.validation.error, warnings: message.validation.warnings};
     paintFeedback();
 }
 
@@ -261,7 +261,7 @@ function addCard(model, canEdit, gate) {
             </div>
             <div data-ac-feedback="add" hidden></div>
             ${canEdit || gate.quiet ? "" : `<p class="note">${esc(gate.why)}</p>`}
-            <p class="note">Typing a correction the list already has adds the typos to it.</p>
+            <p class="note">Typing a correction the list already has adds the typos to it. Entries are checked against your host layout, ${esc(model?.autocorrect?.layoutName)}.</p>
         </div></div>`);
     const correction = /** @type {HTMLInputElement} */ (card.querySelector('[data-f="autocorrect:add:correction"]'));
     const typos = /** @type {HTMLInputElement} */ (card.querySelector('[data-f="autocorrect:add:typos"]'));

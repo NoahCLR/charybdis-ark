@@ -34,7 +34,7 @@ test("the view lists each correction once with its typos, in the stored order, a
         {correction: "thing", warnings: [], typos: [{typo: "tihng", match: 3, warnings: []}]}]);
     const bytes = autocorrectDomainSize(validateSnapshot(current.document).autocorrect);
     assert.deepEqual(view.usage, {corrections: 3, maxCorrections: 1024, typos: 4, maxTypos: 1024, textBytes: 33, maxTextBytes: 20480, bytes, capacity: 34824, free: 34824 - bytes, textMax: 32});
-    assert.deepEqual([view.notices, view.warningCount, view.layoutName], [[], 0, "US"]);
+    assert.deepEqual([view.notices, view.layoutName], [[], "US"]);
     assert.equal(autocorrectEditorView(null), null);
     assert.equal(autocorrectEditorView({incomplete: true, document: current.document}), null);
 });
@@ -53,7 +53,7 @@ test("warnings are published on the entry or typo they are about, and the layout
     assert.equal(german.layoutName, "German (Windows)");
     const us = autocorrectEditorView(fixture(entries), CURRENT_CAPABILITIES);
     assert.deepEqual(us.notices, ["2 entries will not fire on US."]);
-    assert.equal(us.warningCount, 4);
+    assert.equal(us.entries.reduce((total, entry) => total + entry.warnings.length + entry.typos.reduce((sum, typo) => sum + typo.warnings.length, 0), 0), 4);
     assert.match(us.entries.find(entry => entry.correction === "über").warnings[0], /US cannot type “ü”/);
     const on = us.entries.find(entry => entry.correction === "no").typos[0];
     assert.equal(on.warnings.length, 2);
@@ -204,4 +204,17 @@ test("an import adds to the list or replaces it in one step, leaving out what th
     assert.deepEqual(exportedList(current, "txt", day), {fileName: "charybdis-autocorrect-2026-11-10.txt", text: ":teh: -> the\n:tehn: -> then\n", mime: "text/plain"});
     assert.deepEqual([exportedList(current, "csv", day).fileName, exportedList(current, "csv", day).mime], ["charybdis-autocorrect-2026-11-10.csv", "text/csv"]);
     assert.deepEqual([exportedList(current, "json", day).fileName, exportedList(current, "json", day).mime], ["charybdis-autocorrect-2026-11-10.json", "application/json"]);
+});
+
+test("Review warns once of the entries the host layout cannot type, and a list it types has no check", () => {
+    const {profileFindings} = require("../../core/model/profile-checks");
+    const untypable = entries => profileFindings(validateSnapshot(fixture(entries).document)).filter(finding => finding.kind === "untypableAutocorrect");
+    assert.deepEqual(untypable([["the", "teh"], ["iPhone", "iphone"]]), []);
+    const [finding, ...more] = untypable([["über", "ueber"], ["straße", "strasse"], ["the", "teh"], ["a", "ä"]]);
+    assert.deepEqual(more, []);
+    assert.deepEqual({level: finding.level, count: finding.count, title: finding.title, place: finding.place},
+        {level: "warning", count: 3, title: "3 autocorrect entries will not fire on US", place: {kind: "autocorrect", correction: "a"}});
+    assert.match(finding.detail, /US cannot type a character in “a”, “straße”, “über”\. The keyboard stores them and skips them\./);
+    assert.deepEqual(profileFindings(validateSnapshot(fixture([["über", "ueber"]], GERMAN).document)).filter(row => row.kind === "untypableAutocorrect"), []);
+    assert.equal(untypable([["über", "ueber"]])[0].title, "1 autocorrect entry will not fire on US");
 });

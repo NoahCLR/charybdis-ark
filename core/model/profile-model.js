@@ -251,7 +251,7 @@ function profileModel(content, capabilities, editing) {
         macroProtectionChoices: content.macroView?.protectionChoices || [],
         macroEditing: {identity: content.macroView?.identity || "", writable: editing.macros},
         autocorrect: content.autocorrectView ? {entries: content.autocorrectView.entries, usage: content.autocorrectView.usage, notices: content.autocorrectView.notices,
-            warningCount: content.autocorrectView.warningCount, layoutName: content.autocorrectView.layoutName} : null,
+            layoutName: content.autocorrectView.layoutName} : null,
         autocorrectEditing: {identity: content.autocorrectView?.identity || "", writable: editing.autocorrect},
         behaviorTimingDefaults: content.settingsView?.timing || {},
         configDefaults: content.settingsView?.sections || [],

@@ -146,6 +146,11 @@ them:
 - `scripts/generate-host-layouts.js` (`npm run host-layouts`) regenerates
   `core/data/host-layouts.json` from the pinned firmware fixture;
   `tests/data/host-layouts.test.js` checks it still reproduces.
+- `scripts/generate-autocorrect-words.js` (`npm run autocorrect-words`)
+  regenerates `core/data/autocorrect-words.json`, the characters an
+  autocorrect typo may hold and what each folds to, from the pinned firmware
+  fixture; `tests/data/autocorrect-words.test.js` checks it still reproduces.
+  `npm run upstream` runs both generators.
 
 node-hid is an optional dependency, so a native build that fails never stops
 the page's `npm ci`; without it the probe says so and stops. Which adapter

@@ -309,4 +309,4 @@ function exportAutocorrect(list, format) {
     return format === "txt" ? exportText(list) : format === "csv" ? exportCsv(list) : exportJson(list);
 }
 
-module.exports = {AUTOCORRECT_FILE_FORMATS: FORMATS, AUTOCORRECT_MATCH_WORDS: MATCH_WORDS, IMPORT_MAX_BYTES, IMPORT_TOO_LARGE, JSON_VERSION, entriesOf, exportAutocorrect, parseAutocorrectFile, planImport, previewImport, rowsOf, starterFile};
+module.exports = {AUTOCORRECT_FILE_FORMATS: FORMATS, AUTOCORRECT_MATCH_WORDS: MATCH_WORDS, IMPORT_MAX_BYTES, IMPORT_TOO_LARGE, entriesOf, exportAutocorrect, parseAutocorrectFile, planImport, previewImport, rowsOf, starterFile};

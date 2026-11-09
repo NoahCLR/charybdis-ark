@@ -12,7 +12,7 @@ const identity = expect.any(String);
 test("adding an entry posts the correction with every typo typed, matching where the form says", async ({page}) => {
     await openControls(page, "autocorrect");
     await expect(page.locator(".main > .topbar h1")).toHaveText("Autocorrect");
-    await expect(page.locator("[data-ac-count]")).toHaveText("10 corrections · 15 typos");
+    await expect(page.locator("[data-ac-count]")).toHaveText("8 corrections · 12 typos");
     const add = page.locator('[data-act="ac-add"]');
     await expect(add).toBeDisabled();
     await page.locator('[data-f="autocorrect:add:correction"]').fill("definitely");
@@ -80,7 +80,7 @@ test("the open entry posts each edit: a respelling, a typo's spelling, match and
 test("search finds a correction or a typo and opens the entry a typo found; the order changes without a post", async ({page}) => {
     await openControls(page, "autocorrect");
     const rows = page.locator(".ac-rows > [data-ac-entry]");
-    await expect(rows).toHaveCount(10);
+    await expect(rows).toHaveCount(8);
     await expect(rows.first()).toHaveAttribute("data-ac-entry", "a lot");
     await page.locator('[data-f="autocorrect:sort:typos"]').check({force: true});
     await expect(rows.first()).toHaveAttribute("data-ac-entry", "because");
@@ -100,11 +100,23 @@ test("search finds a correction or a typo and opens the entry a typo found; the 
 
 test("what the host layout cannot type is said once and marked on its entries, without blocking the list", async ({page}) => {
     await openControls(page, "autocorrect");
-    await expect(page.locator("[data-ac-notice]")).toContainText("2 entries will not fire on US.");
+    await expect(page.locator("[data-ac-notice]")).toHaveCount(0);
+    // As core publishes a list after the host layout changed under it.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        const warning = "US cannot type “é”, so this entry will not fire.";
+        model.autocorrect.entries.push({correction: "café", warnings: [warning], typos: [{typo: "cafe", match: 0, warnings: []}]});
+        model.autocorrect.notices = ["1 entry will not fire on US."];
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    });
+    await expect(page.locator("[data-ac-notice]")).toContainText("1 entry will not fire on US.");
     await expect(page.locator('[data-ac-entry="café"]')).toHaveClass(/warn/);
     await expect(page.locator('[data-ac-entry="the"]')).not.toHaveClass(/warn/);
     await expect(page.locator('[data-f="autocorrect:add:correction"]')).toBeEnabled();
     await expect(page.locator("[data-ac-meter]")).toBeVisible();
+    await page.locator('[data-ac-entry="café"]').click();
+    await expect(page.locator("[data-ac-open] .ac-warning")).toHaveText("US cannot type “é”, so this entry will not fire.");
 });
 
 test("in the demo the core keeps an Add, checks what is typed, refuses in words and reviews entry by entry", async ({page}) => {

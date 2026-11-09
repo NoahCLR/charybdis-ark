@@ -16,7 +16,8 @@ const {pointingMacros} = require("./pointing-taps");
 const {inertLinkLayers, inertLinkReason, linkNamed} = require("./pointing-links");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {actionName} = require("../schema/actions");
-const {REVIEW_AREAS, VOCABULARY, macroDefaultName, settingsPath, slotName} = require("./vocabulary");
+const {REVIEW_AREAS, VOCABULARY, macroDefaultName, settingsPath, slotName, word} = require("./vocabulary");
+const {WARNING, listWarnings} = require("./autocorrect-list");
 const {macroName} = require("../../rules/qmk-keycodes.mjs");
 
 // A behaviour step that sends a custom key sends only its shortcut (firmware
@@ -90,6 +91,18 @@ function profileFindings(decoded, destination = {}) {
                 detail: "This macro has no steps, so it does nothing yet and leaves a once-per-movement gesture available.",
                 fix: "Add steps in Macros, or choose another output.", place: where});
         }
+    }
+    // Autocorrect entries the host layout cannot type (D-L84): the keyboard
+    // skips them, so they are carried and said once, however many there are.
+    // A layout changed on the Host screen is what leaves them so.
+    const layoutName = word(VOCABULARY.hostLayouts, host.layout);
+    const silent = listWarnings(decoded.autocorrect || {entries: []}, {layout: host.layout, layoutName}).filter(warning => warning.kind === WARNING.UNTYPABLE);
+    if (silent.length) {
+        const named = [...new Set(silent.map(warning => warning.correction))];
+        findings.push({kind: "untypableAutocorrect", level: "warning", layers: [], identity: silent.map(warning => `${warning.correction}:${warning.typo ?? ""}`).join("|"), count: named.length,
+            title: `${named.length} autocorrect ${named.length === 1 ? "entry" : "entries"} will not fire on ${layoutName}`,
+            detail: `${layoutName} cannot type a character in ${named.slice(0, 8).map(name => `“${name}”`).join(", ")}${named.length > 8 ? ` and ${named.length - 8} more` : ""}. The keyboard stores them and skips them.`,
+            fix: `Change ${settingsPath("host", "host")} back, or edit the entries marked on the Autocorrect screen.`, place: {kind: "autocorrect", correction: named[0]}});
     }
     const lighting = baseLighting(decoded.settings.values);
     const max = destination.brightnessMax;

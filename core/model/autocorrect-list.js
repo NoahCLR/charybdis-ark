@@ -321,4 +321,4 @@ function restoreEntry(mine, theirs, correction, respelled) {
     }
 }
 
-module.exports = {WARNING, addTypos, pairEntries, restoreEntry, changeTypo, correctionOf, findEntry, findTypo, firingTypo, listUsage, listWarnings, matchOf, removeEntry, removeTypo, respellCorrection, typoOf, untypable, wordsOf};
+module.exports = {WARNING, addTypos, changeTypo, correctionOf, findEntry, findTypo, firingTypo, listUsage, listWarnings, pairEntries, removeEntry, removeTypo, respellCorrection, restoreEntry, typoOf, wordsOf};

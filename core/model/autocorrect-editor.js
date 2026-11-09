@@ -58,7 +58,6 @@ function autocorrectEditorView(snapshot, capabilities) {
             textBytes: used.textBytes, maxTextBytes: ceilings.maxTextBytes, bytes: used.bytes, capacity,
             free: Math.max(0, Math.min(capacity - used.bytes, sharedFree)), textMax: AUTOCORRECT_DOMAIN_V1.TEXT_MAX},
         notices: notice ? [notice] : [],
-        warningCount: warnings.length,
         layoutName: host.layoutName};
 }
 
@@ -129,4 +128,4 @@ function addLabel(message, document) {
     return findEntry(decodedOf({document}).autocorrect, correction) ? "Added an autocorrect typo" : "Added an autocorrect entry";
 }
 
-module.exports = {addLabel, autocorrectEditorView, editAutocorrect, exportedList, hostOf, importPreview, newWarnings};
+module.exports = {addLabel, autocorrectEditorView, editAutocorrect, exportedList, importPreview, newWarnings};

@@ -149,7 +149,8 @@ saving.
 - **It will not fire on your host layout.** After you change the host
   layout, the top of the screen says how many entries the new layout can't
   type, and each is marked. The keyboard skips them. Change the layout back
-  or edit them.
+  or edit them. Review lists it too, as a warning to confirm once before
+  saving.
 - **A correction is itself a typo.** With `a` → `b` and `b` → `c`, typing
   "b" yourself gives "c". Two entries that correct to each other are marked
   as a loop.

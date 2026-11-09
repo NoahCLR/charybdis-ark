@@ -236,6 +236,8 @@ export type FindingPlace =
     | {kind: 'pointing'; slot: number}
     /** `keycode`: the slot's name, as the Macros screen picks it. */
     | {kind: 'macro'; index: number; keycode: string}
+    /** An autocorrect entry, by its correction as the draft spells it (the keyboard's, for one the draft removed). */
+    | {kind: 'autocorrect'; correction: string}
     | {kind: 'settings'; area?: string; section?: string; stage?: string};
 export interface Finding {
     kind: string;
@@ -287,8 +289,6 @@ export type ReviewPlace = FindingPlace
     | {kind: 'slots'; bank: 'pdModes'; slots: number[]}
     /** `keycode`: the key's name, as the Custom keys screen picks it. */
     | {kind: 'customKey'; index: number; keycode: string}
-    /** An autocorrect entry, by its correction as the draft spells it (the keyboard's, for one the draft removed). */
-    | {kind: 'autocorrect'; correction: string}
     | {kind: 'lighting'; stage?: string | null; layer?: number; slot?: number};
 export interface ReviewChange {
     area: string;

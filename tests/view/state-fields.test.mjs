@@ -81,7 +81,7 @@ test("a draft change resets the existing forms and preserves historically kept p
         accentShown: {stage: "layers", key: "layer:0"},
         macroForms: {MACRO_0: {draft: "unstaged", stepError: "bad"}},
         autocorrectOpen: {correction: "the"}, autocorrectAdd: {correction: "then", typos: "tehn", match: 1},
-        autocorrectCheck: {form: "add", requestId: 3, pending: false, error: "", warnings: []},
+        autocorrectCheck: {form: "add", requestId: 3, error: "", warnings: []},
     });
     openComboBuilder({id: 4, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: 40, followsDefault: false, enabled: true, allowedLayers: 1});
     state.combo.picking = true;

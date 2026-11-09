@@ -61,12 +61,12 @@ export interface CatalogEntry {value: string; key: string; label: string; group:
 export interface AutocorrectTypo {typo: string; match: number; warnings: string[]}
 /** One autocorrect entry: the correction as written, every typo that becomes it, and what will misbehave about the entry, in words. */
 export interface AutocorrectEntry {correction: string; typos: AutocorrectTypo[]; warnings: string[]}
-/** The autocorrect list as its screen draws it (core/model/autocorrect-editor.js): entries in stored order, what the list uses against what the keyboard holds, and what the chosen host layout leaves unable to fire, said once. */
+/** The autocorrect list as its screen draws it (core/model/autocorrect-editor.js): entries in stored order, what the list uses against what the keyboard holds, what the chosen host layout leaves unable to fire, said once, and that layout's name. */
 export interface AutocorrectView {
     entries: AutocorrectEntry[];
     usage: {corrections: number; maxCorrections: number; typos: number; maxTypos: number; textBytes: number; maxTextBytes: number; bytes: number; capacity: number; free: number; textMax: number};
     notices: string[];
-    warningCount: number;
+    /** The host layout entries are checked against, by name. */
     layoutName: string;
 }
 export interface MacroSlot {keycode: string; name: string; /** What it is called while it has no name of its own. */ defaultName: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
