@@ -164,15 +164,18 @@ export function unreleased(steps, model) {
     return held;
 }
 
-// Whether a slot answers a search. A macro is found by the name it was given,
-// and by the slot it sits in as the screens label it — "M3", "Macro 3" or its
-// keycode — so an unnamed macro can still be found. Case is ignored.
+// What a search finds a macro by: the name it was given, and the slot it sits
+// in as the screens label it — "M3", "Macro 3" or its keycode — so an unnamed
+// macro can still be found.
+/** @param {{keycode?: string, name?: string, defaultName?: string} | null | undefined} slot */
+export const macroWords = (slot) => [slot?.name, macroShortName(slot), slot?.defaultName, slot?.keycode].map((text) => String(text ?? ""));
+
+// Whether a slot answers a search. Case is ignored.
 /** @param {{keycode?: string, name?: string, defaultName?: string} | null | undefined} slot @param {unknown} query */
 export function macroMatches(slot, query) {
     const needle = String(query ?? "").trim().toLowerCase();
     if (!needle) return true;
-    return [slot?.name, macroShortName(slot), slot?.defaultName, slot?.keycode]
-        .some((text) => String(text ?? "").toLowerCase().includes(needle));
+    return macroWords(slot).some((text) => text.toLowerCase().includes(needle));
 }
 
 // Whether two payloads are the same macro: the same steps once every key name

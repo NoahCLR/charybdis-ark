@@ -59,4 +59,6 @@ export interface LightOptions {held?: number[];
     comboActive?: null | {locality: string; inputs: readonly number[]; color: import('../../contracts/edits.js').Colour; beneath?: boolean}}
 export interface LedLight {colour: import('../../contracts/edits.js').Colour; source: string; layer?: number | null}
 
-export type PickerSection = {id: string; label: string} & ({kind: 'catalogue'; filter: (entry: Pick<import('../../contracts/panel.js').CatalogEntry, 'group'> & {value?: string; key?: string; name?: string}) => boolean} | {kind: 'board' | 'layers' | 'modes' | 'macros'});
+export type PickerEntry = Pick<import('../../contracts/panel.js').CatalogEntry, 'group'> & {value?: string; key?: string; name?: string; offered?: boolean};
+export type PickerKeyGroup = {name: string; takes: (entry: PickerEntry, model: import('../../contracts/panel.js').PublishedModel | null) => boolean; order?: string[]};
+export type PickerSection = {id: string; label: string} & ({kind: 'catalogue'; filter: (entry: PickerEntry) => boolean; groups: PickerKeyGroup[]} | {kind: 'board' | 'layers' | 'modes' | 'macros' | 'all'});

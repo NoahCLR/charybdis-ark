@@ -535,9 +535,22 @@ macro and a custom key, which have none:
   (`browser-tests/marks.spec.js`).
 - The keycode picker marks what it offers as it marks a layer's row: a pointing
   slot's row and a macro's tile by the thing's mark, and a catalogue tile
-  through `keyNameMarked`, in its section and in a search alike. A mark widens
-  a tile, so tiles run on to the sheet's edge and wrap there
-  (`browser-tests/marks.spec.js`).
+  through `keyNameMarked`, in its section and in a search alike
+  (`browser-tests/marks.spec.js`). Its key sections draw named groups on one
+  twelve-column grid, a group's tiles all of one span, the widest tile's, so
+  edges line up from group to group. A group of twelve or fewer goes one step
+  wider when that fills its last row; otherwise rows run full, whatever that
+  leaves on the last one (`tileSpan`, `browser-tests/picker-groups.spec.js`).
+  All keycodes lists every key the field
+  takes under its section's name, in that section's groups, layers and pointing
+  modes in their sections' rows. A search shows every match, grouped by section
+  in that order, and finds a key by every word typed in any order, one word with
+  the spaces gone, its other names, or the start of a group's or section's name
+  (two letters, or five for Keyboard and All keycodes, which would otherwise
+  bury what a short search finds).
+  The sheet keeps one height, tall enough for every section's name, whatever a
+  section holds or the field takes; its sections and keys each scroll inside it,
+  and a pick keeps their place (`webview/lib/scroll.mjs`).
 - A key or action is named through `actionMarked` or `keyNameMarked`; only
   attributes and plain-text messages carry the words alone
   (`tests/view/key-names-marked.test.mjs`). One that acts on a layer or runs a
@@ -667,7 +680,7 @@ here: its home and tests are in
 | The commit bar: which bar the frame shows over the draft (an Apply running, its read back, a failed one until dismissed, a held live edit, other work, a draft from another keyboard or one the keyboard changed under, a restart, the live modes', the review), drawn by `webview/ui/frame.mjs` | `webview/view/commit-bar.mjs` (`commitBarState`) | `tests/view/commit-bar.test.mjs`, `browser-tests/live-edits.spec.js`, `browser-tests/apply-progress.spec.js` |
 | Whether an area takes an edit now: the draft core binds (`draft.editable`) and the area's own capability, Export only the keyboard; and what a screen says when it does not, or nothing while the draft is busy, which the commit bar says | `webview/view/edit-gate.mjs` (`editGate`) | `tests/view/edit-gate.test.mjs`, `tests/scripts/conventions.test.js` |
 | Which key a spelling is, and whether two spellings are one key: the name the profile knows it by, one canonical spelling per key, what core publishes of it in a table keyed by keycode name (its label and short label, kind, layer, layer form, a layer-mod's modifiers, a layer-tap's tap, the layers it turns on, the host layout's legends), read under every name it goes by with each fact's own rule for an empty entry, the macro, custom key or pointing slot (held or locked) it is, and two ways of finding a behaviour row kept apart, the row keyed exactly by the spelling (what a key means, what a combo sends) and the row listening to the key however either is spelled (a picked or typed key); worked out once per model and spelling | `webview/view/key-identity.mjs` (`keyIdentity`, `sameKey`, `keycodeName`, `macroIndex`) | `tests/view/key-identity.test.mjs`, `tests/scripts/conventions.test.js` |
-| The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, and what a search finds (at most `SEARCH_ROWS` keycodes), drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs` |
+| The keycode picker: which keys and sections a field takes, what is lit and picked, what the pick stores and why it cannot be used yet, what each section lists and in which groups, and what a search finds, drawn by `webview/ui/picker.mjs` | `webview/view/picker.mjs`, `webview/view/picker-sections.mjs`, `webview/view/picker-tiles.mjs` | `tests/view/picker.test.mjs`, `tests/view/picker-sections.test.mjs`, `tests/view/picker-tiles.test.mjs`, `browser-tests/picker-groups.spec.js` |
 | What reaches one key and what it uses, which the hover card and the Key tab both draw: the layer's own key shown alone, the key answering it from below, and of its behaviour row whether it runs here, changes nothing or has no branches, and a dual-role key's threshold and hold; drawn by `webview/ui/hover-card.mjs` (placed by `webview/ui/hover.mjs`) and `webview/ui/keys/key-tab.mjs` | `webview/view/key-reach.mjs` (`keyReachAt`, `keyReach`, `keyBehaviour`) | `tests/view/key-reach.test.mjs`, `browser-tests/participation.spec.js` |
 | What the board shows at each key and on the trackball: the key that answers in the view and the layer supplying it, glass or solid, its light, the dots, badges and icons of what runs there, the LED it carries, which Lighting numbers it with, and whether it is picked for the accent being edited, wearing that accent's colour; drawn by `webview/ui/board.mjs` | `webview/view/board-keys.mjs` (`boardKeys`, `boardTrackball`) | `tests/view/board-keys.test.mjs`, `browser-tests/marks.spec.js`, `browser-tests/participation.spec.js`, `browser-tests/lighting-controls.spec.js` |
 | Empty layers (D-L76): a layer that is not the base or a default layer, has no name of its own (core's `named`), maps no key, is turned on by no key (`layersAnyKeyTurnsOn`), starts no pointing mode, is not the pointer layer, is in no Combo layer matching but its own, has no layer colour that paints or accent, has no key with Use behaviour or Join combos off, and whose Settings switches read as most empty layers' do (an even split counts as set); worked out once per model, and folded where a place does not keep it | `webview/view/empty-layers.mjs` (`emptyLayers`, `foldEmptyLayers`), drawn by `webview/ui/empty-layers.mjs` | `tests/view/empty-layers.test.mjs`, `tests/model/profile-model.test.js`, `browser-tests/empty-layers.spec.js` |

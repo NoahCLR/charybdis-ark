@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {captureContentScroll, captureBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreBenchHeight, scrollContentTo} from "../../webview/lib/scroll.mjs";
+import {captureContentScroll, captureBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restorePickerScroll, restoreBenchHeight, scrollContentTo} from "../../webview/lib/scroll.mjs";
 
 const rootWith = (content) => ({querySelector: (selector) => selector === ".content" ? content : null});
 // A selector list matches when any of its selectors is the one asked about.
@@ -27,6 +27,21 @@ test("a slot bank keeps its own scroll position beside the page's", () => {
     const bank = {scrollTop: 0, scrollLeft: 0};
     restoreContentScroll(rootOf({scrollTop: 0, scrollLeft: 0}, bank), scroll);
     assert.deepEqual(bank, {scrollTop: 2310, scrollLeft: 0});
+});
+
+test("the picker keeps its keys' place and its sections' across a pick, its keys' until other keys show", () => {
+    const rootOf = (keys, side) => ({querySelector: (selector) => selector === ".content" ? {scrollTop: 0, scrollLeft: 0}
+        : selector === "[data-picker-keys]" ? keys : selector === ".picker-side" ? side : null});
+    const scroll = captureContentScroll(rootOf({scrollTop: 1500, dataset: {pickerKeys: "all"}}, {scrollTop: 40}), "keys", "keys");
+    assert.deepEqual(scroll, {top: 0, left: 0, picker: {key: "all", keys: 1500, sections: 40}});
+
+    const same = {scrollTop: 0, dataset: {pickerKeys: "all"}}, side = {scrollTop: 0};
+    restorePickerScroll(rootOf(same, side), scroll);
+    assert.deepEqual([same.scrollTop, side.scrollTop], [1500, 40]);
+
+    const other = {scrollTop: 0, dataset: {pickerKeys: "custom"}}, stays = {scrollTop: 0};
+    restorePickerScroll(rootOf(other, stays), scroll);
+    assert.deepEqual([other.scrollTop, stays.scrollTop], [0, 40], "another section starts at its top, the sections where they were");
 });
 
 test("a taller workbench tab keeps enough page height when another tab is shown", () => {

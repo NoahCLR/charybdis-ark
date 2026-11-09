@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {entriesForPickerSection, pickable, pickerSections} from "../../webview/view/picker-sections.mjs";
+import {entriesForPickerSection, groupedEntries, pickable, pickerSections} from "../../webview/view/picker-sections.mjs";
 
 import {createRequire} from "node:module";
 
@@ -19,16 +19,17 @@ const catalogue = ["KC_A", "KC_SLASH", "KC_EXLM", "KC_HOME", "KC_KP_1", "KC_F12"
 
 test("the picker uses task-shaped sections instead of raw QMK group names", () => {
     assert.deepEqual(pickerSections().map(({label}) => label), [
-        "Keyboard", "Symbols", "Navigation", "Numpad", "Layers", "Pointing modes", "Macros",
-        "Mouse", "Media", "Lighting", "Magic", "Custom keys", "More keys", "Other QMK", "All keycodes",
+        "Keyboard", "Letters and digits", "Symbols", "Numpad", "Common keys", "Layers", "Macros", "Custom keys", "Pointing modes",
+        "Mouse", "Media", "More keys", "Lighting", "Magic", "Other QMK", "All keycodes",
     ]);
 });
 
 test("curated picker sections route representative keycodes", () => {
     const section = (id) => pickerSections().find((candidate) => candidate.id === id);
     for (const id of ["custom", "all"]) assert.ok(entriesForPickerSection(catalogue, section(id)).some((entry) => entry.value === "CUSTOM_KEY_0"), id);
+    assert.deepEqual(entriesForPickerSection(catalogue, section("letters")).map((entry) => entry.value), ["KC_A"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("symbols")).map((entry) => entry.value), ["KC_SLASH", "KC_EXLM"]);
-    assert.deepEqual(entriesForPickerSection(catalogue, section("navigation")).map((entry) => entry.value), ["KC_HOME"]);
+    assert.deepEqual(entriesForPickerSection(catalogue, section("common")).map((entry) => entry.value), ["KC_HOME", "KC_F12"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("numpad")).map((entry) => entry.value), ["KC_KP_1"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("lighting")).map((entry) => entry.value), ["QK_RGB_MATRIX_TOGGLE"]);
     // The keyboard's own pointer keys sit with the mouse; its unnamed slots do nothing.
@@ -61,4 +62,50 @@ test("the picker offers what core offers, in every section and search", async ()
         assert.equal(pickable(/** @type {any} */ (entry)), false, value);
     }
     for (const value of ["KC_A", "QK_RGB_MATRIX_TOGGLE", "DPI_MOD", "QK_BOOTLOADER"]) assert.ok(pickable(published.find((entry) => entry.value === value)), value);
+});
+
+test("every offered key is in one section, and in one of its groups", () => {
+    const published = publishedModel(profileDocument());
+    const offered = published.qmkKeycodes.filter(pickable);
+    const sections = pickerSections().filter(({kind}) => kind === "catalogue");
+    const pointing = (entry) => entry.group === "Pointing modes";
+    for (const entry of offered) {
+        const holding = sections.filter((section) => section.filter(entry)).map(({id}) => id);
+        assert.equal(holding.length, pointing(entry) ? 0 : 1, `${entry.value}: ${holding}`);
+    }
+    for (const section of sections) {
+        const entries = entriesForPickerSection(offered, section);
+        const groups = groupedEntries(section, entries, published);
+        assert.equal(groups.flatMap((group) => group.entries).length, entries.length, section.id);
+        assert.equal(new Set(groups.map((group) => group.name)).size, groups.length, section.id);
+    }
+});
+
+test("arrows and navigation keys read in the order a person says them, not the catalogue's", () => {
+    const published = publishedModel(profileDocument());
+    const common = pickerSections().find((section) => section.id === "common");
+    const groups = groupedEntries(common, entriesForPickerSection(published.qmkKeycodes, common), published);
+    const keysOf = (name) => groups.find((group) => group.name === name).entries.map((entry) => entry.value);
+    assert.deepEqual(keysOf("Arrows"), ["KC_LEFT", "KC_RIGHT", "KC_UP", "KC_DOWN"]);
+    assert.deepEqual(keysOf("Navigation"), ["KC_HOME", "KC_END", "KC_PAGE_UP", "KC_PAGE_DOWN", "KC_INSERT", "KC_DELETE"]);
+});
+
+test("a section's groups tell its keys apart by keycode, and a custom key by whether it has a name", () => {
+    const published = publishedModel(profileDocument());
+    const named = published.customKeys.find((key) => key.name);
+    const unnamed = published.customKeys.find((key) => !key.name);
+    /** @param {string} id @param {string} value */
+    const groupOf = (id, value, model = published) => {
+        const section = pickerSections().find((candidate) => candidate.id === id);
+        return groupedEntries(section, entriesForPickerSection(model.qmkKeycodes, section), model).find((group) => group.entries.some((entry) => entry.value === value))?.name;
+    };
+    assert.deepEqual(["KC_ENTER", "KC_LEFT_CTRL", "KC_LEFT", "KC_HOME", "KC_PRINT_SCREEN", "KC_F12", "KC_NO", "KC_TRANSPARENT"].map((value) => groupOf("common", value)),
+        ["Typing", "Modifiers", "Arrows", "Navigation", "System", "Function", "No key", "No key"]);
+    assert.deepEqual(["KC_UNDO", "KC_INTERNATIONAL_1", "KC_LANGUAGE_1", "KC_KB_MUTE"].map((value) => groupOf("more", value)), ["Editing", "International", "Language", "System"]);
+    assert.deepEqual(["KC_NUM_LOCK", "KC_KP_SLASH", "KC_KP_1"].map((value) => groupOf("numpad", value)), ["Signs and lock", "Signs and lock", "Digits"]);
+    assert.equal(groupOf("other", "QK_GRAVE_ESCAPE"), "Features");
+    if (named) assert.equal(groupOf("custom", named.keycode), "Named");
+    assert.equal(groupOf("custom", unnamed.keycode), "Unnamed");
+    const renamed = {...published, customKeys: published.customKeys.map((key) => key.keycode === unnamed.keycode ? {...key, name: "Thumb"} : key)};
+    assert.equal(groupOf("custom", unnamed.keycode, renamed), "Named");
 });

@@ -266,24 +266,17 @@ test("the keycode picker marks a pointing mode, a macro and a custom key as it m
 
     // Every macro tile, named or not.
     await picker.locator('[data-sec="macros"]').click();
-    const macros = picker.locator(".pk-rows .pk");
+    const macros = picker.locator(".pk-grid .pk");
     const macroCount = await macros.count();
     expect(macroCount).toBeGreaterThan(0);
     await expect(macros.locator('.l .mk .kind-icon[data-kind="macro"]')).toHaveCount(macroCount);
-    await expect(picker.locator('[data-pick="MACRO_0"] .l')).toHaveText("M0");
+    await expect(picker.locator('[data-pick="MACRO_0"] .l')).toHaveText("Macro 0");
 
-    // Custom keys share a section with keys that are none: No key and Transparent.
     await picker.locator('[data-sec="custom"]').click();
     await expect(picker.locator('[data-pick="CUSTOM_KEY_0"] .l .kind-icon[data-kind="customKey"]')).toHaveCount(1);
     await expect(picker.locator('[data-pick="CUSTOM_KEY_0"] .l')).toHaveText("Custom key 0");
+    await picker.locator('[data-sec="common"]').click();
     await expect(picker.locator('[data-pick="KC_TRANSPARENT"] .kind-icon')).toHaveCount(0);
-    // Marks widen a tile: tiles wrap at the sheet's edge, none alone on a line.
-    const perLine = await picker.locator(".pk-rows .pk").evaluateAll((tiles) => {
-        const lines = new Map();
-        for (const tile of tiles) lines.set(tile.offsetTop, (lines.get(tile.offsetTop) || 0) + 1);
-        return [...lines.values()];
-    });
-    expect(perLine.slice(0, -1).every((count) => count > 1), `tiles per line: ${perLine}`).toBe(true);
 
     // A search draws them the same way, a pointing mode's key by its slot's light.
     const search = picker.locator("#pickerSearch");
@@ -299,7 +292,7 @@ test("the keycode picker marks a pointing mode, a macro and a custom key as it m
     await search.fill("CUSTOM_KEY_0");
     await expect(picker.locator('[data-pick="CUSTOM_KEY_0"] .l .kind-icon[data-kind="customKey"]')).toHaveCount(1);
     await search.fill("M0");
-    await expect(picker.locator('.pk-macros [data-pick="MACRO_0"] .l .kind-icon[data-kind="macro"]')).toHaveCount(1);
+    await expect(picker.locator('[data-pick="MACRO_0"] .l .kind-icon[data-kind="macro"]')).toHaveCount(1);
 
     // A key that reaches none of them keeps its bare name.
     await search.fill("KC_ENTER");

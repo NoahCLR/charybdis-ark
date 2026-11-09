@@ -1,14 +1,14 @@
 // @ts-check
 // What the keycode picker offers and holds, read from its state
 // (`state.picker`): which keys and sections a field takes, what is picked,
-// what the pick stores, why it cannot be used yet, and what a search finds.
-// The sheet itself is webview/ui/picker.mjs.
+// what the pick stores and why it cannot be used yet. What its sections and a
+// search draw is webview/view/picker-tiles.mjs; the sheet itself is
+// webview/ui/picker.mjs.
 
 import {pickerExpression} from "./edits.mjs";
 import {keycodeModifiers, modifierPick, pickerModifierProblem} from "./keyvalues.mjs";
 import {keycodeValue} from "./keycode-expression.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "./picker-sections.mjs";
-import {macroMatches} from "./macro.mjs";
 import {shortcutModifiers, shortcutPick, shortcutPickDrop, shortcutPickKey, shortcutPickChord, shortcutPickModifier, shortcutPickMods, shortcutPickProblem} from "./custom-key.mjs";
 import {catalogEntry, keyIdentity, sameKey} from "./key-identity.mjs";
 import {vocabulary} from "./vocabulary.mjs";
@@ -17,9 +17,6 @@ import {vocabulary} from "./vocabulary.mjs";
  * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
  * @typedef {import("../state.js").PickerState} Picker
  */
-
-// A search shows this many keycodes at most, macros apart.
-export const SEARCH_ROWS = 64;
 
 // A field limited to some keys names them as QMK does; a key picked under
 // another name is stored as that one.
@@ -106,11 +103,15 @@ export const shownSection = (model, picker) => {
     return sections.find((entry) => entry.id === picker.section) || sections[0];
 };
 
+// Every catalogue key the field takes.
+/** @param {Model} model @param {Picker} picker */
+export const offeredKeys = (model, picker) => (model?.qmkKeycodes || []).filter((entry) => pickable(entry) && pickAllowed(model, picker, entry.value));
+
 // What a section lists for the field: the macros, or the catalogue's entries.
 /** @param {Model} model @param {Picker} picker */
 export const offeredMacros = (model, picker) => (model?.macros || []).filter(slot => pickAllowed(model, picker, slot.keycode));
 /** @param {Model} model @param {Picker} picker @param {import("./types.js").PickerSection | undefined} section */
-export const offeredEntries = (model, picker, section) => entriesForPickerSection(model?.qmkKeycodes || [], section).filter(entry => pickAllowed(model, picker, entry.value));
+export const offeredEntries = (model, picker, section) => entriesForPickerSection(offeredKeys(model, picker), section);
 
 // Whether a key is lit: picked, or, in a shortcut, a modifier key or shifted
 // symbol whose key and modifiers are all held.
@@ -163,15 +164,3 @@ export const pickProblem = (model, picker) => picker.shortcut ? shortcutPickProb
 /** @param {Model} model @param {Picker | null} picker */
 export const pickedExpression = (model, picker) => !picker ? ""
     : picker.shortcut ? shortcutPickChord(model, shortcutPick(model, picker)) : pickerExpression(storedPick(model, picker));
-
-// What a search finds across every section the field takes: the macros it
-// names and the offered keycodes whose name or words hold it, the first
-// SEARCH_ROWS of them.
-/** @param {Model} model @param {Picker} picker */
-export function pickerMatches(model, picker) {
-    const query = picker.search.toLowerCase();
-    const macros = offeredMacros(model, picker).filter((slot) => macroMatches(slot, query));
-    const keycodes = (model?.qmkKeycodes || []).filter((entry) => pickAllowed(model, picker, entry.value) && pickable(entry)
-        && (entry.search?.includes(query) || entry.value.toLowerCase().includes(query))).slice(0, SEARCH_ROWS);
-    return {macros, keycodes};
-}
