@@ -255,12 +255,15 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
         assert.deepEqual([mode.mode, mode.slaveMode, mode.slaveCounter, mode.slaveKnown, mode.conflict, mode.agreed], [2, 1, 7, true, true, false]);
         await keyboard.set("mode_conflict", 0);
         assert.equal((await coordinator.send(buildEditModeRequest(0x21, 0))).resultName, "NOT_CLEAN", "the mode waits for Save or Revert");
-        for (const [name, value] of /** @type {[string, number][]} */ ([["combos_master", 1], ["combos_override", 0], ["behaviours_master", 1], ["behaviours_override", 1], ["auto_mouse_override", 0], ["default_dpi", 1600], ["rgb_color", 0xc8ff55],
+        for (const [name, value] of /** @type {[string, number][]} */ ([["combos_master", 1], ["combos_override", 0], ["behaviours_master", 1], ["behaviours_override", 1], ["auto_mouse_override", 0], ["autocorrect_override", 0], ["default_dpi", 1600], ["rgb_color", 0xc8ff55],
             ["default_layers", 5], ["keymap_options", 3]])) await keyboard.set(name, value);
         const runtime = await readRuntime(connection, options);
         assert.deepEqual([runtime.combos, runtime.behaviours, runtime.autoMouse], [{master: true, override: false}, {master: true, override: true}, {override: false}]);
         await keyboard.set("auto_mouse_override", 1);
         assert.deepEqual((await readRuntime(connection, options)).autoMouse, {override: true}, "byte 24, the auto-mouse override (firmware D-F66)");
+        assert.deepEqual(runtime.autocorrect, {override: false});
+        await keyboard.set("autocorrect_override", 1);
+        assert.deepEqual((await readRuntime(connection, options)).autocorrect, {override: true}, "page 1 byte 0, the autocorrect override (firmware D-F66)");
         assert.deepEqual([runtime.live.defaultDpi, runtime.live.rgbColor, runtime.live.defaultLayers, runtime.live.keymapOptions], [1600, 0xc8ff55, 5, 3]);
         console.log("replies: the SET reply, status pages 0-2, the active profile's page 0, the mode and runtime pages, and flag bits 0-15 decode in Ark");
     } finally {keyboard.close();}

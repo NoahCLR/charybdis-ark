@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "users/noah/lib/autocorrect/autocorrect_switch.h"
 #include "users/noah/lib/compat/qmk_keyboard_restart.h"
 #include "users/noah/lib/compat/qmk_profile_edit_channel.h"
 #include "users/noah/lib/compat/qmk_portable_profile.h"
@@ -26,7 +27,7 @@ static noah_active_profile_snapshot_t            snapshot;
 static noah_profile_working_copy_t               copy;
 // What the owner adds to the working copy's own status.
 static noah_profile_owner_working_status_t owner;
-static uint32_t                            values[9];
+static uint32_t                            values[10];
 static struct {
     uint16_t transaction;
     uint32_t session, revision;
@@ -100,6 +101,9 @@ bool is_combo_enabled(void) {
 bool auto_mouse_switch_override(void) {
     return values[8] != 0u;
 }
+bool autocorrect_switch_override(void) {
+    return values[9] != 0u;
+}
 uint32_t noah_qmk_portable_live_setting(uint8_t id) {
     return id == NOAH_SETTING_DEFAULT_DPI ? values[4] : id == NOAH_SETTING_RGB_COLOR ? values[5] : id == NOAH_SETTING_DEFAULT_LAYERS ? values[6] : id == NOAH_SETTING_KEYMAP_OPTIONS ? values[7] : 0u;
 }
@@ -150,6 +154,7 @@ static bool set(const char *name, unsigned long value) {
     FIELD("default_layers", values[6])
     FIELD("keymap_options", values[7])
     FIELD("auto_mouse_override", values[8])
+    FIELD("autocorrect_override", values[9])
 #undef FIELD
     return false;
 }
