@@ -3,7 +3,7 @@
 The contracts the firmware keeps with clients, with itself across the two
 halves, and with its own flash. Each section states the contract and names the
 test or fixture that holds it; a change to a contract changes its spec in the
-same pass, and the decisions behind them are in [`docs/adr/`](https://github.com/NoahCLR/charybdis-4x6/blob/c4c5c407ec6d23614570878db577bf1e8c3983fd/docs/adr/).
+same pass, and the decisions behind them are in [`docs/adr/`](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/).
 Words are the [glossary](../../GLOSSARY.md)'s.
 
 Read them in layers, from the report a client sends up to the save both halves
@@ -17,7 +17,8 @@ make:
 | | [pd-mode-domain-v1.md](pd-mode-domain-v1.md) | The pointing domain and how pointing modes run |
 | | [rgb-domain-v1.md](rgb-domain-v1.md) | The lighting domain and how it is drawn |
 | | [participation-policy.md](participation-policy.md) | When a press uses its behaviour or joins a combo |
-| | [host-layouts-v1.md](host-layouts-v1.md) | The host layout catalogue macro text is typed through |
+| | [host-layouts-v1.md](host-layouts-v1.md) | The host layout catalogue macro text is typed through and typing is read through |
+| | [autocorrect-v1.md](autocorrect-v1.md) | What autocorrect reads, corrects, undoes and holds back |
 | | [field-classification.md](field-classification.md) | Which authored values are profile data and which only a build changes |
 | Split | [profile-split-v1.md](profile-split-v1.md) | How the halves compare and copy saved profiles, candidates and the working copy |
 | | [split-activity-sync.md](split-activity-sync.md) | The split link, activity and runtime state, and its diagnostic recorders |

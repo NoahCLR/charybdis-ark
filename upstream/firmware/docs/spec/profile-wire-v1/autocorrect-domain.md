@@ -2,7 +2,7 @@
 
 Domain `0x80`, version 1, holds the profile's autocorrect list: the typos the
 keyboard corrects and what each becomes (D-F68,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/c4c5c407ec6d23614570878db577bf1e8c3983fd/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)).
 It holds the entries as they are written, not a compiled tree. An **entry** is
 one **correction**, the right word, stored once, with every **typo** that
 becomes it; each typo says **where it matches** a word. The domain id,
@@ -92,7 +92,7 @@ Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`build.py --check`; `
 ## Ceilings
 
 Counted, and all held at once (D-F14,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/c4c5c407ec6d23614570878db577bf1e8c3983fd/docs/adr/0014-bigger-profiles.md)):
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0014-bigger-profiles.md)):
 
 | Ceiling | Value |
 | --- | ---: |
@@ -157,7 +157,7 @@ Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`profile_autocorrect_
 
 The keyboard reads the list where it lies, in the active profile: a saved
 slot in flash or the working copy in RAM (D-F54,
-[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/c4c5c407ec6d23614570878db577bf1e8c3983fd/docs/adr/0054-profile-flash-and-validation-leave-the-raw-hid-callback.md)).
+[ADR](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/adr/0054-profile-flash-and-validation-leave-the-raw-hid-callback.md)).
 It keeps the list's range and its four counts, and no index or copy of the
 list in RAM. A newly active profile, a live edit included, replaces the range.
 
@@ -179,7 +179,7 @@ A profile without this domain corrects from the authored list, as the
 compiled defaults do. The authored list is the keymap folder's
 `autocorrect.txt`, one typo a line in QMK's form (`typo -> correction`, a
 colon before the typo for the start of a word, after it for the end, both for
-the whole word, neither for anywhere; [authoring](https://github.com/NoahCLR/charybdis-4x6/blob/c4c5c407ec6d23614570878db577bf1e8c3983fd/docs/guide/authoring.md#the-autocorrect-list)).
+the whole word, neither for anywhere; [authoring](https://github.com/NoahCLR/charybdis-4x6/blob/3d13219524187e2c879ba09b7108716279d42a5b/docs/guide/authoring.md#the-autocorrect-list)).
 `tools/autocorrect/build.py --write-authored` encodes it into
 `authored_autocorrect_list.h`, which the compiled defaults copy;
 real-profile validation refuses a header the list no longer encodes to. An
