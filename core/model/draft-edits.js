@@ -24,7 +24,7 @@ const {shortcutPresent} = require("../schema/settings-domain-v1");
  * @typedef {import("../../contracts/edits.js").DraftEditType} DraftEditType
  * @typedef {import("../../contracts/edits.js").PanelEdit} PanelEdit
  * @typedef {import("./types.js").PortableDocument} Document
- * @typedef {"keymap" | "settings" | "macro" | "customKey" | "keyboardName" | "slots" | "profile"} Editor
+ * @typedef {"keymap" | "settings" | "macro" | "autocorrect" | "customKey" | "keyboardName" | "slots" | "profile"} Editor
  * @typedef {"placement" | "pointing" | "combos" | "behaviours" | "lighting"} Domain
  */
 /**
@@ -66,6 +66,11 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     updateLayoutKeys: {editor: "keymap", label: layoutLabel, follows: true},
     updateConfigDefaults: {editor: "settings", label: "Saved a settings section"},
     updateMacro: {editor: "macro", label: "Edited a macro"},
+    addAutocorrectTypos: {editor: "autocorrect", label: (message, document) => require("./autocorrect-editor").addLabel(message, document)},
+    updateAutocorrectCorrection: {editor: "autocorrect", label: "Respelled an autocorrect correction"},
+    updateAutocorrectTypo: {editor: "autocorrect", label: message => message.correction !== undefined ? "Moved an autocorrect typo" : "Edited an autocorrect typo"},
+    deleteAutocorrectTypo: {editor: "autocorrect", label: "Removed an autocorrect typo"},
+    deleteAutocorrectEntry: {editor: "autocorrect", label: "Removed an autocorrect entry"},
     updateCustomKey: {editor: "customKey", label: "Renamed a custom key"},
     updateCustomKeyShortcut: {editor: "customKey", label: message => message.then || message.name !== undefined ? "Made a custom key for a shortcut"
         : shortcutPresent(message.shortcut) ? "Changed a custom key's shortcut" : "Cleared a custom key's shortcut"},

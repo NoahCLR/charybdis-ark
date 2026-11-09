@@ -12,6 +12,7 @@ const coversNumbers = (list, values, label) => assert.deepEqual(list.map(([id]) 
 
 test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.macroProtection, require("../../core/schema/macro-payload").MACRO_PROTECTION, "macro protection");
+    coversNumbers(VOCABULARY.autocorrectMatches, require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_MATCH, "where an autocorrect typo matches");
     covers(VOCABULARY.holdStyles.hold, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Hold");
     covers(VOCABULARY.holdStyles.long, KEY_BEHAVIOR_HOLD_STYLES, "hold styles under Long hold");
     covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_STYLES, "holds without a long hold");

@@ -3,7 +3,7 @@ const {CURRENT_BASE} = require("./portable-profile");
 // A draft of the PD profile (./pd-profile) with one edit in every area the
 // review describes: keys, a key's participation, a layer's name, macros (steps
 // and name), the key timing settings section, a behaviour, a combo
-// and the combo timing, a custom key, the keyboard's name, a pointing slot and
+// and the combo timing, the autocorrect list (an entry added, one respelled), a custom key, the keyboard's name, a pointing slot and
 // the lighting records.
 const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView} = require("../../core/model/settings-editor");
@@ -35,6 +35,8 @@ function editedDraft() {
     stage({type: "retargetBehavior", keycode: "KC_ESCAPE", target: "KC_Q", expectedBase: draft.identity()});
     stage({type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "50", holdTermMs: "200"});
     stage({type: "updateComboDefaultWindow", defaultTermMs: "70"});
+    stage({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}], expectedFingerprint: draft.current.fingerprint});
+    stage({type: "updateAutocorrectCorrection", correction: "thing", to: "things"});
     stage({type: "updateCustomKey", keycode: "CUSTOM_KEY_3", name: "Thumb", expectedFingerprint: draft.current.fingerprint});
     stage({type: "renameKeyboard", name: "Desk", expectedFingerprint: draft.current.fingerprint});
     stage({type: "updateLayerColor", layer: "Layer 2", mode: "ALL_KEYS", h: 20, s: 200, v: 100});

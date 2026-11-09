@@ -9,6 +9,7 @@ const {SETTING, shortcutIdentity, shortcutPresent} = require("../schema/settings
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView, COMBO_TIMING} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
+const {findTypo, pairEntries} = require("./autocorrect-list");
 const {inspectMacroPlayback} = require("./macro-input");
 const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
@@ -456,6 +457,21 @@ function profileReview(before, after, capabilities) {
         const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
         item(AREA.macros, UNIT.macro(i), `${macroDefaultName(i)}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i, keycode: macroName(i)}, [has(old), has(next)]);
     });
+    // The autocorrect list, an entry an item: its correction, and each typo
+    // with where it matches. A typo that changed entries says where it went
+    // or came from; an entry respelled is one item, old spelling to new.
+    for (const pair of pairEntries(a.autocorrect, b.autocorrect)) {
+        /** @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} entry @param {import("../schema/autocorrect-domain-v1.js").AutocorrectList} other @param {import("../schema/autocorrect-domain-v1.js").Entry | undefined} twin @param {string} moved @returns {Fields} */
+        const fields = (entry, other, twin, moved) => new Map(/** @type {[string, Field][]} */ (!entry ? [] : [["Correction", entry.correction],
+            ...entry.typos.map(typo => {
+                const elsewhere = twin?.typos.some(row => row.typo === typo.typo) ? undefined : findTypo(other, typo.typo)?.entry.correction;
+                return [`typo:${typo.typo}`, {label: "Typo", key: typo.match,
+                    text: `${typo.typo} · ${word(VOCABULARY.autocorrectMatches, typo.match).toLowerCase()}${elsewhere === undefined ? "" : ` · ${moved} “${elsewhere}”`}`}];
+            })]));
+        const old = pair.before, next = pair.after, shown = /** @type {import("../schema/autocorrect-domain-v1.js").Entry} */ (next ?? old);
+        item(AREA.autocorrect, UNIT.autocorrect((old ?? shown).correction, old && next && old.correction !== next.correction ? next.correction : undefined), shown.correction,
+            fields(old, b.autocorrect, next, "moved to"), fields(next, a.autocorrect, old, "moved from"), {kind: "autocorrect", correction: shown.correction}, [Boolean(old), Boolean(next)]);
+    }
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
         macrosB.macros.forEach((macro, index) => {

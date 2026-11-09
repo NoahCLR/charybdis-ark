@@ -90,7 +90,7 @@ function editableDomains(state) {
         busy: Boolean(state.busy), behaviors: Boolean(mask & PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS) && complete,
         pointing: Boolean(mask & PROFILE_WIRE_DOMAINS.PD_MODES) && complete,
         combos: Boolean(mask & PROFILE_WIRE_DOMAINS.COMBOS) && committed && !state.busy,
-        macros: Boolean(state.macroView) && currentLayers, settings: Boolean(state.settingsView) && currentLayers,
+        macros: Boolean(state.macroView) && currentLayers, autocorrect: Boolean(state.autocorrectView) && currentLayers, settings: Boolean(state.settingsView) && currentLayers,
         customKeys: Boolean(state.customKeyView) && !state.busy,
     };
 }

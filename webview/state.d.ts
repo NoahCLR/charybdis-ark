@@ -33,6 +33,13 @@ export interface PanelState {
     railMenu: boolean; stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pointingSlot: number; pointingSearch: string; pdKind: {slot: number; kind: number} | null;
     pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
     pdAdvanced: boolean; applyDismissed: number; recoveryAsk: string | null; feedbackRow: string | undefined; comboPreview: {id: number; keys: number[]} | null; lightingGroupsShut: string[];
+    autocorrectSearch: string; autocorrectSort: 'correction' | 'typos';
+    /** The entry open for editing, by its correction; `was` is the spelling it had before a respelling the core has yet to answer. */
+    autocorrectOpen: {correction: string; was?: string} | null;
+    /** The Add form as typed; `sent` once it is posted: the list it was posted against, and the correction it names. */
+    autocorrectAdd: {correction: string; typos: string; match: number; sent?: {identity: string; correction: string}};
+    /** The core's answer to the autocorrect edit being typed, for the form it is in ("add" or "entry"). */
+    autocorrectCheck: {form: string; requestId: number; pending: boolean; error: string; warnings: string[]} | null;
     macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
     /** The slot tile held for a keyboard swap (D-L81): its bank and the key its screen picks it by. */
     heldSlot: {bank: string; key: string} | null;

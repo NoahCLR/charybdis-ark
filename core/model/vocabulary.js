@@ -346,6 +346,9 @@ const THRESHOLDS = Object.freeze({tapHoldTerm: "tap / hold", longHoldTerm: "long
 /** @param {import("../../contracts/model.js").WordList<unknown>} list @param {unknown} key @returns {string} */
 const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key ?? ""));
 
+// Where an autocorrect typo matches a word.
+/** @type {import("../../contracts/model.js").WordList<number>} */
+const AUTOCORRECT_MATCHES = [[0, "Whole word"], [1, "Start of word"], [2, "End of word"], [3, "Anywhere in a word"]];
 // How a macro plays: whether it is uninterruptible, chosen or automatic.
 /** @type {import("../../contracts/model.js").WordList<"auto" | "on" | "off">} */
 const MACRO_PROTECTION = [["auto", "Automatic"], ["on", "On"], ["off", "Off"]];
@@ -365,6 +368,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     physicalHalves: [[0, "left"], [1, "right"], [0xff, "side not set"]],
     macroPlayback: {setup: "setup", blocked: "blocked", unavailable: "unavailable"},
     macroProtection: MACRO_PROTECTION,
+    // Where an autocorrect typo matches a word (firmware glossary "Where it
+    // matches"), by the number its row stores.
+    autocorrectMatches: AUTOCORRECT_MATCHES,
     // The setting macroProtection chooses (firmware glossary "Uninterruptible
     // playback"), as its field and Review name it, and Automatic as it says
     // whether it plays the macro uninterruptibly now ("Automatic · on").

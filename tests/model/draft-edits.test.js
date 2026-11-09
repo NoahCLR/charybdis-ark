@@ -12,8 +12,9 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 
 const ROOT = path.join(__dirname, "..", "..");
 // Posted beside the edits but never staged: a dropped profile opens an import
-// review, and a macro check is answered without touching the draft.
-const NOT_DRAFT_EDITS = ["reviewPortableProfile", "validateMacro"];
+// review, and a macro or autocorrect check is answered without touching the
+// draft.
+const NOT_DRAFT_EDITS = ["reviewPortableProfile", "validateMacro", "validateAutocorrect"];
 
 // The contract is declarations only, so its keys are read from the text: each
 // `name:` that opens a line of the EditPayloads interface.
@@ -47,7 +48,7 @@ test("the registry, the contract and the interface's builders name the same edit
 
 test("every registered edit names its editor, its words and, on the profile, its domain", () => {
     for (const [type, entry] of Object.entries(DRAFT_EDIT_TYPES)) {
-        assert.ok(["keymap", "settings", "macro", "customKey", "keyboardName", "slots", "profile"].includes(entry.editor), type);
+        assert.ok(["keymap", "settings", "macro", "autocorrect", "customKey", "keyboardName", "slots", "profile"].includes(entry.editor), type);
         assert.equal("domain" in entry, entry.editor === "profile", type);
         if (entry.editor === "profile") assert.ok(["placement", "pointing", "combos", "behaviours", "lighting"].includes(entry.domain), type);
         assert.ok(typeof entry.label === "function" || (typeof entry.label === "string" && entry.label), type);

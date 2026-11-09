@@ -543,6 +543,38 @@ test("accents land in every table, change where they stand, and Ark keeps the gr
     assert.throws(() => stage(draft, edits.addAccent({target: "layer", owner: "Layer 2", leds: [], colour})), /Pick LEDs/, "an accent lights some LEDs");
 });
 
+// ── autocorrect ─────────────────────────────────────────────────────────
+
+test("each autocorrect edit is posted as typed and staged as the keyboard stores it", () => {
+    const draft = session();
+    const list = () => decoded(draft).autocorrect.entries.map((entry) => [entry.correction, ...entry.typos.map((typo) => `${typo.typo}:${typo.match}`)]);
+    const of = (correction) => list().find(([name]) => name === correction);
+    const identity = () => draft.current.fingerprint;
+    const added = edits.addAutocorrectTypos(" then ", " Tehn  thne ", 0, identity());
+    assert.deepEqual(added, {type: "addAutocorrectTypos", correction: " then ", typos: [{typo: "Tehn", match: 0}, {typo: "thne", match: 0}], expectedFingerprint: identity()});
+    stage(draft, added);
+    assert.deepEqual(of("then"), ["then", "tehn:0", "thne:0"]);
+    assert.ok(reviewAreas(draft).includes("Autocorrect"));
+    stage(draft, edits.addAutocorrectTypos("then", "thn", 1, identity()));
+    assert.deepEqual(of("then"), ["then", "tehn:0", "thn:1", "thne:0"], "typed again, the correction gains the typo");
+    assert.deepEqual(edits.respellAutocorrectCorrection("then", "Then", "f"), {type: "updateAutocorrectCorrection", correction: "then", to: "Then", expectedFingerprint: "f"});
+    stage(draft, edits.respellAutocorrectCorrection("then", "Then", identity()));
+    assert.deepEqual(edits.changeAutocorrectTypo("thn", {match: 3}, "f"), {type: "updateAutocorrectTypo", typo: "thn", match: 3, expectedFingerprint: "f"});
+    assert.deepEqual(edits.changeAutocorrectTypo("thn", {to: "thnn"}, "f"), {type: "updateAutocorrectTypo", typo: "thn", to: "thnn", expectedFingerprint: "f"});
+    assert.deepEqual(edits.changeAutocorrectTypo("thn", {correction: "the"}, "f"), {type: "updateAutocorrectTypo", typo: "thn", correction: "the", expectedFingerprint: "f"});
+    stage(draft, edits.changeAutocorrectTypo("thn", {match: 3}, identity()));
+    stage(draft, edits.changeAutocorrectTypo("thn", {to: "thnn"}, identity()));
+    stage(draft, edits.changeAutocorrectTypo("thne", {correction: "the"}, identity()));
+    assert.deepEqual(of("Then"), ["Then", "tehn:0", "thnn:3"]);
+    assert.ok(of("the").includes("thne:0"), "the typo moved to the other correction");
+    stage(draft, edits.deleteAutocorrectTypo("thnn", identity()));
+    assert.deepEqual(of("Then"), ["Then", "tehn:0"]);
+    stage(draft, edits.deleteAutocorrectEntry("Then", identity()));
+    assert.equal(of("Then"), undefined);
+    assert.throws(() => stage(draft, edits.addAutocorrectTypos("ten", "teh", 0, identity())), /already corrects to/);
+    assert.deepEqual(edits.autocorrectValidationMessage(added, 7), {type: "validateAutocorrect", edit: added, requestId: 7});
+});
+
 // ── macros ──────────────────────────────────────────────────────────────
 
 test("a macro payload is posted as the text the keyboard stores", () => {

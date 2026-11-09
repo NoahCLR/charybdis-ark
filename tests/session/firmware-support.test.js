@@ -72,19 +72,19 @@ test("complete Apply adds a split build that saves and keeps its refusal stable"
 });
 
 test("independent editor gates keep partial-read, busy and per-view behavior", () => {
-    const views = {macroView: {}, settingsView: {}, customKeyView: {}};
+    const views = {macroView: {}, autocorrectView: {}, settingsView: {}, customKeyView: {}};
     const state = {capabilities: complete, committed: {state: "read"}, ...views};
-    const all = {busy: false, behaviors: true, pointing: true, combos: true, macros: true, settings: true, customKeys: true};
+    const all = {busy: false, behaviors: true, pointing: true, combos: true, macros: true, autocorrect: true, settings: true, customKeys: true};
     assert.deepEqual(support.editableDomains(state), all);
     assert.deepEqual(support.editableDomains({...state, busy: true}), {
-        busy: true, behaviors: false, pointing: false, combos: false, macros: false, settings: false, customKeys: false,
+        busy: true, behaviors: false, pointing: false, combos: false, macros: false, autocorrect: false, settings: false, customKeys: false,
     });
     assert.deepEqual(support.editableDomains({...state, committed: {state: "read", failures: [{domainId: 16, message: "bad"}]}}),
         {...all, behaviors: false, pointing: false});
     assert.deepEqual(support.editableDomains({...state, capabilities: {...complete, compiledLayerCount: 8}}),
-        {...all, macros: false, settings: false});
-    assert.deepEqual(support.editableDomains({...state, committed: null, macroView: null, settingsView: null}),
-        {...all, behaviors: false, pointing: false, combos: false, macros: false, settings: false});
+        {...all, macros: false, autocorrect: false, settings: false});
+    assert.deepEqual(support.editableDomains({...state, committed: null, macroView: null, autocorrectView: null, settingsView: null}),
+        {...all, behaviors: false, pointing: false, combos: false, macros: false, autocorrect: false, settings: false});
     for (const [domain, area] of [[DOMAINS.KEY_BEHAVIORS, "behaviors"], [DOMAINS.PD_MODES, "pointing"], [DOMAINS.COMBOS, "combos"]]) {
         assert.deepEqual(support.editableDomains({...state, capabilities: {...complete, supportedDomainMask: PROFILE_DOMAIN_MASK & ~domain}}),
             {...all, [area]: false});

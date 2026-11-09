@@ -101,6 +101,14 @@ export const STATE_FIELDS = {
     feedbackRow: kept("hold"),
     macroSlot: kept(null),
     macroSearch: kept(""),
+    // The Autocorrect screen: its search and order, the entry open for
+    // editing, the Add form as typed, and the core's answer to the edit
+    // being typed. The forms start again when the draft is replaced.
+    autocorrectSearch: kept(""),
+    autocorrectSort: kept("correction"),
+    autocorrectOpen: resets(null),
+    autocorrectAdd: resetsTo(/** @type {PanelState["autocorrectAdd"]} */ ({correction: "", typos: "", match: 0}), () => ({correction: "", typos: "", match: 0})),
+    autocorrectCheck: resets(null),
     heldSlot: resets(null),    // {bank, key}: the tile held for a keyboard swap, let go when the draft is replaced
     customKey: kept(null),
     customKeySearch: kept(""),

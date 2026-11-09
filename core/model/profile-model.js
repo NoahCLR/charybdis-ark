@@ -33,6 +33,7 @@ const {linkStarts, linkTargets, pointerCoveredLayers} = require("./pointing-link
 const {comboHeldShows, keycodeLayersOn} = require("./layer-effects");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
+const {autocorrectEditorView} = require("./autocorrect-editor");
 const {customKeyEditorView} = require("./custom-key-editor");
 const {runningComboRows} = require("../schema/combo-domain-v1");
 const {SETTING, SHORTCUT_KEY_LIMITS, alwaysOnLayers} = require("../schema/settings-domain-v1");
@@ -54,19 +55,21 @@ const CATALOG_SOURCE = "vendored QMK keycode catalog";
  * @property {ReturnType<typeof import("./device-profile-view.js").baseRgbForView>} baseEffect
  * @property {ReturnType<typeof settingsEditorView> | null} [settingsView]
  * @property {ReturnType<typeof macroEditorView> | null} [macroView]
+ * @property {ReturnType<typeof autocorrectEditorView> | null} [autocorrectView]
  * @property {ReturnType<typeof customKeyEditorView> | null} [customKeyView]
  * @property {ReturnType<typeof import("./keyboard-name.js").keyboardNameView>} [keyboardNameView]
  * @property {Partial<import("../../contracts/edits.js").BaseIdentity> | null} identity
- * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, settings: boolean, customKeys: boolean}} Editing
+ * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, autocorrect: boolean, settings: boolean, customKeys: boolean}} Editing
  * @typedef {{actionAbiDigest?: number, maxTapStepsPerBehavior?: number} | null | undefined} Capabilities
  * @typedef {import("../../contracts/panel.js").CatalogEntry} CatalogEntry
  */
 
-// The three editor views of a complete snapshot, built here only: the
+// The four editor views of a complete snapshot, built here only: the
 // service keeps them for the profile it read, and a draft builds its own.
 /** @param {import("./types.js").ProfileSnapshot} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
 function editorViews(snapshot, capabilities) {
     return {settingsView: settingsEditorView(snapshot), macroView: macroEditorView(snapshot, capabilities),
+        autocorrectView: autocorrectEditorView(snapshot, capabilities),
         customKeyView: customKeyEditorView(snapshot, capabilities)};
 }
 
@@ -247,6 +250,9 @@ function profileModel(content, capabilities, editing) {
         macroUnicode: content.macroView?.unicode || {mode: 0},
         macroProtectionChoices: content.macroView?.protectionChoices || [],
         macroEditing: {identity: content.macroView?.identity || "", writable: editing.macros},
+        autocorrect: content.autocorrectView ? {entries: content.autocorrectView.entries, usage: content.autocorrectView.usage, notices: content.autocorrectView.notices,
+            warningCount: content.autocorrectView.warningCount, layoutName: content.autocorrectView.layoutName} : null,
+        autocorrectEditing: {identity: content.autocorrectView?.identity || "", writable: editing.autocorrect},
         behaviorTimingDefaults: content.settingsView?.timing || {},
         configDefaults: content.settingsView?.sections || [],
         participation: content.domains.settings?.values && content.domains.settings.layers ? participation(content.domains.settings).view() : null,

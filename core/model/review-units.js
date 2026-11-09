@@ -4,7 +4,7 @@
 // The unit a review item names: the one thing the keyboard stores that the
 // item describes and a discard puts back (D-L29). A key on a layer, a layer's
 // name, a key's participation, a behaviour, a combo, the combo timing, a macro
-// with its name, a custom key's name and shortcut, the keyboard's name, one
+// with its name, an autocorrect entry, a custom key's name and shortcut, the keyboard's name, one
 // settings section, a pointing slot, one lighting record, a change no item
 // describes (`profile`), the layer order, or a slot bank's order (D-L81). The
 // panel gets a unit as a string (`ReviewChange.unit`); this is where that
@@ -20,6 +20,7 @@ const {actionByIdentity} = require("./slot-order");
  *   | {kind: "behavior", target: import("../schema/types.js").SemanticAction}
  *   | {kind: "combo" | "macro" | "customKey", index: number}
  *   | {kind: "pd", slot: number}
+ *   | {kind: "autocorrect", correction: string, respelled?: string}
  *   | {kind: "settings", section: string}
  *   | {kind: "rgb", record: "layer", layer: number}
  *   | {kind: "rgb", record: "pd", slot: number}
@@ -53,6 +54,11 @@ const UNIT = Object.freeze({
     comboTiming: "comboTiming",
     /** @param {number} index */
     macro: index => `macro:${index}`,
+    // An autocorrect entry by its correction as the keyboard spells it (or
+    // as the draft does, for one the keyboard lacks), and with it the
+    // draft's spelling when the entry was respelled.
+    /** @param {string} correction @param {string} [respelled] */
+    autocorrect: (correction, respelled) => `autocorrect:${JSON.stringify(respelled === undefined ? [correction] : [correction, respelled])}`,
     /** @param {number} index */
     customKey: index => `customKey:${index}`,
     keyboardName: "keyboardName",
@@ -83,6 +89,7 @@ function formatUnit(unit) {
         case "behavior": return UNIT.behavior(unit.target);
         case "combo": case "macro": case "customKey": return UNIT[unit.kind](unit.index);
         case "pd": return UNIT.pd(unit.slot);
+        case "autocorrect": return UNIT.autocorrect(unit.correction, unit.respelled);
         case "settings": return UNIT.settings(unit.section);
         case "rgb": return unit.record === "layer" ? UNIT.rgbLayer(unit.layer) : unit.record === "pd" ? UNIT.rgbPd(unit.slot) : UNIT.rgb(unit.record);
         default: return UNIT[unit.kind];
@@ -107,6 +114,13 @@ function read(text) {
     if ((kind === "combo" || kind === "macro" || kind === "customKey") && numbers.length === 1 && whole) return {kind, index: first};
     if (kind === "pd" && numbers.length === 1 && whole) return {kind, slot: first};
     if (kind === "settings" && rest) return {kind, section: rest};
+    if (kind === "autocorrect") {
+        try {
+            const names = JSON.parse(rest);
+            if (!Array.isArray(names) || names.length < 1 || names.length > 2 || names.some(name => typeof name !== "string")) return null;
+            return names.length === 1 ? {kind, correction: names[0]} : {kind, correction: names[0], respelled: names[1]};
+        } catch {return null;}
+    }
     if (kind === "behavior") {
         try {
             const target = JSON.parse(rest);

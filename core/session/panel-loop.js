@@ -76,6 +76,9 @@ const {watchLive} = require("./live-watch");
 const {readFlashFigures} = require("./flash-pauses");
 const {demoControl, demoExport, demoUnsaved, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
+const {newWarnings} = require("../model/autocorrect-editor");
+const {applyDraftEdit} = require("../model/draft-editor");
+const {draftEditEntry} = require("../model/draft-edits");
 const {FILE_MAX_BYTES} = require("../model/portable-profile");
 const {failureSentence, sayable} = require("../model/vocabulary");
 
@@ -224,6 +227,15 @@ function overlayOf(value, base) {
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 
+// What an autocorrect edit would newly warn about, its refusal thrown: the
+// edit is made of the draft as it stands and the result thrown away, so the
+// check and the edit cannot disagree.
+/** @param {import("../model/types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {import("../model/types.js").ProfileDestination} [capabilities] */
+function autocorrectEditStatus(snapshot, edit, capabilities) {
+    if (draftEditEntry(edit?.type)?.editor !== "autocorrect") throw Object.assign(new Error("Unsupported draft edit."), {code: "PROFILE_DRAFT_CONFLICT"});
+    return newWarnings(snapshot, applyDraftEdit(snapshot, edit, {capabilities}));
+}
+
 // Edit/control paths publish, including the ones that decline or fail:
 // the webview waits on that reply — a combo builder closes when its edit is
 // accepted and stays open when it is refused — and a refusal reaches the panel
@@ -244,6 +256,20 @@ async function handleMessage(session, message, shell) {
             reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "MACRO_EDIT_CONFLICT"};
         }
         // Local inspection neither stages an edit nor emits a toast or HID.
+        await shell.post(reply);
+        return;
+    }
+    if (message && panelControl(message.type)?.action === "validateAutocorrect") {
+        const inspection = /** @type {Extract<Message, {type: "validateAutocorrect"}>} */ (message);
+        /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectValidation"}>} */
+        const reply = {type: "autocorrectValidation", requestId: inspection.requestId, draftId: message.draftId, draftRevision: message.draftRevision, validation: {error: "", code: "", warnings: []}};
+        try {
+            const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before editing the autocorrect list.");
+            reply.validation.warnings = autocorrectEditStatus(draft.current, inspection.edit, draft.capabilities);
+        } catch (error) {
+            reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "AUTOCORRECT_EDIT_REFUSED", warnings: []};
+        }
+        // As a macro's inspection: nothing staged, no toast, no HID.
         await shell.post(reply);
         return;
     }

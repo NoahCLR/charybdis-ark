@@ -76,6 +76,10 @@ export interface PdConfig {
     directionOutput?: number;
     scroll?: Record<string, number>;
 }
+/** Where a typo matches a word, as the keyboard stores it: 0 the whole word, 1 its start, 2 its end, 3 anywhere in it. */
+export type AutocorrectMatch = 0 | 1 | 2 | 3;
+/** A typo as an edit names it; `match` left out is the whole word. */
+export interface AutocorrectTypoEdit {typo: string; match?: AutocorrectMatch}
 export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar | boolean}
 
 export interface EditPayloads {
@@ -107,6 +111,17 @@ export interface EditPayloads {
         | {protection: 'auto' | 'on' | 'off'; payload?: string; name?: string}
     );
     validateMacro: {keycode: string; payload: string; requestId: number};
+    /** Typos for a correction: the entry is made when the list has none of that exact spelling, otherwise they are added to it. */
+    addAutocorrectTypos: {correction: string; typos: AutocorrectTypoEdit[]; expectedFingerprint?: string};
+    /** A correction respelled where it stands; respelled to one the list already has, its typos join that one. */
+    updateAutocorrectCorrection: {correction: string; to: string; expectedFingerprint?: string};
+    /** One typo respelled (`to`), matched elsewhere (`match`), or moved to another correction, made when the list has none of that spelling. */
+    updateAutocorrectTypo: {typo: string; to?: string; match?: AutocorrectMatch; correction?: string; expectedFingerprint?: string};
+    /** A typo removed; a correction's last typo takes its entry with it. */
+    deleteAutocorrectTypo: {typo: string; expectedFingerprint?: string};
+    deleteAutocorrectEntry: {correction: string; expectedFingerprint?: string};
+    /** An autocorrect edit checked against the draft without staging it: answered with what it would be refused for, or would newly warn about. */
+    validateAutocorrect: {edit: AutocorrectEdit; requestId: number};
     updateCustomKey: {keycode: string; name: string; expectedFingerprint?: string};
     /**
      * A custom key's shortcut (firmware D-F26): a HID report modifier mask, up to six keys held together in the order they are pressed
@@ -132,8 +147,11 @@ export interface EditPayloads {
 
 export type EditOf<K extends keyof EditPayloads> = {type: K} & EditPayloads[K];
 export type PanelEdit = {[K in keyof EditPayloads]: EditOf<K>}[keyof EditPayloads];
-/** Every posted edit the draft stages: an import opens a review and a macro check is answered, neither an edit. core/model/draft-edits.js registers each one. */
-export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateMacro'>;
+/** Every posted edit the draft stages: an import opens a review and a macro or autocorrect check is answered, none of them an edit. core/model/draft-edits.js registers each one. */
+export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateMacro' | 'validateAutocorrect'>;
+/** The edits the Autocorrect screen makes to the list. */
+export type AutocorrectEditType = 'addAutocorrectTypos' | 'updateAutocorrectCorrection' | 'updateAutocorrectTypo' | 'deleteAutocorrectTypo' | 'deleteAutocorrectEntry';
+export type AutocorrectEdit = Extract<PanelEdit, {type: AutocorrectEditType}>;
 
 /** A dense decoded slot has values even for inactive fields. */
 export interface PointingSlot extends PdConfig {

@@ -450,6 +450,31 @@ test("the published binding is what edits, macro checks, imports and Apply answe
     }
 });
 
+test("an autocorrect edit is checked against the draft without staging it: its refusal in words, or what it would newly warn about", async () => {
+    const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});
+    loop.serviceChanged(); shell.posted.length = 0;
+    const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
+    const ask = (edit, extra = {}) => loop.handleMessage({type: "validateAutocorrect", edit, requestId: 41, draftId: draft.id, draftRevision: revision, ...extra});
+    await ask({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}]});
+    assert.deepEqual(last(shell), {type: "autocorrectValidation", requestId: 41, draftId: draft.id, draftRevision: revision, validation: {error: "", code: "", warnings: []}});
+    await ask({type: "addAutocorrectTypos", correction: "no", typos: [{typo: "on", match: 2}]});
+    assert.equal(last(shell).validation.error, "");
+    assert.match(last(shell).validation.warnings[0], /shorter than four letters/);
+    await ask({type: "addAutocorrectTypos", correction: "ten", typos: [{typo: "teh"}]});
+    assert.deepEqual(last(shell).validation, {error: "“teh” already corrects to “the”.", code: "AUTOCORRECT_EDIT_REFUSED", warnings: []});
+    await ask({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
+    assert.ok(last(shell).validation.error, "only an autocorrect edit is checked here");
+    for (const stale of [{draftId: "old"}, {draftRevision: revision - 1}]) {
+        await ask({type: "deleteAutocorrectTypo", typo: "teh"}, stale);
+        assert.ok(last(shell).validation.error);
+    }
+    assert.deepEqual(draft.document, before);
+    assert.equal(draft.revision, revision);
+    assert.equal(draft.dirty, false);
+    assert.deepEqual(shell.errors, []);
+    assert.deepEqual(service.calls, []);
+});
+
 test("a reconnect refuses keeping an already-open import or layer review", async () => {
     for (const type of ["restorePortableProfile", "savePortableLayers"]) {
         const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});

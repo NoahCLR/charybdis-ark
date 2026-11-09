@@ -67,7 +67,8 @@ const read = (value, path) => path.reduce((current, part) => current[part], valu
 function set(value, path, next) { read(value, path.slice(0, -1))[path.at(-1)] = next; }
 function candidates(value) {
     if (typeof value === "boolean") return [!value];
-    if (typeof value === "string") return [value ? "" : "Review coverage", "Review coverage"];
+    // The last is a word an autocorrect typo may be: folded letters alone.
+    if (typeof value === "string") return [value ? "" : "Review coverage", "Review coverage", "reviewcoverage"];
     if (value === null) return [75];
     return [...new Set([value + 1, value - 1, value ^ 1, 0, 1, 2, 3, 4, 5, 6, 100, 200, 400])].filter(next => next !== value);
 }

@@ -13,6 +13,7 @@ const {settingsEditorView, fieldMask} = require("./settings-editor");
 const {singleComboRemovalIndex} = require("./profile-review");
 const {settingsShortcutRefusal} = require("./shortcut-layers");
 const {UNIT, parseUnit} = require("./review-units");
+const {restoreEntry} = require("./autocorrect-list");
 
 /** @template T @param {T} value @returns {T} */
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -66,6 +67,9 @@ function revertUnits(before, after, units, capabilities) {
                 macros.mine[unit.index] = macros.theirs[unit.index];
                 const settings = domain("settings");
                 settings.mine.macroNames[unit.index] = settings.theirs.macroNames[unit.index];
+            } else if (unit.kind === "autocorrect") {
+                const list = domain("autocorrect");
+                restoreEntry(list.mine, list.theirs, unit.correction, unit.respelled);
             } else if (unit.kind === "customKey") {
                 const settings = domain("settings");
                 settings.mine.customKeyNames[unit.index] = settings.theirs.customKeyNames[unit.index];

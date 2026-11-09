@@ -115,6 +115,8 @@ export interface Vocabulary {
     physicalHalves: WordList<number>;
     macroPlayback?: Readonly<Record<string, string>>;
     macroProtection: WordList<'auto' | 'on' | 'off'>;
+    /** Where an autocorrect typo matches a word, by the number its row stores. */
+    autocorrectMatches: WordList<number>;
     /** The setting macroProtection chooses, by its name, and Automatic as it says whether it plays uninterruptibly now ("Automatic · on"). */
     macroUninterruptible: Readonly<{label: string; automatic: Readonly<{on: string; off: string}>}>;
     macroSteps: WordList<MacroStepKind>;
@@ -285,6 +287,8 @@ export type ReviewPlace = FindingPlace
     | {kind: 'slots'; bank: 'pdModes'; slots: number[]}
     /** `keycode`: the key's name, as the Custom keys screen picks it. */
     | {kind: 'customKey'; index: number; keycode: string}
+    /** An autocorrect entry, by its correction as the draft spells it (the keyboard's, for one the draft removed). */
+    | {kind: 'autocorrect'; correction: string}
     | {kind: 'lighting'; stage?: string | null; layer?: number; slot?: number};
 export interface ReviewChange {
     area: string;

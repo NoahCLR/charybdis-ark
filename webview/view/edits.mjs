@@ -231,6 +231,29 @@ export const deleteAccent = (target, index) => ({type: "deleteRgbLedGroup", targ
 export const macroMessage = (keycode, payload, identity, fields) => ({type: "updateMacro", keycode, payload, ...(fields ? {name: fields.name, protection: fields.protection} : {}), expectedFingerprint: identity});
 /** @param {string} keycode @param {string} payload @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateMacro'>} */
 export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateMacro", keycode, payload, requestId});
+// The autocorrect list (firmware D-F68). Core trims and folds what is typed
+// and refuses what the list cannot hold, in words.
+// Typos for a correction: a new entry, or more for one the list has. `typos`
+// is what was typed, one or more separated by spaces, each matching where
+// `match` says.
+/** @param {string} correction @param {string} typos @param {number} match @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'addAutocorrectTypos'>} */
+export const addAutocorrectTypos = (correction, typos, match, identity) => ({type: "addAutocorrectTypos", correction,
+    typos: String(typos ?? "").split(/\s+/).filter(Boolean).map((typo) => ({typo, match: /** @type {import("../../contracts/edits.js").AutocorrectMatch} */ (match)})), expectedFingerprint: identity});
+/** @param {string} correction @param {string} to @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectCorrection'>} */
+export const respellAutocorrectCorrection = (correction, to, identity) => ({type: "updateAutocorrectCorrection", correction, to, expectedFingerprint: identity});
+// One typo changed: its spelling (`to`), where it matches (`match`) or the
+// correction it belongs to (`correction`), whichever the change names.
+/** @param {string} typo @param {{to?: string, match?: number, correction?: string}} change @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateAutocorrectTypo'>} */
+export const changeAutocorrectTypo = (typo, change, identity) => ({type: "updateAutocorrectTypo", typo,
+    ...(change.to === undefined ? {} : {to: change.to}), ...(change.match === undefined ? {} : {match: /** @type {import("../../contracts/edits.js").AutocorrectMatch} */ (change.match)}),
+    ...(change.correction === undefined ? {} : {correction: change.correction}), expectedFingerprint: identity});
+/** @param {string} typo @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectTypo'>} */
+export const deleteAutocorrectTypo = (typo, identity) => ({type: "deleteAutocorrectTypo", typo, expectedFingerprint: identity});
+/** @param {string} correction @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectEntry'>} */
+export const deleteAutocorrectEntry = (correction, identity) => ({type: "deleteAutocorrectEntry", correction, expectedFingerprint: identity});
+// An autocorrect edit to be checked without staging it.
+/** @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateAutocorrect'>} */
+export const autocorrectValidationMessage = (edit, requestId) => ({type: "validateAutocorrect", edit, requestId});
 // A macro's name; its steps stay as they are.
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {name: string}} */
 export const macroNameMessage = (keycode, name, identity) => ({type: "updateMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});

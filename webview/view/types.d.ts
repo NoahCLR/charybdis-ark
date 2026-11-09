@@ -43,6 +43,8 @@ export interface DraftMarks {
     behaviours: Set<string>;
     combos: Set<number>;
     macros: Set<string>;
+    /** The autocorrect entries changed, by correction. */
+    autocorrect: Set<string>;
     customKeys: Set<string>;
     pointing: Set<number>;
     lighting: Set<string>;

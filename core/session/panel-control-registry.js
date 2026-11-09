@@ -57,6 +57,7 @@ const CONTROLS = Object.freeze({
     useRecovery: Object.freeze({route: "shell", action: "useRecovery", binding: "none", demo: "refuse", phase: "shell", identity: false}),
     deleteRecovery: Object.freeze({route: "shell", action: "deleteRecovery", binding: "none", demo: "allow", phase: "shell", identity: false}),
     validateMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
+    validateAutocorrect: Object.freeze({route: "inspect", action: "validateAutocorrect", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
     // The Keyboard screen's Diagnostics opened: each half's flash pauses, a
     // background read (flash-pauses.js) skipped while anything runs.
     readFlashPauses: Object.freeze({route: "diagnose", action: "readFlashPauses", binding: "none", demo: "ignore", phase: "diagnose", identity: false}),

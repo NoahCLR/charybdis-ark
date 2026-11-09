@@ -20,7 +20,7 @@ test("every unit the review names reads back as itself, and Discard takes it", (
         kinds.add(read.kind === "rgb" ? `rgb:${read.record}` : read.kind);
         assert.doesNotThrow(() => revertUnits(base, current, new Set([unit]), capabilities), unit);
     }
-    assert.deepEqual([...kinds].sort(), ["behavior", "combo", "comboTiming", "customKey", "keyboardName", "layerName", "layout", "macro", "pd", "placement",
+    assert.deepEqual([...kinds].sort(), ["autocorrect", "behavior", "combo", "comboTiming", "customKey", "keyboardName", "layerName", "layout", "macro", "pd", "placement",
         "rgb:automouse", "rgb:combo", "rgb:groups", "rgb:key", "rgb:layer", "rgb:pd", "rgb:stages", "settings"], "the draft edits every area");
     assert.deepEqual(parseUnit(layerOrderReview(current, SWAP).unit), {kind: "layerOrder"});
     for (const bank of /** @type {const} */ (["macros", "customKeys", "pdModes"])) {
@@ -38,6 +38,8 @@ test("each builder writes a unit that reads back as what it names", () => {
         [UNIT.combo(7), {kind: "combo", index: 7}],
         [UNIT.comboTiming, {kind: "comboTiming"}],
         [UNIT.macro(2), {kind: "macro", index: 2}],
+        [UNIT.autocorrect("a lot"), {kind: "autocorrect", correction: "a lot"}],
+        [UNIT.autocorrect("the", "The: one"), {kind: "autocorrect", correction: "the", respelled: "The: one"}],
         [UNIT.customKey(9), {kind: "customKey", index: 9}],
         [UNIT.keyboardName, {kind: "keyboardName"}],
         [UNIT.settings("host"), {kind: "settings", section: "host"}],
@@ -57,13 +59,13 @@ test("each builder writes a unit that reads back as what it names", () => {
     }
     // The strings the panel already reads keep their bytes.
     assert.deepEqual(units.map(([unit]) => unit), ["layout:2:5", "placement:2:5", "layerName:3", 'behavior:{"kind":1,"flags":0,"operand":41}', "combo:7", "comboTiming",
-        "macro:2", "customKey:9", "keyboardName", "settings:host", "settings:otherKeyOptions", "pd:4", "rgb:groups", "rgb:layer:2", "rgb:pd:1", "profile", "layerOrder",
+        "macro:2", 'autocorrect:["a lot"]', 'autocorrect:["the","The: one"]', "customKey:9", "keyboardName", "settings:host", "settings:otherKeyOptions", "pd:4", "rgb:groups", "rgb:layer:2", "rgb:pd:1", "profile", "layerOrder",
         "macroOrder", "customKeyOrder", "pdOrder"]);
 });
 
 test("a string review never writes is no unit", () => {
     for (const text of ["mystery:1", "mystery", "layout:1", "layout:01:2", "layout:1:2:3", "layout:a:2", "combo:-1", "settings:", "rgb:layer", "rgb:layers",
-        "rgb:groups:1", "behavior:{", "behavior:[1]", 'behavior:{ "kind":1}', "layerOrder:1", ""]) {
+        "rgb:groups:1", "autocorrect:{}", "autocorrect:[]", "autocorrect:[1]", 'autocorrect:["a","b","c"]', 'autocorrect:[ "a"]', "behavior:{", "behavior:[1]", 'behavior:{ "kind":1}', "layerOrder:1", ""]) {
         assert.equal(parseUnit(text), null, text);
     }
 });

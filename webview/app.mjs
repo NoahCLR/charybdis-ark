@@ -34,6 +34,7 @@ import {screenBehaviours, screenCombos, screenHost, screenPointer} from "./ui/se
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
 import {receiveMacroValidation} from "./ui/macros/validation.mjs";
+import {receiveAutocorrectValidation, screenAutocorrect} from "./ui/autocorrect.mjs";
 import {reconcileRecording} from "./ui/macros/recorder.mjs";
 import {macroClipboardShortcut, macroHistoryShortcut} from './ui/macros/history.mjs';
 import {macroStepShortcut} from "./ui/macros/steps.mjs";
@@ -50,7 +51,7 @@ const root = /** @type {HTMLElement} */ (document.getElementById("root"));
 let renderedScreen = null;
 
 const SCREEN_RENDERERS = {
-    screenKeys, screenLighting, screenMacros, screenCustomKeys, screenPointing,
+    screenKeys, screenLighting, screenMacros, screenAutocorrect, screenCustomKeys, screenPointing,
     screenBehaviours, screenCombos, screenPointer, screenHost, screenProfile, screenDevice,
 };
 
@@ -190,7 +191,7 @@ function refreshCommitBar() {
     announce(announcements(getModel(), state));
 }
 
-const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation});
+const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation});
 // Replies from the core cross the message boundary as copies, in the shapes
 // contracts/ declares. Device values have already passed core's validators.
 addEventListener("message", (event) => receivePanelMessage(/** @type {import("../contracts/messages.js").PanelResponse} */ (event.data)));

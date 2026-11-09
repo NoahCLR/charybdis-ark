@@ -136,7 +136,7 @@ function emptyModel(shell) {
 // review and leaving with edits not exported can be looked at.
 /**
  * @param {import("../core/session/types.js").PanelShell} shell
- * @param {Exclude<import("../contracts/edits.js").PanelEdit, {type: "reviewPortableProfile" | "validateMacro"}>[]} [edits]
+ * @param {Exclude<import("../contracts/edits.js").PanelEdit, {type: "reviewPortableProfile" | "validateMacro" | "validateAutocorrect"}>[]} [edits]
  */
 function demoModel(shell, edits = []) {
     const {openDemo, panelState} = require("../core/session/demo-session");

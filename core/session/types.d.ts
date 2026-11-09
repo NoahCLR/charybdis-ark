@@ -54,6 +54,7 @@ export interface DeviceModelInput {
     baseRgb?: BaseRgbRead | null;
     settingsView?: null | ReturnType<typeof import('../model/settings-editor.js').settingsEditorView>;
     macroView?: null | ReturnType<typeof import('../model/macro-editor.js').macroEditorView>;
+    autocorrectView?: null | ReturnType<typeof import('../model/autocorrect-editor.js').autocorrectEditorView>;
     customKeyView?: null | ReturnType<typeof import('../model/custom-key-editor.js').customKeyEditorView>;
     device?: import('../transport/types.js').DeviceDescriptor;
     /** The keyboard's name as the connected keyboard stores it, '' for its built-in name; undefined until its profile is read. */

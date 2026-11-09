@@ -106,6 +106,7 @@ function categoryOf(item, names, stages, sections) {
         case "behaviour": return ["Keys", "Behaviours", 30];
         case "combo": return ["Keys", "Combos", 40];
         case "macro": return ["Macros", "Macros", 0];
+        case "autocorrect": return ["Autocorrect", "Autocorrect", 0];
         case "customKey": return ["Keys", "Custom keys", 35];
         case "pointing": return ["Pointing modes", "Pointing modes", 0];
         case "slots": return place.bank === "macros" ? ["Macros", "Macro order", 1] : place.bank === "customKeys" ? ["Keys", "Custom key order", 36] : ["Pointing modes", "Pointing mode order", 1];
@@ -176,6 +177,7 @@ export function placeState(place, layers = []) {
         // asked for by id and the tab picks it where it finds it.
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};
         case "macro": return {screen: "macros", macroSlot: place.keycode};
+        case "autocorrect": return {screen: "autocorrect", autocorrectOpen: {correction: place.correction}, autocorrectSearch: "", reveal: "[data-ac-open]"};
         case "customKey": return {screen: "customKeys", customKey: place.keycode};
         case "pointing": return {screen: "pointing", pointingSlot: place.slot, pdKind: null, pdTaps: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
@@ -226,7 +228,7 @@ export function draftMarks(changes = []) {
 /** @param {readonly import("../../contracts/model.js").ReviewChange[]} changes @returns {import("./types.js").DraftMarks} */
 function computeMarks(changes) {
     /** @type {import("./types.js").DraftMarks} */
-    const marks = {keys: new Map(), layers: new Set(), behaviours: new Set(), combos: new Set(), macros: new Set(), customKeys: new Set(),
+    const marks = {keys: new Map(), layers: new Set(), behaviours: new Set(), combos: new Set(), macros: new Set(), autocorrect: new Set(), customKeys: new Set(),
         pointing: new Set(), lighting: new Set(), lightingLayers: new Set(), lightingSlots: new Set(), settings: new Set(), layerNames: false};
     for (const change of changes) {
         const {place} = change;
@@ -238,6 +240,7 @@ function computeMarks(changes) {
         } else if (place.kind === "behaviour") marks.behaviours.add(place.keycode);
         else if (place.kind === "combo") marks.combos.add(place.index);
         else if (place.kind === "macro") marks.macros.add(place.keycode);
+        else if (place.kind === "autocorrect") marks.autocorrect.add(place.correction);
         else if (place.kind === "customKey") marks.customKeys.add(place.keycode);
         else if (place.kind === "pointing") marks.pointing.add(place.slot);
         else if (place.kind === "lighting") {

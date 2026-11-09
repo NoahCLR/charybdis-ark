@@ -2292,3 +2292,34 @@ details > summary { list-style: none; }
 .flash-pauses-section > .note { margin-bottom: var(--sp-2); }
 .flash-pauses { table-layout: fixed; }
 .flash-pauses th:first-child { width: 40%; }
+
+/* Autocorrect: one column, the Add form over the list. An entry is a row,
+   its correction then its typos as chips; the open one is edited in place. */
+.pad.autocorrect { max-width: 980px; }
+.ac-add-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto auto; gap: var(--sp-3); align-items: end; }
+.ac-list .card-h .search { width: 180px; min-width: 0; }
+.ac-rows { display: grid; gap: var(--sp-0); }
+.ac-row { display: grid; grid-template-columns: minmax(120px, 220px) auto minmax(0, 1fr); gap: var(--sp-3); align-items: center; width: 100%; text-align: left;
+  padding: var(--sp-2) var(--sp-3); border: 1px solid transparent; border-radius: var(--r-control); background: none; color: var(--text); font: inherit; cursor: pointer; }
+.ac-row:hover { background: var(--surface-2); }
+.ac-row.warn .ac-correction, .ac-chip.warn { color: var(--warning); }
+.ac-chip.warn { border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); }
+.ac-chip.found, .ac-typo.found .input.mono { border-color: var(--line-3); background: var(--surface-3); color: var(--text); }
+.ac-correction { font-weight: var(--fw-strong); overflow-wrap: anywhere; }
+.ac-arrow { color: var(--text-3); }
+.ac-typos { display: flex; flex-wrap: wrap; gap: var(--sp-1); min-width: 0; }
+.ac-where { color: var(--text-3); font-size: var(--fs-xs); }
+.ac-row.open { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); cursor: default; border-color: var(--line-2); background: var(--surface-2); padding: var(--sp-3); }
+.ac-open-h { display: flex; align-items: end; gap: var(--sp-3); }
+.ac-open-h > .field { flex: 1 1 auto; max-width: 320px; }
+.ac-open-h > .right { margin-left: auto; display: flex; gap: var(--sp-2); }
+.ac-typo-rows { display: grid; gap: var(--sp-2); }
+.ac-typo { display: grid; grid-template-columns: minmax(0, 170px) auto minmax(0, 150px) auto; gap: var(--sp-2); align-items: center; }
+.ac-typo > .note { grid-column: 1 / -1; }
+.ac-warning { color: var(--warning); }
+.ac-notice { color: var(--warning); }
+@media (max-width: 760px) {
+  .ac-add-row, .ac-typo { grid-template-columns: minmax(0, 1fr); }
+  .ac-row { grid-template-columns: minmax(0, 1fr); }
+  .ac-arrow { display: none; }
+}

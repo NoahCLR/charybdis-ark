@@ -81,7 +81,7 @@ test("an editor read and a restore attach the same device facts and rebuild the 
     const {editorViews} = require("../../core/model/profile-model");
     const f = fixture(), {service} = await connectedService(t, {keyboard: f.keyboard});
     const facts = ({limits, options, hostOs}) => ({limits, options, hostOs});
-    const views = () => {const {settingsView, macroView, customKeyView} = service.snapshot(); return {settingsView, macroView, customKeyView};};
+    const views = () => {const {settingsView, macroView, autocorrectView, customKeyView} = service.snapshot(); return {settingsView, macroView, autocorrectView, customKeyView};};
     // Snapshots carry JSON copies.
     const built = snapshot => JSON.parse(JSON.stringify(editorViews(snapshot, service.capabilities)));
     await service.readKeyboardProfile();
@@ -489,7 +489,7 @@ test("standalone export reads the current keyboard without replacing its editor 
         const exported = await service.readPortableProfile();
         assert.notEqual(exported.fingerprint, editor.fingerprint);
         assert.equal(service.portable, editor);
-        for (const field of ["layout", "committed", "combos", "baseRgb", "macroView", "customKeyView", "settingsView"]) {
+        for (const field of ["layout", "committed", "combos", "baseRgb", "macroView", "autocorrectView", "customKeyView", "settingsView"]) {
             assert.deepEqual(service.snapshot()[field], state[field], `${field} is still the editor read`);
         }
     } finally {await service.close();}
