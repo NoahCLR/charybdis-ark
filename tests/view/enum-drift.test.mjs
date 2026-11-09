@@ -91,6 +91,12 @@ test("the webview refuses a profile file over core's limit in core's words", () 
     assert.deepEqual([PROFILE_FILE_MAX_BYTES, PROFILE_FILE_TOO_LARGE], [FILE_MAX_BYTES, FILE_TOO_LARGE]);
 });
 
+test("the webview refuses an autocorrect list file over core's limit in core's words, and names core's formats", async () => {
+    const {LIST_FILE_FORMATS, LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE} = await import("../../webview/view/autocorrect.mjs");
+    const {AUTOCORRECT_FILE_FORMATS, IMPORT_MAX_BYTES, IMPORT_TOO_LARGE} = require("../../core/model/autocorrect-import");
+    assert.deepEqual([[...LIST_FILE_FORMATS], LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE], [[...AUTOCORRECT_FILE_FORMATS], IMPORT_MAX_BYTES, IMPORT_TOO_LARGE]);
+});
+
 test("the webview's whole-word match is the number the autocorrect list stores", async () => {
     const {WHOLE_WORD} = await import("../../webview/view/autocorrect.mjs");
     assert.equal(WHOLE_WORD, require("../../core/schema/autocorrect-domain-v1").AUTOCORRECT_MATCH.WHOLE_WORD);

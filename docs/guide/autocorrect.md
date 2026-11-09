@@ -75,6 +75,72 @@ A field is kept when you leave it or press Enter; Escape puts it back.
 **Search** finds entries by correction or by typo, and opens the entry a typo
 was found in. **A to Z** and **Most typos** set the order.
 
+## The starter list
+
+**Add the starter list…** offers about 200 common English words with the
+ways they are usually mistyped, some 400 typos, each matching the whole word.
+An empty list offers it too. It is written for Ark, and no typo in it is an
+English word.
+
+It is added like a file: Ark first shows what it would do, as below.
+
+## Importing a list
+
+**Import…** opens a list from a file, or drop the file anywhere on the
+screen. Ark reads three formats, by the file's extension:
+
+- **`.txt`**, QMK's autocorrect dictionary: a line a typo, `typo ->
+  correction`. A colon before the typo matches the start of a word, after it
+  the end, both the whole word, and neither anywhere in a word: `:teh: -> the`,
+  `tihng -> thing`. Lines that start with `#` and blank lines are skipped.
+- **`.csv`**, a spreadsheet: columns `typos`, `correction` and, if you like,
+  `match`. The typos cell can hold several typos with spaces between them.
+  `match` is `whole word`, `start`, `end` or `anywhere`, and an empty one is
+  the whole word. A header row that names the columns lets them be in any
+  order. Files as Excel, Numbers and Google Sheets save them all work: commas
+  or semicolons, quoted cells, with or without a header.
+- **`.json`**, Ark's own format, as **Export** writes it.
+
+In every format, lines and rows with the same correction, spelled exactly
+alike, become one entry.
+
+Before anything changes, Ark shows what the file would do, for each choice:
+
+- the new corrections it makes, and their typos;
+- the typos it adds to corrections you already have;
+- the typos already in your list, which are skipped;
+- the lines it refuses, each with its line or row number and the reason: the
+  same checks as when you [add an entry](#adding-an-entry). A typo your list
+  already sends to another correction is refused and named;
+- how many typos don't fit, when the file holds more than the keyboard does.
+
+Then choose **Add to my list**, which keeps your entries, or **Replace my
+list**, which removes them first; or **Cancel**. Either is one step of the
+draft, so Undo takes all of it back.
+
+## Exporting your list
+
+**Export as** saves the list as it is on screen, to your downloads:
+
+- **Text**: QMK's form, a line a typo.
+- **CSV**: a header row `correction,typos,match`, then a row for each
+  correction and match, with that correction's typos in one cell. It opens in
+  a spreadsheet one word a row.
+- **JSON**: Ark's format, version 1:
+
+  ```json
+  {
+    "version": 1,
+    "entries": [
+      {"correction": "because", "typos": [{"typo": "becuase", "match": "whole word"}]}
+    ]
+  }
+  ```
+
+  A file in another version is refused rather than guessed at.
+
+A list exported in any format imports as the same list.
+
 ## Warnings
 
 A warning marks an entry or a typo that will misbehave. It never stops you

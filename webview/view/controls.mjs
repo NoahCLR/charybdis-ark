@@ -28,6 +28,18 @@ export const layersFollow = (keysFollow, names) => ({type: 'editPortableLayer', 
 /** @param {number} id @param {LayerMove} change @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const moveLayer = (id, change, names) => ({type: 'editPortableLayer', id, ...change, names});
 
+// An autocorrect list file (D-L85): a dropped file, the file the shell's
+// chooser picks, or the starter list, read and judged against the draft; and
+// the draft's list saved in one of the three formats.
+/** @param {string} text @param {string} name @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const previewAutocorrectFile = (text, name, requestId) => ({type: 'previewAutocorrectImport', text, name, requestId});
+/** @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const previewAutocorrectStarter = (requestId) => ({type: 'previewAutocorrectImport', starter: true, requestId});
+/** @param {number} requestId @returns {import("../../contracts/messages.js").ControlsOn<'inspect'>} */
+export const chooseAutocorrectFile = (requestId) => ({type: 'chooseAutocorrectFile', requestId});
+/** @param {import("../../contracts/messages.js").AutocorrectFileFormat} format @returns {import("../../contracts/messages.js").PortableControl} */
+export const exportAutocorrect = (format) => ({type: 'exportAutocorrect', format});
+
 // Live preview + save (firmware D-F32): the keyboard's Save and Revert, the
 // answer to a live edit's trap check, and how edits reach the keyboard.
 /** @param {boolean} [confirmChecks] @returns {import("../../contracts/messages.js").DraftControl} */

@@ -347,6 +347,8 @@ export interface ExpectedReconnect {deviceId: string; serialNumber: string; name
 export interface ControlShell extends PanelShell {
     progress?: <T>(title: string, work: () => Promise<T>) => Promise<T>;
     saveRecovery?: ShellSaveRecovery;
+    /** Saves an exported file where the shell keeps them (a download on the web page); resolves to where, in words. */
+    saveExport?(file: import('../../contracts/messages.js').ExportedProfile): Promise<string | undefined>;
 }
 export interface LoopShell extends ControlShell {
     post(message: import('../../contracts/messages.js').PanelResponse): unknown;

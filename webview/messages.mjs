@@ -11,9 +11,10 @@ import {sameEditorContent} from "./view/render-content.mjs";
 
 /**
  * @param {{root: HTMLElement, refreshCommitBar: () => void, render: (options: {keepScreen: boolean}) => void, receiveMacroValidation: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'macroValidation'}>) => void,
- *   receiveAutocorrectValidation: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectValidation'}>) => void}} surface
+ *   receiveAutocorrectValidation: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectValidation'}>) => void,
+ *   receiveAutocorrectImport: (message: Extract<import("../contracts/messages.js").PanelResponse, {type: 'autocorrectImportPreview'}>) => void}} surface
  */
-export function createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation}) {
+export function createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation, receiveAutocorrectValidation, receiveAutocorrectImport}) {
     let inDemo = false;
     /** @type {string | null} */
     let lastStackKey = null;
@@ -25,6 +26,7 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
     return function receive(message) {
         if (message?.type === "macroValidation") { receiveMacroValidation(message); return; }
         if (message?.type === "autocorrectValidation") { receiveAutocorrectValidation(message); return; }
+        if (message?.type === "autocorrectImportPreview") { receiveAutocorrectImport(message); return; }
         if (message?.type === "catalog") {
             setCatalog(message.catalog);
             const waiting = held;

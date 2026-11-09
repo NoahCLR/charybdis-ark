@@ -11,6 +11,11 @@
 // in place: its spelling, each typo's spelling and match, the correction a
 // typo belongs to, and another typo typed and kept with Enter.
 //
+// A list comes in from a file (QMK's text, a spreadsheet's CSV or Ark's JSON,
+// D-L85), chosen or dropped on the screen, or from the starter list. The core
+// reads it and says what it would do; nothing changes until Add to my list
+// or Replace my list is chosen. Export saves the list in any of the three.
+//
 // What is typed is checked by the core against the draft as it stands, which
 // answers with the refusal the edit would meet or what it would newly warn
 // about; the edit itself is posted when it is kept, and the core has the
@@ -24,8 +29,9 @@ import {getModel, post, render, state} from "../store.mjs";
 import {editGate} from "../view/edit-gate.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
-import {AUTOCORRECT_SORTS, WHOLE_WORD, autocorrectRows, countWords, matchWords, usageShare} from "../view/autocorrect.mjs";
+import {AUTOCORRECT_SORTS, LIST_FILE_FORMATS, LIST_FILE_MAX_BYTES, LIST_FILE_TOO_LARGE, WHOLE_WORD, autocorrectRows, countWords, importLines, matchWords, usageShare} from "../view/autocorrect.mjs";
 import * as edits from "../view/edits.mjs";
+import * as controls from "../view/controls.mjs";
 
 const SORT_WORDS = /** @type {const} */ ({correction: "A to Z", typos: "Most typos"});
 
@@ -96,11 +102,139 @@ export function screenAutocorrect() {
         state.autocorrectCheck = null;
     } else if (sent && state.error) state.autocorrectAdd = {...state.autocorrectAdd, sent: undefined};
 
+    if (state.autocorrectImport) pad.appendChild(importCard(model, list, canEdit));
     for (const notice of list.notices) pad.appendChild(el(`<div class="unavailable ac-notice" data-ac-notice>${esc(notice)} Change the host layout back, or edit the marked entries.</div>`));
-    pad.append(addCard(model, canEdit, gate), listCard(model, list, canEdit));
+    pad.append(addCard(model, canEdit, gate), filesCard(list, canEdit), listCard(model, list, canEdit));
+    takesDrops(pad);
     paintFeedbackLater();
     return main;
 }
+
+// ── files ───────────────────────────────────────────────────────────────
+
+let nextImport = 0;
+// Asks the core to read a list and say what it would do: the file the
+// shell's chooser picks, a dropped file's text, or the starter list.
+/** @param {{text: string, name: string} | "starter" | "choose"} source */
+function previewImport(source) {
+    const requestId = ++nextImport;
+    state.autocorrectImport = {requestId, pending: true, name: typeof source === "string" ? "" : source.name, starter: source === "starter"};
+    post(source === "choose" ? controls.chooseAutocorrectFile(requestId) : source === "starter" ? controls.previewAutocorrectStarter(requestId)
+        : controls.previewAutocorrectFile(source.text, source.name, requestId));
+    render();
+}
+
+/** @param {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectImportPreview"}>} message */
+export function receiveAutocorrectImport(message) {
+    const asked = state.autocorrectImport, draft = getModel()?.draft;
+    if (!asked || asked.requestId !== message.requestId) return;
+    // A chooser closed without a file leaves nothing to show.
+    const stale = message.draftId !== draft?.id || message.draftRevision !== draft?.revision;
+    state.autocorrectImport = stale || (!message.preview && !message.error) ? null
+        : {...asked, pending: false, name: message.name || asked.name, preview: message.preview, error: message.error};
+    render();
+}
+
+// Import, the starter list and Export, in one row over the list.
+/** @param {NonNullable<NonNullable<Model>["autocorrect"]>} list @param {boolean} canEdit */
+function filesCard(list, canEdit) {
+    const off = canEdit ? "" : "disabled", none = list.entries.length ? "" : "disabled";
+    const card = el(`<div class="card ac-files"><div class="card-b ac-files-row">
+        <button class="btn" data-act="ac-import" ${off} data-tip="A .txt file in QMK's form, a .csv from a spreadsheet, or a .json Ark exported">Import…</button>
+        <button class="btn" data-act="ac-starter" ${off} data-tip="Common English typos, each matching the whole word">Add the starter list…</button>
+        <span class="note ac-drop-note">or drop a .txt, .csv or .json file here</span>
+        <span class="ac-export"><span class="note">Export as</span>
+            ${LIST_FILE_FORMATS.map((format) => `<button class="btn" data-act="ac-export" data-format="${esc(format)}" ${none}>${esc(format === "txt" ? "Text" : format.toUpperCase())}</button>`).join("")}</span>
+        <p class="note ac-file-status" data-ac-file-status hidden></p>
+    </div></div>`);
+    card.addEventListener("click", (event) => {
+        const button = /** @type {HTMLButtonElement | null} */ (/** @type {HTMLElement} */ (event.target).closest("button[data-act]"));
+        if (!button || button.disabled) return;
+        if (button.dataset.act === "ac-import") previewImport("choose");
+        else if (button.dataset.act === "ac-starter") previewImport("starter");
+        else if (button.dataset.act === "ac-export") post(controls.exportAutocorrect(/** @type {typeof LIST_FILE_FORMATS[number]} */ (button.dataset.format)));
+    });
+    return card;
+}
+
+// A list file dropped anywhere on the screen is read as a chosen one is.
+/** @param {HTMLElement} pad */
+function takesDrops(pad) {
+    const available = () => editGate(getModel(), "autocorrect").editable;
+    /** @param {string} text */
+    const tell = (text) => {
+        const status = /** @type {HTMLElement | null} */ (pad.querySelector("[data-ac-file-status]"));
+        if (status) { status.textContent = text; status.hidden = !text; }
+    };
+    /** @param {DragEvent} event */
+    const files = (event) => Array.from(event.dataTransfer?.types || []).includes("Files");
+    for (const type of /** @type {const} */ (["dragenter", "dragover"])) pad.addEventListener(type, (event) => {
+        if (!files(event)) return;
+        event.preventDefault();
+        /** @type {DataTransfer} */ (event.dataTransfer).dropEffect = available() ? "copy" : "none";
+        pad.classList.toggle("drag-over", available());
+    });
+    pad.addEventListener("dragleave", (event) => {
+        if (!pad.contains(/** @type {Node | null} */ (event.relatedTarget))) pad.classList.remove("drag-over");
+    });
+    pad.addEventListener("drop", async (event) => {
+        if (!files(event)) return;
+        event.preventDefault();
+        pad.classList.remove("drag-over");
+        if (!available()) return;
+        const dropped = Array.from(/** @type {DataTransfer} */ (event.dataTransfer).files);
+        if (dropped.length !== 1) { tell("Drop one file at a time."); return; }
+        const file = dropped[0];
+        if (file.size > LIST_FILE_MAX_BYTES) { tell(LIST_FILE_TOO_LARGE); return; }
+        const draft = getModel()?.draft;
+        if (!draft) return;
+        const {id, revision} = draft;
+        tell("Reading the file…");
+        try {
+            const text = await file.text();
+            if (getModel()?.draft?.id !== id || getModel()?.draft?.revision !== revision || !available()) { tell("The draft changed while reading this file. Drop it again when ready."); return; }
+            previewImport({text, name: file.name});
+        } catch {
+            tell("This file could not be read. Try Import… instead.");
+        }
+    });
+}
+
+// What the file would do, both ways, and the choice.
+/** @param {Model} model @param {NonNullable<NonNullable<Model>["autocorrect"]>} list @param {boolean} canEdit */
+function importCard(model, list, canEdit) {
+    const asked = /** @type {NonNullable<typeof state.autocorrectImport>} */ (state.autocorrectImport);
+    const title = asked.starter ? "Add the starter list" : `Import ${asked.name || "a list"}`;
+    const preview = asked.preview;
+    /** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome */
+    const lines = (outcome) => importLines(outcome, list.usage).map((line) => `<li data-ac-line="${esc(line.kind)}">${esc(line.text)}${line.names?.length
+        ? `<span class="ac-names">${line.names.slice(0, NAMES_SHOWN).map((name) => `<span>${esc(name)}</span>`).join("")}${line.names.length > NAMES_SHOWN ? `<span>and ${esc(line.names.length - NAMES_SHOWN)} more</span>` : ""}</span>` : ""}</li>`).join("");
+    const changes = (/** @type {import("../../contracts/messages.js").AutocorrectImportOutcome} */ outcome) => outcome.newCorrections.length + outcome.addedTypos.length > 0;
+    const card = el(`<div class="card ac-import" data-ac-import role="region" aria-label="${esc(title)}"><div class="card-h"><h3>${esc(title)}</h3>
+            <div class="right"><button class="btn ghost" data-act="ac-import-cancel">Cancel</button></div></div>
+        <div class="card-b stack">${asked.pending ? `<p class="note">Reading…</p>` : asked.error || !preview ? `<div class="unavailable">${esc(asked.error || "This file could not be read.")}</div>` : `
+            <div class="ac-import-ways">
+                <section data-ac-way="add"><h4>Add to my list</h4><ul class="ac-import-lines">${lines(preview.add)}</ul>
+                    <p class="note">Your list would hold ${esc(preview.add.corrections.toLocaleString("en-US"))} corrections and ${esc(preview.add.typos.toLocaleString("en-US"))} typos.</p>
+                    <button class="btn primary" data-act="ac-import-add" ${canEdit && changes(preview.add) ? "" : "disabled"}>Add to my list</button></section>
+                <section data-ac-way="replace"><h4>Replace my list</h4><ul class="ac-import-lines">${lines(preview.replace)}</ul>
+                    <p class="note">Your list would hold ${esc(preview.replace.corrections.toLocaleString("en-US"))} corrections and ${esc(preview.replace.typos.toLocaleString("en-US"))} typos.</p>
+                    <button class="btn" data-act="ac-import-replace" ${canEdit && preview.replace.corrections ? "" : "disabled"}>Replace my list</button></section>
+            </div>
+            <p class="note">Nothing changes until you choose. Either way it is one step of the draft, which Undo takes back.</p>`}
+        </div></div>`);
+    card.addEventListener("click", (event) => {
+        const button = /** @type {HTMLButtonElement | null} */ (/** @type {HTMLElement} */ (event.target).closest("button[data-act]"));
+        if (!button || button.disabled) return;
+        const mode = button.dataset.act === "ac-import-add" ? "add" : button.dataset.act === "ac-import-replace" ? "replace" : null;
+        state.autocorrectImport = null;
+        if (mode && preview) { state.error = ""; post(edits.importAutocorrect(mode, preview.entries, identityOf(getModel()))); }
+        render();
+    });
+    return card;
+}
+// How many names a line of the import's preview lists before it counts the rest.
+const NAMES_SHOWN = 12;
 
 // The feedback lines are painted once the screen is in the page.
 function paintFeedbackLater() {
@@ -176,7 +310,10 @@ function listCard(model, list, canEdit) {
     });
     const body = /** @type {HTMLElement} */ (card.querySelector(".ac-rows"));
     if (!list.entries.length) {
-        body.replaceWith(el(`<div class="empty-card" data-ac-empty><p class="note">No entries yet. Add a correction and the ways you mistype it above; the keyboard fixes them once the list is saved.</p></div>`));
+        const empty = el(`<div class="empty-card" data-ac-empty><p class="note">No entries yet. Add a correction and the ways you mistype it above, import a list, or start from common English typos.</p>
+            <button class="btn" data-act="ac-starter-empty" ${canEdit ? "" : "disabled"}>Add the starter list…</button></div>`);
+        /** @type {HTMLButtonElement} */ (empty.querySelector("button")).addEventListener("click", () => previewImport("starter"));
+        body.replaceWith(empty);
         return card;
     }
     if (!rows.length) {

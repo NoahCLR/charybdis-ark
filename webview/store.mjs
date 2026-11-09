@@ -109,6 +109,7 @@ export const STATE_FIELDS = {
     autocorrectOpen: resets(null),
     autocorrectAdd: resetsTo(/** @type {PanelState["autocorrectAdd"]} */ ({correction: "", typos: "", match: 0}), () => ({correction: "", typos: "", match: 0})),
     autocorrectCheck: resets(null),
+    autocorrectImport: resets(null),
     heldSlot: resets(null),    // {bank, key}: the tile held for a keyboard swap, let go when the draft is replaced
     customKey: kept(null),
     customKeySearch: kept(""),

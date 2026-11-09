@@ -475,6 +475,63 @@ test("an autocorrect edit is checked against the draft without staging it: its r
     assert.deepEqual(service.calls, []);
 });
 
+test("an autocorrect list file is read and judged against the draft without staging it, dropped, chosen or the starter list", async () => {
+    let chosen;
+    const service = fakeService(), shell = fakeShell({chooseProfile: async () => chosen}), loop = openPanelLoop(shell, {service});
+    loop.serviceChanged(); shell.posted.length = 0;
+    const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
+    const bound = {draftId: draft.id, draftRevision: revision};
+    await loop.handleMessage({type: "previewAutocorrectImport", requestId: 5, text: ":tehn: -> then\n:teh: -> ten\nbroken\n", name: "mine.txt", ...bound});
+    const reply = last(shell);
+    assert.deepEqual({type: reply.type, requestId: reply.requestId, name: reply.name, draftId: reply.draftId, draftRevision: reply.draftRevision, error: reply.error},
+        {type: "autocorrectImportPreview", requestId: 5, name: "mine.txt", ...bound, error: undefined});
+    assert.equal(reply.preview.format, "txt");
+    assert.deepEqual(reply.preview.add.newCorrections, [{correction: "then", typos: ["tehn"]}]);
+    assert.deepEqual(reply.preview.add.refused.map(row => row.reason), ["It has no “->” between a typo and its correction.", "“teh” already corrects to “the”."]);
+    assert.equal(reply.preview.replace.corrections, 2);
+    // The chooser's file, as the shell hands it over; none chosen answers with no preview.
+    chosen = {text: "typos,correction\ntehn,then\n", name: "sheet.csv"};
+    await loop.handleMessage({type: "chooseAutocorrectFile", requestId: 6, ...bound});
+    assert.deepEqual([last(shell).name, last(shell).preview.format, last(shell).preview.entries], ["sheet.csv", "csv", [{correction: "then", typos: [{typo: "tehn", match: 0}]}]]);
+    chosen = undefined;
+    await loop.handleMessage({type: "chooseAutocorrectFile", requestId: 7, ...bound});
+    assert.deepEqual(last(shell), {type: "autocorrectImportPreview", requestId: 7, name: "", ...bound});
+    await loop.handleMessage({type: "previewAutocorrectImport", requestId: 8, starter: true, ...bound});
+    assert.deepEqual([last(shell).preview.format, last(shell).preview.add.refused.length], ["starter", 0]);
+    assert.ok(last(shell).preview.add.newCorrections.length > 150);
+    // A file that is no list, and a stale draft, answer with why.
+    await loop.handleMessage({type: "previewAutocorrectImport", requestId: 9, text: "{nope", name: "x.json", ...bound});
+    assert.deepEqual([last(shell).error, last(shell).preview], ["This file is not a valid autocorrect list.", undefined]);
+    await loop.handleMessage({type: "previewAutocorrectImport", requestId: 10, text: "a -> b", name: "x.txt", draftId: draft.id, draftRevision: revision - 1});
+    assert.ok(last(shell).error);
+    assert.deepEqual(draft.document, before);
+    assert.equal(draft.revision, revision);
+    assert.deepEqual(shell.errors, []);
+    assert.deepEqual(service.calls, []);
+
+    // Keeping it is one draft edit of the preview's entries.
+    await loop.handleMessage({type: "importAutocorrect", mode: "add", entries: reply.preview.entries, ...bound});
+    assert.equal(draft.dirty, true);
+    assert.equal(last(shell).acceptedEdit.message.type, "importAutocorrect");
+});
+
+test("the draft's autocorrect list is exported as a file in the format asked for", async () => {
+    const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});
+    loop.serviceChanged();
+    const draft = loop.session.draft;
+    await loop.handleMessage({type: "addAutocorrectTypos", correction: "then", typos: [{typo: "tehn"}], draftId: draft.id, draftRevision: draft.revision});
+    for (const format of ["txt", "csv", "json"]) {
+        await loop.handleMessage({type: "exportAutocorrect", format});
+        const file = shell.exports.at(-1);
+        assert.match(file.fileName, new RegExp(`^charybdis-autocorrect-\\d{4}-\\d\\d-\\d\\d\\.${format}$`));
+        assert.match(file.text, /tehn/, "the draft's list, the edit not yet saved included");
+        assert.equal(last(shell).notice, `Autocorrect list exported to /exports/${file.fileName}`);
+    }
+    await loop.handleMessage({type: "exportAutocorrect", format: "xml"});
+    assert.match(last(shell).notice, /^Failed: Choose a text, CSV or JSON file\./);
+    assert.deepEqual(service.calls, [], "nothing is read from or written to the keyboard");
+});
+
 test("a reconnect refuses keeping an already-open import or layer review", async () => {
     for (const type of ["restorePortableProfile", "savePortableLayers"]) {
         const service = fakeService(), shell = fakeShell(), loop = openPanelLoop(shell, {service});

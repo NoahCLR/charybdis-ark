@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {AUTOCORRECT_SORTS, autocorrectRows, countWords, matchWords, usageShare} from "../../webview/view/autocorrect.mjs";
+import {AUTOCORRECT_SORTS, autocorrectRows, countWords, importLines, matchWords, usageShare} from "../../webview/view/autocorrect.mjs";
 
 const entry = (correction, ...typos) => ({correction, warnings: [], typos: typos.map((typo) => ({typo: Array.isArray(typo) ? typo[0] : typo, match: Array.isArray(typo) ? typo[1] : 0, warnings: []}))});
 const view = {entries: [entry("the", "teh", "hte"), entry("because", "becuase", "becasue", "beacuse"), entry("iPhone", "iphone"), entry("Äpfel", "aepfel"), entry("thing", ["tihng", 3])]};
@@ -33,4 +33,22 @@ test("the counts and the meter read what the keyboard holds", () => {
     assert.equal(countWords({...usage, corrections: 2, typos: 1}), "2 corrections · 1 typo");
     assert.equal(usageShare(usage), 100 * 1200 / 2048, "the fullest ceiling");
     assert.equal(usageShare({...usage, typos: 5000}), 100);
+});
+
+test("an import's preview says what it would do in sentences, with the names each is about", () => {
+    const holds = {maxCorrections: 1024, maxTypos: 1024};
+    const outcome = {corrections: 5, typos: 9, removed: 0, duplicates: 2, unfit: 3,
+        newCorrections: [{correction: "because", typos: ["becuase", "becasue"]}, {correction: "then", typos: ["tehn"]}],
+        addedTypos: [{correction: "the", typos: ["hte", "tthe"]}],
+        refused: [{line: 4, text: "teh → ten", reason: "“teh” already corrects to “the”."}, {line: null, text: "x", reason: "Why."}]};
+    assert.deepEqual(importLines(outcome, holds), [
+        {kind: "new", text: "2 new corrections, with 3 typos.", names: ["because", "then"]},
+        {kind: "added", text: "2 typos added to 1 correction you already have.", names: ["the ← hte tthe"]},
+        {kind: "duplicates", text: "2 typos are already in the list, and skipped."},
+        {kind: "unfit", text: "3 typos do not fit: the keyboard holds 1,024 corrections and 1,024 typos."},
+        {kind: "refused", text: "2 lines are refused:", names: ["4: teh → ten — “teh” already corrects to “the”.", "x — Why."]}]);
+    const replace = importLines({...outcome, removed: 1, addedTypos: [], duplicates: 1, unfit: 1, refused: [outcome.refused[0]]}, holds);
+    assert.deepEqual(replace.map((line) => line.text), ["1 entry in your list now is removed.", "2 new corrections, with 3 typos.", "1 typo is already in the list, and skipped.",
+        "1 typo does not fit: the keyboard holds 1,024 corrections and 1,024 typos.", "1 line is refused:"]);
+    assert.deepEqual(importLines({...outcome, newCorrections: [], addedTypos: [], unfit: 0, refused: []}, holds).map((line) => line.kind), ["nothing", "duplicates"]);
 });

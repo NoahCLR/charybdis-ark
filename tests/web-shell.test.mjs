@@ -5,10 +5,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {connectPanel} from "../web/panel-channel.mjs";
 import {workerSleep} from "../web/sleep.mjs";
-import {BLOCKED, COMPILED_DEFAULTS_KEY, LOAD_FAILED, compiledDefaultsStore, initialTheme, readProfileFile, showLoadFailure, startWebShell} from "../web/web-shell.mjs";
+import {BLOCKED, COMPILED_DEFAULTS_KEY, LIST_FILE, LOAD_FAILED, compiledDefaultsStore, initialTheme, readProfileFile, showLoadFailure, startWebShell} from "../web/web-shell.mjs";
 import {listed} from "../web/recoveries.mjs";
 import {CHARYBDIS_PRODUCT_ID, CHARYBDIS_VENDOR_ID, QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE_PAGE} from "../core/transport/device-adapter.js";
 import {FILE_MAX_BYTES} from "../core/model/portable-profile.js";
+import {IMPORT_MAX_BYTES} from "../core/model/autocorrect-import.js";
 
 // A MessageChannel delivers on a later task, but not within any fixed time: a
 // loaded runner can take longer than a few milliseconds. Wait for the delivery
@@ -221,6 +222,13 @@ test("a chosen profile file has the portable document's size limit", async () =>
     const file = (size) => ({size, name: "mine.charybdis.json", text: async () => "{}"});
     assert.deepEqual(await readProfileFile(file(FILE_MAX_BYTES)), {text: "{}", name: "mine.charybdis.json"});
     await assert.rejects(readProfileFile(file(FILE_MAX_BYTES + 1)), /too large/);
+});
+
+test("a chosen autocorrect list has its own formats and size limit", async () => {
+    assert.deepEqual({accept: LIST_FILE.accept, max: LIST_FILE.max}, {accept: ".txt,.csv,.json,text/plain,text/csv,application/json", max: IMPORT_MAX_BYTES});
+    const file = (size) => ({size, name: "typos.csv", text: async () => "teh,the"});
+    assert.deepEqual(await readProfileFile(file(IMPORT_MAX_BYTES), LIST_FILE), {text: "teh,the", name: "typos.csv"});
+    await assert.rejects(readProfileFile(file(IMPORT_MAX_BYTES + 1), LIST_FILE), /too large for an autocorrect list/);
 });
 
 test("a stored recovery copy lists with what made it and its keyboard, an older one without", () => {

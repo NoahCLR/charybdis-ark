@@ -184,3 +184,126 @@ test("in the demo the core keeps an Add, checks what is typed, refuses in words 
     await expect(review.locator(".sheet-h h2")).toHaveText("Review 2 changes");
     await expect(review).toContainText("seprate · start of word");
 });
+
+// ── files (D-L85) ───────────────────────────────────────────────────────
+
+test("Import, the starter list and Export each post their control from the preview", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await page.locator('[data-act="ac-import"]').click();
+    await expectPost(page, {type: "chooseAutocorrectFile", requestId: expect.any(Number)});
+    await expect(page.locator("[data-ac-import]")).toContainText("Reading…");
+    await page.locator('[data-act="ac-import-cancel"]').click();
+    await expect(page.locator("[data-ac-import]")).toHaveCount(0);
+    await clearPosts(page);
+    await page.locator('[data-act="ac-starter"]').click();
+    await expectPost(page, {type: "previewAutocorrectImport", starter: true, requestId: expect.any(Number)});
+    await page.locator('[data-act="ac-import-cancel"]').click();
+    for (const format of ["txt", "csv", "json"]) {
+        await clearPosts(page);
+        await page.locator(`[data-act="ac-export"][data-format="${format}"]`).click();
+        await expectPost(page, {type: "exportAutocorrect", format});
+    }
+    // A dropped file is read in the page and posted with its name.
+    await clearPosts(page);
+    const {dropFiles} = require("./profile-drop");
+    expect(await dropFiles(page, [{text: ":tehn: -> then\n", name: "mine.txt", type: "text/plain"}], ".pad.autocorrect")).toBe(true);
+    await expectPost(page, {type: "previewAutocorrectImport", text: ":tehn: -> then\n", name: "mine.txt", requestId: expect.any(Number)});
+    // Two files, or one too large, are refused where they are dropped.
+    await page.locator('[data-act="ac-import-cancel"]').click();
+    await clearPosts(page);
+    await dropFiles(page, [{text: "a -> b", name: "a.txt"}, {text: "c -> d", name: "b.txt"}], ".pad.autocorrect");
+    await expect(page.locator("[data-ac-file-status]")).toHaveText("Drop one file at a time.");
+    await dropFiles(page, [{text: "x".repeat(262145), name: "big.txt"}], ".pad.autocorrect");
+    await expect(page.locator("[data-ac-file-status]")).toHaveText("This file is too large for an autocorrect list.");
+    expect(await posted(page)).toEqual([]);
+});
+
+test("in the demo a list is imported in each format by picker and by drop, previewed, added or replaced, exported, and the starter list added", async ({page}) => {
+    const {dropFiles} = require("./profile-drop");
+    await page.goto("/dist/web/index.html");
+    await page.locator('.read-placeholder [data-act="explore-demo"]').click();
+    await page.locator('[data-screen="autocorrect"]').click();
+    const count = page.locator("[data-ac-count]"), card = page.locator("[data-ac-import]");
+    await expect(count).toHaveText("8 corrections · 14 typos");
+
+    // QMK's text, through the chooser: one line refused with its reason.
+    const txt = "# mine\n:tehn: -> then\n:thne: -> then\nsomthing -> something\n:teh: -> ten\n:nto: -> not\n";
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator('[data-act="ac-import"]').click()]);
+    expect(chooser.element()).toBeTruthy();
+    await chooser.setFiles({name: "typos.txt", mimeType: "text/plain", buffer: Buffer.from(txt)});
+    await expect(card.locator("h3")).toHaveText("Import typos.txt");
+    const add = card.locator('[data-ac-way="add"]');
+    await expect(add.locator('[data-ac-line="new"]')).toContainText("3 new corrections, with 4 typos.");
+    await expect(add.locator('[data-ac-line="refused"]')).toContainText("5: teh → ten — “teh” already corrects to “the”.");
+    await expect(card.locator('[data-ac-way="replace"] [data-ac-line="removed"]')).toContainText("8 entries in your list now are removed.");
+    await expect(count).toHaveText("8 corrections · 14 typos");
+    await add.locator('[data-act="ac-import-add"]').click();
+    await expect(card).toHaveCount(0);
+    await expect(count).toHaveText("11 corrections · 18 typos");
+    await expect(page.locator('[data-ac-entry="something"] .ac-where')).toHaveText("anywhere in a word");
+
+    // A spreadsheet's CSV, dropped: a typo added to a correction the list has, a duplicate skipped.
+    const csv = "﻿typos;correction;match\r\ntehn thn;then;\r\nrecieve;receive;whole word\r\nwierd;weird;sometimes\r\n";
+    expect(await dropFiles(page, [{text: csv, name: "sheet.csv", type: "text/csv"}], ".pad.autocorrect")).toBe(true);
+    await expect(card.locator("h3")).toHaveText("Import sheet.csv");
+    await expect(add.locator('[data-ac-line="added"]')).toContainText("1 typo added to 1 correction you already have.");
+    await expect(add.locator('[data-ac-line="duplicates"]')).toContainText("2 typos are already in the list, and skipped.");
+    await expect(add.locator('[data-ac-line="refused"]')).toContainText("“sometimes” is not where a typo can match");
+    await add.locator('[data-act="ac-import-add"]').click();
+    await expect(count).toHaveText("11 corrections · 19 typos");
+
+    // Export in each format, then Ark's own JSON back in to replace the list with itself.
+    const exports = {};
+    for (const format of ["txt", "csv", "json"]) {
+        const [download] = await Promise.all([page.waitForEvent("download"), page.locator(`[data-act="ac-export"][data-format="${format}"]`).click()]);
+        expect(download.suggestedFilename()).toMatch(new RegExp(`^charybdis-autocorrect-\\d{4}-\\d\\d-\\d\\d\\.${format}$`));
+        exports[format] = require("node:fs").readFileSync(await download.path(), "utf8");
+    }
+    expect(exports.txt).toContain(":tehn: -> then\n");
+    expect(exports.csv.startsWith("correction,typos,match\r\n")).toBe(true);
+    expect(JSON.parse(exports.json).version).toBe(1);
+    for (const format of ["json", "csv", "txt"]) {
+        await dropFiles(page, [{text: exports[format], name: `back.${format}`}], ".pad.autocorrect");
+        const replace = card.locator('[data-ac-way="replace"]');
+        await expect(replace.locator('[data-ac-line="new"]')).toContainText("11 new corrections, with 19 typos.");
+        await expect(card.locator('[data-ac-way="add"] [data-ac-line="nothing"]')).toHaveText("Nothing in it would change your list.");
+        await expect(card.locator('[data-act="ac-import-add"]')).toBeDisabled();
+        await replace.locator('[data-act="ac-import-replace"]').click();
+        await expect(card).toHaveCount(0);
+        await expect(count).toHaveText("11 corrections · 19 typos");
+    }
+
+    // A file that is no list says so, and changes nothing.
+    await dropFiles(page, [{text: "{nope", name: "broken.json"}], ".pad.autocorrect");
+    await expect(card.locator(".unavailable")).toHaveText("This file is not a valid autocorrect list.");
+    await card.locator('[data-act="ac-import-cancel"]').click();
+
+    // The starter list, added with the same summary.
+    await page.locator('[data-act="ac-starter"]').click();
+    await expect(card.locator("h3")).toHaveText("Add the starter list");
+    await expect(card.locator('[data-ac-way="add"] [data-ac-line="new"]')).toContainText("new corrections");
+    await card.locator('[data-act="ac-import-add"]').click();
+    await expect(card).toHaveCount(0);
+    await expect(page.locator('[data-ac-entry="tomorrow"]')).toHaveCount(1);
+    await expect.poll(async () => Number((await count.textContent()).split(" ")[0])).toBeGreaterThan(190);
+    // One undo takes the whole import back.
+    await page.locator('.rail [data-act="undo"]').click();
+    await expect(count).toHaveText("11 corrections · 19 typos");
+});
+
+test("an empty list offers the starter list", async ({page}) => {
+    await openControls(page, "autocorrect");
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.autocorrect.entries = [];
+        model.autocorrect.usage = {...model.autocorrect.usage, corrections: 0, typos: 0, textBytes: 0, bytes: 8};
+        model.autocorrect.notices = [];
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+        window.__posted.length = 0;
+    });
+    await expect(page.locator("[data-ac-empty]")).toContainText("No entries yet.");
+    await expect(page.locator('[data-act="ac-export"]').first()).toBeDisabled();
+    await page.locator('[data-act="ac-starter-empty"]').click();
+    await expectPost(page, {type: "previewAutocorrectImport", starter: true, requestId: expect.any(Number)});
+});

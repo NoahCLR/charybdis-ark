@@ -49,6 +49,8 @@ export interface ControlPayloads {
         editPortableLayer: LayerEditPayload;
         savePortableLayers: LayerSavePayload;
         reviewPortableProfile: Omit<Extract<PanelEdit, {type: 'reviewPortableProfile'}>, 'type'>;
+        /** Save the draft's autocorrect list as a file in one of the three formats (D-L85). */
+        exportAutocorrect: {format: AutocorrectFileFormat};
     };
     demo: {
         openDemo: {discardDemo?: boolean};
@@ -76,6 +78,10 @@ export interface ControlPayloads {
     inspect: {
         validateMacro: Omit<Extract<PanelEdit, {type: 'validateMacro'}>, 'type'>;
         validateAutocorrect: Omit<Extract<PanelEdit, {type: 'validateAutocorrect'}>, 'type'>;
+        /** What a list file, dropped (`text`, `name`) or the starter list (`starter`), would do to the draft's list; answered with `autocorrectImportPreview`. */
+        previewAutocorrectImport: {requestId: number} & ({text: string; name: string; starter?: undefined} | {starter: true; text?: undefined; name?: undefined});
+        /** The same for a file the shell's chooser picks. */
+        chooseAutocorrectFile: {requestId: number};
     };
     diagnose: {
         /** Read each half's flash pauses (GET 0x0D) for the Keyboard screen's Diagnostics. */
@@ -99,6 +105,22 @@ export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProg
 export type MacroValidation = MacroInspection | {error: string; code: string};
 /** What an autocorrect edit would be refused for (`error`, '' when it would be taken) and what it would newly warn about. */
 export interface AutocorrectValidation {error: string; code: string; warnings: string[]}
+export type AutocorrectFileFormat = 'txt' | 'csv' | 'json';
+/** A line a list file or the list refused, and why; `line` is the file's line, row or entry number. */
+export interface AutocorrectImportRefused {line: number | null; text: string; reason: string}
+/** What importing a file one way would do: the list's size after it, the corrections it makes and the typos it adds to corrections the list has (each with its typos), how many typos it skips as already there, what it refuses, how many typos do not fit what the keyboard holds, and how many entries replacing takes away. */
+export interface AutocorrectImportOutcome {
+    corrections: number; typos: number;
+    newCorrections: {correction: string; typos: string[]}[];
+    addedTypos: {correction: string; typos: string[]}[];
+    duplicates: number; refused: AutocorrectImportRefused[]; unfit: number; removed: number;
+}
+/** A list file read and judged both ways (core/model/autocorrect-import.js): what it holds, and what Add and Replace would each do. */
+export interface AutocorrectImportPreview {
+    format: AutocorrectFileFormat | 'starter';
+    entries: import('./edits.js').AutocorrectEntryEdit[];
+    add: AutocorrectImportOutcome; replace: AutocorrectImportOutcome;
+}
 /** What the shell posts to the panel. The catalog comes before the first model, and again after each `ready`; a model leaves out what it holds. */
 export type PanelResponse<M = import('./panel.js').PostedModel> =
     | {type: 'catalog'; catalog: import('./panel.js').PanelCatalog}
@@ -106,5 +128,8 @@ export type PanelResponse<M = import('./panel.js').PostedModel> =
     | ({type: 'applyProgress'; apply: ApplyView} & Partial<DraftIdentity>)
     | ({type: 'readProgress'; read: ReadProgress} & Partial<DraftIdentity>)
     | ({type: 'macroValidation'; keycode: string; payload: string; requestId: number; validation: MacroValidation} & Partial<DraftIdentity>)
-    | ({type: 'autocorrectValidation'; requestId: number; validation: AutocorrectValidation} & Partial<DraftIdentity>);
-export interface ExportedProfile {fileName: string; text: string}
+    | ({type: 'autocorrectValidation'; requestId: number; validation: AutocorrectValidation} & Partial<DraftIdentity>)
+    /** `preview` is absent when no file was chosen, or with `error`, why the file could not be read. */
+    | ({type: 'autocorrectImportPreview'; requestId: number; name: string; preview?: AutocorrectImportPreview; error?: string} & Partial<DraftIdentity>);
+/** A file a shell saves: `mime` is its media type when it is not JSON. */
+export interface ExportedProfile {fileName: string; text: string; mime?: string}

@@ -15,7 +15,8 @@ page for whatever you want to change.
 6. [Macros](macros.md): text and key sequences, swapping slots, recording,
    and your computer's keyboard layout.
 7. [Autocorrect](autocorrect.md): the typos the keyboard fixes as you
-   type, each correction with the ways you mistype it.
+   type, each correction with the ways you mistype it, the starter list,
+   and importing and exporting a list.
 8. [Pointing](pointing.md): the trackball's speed, sniping and auto-mouse,
    and the 32 pointing modes.
 9. [Lighting](lighting.md): the background effect, layer and mode colours,

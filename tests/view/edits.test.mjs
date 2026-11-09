@@ -575,6 +575,22 @@ test("each autocorrect edit is posted as typed and staged as the keyboard stores
     assert.deepEqual(edits.autocorrectValidationMessage(added, 7), {type: "validateAutocorrect", edit: added, requestId: 7});
 });
 
+test("an import is one staged edit of a preview's entries, and the list's file controls are built as posted", () => {
+    const draft = session();
+    const entries = [{correction: "then", typos: [{typo: "tehn", match: 0}]}, {correction: "thing", typos: [{typo: "tihngs", match: 3}]}];
+    const message = edits.importAutocorrect("add", entries, draft.current.fingerprint);
+    assert.deepEqual(message, {type: "importAutocorrect", mode: "add", entries, expectedFingerprint: draft.current.fingerprint});
+    stage(draft, message);
+    const corrections = () => decoded(draft).autocorrect.entries.map((entry) => entry.correction);
+    assert.ok(corrections().includes("then") && corrections().length > 2, "added to what the list had");
+    stage(draft, edits.importAutocorrect("replace", entries, draft.current.fingerprint));
+    assert.deepEqual(corrections(), ["then", "thing"]);
+    assert.deepEqual(controls.previewAutocorrectFile(":teh: -> the", "a.txt", 3), {type: "previewAutocorrectImport", text: ":teh: -> the", name: "a.txt", requestId: 3});
+    assert.deepEqual(controls.previewAutocorrectStarter(4), {type: "previewAutocorrectImport", starter: true, requestId: 4});
+    assert.deepEqual(controls.chooseAutocorrectFile(5), {type: "chooseAutocorrectFile", requestId: 5});
+    assert.deepEqual(controls.exportAutocorrect("csv"), {type: "exportAutocorrect", format: "csv"});
+});
+
 // ── macros ──────────────────────────────────────────────────────────────
 
 test("a macro payload is posted as the text the keyboard stores", () => {

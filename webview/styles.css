@@ -2323,3 +2323,13 @@ details > summary { list-style: none; }
   .ac-row { grid-template-columns: minmax(0, 1fr); }
   .ac-arrow { display: none; }
 }
+.ac-files-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.ac-export { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-2); }
+.ac-file-status { flex-basis: 100%; }
+.pad.autocorrect.drag-over .ac-files { border-color: var(--text); background: var(--surface-2); }
+.ac-import { border-color: var(--line-3); }
+.ac-import-ways { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); align-items: start; }
+.ac-import-ways section { display: grid; gap: var(--sp-2); justify-items: start; }
+.ac-import-lines { margin: 0; padding-left: var(--sp-4); display: grid; gap: var(--sp-1); font-size: var(--fs-md); }
+.ac-names { display: flex; flex-wrap: wrap; gap: var(--sp-0) var(--sp-2); color: var(--text-2); font-size: var(--fs-sm); }
+@media (max-width: 760px) { .ac-import-ways { grid-template-columns: minmax(0, 1fr); } }

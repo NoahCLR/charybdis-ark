@@ -251,6 +251,10 @@ export const changeAutocorrectTypo = (typo, change, identity) => ({type: "update
 export const deleteAutocorrectTypo = (typo, identity) => ({type: "deleteAutocorrectTypo", typo, expectedFingerprint: identity});
 /** @param {string} correction @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteAutocorrectEntry'>} */
 export const deleteAutocorrectEntry = (correction, identity) => ({type: "deleteAutocorrectEntry", correction, expectedFingerprint: identity});
+// A file's entries, or the starter list's, as its preview gave them, added to
+// the list or replacing it.
+/** @param {'add' | 'replace'} mode @param {import("../../contracts/edits.js").AutocorrectEntryEdit[]} entries @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'importAutocorrect'>} */
+export const importAutocorrect = (mode, entries, identity) => ({type: "importAutocorrect", mode, entries, expectedFingerprint: identity});
 // An autocorrect edit to be checked without staging it.
 /** @param {import("../../contracts/edits.js").AutocorrectEdit} edit @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateAutocorrect'>} */
 export const autocorrectValidationMessage = (edit, requestId) => ({type: "validateAutocorrect", edit, requestId});

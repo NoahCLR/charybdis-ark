@@ -76,7 +76,8 @@ const {watchLive} = require("./live-watch");
 const {readFlashFigures} = require("./flash-pauses");
 const {demoControl, demoExport, demoUnsaved, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
-const {newWarnings} = require("../model/autocorrect-editor");
+const {importPreview, newWarnings} = require("../model/autocorrect-editor");
+const {parseAutocorrectFile, starterFile} = require("../model/autocorrect-import");
 const {applyDraftEdit} = require("../model/draft-editor");
 const {draftEditEntry} = require("../model/draft-edits");
 const {FILE_MAX_BYTES} = require("../model/portable-profile");
@@ -270,6 +271,27 @@ async function handleMessage(session, message, shell) {
             reply.validation = {error: failureSentence(error), code: /** @type {import("./types.js").OperationFailure} */ (error).code || "AUTOCORRECT_EDIT_REFUSED", warnings: []};
         }
         // As a macro's inspection: nothing staged, no toast, no HID.
+        await shell.post(reply);
+        return;
+    }
+    const inspected = message && panelControl(message.type)?.action;
+    if (message && (inspected === "previewAutocorrectImport" || inspected === "chooseAutocorrectFile")) {
+        /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectImportPreview"}>} */
+        const reply = {type: "autocorrectImportPreview", requestId: /** @type {{requestId: number}} */ (message).requestId, name: "", draftId: message.draftId, draftRevision: message.draftRevision};
+        try {
+            // The file is read against the draft it would change. A chooser
+            // opened in the click is waited for; closed without a file, it
+            // answers with no preview.
+            const chosen = message.type === "chooseAutocorrectFile" ? await shell.chooseProfile?.() : message.type === "previewAutocorrectImport" && !message.starter ? message : null;
+            if (chosen !== undefined) {
+                const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before importing an autocorrect list.");
+                reply.name = chosen === null || typeof chosen === "string" ? "" : chosen.name || "";
+                const file = chosen === null ? starterFile() : parseAutocorrectFile(typeof chosen === "string" ? chosen : chosen.text, reply.name);
+                reply.preview = importPreview(draft.current, file, draft.capabilities);
+            }
+        } catch (error) {
+            reply.error = failureSentence(error);
+        }
         await shell.post(reply);
         return;
     }

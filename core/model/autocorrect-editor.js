@@ -11,6 +11,7 @@ const {AUTOCORRECT_DOMAIN_V1} = require("../schema/autocorrect-domain-v1");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
 const {hostSettings} = require("../schema/host-settings");
 const {WARNING, addTypos, changeTypo, findEntry, listUsage, listWarnings, removeEntry, removeTypo, respellCorrection} = require("./autocorrect-list");
+const {exportAutocorrect, planImport, previewImport, rowsOf} = require("./autocorrect-import");
 const {VOCABULARY, word} = require("./vocabulary");
 
 /**
@@ -62,14 +63,24 @@ function autocorrectEditorView(snapshot, capabilities) {
 }
 
 // Each edit's change to the list, by the type the screen posts.
-/** @type {{[K in AutocorrectEditType]: (list: AutocorrectList, message: import("../../contracts/edits.js").EditOf<K>, host: Host) => void}} */
+/** @type {{[K in AutocorrectEditType]: (list: AutocorrectList, message: import("../../contracts/edits.js").EditOf<K>, host: Host, ceilings: Required<import("../schema/autocorrect-domain-v1.js").Ceilings>) => void}} */
 const CHANGES = {
     addAutocorrectTypos: (list, message, host) => addTypos(list, message.correction, message.typos, host),
     updateAutocorrectCorrection: (list, message, host) => respellCorrection(list, message.correction, message.to, host),
     updateAutocorrectTypo: (list, message, host) => changeTypo(list, message.typo, {to: message.to, match: message.match, correction: message.correction}, host),
     deleteAutocorrectTypo: (list, message) => removeTypo(list, message.typo),
     deleteAutocorrectEntry: (list, message) => removeEntry(list, message.correction),
+    // What the list cannot take of an import is left out, as its preview
+    // said (autocorrect-import.js planImport); the rest becomes the list.
+    importAutocorrect: (list, message, host, ceilings) => {
+        if (message.mode !== "add" && message.mode !== "replace") throw refuse("Choose whether to add to the list or replace it.");
+        const entries = Array.isArray(message.entries) ? message.entries : [];
+        if (entries.some(entry => !entry || typeof entry.correction !== "string" || !Array.isArray(entry.typos) || entry.typos.some(typo => !typo || typeof typo.typo !== "string"))) throw refuse("This is not an autocorrect list.");
+        list.entries = planImport(list, rowsOf(entries), message.mode, host, ceilings).list.entries;
+    },
 };
+/** @param {string} message */
+const refuse = message => Object.assign(new Error(message), {code: "AUTOCORRECT_EDIT_REFUSED"});
 
 // One edit to the list. The list is opened, changed in place and encoded
 // again in its canonical order; a list past what the keyboard holds is
@@ -78,8 +89,8 @@ const CHANGES = {
 function editAutocorrect(document, message, draft) {
     return editProfileDomains(document, draft, (open, read) => {
         const host = hostOf(read(), draft.hostOs);
-        const change = /** @type {(list: AutocorrectList, message: unknown, host: Host) => void} */ (CHANGES[message.type]);
-        change(open("autocorrect"), message, host);
+        const change = /** @type {(list: AutocorrectList, message: unknown, host: Host, ceilings: unknown) => void} */ (CHANGES[message.type]);
+        change(open("autocorrect"), message, host, autocorrectCeilings(draft.capabilities));
     });
 }
 
@@ -92,6 +103,24 @@ function newWarnings(before, after) {
     return listWarnings(next.autocorrect, hostOf(next, before.hostOs)).filter(warning => !had.has(warning.text)).map(warning => warning.text);
 }
 
+// What a list file, or the starter list, would do to a snapshot's list,
+// added to it and replacing it, on its host layout and within what the
+// keyboard holds.
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {Parameters<typeof previewImport>[1]} file @param {import("./types.js").ProfileDestination} [capabilities] */
+function importPreview(snapshot, file, capabilities) {
+    const decoded = decodedOf(snapshot);
+    // A row's match is one of the four the keyboard stores: every reader of a file maps a word to one.
+    return /** @type {import("../../contracts/messages.js").AutocorrectImportPreview} */ (previewImport(decoded.autocorrect, file, hostOf(decoded, snapshot.hostOs), autocorrectCeilings(capabilities)));
+}
+
+// A snapshot's list as a file in one of the three formats, and the name a
+// shell may suggest for it.
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("./autocorrect-import.js").Format} format @param {Date} [now] */
+function exportedList(snapshot, format, now = new Date()) {
+    return {fileName: `charybdis-autocorrect-${now.toISOString().slice(0, 10)}.${format}`, text: exportAutocorrect(decodedOf(snapshot).autocorrect, format),
+        mime: format === "json" ? "application/json" : format === "csv" ? "text/csv" : "text/plain"};
+}
+
 // What a staged addAutocorrectTypos did, for its history step: a new entry,
 // or typos for one the list had.
 /** @param {import("../../contracts/edits.js").EditOf<"addAutocorrectTypos">} message @param {import("./types.js").PortableDocument} document */
@@ -100,4 +129,4 @@ function addLabel(message, document) {
     return findEntry(decodedOf({document}).autocorrect, correction) ? "Added an autocorrect typo" : "Added an autocorrect entry";
 }
 
-module.exports = {addLabel, autocorrectEditorView, editAutocorrect, hostOf, newWarnings};
+module.exports = {addLabel, autocorrectEditorView, editAutocorrect, exportedList, hostOf, importPreview, newWarnings};

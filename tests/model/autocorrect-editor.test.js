@@ -171,3 +171,37 @@ test("Review lists each changed entry once: added, removed, respelled, and each 
     assert.deepEqual(listOf(all), listOf(before));
     assert.equal(all.fingerprint, before.fingerprint);
 });
+
+test("an import adds to the list or replaces it in one step, leaving out what the list cannot take", () => {
+    const {exportedList, importPreview} = require("../../core/model/autocorrect-editor");
+    const {parseAutocorrectFile, starterFile} = require("../../core/model/autocorrect-import");
+    const current = fixture([["the", "teh"], ["then", "tehn"]]);
+    const entries = [{correction: "the", typos: [{typo: "hte"}, {typo: "teh"}]}, {correction: "ten", typos: [{typo: "tehn"}]}, {correction: "thing", typos: [{typo: "Tihng", match: MATCH.ANYWHERE}]}];
+    const added = edit(current, {type: "importAutocorrect", mode: "add", entries, expectedFingerprint: current.fingerprint});
+    assert.deepEqual(listOf(added), [["the", "hte", "teh"], ["then", "tehn"], ["thing", ["tihng", MATCH.ANYWHERE]]]);
+    const replaced = edit(current, {type: "importAutocorrect", mode: "replace", entries});
+    assert.deepEqual(listOf(replaced), [["ten", "tehn"], ["the", "hte", "teh"], ["thing", ["tihng", MATCH.ANYWHERE]]]);
+    assert.deepEqual(listOf(edit(current, {type: "importAutocorrect", mode: "replace", entries: []})), [], "replacing with nothing empties the list");
+    // Past the keyboard's ceilings, what fits is kept and the rest left out.
+    assert.deepEqual(listOf(edit(current, {type: "importAutocorrect", mode: "add", entries}, {...CURRENT_CAPABILITIES, maxAutocorrectTypos: 3})), [["the", "hte", "teh"], ["then", "tehn"]]);
+    says(() => edit(current, {type: "importAutocorrect", mode: "merge", entries}), /add to the list or replace it/, "AUTOCORRECT_EDIT_REFUSED");
+    says(() => edit(current, {type: "importAutocorrect", mode: "add", entries: [{correction: "the", typos: [{typo: 7}]}]}), /not an autocorrect list/);
+    says(() => edit(current, {type: "importAutocorrect", mode: "add", entries: [null]}), /not an autocorrect list/);
+    assert.equal(draftEditLabel({type: "importAutocorrect", mode: "add", entries}, current.document), "Added to the autocorrect list");
+    assert.equal(draftEditLabel({type: "importAutocorrect", mode: "replace", entries}, current.document), "Replaced the autocorrect list");
+
+    // The preview says what each choice would do, and its entries are what the edit takes.
+    const preview = importPreview(current, parseAutocorrectFile(":hte: -> the\n:tehn: -> ten\ntihng -> thing\n", "in.txt"), CURRENT_CAPABILITIES);
+    assert.deepEqual([preview.add.corrections, preview.add.typos, preview.add.refused.length, preview.replace.corrections, preview.replace.removed], [3, 4, 1, 3, 2]);
+    assert.deepEqual(listOf(edit(current, {type: "importAutocorrect", mode: "add", entries: preview.entries})), [["the", "hte", "teh"], ["then", "tehn"], ["thing", ["tihng", MATCH.ANYWHERE]]]);
+    const starter = importPreview(fixture([]), starterFile(), CURRENT_CAPABILITIES);
+    assert.equal(starter.format, "starter");
+    assert.deepEqual([starter.add.refused, starter.add.unfit], [[], 0]);
+    assert.equal(validateSnapshot(edit(fixture([]), {type: "importAutocorrect", mode: "add", entries: starter.entries}).document).autocorrect.entries.length, starter.add.corrections);
+
+    // The list as a file, named by the day and the format.
+    const day = new Date("2026-11-10T08:00:00Z");
+    assert.deepEqual(exportedList(current, "txt", day), {fileName: "charybdis-autocorrect-2026-11-10.txt", text: ":teh: -> the\n:tehn: -> then\n", mime: "text/plain"});
+    assert.deepEqual([exportedList(current, "csv", day).fileName, exportedList(current, "csv", day).mime], ["charybdis-autocorrect-2026-11-10.csv", "text/csv"]);
+    assert.deepEqual([exportedList(current, "json", day).fileName, exportedList(current, "json", day).mime], ["charybdis-autocorrect-2026-11-10.json", "application/json"]);
+});

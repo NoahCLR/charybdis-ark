@@ -55,3 +55,34 @@ export const countWords = (usage) => `${usage.corrections.toLocaleString("en-US"
 // ceilings is used to.
 /** @param {View["usage"]} usage */
 export const usageShare = (usage) => Math.min(100, 100 * Math.max(usage.corrections / usage.maxCorrections, usage.typos / usage.maxTypos, usage.textBytes / usage.maxTextBytes, usage.bytes / usage.capacity));
+
+// The largest list file read, and what a larger one is told: core's own
+// (IMPORT_MAX_BYTES and IMPORT_TOO_LARGE in core/model/autocorrect-import.js).
+export const LIST_FILE_MAX_BYTES = 262144;
+export const LIST_FILE_TOO_LARGE = "This file is too large for an autocorrect list.";
+// The formats a list is saved in, by the extension core names each with.
+export const LIST_FILE_FORMATS = /** @type {const} */ (["txt", "csv", "json"]);
+
+/** @param {number} count @param {string} one @param {string} many */
+const counted = (count, one, many) => `${count.toLocaleString("en-US")} ${count === 1 ? one : many}`;
+
+// What importing a file one way would do, as the lines its preview shows:
+// each a sentence, with the names it is about where it has some.
+/** @param {import("../../contracts/messages.js").AutocorrectImportOutcome} outcome @param {{maxTypos: number, maxCorrections: number}} holds @returns {{kind: "new" | "added" | "duplicates" | "refused" | "unfit" | "removed" | "nothing", text: string, names?: string[]}[]} */
+export function importLines(outcome, holds) {
+    /** @param {{typos: string[]}[]} groups */
+    const typos = (groups) => groups.reduce((total, group) => total + group.typos.length, 0);
+    /** @type {ReturnType<typeof importLines>} */
+    const lines = [];
+    if (outcome.removed) lines.push({kind: "removed", text: `${counted(outcome.removed, "entry", "entries")} in your list now ${outcome.removed === 1 ? "is" : "are"} removed.`});
+    if (outcome.newCorrections.length) lines.push({kind: "new", text: `${counted(outcome.newCorrections.length, "new correction", "new corrections")}, with ${counted(typos(outcome.newCorrections), "typo", "typos")}.`,
+        names: outcome.newCorrections.map((entry) => entry.correction)});
+    if (outcome.addedTypos.length) lines.push({kind: "added", text: `${counted(typos(outcome.addedTypos), "typo", "typos")} added to ${counted(outcome.addedTypos.length, "correction", "corrections")} you already have.`,
+        names: outcome.addedTypos.map((entry) => `${entry.correction} ← ${entry.typos.join(" ")}`)});
+    if (outcome.duplicates) lines.push({kind: "duplicates", text: `${counted(outcome.duplicates, "typo is", "typos are")} already in the list, and skipped.`});
+    if (outcome.unfit) lines.push({kind: "unfit", text: `${counted(outcome.unfit, "typo does", "typos do")} not fit: the keyboard holds ${holds.maxCorrections.toLocaleString("en-US")} corrections and ${holds.maxTypos.toLocaleString("en-US")} typos.`});
+    if (outcome.refused.length) lines.push({kind: "refused", text: `${counted(outcome.refused.length, "line is", "lines are")} refused:`,
+        names: outcome.refused.map((row) => `${row.line === null ? "" : `${row.line}: `}${row.text} — ${row.reason}`)});
+    if (!outcome.newCorrections.length && !outcome.addedTypos.length && !outcome.removed) lines.unshift({kind: "nothing", text: "Nothing in it would change your list."});
+    return lines;
+}
