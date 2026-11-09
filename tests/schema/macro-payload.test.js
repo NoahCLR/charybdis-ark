@@ -82,4 +82,10 @@ test("a key a macro cannot send is refused by name, never mistaken for another k
         assert.throws(() => read(payload), (error) => error.problem?.code === "unknown" && error.problem.key === key, payload);
     }
     assert.throws(() => read("{KC_A,KC_A}"), (error) => error.problem?.code === "chord", "the same key twice is still one chord key twice");
+    // A macro step takes basic keycodes only, so neither the combo keys nor
+    // their behaviours twins (firmware D-F66).
+    for (const key of ["CM_TOGG", "QK_COMBO_ON", "BH_ON", "BH_TOGG"]) {
+        assert.throws(() => read(`{${key}}`), (error) => error.problem?.code === "unknown" && error.problem.key === key, key);
+        assert.ok(!macroKeycodes().includes(key), key);
+    }
 });

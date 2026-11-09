@@ -7,10 +7,10 @@ const {judge, markdown} = require("../../scripts/check-agreement");
 
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
-// Capability pages as firmware's contract probe states them (Profile Wire 2.0,
-// schema 4.3, action-ABI digest 0x67df11b3, sixteen layers, all seven domains, a
+// Capability pages as firmware's contract probe states them (Profile Wire 2.1,
+// schema 4.3, action-ABI digest 0xb2205fc3, sixteen layers, all seven domains, a
 // split build that saves and has pointing).
-const PAGES = ["03030200040320140207000000b311df6700000100c0a24491", "10108005801010203a0880807f202040000000000000000000", "800200d00000e0cf0000e0cf00005788000000000000000000"];
+const PAGES = ["03030201040320140207000000c35f20b200000100c0a24491", "10108005801010203a0880807f202040000000000000000000", "800200d00000e0cf0000e0cf00005788000000000000000000"];
 const sha = text => createHash("sha256").update(text).digest("hex");
 
 function setup() {
@@ -62,7 +62,7 @@ test("each contract check can fail on its own", () => {
         // A schema or Profile Wire version that is not exactly Ark's, minor included.
         const schema = Buffer.from(PAGES[0], "hex"); schema[5] = 0;
         assert.deepEqual(failing({capabilityPages: [schema.toString("hex"), PAGES[1], PAGES[2]]}), ["profile schema is the one Ark reads"]);
-        const protocol = Buffer.from(PAGES[0], "hex"); protocol[3] = 1;
+        const protocol = Buffer.from(PAGES[0], "hex"); protocol[3] = 0;
         assert.deepEqual(failing({capabilityPages: [protocol.toString("hex"), PAGES[1], PAGES[2]]}), ["Profile Wire version is the one Ark requires"]);
         // Firmware's golden bytes moved past what Ark pinned.
         assert.deepEqual(failing({fixtures: {"tests/fixtures/a.fixture": sha("b")}}), ["Ark's pinned fixtures equal the firmware's"]);

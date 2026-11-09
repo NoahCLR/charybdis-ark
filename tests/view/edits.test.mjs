@@ -33,7 +33,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core"
 const {RGB_LOCALITIES} = require(path.join(here, "..", "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "..", "fixtures", "pd-profile"));
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3,
+const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3,
     featureFlags: require(path.join(here, "..", "..", "core", "protocol", "profile-wire-v1")).PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 
 test("the playback protection control stages a portable policy and Review/discard/undo preserve text", () => {
@@ -152,6 +152,33 @@ test("the picker posts layer keys by index, and wraps the key in modifiers and L
         stage(draft, edits.setKey("Layer 0", 5, keycode));
     }
     assert.equal(profileLayers(draft.document)[0][slotOf(5)], 0x0304, "C(S(KC_A))");
+});
+
+// The keyboard's keys that switch behaviours (firmware D-F66) are plain
+// keycodes it names: picked by name, they go on a key, as a combo's output and
+// in a behaviour, a behaviour of their own included, and read back by name
+// from a backup of the draft.
+test("the keys that switch behaviours go where the combo keys go, and come back by name from a backup", () => {
+    const draft = session();
+    stage(draft, edits.setKey("Layer 0", 5, "BH_TOGG"));
+    stage(draft, edits.comboMessage(null, {inputs: ["KC_D", "KC_F"], output: "BH_OFF", termMs: ""}));
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch: {style: "TAP_SENDS", action: "BH_ON"}}}, draft.identity()));
+    stage(draft, edits.saveBehaviour({keycode: "BH_TOGG", stored: false, steps: []}, {change: {tapCount: 1, kind: "tap", branch: {style: "TAP_SENDS", action: "CM_TOGG"}}}, draft.identity()));
+    assert.equal(profileLayers(draft.document)[0][slotOf(5)], 0x7ee2);
+    const output = decoded(draft).combos.rows.at(-1).output;
+    assert.deepEqual([output.kind, output.operand], [1, 0x7ee1]);
+    const rows = decoded(draft).behaviors.rows;
+    const tap = rows.find((row) => row.target.operand === 0x14).steps[0].tap;
+    assert.deepEqual([tap.kind, tap.operand], [1, 0x7ee0]);
+    assert.ok(rows.some((row) => row.target.kind === 1 && row.target.operand === 0x7ee2), "a behaviours key may have a row of its own");
+    const backup = portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document))).document;
+    const model = publishedModel(backup);
+    const key = model.layers[0].positions.find((position) => position.layoutIndex === 5);
+    assert.deepEqual([key.keycode, key.semantic, key.display], ["0x7EE2", "BH_TOGG", "Toggle Behaviours"]);
+    assert.ok(model.keyBehaviors.some((row) => row.keycode === "BH_TOGG"), "its row is keyed as the key means it");
+    assert.equal(model.qmkKeyLabels["0x7EE1"], "Behaviours Off");
+    assert.equal(model.qmkKeycodeAliases["0x7EE0"], "BH_ON");
+    assert.ok(model.qmkKeycodes.some((entry) => entry.value === "BH_TOGG" && entry.keycode === 0x7ee2));
 });
 
 // ── keyboard shortcuts ──────────────────────────────────────────────────

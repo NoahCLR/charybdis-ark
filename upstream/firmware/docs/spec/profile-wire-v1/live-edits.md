@@ -4,8 +4,8 @@ How a client changes the working copy over Profile Wire so an edit runs on
 both halves at once without a save, then saves it, reverts it, or has the
 keyboard save it in Live edit; the edit mode stored beside the profile; keyboard
 adjustments; and how a stopped keyboard says so and is restarted
-([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0032-live-edits-working-copy-and-save.md),
-[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
+([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/9c9dc7d41e17c6aa0ae557028f7eee46b1fbc725/docs/adr/0032-live-edits-working-copy-and-save.md),
+[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/9c9dc7d41e17c6aa0ae557028f7eee46b1fbc725/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
 Raw HID framing and read envelope are in [the HID channel](hid-channel.md);
 every result code is in [errors](errors.md); Save writes through
 [candidate transfer](candidate-transfer.md). How the slave half follows the
@@ -244,7 +244,7 @@ was; its result (`VALIDATION_REJECTED`, or `PUBLICATION_FAILED` with the
 candidate's error id) and transaction are on page 1, and a working copy
 replaced before the save began writing ends it `ABORTED`. A save waits for
 a quiet keyboard before each flash erase
-([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/9dcf1c915a84d0b61381e7c6af6a33a933390f26/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
+([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/9c9dc7d41e17c6aa0ae557028f7eee46b1fbc725/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
 wait counts toward no timeout on either half.
 
 An Apply still works and replaces the working copy: unsaved edits are gone
@@ -529,7 +529,8 @@ reports the stored values.
 A toggle is a runtime override beside its stored master, never an edit:
 combos run only while the stored master and QMK's combo flag (flipped by
 QMK's combo keys) both allow; behaviours only while the stored master and
-the firmware's behaviours override both allow. An override starts allowed
+the firmware's behaviours override (flipped by `BH_ON`, `BH_OFF` and
+`BH_TOGG`, D-F66) both allow. An override starts allowed
 at boot, is never saved, and reads back through GET `0x22`. RGB on and off
 is a lighting adjustment, not a toggle.
 

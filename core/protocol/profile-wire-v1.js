@@ -8,9 +8,10 @@ const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/devic
 const PROFILE_WIRE_V1 = Object.freeze({
     // Profile Wire 2.0 opens the new base (firmware D-F28): every profile
     // length and offset is 32 bits, and the feature word holds only what a
-    // build varies by. Ark requires this version exactly (D-L64).
+    // build varies by. 2.1 adds the keys that switch behaviours (firmware
+    // D-F66). Ark requires this version exactly (D-L64).
     PROTOCOL_MAJOR: 2,
-    PROTOCOL_MINOR: 0,
+    PROTOCOL_MINOR: 1,
     // Response layout 3 (firmware D-F28): page 1 the ceilings that fit a byte,
     // page 2 the wider ones. Any other layout is refused.
     CAPABILITY_LAYOUT: 3,

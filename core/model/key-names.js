@@ -15,7 +15,7 @@
 
 const {VOCABULARY} = require("./vocabulary");
 const {PD_MODE_KEYS, pdModeKeyOfCode, pdModeKeyOfName} = require("../data/pd-mode-keys");
-const {CUSTOM_KEY_SLOTS, customKeyCode, customKeyName, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
+const {BEHAVIORS_KEYS, CUSTOM_KEY_SLOTS, behaviorsKeyCode, behaviorsKeyName, customKeyCode, customKeyName, customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const catalog = require("../data/keycode-catalog");
 const keycodes = require("../schema/keycodes");
 const {LAYER_FORMS, MODS, QK, inBlock, layerFormBase, wrapperOf} = require("../../rules/qmk-keycodes.mjs");
@@ -23,7 +23,7 @@ const {actionName, knownActionAbi} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {MACOS} = require("../schema/host-settings");
-const {LAYER_KEY_VERBS: LAYER_VERBS, layerName, macroDefaultName, slotName} = require("./vocabulary");
+const {BEHAVIORS_KEY_WORDS, LAYER_KEY_VERBS: LAYER_VERBS, layerName, macroDefaultName, slotName} = require("./vocabulary");
 const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 const {LAYERS} = require("../data/charybdis-layout");
 const {shortcutPresent, shortcutSends} = require("../schema/settings-domain-v1");
@@ -164,6 +164,13 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
         aliases[native] = name;
         labels[native] = labels[name] = label;
         custom.push({name, native, code, label});
+    }
+    // The keys that switch behaviours, by the keyboard's names and the words
+    // their combo twins read by in QMK's catalogue: "Toggle Behaviours".
+    for (const name of BEHAVIORS_KEYS) {
+        const native = keycodes.resolve(/** @type {number} */ (behaviorsKeyCode(name))).name;
+        aliases[native] = name;
+        labels[native] = labels[name] = BEHAVIORS_KEY_WORDS[name];
     }
     // A behaviour row keyed by a semantic target names its keycode only where
     // the catalogue has nothing better than a bare user slot: LOCK_LAYER(2)
@@ -394,7 +401,8 @@ function unnamedKeyCount(layers, capabilities) {
     const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest ?? 0);
     /** @param {{keycode: number, resolved: {known: boolean}}} key */
     const named = ({keycode, resolved}) => resolved.known
-        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdModeKeyOfCode(keycode) !== undefined);
+        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdModeKeyOfCode(keycode) !== undefined
+            || behaviorsKeyName(keycode) !== undefined);
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 

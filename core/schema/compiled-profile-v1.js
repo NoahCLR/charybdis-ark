@@ -10,7 +10,7 @@ const keycodes = require("./keycodes");
 const legacy = require("../data/keycode-legacy");
 const {PD_MODE_KEYS, formerNames, pdModeKeyOfName} = require("../data/pd-mode-keys");
 const {macroOfName} = require("../../rules/qmk-keycodes.mjs");
-const {customKeyCode, customKeyOfName, LAYER_LOCK_BLOCK} = require("../data/user-keycodes");
+const {behaviorsKeyCode, customKeyCode, customKeyOfName, LAYER_LOCK_BLOCK} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 const {DIALECTS, callParts, encodeExpression, normalizeExpression, splitArguments} = require("../../rules/keycode-expression.mjs");
 
@@ -74,8 +74,8 @@ function semanticActionForExpression(value, model) {
 const SPELLINGS = Object.freeze({names: legacy.NAMES, modTaps: legacy.MOD_TAP_SHORTHANDS, wrappers: legacy.WRAPPER_ALIASES});
 // What the draft knows by name: the model's keycode values, the Charybdis's
 // own pointer keys, QMK's blank names and other spellings, then (after a
-// macro's name) custom keys and pointing keys, and the profile's layers by
-// name.
+// macro's name) custom keys, pointing keys and the keys that switch
+// behaviours, and the profile's layers by name.
 /** @param {ExpressionModel} model @returns {import("../../rules/keycode-expression.mjs").ExpressionTables} */
 function tablesOf(model) {
     const catalog = model?.qmkKeycodeValues || {};
@@ -91,7 +91,7 @@ function tablesOf(model) {
             const custom = customKeyOfName(name);
             if (custom !== undefined) return customKeyCode(custom);
             const pd = pdModeKeyOfName(name);
-            return pd ? (pd.locked ? PD_MODE_KEYS[pd.slot].lockCode : PD_MODE_KEYS[pd.slot].holdCode) : undefined;
+            return pd ? (pd.locked ? PD_MODE_KEYS[pd.slot].lockCode : PD_MODE_KEYS[pd.slot].holdCode) : behaviorsKeyCode(name);
         },
         spellings: SPELLINGS,
         layers: model?.layers || [],

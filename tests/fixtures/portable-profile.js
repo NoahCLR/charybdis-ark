@@ -21,7 +21,7 @@ const {LAYER_LOCK_BASE} = require("../../core/data/user-keycodes");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
 
 const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/populated_profile_v4.fixture");
-const CURRENT_CAPABILITIES = Object.freeze({protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI,
+const CURRENT_CAPABILITIES = Object.freeze({protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI,
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
 
 // Settings v10: values 10..14 are the retired pointing DPI and 27 the retired

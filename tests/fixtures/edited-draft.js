@@ -11,7 +11,7 @@ const {LAYER_IDENTITY} = require("../../core/data/charybdis-layout");
 const {RGB_LOCALITIES, RGB_TAP_COMMIT_MODES} = require("../../core/schema/rgb-domain-v1");
 const {document: pdDocument} = require("./pd-profile");
 
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
+const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3};
 /** @param {import("../../core/model/types.js").PortableDocument} document */
 const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
 

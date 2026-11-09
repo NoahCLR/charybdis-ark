@@ -103,7 +103,7 @@ test("the Settings card gets the stored name, and the built-in one only while th
     const {document} = require("../fixtures/portable-profile");
     const {fingerprint, summary} = require("../../core/model/portable-profile");
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
+    const caps = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3};
     const binding = {editable: true, reason: ""}, device = {product: "Charybdis (4x6) Splinky"};
     assert.deepEqual(buildSnapshotModel(snapshot, caps, binding, {device, storedKeyboardName: ""}).keyboardName,
         {name: "", builtIn: "Charybdis (4x6) Splinky", identity: snapshot.fingerprint, perName: 32});

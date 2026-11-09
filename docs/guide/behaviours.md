@@ -205,9 +205,18 @@ key, the key does what it would without one: the board shows no dots on it,
 and the Key tab and the hover card say which switch is keeping it off, with
 no branches or timing, since none of them run.
 
-A key on the keyboard can turn behaviours or combos off for now. Behaviour
-settings or Combo settings then marks the switch **turned off by key**. That
-isn't a change and isn't in Review: the key, or unplugging, turns it back on.
+A key on the keyboard can turn behaviours or combos off for now:
+**Behaviours Off** (`BH_OFF`) or **Toggle Behaviours** (`BH_TOGG`) for
+behaviours, and QMK's **Combo Off** (`CM_OFF`) or **Toggle Combo**
+(`CM_TOGG`) for combos. **Behaviours On** (`BH_ON`) and **Combo On**
+(`CM_ON`) turn them back on. Each **Enabled** says **↺ keyboard keys change
+this too**, and Behaviour settings or Combo settings then marks it **turned
+off by key**. That isn't a change and isn't in Review: the key, or unplugging,
+turns it back on. The behaviours keys still work while behaviours are off,
+even with a behaviour of their own, and a key already holding something when
+behaviours go off keeps it until you let go. The picker lists all six in
+**Other QMK**, under **Combos and behaviours**; they go on a key, in a
+behaviour or as a combo's output, but not in a macro.
 
 ## Behaviour settings
 

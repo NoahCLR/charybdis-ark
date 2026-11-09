@@ -26,14 +26,19 @@ test("an action has one name and one native keycode", () => {
     assert.equal(actionName({kind: ACTION.POINTING_MODE_LOCK, operand: 31}), "PD_MODE_31_LOCK");
     assert.equal(nativeCode({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 31}), 0x7e9f);
     assert.throws(() => actionName({kind: ACTION.POINTING_MODE_MOMENTARY, operand: 32}), /pointing slot/);
+    // The keys that switch behaviours are plain keycodes the keyboard names
+    // (firmware D-F66); the rest of their block names nothing.
+    assert.deepEqual([0x7ee0, 0x7ee1, 0x7ee2].map(operand => actionName({kind: ACTION.QMK_KEYCODE, operand})), ["BH_ON", "BH_OFF", "BH_TOGG"]);
+    assert.equal(nativeCode({kind: ACTION.QMK_KEYCODE, operand: 0x7ee2}), 0x7ee2);
+    assert.equal(actionName({kind: ACTION.QMK_KEYCODE, operand: 0x7ee3}), "0x7EE3");
 });
 
 test("one action vocabulary is known, and a layer reference reads back", () => {
     assert.equal(layerRef(3), "Layer 3");
     assert.equal(layerOfRef("Layer 3"), 3);
     assert.equal(layerOfRef("Numbers"), undefined);
-    assert.equal(knownActionAbi(0x67df11b3), true, "the vocabulary with the keycode blocks and 32 pointing slots");
-    for (const retired of [0x837cf479, 0xf79c6151, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959]) assert.equal(knownActionAbi(retired), false, `0x${retired.toString(16)} is retired`);
+    assert.equal(knownActionAbi(0xb2205fc3), true, "the vocabulary with the keycode blocks and 32 pointing slots");
+    for (const retired of [0x837cf479, 0xf79c6151, 0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0x67df11b3]) assert.equal(knownActionAbi(retired), false, `0x${retired.toString(16)} is retired`);
     assert.equal(knownActionAbi(1), false);
 });
 
@@ -55,6 +60,13 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
     for (const unowned of [0x5241, 0x52e1, 0x5102, 0x5268]) assert.equal(places(code(unowned)), "- - - - -", `0x${unowned.toString(16)} goes nowhere`);
     assert.equal(places({kind: ACTION.CUSTOM_KEY, operand: 2}), "ok ok ok ok ok", "a custom key goes anywhere: a step sends its shortcut (firmware D-F26)");
     assert.equal(places({kind: ACTION.CUSTOM_KEY, operand: 127}), "ok ok ok ok ok", "custom key 127 too");
+    // The keys that switch behaviours go wherever QMK's combo keys go
+    // (firmware D-F66, blob-and-digests.md).
+    const keycodes = require("../../core/schema/keycodes");
+    for (const [combo, behaviours] of [["QK_COMBO_ON", 0x7ee0], ["QK_COMBO_OFF", 0x7ee1], ["QK_COMBO_TOGGLE", 0x7ee2]]) {
+        assert.equal(places(code(behaviours)), places(code(/** @type {number} */ (keycodes.encode(combo)))), actionName(code(behaviours)));
+        assert.equal(places(code(behaviours)), "ok ok ok ok ok");
+    }
 });
 
 test("placement covers all sixteen layers and refuses a layer past the bank", () => {
@@ -80,7 +92,7 @@ test("the keyboard has the 32 pointing slots of the keycode blocks", () => {
     const {ACTION_ABI, KNOWN_ACTION_ABIS} = require("../../core/schema/actions");
     const {POINTING_SLOT_COUNT} = require("../../core/data/pd-mode-keys");
     assert.deepEqual(KNOWN_ACTION_ABIS, [ACTION_ABI]);
-    assert.equal(ACTION_ABI, 0x67df11b3);
+    assert.equal(ACTION_ABI, 0xb2205fc3);
     assert.equal(POINTING_SLOT_COUNT, 32);
     assert.equal(pointingSlotOfCode(0x7e94), 20);
     assert.equal(pointingSlotOfCode(0x7ebf), 31);

@@ -57,7 +57,7 @@ function fillPreviewLayer(document) {
 
 /** @type {Partial<import("../core/session/types.js").DeviceCapabilities> & {brightnessMax: number}} */
 const capabilities = {
-    protocol: {major: 2, minor: 0},
+    protocol: {major: 2, minor: 1},
     schema: {major: 4, minor: 3},
     compiledLayerCount: 16,
     supportedDomainMask: 127,

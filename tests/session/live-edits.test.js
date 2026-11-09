@@ -428,6 +428,14 @@ test("a toggle a key turned off is published beside the stored master, not as a 
     assert.equal(session.draft.dirty, false);
 });
 
+// BH_OFF or BH_TOGG (firmware D-F66) turned behaviours off over a stored on:
+// runtime page 0 byte 3 reads off while byte 2 reads on.
+test("behaviours a key turned off are published beside the stored master, not as a change", async t => {
+    const {shell, session} = await open(t, {behavioursOverride: false});
+    assert.deepEqual(lastModel(shell).runtime, {combosOffByKey: false, behavioursOffByKey: true});
+    assert.equal(session.draft.dirty, false);
+});
+
 test("a live draft out of step with the keyboard is read again, not rebased", async t => {
     const {shell, session, send} = await open(t);
     session.draft.needsRead = true;
@@ -656,6 +664,11 @@ test("choosing the same mode again settles halves that stored different modes", 
 test("in Apply a toggle a key turned off is shown too", async t => {
     const {shell} = await open(t, {mode: EDIT_MODE.APPLY, combosOverride: false});
     assert.deepEqual(lastModel(shell).runtime, {combosOffByKey: true, behavioursOffByKey: false});
+});
+
+test("in Apply behaviours a key turned off are shown too", async t => {
+    const {shell} = await open(t, {mode: EDIT_MODE.APPLY, behavioursOverride: false});
+    assert.deepEqual(lastModel(shell).runtime, {combosOffByKey: false, behavioursOffByKey: true});
 });
 
 test("Live preview + save into Live edit with unsaved edits asks Save or Revert first, as the keyboard refuses the change otherwise", async t => {

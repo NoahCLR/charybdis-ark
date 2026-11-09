@@ -770,6 +770,11 @@ const macroProblemWords = (problem) => wordedProblem(problem, VOCABULARY.macroPr
 // What a layer key does to its layer, in words (VOCABULARY.layerKeyVerbs).
 /** @type {Readonly<Record<string, string>>} */
 const LAYER_KEY_VERBS = VOCABULARY.layerKeyVerbs;
+// The keys that switch behaviours (data/user-keycodes.js BEHAVIORS_KEYS), in
+// the words QMK's catalogue gives their combo twins, Combo On, Combo Off and
+// Toggle Combo (CM_ON, CM_OFF, CM_TOGG).
+/** @type {Readonly<Record<string, string>>} */
+const BEHAVIORS_KEY_WORDS = Object.freeze({BH_ON: "Behaviours On", BH_OFF: "Behaviours Off", BH_TOGG: "Toggle Behaviours"});
 
 // A refusal from the macro grammar (core/schema/macro-payload.js), in words:
 // the schema names the grammar's reason (`problem`), and every reader of a
@@ -848,4 +853,4 @@ function failureSentence(error) {
     return INCOMPATIBLE_ANSWERS.has(String(code)) ? FAILURE_WORDS.incompatible : FAILURE_WORDS.unreadable;
 }
 
-module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};
+module.exports = {PHASE, listed, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, SAVE_STEP_WORDS, SAVE_FAILURE_WORDS, APPLY_VERDICTS, SAVE_WORDS, INTERRUPTION_REASONS, PROFILE_FULL_WORDS, heldWords, EDIT_MODE_WORDS, editModeWords, quietWords, VOCABULARY, word, layerName, macroDefaultName, slotName, branchName, ledsCalled, LAYER_KEY_VERBS, BEHAVIORS_KEY_WORDS, wordedMacroError, protectionWords, settingsPath, modifierNames, PROFILE_AREAS, REVIEW_AREAS, FAILURE_WORDS, sayable, arkCode, failureSentence};

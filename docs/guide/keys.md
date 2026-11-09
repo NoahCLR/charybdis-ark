@@ -9,12 +9,12 @@ does on this layer and lets you change it.
 layer (Number)*) shows the key's **Keycode** and what it **Does**. Change it
 by typing a keycode or with **Pick…**. The field takes QMK's spellings, such
 as `LCTL_T(KC_A)`, `SGUI(KC_S)` or `OSM(MOD_MEH)`, the keyboard's own names,
-such as `MACRO_3`, `LOCK_LAYER(2)` or `CUSTOM_KEY_5`, a layer by its number,
-as in `MO(2)`, and a keycode as up to four hex digits, `0x0004`. A number in
-decimal isn't a keycode, inside a call or on its own, and neither are
-spellings QMK doesn't have, such as `LAS()`, or a slot written with a leading
-zero, such as `MACRO_03`. The field and the picker take exactly the same
-keycodes. A keycode the keyboard can't store stays in the field with the
+such as `MACRO_3`, `LOCK_LAYER(2)`, `CUSTOM_KEY_5` or `BH_TOGG`, a layer by
+its number, as in `MO(2)`, and a keycode as up to four hex digits, `0x0004`.
+A number in decimal isn't a keycode, inside a call or on its own, and neither
+are spellings QMK doesn't have, such as `LAS()`, or a slot written with a
+leading zero, such as `MACRO_03`. The field and the picker take exactly the
+same keycodes. A keycode the keyboard can't store stays in the field with the
 reason under it, and nothing changes; so does a lock of a layer this keyboard
 doesn't have.
 
@@ -53,7 +53,9 @@ a board labelled for your computer's keyboard layout (set in
 Option or AltGr on the right. Below it are sections by task: **Letters and
 digits**, **Symbols**, **Numpad**, **Common keys**, then the things you own,
 **Layers**, **Macros**, **Custom keys** and **Pointing modes**, then **Mouse**,
-**Media**, **More keys**, **Lighting** and **Other QMK**, which holds Magic.
+**Media**, **More keys**, **Lighting** and **Other QMK**, which holds Magic
+and, under **Combos and behaviours**, the keys that turn combos and behaviours
+on and off ([turned off by key](behaviours.md#where-behaviours-run)).
 Keys sit in named groups, such as Arrows, Function and Modifiers, and **No key**
 in Common keys holds N/A and Transparent. **All keycodes** lists every key the
 picker offers, section by section, in the same groups.

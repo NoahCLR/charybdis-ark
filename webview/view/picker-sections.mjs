@@ -107,7 +107,11 @@ export function pickerSections() {
         ), groups: [
             group("Magic swaps", (entry) => entry.group === "magic" && /SWAP|TOGGLE_(?:CONTROL|BACKSLASH|ALT_GUI|CTL_GUI|ESCAPE)/.test(valueOf(entry))),
             group("Magic switches", from("magic")),
-            group("System", from("system")), group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)), group("Features", rest),
+            group("System", from("system")), group("Firmware", named(/BOOTLOADER|REBOOT|DEBUG|EEPROM|MAKE/)), group("Space Cadet", named(/SPACE_CADET/)),
+            // The keyboard's keys that switch behaviours, after QMK's that
+            // switch combos, which they mirror.
+            listed("Combos and behaviours", "QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "BH_ON", "BH_OFF", "BH_TOGG"),
+            group("Features", rest),
         ]},
         {id: "all", label: "All keycodes", kind: "all"},
     ];

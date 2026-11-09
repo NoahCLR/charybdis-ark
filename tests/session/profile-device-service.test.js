@@ -64,12 +64,12 @@ test("a restore to firmware on another base is refused before recovery or any wr
     const keyboard = {...source, answer: report => {
         const responses = source.answer(report);
         if (report[0] === PROFILE_WIRE_V1.COMMAND_GET && report[2] === PROFILE_WIRE_V1.VALUE_CAPABILITIES && report[4] === 0) {
-            for (const response of responses) response[PROFILE_WIRE_V1.PAYLOAD_OFFSET + 3] = 1;
+            for (const response of responses) response[PROFILE_WIRE_V1.PAYLOAD_OFFSET + 3] = PROFILE_WIRE_V1.PROTOCOL_MINOR + 1;
         }
         return responses;
     }};
     const {service} = await connectedService(t, {keyboard});
-    assert.deepEqual(service.capabilities.protocol, {major: 2, minor: 1});
+    assert.deepEqual(service.capabilities.protocol, {major: 2, minor: 2});
     let recovery = 0;
     await assert.rejects(service.restorePortableProfile(document(), {saveRecovery: () => {recovery++;}}), {code: "FIRMWARE_UPDATE_REQUIRED"});
     assert.equal(recovery, 0);
@@ -131,7 +131,7 @@ function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
     const featureFlags = (PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.POINTING
         | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0)) >>> 0;
-    capabilityIdentity.set([options.capabilityLayout ?? 3, 3, 2, 0, options.schemaMajor || 4, options.schemaMajor ? 0 : 3, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.set([options.capabilityLayout ?? 3, 3, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, options.schemaMajor || 4, options.schemaMajor ? 0 : 3, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
@@ -372,7 +372,7 @@ test("compatibility compares only what the keyboard reports with what this app r
 test("compatibility uses the exact Profile Wire and schema versions in capabilities", () => {
     const {capabilities} = require("../fixtures/portable-restore");
     assert.equal(evaluateProfileCompatibility(capabilities).compatible, true);
-    for (const protocol of [{major: 1, minor: 0}, {major: 2, minor: 1}]) {
+    for (const protocol of [{major: 1, minor: 0}, {major: 2, minor: 0}, {major: 2, minor: 2}]) {
         const result = evaluateProfileCompatibility({...capabilities, protocol});
         assert.equal(result.compatible, false);
         assert.match(result.reasons.join("\n"), /Update both halves/);

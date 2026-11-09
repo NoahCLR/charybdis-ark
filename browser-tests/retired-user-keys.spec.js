@@ -48,3 +48,22 @@ for (const theme of ["dark", "light"]) {
         expect(validateSnapshot(draft.document).layers[0][0]).toBe(0x7f02);
     });
 }
+
+// The keyboard's keys that switch behaviours (firmware D-F66) are picked
+// beside QMK's combo keys, in Other QMK, and post by the keyboard's name.
+test("a key that switches behaviours is picked beside the combo keys and posts by name", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('[data-act="pick"]').click();
+    const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+    await picker.locator('[data-sec="other"]').click();
+    const switches = ["QK_COMBO_ON", "QK_COMBO_OFF", "QK_COMBO_TOGGLE", "BH_ON", "BH_OFF", "BH_TOGG"];
+    const shown = await picker.locator("[data-pick]").evaluateAll(tiles => tiles.map(tile => tile.getAttribute("data-pick")));
+    const at = shown.indexOf("QK_COMBO_ON");
+    expect(shown.slice(at, at + switches.length)).toEqual(switches);
+    await expect(picker.locator('[data-pick="BH_TOGG"]')).toContainText("Toggle Behaviours");
+    await clearPosts(page);
+    await picker.locator('[data-pick="BH_TOGG"]').click();
+    await picker.locator('[data-act="use"]').click();
+    expect(await posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys",
+        changes: [expect.objectContaining({layoutIndex: 0, keycode: "BH_TOGG"})]})]);
+});

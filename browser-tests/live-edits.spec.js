@@ -134,6 +134,17 @@ test("combos turned off by a key show beside the switch, not as a change", async
     await expect(page.locator(".commit.live")).toContainText("1 unsaved change");
 });
 
+// BH_OFF and BH_TOGG (firmware D-F66) switch behaviours as CM_OFF and CM_TOGG
+// switch combos, and Behaviour settings says so the same way.
+test("behaviours turned off by a key show beside their switch, which says keyboard keys change it", async ({page}) => {
+    await openLive(page, "behaviours");
+    const row = page.locator('.setrow:has([data-macro="behaviorsEnabled"])');
+    await expect(row.locator(".kk-mark")).toHaveText(["↺ keyboard keys change this too"]);
+    await withModel(page, model => {model.runtime = {combosOffByKey: false, behavioursOffByKey: true};});
+    await expect(row.locator(".off-by-key")).toHaveText("turned off by key");
+    await expect(page.locator(".off-by-key")).toHaveCount(1);
+});
+
 // In the live modes a builder's Keep sends its edit to the keyboard at once,
 // and posts as in Review and save.
 test("the combo builder's Keep says it sends the combo to the keyboard, and posts", async ({page}) => {

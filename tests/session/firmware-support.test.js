@@ -13,16 +13,17 @@ const bits = mask => Array.from({length: 32}, (_, bit) => 2 ** bit).filter(bit =
 const MUTATION = MASKS.CURRENT_MUTATION_FEATURES;
 const complete = {...capabilities, supportedDomainMask: PROFILE_DOMAIN_MASK, featureFlags: MASKS.CURRENT_PAIR_FEATURES};
 const read = {...complete, featureFlags: 0, supportedDomainMask: DOMAINS.RGB | DOMAINS.KEY_BEHAVIORS};
-// Earlier and later bases: Profile Wire 1 with schema 3, and either version
-// off by one in its major or its minor (D-L64).
+// Earlier and later bases: Profile Wire 1 with schema 3, the released 2.0
+// without the behaviours keys (firmware D-F66), and either version off by one
+// in its major or its minor (D-L64).
 const otherBases = [
     {protocol: {major: 1, minor: 0}, schema: {major: 3, minor: 0}},
-    {protocol: {major: 2, minor: 1}}, {protocol: {major: 3, minor: 0}}, {protocol: {major: 1, minor: 0}},
+    {protocol: {major: 2, minor: 0}}, {protocol: {major: 2, minor: 2}}, {protocol: {major: 3, minor: 1}}, {protocol: {major: 1, minor: 1}},
     {schema: {major: 4, minor: 2}}, {schema: {major: 4, minor: 4}}, {schema: {major: 5, minor: 0}}, {schema: {major: 3, minor: 0}},
 ];
 
 test("reads accept reported capacities and require the exact current base", () => {
-    assert.deepEqual(support.SUPPORTED_PROFILE_PROTOCOL, {major: 2, minor: 0});
+    assert.deepEqual(support.SUPPORTED_PROFILE_PROTOCOL, {major: 2, minor: 1});
     assert.deepEqual(support.SUPPORTED_PROFILE_SCHEMA, {major: 4, minor: 3});
     const partial = {...read, compiledLayerCount: 8, actionAbiDigest: 0, candidateChunkMax: 0};
     assert.equal(support.canRead(partial), true, "no feature bit is needed to read");
@@ -116,14 +117,14 @@ test("snapshot and identity reads retain the lease, active-profile, conflict and
 test("read diagnostic reasons and their order stay stable", () => {
     const result = support.evaluateProfileCompatibility({});
     assert.deepEqual(result.reasons, [
-        "Profile Wire version is undefined.undefined; Charybdis Ark requires 2.0. Update both halves.",
+        "Profile Wire version is undefined.undefined; Charybdis Ark requires 2.1. Update both halves.",
         "Profile schema is undefined.undefined; Charybdis Ark requires 4.3. Update both halves.",
         "Raw HID report size is undefined; Charybdis Ark requires 32.",
         "Status pages is undefined; at least 2 is required.",
         "Required profile domains mask 0x0 does not include required mask 0x3.",
     ]);
     assert.deepEqual(support.evaluateProfileCompatibility({...complete, ...otherBases[0]}).reasons, [
-        "Profile Wire version is 1.0; Charybdis Ark requires 2.0. Update both halves.",
+        "Profile Wire version is 1.0; Charybdis Ark requires 2.1. Update both halves.",
         "Profile schema is 3.0; Charybdis Ark requires 4.3. Update both halves.",
     ]);
 });

@@ -11,7 +11,7 @@ const {macroEditorView} = require("../../core/model/macro-editor");
 const {profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {buildDeviceModel} = require("../../core/session/device-model");
-const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x67df11b3};
+const capabilities = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0xb2205fc3};
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 
 test("all 128 custom keys are listed, and a name changes nothing else", () => {

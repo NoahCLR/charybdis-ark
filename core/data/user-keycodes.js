@@ -9,10 +9,16 @@
 //   0x7e80–0x7e9f  PD_MODE_n         hold pointing slot n
 //   0x7ea0–0x7ebf  PD_MODE_n_LOCK    lock pointing slot n
 //   0x7ec0–0x7edf  LOCK_LAYER(n)     toggle layer n's lock
+//   0x7ee0–0x7eef  BH_ON, BH_OFF, BH_TOGG
+//                                    switch behaviours on, off or the other way,
+//                                    as QMK's CM_ON, CM_OFF, CM_TOGG do combos
+//                                    (firmware D-F66; 16 reserved, 3 used)
 //   0x7f00–0x7f7f  CUSTOM_KEY_0–127  named keys that do what their behaviour says
 
 const CUSTOM_KEY_BASE = 0x7f00, PD_HOLD_BASE = 0x7e80, PD_LOCK_BASE = 0x7ea0, LAYER_LOCK_BASE = 0x7ec0;
 const CUSTOM_KEY_SLOTS = 128, LAYER_LOCK_SLOTS = 16;
+// The behaviours keys' block: sixteen codes reserved, three used.
+const BEHAVIORS_KEY_BASE = 0x7ee0, BEHAVIORS_KEY_SLOTS = 16;
 // The block custom keys used before D-F14, now inert: nothing there is a
 // custom key.
 const RETIRED_CUSTOM_KEY_BASE = 0x7e40, RETIRED_CUSTOM_KEY_SLOTS = 64;
@@ -37,9 +43,20 @@ const LAYER_LOCK_BLOCK = Object.freeze({first: LAYER_LOCK_BASE, count: LAYER_LOC
 const layerLockCode = layer => LAYER_LOCK_BASE + layer;
 /** @param {number} code */
 const layerLockOfCode = code => Number.isInteger(code) && code >= LAYER_LOCK_BASE && code < LAYER_LOCK_BASE + LAYER_LOCK_SLOTS ? code - LAYER_LOCK_BASE : undefined;
+// The keys that switch behaviours, in their block's order: on, off, the
+// other way. A stored one is a plain keycode (action kind 1), as QMK's combo
+// keys are; the rest of the block is inert.
+const BEHAVIORS_KEYS = Object.freeze(["BH_ON", "BH_OFF", "BH_TOGG"]);
+/** @param {unknown} name */
+const behaviorsKeyCode = name => {
+    const at = BEHAVIORS_KEYS.indexOf(String(name ?? ""));
+    return at < 0 ? undefined : BEHAVIORS_KEY_BASE + at;
+};
+/** @param {number} code */
+const behaviorsKeyName = code => Number.isInteger(code) && code >= BEHAVIORS_KEY_BASE ? BEHAVIORS_KEYS[code - BEHAVIORS_KEY_BASE] : undefined;
 
 module.exports = {
-    CUSTOM_KEY_BASE, PD_HOLD_BASE, PD_LOCK_BASE, LAYER_LOCK_BASE, CUSTOM_KEY_SLOTS, LAYER_LOCK_SLOTS, LAYER_LOCK_BLOCK,
-    RETIRED_CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_SLOTS,
-    customKeyCode, customKeyName, customKeyOfCode, customKeyOfName, layerLockCode, layerLockOfCode,
+    CUSTOM_KEY_BASE, PD_HOLD_BASE, PD_LOCK_BASE, LAYER_LOCK_BASE, BEHAVIORS_KEY_BASE, CUSTOM_KEY_SLOTS, LAYER_LOCK_SLOTS, LAYER_LOCK_BLOCK,
+    BEHAVIORS_KEY_SLOTS, BEHAVIORS_KEYS, RETIRED_CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_SLOTS,
+    behaviorsKeyCode, behaviorsKeyName, customKeyCode, customKeyName, customKeyOfCode, customKeyOfName, layerLockCode, layerLockOfCode,
 };

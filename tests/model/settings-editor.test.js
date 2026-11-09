@@ -354,6 +354,17 @@ test("settings presentation owns combo timing words and explicit duration units"
     }
 });
 
+// Keys on the keyboard switch both masters for now, combos' with QMK's CM_*
+// and behaviours' with the keyboard's BH_* (firmware D-F66), so both say so;
+// their layer switches no key changes.
+test("the behaviour and combo masters say keyboard keys change them too, and their layers do not", () => {
+    const sections = settingsEditorView(snapshot()).sections;
+    for (const [id, macro] of [["behaviorSettings", "behaviorsEnabled"], ["comboSettings", "combosEnabled"]]) {
+        const fields = sections.find(section => section.id === id).fields;
+        assert.deepEqual(fields.filter(field => field.keyboardKeys).map(field => field.macro), [macro], id);
+    }
+});
+
 // Settings v9: auto-sniping follows a set of layers beside its master switch,
 // drawn as one row of layer switches like the other per-layer settings.
 test("auto-sniping is its switch and one switch per layer, saved as one layer mask", () => {

@@ -10,7 +10,7 @@ const {candidateMetadataForBlob, buildCandidateBeginRequest} = require("../../co
 const {buildSnapshotModel} = require("../../core/session/device-model");
 function fixture() {
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
+    const caps = {protocol: {major: 2, minor: 1}, schema: {major: 4, minor: 3}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
     const draft = new ProfileDraftSession(snapshot, "board", caps);
     const stage = message => draft.stage({...message, draftRevision: draft.revision});
     return {draft, stage, caps};

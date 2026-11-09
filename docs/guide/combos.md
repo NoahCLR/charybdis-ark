@@ -63,7 +63,9 @@ builder says which.
 both open. **How combos run**:
 
 - **Enabled**: every combo on or off. A key on the keyboard can change it
-  too.
+  too: QMK's **Combo On**, **Combo Off** and **Toggle Combo** (`CM_ON`,
+  `CM_OFF`, `CM_TOGG`), until the keyboard restarts
+  ([turned off by key](behaviours.md#where-behaviours-run)).
 - **Default combo window**: for every combo without its own. New combos start
   on it, and the combos that follow it change with it.
 - **Combo hold threshold**: how long a combo that must be held, or is tap
