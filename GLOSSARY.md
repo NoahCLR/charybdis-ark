@@ -3,7 +3,8 @@
 The words for the app: how a person reads the keyboard, edits it in a draft,
 reviews and keeps changes, and backs them up. The keyboard's own words
 (profile, half, generation, working copy, edit mode, Save, Apply, behaviour,
-pointing mode, switch key and the rest) are in the [firmware's
+pointing mode, switch key, the autocorrect list with its entries, corrections
+and typos, and the rest) are in the [firmware's
 glossary](upstream/firmware/GLOSSARY.md), which Ark imports at a pinned
 commit. A person sees the keyboard's Apply and its Save both as **Save**
 (D-L72).

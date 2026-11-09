@@ -1,8 +1,8 @@
 # Backups
 
 A backup is one file that holds everything the keyboard stores: keys,
-layers, behaviours, combos, macros, custom keys, pointing modes, lighting,
-settings and the keyboard's name. It holds the complete profile, so importing
+layers, behaviours, combos, macros, the autocorrect list, custom keys,
+pointing modes, lighting, settings and the keyboard's name. It holds the complete profile, so importing
 it doesn't depend on what the keyboard had before.
 
 Everything here is on the **Backups** screen. It needs a keyboard on current

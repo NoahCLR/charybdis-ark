@@ -14,12 +14,14 @@ page for whatever you want to change.
 5. [Combos](combos.md): keys pressed together.
 6. [Macros](macros.md): text and key sequences, swapping slots, recording,
    and your computer's keyboard layout.
-7. [Pointing](pointing.md): the trackball's speed, sniping and auto-mouse,
+7. [Autocorrect](autocorrect.md): the typos the keyboard fixes as you
+   type, each correction with the ways you mistype it.
+8. [Pointing](pointing.md): the trackball's speed, sniping and auto-mouse,
    and the 32 pointing modes.
-8. [Lighting](lighting.md): the background effect, layer and mode colours,
+9. [Lighting](lighting.md): the background effect, layer and mode colours,
    feedback and the idle timeout.
-9. [Review and save](review-and-save.md): the edit modes (Live edit, Live
-   preview + save and Review and save), Review and its checks, and what
-   happens while the keyboard saves.
-10. [Backups](backups.md): exporting and importing profiles, and the recovery
+10. [Review and save](review-and-save.md): the edit modes (Live edit, Live
+    preview + save and Review and save), Review and its checks, and what
+    happens while the keyboard saves.
+11. [Backups](backups.md): exporting and importing profiles, and the recovery
     copies Ark keeps.

@@ -67,7 +67,7 @@ released with it (D-L44, D-L50).
 | --- | --- | --- |
 | Profile Wire | 2.1, exactly | `PROFILE_WIRE_V1` in `protocol/profile-wire-v1.js` |
 | Profile schema | 4.4, exactly | `PROFILE_BLOB_V1` in `schema/profile-blob-v1.js` |
-| Domain versions | RGB 4, key behaviours 2, combos 3, settings 11, PD 4, keymap 1, macros 1 | `schema/profile-domains.js` |
+| Domain versions | RGB 4, key behaviours 2, combos 3, settings 11, PD 4, keymap 1, macros 1, autocorrect 1 | `schema/profile-domains.js` |
 | Store format | 6 (implied by Profile Wire 2, not on the wire) | `PROFILE_CANDIDATE_V1` in `protocol/profile-candidate-v1.js` |
 | Profile size | 130,048 bytes; lengths and offsets 32 bits | `PROFILE_BLOB_V1` in `schema/profile-blob-v1.js`, which `PROFILE_CANDIDATE_V1` reads |
 | Action vocabulary | `0x3c9e17ff` | `ACTION_ABI` in `schema/actions.js` |

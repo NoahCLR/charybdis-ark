@@ -3,9 +3,9 @@
 Ark is the web editor for
 [Noah's Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6),
 and works only with that firmware. Once a keyboard is connected, Ark reads
-its profile: keymap, behaviours, combos, macros, trackball and lighting. In
-the default edit mode, a change runs on the keyboard from the next keypress
-and can be tried in real typing before it is saved.
+its profile: keymap, behaviours, combos, macros, autocorrect, trackball and
+lighting. In the default edit mode, a change runs on the keyboard from the
+next keypress and can be tried in real typing before it is saved.
 
 <p align="center">
   <picture>
@@ -142,6 +142,15 @@ character it can't type says which one and isn't kept.
   <br>
   <sub>Command+Space added as a chord, then <code>notes</code> and Enter recorded, and the macro named Open Notes.</sub>
 </p>
+
+### Autocorrect
+
+List the typos you make and the keyboard fixes them as you finish a word, on
+any computer. An entry is one correction with every way you mistype it, so
+"because" is written once for `becuase`, `becasue` and `beacuse`. A typo
+matches the whole word unless it is set to match the start, the end or any
+part of one. Ark checks each entry as it is typed, refuses one the computer's
+layout can't type, and marks the ones that would misfire.
 
 ### Pointing modes
 
@@ -284,6 +293,7 @@ The [Ark guide](docs/guide/README.md) has a page per screen:
 - [Behaviours](docs/guide/behaviours.md)
 - [Combos](docs/guide/combos.md)
 - [Macros](docs/guide/macros.md)
+- [Autocorrect](docs/guide/autocorrect.md)
 - [Pointing](docs/guide/pointing.md)
 - [Lighting](docs/guide/lighting.md)
 - [Edit modes and Review](docs/guide/review-and-save.md)

@@ -32,6 +32,15 @@ unused tails and malformed data receive matching C/JS judgements, with exact
 transported bytes and source offsets beyond 64 KiB. Both variants run under
 the bridge, with no VIA code or hardware.
 
+The autocorrect-domain runner owns its C probe here and links the selected
+firmware's production list validator and the lookups its engine reads the
+list with. Both sides judge the firmware's own valid and invalid vectors,
+lists Ark writes (every match, text outside ASCII, a list at every ceiling)
+and every byte of a small list changed three ways: a refusal must name the
+same reason, table and row, and what both accept the firmware's lookups must
+read as Ark decodes it and Ark must write back byte for byte, at read offsets
+past 64 KiB, in normal and sanitizer builds.
+
 The live-edit runner owns its C probe here and links the selected firmware's
 production edit channel and working copy; the probe is the owner between them
 (one half; Save, the edit mode and the slave half's facts are fields the corpus
@@ -39,10 +48,10 @@ sets). Ark's coordinator sends real edits and the C working copy must equal
 Ark's splicing byte for byte; refusals and every reply layout and status flag
 pass through Ark's decoders, in normal and sanitizer builds.
 
-The schema-4 candidate corpus uses all seven domains. The maximum frozen
-profile is 74,801 bytes, so full and differential uploads exercise offsets
+The schema-4 candidate corpus uses all eight domains. The maximum frozen
+profile is 114,703 bytes, so full and differential uploads exercise offsets
 past 64 KiB through the production C validator and store, in both normal and
 sanitizer builds. The probe’s byte media models the dedicated profile region,
 independent of QMK’s eeconfig EEPROM. Production matrix dimensions set the keymap
 validator’s placement count. The compiled-defaults runner also validates
-Ark-generated seven-domain candidates, including populated macro streams.
+Ark-generated eight-domain candidates, including populated macro streams.

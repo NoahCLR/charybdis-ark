@@ -555,6 +555,6 @@ What can break Ark, and what checks it:
 | Stored profile format (blob, domains, settings, compiled defaults) | firmware `lib/profile/schema/` | schema version | the bridge's runners; agreement (fixtures equal) |
 | Action vocabulary and action-ABI digest | firmware, and BK keycode values | digest against `KNOWN_ACTION_ABIS` | agreement |
 | Keycode catalog and layout | BK | Ark's pinned BK inputs | agreement (files equal at firmware's BK pin); `npm run keycodes -- --check` |
-| Keymap and macro domains | firmware profile codecs and config | domain versions and capability capacities | golden codecs; candidate and macro-domain runners |
+| Keymap, macro and autocorrect domains | firmware profile codecs and config | domain versions and capability capacities | golden codecs; candidate, macro-domain and autocorrect-domain runners |
 | Keyboard options (RGB effects and order, LED flags) | BK's RGB matrix and firmware config | reported at runtime | `qmk_portable_editor` runner |
 | Behaviour on the keyboard | firmware | nothing | keyboard checks only |

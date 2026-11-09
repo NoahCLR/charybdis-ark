@@ -37,8 +37,12 @@ let nextCheck = 0;
 function check(form, edit) {
     if (!edit || !editGate(getModel(), "autocorrect").editable) { state.autocorrectCheck = null; paintFeedback(); return; }
     const requestId = ++nextCheck;
-    state.autocorrectCheck = {form, requestId, pending: true, error: "", warnings: []};
+    // What the last answer said stands until this one comes, so the line
+    // does not blink as each letter is typed; another form's is dropped.
+    const last = state.autocorrectCheck?.form === form ? state.autocorrectCheck : null;
+    state.autocorrectCheck = {form, requestId, pending: true, error: "", warnings: last?.warnings || []};
     post(edits.autocorrectValidationMessage(edit, requestId));
+    paintFeedback();
 }
 
 /** @param {Extract<import("../../contracts/messages.js").PanelResponse, {type: "autocorrectValidation"}>} message */
