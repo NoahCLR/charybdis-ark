@@ -3,12 +3,12 @@
  * @typedef {import("../../../contracts/panel.js").PublishedModel | null} Model
  */
 // The parts of the Keys board card around the board itself: the bar over it
-// while a keycode is placed or combo inputs are picked, the caption under it
-// in a layer preview, and the legend that reads under the card with its
-// Shortcuts list.
+// while a keycode is placed or combo inputs are picked, the caption on it in
+// a layer preview, the info mark on its top-right corner whose list says the
+// board's shortcuts, and the legend that reads under the card.
 
 import {css, isOff} from "../../lib/colour.mjs";
-import {el, esc, watchPressOutside} from "../../lib/dom.mjs";
+import {el, esc} from "../../lib/dom.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {getModel, render, state} from "../../store.mjs";
 import {editGate} from "../../view/edit-gate.mjs";
@@ -41,21 +41,14 @@ export function placementBar() {
     return node;
 }
 
-/** @type {(() => void) | null} */
-let stopWatching = null;   // stops the open shortcuts list's outside-press watch
-
-// What each mark on the board means, on one line, then a Shortcuts button
-// whose list says what the board takes from the mouse and the keys. Read
-// only (Live edit's held states, a keyboard not read yet), the list says
-// only what still works there: selecting a key and copying it.
+// What each mark on the board means, on one line.
 /** @param {Model} model */
 export function legend(model) {
     const colours = feedbackColours(model);
     const on = stageEnabled(model, "key");
     /** @param {import("../../../contracts/edits.js").Colour} colour */
     const dot = (colour) => on && !isOff(colour) ? `<i class="ldot" style="background:${css(colour)}"></i>` : `<i class="ldot off"></i>`;
-    const open = Boolean(state.boardShortcuts);
-    const node = el(`<div class="board-legend">
+    return el(`<div class="board-legend">
         <span class="legend-item"><i class="lkey sel"></i> Selected key</span>
         <span class="legend-item"><i class="lkey indicated"></i> Keys of the picked row or new combo</span>
         <span class="legend-item">${dot(colours.tap)}${dot(colours.hold)}${dot(colours.long)} Tap, hold and long hold branches</span>
@@ -64,27 +57,27 @@ export function legend(model) {
         <span class="legend-item"><i class="lkey transparent"></i> Transparent</span>
         ${model?.draft?.dirty ? `<span class="legend-item">${draftDot(model?.draft)} ${esc(editWords(model?.draft).mark)}</span>` : ""}
         ${state.keyClipboard ? `<span class="legend-item">Copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
-        <span class="legend-shortcuts">
-            <button class="btn tiny ghost" id="board-shortcuts-button" data-act="board-shortcuts" aria-expanded="${open}"
-                ${open ? 'aria-controls="board-shortcuts"' : ""}>Shortcuts</button>
-            ${open ? shortcutList(editGate(model, "keys").editable) : ""}</span>
     </div>`);
-    const button = /** @type {HTMLButtonElement} */ (node.querySelector("#board-shortcuts-button"));
-    button.addEventListener("click", () => {
-        if (state.boardShortcuts) closeBoardShortcuts();
-        else state.boardShortcuts = true;
-        render();
-    });
-    const list = /** @type {HTMLElement | null} */ (node.querySelector("#board-shortcuts"));
-    if (list) {
-        stopWatching?.();
-        stopWatching = watchPressOutside([list, button], () => {
-            closeBoardShortcuts();
-            list.remove();
-            button.setAttribute("aria-expanded", "false");
-            button.removeAttribute("aria-controls");
-        });
-    } else closeBoardShortcuts();
+}
+
+const INFO_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4.3"/><circle class="dot" cx="8" cy="4.9" r=".55"/></svg>`;
+
+// An info mark on the board's top-right corner, which the drawing leaves
+// empty, whose list says what the board takes from the mouse and the keys.
+// Hovering the mark, or reaching it by the keyboard, shows the list, a
+// screen reader hearing it as the mark's description; the list stays open
+// while the pointer is on it, and Escape hides it until the pointer or the
+// focus leaves. Read only (Live edit's held states, a keyboard not read
+// yet), the list says only what still works there: selecting a key and
+// copying it.
+/** @param {Model} model */
+export function boardShortcuts(model) {
+    const node = el(`<div class="board-info">
+        <button type="button" class="board-info-button" aria-label="Shortcuts" aria-describedby="board-shortcuts">${INFO_ICON}</button>
+        ${shortcutList(editGate(model, "keys").editable)}</div>`);
+    const open = () => delete node.dataset.shut;
+    node.addEventListener("mouseleave", open);
+    node.addEventListener("focusout", open);
     return node;
 }
 
@@ -95,7 +88,7 @@ function shortcutList(editable) {
     // Previewing layers together reads the board, so it is listed whether or
     // not the board can be edited (ui/layerbar.mjs, view/layer-set.mjs).
     const layers = row(`${modifierKey()}-click a layer`, "Preview it on with the others");
-    return `<div class="shortcuts-pop" id="board-shortcuts" role="group" aria-label="Board shortcuts"><dl>${editable
+    return `<div class="shortcuts-pop" id="board-shortcuts" role="group" aria-label="Board shortcuts"><div class="shortcuts-h">Shortcuts</div><dl>${editable
         ? row("Double-click", "Pick a keycode")
             + row("Drag onto a key", "Swap the two keys")
             + row(`${shortcut("C")}, ${shortcut("V")}`, "Copy a key, paste it onto the selected one")
@@ -108,20 +101,12 @@ function shortcutList(editable) {
             + layers}</dl></div>`;
 }
 
-function closeBoardShortcuts() {
-    state.boardShortcuts = false;
-    stopWatching?.();
-    stopWatching = null;
-}
-
-// Esc anywhere closes the shortcuts list, focus back on its button.
+// Esc hides the shortcuts list while it shows, until the pointer or the
+// focus leaves the mark.
 export function escapeBoardShortcuts() {
-    if (!state.boardShortcuts) return false;
-    closeBoardShortcuts();
-    // Left open on another screen, it was not on show: Esc is not its.
-    if (!document.querySelector("#board-shortcuts")) return false;
-    render();
-    /** @type {HTMLElement | null} */ (document.querySelector("#board-shortcuts-button"))?.focus();
+    const info = /** @type {HTMLElement | null} */ (document.querySelector(".board-info:hover, .board-info:has(:focus-visible)"));
+    if (!info || info.dataset.shut !== undefined) return false;
+    info.dataset.shut = "";
     return true;
 }
 

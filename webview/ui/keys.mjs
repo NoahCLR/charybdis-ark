@@ -19,7 +19,7 @@ import {linkTabPanel} from "../lib/tabs.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {topbar} from "./frame.mjs";
 import {bench} from "./keys/bench.mjs";
-import {legend, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
+import {boardShortcuts, legend, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
 import {behaviourKey, selectBehaviourKey} from "./keys/behaviour-selection.mjs";
 import {pickKeycodeFor, swapKeys} from "./keys/key-edits.mjs";
 import {reachHighlight} from "./keys/reach.mjs";
@@ -90,6 +90,7 @@ export function screenKeys() {
     // bottom-left corner, as Lighting's does, so the card keeps its height
     // whether one layer is shown or several.
     if (view.previewing) drawn.appendChild(previewFoot(view));
+    drawn.appendChild(boardShortcuts(model));
     card.append(bar);
     linkTabPanel(/** @type {HTMLElement | null} */ (bar.querySelector(".layer-tabs")), drawn);
     stage.append(card, legend(model));
